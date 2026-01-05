@@ -1,0 +1,385 @@
+:host { display: block; }
+
+/* Igual patrón que ver-tours/inicio */
+.page-container{
+  max-width: 1600px;
+  margin: 28px auto 60px;
+  padding: 0 18px;
+  animation: fadeInScale .5s ease-out;
+}
+
+/* Header tipo app */
+.page-header{
+  display:flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.header-left { flex: 0 0 auto; }
+.header-center { flex: 1 1 auto; display:flex; justify-content:center; }
+.header-right { flex: 0 0 auto; display:flex; justify-content:flex-end; gap:8px; }
+
+/* Center the search input box and limit its width */
+.header-center .search{
+  min-width: 0; /* allow flex shrinking */
+  width: 100%;
+  max-width: 620px;
+  margin: 0 12px; /* small horizontal spacing */
+}
+
+.page-header h1{
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.subtitle{
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: .95rem;
+}
+
+.header-actions{
+  display:flex;
+  gap: 12px;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+/* Search idéntico vibe */
+.search{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-width: 320px;
+}
+
+.search-icon{
+  color: var(--text-tertiary);
+  opacity: .9;
+}
+
+.search input{
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  width: 100%;
+  font-size: .95rem;
+  font-family: var(--font-family);
+}
+
+.clear-btn{
+  border:none;
+  background: transparent;
+  color: var(--text-tertiary);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.clear-btn:hover{
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+
+.btn-secondary:disabled{
+  opacity: .6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-delete {
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 800;
+    transition: filter .2s, transform .15s;
+}
+
+.btn-primary {
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--separator-color);
+}
+.btn-delete {
+    background: var(--accent-red);
+    color: #fff;
+    border: none;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-delete:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+
+
+/* Meta bar */
+.meta-bar{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.count{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--separator-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.muted{ color: var(--text-secondary); }
+.sep{ color: var(--text-tertiary); opacity: .7; }
+
+/* List */
+.puntos-list{
+  display:flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Card tipo "tour-card" */
+.punto-card{
+  background: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 8px 22px rgba(var(--shadow-color));
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.punto-card:hover{
+  box-shadow: 0 14px 30px rgba(var(--shadow-color));
+  border-color: color-mix(in oklab, var(--accent-blue) 35%, var(--separator-color));
+}
+
+.card-top{ display:flex; flex-direction: column; gap: 12px; }
+
+.title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.punto-left{ min-width: 0; }
+
+.punto-name{
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.punto-address{
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: .95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.punto-right{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  flex-shrink: 0;
+}
+
+.chip{
+  font-size: .8rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--separator-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.mini-pill{
+  font-size: .8rem;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(10,132,255,.28);
+  background: rgba(10,132,255,.10);
+  color: var(--text-primary);
+}
+
+.card-bottom{ margin-top: 14px; }
+
+.card-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* delete animation */
+.punto-card.deleting{
+  animation: puntoDelete .38s ease-in forwards;
+}
+
+@keyframes puntoDelete{
+  0%{ opacity: 1; transform: translateY(0) scale(1); max-height: 999px; margin-bottom: 14px; }
+  50%{ opacity: .6; transform: translateY(-6px) scale(.995); }
+  100%{ opacity: 0; transform: translateY(-12px) scale(.98); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; height: 0; }
+}
+
+/* Horarios siempre visibles */
+.schedule-list{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.schedule{
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--separator-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.schedule .tour{
+  font-weight: 800;
+}
+
+.schedule .dot{
+  color: var(--text-tertiary);
+  opacity: .8;
+}
+
+.schedule .hora{
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.no-horarios{
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--separator-color);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+/* Pagination */
+.pagination{
+  display:flex;
+  justify-content: center;
+  align-items:center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.page-indicator{
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+/* Empty */
+.empty-state{
+  text-align:center;
+  padding: 80px 40px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: 18px;
+}
+
+.empty-state h3{
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+/* Responsive */
+@media (max-width: 900px){
+  .search{ min-width: 260px; width: 100%; }
+  .header-actions{ width: 100%; }
+}
+@media (max-width: 560px){
+  .title-row{ flex-direction: column; align-items: flex-start; }
+  .punto-right{ width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+}
+
+
+/* ==============================
+   Animaciones (look & feel app)
+   ============================== */
+
+/* Entrada general */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(10px) scale(.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.page-container{
+  animation: pageEnter .45s ease-out both;
+}
+
+/* Cards: entrada escalonada + hover suave */
+
+/* Stagger: usa el index con variable CSS */
+.punto-card{
+  animation: cardEnter .45s ease-out both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  will-change: transform, opacity;
+}
+
+
+/* Chips: micro-pop al cargar (sutil) */
+@keyframes chipPop {
+  from { transform: scale(.96); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.schedule{
+  animation: chipPop .25s ease-out both;
+}
+
+/* Respeta usuarios con reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .page-container, .punto-card, .schedule{
+    animation: none !important;
+    transition: none !important;
+  }
+}

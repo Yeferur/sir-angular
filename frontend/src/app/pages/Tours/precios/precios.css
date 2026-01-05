@@ -1,0 +1,229 @@
+:host { display:block; }
+
+/* Layout igual al resto */
+.booking-dashboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 30px;
+  max-width: 1400px;
+  margin: auto;
+  animation: fadeIn 0.5s ease;
+  margin-top: 40px;
+  margin-bottom: 60px;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* Card consistente */
+.card {
+  background-color: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 15px var(--shadow-color);
+  transition: background-color 0.3s ease;
+}
+
+.card-header {
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.card-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.header-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+
+
+/* Form */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.hint {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+.form-input,
+.form-select {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+}
+
+/* Quitar spinners number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance:none; margin:0;
+}
+input[type=number]{ -moz-appearance:textfield; appearance:textfield; }
+
+/* Divider */
+.divider{
+  height:1px;
+  background:var(--separator-color);
+}
+
+/* Botones */
+.btn-primary{
+  background-color:var(--accent-blue);
+  color:#fff;
+  font-weight:700;
+  padding:12px 18px;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+}
+
+.btn-ghost{
+  background:transparent;
+  border:1px solid var(--separator-color);
+  color:var(--text-secondary);
+  padding:12px 16px;
+  border-radius:12px;
+  cursor:pointer;
+}
+
+@keyframes fadeIn{
+  from{ opacity:0; transform:scale(.98); }
+  to{ opacity:1; transform:scale(1); }
+}
+
+
+/* Header más compacto y pro */
+.card-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.header-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.btn-primary{ width:auto; padding:12px 18px; }
+.btn-ghost{ padding:12px 16px; }
+
+/* Sub-card de precios */
+.prices-section{
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.prices-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom: 14px;
+}
+
+.prices-title{
+  margin:0;
+  font-size:1.05rem;
+  font-weight:700;
+  color: var(--text-primary);
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  height:30px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid var(--separator-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight:700;
+  font-size:.82rem;
+}
+
+/* Input con prefijo de moneda */
+.money-input{
+  display:flex;
+  align-items:center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  overflow:hidden;
+  transition: border-color .2s, background-color .2s;
+}
+.money-input:focus-within{
+  border-color: var(--accent-blue);
+  background: var(--bg-secondary);
+}
+.money-input .prefix{
+  padding: 0 12px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  border-right: 1px solid var(--separator-color);
+  height: 46px;
+  display:flex;
+  align-items:center;
+}
+.money-input .form-input{
+  border: none;
+  background: transparent;
+  height: 46px;
+  border-radius: 0;
+}
+.money-input .form-input:focus{
+  border: none;
+  background: transparent;
+}
+
+/* Responsive */
+@media (max-width: 720px){
+  .prices-header{ flex-direction:column; align-items:flex-start; }
+}

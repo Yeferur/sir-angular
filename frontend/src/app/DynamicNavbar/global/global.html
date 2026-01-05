@@ -1,0 +1,95 @@
+<!-- 
+  ========================================
+  PLANTILLA DE DYNAMIC NAVBAR ACTUALIZADA
+  ========================================
+  Añadido el ng-container para mostrar el componente
+  de login cuando el modo sea 'login'.
+-->
+<div class="navbar-container" [attr.data-state]="islandState()">
+    <!-- Barras laterales (sin cambios) -->
+    <div class="sidebar-widget left">
+        <a routerLink="/Reservas/VerReservas" class="quick-button">Ver Reservas</a>
+        <a routerLink="/Reservas/NuevaReserva" class="quick-button">Crear Reserva</a>
+    </div>
+
+    <!-- La Dynamic Island Central -->
+    <div class="dynamic-island">
+        <div class="island-content">
+            <!-- Estado Compacto (Logo) -->
+            @if (islandState() === 'compact') {
+            <div class="activity-content">
+                <img [src]="isDarkMode ? 'assets/img/LogoMaxitoursPNG.webp' : 'assets/img/LogoMaxitours-Light.webp'"
+                    alt="Logo" class="logo">
+            </div>
+            }
+
+            <!-- Contenido de Login -->
+            @if (islandState() === 'full-screen' && mode() === 'login') {
+            <div class="activity-content">
+                <app-login> </app-login>
+            </div>
+            }
+
+            <!-- Contenido de Alerta -->
+            @if (islandState() === 'alert' || (islandState() === 'loading' && alert())) {
+            <div class="activity-content">
+                <app-alert-content [type]="alert()?.type || 'info'" [title]="alert()?.title || ''"
+                    [message]="alert()?.message || ''" [buttons]="alert()?.buttons || []"
+                    [loading]="alert()?.loading || false" [autoClose]="alert()?.autoClose || false"
+                    [autoCloseTime]="alert()?.autoCloseTime || 3000" (onClose)="clearAlert()">
+                </app-alert-content>
+            </div>
+            }
+
+            <!-- Contenido de Cupos -->
+            @if (islandState() === 'cupos' && cuposInfo()) {
+            <div class="activity-content">
+                <app-cupos-widget [cuposInfo]="cuposInfo()"></app-cupos-widget>
+            </div>
+            }
+            @if (islandState() === 'reserva' && reserva()) {
+            <div class="activity-content">
+                <app-reserva [Id_Reserva]="reserva()" (onClose)="clearReserva()" />
+            </div>
+            }
+
+            @if (islandState() === 'mapa' && mapa()) {
+            <div class="activity-content">
+                <app-mapa [puntos]="mapa()" (onClose)="clearPuntos()" />
+            </div>
+            }
+            <!-- Otros contenidos como Reserva, Mapa, etc. -->
+
+            <!-- Contenido de Combinaciones -->
+            @if (islandState() === 'sugerencias' && sugerencias()) {
+            <div class="activity-content">
+                <app-combinaciones [tour]="sugerencias()?.tour" [sugerencias]="sugerencias()?.sugerencias"
+                    [flotaManual]="sugerencias()?.flotaManual"
+                    (onSeleccionarSugerencia)="seleccionarSugerenciaDesdeNavbar($event)"
+                    (onGenerarManual)="generarManual($event)" (onClose)="clearCombinaciones()" />
+            </div>
+            }
+
+            <!-- Contenido de Preview (comprobante u otros recursos) -->
+            @if (islandState() === 'preview' && preview()) {
+            <div class="activity-content">
+                <app-preview [url]="safePreviewUrl()" [rawUrl]="preview()" [title]="previewTitle()"></app-preview>
+            </div>
+            }
+
+            <!-- Contenido de Paneles personalizados (ej: duplicar reserva) -->
+            @if (panel() && panel().open) {
+            <div class="activity-content">
+                @if (panel().id === 'duplicar') {
+                    <app-duplicar-panel></app-duplicar-panel>
+                }
+            </div>
+            }
+
+        </div>
+    </div>
+
+    <div class="sidebar-widget right">
+        <!-- Otros accesos rápidos -->
+    </div>
+</div>

@@ -1,0 +1,176 @@
+<div class="page-container">
+  <!-- ENCABEZADO DE LA PÁGINA -->
+  <div class="page-header">
+    <h1>Aforos</h1>
+    <div class="form-group">
+      <label for="fecha" class="form-label">Fecha:</label>
+      <input id="fecha" class="form-input" type="date" [value]="fecha" (change)="onFechaChange($event)" />
+    </div>
+  </div>
+
+  <!-- SECCIÓN DE RESERVAS PRIVADAS -->
+  @if (toursConPrivados.length > 0 && !isLoading) {
+    <section style="margin-bottom: 2rem;">
+      <h2 class="section-title">Reservas Privadas del Día</h2>
+      <div class="capacity-card">
+        <div class="private-grid">
+          @for (tour of toursConPrivados; track tour.Id_Tour) {
+            <div class="private-tour-group">
+              <h3>{{ tour.Nombre_Tour }}</h3>
+              <ul>
+                @for (p of tour.privados; track p.Id_Reserva) {
+                  <li>Reserva #{{ p.Id_Reserva }} – {{ p.NumeroPasajeros }} pasajeros</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+  }
+
+  <!-- ESTADO DE CARGA (SKELETON LOADER) -->
+  @if (isLoading) {
+    <div class="dashboard-grid">
+      @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="capacity-card is-loading">
+          <div class="card-content">
+            <div class="gauge-container skeleton-shape"></div>
+            <div class="stats-container">
+              <div class="skeleton-shape skeleton-text-h2"></div>
+              <div class="skeleton-shape skeleton-text-p"></div>
+              <div class="skeleton-shape skeleton-text-p-small"></div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="skeleton-shape skeleton-button"></div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- GRID DE TARJETAS DE AFORO (DATOS CARGADOS) -->
+  @if (!isLoading) {
+    <div class="dashboard-grid">
+      <!-- Card Combinada (si existe) -->
+      @if (combinedTour) {
+        <div class="capacity-card"
+             [style.--animation-order]="0"
+             [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)">
+          <div class="card-content">
+            <div class="gauge-container">
+              <div class="gauge" [style.--progress]="(combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100">
+                <span class="gauge-percentage">
+                  {{ (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 | number:'1.0-0' }}%
+                </span>
+              </div>
+            </div>
+
+            <div class="stats-container">
+              <h2 class="tour-name">{{ combinedTour!.Nombre_Tour }}</h2>
+
+              @if (!editando[5] && !mostrarDetallesCombinada) {
+                <p class="stat-main">
+                  {{ combinedTour!.cupos - combinedTour!.NumeroPasajeros }}
+                  <span class="stat-label">Disponibles</span>
+                </p>
+                <p class="stat-secondary">{{ combinedTour!.NumeroPasajeros }} de {{ combinedTour!.cupos }} ocupados</p>
+              }
+
+              <!-- Vista de Detalles -->
+              @if (mostrarDetallesCombinada) {
+                <div class="details-view">
+                  @for (detail of combinedDetails; track detail.Id_Tour ?? detail.Nombre_Tour) {
+                    <div class="detail-item">
+                      <strong>{{ detail.Nombre_Tour }}:</strong>
+                      <span>{{ detail.NumeroPasajeros }} pasajeros</span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Formulario de Edición -->
+              @if (editando[5]) {
+                <div class="edit-form">
+                  <label class="form-label">Nuevo Cupo</label>
+                  <input type="text"
+                         class="form-input"
+                         [value]="nuevoCupo[5]"
+                         (input)="nuevoCupo[5] = $any($event.target).value">
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="card-footer">
+            @if (!editando[5]) {
+              <button class="btn-secondary" (click)="alternarDetallesCombinada()">
+                {{ mostrarDetallesCombinada ? 'Ocultar Detalles' : 'Ver Detalles' }}
+              </button>
+            }
+            @if (!editando[5] && !mostrarDetallesCombinada) {
+              <button class="btn-secondary" (click)="activarEdicion(5)">Editar</button>
+            }
+            @if (editando[5]) {
+              <button class="btn-secondary" (click)="editando[5] = false">Cancelar</button>
+              <button class="btn-primary" (click)="guardarAforo(combinedTour!)">Guardar</button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Cards Normales -->
+      @for (tour of tours; track tour.Id_Tour; let i = $index) {
+        @if (tour.Id_Tour !== 1 && tour.Id_Tour !== 5) {
+          <div class="capacity-card"
+               [style.--animation-order]="i + 1"
+               [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)">
+            <div class="card-content">
+              <div class="gauge-container">
+                <div class="gauge" [style.--progress]="(tour.NumeroPasajeros / tour.cupos) * 100">
+                  <span class="gauge-percentage">
+                    {{ (tour.NumeroPasajeros / tour.cupos) * 100 | number:'1.0-0' }}%
+                  </span>
+                </div>
+              </div>
+
+              <div class="stats-container">
+                <h2 class="tour-name">{{ tour.Nombre_Tour }}</h2>
+
+                @if (!editando[tour.Id_Tour]) {
+                  <p class="stat-main">
+                    {{ tour.cupos - tour.NumeroPasajeros }}
+                    <span class="stat-label">Disponibles</span>
+                  </p>
+                  <p class="stat-secondary">{{ tour.NumeroPasajeros }} de {{ tour.cupos }} ocupados</p>
+                }
+
+                <!-- Formulario de Edición -->
+                @if (editando[tour.Id_Tour]) {
+                  <div class="edit-form">
+                    <label class="form-label">Nuevo Cupo</label>
+                    <input type="text"
+                           class="form-input"
+                           [value]="nuevoCupo[tour.Id_Tour]"
+                           (input)="nuevoCupo[tour.Id_Tour] = $any($event.target).value">
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="card-footer">
+              @if (!editando[tour.Id_Tour]) {
+                <button class="btn-secondary" (click)="activarEdicion(tour.Id_Tour)">Editar</button>
+              }
+              @if (editando[tour.Id_Tour]) {
+                <button class="btn-secondary" (click)="editando[tour.Id_Tour] = false">Cancelar</button>
+                <button class="btn-primary" (click)="guardarAforo(tour)">Guardar</button>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

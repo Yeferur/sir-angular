@@ -1,0 +1,19 @@
+@if (cuposInfoSignal()) {
+  <div class="widget-container" [ngClass]="colorClass()">
+    <div class="gauge-container">
+      <div class="gauge" [style.--progress]="ocupacionPorcentaje()">
+        <span class="gauge-percentage">{{ ocupacionPorcentaje() | number:'1.0-0' }}%</span>
+      </div>
+    </div>
+    <div class="stats-container">
+      <h3 class="tour-name">{{ cuposInfoSignal().nombreTour }}</h3>
+      <p class="stat-main">
+        {{ cuposInfoSignal().cuposDisponibles }}
+        <span class="stat-label">Disponibles</span>
+      </p>
+      <p class="stat-secondary">
+        {{ cuposInfoSignal().ocupados }} de {{ cuposInfoSignal().cupoTotal }} ocupados
+      </p>
+    </div>
+  </div>
+}

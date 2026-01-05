@@ -1,0 +1,267 @@
+/* Sidebar - Diseño base */
+.sidebar {
+  position: fixed;
+  left: -280px; /* Oculto por defecto en pantallas pequeñas */
+  top: 0;
+  width: 280px;
+  height: 100vh;
+  background-color: var(--primary-bg);
+  color: var(--font-color);
+  display: flex;
+  flex-direction: column;
+  transition: left 0.3s ease-in-out, background-color 0.4s ease-in-out;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+  overflow-x: hidden;
+  overflow-y: auto;
+  z-index: 1000; /* Asegura que esté sobre la `top-bar` */
+  scrollbar-width: none;
+  border-radius: 10px;
+}
+
+/* Mostrar el sidebar cuando está activo */
+.sidebar.open {
+  left: 0;
+}
+
+/* 📌 Zona de usuario */
+.user-section {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--secondary-bg);
+  transition: opacity var(--transition-time), transform var(--transition-time);
+}
+
+.avatar-placeholder-large {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+  font-size: 28px;
+  color: white;
+}
+
+.user-section img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+  transition: transform var(--transition-time);
+}
+
+/* 📌 Mostrar información del usuario siempre en pantallas pequeñas */
+.user-info {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity var(--transition-time), transform var(--transition-time);
+}
+
+.user-info h4,
+.user-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--font-color);
+  white-space: nowrap;
+}
+
+/* 📌 En pantallas grandes, solo mostrar info en hover */
+@media (min-width: 767px) {
+  .user-info {
+    display: none;
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  .sidebar:hover .user-info {
+    display: flex;
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 📌 Menú */
+.menu {
+  width: 100%;
+  padding: 5px 0;
+  flex-grow: 1;
+}
+
+.menu a {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  color: var(--font-color);
+  text-decoration: none;
+  transition: background-color var(--transition-time), padding-left var(--transition-time);
+  margin: 3px 0;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.menu a:hover {
+  background-color: var(--hover-bg);
+}
+
+.menu i {
+  font-size: 20px;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* 📌 Mostrar los textos SIEMPRE en pantallas pequeñas */
+.menu span {
+  opacity: 1;
+  transform: translateX(0);
+  white-space: nowrap;
+}
+
+/* 📌 En pantallas grandes, ocultar los textos hasta que haya hover */
+@media (min-width: 767px) {
+  .menu span {
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity var(--transition-time), transform var(--transition-time);
+  }
+
+  .sidebar:hover .menu span {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 📌 Submenús */
+.submenu {
+  max-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+  transition: max-height var(--transition-time);
+}
+
+.menu-item {
+  cursor: pointer;
+}
+
+.menu-item.active > .submenu {
+  max-height: 300px;
+}
+
+.menu-item > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu-item > a i:last-child {
+  margin-left: auto;
+  transition: transform var(--transition-time);
+}
+
+.menu-item.active > a i:last-child {
+  transform: rotate(180deg);
+}
+
+.submenu a {
+  padding-left: 20px;
+  background-color: var(--secondary-bg);
+  font-size: 13px;
+}
+
+/* 📌 Botón de Logout */
+.logout {
+  width: 100%;
+  text-align: center;
+  border-top: 1px solid var(--secondary-bg);
+  padding: 10px 0;
+  position: sticky;
+  bottom: 0;
+  background-color: var(--primary-bg);
+  z-index: 1;
+}
+
+.logout .Logout_link {
+  color: var(--font-color);
+  text-decoration: none;
+  transition: color var(--transition-time), background-color var(--transition-time);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.logout .Logout_link:hover {
+  color: var(--font-color-hover);
+}
+
+/* 📌 Barra superior en móviles */
+.top-bar {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background-color: var(--primary-bg);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  z-index: 200; /* Ahora el sidebar tendrá un z-index mayor */
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.top-bar .avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.top-bar .avatar {
+  border-radius: 50%;
+}
+
+.top-bar .menu-button {
+  background: none;
+  border: none;
+  color: var(--font-color);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.top-bar .logo {
+  height: 40px;
+}
+
+/* 📌 Sidebar en pantallas grandes */
+@media (min-width: 767px) {
+  .top-bar {
+    display: none;
+  }
+  .sidebar {
+    left: 0;
+    width: 70px;
+    transition: width var(--transition-time), background-color 0.4s ease-in-out;
+  }
+
+  .sidebar:hover {
+    width: 280px;
+  }
+}
+
+/* 📌 Ocultar barra de desplazamiento en Webkit */
+.sidebar::-webkit-scrollbar {
+  display: none;
+}

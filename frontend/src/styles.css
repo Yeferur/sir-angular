@@ -1,0 +1,1008 @@
+@import 'maplibre-gl/dist/maplibre-gl.css';
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap");
+@import "flatpickr/dist/flatpickr.min.css";
+
+/*========== VARIABLES CSS ==========*/
+:root {
+  /* DARK THEME (por defecto) */
+  --primary-bg: #1b1b1b;
+  --secondary-bg: #141414;
+  --hover-bg: #5ec6e9;
+  --card-bg: rgba(27, 27, 27, 0.9);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --input-bg: rgb(42, 42, 42);
+
+  --text-color: #eaeaea;
+  --font-color: #e0e0e0;
+  --font-color-hover: #ff6666;
+  --accent: #5ec6e9;
+  --label-color: #b0b0b0;
+
+  --text-secondary: rgba(255, 255, 255, 0.85);
+  --button-bg: #2e3032;
+  --button-text: #ffffff;
+  --button-hover-bg: #3b3e40;
+
+  --green: #4caf50;
+  --blue: #2196f3;
+  --yellow: #ffb300;
+  --red: #f44336;
+  --success-color: #2ecc71;
+  --info-color: #3498db;
+  --error-color: #e74c3c;
+  --warning-color: #f1c40f;
+
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --body-color: #121212;
+
+  --dropdown-bg: #2a2a2a;
+  --dropdown-hover-bg: #3a3a3a;
+  --dropdown-border: #3a3a3a;
+  --dropdown-text: #ffffff;
+  --dropdown-selected: #4cafb0;
+
+  --toggle-bg: #2a2a2a;
+  --toggle-text: #ffffff;
+  --toggle-hover: #3a3a3a;
+  --toggle-active: #4cafb0;
+
+  --body-font: "Poppins", sans-serif;
+  --normal-font-size: 0.938rem;
+  --small-font-size: 0.75rem;
+  --smaller-font-size: 0.7rem;
+
+  --font-medium: 500;
+  --font-semi-bold: 600;
+
+  --transition-time: 0.3s;
+
+  --navbar-bg: linear-gradient(145deg, #1a1a1a, #000);
+  --navbar-border: rgba(0, 0, 0, 0.9);
+
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --bg-primary: #000000;
+  --bg-secondary: #1c1c1e;
+  --bg-tertiary: #2c2c2e;
+  --bg-secondary-translucent: rgba(28, 28, 30, 0.8);
+  --text-primary: #ffffff;
+  --text-secondary: #8d8d92;
+  --text-tertiary: #636366;
+
+  --accent-blue: #0A84FF;
+  --accent-green: #30D158;
+  --accent-red: #FF453A;
+  --accent-yellow: #FFD60A;
+
+  --separator-color: #38383a;
+  --shadow-color: rgba(0, 0, 0, 0.2);
+}
+
+/* MODO CLARO */
+[data-theme="light"] {
+  --primary-bg: #f5f7fa;
+  --secondary-bg: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --border-color: rgba(0, 0, 0, 0.1);
+  --input-bg: rgb(250, 250, 250);
+  /* Casi blanco */
+
+  --text-color: #1b1b1b;
+  --font-color: #2a2a2a;
+  --font-color-hover: #007acc;
+  --accent: #007acc;
+  --label-color: #1b1b1b;
+  --success-color: #27ae60;
+  --info-color: #2980b9;
+  --error-color: #c0392b;
+  --warning-color: #ff9900;
+
+  --text-secondary: rgba(0, 0, 0, 0.75);
+  --button-bg: #e4e4e4;
+  --button-text: #000000;
+  --button-hover-bg: #cfcfcf;
+
+  --green: #4caf50;
+  --blue: #2196f3;
+  --yellow: #ffb300;
+  --red: #f44336;
+  --progress-bg: #d9d9d9;
+
+  --dropdown-bg: #ffffff;
+  --dropdown-hover-bg: #e5e5e5;
+  --dropdown-border: #cccccc;
+  --dropdown-text: #1b1b1b;
+  --dropdown-selected: #007acc;
+
+  --toggle-bg: #f0f0f0;
+  --toggle-text: #000000;
+  --toggle-hover: #dddddd;
+  --toggle-active: #007acc;
+
+  --body-color: #ffffff;
+  --navbar-bg: linear-gradient(145deg, #ffffff, #e5e5e5);
+  --navbar-border: rgba(0, 0, 0, 0.2);
+
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bg-primary: #f9f9f9;
+  /* Fondo principal ligeramente gris */
+  --bg-secondary: #ffffff;
+  /* Fondo para elementos como tarjetas */
+  --bg-tertiary: #f2f2f7;
+  /* Fondo para inputs, controles, etc. */
+  --bg-secondary-translucent: #ffffff;
+
+  --text-primary: #1d1d1f;
+  /* Texto principal (casi negro) */
+  --text-secondary: #6e6e73;
+  /* Texto secundario (gris) */
+  --text-tertiary: #8a8a8e;
+  /* Texto para placeholders o deshabilitado */
+
+  --accent-blue: #007AFF;
+  --accent-green: #34C759;
+  --accent-red: #FF3B30;
+  --accent-yellow: #FF9500;
+
+  --separator-color: #e5e5ea;
+  /* Color para bordes y líneas divisorias */
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  /* Sombra suave para las tarjetas */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--body-color);
+  font-family: var(--body-font);
+  font-size: var(--normal-font-size);
+  color: var(--text-color);
+  transition: background 0.4s ease-in-out;
+}
+
+.content {
+  width: 100%;
+  height: 100vh;
+  padding: 20px 20px 20px 90px;
+  padding-top: 70px;
+  overflow-y: auto;
+}
+
+
+.required-star {
+  color: var(--accent-blue);
+}
+
+.cardHeader {
+  background-color: var(--card-bg);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #3a3a3a;
+  text-align: center;
+}
+
+.cardHeader h1,
+.cardHeader h3 {
+  margin: 0;
+  /* Elimina espacios innecesarios */
+  font-size: 1.125rem;
+  /* un poco más pequeño que antes */
+  font-weight: 600;
+  color: #4cafb0;
+  line-height: 1.3;
+  /* Compacta un poco verticalmente */
+}
+
+.cardHeader p {
+  margin: 0.25rem 0 0 0;
+  /* Un pequeño espacio inferior después del título */
+  font-size: 0.8125rem;
+  /* Un poco más pequeño */
+  color: #e57373;
+  line-height: 1.2;
+}
+
+.cardBody {
+  padding: 1rem;
+  /* p-4 */
+}
+
+.title {
+  display: flex;
+  justify-content: center;
+}
+
+.textDanger {
+  color: #e57373;
+  font-weight: bold;
+}
+
+/* Formulario */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: .9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.hint {
+  display: block;
+  font-size: .8rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  opacity: .8;
+}
+
+.form-input,
+.form-select {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  transition: border-color .2s, background-color .2s;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+
+.errorInput {
+  border: 1px solid #e57373 !important;
+  box-shadow: 0px 0px 5px rgba(229, 115, 115, 0.8);
+}
+
+.errorMessage {
+  color: #e57373;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.errorCard {
+  background-color: #2c2c2c;
+  color: #ff6b6b;
+  padding: 1rem;
+  border: 1px solid #ff6b6b;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.errorCard h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+/* Botones */
+.submitButton,
+.filterButton,
+.guardarBtn,
+.addButton {
+  background: linear-gradient(135deg,
+      rgba(88, 86, 214, 0.9),
+      rgba(75, 68, 188, 0.9));
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 15px rgba(88, 86, 214, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.submitButton:hover,
+.filterButton:hover,
+.guardarBtn:hover,
+.addButton:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(88, 86, 214, 0.4);
+}
+
+/* Contenedor del botón de filtro */
+.filterButtonWrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Dropdown */
+.dropdown {
+  position: relative;
+}
+
+.dropdownButton {
+  background-color: var(--dropdown-bg);
+  border: 1px solid var(--dropdown-border);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--dropdown-text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.dropdownButton:hover {
+  background-color: var(--dropdown-hover-bg);
+  border-color: var(--dropdown-selected);
+}
+
+.dropdownMenu {
+  position: absolute;
+  background-color: var(--dropdown-bg);
+  border: 1px solid var(--dropdown-border);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+  width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.dropdownMenu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  font-size: 14px;
+  color: var(--dropdown-text);
+}
+
+.dropdownOption:hover {
+  background-color: var(--dropdown-hover-bg);
+}
+
+.dropdownOption.selected {
+  background-color: var(--dropdown-selected);
+  color: var(--dropdown-bg);
+}
+
+.dropdownOption.selected:hover {
+  filter: brightness(1.1);
+}
+
+/* Toggle */
+.toggleLabel {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--label-color);
+  margin-bottom: 8px;
+}
+
+.toggleButton {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--toggle-text);
+  background-color: var(--toggle-bg);
+  border: 1px solid var(--dropdown-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.toggleButton.active {
+  background-color: var(--toggle-active);
+  color: var(--dropdown-bg);
+}
+
+.toggleButton:hover {
+  background-color: var(--toggle-hover);
+}
+
+.toggleButton.active:hover {
+  background-color: var(--toggle-active);
+  filter: brightness(1.1);
+}
+
+/* Contenedor de reservas */
+.containerReservas,
+.containerTransfers {
+  margin-top: 30px;
+  padding: 24px;
+  background-color: #1b1b1b;
+  border-radius: 12px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+}
+
+/* Lista de reservas */
+.reservasList,
+.transfersList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Mensaje cuando no hay reservas disponibles */
+.noReservas,
+.noTransfers {
+  font-size: 18px;
+  font-weight: bold;
+  color: #e57373;
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* Mensaje cuando no se han aplicado filtros */
+.noFilters {
+  font-size: 18px;
+  font-weight: bold;
+  color: #f9a825;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.loadingTransfers,
+.loadingReservas {
+  font-size: 18px;
+  font-weight: bold;
+  color: #f9a825;
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* Listas */
+.lista {
+  list-style: none;
+  padding: 0;
+}
+
+.punto {
+  display: flex;
+  align-items: center;
+  background: #333;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  transition: transform 0.2s, background 0.3s;
+}
+
+.punto:hover {
+  transform: scale(1.02);
+  background: #2c2c2c;
+}
+
+.gridLayoutCardsInicio {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1rem;
+  /* 16px */
+  padding: 1rem;
+  /* 16px */
+}
+
+.noPuntos {
+  text-align: center;
+  color: #b0b0b0;
+  font-size: 14px;
+}
+
+/* Contenedor para la lista de puntos */
+.puntosContainer {
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background: #1b1b1b;
+  /* Fondo acorde al diseño */
+  border-radius: 12px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
+  border: 1px solid #282828;
+}
+
+/* Contenedor del mapa */
+.mapaContainer {
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background: #1b1b1b;
+  /* Mismo fondo que el de los puntos */
+  border-radius: 12px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
+  border: 1px solid #282828;
+  height: 100%;
+  /* Asegura que ocupe todo el alto disponible */
+  overflow: hidden;
+  /* Para que el borde redondeado se aplique correctamente */
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+  gap: 20px;
+}
+
+.panelIzquierdo {
+  width: 35%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Permite el desplazamiento */
+  scrollbar-width: none;
+}
+
+.panelDerecho {
+  flex-grow: 1;
+  height: 100%;
+}
+
+
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .filterContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .content {
+    padding: 10px;
+    padding-left: 10px;
+    padding-top: 70px;
+  }
+}
+
+@media (max-width: 600px) {
+  .formGroup {
+    flex: 1 1 100%;
+  }
+}
+
+
+/* Quitar spinners number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+
+
+
+/* =========================================================
+   FLATPICKR – SIR UI (LIMPIO, SIN FIXES DUPLICADOS)
+   ========================================================= */
+
+/* ===== INPUT ===== */
+input.form-input.flatpickr-input,
+input.form-input.flatpickr-input[readonly],
+.flatpickr-input[readonly] {
+  width: 100%;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color .2s ease, background-color .2s ease;
+}
+
+input.form-input.flatpickr-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+}
+
+input.form-input.flatpickr-input::placeholder {
+  color: var(--text-secondary);
+  opacity: .8;
+}
+
+input.form-input.flatpickr-input:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   POPUP
+   ========================================================= */
+
+.sir-flatpickr.flatpickr-calendar {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--separator-color) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 18px 55px var(--shadow-color) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 12px 14px 14px !important;
+  font-family: var(--font-family) !important;
+  color: var(--text-primary) !important;
+  width: min(360px, calc(100vw - 24px)) !important;
+  max-width: 360px !important;
+  overflow: hidden !important;
+  z-index: 8000 !important;
+}
+
+.sir-flatpickr.flatpickr-calendar:before,
+.sir-flatpickr.flatpickr-calendar:after {
+  display: none !important;
+}
+
+/* =========================================================
+   HEADER (UN SOLO LAYOUT): prev | centro | next
+   ========================================================= */
+
+.sir-flatpickr .flatpickr-months {
+  grid-template-columns: 40px 1fr 40px !important;
+  align-items: center !important;
+  padding: 8px 10px 10px !important;
+  position: relative !important;
+}
+
+/* 🔥 MATA cualquier absolute viejo */
+.sir-flatpickr .flatpickr-prev-month,
+.sir-flatpickr .flatpickr-next-month {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 !important;
+
+  width: 36px !important;
+  height: 36px !important;
+  display: grid !important;
+  place-items: center !important;
+
+  border-radius: 10px !important;
+  border: 1px solid var(--separator-color) !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  cursor: pointer;
+
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+  z-index: 2 !important;
+}
+
+.sir-flatpickr .flatpickr-prev-month {
+  grid-column: 1 !important;
+  justify-self: start !important;
+}
+
+.sir-flatpickr .flatpickr-next-month {
+  grid-column: 3 !important;
+  justify-self: end !important;
+}
+
+.sir-flatpickr .flatpickr-prev-month:hover,
+.sir-flatpickr .flatpickr-next-month:hover {
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent-blue) 18%, transparent) !important;
+  color: var(--accent-blue) !important;
+}
+
+.sir-flatpickr .flatpickr-prev-month svg,
+.sir-flatpickr .flatpickr-next-month svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* centro */
+.sir-flatpickr .flatpickr-month {
+  grid-column: 2 !important;
+  width: auto !important;
+  padding: 0 !important;
+  /* ✅ mata los 52px */
+  overflow: visible !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+/* pill */
+.sir-flatpickr .flatpickr-current-month {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  white-space: nowrap !important;
+
+  padding: 6px 10px;
+
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 0 !important;
+  z-index: 3 !important;
+}
+
+/* Mes no se recorta */
+.sir-flatpickr .flatpickr-current-month .cur-month,
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+}
+
+/* Año select (tu inject) */
+.sir-flatpickr .sir-year-select {
+  display: inline-block;
+  line-height: 1;
+  background-color: var(--bg-tertiary) !important;
+  border: 1px solid var(--separator-color) !important;
+  border-radius: 10px !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-family) !important;
+  font-size: .95rem;
+  font-weight: 700;
+  padding: 6px 8px !important;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: border-color .2s ease, background-color .2s ease, color .2s ease;
+}
+
+/* =========================================================
+   WEEKDAYS + GRID
+   ========================================================= */
+
+.sir-flatpickr .flatpickr-weekdays {
+  padding: 0 6px 10px !important;
+}
+
+.sir-flatpickr .flatpickr-weekday {
+  color: var(--text-secondary) !important;
+  font-weight: 600;
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: capitalize;
+  opacity: .9;
+}
+
+.sir-flatpickr .flatpickr-innerContainer,
+.sir-flatpickr .flatpickr-rContainer {
+  padding: 0 4px 6px !important;
+  width: 100% !important;
+}
+
+.sir-flatpickr .flatpickr-days {
+  padding: 4px 0 6px !important;
+  width: 100% !important;
+}
+
+.sir-flatpickr .flatpickr-day {
+  margin: 2px !important;
+  width: 38px;
+  max-width: 38px;
+  height: 38px;
+  line-height: 38px;
+  border-radius: 12px;
+  font-size: .9rem;
+  font-weight: 650;
+  color: var(--text-primary) !important;
+
+  border: 1px solid rgba(255, 255, 255, .04) !important;
+  background: rgba(255, 255, 255, 0) !important;
+
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease, transform .08s ease;
+}
+
+.sir-flatpickr .flatpickr-day:hover {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent-blue) 20%, transparent) !important;
+  transform: translateY(-1px);
+}
+
+.sir-flatpickr .flatpickr-day.today {
+  border-color: rgba(10, 132, 255, .55) !important;
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, .25);
+}
+
+.sir-flatpickr .flatpickr-day.selected,
+.sir-flatpickr .flatpickr-day.startRange,
+.sir-flatpickr .flatpickr-day.endRange {
+  background: linear-gradient(180deg, var(--accent-blue), color-mix(in srgb, var(--accent-blue) 78%, transparent)) !important;
+  border-color: var(--accent-blue) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--accent-blue) 22%, transparent) !important;
+  transform: none !important;
+}
+
+.sir-flatpickr .flatpickr-day.inRange {
+  background: rgba(94, 198, 233, .15) !important;
+}
+
+.sir-flatpickr .flatpickr-day.prevMonthDay,
+.sir-flatpickr .flatpickr-day.nextMonthDay {
+  opacity: .55 !important;
+}
+
+.sir-flatpickr .flatpickr-day.disabled,
+.sir-flatpickr .flatpickr-day.notAllowed {
+  opacity: .35;
+  color: var(--text-secondary) !important;
+  cursor: not-allowed !important;
+}
+
+/* Mes selector + year select should inherit app font/colors */
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months,
+.sir-flatpickr .flatpickr-current-month .cur-month {
+  font-family: var(--font-family) !important;
+  color: var(--text-primary) !important;
+}
+
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--separator-color) !important;
+  color: var(--text-primary) !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+}
+
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months option,
+.sir-flatpickr .sir-year-select option {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Oculta la barra de scroll en los selects de mes/año pero permite scroll
+   - Firefox: scrollbar-width: none
+   - IE/Edge legacy: -ms-overflow-style: none
+   - WebKit: ajustar ancho a 0 */
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months,
+.sir-flatpickr .sir-year-select {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months::-webkit-scrollbar,
+.sir-flatpickr .sir-year-select::-webkit-scrollbar {
+  width: 0; /* WebKit browsers */
+  height: 0;
+}
+
+/* MOBILE */
+@media (max-width: 480px) {
+  .sir-flatpickr.flatpickr-calendar {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    left: 10px !important;
+    right: 10px !important;
+  }
+}
+
+
+/* =========================================================
+   FIX: MES + AÑO PEGADOS (Ene2026)
+   ========================================================= */
+
+/* El pill debe organizar sus hijos en grid: [mes][año] */
+.sir-flatpickr .flatpickr-current-month {
+  grid-auto-flow: column !important;
+  grid-template-columns: auto auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  column-gap: 12px !important;
+}
+
+.flatpickr-calendar {
+  overflow: hidden !important;
+}
+
+/* Small final tweak: ensure the month label and year select are separated */
+.flatpickr-current-month {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+}
+
+/* center the pill within the middle column explicitly */
+.sir-flatpickr .flatpickr-current-month {
+  justify-self: center !important;
+  margin: 0 auto !important;
+}
+
+.flatpickr-current-month .cur-month {
+  flex: none !important;
+  margin: 0 !important;
+  padding-right: 4px !important;
+}
+
+
+/* El selector de mes (Flatpickr) */
+.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months {
+  width: auto !important;
+  max-width: 140px !important;
+  /* espacio para caret */
+  margin: 0 !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Si tu Flatpickr usa .cur-month en vez de dropdown (fallback) */
+.sir-flatpickr .flatpickr-current-month .cur-month {
+  margin: 0 !important;
+  padding: 0 4px 0 0 !important;
+}
+
+/* Asegura que el contenedor no aplaste contenido */
+.sir-flatpickr .flatpickr-month {
+  justify-content: center !important;
+}
+
+/* Quita cualquier centrado/line-height raro heredado */
+.sir-flatpickr .flatpickr-months .flatpickr-month {
+  text-align: initial !important;
+  line-height: normal !important;
+}
+
+
+.sir-flatpickr .sir-year-div {
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-template-columns: auto auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  column-gap: 12px !important;
+  gap: 10px !important;
+  column-gap: 10px;
+  white-space: nowrap !important;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 0 !important;
+  z-index: 3 !important;
+}

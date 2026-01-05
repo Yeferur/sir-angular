@@ -1,0 +1,62 @@
+<div class="booking-dashboard">
+  <div class="main-content">
+
+    <!-- Header outside card -->
+    <div class="card-header header-row">
+      <div>
+        <h2>Precios para el Tour {{ tourName() }}</h2>
+        <span class="hint">Editar precios por tipo de pasajero</span>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-ghost" (click)="cancelar()">Cancelar</button>
+        <button class="btn-primary" (click)="guardar()" [disabled]="saving()">Guardar</button>
+      </div>
+    </div>
+
+    <!-- Selects below header -->
+    <div class="form-grid" style="margin-top:14px;">
+      <div class="form-group">
+        <label class="form-label">Moneda</label>
+        <select class="form-select" [ngModel]="selectedMoneda()" (ngModelChange)="selectedMoneda.set($event); onFilterChange()">
+          @for (m of monedas(); track m.Id_Moneda) {
+            <option [ngValue]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Plan</label>
+        <select class="form-select" [ngModel]="selectedPlan()" (ngModelChange)="selectedPlan.set($event); onFilterChange()">
+          <option [ngValue]="null">(Sin plan)</option>
+          @for (p of planes(); track p.Id_Plan) {
+            <option [ngValue]="p.Id_Plan">{{ p.Nombre_Plan }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <!-- Card with tour and inputs -->
+    <div class="card" style="margin-top:18px;">
+
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="form-group">
+          <label class="form-label">Adulto</label>
+          <input type="number" class="form-input" [ngModel]="precios().ADULTO" (ngModelChange)="updatePrecio('ADULTO', $event)" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Niño</label>
+          <input type="number" class="form-input" [ngModel]="precios().NINO" (ngModelChange)="updatePrecio('NINO', $event)" />
+        </div>
+
+        @if (precios().INFANTE !== null) {
+        <div class="form-group">
+          <label class="form-label">Infante</label>
+          <input type="number" class="form-input" [ngModel]="precios().INFANTE" (ngModelChange)="updatePrecio('INFANTE', $event)" />
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

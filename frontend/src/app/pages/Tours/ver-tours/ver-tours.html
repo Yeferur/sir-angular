@@ -1,0 +1,71 @@
+@if (!isLoading()) {
+  <div class="page-container">
+
+    <div class="page-header">
+      <div>
+        <h1>Tours</h1>
+        <p class="subtitle">Gestiona cupos, comisiones y programación.</p>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-primary" (click)="crearTour()">
+          <i class="ri-add-line"></i> Nuevo Tour
+        </button>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      @for (tour of toursFiltrados(); track tour.Id_Tour; let i = $index) {
+        <div class="tour-card" [style.--animation-order]="i">
+
+          <div class="card-top">
+            <div class="title-row">
+              <h2 class="tour-name" title="{{ tour.Nombre_Tour }}">{{ tour.Nombre_Tour }}</h2>
+              @if (tour.Abreviacion) {
+                <span class="pill">{{ tour.Abreviacion }}</span>
+              }
+            </div>
+
+            <div class="meta">
+              <div class="meta-item">
+                <span class="meta-label">Cupo Base</span>
+                <span class="meta-value">{{ showNumber(tour.Cupo_Base) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="commissions">
+            <div class="kpi">
+              <span class="kpi-label">Hotel</span>
+              <span class="kpi-value">{{ showNumber(tour.Comision_Hotel) }}</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Agencia</span>
+              <span class="kpi-value">{{ showNumber(tour.Comision_Agencia) }}</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Freelance</span>
+              <span class="kpi-value">{{ showNumber(tour.Comision_Freelance) }}</span>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn-secondary" (click)="verProgramacion(tour)">
+              Ver temporadas
+            </button>
+            <button class="btn-secondary" (click)="editarTour(tour)">
+              Editar
+            </button>
+            <button class="btn-danger" (click)="eliminarTour(tour)">
+              Eliminar
+            </button>
+          </div>
+
+        </div>
+      }
+    </div>
+
+  </div>
+}

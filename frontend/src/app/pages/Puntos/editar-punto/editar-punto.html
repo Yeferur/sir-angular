@@ -1,0 +1,79 @@
+<div class="booking-dashboard">
+  <div class="main-content">
+    <form [formGroup]="form" (ngSubmit)="onSubmitGuardarCambios()">
+      <div class="card">
+        <div class="card-header header-row">
+          <div class="header-title">
+            <h2>Editar Punto de Encuentro</h2>
+            <p class="muted">Modifica la información del punto.</p>
+          </div>
+
+          <div class="header-actions">
+            <button class="btn-primary" type="submit" [disabled]="isLoading">{{ isLoading ? 'Guardando...' : 'Guardar cambios' }}</button>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label class="form-label">Nombre del Punto <span class="required-star">*</span></label>
+            <input formControlName="NombrePunto" type="text" class="form-input" maxlength="255" placeholder="Ej: Parque Central" [ngClass]="form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid ? 'errorInput' : ''" />
+            @if (form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid) { <div class="errorMessage">Ingresa un nombre válido.</div> }
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sector <span class="required-star">*</span></label>
+            <input formControlName="Sector" type="text" class="form-input" placeholder="Ej: Poblado" [ngClass]="form.get('Sector')?.touched && form.get('Sector')?.invalid ? 'errorInput' : ''" />
+            @if (form.get('Sector')?.touched && form.get('Sector')?.invalid) { <div class="errorMessage">Ingresa un sector válido.</div> }
+          </div>
+
+          <div class="form-group full-width">
+            <label class="form-label">Dirección <span class="required-star">*</span></label>
+            <input formControlName="Direccion" (input)="onDireccionInput($any($event.target).value)" type="text" class="form-input" placeholder="Calle 1 #2-34" [ngClass]="(form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) || form.get('Direccion')?.hasError('duplicate') ? 'errorInput' : ''" />
+            @if (form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) { <div class="errorMessage">La dirección es obligatoria.</div> }
+            @if (form.get('Direccion')?.hasError('duplicate')) { <div class="errorMessage">Ya existe un punto con esta dirección.</div> }
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Latitud</label>
+            <input formControlName="Latitud" type="number" step="any" class="form-input" placeholder="6.24..." [ngClass]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid ? 'errorInput' : ''" />
+            @if (form.get('Latitud')?.touched && form.get('Latitud')?.hasError('required')) { <div class="errorMessage">La latitud es obligatoria.</div> }
+            @if (form.get('Latitud')?.touched && (form.get('Latitud')?.hasError('min') || form.get('Latitud')?.hasError('max'))) { <div class="errorMessage">Latitud debe estar entre -90 y 90.</div> }
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Longitud</label>
+            <input formControlName="Longitud" type="number" step="any" class="form-input" placeholder="-75.57..." [ngClass]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid ? 'errorInput' : ''" />
+            @if (form.get('Longitud')?.touched && form.get('Longitud')?.hasError('required')) { <div class="errorMessage">La longitud es obligatoria.</div> }
+            @if (form.get('Longitud')?.touched && (form.get('Longitud')?.hasError('min') || form.get('Longitud')?.hasError('max'))) { <div class="errorMessage">Longitud debe estar entre -180 y 180.</div> }
+          </div>
+
+          <div class="form-group full-width">
+            <div class="divider"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="header-title">
+            <h2>Horarios por Tour</h2>
+            <p class="muted">Si dejas la hora vacía se guardará como <strong>Pendiente</strong>.</p>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="tour-grid">
+            @for (t of tours(); track t.Id_Tour) {
+              <div class="tour-row">
+                <div class="tour-name">{{ t.Nombre_Tour }}</div>
+                <div class="tour-input">
+                  <input class="form-input" [(ngModel)]="$any(horariosMap)[t.Id_Tour]" [ngModelOptions]="{ standalone: true }" placeholder="Hora (ej: 7:00 AM)" />
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

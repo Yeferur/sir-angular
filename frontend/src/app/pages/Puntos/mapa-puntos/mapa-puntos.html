@@ -1,0 +1,8 @@
+<div>
+  <label for="ruta">Ruta:</label>
+  <select id="ruta" [(ngModel)]="selectedRuta" (change)="loadRoute(selectedRuta)">
+    <option value="">Todas</option>
+    <option *ngFor="let r of rutas" [value]="r">{{ r }}</option>
+  </select>
+</div>
+<div #mapa class="mapa"></div>

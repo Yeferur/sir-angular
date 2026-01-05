@@ -1,0 +1,28 @@
+<div class="duplicar-panel">
+  <h3>Duplicar Reserva</h3>
+  <p>Selecciona Tour y Fecha para la nueva reserva:</p>
+
+  <div class="field">
+    <label>Tour</label>
+    <select [(ngModel)]="Id_Tour">
+      @for (t of tours; track t) {
+        <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Fecha</label>
+    <input type="date" [(ngModel)]="Fecha_Tour" />
+  </div>
+
+  <div class="field">
+    <label>Observaciones (opcional)</label>
+    <textarea class="form-input" rows="4" [(ngModel)]="Observaciones" placeholder="Anota aquí comentarios u observaciones para la nueva reserva..."></textarea>
+  </div>
+
+  <div class="actions">
+    <button (click)="confirmar()" class="btn-primary">Confirmar</button>
+    <button (click)="cancelar()" class="btn-secondary">Cancelar</button>
+  </div>
+</div>

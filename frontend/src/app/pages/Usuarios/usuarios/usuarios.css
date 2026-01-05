@@ -1,0 +1,107 @@
+.usuarios-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.usuario-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  transition: background 0.3s, border-color 0.3s;
+  flex-wrap: wrap;
+}
+
+/* Cambia el borde al pasar */
+.usuario-card:hover {
+  border-color: var(--accent);
+}
+
+/* Información del usuario */
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+
+/* Bloque derecho que contiene estado y botón */
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Nombre */
+.name {
+  font-weight: var(--font-semi-bold);
+  color: var(--text-color);
+}
+
+/* Email */
+.email {
+  font-size: var(--small-font-size);
+  color: var(--text-secondary);
+}
+
+/* Estado visual */
+.estado {
+  display: flex;
+  align-items: center;
+  font-weight: var(--font-medium);
+  text-transform: capitalize;
+  font-size: var(--normal-font-size);
+}
+
+.estado .dot {
+  font-size: 1.1rem;
+  margin-right: 0.4rem;
+}
+
+.estado-activa {
+  color: var(--green);
+}
+
+.estado-inactiva {
+  color: var(--yellow);
+}
+
+.estado-cerrada {
+  color: var(--red);
+}
+
+/* Botón de cerrar sesión */
+.cerrar-sesion-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: var(--small-font-size);
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.cerrar-sesion-btn:hover {
+  background: #c0392b;
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+  .usuario-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .acciones {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+  }
+}

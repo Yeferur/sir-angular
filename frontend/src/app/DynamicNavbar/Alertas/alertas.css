@@ -1,0 +1,124 @@
+/*
+  ========================================
+  ESTILOS PARA ALERT-CONTENT
+  ========================================
+  Diseño limpio y minimalista que se integra
+  perfectamente en la Dynamic Navbar.
+*/
+:host {
+  width: 100%;
+  height: 100%;
+}
+
+.alert-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* === ICONOS === */
+.icon-container {
+  margin-bottom: 16px;
+}
+
+.icon {
+  width: 50px;
+  height: 50px;
+  stroke-width: 1.5; /* Grosor de línea consistente */
+  animation: icon-pop-in 0.5s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes icon-pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Colores de los iconos basados en el tipo */
+.alert-container[data-type="success"] .icon { color: var(--accent-green); }
+.alert-container[data-type="error"] .icon { color: var(--accent-red); }
+.alert-container[data-type="warning"] .icon { color: var(--accent-yellow); }
+.alert-container[data-type="info"] .icon { color: var(--accent-blue); }
+
+/* Spinner de carga */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 4px solid var(--separator-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* === TEXTO === */
+.text-content {
+  max-width: 320px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.message {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* === BOTONES === */
+.buttons-container {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.alert-button {
+  flex-grow: 1;
+  max-width: 150px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.alert-button:hover {
+  filter: brightness(0.9);
+}
+[data-theme="dark"] .alert-button:hover {
+  filter: brightness(1.2);
+}
+
+/* Estilo de botón primario (acción principal) */
+.alert-button.primary {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* Estilo de botón secundario (cancelar, etc.) */
+.alert-button.secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.alert-button.delete {
+  background-color: var(--accent-red);
+  color: #fff;
+}
+

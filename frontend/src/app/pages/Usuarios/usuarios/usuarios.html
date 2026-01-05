@@ -1,0 +1,25 @@
+<div class="usuarios-container">
+  @for (user of usuarios(); track user.id_user) {
+    <div class="usuario-card">
+      <div class="info">
+        <div class="name">{{ user.name }} {{ user.apellidos }}</div>
+        <div class="email">{{ user.email }}</div>
+      </div>
+      <div class="acciones">
+        <div
+          class="estado"
+        [ngClass]="{
+          'estado-activa': estados().get(user.id_user.toString()) === 'activa',
+          'estado-inactiva': estados().get(user.id_user.toString()) === 'inactiva',
+          'estado-cerrada': estados().get(user.id_user.toString()) === 'cerrada'
+        }">
+          <span class="dot">●</span>
+          <span class="label">{{ estados().get(user.id_user.toString()) }}</span>
+        </div>
+        <button class="cerrar-sesion-btn" (click)="forzarCierreSesion(user.id_user)">
+          Forzar Cierre
+        </button>
+      </div>
+    </div>
+  }
+</div>

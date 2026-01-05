@@ -1,0 +1,96 @@
+<div class="page-container">
+
+  <!-- ENCABEZADO -->
+  <div class="page-header">
+    <h1>Programación</h1>
+    <div class="form-group">
+      <label for="fecha" class="form-label">Fecha de Operación:</label>
+      <input id="fecha" class="form-input" type="date" [(ngModel)]="fechaSeleccionada" (change)="cargarToursDelDia()" />
+    </div>
+  </div>
+
+  <!-- SPINNER -->
+  <div *ngIf="cargando" class="loading-state">
+    <div class="spinner"></div>
+    <p>Cargando...</p>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section *ngIf="!cargando && modoVista === 'dashboard'" class="dashboard-section">
+    <div *ngIf="toursDelDia.length === 0" class="empty-state">
+      <h3>No hay tours para la fecha seleccionada.</h3>
+      <p>Elige otra fecha para ver la programación.</p>
+    </div>
+
+    <div class="capacity-dashboard" *ngIf="toursDelDia.length > 0">
+      <div class="capacity-card" *ngFor="let tour of toursDelDia"
+        (click)="tour.planGenerado ? generarPlan(tour) : generarPlan(tour)"
+        [class.generated]="tour.estado === 'Generado'">
+        <div class="card-content">
+          <div class="stats-container">
+            <div class="card-header">
+              <h2 class="tour-name">{{ tour.NombreTour }}</h2>
+              <span class="badge" [ngClass]="tour.estado | lowercase">{{ tour.estado || 'Pendiente' }}</span>
+            </div>
+            <div *ngIf="tour.estado === 'Pendiente'">
+              <p class="stat-main">Pendiente</p>
+              <p class="stat-secondary">Clic para generar plan logístico</p>
+            </div>
+            <div *ngIf="tour.estado === 'Generado'">
+              <p class="stat-main">{{ tour.totalPasajeros || 0 }} <span class="stat-label">Pasajeros</span></p>
+              <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Listo para generar' }}</span>
+          <span class="arrow-icon">→</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDITOR DE LISTADOS -->
+  <section *ngIf="!cargando && modoVista === 'editor' && planSeleccionado" class="editor-section">
+    <div class="editor-header">
+      <div class="editor-title">
+        <h3>Editor de Listado</h3>
+        <p>{{ tourSeleccionado?.NombreTour }}</p>
+      </div>
+      <div class="editor-actions">
+        <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
+        <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
+      </div>
+    </div>
+
+    <div class="editor-board" cdkDropListGroup>
+      <div class="bus-column" *ngFor="let bus of planSeleccionado.buses; let i = index">
+        <div class="bus-header">
+          <input type="text" class="form-input placa-input" placeholder="Placa del Bus" [(ngModel)]="bus.id">
+          <span class="bus-occupancy">{{ bus.ocupados }} / {{ bus.capacidad }} Pax</span>
+          <button class="btn-secondary" style="margin-top: 0.5rem" (click)="verMapa(bus)">Ver Mapa</button>
+        </div>
+        <div class="bus-body" cdkDropList [id]="'bus-' + i" [cdkDropListData]="bus.reservas"
+          (cdkDropListDropped)="drop($event)">
+          <div *ngIf="bus.reservas.length === 0" class="drop-placeholder">
+            <span>Arrastra reservas aquí</span>
+          </div>
+          <ng-container *ngFor="let reserva of bus.reservas; let i = index">
+            <div *ngIf="mostrarEncabezadoPunto(bus.reservas, i)" class="punto-header">
+              {{ reserva.NombrePunto }}
+            </div>
+
+            <div class="reserva-card" cdkDrag>
+              <div class="reserva-details">
+                <span>#{{ reserva.Id_Reserva }}</span>
+                <span class="reserva-pax">{{ reserva.NumeroPasajeros }} Pax</span>
+              </div>
+            </div>
+          </ng-container>
+
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+

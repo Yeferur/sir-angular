@@ -1,0 +1,16 @@
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+dist/
+.angular/
+coverage/
+.env
+.env.*
+backend/env
+!backend/env.example
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

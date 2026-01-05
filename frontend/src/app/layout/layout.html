@@ -1,0 +1,115 @@
+<!-- Barra superior -->
+<!-- public/index.html -->
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+
+<div class="top-bar">
+  <div class="avatar-placeholder">
+    <i class="bx bx-user"></i>
+  </div>
+  <button class="menu-button" (click)="toggleSidebar()">
+    <i class="bx bx-menu"></i>
+  </button>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" [class.open]="isSidebarOpen()" (mouseleave)="closeAllSubmenus()">
+  <div class="user-section">
+    <div class="avatar-placeholder-large">
+      <i class="bx bx-user"></i>
+    </div>
+    <div class="user-info">
+      <h4>{{ user()?.name }} {{ user()?.apellidos }}</h4>
+      <p>{{ user()?.email }}</p>
+    </div>
+  </div>
+
+  <div class="menu">
+    <!-- Inicio -->
+    <a *appPermiso="'INICIO.LEER'" routerLink="/" (click)="clickPage()"><i class="bx bxs-dashboard"></i><span>Inicio</span></a>
+    
+    <!-- Informes -->
+    <a *appPermiso="'INFORMES.LEER'" routerLink="/" (click)="clickPage()"><i class="bx bx-line-chart"></i><span>Informes</span></a>
+    
+    <!-- Historial -->
+    <a *appPermiso="'HISTORIAL.LEER'" routerLink="/Historial" (click)="clickPage()"><i class="bx bx-history"></i><span>Historial</span></a>
+
+    <!-- Reservas -->
+    <div *appPermiso="'RESERVAS.LEER'" class="menu-item" [class.active]="activeMenu() === 1">
+      <a (click)="toggleMenu(1)" class="link"><i class="bx bx-calendar-plus"></i><span>Reservas</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a *appPermiso="'RESERVAS.CREAR'" routerLink="/Reservas/NuevaReserva" (click)="clickPage()">Nueva Reserva</a>
+        <a *appPermiso="'RESERVAS.LEER'" routerLink="/Reservas/VerReservas" (click)="clickPage()">Ver Reservas</a>
+      </div>
+    </div>
+
+    <!-- Transfer -->
+    <div *appPermiso="'TRANSFERS.LEER'" class="menu-item" [class.active]="activeMenu() === 2">
+      <a (click)="toggleMenu(2)" class="link"><i class="bx bx-car"></i><span>Transfer</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a *appPermiso="'TRANSFERS.CREAR'" routerLink="/Transfers/NuevoTransfer" (click)="clickPage()">Nuevo Transfer</a>
+        <a *appPermiso="'TRANSFERS.LEER'" routerLink="/Transfers/VerTransfers" (click)="clickPage()">Ver Transfer</a>
+      </div>
+    </div>
+
+    <!-- Tours -->
+    <div *appPermiso="'TOURS.LEER'" class="menu-item" [class.active]="activeMenu() === 3">
+      <a (click)="toggleMenu(3)" class="link"><i class="bx bx-flag"></i><span>Tours</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a *appPermiso="'TOURS.CREAR'" routerLink="/Tours/NuevoTour" (click)="clickPage()">Nuevo Tour</a>
+        <a *appPermiso="'TOURS.LEER'" routerLink="/Tours/VerTours" (click)="clickPage()">Ver Tours</a>
+      </div>
+    </div>
+
+    <!-- Puntos de Encuentro -->
+    <div *appPermiso="'PUNTOS.LEER'" class="menu-item" [class.active]="activeMenu() === 4">
+      <a (click)="toggleMenu(4)" class="link"><i class="bx bx-map"></i><span>Puntos de Encuentro</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a *appPermiso="'PUNTOS.CREAR'" routerLink="/Puntos/NuevoPunto" (click)="clickPage()">Nuevo Punto </a>
+        <a *appPermiso="'PUNTOS.LEER'" routerLink="/Puntos/VerPuntos" (click)="clickPage()">Ver Puntos</a>
+      </div>
+    </div>
+
+    <!-- Programación -->
+    <div *appPermiso="'PROGRAMACION.LEER'" class="menu-item" [class.active]="activeMenu() === 5">
+      <a (click)="toggleMenu(5)" class="link"><i class="bx bx-list-check"></i><span>Programación</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a *appPermiso="'PROGRAMACION.CREAR'" routerLink="/Transfer/NuevoTransfer" (click)="clickPage()">Nuevo Transfer</a>
+        <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" (click)="clickPage()">Listado</a>
+      </div>
+    </div>
+
+    <!-- Comisiones -->
+    <a *appPermiso="'COMISIONES.LEER'" routerLink="/" (click)="clickPage()"><i class="bx bx-money"></i><span>Comisiones</span></a>
+    
+    <!-- Seguros -->
+    <a *appPermiso="'SEGUROS.LEER'" routerLink="/" (click)="clickPage()"><i class="bx bx-shield-plus"></i><span>Seguros</span></a>
+
+    <!-- Configuración -->
+    <div *appPermiso="['USUARIOS.LEER', 'USUARIOS.GESTIONAR_ROLES']; requireAll: false" class="menu-item" [class.active]="activeMenu() === 6">
+      <a (click)="toggleMenu(6)" class="link"><i class="bx bx-cog"></i><span>Configuración</span><i
+          class="bx bx-chevron-down"></i></a>
+      <div class="submenu">
+        <a routerLink="/" (click)="clickPage()">Perfil</a>
+        <a *appPermiso="'USUARIOS.GESTIONAR_ROLES'" routerLink="/Usuarios" (click)="clickPage()">Administrar Usuarios</a>
+        <a *appPermiso="'USUARIOS.CREAR'" routerLink="/" (click)="clickPage()">Crear Usuarios</a>
+        <a routerLink="/" (click)="clickPage()">Ayuda</a>
+        <a (click)="toggleTheme()">
+          Tema: {{ isDarkMode ? 'Oscuro' : 'Claro' }}
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="logout">
+    <a class="Logout_link" (click)="handleLogout()">
+      <i class="bx bx-log-out"></i>
+      <span>Salir</span>
+    </a>
+  </div>
+</div>

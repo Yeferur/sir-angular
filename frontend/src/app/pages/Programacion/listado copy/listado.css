@@ -1,0 +1,277 @@
+/* GENERAL */
+.tablero {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+
+.columna, .bus-card {
+   width: 100%;
+  max-width: 100%;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 1rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform 0.2s;
+}
+
+.columna:hover, .bus-card:hover {
+  transform: scale(1.015);
+}
+
+/* CABECERAS DE COLUMNA Y CARD */
+header, .bus-card h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+header span, .bus-card h3 span {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  background: var(--green);
+  color: #fff;
+}
+
+header span.warning {
+  background: var(--yellow);
+}
+
+header span.full {
+  background: var(--red);
+}
+
+/* LISTA DE RESERVAS */
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+li {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+  transition: background 0.2s;
+}
+
+li:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* BOTONES */
+button {
+  background-color: var(--ok);
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.3s;
+  font-size: 0.85rem;
+}
+
+button:hover {
+  background-color: #2e7d32;
+}
+
+.btn-toggle {
+  background: transparent;
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  margin-bottom: 1rem;
+}
+
+.btn-toggle:hover {
+  background: var(--ok);
+  color: white;
+}
+
+.btn-save {
+  align-self: flex-end;
+  margin-top: 1rem;
+}
+
+/* DRAG FEEDBACK */
+.cdk-drag-preview {
+  background: #333;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  color: white;
+  transform: rotate(2deg);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0;
+}
+
+/* RESERVAS SIN ASIGNAR (lectura) */
+.reservas-sin-asignar {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.reservas-sin-asignar h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.reservas-sin-asignar li {
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  background: rgba(255,255,255,0.05);
+}
+
+/* LAYOUT GRID EN LECTURA */
+.bus-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+
+/* Botón de edición */
+.btn-toggle {
+  background-color: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.btn-toggle:hover {
+  background-color: var(--accent);
+  color: var(--button-text);
+}
+
+/* Save bar fija al final en modo edición */
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  background-color: var(--primary-bg);
+  padding: 1rem;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+  text-align: right;
+  z-index: 20;
+}
+
+@media screen and (max-width: 600px) {
+  .tablero {
+    grid-template-columns: 1fr;
+    padding: 0.5rem;
+  }
+
+  .columna {
+    padding: 0.75rem;
+  }
+
+  .bus-card,
+  .reserva {
+    font-size: 0.85rem;
+  }
+
+  button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .save-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--primary-bg);
+    padding: 0.75rem 1rem;
+    text-align: center;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+.reserva-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.reserva-id {
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.reserva-punto {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.reserva-pax {
+  font-size: 0.8rem;
+  color: var(--text-color);
+}
+
+
+/* Consistencia visual entre edición y lectura */
+li {
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+li:hover {
+  background: var(--hover-bg);
+  color: var(--text-color);
+}
+
+.btn-ver-ruta {
+  margin-top: auto;
+  align-self: flex-start;
+  background-color: var(--accent);
+  color: var(--button-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.btn-ver-ruta:hover {
+  background-color: var(--font-color-hover);
+  color: var(--text-color);
+}

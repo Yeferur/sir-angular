@@ -1,0 +1,15 @@
+/* styles.css global (o donde manejes el layout) */
+.app-shell {
+  display: grid;
+  grid-template-columns: auto 1fr; /* el sidebar define su ancho */
+  min-height: 100svh;
+}
+.main-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+.content {
+  flex: 1;
+  overflow: auto;
+}

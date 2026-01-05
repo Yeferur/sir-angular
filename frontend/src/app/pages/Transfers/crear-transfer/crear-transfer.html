@@ -1,0 +1,267 @@
+@if (!isLoading()) {
+<div class="booking-dashboard" [formGroup]="form">
+  <div class="main-content">
+
+    <!-- DETALLES DEL SERVICIO -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Nuevo Transfer</h2>
+      </div>
+
+      <div class="form-grid">
+
+        <!-- Estado eliminado: lo decide el servidor automáticamente -->
+
+        <div class="form-group">
+          <label class="form-label">
+            Titular del servicio <span class="required-star">*</span>
+          </label>
+          <input type="text" formControlName="Titular" class="form-input"
+            [ngClass]="form.get('Titular')?.touched && form.get('Titular')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Titular')?.touched && form.get('Titular')?.invalid) {
+          <div class="errorMessage">Titular es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Teléfono del titular</label>
+          <div class="phone-input-group">
+            <input type="text" class="form-input phone-prefix" formControlName="IndicativoTitular" />
+            <input type="tel" class="form-input phone-number" formControlName="TelefonoTitular" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Rango de pasajeros <span class="required-star">*</span>
+          </label>
+          <select formControlName="Rango" class="form-select"
+            [ngClass]="form.get('Rango')?.touched && form.get('Rango')?.invalid ? 'errorInput' : ''">
+            <option value="Seleccionar" disabled>SELECCIONAR</option>
+            @for (rango of resultsRangos; track rango.id) {
+            <option [value]="rango.id">{{ rango.Descripcion }} ({{ rango.Minimo }}-{{ rango.Maximo }} pax)</option>
+            }
+          </select>
+          @if (form.get('Rango')?.touched && form.get('Rango')?.invalid) {
+          <div class="errorMessage">Rango es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Tipo de servicio <span class="required-star">*</span>
+          </label>
+          <select formControlName="TipoServicio" class="form-select"
+            [ngClass]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'errorInput' : ''">
+            <option value="Seleccionar" disabled>SELECCIONAR</option>
+            @for (servicio of resultsServicioTransfer; track servicio.id) {
+            <option [value]="servicio.id">{{ servicio.Servicio }}</option>
+            }
+          </select>
+          @if (form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid) {
+          <div class="errorMessage">Tipo de servicio es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Punto de salida</label>
+          <input type="text" formControlName="Salida" class="form-input"
+            [ngClass]="form.get('Salida')?.touched && form.get('Salida')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Salida')?.touched && form.get('Salida')?.invalid) {
+          <div class="errorMessage">Punto de salida es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Punto de llegada</label>
+          <input type="text" formControlName="Llegada" class="form-input"
+            [ngClass]="form.get('Llegada')?.touched && form.get('Llegada')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Llegada')?.touched && form.get('Llegada')?.invalid) {
+          <div class="errorMessage">Punto de llegada es requerido.</div>
+          }
+        </div>
+
+        <!-- Campos adicionales para transfers Hotel->Aeropuerto -->
+        @if (showFlightFields) {
+        <div class="form-group">
+          <label class="form-label"># Vuelo <span class="required-star">*</span></label>
+          <input type="text" formControlName="Vuelo" class="form-input"
+            [ngClass]="form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid) {
+          <div class="errorMessage">Número de vuelo es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tipo de vuelo</label>
+          <select formControlName="TipoVuelo" class="form-select"
+            [ngClass]="form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid ? 'errorInput' : ''">
+            <option value="" selected disabled>Seleccionar</option>
+            <option value="Nacional">Nacional</option>
+            <option value="Internacional">Internacional</option>
+          </select>
+          @if (form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid) {
+          <div class="errorMessage">Tipo de vuelo es requerido.</div>
+          }
+        </div>
+        }
+
+        <div class="form-group">
+          <label class="form-label">
+            Fecha del servicio <span class="required-star">*</span>
+          </label>
+          <input type="text" formControlName="Fecha" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+            placeholder="Selecciona una fecha"
+            [ngClass]="form.get('Fecha')?.touched && form.get('Fecha')?.invalid ? 'errorInput' : ''" />
+
+          @if (form.get('Fecha')?.touched && form.get('Fecha')?.invalid) {
+          <div class="errorMessage">Fecha es requerida.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Hora de salida</label>
+          <input type="text" formControlName="Hora" class="form-input" />
+        </div>
+
+      </div>
+
+      <div class="form-group full-width">
+        <label class="form-label">Observaciones</label>
+        <textarea formControlName="Observaciones" class="form-input" rows="3"></textarea>
+      </div>
+    </div>
+
+    <!-- RESPONSABLE (igual que reserva, pero con tus campos) -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Responsable</h2>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">
+            ¿Quién reporta? <span class="required-star">*</span>
+          </label>
+          <input type="text" formControlName="Reporta" class="form-input"
+            [ngClass]="form.get('Reporta')?.touched && form.get('Reporta')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Reporta')?.touched && form.get('Reporta')?.invalid) {
+          <div class="errorMessage">Nombre de quien reporta es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Teléfono Reserva <span class="required-star">*</span>
+          </label>
+          <div class="phone-input-group">
+            <input type="text" class="form-input phone-prefix" formControlName="IndicativoReserva" />
+            <input type="tel" class="form-input phone-number"
+              [ngClass]="form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid ? 'errorInput' : ''"
+              formControlName="TelefonoReserva" />
+            <!-- <button type="button" class="btn-secondary" (click)="checkWhatsappForReserva()">Verificar WhatsApp</button> -->
+          </div>
+          @if (form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid) {
+          <div class="errorMessage">Teléfono de reserva es requerido.</div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- VALOR -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Valor</h2>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Valor del servicio</label>
+          <input type="number" formControlName="Valor" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moneda</label>
+          <select formControlName="Moneda" class="form-select">
+            @for (m of resultsMonedas; track m.Id_Moneda) {
+            <option [value]="m.Codigo">{{ m.Codigo }} - {{ m.Nombre_Moneda }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SIDEBAR / RESUMEN FLOTANTE (misma estructura de reserva) -->
+<div class="floating-summary" [attr.data-state]="openSummary ? 'expanded' : 'compact'">
+
+  <!-- COMPACTO -->
+  <div class="summary-collapsed" (click)="toggleSummary()">
+    <div class="summary-left">
+      <span class="badge">
+        {{ getNombreServicio() || 'Transfer' }}
+      </span>
+
+      <span class="meta">
+        {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
+      </span>
+    </div>
+
+    <button class="expand-btn" type="button" aria-label="Ver resumen completo">
+      <span class="expand-icon">▲</span>
+    </button>
+  </div>
+
+  <!-- EXPANDIDO -->
+  <div class="summary-expanded">
+    <div class="summary-expanded-header">
+      <h2>Resumen</h2>
+      <button class="btn-icon-delete" type="button" aria-label="Cerrar resumen" (click)="toggleSummary(false)">
+        ✕
+      </button>
+    </div>
+
+    <div class="summary-totals">
+      <div class="summary-item">
+        <label class="form-label">Titular</label>
+        <span class="summary-value">{{ form.get('Titular')?.value || '—' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Rango de pasajeros</label>
+        <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Hora Salida</label>
+        <span class="summary-value">
+          {{ form.get('Hora')?.value || '—' }}
+        </span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Punto de salida</label>
+        <span class="summary-value">{{ form.get('Salida')?.value || '—' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Punto de llegada</label>
+        <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
+      </div>
+
+
+      <div class="summary-item total-row">
+        <label class="form-label">Valor</label>
+        <span class="summary-value summary-total">
+          {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
+        </span>
+      </div>
+    </div>
+
+    <button type="button" class="btn-save-summary" (click)="onSubmit()">
+      Guardar Transfer
+    </button>
+  </div>
+</div>
+}

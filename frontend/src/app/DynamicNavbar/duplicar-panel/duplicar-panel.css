@@ -1,0 +1,113 @@
+.duplicar-panel {
+    padding: var(--panel-padding, 20px 22px);
+    max-width: var(--panel-max-width, 520px);
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+    color: var(--text-primary, #fff);
+    display: block;
+}
+
+.duplicar-panel h3 {
+    margin: 0 0 6px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+}
+
+.duplicar-panel p {
+    margin: 0 0 14px 0;
+    color: var(--text-muted, #bdbdbd);
+    font-size: 13px;
+}
+
+.field {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.field label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.field select,
+.field input[type="date"],
+.field textarea {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--separator-color);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 1rem;
+    font-family: var(--font-family);
+    width: 100%;
+    box-sizing: border-box;
+    color: var(--text-primary);
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.field select:focus,
+.field input[type="date"]:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background-color: var(--bg-secondary);
+}
+
+.actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-primary {
+    flex-grow: 1;
+    max-width: 150px;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s;
+    background-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-primary:hover {
+    filter: brightness(.95);
+}
+
+.btn-secondary {
+     flex-grow: 1;
+  max-width: 150px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s;
+   background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Small screens: make the panel narrower and buttons full width */
+@media (max-width: 520px) {
+    .duplicar-panel {
+        padding: var(--panel-mobile-padding, 16px);
+        max-width: 92vw;
+    }
+
+    .actions {
+        flex-direction: column-reverse;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        width: 100%;
+    }
+}

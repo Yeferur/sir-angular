@@ -1,0 +1,11 @@
+<!-- app.component.html (o tu shell principal) -->
+<div class="app-shell">
+  @if (loggedIn) { <app-sidebar></app-sidebar> }
+
+  <div class="main-shell">
+    <app-dynamic-navbar></app-dynamic-navbar>
+    <main class="content">
+      @if (loggedIn) { <router-outlet></router-outlet> }
+    </main>
+  </div>
+</div>

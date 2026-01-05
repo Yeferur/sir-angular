@@ -1,0 +1,51 @@
+<div class="widget-combinaciones">
+  <button class="close-btn" (click)="cerrar()">×</button>
+  <h2>Opciones de Combinación</h2>
+  <p>Se han generado múltiples opciones para {{ tour.NombreTour }}</p>
+
+  <!-- Botón de cambio de modo -->
+  <div class="modo-toggle">
+    @if (!modomanual) {
+      <button class="btn-secondary" (click)="activarManual()">Cambiar a Modo Manual</button>
+    }
+    @if (modomanual) {
+      <button class="btn-secondary" (click)="modomanual = false">← Volver a sugerencias</button>
+    }
+  </div>
+
+  <!-- === Sugerencias === -->
+  @if (!modomanual) {
+    @for (sugerencia of sugerencias; track sugerencia; let i = $index) {
+      <div class="sugerencia-card"
+        (click)="onSeleccionarSugerencia.emit(sugerencia)">
+        <div class="sugerencia-title">
+          <h4>Opción {{ i + 1 }}</h4>
+          @if (i === 0) {
+            <span class="badge recommended">Recomendada</span>
+          }
+        </div>
+        <div class="sugerencia-details">
+          <div><strong>Capacidad de los Buses:</strong> {{ sugerencia.combinacion.join(', ') }} ({{ sugerencia.totalBuses }} buses)</div>
+          <div><strong>Costo:</strong> {{ sugerencia.costoTotalKm | number:'1.0-0' }} km</div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- === Modo Manual === -->
+  @if (modomanual) {
+    <h4 style="margin-top: 2rem;">Modo Manual</h4>
+    <p>Agrega la flota deseada y genera el plan.</p>
+    @for (bus of flotaManual; track bus; let i = $index) {
+      <div class="formRow-flex">
+        <input type="number" [(ngModel)]="bus.capacidad" placeholder="Capacidad" class="form-input" />
+        <button class="btn-secondary" (click)="eliminarBus(i)">Eliminar</button>
+      </div>
+    }
+    <div class="manual-actions">
+      <button class="btn-secondary" (click)="agregarBus()">+ Agregar Bus</button>
+      <button class="btn-primary" (click)="generarManual()">Generar</button>
+    </div>
+  }
+
+</div>

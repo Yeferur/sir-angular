@@ -1,0 +1,449 @@
+
+@property --progress-end {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+/*
+========================================
+  ESTILOS GLOBALES Y DE LAYOUT
+========================================
+*/
+:host {
+  display: block;
+}
+
+.page-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px; /* Añadido padding para espaciado en bordes */
+  animation: fadeInScale 0.5s ease-out;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap; /* Permite que los elementos pasen a la siguiente línea */
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+  flex-shrink: 0; /* Evita que el título se encoja */
+}
+
+.page-header .form-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap; /* Permite que el label y el input se ajusten */
+}
+
+.form-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-input {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: .95rem;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  min-width: 200px; /* Ancho mínimo para el input */
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+}
+/*
+========================================
+  SECCIONES Y TÍTULOS
+========================================
+*/
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+/*
+========================================
+  GRILLA DEL DASHBOARD (MODIFICADO)
+========================================
+*/
+
+  /*
+    FIX: Estilos para el formulario de edición dentro de las tarjetas.
+    Estos estilos aseguran que la etiqueta y el input se vean bien.
+  */
+  .edit-form {
+    animation: fadeInScale 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Espacio entre la etiqueta y el input */
+  }
+
+  .edit-form .form-label {
+    font-size: 0.9rem;
+    margin-bottom: -4px;
+  }
+
+  .edit-form .form-input {
+    width: 100%;
+    min-width: 0;
+    /* Anula el min-width global para este contexto */
+  }
+
+  /*
+    FIX: Estilos para la grilla de reservas privadas
+  */
+  .private-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .private-tour-group h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .private-tour-group ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 2rem;
+  margin-bottom: 30px;
+}
+
+/*
+========================================
+  TARJETA DE CAPACIDAD (COMPONENTE PRINCIPAL)
+========================================
+*/
+.capacity-card {
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--separator-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  opacity: 0;
+  transform: translateY(20px);
+  /* Animación de entrada escalonada */
+  animation: cardFadeInUp 0.5s ease-out forwards;
+  animation-delay: calc(var(--animation-order, 0) * 80ms);
+}
+
+.capacity-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px var(--shadow-color, rgba(0, 0, 0, 0.1));
+}
+
+.card-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-grow: 1;
+}
+
+/*
+========================================
+  MEDIDOR CIRCULAR (GAUGE)
+========================================
+*/
+.gauge-container {
+  flex-shrink: 0;
+}
+
+.gauge {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  /* Animación del medidor */
+  --progress-end: calc(var(--progress, 0) * 1%);
+  background: conic-gradient(var(--gauge-color, var(--accent-green)) var(--progress-end), var(--bg-tertiary) 0);
+  transition: --progress-end 1s cubic-bezier(0.32, 0.72, 0, 1);
+  transition-delay: calc(var(--animation-order, 0) * 80ms + 200ms);
+}
+
+.gauge::before {
+  content: '';
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+}
+
+.gauge-percentage {
+  position: relative;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Colores dinámicos del medidor */
+.capacity-card.green { --gauge-color: var(--accent-green); }
+.capacity-card.blue { --gauge-color: var(--accent-blue); }
+.capacity-card.yellow { --gauge-color: var(--accent-yellow); }
+.capacity-card.red { --gauge-color: var(--accent-red); }
+
+/*
+========================================
+  ESTADÍSTICAS DE LA TARJETA
+========================================
+*/
+.stats-container {
+  flex-grow: 1;
+  overflow: hidden; /* Evita que el texto largo se desborde */
+}
+
+.tour-name {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-main {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1;
+}
+
+.stat-main .stat-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 5px;
+}
+
+.stat-secondary {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 5px 0 0;
+}
+
+/*
+========================================
+  FOOTER Y BOTONES DE LA TARJETA
+========================================
+*/
+.card-footer {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--separator-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-secondary,
+.btn-primary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.btn-secondary:hover,
+.btn-primary:hover {
+  filter: brightness(0.9);
+  transform: scale(1.05);
+}
+
+[data-theme="dark"] .btn-secondary:hover,
+[data-theme="dark"] .btn-primary:hover {
+  filter: brightness(1.2);
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.btn-primary {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* === VISTA DE DETALLES (TOUR COMBINADO) === */
+.details-view {
+  margin-top: 15px;
+  animation: fadeInScale 0.3s ease;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+/*
+========================================
+  ESTILOS PARA SKELETON LOADER
+========================================
+*/
+.capacity-card.is-loading {
+  animation: none; /* Desactiva animación de entrada */
+  opacity: 1;
+  transform: none;
+}
+
+.is-loading .skeleton-shape {
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.is-loading .gauge-container {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+}
+
+.is-loading .stats-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.is-loading .skeleton-text-h2 { width: 80%; height: 24px; }
+.is-loading .skeleton-text-p { width: 60%; height: 36px; }
+.is-loading .skeleton-text-p-small { width: 70%; height: 16px; }
+
+.is-loading .card-footer {
+  border-top: none;
+  justify-content: flex-end;
+}
+
+.is-loading .skeleton-button {
+  width: 80px;
+  height: 35px;
+}
+
+/*
+========================================
+  ANIMACIONES (KEYFRAMES)
+========================================
+*/
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes cardFadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/*
+======================================================================
+  DISEÑO RESPONSIVO (MEDIA QUERIES)
+======================================================================
+*/
+
+/* --- Tablets (hasta 768px) --- */
+@media (max-width: 768px) {
+  .page-header h1 {
+    font-size: 2rem; /* Reducir tamaño del título principal */
+  }
+
+  .dashboard-grid {
+    /* Ajustar el tamaño mínimo para que quepa una tarjeta por fila si es necesario */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .stat-main {
+    font-size: 2rem; /* Reducir tamaño de la estadística principal */
+  }
+}
+
+/* --- Móviles (hasta 480px) --- */
+@media (max-width: 480px) {
+  .page-container {
+    padding: 15px; /* Menos padding en móviles */
+  }
+
+  .page-header {
+    /* Apilar el título y el formulario */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 30px;
+  }
+
+  .card-content {
+    /* Apilar el medidor y las estadísticas en pantallas muy pequeñas */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .stats-container {
+    width: 100%; /* Ocupar todo el ancho disponible */
+  }
+
+  .card-footer {
+    /* Botones ocupan todo el ancho para fácil acceso */
+    flex-direction: column;
+  }
+
+  .btn-primary, .btn-secondary {
+    width: 100%;
+    text-align: center;
+  }
+}

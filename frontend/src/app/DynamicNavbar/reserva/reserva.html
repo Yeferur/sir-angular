@@ -1,0 +1,129 @@
+<!-- components/reserva/reserva.html -->
+<div class="page-container">
+
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando reserva...</p>
+    </div>
+  } @else if (reserva) {
+    <div class="reserva-view">
+      <!-- Encabezado -->
+      <div class="view-header">
+        <div class="header-main">
+          <h1 class="reserva-id">Reserva #{{ reserva.Id_Reserva }}</h1>
+          <span class="status-tag"
+                [ngClass]="'status-' + (reserva.Estado || 'pendiente')!.toLowerCase()">
+            {{ reserva.Estado }}
+          </span>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary" (click)="descargarPDF()">Descargar</button>
+          <button class="btn-secondary" (click)="editarReserva()">Editar</button>
+          <button class="btn-close" (click)="onClose.emit()">✕</button>
+        </div>
+      </div>
+
+      <!-- Detalles -->
+      <div class="details-grid">
+        <!-- Detalles del Tour -->
+        <div class="card">
+          <div class="card-header"><h2>Detalles del Tour</h2></div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="info-label">Tour</span>
+              <span class="info-value">{{ reserva.TourReserva || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Fecha</span>
+              <span class="info-value">
+                {{ reserva.FechaReserva | date:'fullDate':'':'es-CO' }}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Punto de Encuentro</span>
+              <span class="info-value">{{ reserva.PuntoEncuentro || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Hora de Salida</span>
+              <span class="info-value">{{ reserva.HoraSalida || '—' }}</span>
+            </div>
+
+            @if (reserva.IdiomaReserva) {
+              <div class="info-row">
+                <span class="info-label">Idioma</span>
+                <span class="info-value">{{ reserva.IdiomaReserva }}</span>
+              </div>
+            }
+
+            @if (reserva.Observaciones) {
+              <div class="info-row">
+                <span class="info-label">Observaciones</span>
+                <span class="info-value">{{ reserva.Observaciones }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Responsable -->
+        <div class="card">
+          <div class="card-header"><h2>Responsable</h2></div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="info-label">Nombre</span>
+              <span class="info-value">{{ responsable?.nombre || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Teléfono</span>
+              <span class="info-value">{{ responsable?.telefono || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Canal de Reserva</span>
+              <span class="info-value">{{ responsable?.CanalReserva || '—' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pasajeros -->
+      <div class="passengers-section">
+        <h2>Pasajeros ({{ reserva.NumeroPasajeros || 0 }})</h2>
+
+        <div class="passengers-grid" [ngClass]="tipoClases">
+          <!-- Adultos -->
+          @for (p of pasajeros.adultos; track p.id ?? p.NombrePasajero; let i = $index) {
+            <div class="passenger-card">
+              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
+              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
+              <span class="passenger-price">
+                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+              </span>
+            </div>
+          }
+
+          <!-- Niños -->
+          @for (p of pasajeros.ninos; track p.id ?? p.NombrePasajero; let i = $index) {
+            <div class="passenger-card">
+              <span class="passenger-name">{{ p.NombrePasajero || '—' }} (Niño)</span>
+              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
+              <span class="passenger-price">
+                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+              </span>
+            </div>
+          }
+
+          <!-- Infantes -->
+          @for (p of pasajeros.infantes; track p.id ?? p.NombrePasajero; let i = $index) {
+            <div class="passenger-card">
+              <span class="passenger-name">{{ p.NombrePasajero || '—' }} (Infante)</span>
+              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
+              <span class="passenger-price">
+                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+              </span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

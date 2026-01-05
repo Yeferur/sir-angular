@@ -1,0 +1,103 @@
+<div class="page-container">
+  @if (vm$ | async; as vm) {
+
+    <!-- HEADER (igual vibe del resto) -->
+    <div class="page-header">
+      <div class="header-left">
+        <h1>Puntos de Encuentro</h1>
+      </div>
+
+      <div class="header-center">
+        <div class="search">
+          <span class="search-icon">⌕</span>
+
+          <input
+            type="text"
+            [ngModel]="searchTerm"
+            (ngModelChange)="onSearchInput($event)"
+            placeholder="Buscar por nombre, sector o dirección..."
+          />
+
+          @if (searchTerm?.length) { <button type="button" class="clear-btn" (click)="clearSearch()" aria-label="Limpiar búsqueda">✕</button> }
+        </div>
+      </div>
+
+      <div class="header-right header-actions">
+        <button class="btn-primary" type="button" (click)="crearPunto()">Crear Punto</button>
+      </div>
+    </div>
+
+    <!-- META BAR -->
+    <div class="meta-bar">
+      <div class="count">
+        <span class="muted">
+          Página {{ vm.hasLoadedOnce ? vm.page : '—' }} / {{ vm.hasLoadedOnce ? vm.totalPages : '—' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    @if (!vm.hasLoadedOnce) {
+      <div class="empty-state">
+        <h3>Cargando puntos…</h3>
+        <p>Un momento.</p>
+      </div>
+    } @else if (vm.puntos.length === 0) {
+      <div class="empty-state">
+        <h3>No hay resultados</h3>
+        <p>Prueba con otro término de búsqueda.</p>
+      </div>
+    } @else {
+
+      <div class="puntos-list">
+        @for (p of vm.puntos; track trackById($index, p)) {
+          <div class="punto-card" [style.--i]="$index" [class.deleting]="p._deleting">
+
+
+            <div class="card-top">
+              <div class="title-row">
+                <div class="punto-left">
+                  <div class="punto-name">{{ p.NombrePunto || p.Nombre_Punto }}</div>
+                  <div class="punto-address">{{ p.Direccion || 'Sin dirección' }}</div>
+                </div>
+
+                <div class="punto-right">
+                  <span class="chip">{{ p.Sector || '—' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-bottom">
+              @if (!p.horarios?.length) {
+                <div class="no-horarios">Sin horarios disponibles</div>
+              } @else {
+                <div class="schedule-list">
+                  @for (h of p.horarios; track h.Id_Tour) {
+                    <span class="schedule">
+                      <span class="tour">{{ h.NombreTour || ('Tour ' + h.Id_Tour) }}</span>
+                      <span class="dot">·</span>
+                      <span class="hora">{{ h.HoraSalida || 'Pendiente' }}</span>
+                    </span>
+                  }
+                </div>
+              }
+
+              <div class="card-actions">
+                <button type="button" class="btn-secondary" (click)="editarPunto(p)">Editar</button>
+                <button type="button" class="btn-delete" (click)="confirmEliminarPunto(p)">Eliminar</button>
+              </div>
+            </div>
+
+          </div>
+        }
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="btn-secondary" (click)="prevPage()" [disabled]="page <= 1">Anterior</button>
+        <span class="page-indicator">Página {{ vm.page }} / {{ vm.totalPages }}</span>
+        <button class="btn-secondary" (click)="nextPage(vm.totalPages)" [disabled]="page >= vm.totalPages">Siguiente</button>
+      </div>
+    }
+  }
+</div>

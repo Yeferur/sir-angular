@@ -1,0 +1,259 @@
+:host {
+    display: block;
+}
+
+.page-container {
+    max-width: 1600px;
+    margin: 28px auto 60px;
+    padding: 0 18px;
+    animation: fadeInScale .5s ease-out;
+}
+
+/* ===== Header tipo inicio ===== */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.subtitle {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: .95rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--separator-color);
+    border-radius: 12px;
+    padding: 10px 12px;
+    min-width: 260px;
+}
+
+.search input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    width: 100%;
+    font-size: .95rem;
+}
+
+/* ===== Grid ===== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 2rem;
+  margin-bottom: 30px;
+}
+
+/* ===== Card tipo inicio ===== */
+.tour-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--separator-color);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 4px 5px var(--shadow-color);
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    opacity: 0;
+    transform: translateY(12px), ;
+    animation: cardFadeInUp 0.5s ease-out forwards;
+    animation-delay: calc(var(--animation-order, 0) * 80ms);
+}
+
+.tour-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 10px var(--shadow-color);
+    border-color: color-mix(in oklab, var(--accent-blue) 35%, var(--separator-color));
+}
+
+.card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tour-name {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--separator-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: .78rem;
+}
+
+.meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.meta-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-secondary);
+}
+
+.meta-label {
+    opacity: .85;
+    font-weight: 600;
+}
+
+.meta-value {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.divider {
+    height: 1px;
+    background: var(--separator-color);
+    margin: 14px 0;
+}
+
+/* KPIs */
+.commissions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.kpi {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--separator-color);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.kpi-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.kpi-value {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 900;
+}
+
+/* Footer botones */
+.card-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 800;
+    transition: filter .2s, transform .15s;
+}
+
+.btn-primary {
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--separator-color);
+}
+
+.btn-danger {
+    background: var(--accent-red);
+    color: #fff;
+    border: none;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-danger:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes cardFadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 720px) {
+    .search {
+        min-width: 100%;
+    }
+
+    .card-footer {
+        justify-content: flex-start;
+    }
+
+    .commissions {
+        grid-template-columns: 1fr;
+    }
+}

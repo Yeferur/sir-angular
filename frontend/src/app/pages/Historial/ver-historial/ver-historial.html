@@ -1,0 +1,247 @@
+<div class="page-container">
+  <!-- ENCABEZADO -->
+  <div class="page-header">
+    <div>
+      <h1>Historial de Actividad</h1>
+      <p class="subtitle">Registro de todas las acciones realizadas en el sistema.</p>
+    </div>
+  </div>
+
+  <!-- BARRA DE BÚSQUEDA -->
+  <div class="search-container">
+    <i class="bx bx-search search-icon"></i>
+    <input
+      type="text"
+      class="search-input"
+      placeholder="Buscar por usuario, descripción, tabla..."
+      [value]="filters().searchText"
+      (input)="updateFilter('searchText', $any($event.target).value)"
+      (keyup.enter)="buscar()"
+      autocomplete="off"
+      />
+  </div>
+
+  <!-- BARRA DE HERRAMIENTAS DE FILTROS -->
+  <div class="filters-toolbar">
+    <button class="btn-filter" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
+      <i class="bx bx-filter-alt"></i>
+      <span>Filtros Avanzados</span>
+    </button>
+
+    <!-- Tokens de filtros activos -->
+    <div class="active-filters">
+      @if (filters().Usuario) {
+        <div class="filter-token">
+          <span>{{ filters().Usuario }}</span>
+          <button class="remove-token-btn" (click)="updateFilter('Usuario', '')" aria-label="Remover filtro">✕</button>
+        </div>
+      }
+      @if (filters().Tipo_Accion) {
+        <div class="filter-token">
+          <span>{{ getAccionLabel(filters().Tipo_Accion) }}</span>
+          <button class="remove-token-btn" (click)="updateFilter('Tipo_Accion', '')" aria-label="Remover filtro">✕</button>
+        </div>
+      }
+      @if (filters().Tabla_Afectada) {
+        <div class="filter-token">
+          <span>{{ filters().Tabla_Afectada }}</span>
+          <button class="remove-token-btn" (click)="updateFilter('Tabla_Afectada', '')" aria-label="Remover filtro">✕</button>
+        </div>
+      }
+      @if (filters().FechaInicio) {
+        <div class="filter-token">
+          <span>{{ filters().FechaInicio | date:'shortDate' }}</span>
+          <button class="remove-token-btn" (click)="updateFilter('FechaInicio', '')" aria-label="Remover filtro">✕</button>
+        </div>
+      }
+      @if (filters().FechaFin) {
+        <div class="filter-token">
+          <span>{{ filters().FechaFin | date:'shortDate' }}</span>
+          <button class="remove-token-btn" (click)="updateFilter('FechaFin', '')" aria-label="Remover filtro">✕</button>
+        </div>
+      }
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-primary" (click)="buscar()" [disabled]="isLoading()">
+        @if (!isLoading()) {
+          <i class="bx bx-search"></i>
+          <span>Buscar</span>
+        }
+        @if (isLoading()) {
+          <span>Cargando...</span>
+        }
+      </button>
+      <button class="btn-secondary" (click)="limpiarFiltros()">
+        <i class="bx bx-refresh"></i>
+        <span>Limpiar</span>
+      </button>
+      <button class="btn-info" (click)="exportarHistorial()">
+        <i class="bx bx-download"></i>
+        <span>Exportar CSV</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- PANEL DE FILTROS AVANZADOS (desplegable) -->
+  @if (advancedFiltersVisible()) {
+    <div class="advanced-filters-panel">
+      <div class="form-grid">
+        <!-- Usuario -->
+        <div class="form-group">
+          <label class="form-label">Usuario</label>
+          <input
+            type="text"
+            class="form-input"
+            placeholder="Nombre del usuario"
+            [value]="filters().Usuario"
+            (change)="updateFilter('Usuario', $any($event.target).value)"
+            />
+        </div>
+
+        <!-- Tipo de Acción -->
+        <div class="form-group">
+          <label class="form-label">Tipo de Acción</label>
+          <select
+            class="form-input"
+            [value]="filters().Tipo_Accion"
+            (change)="updateFilter('Tipo_Accion', $any($event.target).value)"
+            >
+            <option value="">-- Todas las acciones --</option>
+            @for (tipo of tiposAccion(); track tipo) {
+              <option [value]="tipo">{{ getAccionLabel(tipo) }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Tabla Afectada -->
+        <div class="form-group">
+          <label class="form-label">Tabla Afectada</label>
+          <select
+            class="form-input"
+            [value]="filters().Tabla_Afectada"
+            (change)="updateFilter('Tabla_Afectada', $any($event.target).value)"
+            >
+            <option value="">-- Todas las tablas --</option>
+            @for (tabla of tablasAfectadas(); track tabla) {
+              <option [value]="tabla">{{ tabla }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Fecha Inicio -->
+        <div class="form-group">
+          <label class="form-label">Desde</label>
+          <input
+            type="date"
+            class="form-input"
+            [value]="filters().FechaInicio"
+            (change)="updateFilter('FechaInicio', $any($event.target).value)"
+            />
+        </div>
+
+        <!-- Fecha Fin -->
+        <div class="form-group">
+          <label class="form-label">Hasta</label>
+          <input
+            type="date"
+            class="form-input"
+            [value]="filters().FechaFin"
+            (change)="updateFilter('FechaFin', $any($event.target).value)"
+            />
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- TABLA DE HISTORIAL -->
+  <div class="table-container">
+    @if (isLoading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando historial...</p>
+      </div>
+    } @else if (historialList().length === 0) {
+      <div class="empty-state">
+        <i class="bx bx-inbox" style="font-size: 60px;"></i>
+        <p>No hay registros en el historial</p>
+      </div>
+    } @else {
+      <table class="historial-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Tabla</th>
+            <th>ID Registro</th>
+            <th>Descripción</th>
+            <th>IP Address</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (record of historialList(); track record.Id_Historial) {
+            <tr>
+              <td class="date-cell">
+                {{ record.Fecha_Accion | date:'short' }}
+              </td>
+              <td>
+                <span class="user-badge">{{ record.Usuario_Nombre }}</span>
+              </td>
+              <td>
+                <span 
+                  class="accion-badge"
+                  [style.background-color]="getAccionColor(record.Tipo_Accion!)"
+                  >
+                  {{ getAccionLabel(record.Tipo_Accion!) }}
+                </span>
+              </td>
+              <td class="tabla-cell">
+                <code>{{ record.Tabla_Afectada }}</code>
+              </td>
+              <td class="id-cell">
+                {{ record.Id_Registro || '-' }}
+              </td>
+              <td class="descripcion-cell">
+                <span class="text-truncate">{{ record.Descripcion }}</span>
+              </td>
+              <td class="ip-cell">
+                {{ record.IP_Address || '-' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- PAGINACIÓN -->
+  @if (totalPages() > 1) {
+    <div class="pagination-container">
+      <button 
+        class="btn-pagination"
+        (click)="previousPage()"
+        [disabled]="currentPage() === 1"
+        aria-label="Página anterior"
+        >
+        <i class="bx bx-chevron-left"></i>
+        <span>Anterior</span>
+      </button>
+
+      <div class="page-info">
+        Página <strong>{{ currentPage() }}</strong> de <strong>{{ totalPages() }}</strong>
+        <span class="total-records">({{ totalRecords() }} registros)</span>
+      </div>
+
+      <button 
+        class="btn-pagination"
+        (click)="nextPage()"
+        [disabled]="currentPage() === totalPages()"
+        aria-label="Siguiente página"
+        >
+        <span>Siguiente</span>
+        <i class="bx bx-chevron-right"></i>
+      </button>
+    </div>
+  }
+</div>

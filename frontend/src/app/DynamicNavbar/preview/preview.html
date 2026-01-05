@@ -1,0 +1,31 @@
+<div class="preview-container">
+  <div class="preview-header">
+    <strong>{{ title || 'Preview' }}</strong>
+    <div class="preview-actions">
+      <button class="btn-close" type="button" (click)="close()" aria-label="Cerrar">✕</button>
+    </div>
+  </div>
+
+  @if (url) {
+    <div class="preview-content">
+      <div class="preview-frame-wrapper">
+        @if (loading) {
+          <div class="spinner">
+            <div class="spinner-circle" aria-hidden="true"></div>
+            <div class="spinner-text">Cargando...</div>
+          </div>
+        }
+
+        <iframe [src]="url" [title]="title || 'Preview'" frameborder="0" (load)="onLoad()" (error)="onError()"></iframe>
+      </div>
+    </div>
+  }
+
+  @if (!url) {
+    <div class="no-preview">No hay archivo para previsualizar.</div>
+  }
+
+  @if (error) {
+    <div class="preview-error">{{ error }}</div>
+  }
+</div>

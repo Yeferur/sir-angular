@@ -1,0 +1,567 @@
+@if (!isLoading()) {
+
+<div class="booking-dashboard" [formGroup]="form">
+  <div class="page-header">
+    <div>
+      <h1>Editar Reserva</h1>
+      <p class="subtitle">Ajusta los detalles de la reserva y guarda los cambios.</p>
+    </div>
+  </div>
+  <div class="main-content">
+
+    <!-- DETALLES DEL VIAJE -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Detalles del Viaje</h2>
+      </div>
+
+      <div class="form-grid">
+        <!-- Tour -->
+        <div class="form-group">
+          <label class="form-label">
+            Tour <span class="required-star">*</span>
+          </label>
+
+          <select class="form-select"
+            [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
+            formControlName="SelectTour"
+            (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar(); autollenarPrecios();">
+            <option value="" disabled>Seleccionar un tour...</option>
+
+            @for (tour of tours(); track tour.Id_Tour) {
+            <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+            }
+          </select>
+
+          @if (form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid) {
+          <div class="errorMessage">Selecciona un tour.</div>
+          }
+        </div>
+
+        <!-- Plan (si hay más de uno) -->
+        @if (planes().length > 1) {
+        <div class="form-group">
+          <label class="form-label">Plan</label>
+          <select class="form-select" formControlName="Id_Plan" (change)="onPlanMonedaChange()">
+            @for (p of planes(); track p.Id_Plan) {
+            <option [value]="p.Id_Plan">{{ p.Nombre_Plan }}</option>
+            }
+          </select>
+        </div>
+        }
+
+        <!-- Fecha -->
+        <div class="form-group">
+          <label class="form-label">
+            Fecha del Tour <span class="required-star">*</span>
+          </label>
+
+          <input type="date" class="form-input" formControlName="Fecha_Tour"
+            [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
+            (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+
+          @if (form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid) {
+          <div class="errorMessage">Selecciona una fecha válida.</div>
+          }
+        </div>
+
+        <!-- Idioma -->
+        <div class="form-group">
+          <label class="form-label">Idioma</label>
+          <select class="form-select" formControlName="Idioma_Reserva">
+            <option value="ESPAÑOL">Español</option>
+            <option value="INGLÉS">Inglés</option>
+          </select>
+        </div>
+
+        <!-- Moneda -->
+        <div class="form-group">
+          <label class="form-label">Moneda</label>
+          <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
+            @for (m of monedas(); track m.Id_Moneda) {
+            <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Puntos -->
+        <div class="form-group full-width">
+          <label class="form-label">
+            Puntos de Encuentro (máx. 3) <span class="required-star">*</span>
+          </label>
+
+          <div class="punto-autocomplete-wrapper">
+            <!-- Tokens seleccionados -->
+            @if (puntosSeleccionados().length > 0) {
+            <div class="punto-tokens-container">
+              @for (punto of puntosSeleccionados(); let i = $index; track punto.Id_Punto ?? i) {
+              <div class="punto-token">
+                <span>
+                  {{ i === 0 ? 'Principal: ' : '' }}{{ punto.NombrePunto }}
+                </span>
+                <button type="button" class="remove-token-btn" (click)="eliminarPunto(punto)">✕</button>
+              </div>
+              }
+            </div>
+            }
+
+            <!-- Buscador (solo si hay espacio para más puntos) -->
+            @if (puntosSeleccionados().length < 3) { <div class="form-group">
+              <input type="text" class="form-input" placeholder="Buscar y añadir punto..." #puntoInput
+                (input)="onPuntoSearch($event)" />
+
+              @if (puntoBusquedaResults().length > 0) {
+              <ul class="autocomplete-list">
+                @for (result of puntoBusquedaResults(); track result.Id_Punto) {
+                <li (click)="seleccionarPunto(result, puntoInput)">
+                  {{ result.NombrePunto }}
+                </li>
+                }
+              </ul>
+              }
+          </div>
+          }
+
+          <!-- Aviso cuando no hay punto seleccionado -->
+          @if (form.get('Puntos')?.touched && puntosSeleccionados().length === 0) {
+          <div class="errorMessage">
+            Selecciona al menos un punto de encuentro.
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- RESPONSABLE -->
+<div class="card">
+  <div class="card-header">
+    <h2>Responsable</h2>
+  </div>
+
+  <div class="form-grid">
+    <div class="form-group">
+      <label class="form-label">
+        ¿Quién reporta? <span class="required-star">*</span>
+      </label>
+
+      <input type="text" class="form-input"
+        [ngClass]="form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid ? 'errorInput' : ''"
+        formControlName="Nombre_Reportante" />
+
+      @if (form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid) {
+      <div class="errorMessage">Nombre de quien reporta es requerido.</div>
+      }
+    </div>
+
+    <!-- Canal -->
+    <div class="form-group">
+      <label class="form-label">Canal / Categoría</label>
+      <select class="form-select" formControlName="Id_Canal" (change)="recalcularComisionesPorCanal()">
+        @for (canal of canales(); track canal.Id_Canal) {
+        <option [value]="canal.Id_Canal">
+          {{ canal.Nombre_Canal }}
+        </option>
+        }
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        Teléfono <span class="required-star">*</span>
+      </label>
+
+      <div class="phone-input-group">
+        <input type="text" class="form-input phone-prefix" formControlName="Indicativo" />
+
+        <input type="tel" class="form-input phone-number"
+          [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
+          formControlName="Telefono_Reportante" />
+      </div>
+
+      @if (form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid) {
+      <div class="errorMessage">Teléfono inválido (10 dígitos).</div>
+      }
+    </div>
+
+    <div class="form-group full-width">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-input" formControlName="Observaciones"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- PASAJEROS -->
+<div class="card" formArrayName="Pasajeros">
+  <div class="card-header">
+    <h2>Pasajeros</h2>
+
+    <div class="form-grid" style="gap: 16px;">
+      <div class="form-group">
+        <label class="form-label">Adultos</label>
+        <input type="number" min="0" class="form-input" [value]="adultosInputValue()"
+          (input)="setCantidadPasajeros('ADULTO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
+          (change)="verificarCuposDisponibles(); autollenarPrecios(); CuposDisponiblesNavbar()" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Niños</label>
+        <input type="number" min="0" class="form-input" [value]="ninosInputValue()"
+          (input)="setCantidadPasajeros('NINO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
+          (change)="verificarCuposDisponibles(); autollenarPrecios(); CuposDisponiblesNavbar()" />
+
+        @if (isRioClaroTour()) {
+        <small class="hint">En Río Claro, los niños deben tener 5 o más años.</small>
+        }
+      </div>
+
+      <!-- Infantes oculto en Río Claro -->
+      @if (!isRioClaroTour()) {
+      <div class="form-group">
+        <label class="form-label">Infantes</label>
+        <input type="number" min="0" class="form-input" [value]="infantesInputValue()"
+          (input)="setCantidadPasajeros('INFANTE', $any($event.target).value)" (focus)="seleccionarTexto($event)" />
+      </div>
+      }
+    </div>
+  </div>
+
+  @for (pasajero of pasajeros.controls; let i = $index; track i) {
+  <div [formGroupName]="i" class="passenger-card" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value">
+      <div class="passenger-header">
+        <div class="passenger-title">
+          <h4>{{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }} {{ tipoIndex(i) }}</h4>
+
+          <span class="passenger-pill" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value">
+            {{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }}
+          </span>
+        </div>
+
+        <button type="button" class="btn-icon-delete" (click)="eliminarPasajero(i)">✕</button>
+      </div>
+
+    <div class="passenger-body">
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input type="text" class="form-input" formControlName="Nombre_Pasajero" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">DNI/Pasaporte</label>
+        <input type="text" class="form-input" formControlName="DNI" />
+      </div>
+
+      @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-input" formControlName="Telefono_Pasajero" />
+      </div>
+      }
+
+      <div class="form-group">
+        <label class="form-label">Precio</label>
+        <input type="number" class="form-input" formControlName="Precio_Pasajero" readonly />
+      </div>
+
+      @if (pasajero.get('Comision')?.value > 0) {
+      <div class="form-group">
+        <label class="form-label">Comisión</label>
+        <input type="number" class="form-input" formControlName="Comision" readonly />
+      </div>
+      }
+
+      @if (puntosSeleccionados().length > 1) {
+      <div class="form-group">
+        <label class="form-label">Punto de Encuentro</label>
+        <select class="form-select" formControlName="PuntoEncuentro">
+          @for (punto of puntosSeleccionados(); track punto.Id_Punto) {
+          <option [value]="punto.Id_Punto">
+            {{ punto.NombrePunto }}
+          </option>
+          }
+        </select>
+      </div>
+      }
+    </div>
+  </div>
+  }
+
+  <div class="add-buttons-container">
+    <button type="button" class="btn-add" (click)="agregarPasajero('ADULTO')">+ Adulto</button>
+    <button type="button" class="btn-add" (click)="agregarPasajero('NINO')">+ Niño</button>
+    @if (!isRioClaroTour()) {
+    <button type="button" class="btn-add" (click)="agregarPasajero('INFANTE')">+ Infante</button>
+    }
+  </div>
+</div>
+
+<!-- PAGOS -->
+<!-- PAGOS -->
+<div class="card">
+  <div class="card-header">
+    <h2>Detalles de Pago</h2>
+  </div>
+
+  <div class="payments-grid">
+
+    <!-- Col A: forma de pago -->
+    <div class="form-group">
+      <label class="form-label">Forma de Pago</label>
+      <select class="form-select" formControlName="FormaPago" (change)="recalcularTotales()">
+        <option value="Directo">Pago en el punto</option>
+        <option value="Completo">Ya pagó</option>
+        <option value="Abono">Abonos</option>
+      </select>
+
+      <small class="hint">
+        Selecciona cómo se registrará el pago de esta reserva.
+      </small>
+    </div>
+
+    <!-- Col B: área dinámica -->
+    <div class="form-group full-width payments-right">
+
+      <!-- ========== ABONOS ========== -->
+      @if (form.get('FormaPago')?.value === 'Abono') {
+      <div class="payments-panel" formArrayName="Abonos">
+
+        <div class="payments-panel-head">
+          <div class="payments-title">
+            <h3>Abonos</h3>
+            <span class="payments-sub">
+              Moneda: <strong>{{ monedaCodigo() }}</strong>
+            </span>
+          </div>
+
+          <button type="button" class="btn-add-abono" (click)="agregarAbono()">
+            + Agregar Abono
+          </button>
+        </div>
+
+        <div class="abonos-grid">
+          @for (group of abonos.controls; let i = $index; track i) {
+          <div class="abono-row" [formGroupName]="i">
+
+            <!-- Monto -->
+            <div class="abono-col monto-col">
+              <label class="form-label subtle">Monto</label>
+              <input type="number" class="form-input" formControlName="Monto" (change)="recalcularTotales()"
+                placeholder="0" />
+            </div>
+
+            <!-- Archivo -->
+            <div class="abono-col file-col">
+              <label class="form-label subtle">Comprobante</label>
+
+              <div class="file-upload-wrapper">
+                <input type="file" [id]="'ComprobanteAbono' + i" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
+                  (change)="onAbonoFileSelected($event, i)" style="display:none" />
+
+                <label class="btn-upload" [for]="'ComprobanteAbono' + i">
+                  Subir archivo
+                </label>
+
+                @if (abonos.controls[i].get('Comprobante')?.value; as f) {
+                <div class="file-name">
+                  {{ f?.name }} — {{ (f?.size / 1024) | number:'1.0-0' }} KB
+                </div>
+                } @else {
+                <div class="file-placeholder">PDF / JPG / PNG</div>
+                }
+              </div>
+            </div>
+
+            <!-- Delete -->
+            <div class="delete-buttons-container">
+              @if (abonos.length > 1) {
+              <button type="button" class="btn-icon-delete" aria-label="Eliminar abono" (click)="eliminarAbono(i)">
+                ✕
+              </button>
+              }
+            </div>
+
+          </div>
+          }
+        </div>
+
+        @if (!abonosValidos) {
+        <div class="errorMessage">Los abonos no pueden superar el total a pagar.</div>
+        }
+
+        <div class="payments-foot">
+          <span class="hint">
+            Tip: registra cada abono con su comprobante para auditoría.
+          </span>
+        </div>
+      </div>
+      }
+
+      <!-- ========== PAGO COMPLETO ========== -->
+      @if (form.get('FormaPago')?.value === 'Completo') {
+      <div class="payments-panel pago-completo">
+
+        <div class="payments-panel-head">
+          <div class="payments-title">
+            <h3>Comprobante de Pago</h3>
+            <span class="payments-sub">
+              Sube el soporte del pago completo (máx. 5MB).
+            </span>
+          </div>
+        </div>
+
+        <div class="pc-grid">
+
+          <!-- Botón de carga -->
+          <div class="uploader">
+            <input type="file" id="ComprobantePago" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
+              (change)="onFileSelected($event)" style="display:none" />
+            <label class="btn-upload" for="ComprobantePago">
+              Subir comprobante
+            </label>
+          </div>
+
+          <!-- Chip archivo -->
+          <div class="file-chip">
+
+            @if (form.get('ComprobantePago')?.value; as f) {
+
+            @if (f?.SoporteUrl) {
+            <span class="status-pill ok">Guardado</span>
+            <span class="name">Comprobante guardado</span>
+
+            <div class="file-actions">
+              <button type="button" class="btn-link" (click)="viewComprobante(f.SoporteUrl)">Ver</button>
+              <button type="button" class="btn-subtle" (click)="triggerComprobanteUpload()">Actualizar</button>
+              <button type="button" class="btn-danger" (click)="deleteComprobante()">Eliminar</button>
+            </div>
+            } @else {
+            <span class="status-pill pending">Listo para subir</span>
+            <span class="name">{{ f?.name }}</span>
+            <span class="size">— {{ (f?.size / 1024) | number:'1.0-0' }} KB</span>
+            }
+
+            } @else {
+            <span class="status-pill neutral">Sin archivo</span>
+            <span class="name">Aún no has subido el comprobante</span>
+            }
+
+          </div>
+
+          <!-- Error -->
+          @if (form.get('ComprobantePago')?.touched) {
+          <div class="errorMessage pc-error">El comprobante debe ser menor a 5 MB.</div>
+          }
+
+        </div>
+
+      </div>
+      }
+
+      <!-- ========== PAGO DIRECTO ========== -->
+      @if (form.get('FormaPago')?.value === 'Directo') {
+      <div class="payments-panel payments-panel-muted">
+        <h3>Pago Directo</h3>
+        <p class="hint">
+          No se requiere comprobante. El cobro se registra por fuera del sistema.
+        </p>
+      </div>
+      }
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- MODAL PREVIEW (FUERA de label / fuera de summary-totals) -->
+<!-- Preview handled by Dynamic Navbar Preview component -->
+
+<!-- SIDEBAR / RESUMEN FLOTANTE INFERIOR -->
+<div class="floating-summary" [attr.data-state]="openSummary ? 'expanded' : 'compact'">
+
+  <!-- ESTADO COMPACTO -->
+  <div class="summary-collapsed" (click)="toggleSummary()">
+    <div class="summary-left">
+      <span class="badge">
+        {{ form.get('Tipo_Reserva')?.value || 'Grupal' }}
+      </span>
+
+      <span class="meta">
+        {{ pasajerosConAsiento() || 0 }} pax ·
+        {{ pendientePorPagar() | number:'1.0-0' }} {{ monedaCodigo() }}
+      </span>
+    </div>
+
+    <button class="expand-btn" type="button" aria-label="Ver resumen completo">
+      <span class="expand-icon">▲</span>
+    </button>
+  </div>
+
+  <!-- ESTADO EXPANDIDO -->
+  <div class="summary-expanded">
+    <div class="summary-expanded-header">
+      <h2>Resumen</h2>
+      <button class="btn-icon-delete" type="button" aria-label="Cerrar resumen"
+        (click)="toggleSummary(false)">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Tipo de Reserva</label>
+      <div class="segmented-control">
+        <button type="button" [class.active]="form.get('Tipo_Reserva')?.value === 'Grupal'"
+          (click)="form.get('Tipo_Reserva')?.setValue('Grupal')">
+          Grupal
+        </button>
+        <button type="button" [class.active]="form.get('Tipo_Reserva')?.value === 'Privada'"
+          (click)="form.get('Tipo_Reserva')?.setValue('Privada')">
+          Privada
+        </button>
+      </div>
+    </div>
+
+    <div class="summary-totals">
+      <div class="summary-item">
+        <label class="form-label">Número de Pasajeros</label>
+        <span class="summary-value">{{ pasajerosConAsiento() || '—' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Horario</label>
+        <span class="summary-value">{{ horaSalida() || '—' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Total Neto ({{ monedaCodigo() }})</label>
+        <span class="summary-value">{{ totalNeto() | number:'1.0-0' }}</span>
+      </div>
+
+      <div class="summary-item">
+        <label class="form-label">Comisión ({{ monedaCodigo() }})</label>
+        <span class="summary-value">{{ comisionTotal() | number:'1.0-0' }}</span>
+      </div>
+
+      @if (form.get('FormaPago')?.value === 'Abono') {
+      <div class="summary-item">
+        <label class="form-label">Total Abonos ({{ monedaCodigo() }})</label>
+        <span class="summary-value">{{ totalAbonos() | number:'1.0-0' }}</span>
+      </div>
+      }
+
+      <div class="summary-item total-row">
+        <label class="form-label">Pendiente ({{ monedaCodigo() }})</label>
+        <span class="summary-value summary-total">{{ pendientePorPagar() | number:'1.0-0' }}</span>
+      </div>
+    </div>
+
+    <button type="button" class="btn-save-summary" (click)="onSubmit()">
+      Guardar Reserva
+    </button>
+    <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
+      Duplicar Reserva
+    </button>
+  </div>
+</div>
+
+}
