@@ -30,64 +30,113 @@ async function generarIdReservaUnico(idTour) {
  * LISTADOS / LECTURA
  * =========================== */
 async function filtrarReservas(q) {
+  const params = (typeof q === 'object' && q !== null) ? q : { q: String(q || '') };
 
-
-  // Permitir búsqueda por 'q' (nombre genérico) desde el frontend
   const {
-    Fecha_Tour,
-    Id_Tour,
-    Id_Canal,
-    Estado,
-    Id_Reserva,
-    Idioma_Reserva,
-    Telefono_Reportante,
-    Nombre_Reportante
-  } = q;
-  // Si viene 'q', usarlo como filtro de pasajero
-  const nombrePasajeroFiltro = q.q ? q.q : (q.NombreApellido || '');
+    Fecha_Tour, FechaRegistro, Id_Tour, Id_Canal, Estado,
+    Id_Reserva, Idioma_Reserva, Telefono_Reportante,
+    Nombre_Reportante, DNI, Punto
+  } = params;
+
+  const qTerm = String(params.q ?? params.NombreApellido ?? '').trim();
 
   const conds = [];
-  if (Fecha_Tour) conds.push(`r.Fecha_Tour = ${db.escape(Fecha_Tour)}`);
-  // Permitir array de tours
+  const values = [];
+
+  const like = (v) => `%${v}%`;
+
+  if (Fecha_Tour) { conds.push(`r.Fecha_Tour = ?`); values.push(Fecha_Tour); }
+
   if (Id_Tour) {
     if (Array.isArray(Id_Tour)) {
-      const ids = Id_Tour.map((id) => db.escape(id)).join(',');
-      conds.push(`h.Id_Tour IN (${ids})`);
-    } else {
-      conds.push(`h.Id_Tour = ${db.escape(Id_Tour)}`);
+      conds.push(`h.Id_Tour IN (${Id_Tour.map(() => '?').join(',')})`);
+      values.push(...Id_Tour);
+    } else { conds.push(`h.Id_Tour = ?`); values.push(Id_Tour); }
+  }
+
+  if (Id_Canal) {
+    if (Array.isArray(Id_Canal)) {
+      conds.push(`r.Id_Canal IN (${Id_Canal.map(() => '?').join(',')})`);
+      values.push(...Id_Canal);
+    } else { conds.push(`r.Id_Canal = ?`); values.push(Id_Canal); }
+  }
+
+  if (Estado) {
+    if (Array.isArray(Estado)) {
+      conds.push(`r.Estado IN (${Estado.map(() => '?').join(',')})`);
+      values.push(...Estado);
+    } else { conds.push(`r.Estado = ?`); values.push(Estado); }
+  }
+
+  if (Id_Reserva) { conds.push(`r.Id_Reserva = ?`); values.push(Id_Reserva); }
+  if (Idioma_Reserva) { conds.push(`r.Idioma_Reserva = ?`); values.push(Idioma_Reserva); }
+  if (Telefono_Reportante) { conds.push(`r.Telefono_Reportante LIKE ?`); values.push(like(Telefono_Reportante)); }
+  if (Nombre_Reportante) { conds.push(`r.Nombre_Reportante LIKE ?`); values.push(like(Nombre_Reportante)); }
+
+  if (DNI) {
+    conds.push(`EXISTS (SELECT 1 FROM pasajeros px WHERE px.Id_Reserva = r.Id_Reserva AND px.DNI = ?)`);
+    values.push(DNI);
+  }
+
+  if (qTerm) {
+    conds.push(`(
+      r.Id_Reserva LIKE ?
+      OR r.Nombre_Reportante LIKE ?
+      OR t.Nombre_Tour LIKE ?
+      OR c.Nombre_Canal LIKE ?
+      OR EXISTS (SELECT 1 FROM pasajeros px WHERE px.Id_Reserva = r.Id_Reserva AND px.Nombre_Pasajero LIKE ?)
+      OR EXISTS (SELECT 1 FROM pasajeros px WHERE px.Id_Reserva = r.Id_Reserva AND px.DNI LIKE ?)
+      OR EXISTS (SELECT 1 FROM puntos pt WHERE pt.Id_Punto = h.Id_Punto AND pt.Nombre_Punto LIKE ?)
+      OR EXISTS (
+        SELECT 1 FROM pasajeros px
+        JOIN puntos pt2 ON pt2.Id_Punto = px.Id_Punto
+        WHERE px.Id_Reserva = r.Id_Reserva AND pt2.Nombre_Punto LIKE ?
+      )
+    )`);
+    const L = like(qTerm);
+    values.push(L, L, L, L, L, L, L, L);
+  }
+
+  if (Punto) {
+    const p = String(Punto).trim();
+    if (p && p !== qTerm) {
+      conds.push(`(
+        EXISTS (SELECT 1 FROM puntos pt WHERE pt.Id_Punto = h.Id_Punto AND pt.Nombre_Punto LIKE ?)
+        OR EXISTS (
+          SELECT 1 FROM pasajeros px
+          JOIN puntos pt2 ON pt2.Id_Punto = px.Id_Punto
+          WHERE px.Id_Reserva = r.Id_Reserva AND pt2.Nombre_Punto LIKE ?
+        )
+      )`);
+      const LP = like(p);
+      values.push(LP, LP);
     }
   }
-  if (Id_Canal) conds.push(`r.Id_Canal = ${db.escape(Id_Canal)}`);
-  if (Estado) conds.push(`r.Estado = ${db.escape(Estado)}`);
-  if (Id_Reserva) conds.push(`r.Id_Reserva = ${db.escape(Id_Reserva)}`);
-  if (Idioma_Reserva) conds.push(`r.Idioma_Reserva = ${db.escape(Idioma_Reserva)}`);
-  if (Telefono_Reportante) conds.push(`r.Telefono_Reportante LIKE ${db.escape('%' + Telefono_Reportante + '%')}`);
-  if (nombrePasajeroFiltro) conds.push(`EXISTS (SELECT 1 FROM pasajeros px WHERE px.Id_Reserva = r.Id_Reserva AND px.Nombre_Pasajero LIKE ${db.escape('%' + nombrePasajeroFiltro + '%')})`);
+
+  if (FechaRegistro) { conds.push(`DATE(r.Fecha_Registro) = ?`); values.push(FechaRegistro); }
+
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-  console.log(where);
 
   const sql = `
     SELECT
-      r.Id_Reserva,
-      r.Fecha_Tour,
-      h.Id_Tour,
-      t.Nombre_Tour,
-      r.Estado,
-      r.Idioma_Reserva,
-      r.Telefono_Reportante,
-      r.Nombre_Reportante,
+      r.Id_Reserva, r.Fecha_Tour, h.Id_Tour, t.Nombre_Tour,
+      r.Estado, r.Idioma_Reserva, r.Telefono_Reportante, r.Nombre_Reportante,
       COUNT(p.Id_Pasajero) AS Pasajeros
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
+    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     ${where}
     GROUP BY r.Id_Reserva
     ORDER BY r.Fecha_Registro DESC
   `;
-  const [rows] = await db.query(sql);
+
+  console.log(where, values);
+  const [rows] = await db.query(sql, values);
   return rows;
 }
+
 
 async function obtenerReserva(Id_Reserva) {
   const [cabRows] = await db.query(

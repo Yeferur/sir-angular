@@ -1,105 +1,120 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 // Importa tus servicios
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 
 @Component({
   selector: 'app-ver-reservas',
-  standalone: true, // Asegúrate de que tu componente sea standalone
-  imports: [CommonModule, DatePipe], // Añade DatePipe para el formato de fecha
+  standalone: true,
+  imports: [CommonModule, DatePipe],
   templateUrl: './ver-reservas.html',
   styleUrls: ['./ver-reservas.css']
 })
 export class VerReservasComponent implements OnInit {
-        // Control de focus para el input principal
-        mainInputFocused = signal(false);
+  mainInputFocused = signal(false);
+private settingFromAutocomplete = false;
 
-        onMainInputFocus() {
-          this.mainInputFocused.set(true);
-          // Si hay sugerencias, mostrar
-          if (this.puntoSugerencias().length > 0) this.puntoAutocompleteVisible.set(true);
-        }
+  onMainInputFocus() {
+    this.mainInputFocused.set(true);
+    if (this.puntoSugerencias().length > 0) this.puntoAutocompleteVisible.set(true);
+  }
 
-        onMainInputBlur() {
-          // Pequeño retardo para permitir click en sugerencia
-          setTimeout(() => {
-            this.mainInputFocused.set(false);
-            this.puntoAutocompleteVisible.set(false);
-          }, 120);
-        }
-      // Autocompletar puntos de encuentro
-      puntoSugerencias = signal<any[]>([]);
-      puntoAutocompleteVisible = signal(false);
+  onMainInputBlur() {
+    setTimeout(() => {
+      this.mainInputFocused.set(false);
+      this.puntoAutocompleteVisible.set(false);
+    }, 120);
+  }
+  puntoSugerencias = signal<any[]>([]);
+  puntoAutocompleteVisible = signal(false);
 
-      // Buscar puntos de encuentro al escribir
-      async onPuntoAutocomplete(ev: Event) {
-        const term = (ev.target as HTMLInputElement)?.value?.trim() || '';
-        if (term.length < 2) {
-          this.puntoSugerencias.set([]);
-          this.puntoAutocompleteVisible.set(false);
-          return;
-        }
-        try {
-          const results = await this.reservasService.buscarPuntos(term).toPromise();
-          this.puntoSugerencias.set(results || []);
-          // Solo mostrar si el input tiene focus
-          this.puntoAutocompleteVisible.set((results && results.length > 0 && this.mainInputFocused()));
-        } catch {
-          this.puntoSugerencias.set([]);
-          this.puntoAutocompleteVisible.set(false);
-        }
-      }
-
-      // Seleccionar punto de encuentro del autocompletar
-      puntoSeleccionado: any = null;
-      seleccionarPuntoAutocomplete(p: any) {
-        this.updateFilter('Punto', p.NombrePunto);
-        this.puntoSeleccionado = p;
-        this.puntoAutocompleteVisible.set(false);
-        this.puntoSugerencias.set([]);
-        // También actualiza el input principal
-        this.updateFilter('NombreApellido', p.NombrePunto);
-      }
-
-      // Detectar si el input es un ID de reserva, DNI, o nombre
-      onMainSearchInput(val: string) {
-        // Si el usuario seleccionó un punto del autocompletar, no sobreescribir el filtro Punto
-        if (!this.puntoSeleccionado) {
-          this.updateFilter('NombreApellido', val);
-          this.updateFilter('Punto', '');
-        }
-        // Si es un número largo, puede ser DNI
-        if (/^\d{6,}$/.test(val)) {
-          this.updateFilter('IdPas', val);
-        } else if (/^RSV\d+/i.test(val)) {
-          this.updateFilter('Id_Reserva', val);
-        } else {
-          this.updateFilter('IdPas', '');
-          this.updateFilter('Id_Reserva', '');
-        }
-        // Lanzar autocompletar de puntos solo si no hay punto seleccionado
-        if (!this.puntoSeleccionado) {
-          this.onPuntoAutocomplete({ target: { value: val } } as any);
-        }
-      }
-    // Devuelve el texto de los tours seleccionados para mostrar en el chip
-    getSelectedToursText(): string {
-      const ids = this.filters().tour;
-      if (!ids?.length) return '';
-      return ids
-        .map(id => {
-          const t = this.resultsTours().find(tour => tour.Id_Tour == id);
-          return t ? t.Nombre_Tour : id;
-        })
-        .join(', ');
+  async onPuntoAutocomplete(ev: Event) {
+    const term = (ev.target as HTMLInputElement)?.value?.trim() || '';
+    if (term.length < 2) {
+      this.puntoSugerencias.set([]);
+      this.puntoAutocompleteVisible.set(false);
+      return;
     }
-  
-  // Inyección de servicios
+    try {
+      const results = await firstValueFrom(this.reservasService.buscarPuntos(term));
+      this.puntoSugerencias.set(results || []);
+      // Solo mostrar si el input tiene focus
+      this.puntoAutocompleteVisible.set((results && results.length > 0 && this.mainInputFocused()));
+    } catch {
+      this.puntoSugerencias.set([]);
+      this.puntoAutocompleteVisible.set(false);
+    }
+  }
+
+  puntoSeleccionado: any = null;
+seleccionarPuntoAutocomplete(p: any) {
+  this.settingFromAutocomplete = true;
+
+  this.puntoSeleccionado = p;
+
+  this.updateFilter('NombreApellido', p.NombrePunto);
+
+  // ✅ filtro avanzado
+  this.updateFilter('Punto', p.NombrePunto);
+
+  // opcional: al seleccionar punto, limpia DNI / IdReserva (para no mezclar)
+  this.updateFilter('IdPas', '');
+  this.updateFilter('Id_Reserva', '');
+
+  this.puntoAutocompleteVisible.set(false);
+  this.puntoSugerencias.set([]);
+
+  // liberar en el siguiente tick para que no pegue con el input event
+  setTimeout(() => (this.settingFromAutocomplete = false), 0);
+}
+
+
+  onMainSearchInput(val: string) {
+  const v = (val || '').trim();
+
+  if (!this.settingFromAutocomplete) {
+    if (this.puntoSeleccionado && this.puntoSeleccionado.NombrePunto !== v) {
+      this.puntoSeleccionado = null;
+      this.updateFilter('Punto', '');
+    }
+  }
+
+  this.updateFilter('NombreApellido', v);
+
+  if (/^\d{6,}$/.test(v)) {
+    this.updateFilter('IdPas', v);
+  } else {
+    this.updateFilter('IdPas', '');
+  }
+
+  if (/^RSV\d+/i.test(v)) {
+    this.updateFilter('Id_Reserva', v);
+  } else {
+    this.updateFilter('Id_Reserva', '');
+  }
+
+  if (!this.puntoSeleccionado) {
+    this.onPuntoAutocomplete({ target: { value: v } } as any);
+  }
+}
+
+
+  getSelectedToursText(): string {
+    const ids = this.filters().tour;
+    if (!ids?.length) return '';
+    return ids
+      .map(id => {
+        const t = this.resultsTours().find(tour => tour.Id_Tour == id);
+        return t ? t.Nombre_Tour : id;
+      })
+      .join(', ');
+  }
+
   private navbar = inject(DynamicIslandGlobalService);
   private reservasService = inject(Reservas);
 
-  // Signals para datos y estado de la UI
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
   reservas = signal<any[]>([]);
@@ -107,22 +122,19 @@ export class VerReservasComponent implements OnInit {
   isLoadingReservas = signal(false);
   filtersApplied = signal(false);
 
-  // Signal para controlar la visibilidad del panel de filtros avanzados
   advancedFiltersVisible = signal(false);
 
-  // Signal para el estado de los dropdowns de filtros
   dropdownOpenCategoria = signal(false);
   dropdownOpenTour = signal(false);
   dropdownOpenEstado = signal(false);
 
-  // Signal que almacena todos los filtros
   filters = signal({
     FechaReserva: '',
     FechaRegistro: '',
     CategoriaReserva: [] as number[],
     tour: [] as number[],
     Id_Reserva: '',
-    NombreApellido: '', // Este se vincula a la barra de búsqueda principal
+    NombreApellido: '',
     IdPas: '',
     Punto: '',
     Estado: [] as string[],
@@ -145,18 +157,15 @@ export class VerReservasComponent implements OnInit {
         error: (error) => console.error('Error al cargar categorías:', error)
       });
     } catch (error) {
-      // Manejo de errores...
     } finally {
       this.isLoading.set(false);
     }
   }
 
-  // Actualiza el valor de un filtro específico
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Maneja la selección múltiple en los dropdowns
   toggleSelection(value: any, filterKey: 'CategoriaReserva' | 'tour' | 'Estado') {
     const current = this.filters()[filterKey] as any[];
     const updated = current.includes(value)
@@ -165,13 +174,10 @@ export class VerReservasComponent implements OnInit {
     this.updateFilter(filterKey, updated);
   }
 
-
-  // Mapea los nombres de los filtros del UI a los del backend
   private buildApiFilters() {
     const f = this.filters();
     const api: any = {};
 
-    // FECHAS: manda ISO (YYYY-MM-DD)
     if (f.FechaReserva) api.Fecha_Tour = f.FechaReserva;     // o FechaReserva según tu backend
     if (f.FechaRegistro) api.FechaRegistro = f.FechaRegistro;
 
