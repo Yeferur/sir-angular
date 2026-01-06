@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, ViewChild } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, ViewChild, NgZone } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
@@ -34,6 +34,7 @@ export class CrearReservaComponent implements OnInit {
   private cdr = inject(ChangeDetectorRef);
   private reservasSvc = inject(Reservas);
   private navbar = inject(DynamicIslandGlobalService);
+  private zone = inject(NgZone);
 
   isLoading = signal<boolean>(true);
   form!: FormGroup;
@@ -209,6 +210,7 @@ export class CrearReservaComponent implements OnInit {
   private disponibilidadActual: any = null;
 
   async ngOnInit(): Promise<void> {
+
     this.form = this.fb.group({
       // cabecera (corrige la sintaxis de disabled)
       SelectTour: [{ value: '', disabled: false }, Validators.required],
@@ -246,13 +248,32 @@ export class CrearReservaComponent implements OnInit {
       ComprobantePago: [null],
     });
     this.wsService.messages$.subscribe((msg: any) => {
-      const fecha = this.form.get('Fecha_Tour')?.value;
-      const tour = this.form.get('SelectTour')?.value;
-      if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
-        this.CuposDisponiblesNavbar();
-      }
+      this.zone.run(() => {
+        const fecha = this.form.get('Fecha_Tour')?.value;
+        const tour = this.form.get('SelectTour')?.value;
+
+        // Reservas que afectan cupos del tour/fecha actual
+        if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
+          this.CuposDisponiblesNavbar();
+          this.verificarCuposDisponibles();
+        }
+
+        // Cambios de aforo del tour actual (si el evento trae fecha, intenta matchear)
+        if (msg?.type === 'aforoActualizado' && msg?.Id_Tour == tour) {
+          if (!msg?.Fecha || msg.Fecha === fecha) {
+            this.CuposDisponiblesNavbar();
+            this.verificarCuposDisponibles();
+          }
+        }
+      });
     });
     try {
+      this.isLoading.set(true);
+      this.navbar.alert.set({
+        title: 'Cargando datos...',
+        loading: true,
+        autoClose: false,
+      });
       const [tours, canales, monedas] = await Promise.all([
         firstValueFrom(this.reservasSvc.getTours()),
         firstValueFrom(this.reservasSvc.getCanales()),
@@ -273,6 +294,7 @@ export class CrearReservaComponent implements OnInit {
         ],
       });
     } finally {
+      this.navbar.alert.set(null);
       this.isLoading.set(false);
       this.cdr.markForCheck();
     }
@@ -757,11 +779,7 @@ private applyDisponibilidadToDatepicker() {
   const isAllowed = (date: Date) => {
     const d = onlyDate(date);
     const wk = d.getDay();
-
-    // ❌ pasado
     if (d < today) return false;
-
-    // ✅ si cae en temporada, manda la temporada
     for (const t of temporadas) {
       if (!t.inicio || !t.fin) continue;
 
@@ -774,10 +792,8 @@ private applyDisponibilidadToDatepicker() {
       }
     }
 
-    // ✅ SOLO_TEMPORADAS: si no cayó en temporada => NO
     if (modoNorm === 'SOLO_TEMPORADAS') return false;
 
-    // ✅ TODO_EL_AÑO: usar días base
     if (diasBaseSet.size > 0) return diasBaseSet.has(wk);
 
     // ❌ nunca permitir por defecto
@@ -1522,7 +1538,7 @@ private applyDisponibilidadToDatepicker() {
   }
 
   private verReservaDuplicada(idReserva: string) {
-    // Usar el servicio del navbar para mostrar la reserva
+
     this.navbar.Id_Reserva.set(idReserva);
   }
 

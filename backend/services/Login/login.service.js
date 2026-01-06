@@ -1,6 +1,9 @@
+// backend/services/Login/login.service.js
 const db = require('../../database/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const permisosService = require('../Permisos/permisos.service');
+const wsManager = require('../../websocketManager');
 
 /**
  * Buscar usuario por username/email/id
@@ -33,10 +36,9 @@ function generateToken(user) {
       role: user.Rol
     },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }   // ahora dura 7 días
+    { expiresIn: '7d' }
   );
 }
-
 
 /**
  * Guardar la sesión en base de datos
@@ -50,40 +52,25 @@ async function saveSession(userId, token) {
 }
 
 /**
- * Eliminar sesión en base de datos
- */
-/**
- * Cierra todas las sesiones de un usuario, desconecta WebSocket y notifica.
+ * Cierra todas las sesiones de un usuario, notifica y desconecta WS.
+ * - isForced=true: cierre remoto/forzado
+ * - isForced=false: logout normal del mismo usuario
  */
 async function logoutUserById(userId, isForced = false) {
-  // 1) Borrar todas las sesiones
-  await db.query(
-    'DELETE FROM sesiones WHERE Id_Usuario = ?',
-    [userId]
-  );
+  const uid = Number(userId);
 
-  // 2) Cerrar WebSocket si está conectado
-  const wsManager = require('../../websocketManager');
-  const clientSocket = wsManager.getClient(userId);
-  if (clientSocket && clientSocket.readyState === 1) { // 1 = OPEN
-    // Enviar tipo diferente según si es logout normal o forzado
-    const messageType = isForced ? 'force-logout' : 'logout';
-    clientSocket.send(JSON.stringify({ type: messageType }));
-    
-    // Pequeño delay para asegurar que el mensaje se envíe antes de cerrar
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // Cerrar socket - esto dispara ws.on('close') que llamará removeClient
-    clientSocket.close();
-  } else if (clientSocket) {
-    // Si el socket existe pero no está abierto, remover manualmente
-    wsManager.removeClient(userId);
+  // 1) eliminar sesiones
+  await db.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [uid]);
+
+  // 2) avisar y desconectar websockets del usuario (todas sus pestañas)
+  if (isForced) {
+    wsManager.sendForceLogout(uid, 'sesion_cerrada_remotamente');
+  } else {
+    // logout normal: también puedes cerrar todas sus pestañas si quieres
+    wsManager.sendForceLogout(uid, 'logout');
   }
 
-  // 3) Pequeño delay para asegurar que la DB se actualizó antes de broadcast
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  // 4) Notificar a todos los clientes
+  // 3) refrescar conectados
   await wsManager.broadcastActiveUsers();
 }
 
@@ -96,6 +83,27 @@ async function getUserById(userId) {
   return rows[0] || null;
 }
 
+/**
+ * Obtener permisos y menú del usuario al hacer login
+ */
+async function getPermisosYMenu(userId) {
+  const [permisos, menu] = await Promise.all([
+    permisosService.obtenerPermisosPorUsuario(userId),
+    permisosService.obtenerMenuPorUsuario(userId)
+  ]);
+
+  return {
+    permisos: permisos.map(p => p.Codigo_Permiso),
+    menu: menu.map(m => ({
+      id: m.Id_Modulo,
+      nombre: m.Nombre_Modulo,
+      codigo: m.Codigo_Modulo,
+      icono: m.Icono,
+      ruta: m.Ruta,
+      orden: m.Orden
+    }))
+  };
+}
 
 module.exports = {
   findUserByUsername,
@@ -103,5 +111,6 @@ module.exports = {
   generateToken,
   saveSession,
   logoutUserById,
-  getUserById
+  getUserById,
+  getPermisosYMenu
 };

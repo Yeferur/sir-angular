@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, NgZone, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -30,6 +30,7 @@ export interface Transfer {
 export class InicioService {
   private http = inject(HttpClient);
   private ws = inject(WebSocketService);
+  private zone = inject(NgZone);
   private baseUrl = environment.apiUrl;
   
   // Signal para cambios en tiempo real
@@ -42,21 +43,24 @@ export class InicioService {
 
   private setupWebSocketListeners() {
     this.ws.messages$.subscribe(msg => {
-      if (msg.type === 'aforoActualizado') {
-        console.log('📡 Aforo actualizado recibido:', msg);
-        this.aforoActualizado.set(msg);
-      }
-      
-      if (msg.type === 'reservaCreada' || msg.type === 'reservaActualizada' || msg.type === 'reservaEliminada') {
-        console.log('📡 Evento de reserva recibido:', msg);
-        this.reservaActualizada.set(msg);
-      }
+      // Asegura que la escritura del signal ocurra dentro de Angular
+      this.zone.run(() => {
+        if (msg.type === 'aforoActualizado') {
+          this.aforoActualizado.set(msg);
+        }
+
+        if (msg.type === 'reservaCreada' || msg.type === 'reservaActualizada' || msg.type === 'reservaEliminada') {
+          this.reservaActualizada.set(msg);
+        }
+      });
     });
   }
 
   getDatosInicio(fecha: string): Observable<{ tours: Tour[]; transfers: Transfer[] }> {
-    const url = `${this.baseUrl}/tours-data?fecha=${fecha}`;
-    return this.http.get<{ tours: Tour[]; transfers: Transfer[] }>(url);
+    const url = `${this.baseUrl}/tours-data`;
+    // Evitar devoluciones en caché del navegador cuando la URL es idéntica
+    const params = { fecha, t: Date.now().toString() };
+    return this.http.get<{ tours: Tour[]; transfers: Transfer[] }>(url, { params });
   }
 
   guardarCupo(body: { SelectTour: number; NuevoCupo: number; Fecha: string; id_user?: number }): Observable<{ message: string }> {

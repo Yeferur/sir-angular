@@ -1,101 +1,71 @@
-// Emitir evento de aforo actualizado a todos los clientes menos el que lo actualizó
-function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId }) {
-  try {
-    const payload = JSON.stringify({
-      type: 'aforoActualizado',
-      Id_Tour,
-      Nombre_Tour,
-      NuevoCupo
-    });
-    
-    let enviados = 0;
-    for (const [uid, socket] of clients.entries()) {
-      if (uid !== userId && socket.readyState === 1) {
-        socket.send(payload);
-        enviados++;
-      }
-    }
-    console.log(`📡 Broadcast Aforo: Enviado a ${enviados} clientes (Tour ${Id_Tour}, Cupo: ${NuevoCupo})`);
-  } catch (err) {
-    console.error('Error en broadcastAforoActualizado:', err.message);
-  }
-}
-
-// Emitir evento de reserva creada/actualizada a todos los clientes
-function broadcastReservaEvento(evento) {
-  try {
-    const payload = JSON.stringify(evento);
-    
-    let enviados = 0;
-    for (const socket of clients.values()) {
-      if (socket.readyState === 1) {
-        socket.send(payload);
-        enviados++;
-      }
-    }
-    console.log(`📡 Broadcast Reserva: Enviado a ${enviados} clientes (Tipo: ${evento.type})`);
-  } catch (err) {
-    console.error('Error en broadcastReservaEvento:', err.message);
-  }
-}
+// backend/websocketManager.js
 const db = require('./database/db');
 
+const clients = new Map(); // userId -> Set<WebSocket>
 
-const clients = new Map(); // userId -> socket
-const disconnectingUsers = new Set(); // usuarios que se están desconectando
-
-async function addClient(userId, socket) {
-  disconnectingUsers.delete(userId); // Limpiar si estaba marcado
-  clients.set(userId, socket);
-  console.log(`✅ Cliente agregado: ${userId}, total: ${clients.size}`);
-  await broadcastActiveUsers().catch(err => console.error('Error en addClient broadcast:', err));
+function isOpen(ws) {
+  return ws && ws.readyState === 1; // WebSocket.OPEN
 }
 
-async function removeClient(userId) {
-  // Evitar dobles remociones
-  if (disconnectingUsers.has(userId)) {
-    console.log(`⚠️ Usuario ${userId} ya en proceso de desconexión`);
-    return;
+function getSet(uid) {
+  let set = clients.get(uid);
+  if (!set) {
+    set = new Set();
+    clients.set(uid, set);
   }
-  
-  disconnectingUsers.add(userId);
-  clients.delete(userId);
-  console.log(`❌ Cliente removido: ${userId}, total: ${clients.size}`);
-  
-  // Pequeño delay para asegurar que se procese la BD antes de broadcast
-  await new Promise(resolve => setTimeout(resolve, 50));
-  
-  await broadcastActiveUsers().catch(err => console.error('Error en removeClient broadcast:', err));
+  return set;
 }
 
-function getClient(userId) {
-  return clients.get(userId);
+async function addClient(userId, ws) {
+  const uid = Number(userId);
+  const set = getSet(uid);
+
+  set.add(ws);
+
+  console.log(`✅ addClient uid=${uid} sockets=${set.size} usuarios=${clients.size}`);
+  await broadcastActiveUsers();
+}
+
+async function removeClient(userId, ws) {
+  const uid = Number(userId);
+  const set = clients.get(uid);
+  if (!set) return;
+
+  if (ws) set.delete(ws);
+
+  if (set.size === 0) clients.delete(uid);
+
+  console.log(`❌ removeClient uid=${uid} sockets=${set.size || 0} usuarios=${clients.size}`);
+  await broadcastActiveUsers();
+}
+
+function getClients(userId) {
+  const uid = Number(userId);
+  const set = clients.get(uid);
+  return set ? Array.from(set) : [];
 }
 
 function getAllActiveUsers() {
   return Array.from(clients.keys());
 }
 
-
 async function broadcastActiveUsers() {
   try {
     const usuarios = getAllActiveUsers();
-
-    // Consulta las sesiones activas en DB
     const [rows] = await db.query('SELECT Id_Usuario FROM sesiones');
-    const sesionesDB = rows.map(r => r.Id_Usuario);
+    const sesionesDB = rows.map(r => Number(r.Id_Usuario));
 
     const payload = JSON.stringify({
-      type: "usuarios_conectados_actualizados",
+      type: 'usuarios_conectados_actualizados',
       usuarios,
       sesiones: sesionesDB
     });
 
-    console.log(`📡 Broadcast: ${usuarios.length} conectados, ${sesionesDB.length} en DB`);
+    console.log(`📡 BroadcastActiveUsers: ${usuarios.length} conectados, ${sesionesDB.length} en DB`);
 
-    for (const socket of clients.values()) {
-      if (socket.readyState === 1) {
-        socket.send(payload);
+    for (const set of clients.values()) {
+      for (const ws of set) {
+        if (isOpen(ws)) ws.send(payload);
       }
     }
   } catch (err) {
@@ -103,13 +73,89 @@ async function broadcastActiveUsers() {
   }
 }
 
+// ✅ Aforo a todos menos quien actualiza (si userId viene)
+function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId = null }) {
+  try {
+    const payload = JSON.stringify({
+      type: 'aforoActualizado',
+      Id_Tour,
+      Nombre_Tour,
+      NuevoCupo
+    });
+
+    let enviados = 0;
+
+    for (const [uid, set] of clients.entries()) {
+      if (userId != null && uid === Number(userId)) continue;
+
+      for (const ws of set) {
+        if (isOpen(ws)) {
+          ws.send(payload);
+          enviados++;
+        }
+      }
+    }
+
+    console.log(`📡 Broadcast Aforo: Enviado a ${enviados} sockets (Tour ${Id_Tour}, Cupo: ${NuevoCupo})`);
+  } catch (err) {
+    console.error('Error en broadcastAforoActualizado:', err.message);
+  }
+}
+
+function broadcastReservaEvento(evento) {
+  try {
+    const payload = JSON.stringify(evento);
+
+    let enviados = 0;
+    for (const set of clients.values()) {
+      for (const ws of set) {
+        if (isOpen(ws)) {
+          ws.send(payload);
+          enviados++;
+        }
+      }
+    }
+
+    console.log(`📡 Broadcast Reserva: Enviado a ${enviados} sockets (Tipo: ${evento.type})`);
+  } catch (err) {
+    console.error('Error en broadcastReservaEvento:', err.message);
+  }
+}
+
+// ✅ Logout forzado a todas las pestañas/navegadores del usuario
+function sendForceLogout(userId, reason = 'logout_remoto') {
+  const uid = Number(userId);
+  const set = clients.get(uid);
+  if (!set || set.size === 0) return 0;
+
+  let enviados = 0;
+
+  for (const ws of set) {
+    if (!isOpen(ws)) continue;
+
+    try {
+      ws.send(JSON.stringify({ type: 'forceLogout', reason }));
+      enviados++;
+    } catch {}
+
+    try {
+      ws.close(1000, 'force_logout');
+    } catch {}
+  }
+
+  set.clear();
+  clients.delete(uid);
+
+  return enviados;
+}
 
 module.exports = {
   addClient,
   removeClient,
-  getClient,
+  getClients,
   getAllActiveUsers,
-  broadcastActiveUsers
-  ,broadcastReservaEvento
-  ,broadcastAforoActualizado
+  broadcastActiveUsers,
+  broadcastAforoActualizado,
+  broadcastReservaEvento,
+  sendForceLogout
 };

@@ -17,6 +17,9 @@ exports.login = async (req, res) => {
     const token = loginService.generateToken(user);
     await loginService.saveSession(user.Id_Usuario, token);
 
+    // Obtener permisos y menú del usuario
+    const { permisos, menu } = await loginService.getPermisosYMenu(user.Id_Usuario);
+
     return res.json({
       token,
       user: {
@@ -25,7 +28,9 @@ exports.login = async (req, res) => {
         username: user.Usuario,
         email: user.Correo,
         role: user.Rol
-      }
+      },
+      permisos,
+      menu
     });
   } catch (e) {
     console.error('login error:', e);
