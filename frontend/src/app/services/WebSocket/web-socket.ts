@@ -18,7 +18,9 @@ export class WebSocketService {
   connect(token: string) {
     this.currentToken = token;
     this.reconnectAttempts = 0;
-    this.ws = new WebSocket('ws://localhost:5000');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+    this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
       console.log('✅ WebSocket conectado');

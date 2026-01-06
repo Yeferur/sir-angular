@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database/db');
 const websocketManager = require('./websocketManager');
 
-const wss = new WebSocket.Server({ port: 5000 });
+const wss = new WebSocket.Server({ port: 6000 });
 
 wss.on('connection', (ws) => {
   let userId = null;
@@ -64,4 +64,4 @@ wss.on('connection', (ws) => {
   });
 });
 
-console.log('Servidor WebSocket corriendo en ws://localhost:5000');
+console.log('Servidor WebSocket corriendo en ws://localhost:6000');

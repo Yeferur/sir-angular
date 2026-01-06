@@ -1,7 +1,12 @@
 // backend/db.js
 const mysql = require('mysql2');
 const dotenv = require('dotenv');
-dotenv.config({ path: "./env/.env" });
+
+// Usar ruta flexible según entorno
+const envPath = process.env.NODE_ENV === 'production' 
+  ? './env/.env' 
+  : './env/.env';
+dotenv.config({ path: envPath });
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,

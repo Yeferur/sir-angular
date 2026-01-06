@@ -1,0 +1,169 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    SIR-ANGULAR: CAMBIOS PARA PRODUCCIÓN                         ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+📦 ARCHIVOS MODIFICADOS:
+────────────────────────────────────────────────────────────────────────────────
+
+1. ✅ backend/websocket.js
+   └─ Puerto: 5000 → 6000 (línea 7)
+
+2. ✅ backend/server.js
+   └─ Mensaje console: puerto 5000 → 6000 (línea 44)
+
+3. ✅ backend/database/db.js
+   └─ Manejo flexible de .env para development/production
+
+4. ✅ frontend/src/app/services/WebSocket/web-socket.ts
+   └─ URL dinámica: ws://localhost:5000 → ${wsProtocol}//${host}/ws
+
+
+📁 ARCHIVOS NUEVOS CREADOS:
+────────────────────────────────────────────────────────────────────────────────
+
+1. 📋 ecosystem.config.js
+   ├─ Configuración PM2 para backend (puerto 4000)
+   ├─ Configuración PM2 para frontend (puerto 3000)
+   └─ Gestión de logs y recursos
+
+2. 🌐 nginx.conf
+   ├─ Proxy reverso puerto 80/443
+   ├─ Rutas:
+   │  ├─ / → localhost:3000 (frontend)
+   │  ├─ /api → localhost:4000 (backend)
+   │  ├─ /ws → localhost:6000 (websocket)
+   │  └─ /uploads → localhost:4000
+   └─ Configuración HTTPS comentada (SSL)
+
+3. 🔐 backend/.env.production
+   ├─ Variables de base de datos
+   ├─ Variables JWT
+   └─ Configuración NODE_ENV=production
+
+4. 📖 DEPLOY_GUIDE.md
+   ├─ Guía paso a paso de instalación
+   ├─ Configuración de VPS
+   ├─ Comandos PM2 y Nginx
+   └─ Troubleshooting
+
+5. 📝 CAMBIOS_PRODUCCION.md
+   ├─ Resumen de cambios
+   ├─ Checklist pre-producción
+   └─ Archivos importantes
+
+6. 🚀 deploy.sh
+   ├─ Script automático de despliegue
+   ├─ Instala dependencias
+   ├─ Construye frontend
+   └─ Inicia con PM2
+
+7. 🖥️  test-local.bat (Windows)
+   └─ Script para probar localmente antes de subir
+
+
+🔄 FLUJO DE CONEXIÓN EN PRODUCCIÓN:
+────────────────────────────────────────────────────────────────────────────────
+
+CLIENTE (navegador)
+    ↓
+Nginx (puerto 80/443)
+    ├─→ GET / (frontend en puerto 3000)
+    ├─→ GET /api/* (backend en puerto 4000)
+    └─→ WebSocket /ws (backend en puerto 6000)
+
+
+📊 PUERTOS ANTES vs DESPUÉS:
+────────────────────────────────────────────────────────────────────────────────
+
+ANTES (localhost - desarrollo):
+  Frontend:  localhost:4200
+  Backend:   localhost:4000
+  WebSocket: localhost:5000 ❌ (CONFLICTO EN VPS)
+
+DESPUÉS (VPS con Nginx):
+  Frontend:  ejemplo.com (puerto 80/443)
+  Backend:   ejemplo.com/api (proxy a puerto 4000)
+  WebSocket: ejemplo.com/ws (proxy a puerto 6000) ✅
+
+
+🛠️  PASOS RÁPIDOS DE DESPLIEGUE:
+────────────────────────────────────────────────────────────────────────────────
+
+1. Copiar proyecto a VPS
+   scp -r . ubuntu@tu_vps:/home/ubuntu/sir-angular/
+
+2. SSH a VPS
+   ssh ubuntu@tu_vps
+
+3. Ejecutar deploy automático
+   cd /home/ubuntu/sir-angular
+   chmod +x deploy.sh
+   ./deploy.sh
+
+4. Configurar Nginx
+   sudo cp nginx.conf /etc/nginx/sites-available/sir-angular
+   sudo nano /etc/nginx/sites-available/sir-angular  # Editar dominio
+   sudo ln -s /etc/nginx/sites-available/sir-angular /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+
+5. ¡Listo! Tu app está en producción
+
+
+⚠️  CAMBIOS CRÍTICOS DE CÓDIGO:
+────────────────────────────────────────────────────────────────────────────────
+
+🔴 ANTES:
+   const wsUrl = 'ws://localhost:5000';  // ❌ Hardcoded a localhost
+
+🟢 DESPUÉS:
+   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+   const wsUrl = `${wsProtocol}//${window.location.host}/ws`;  // ✅ Dinámico
+
+
+✅ VENTAJAS DE ESTA CONFIGURACIÓN:
+────────────────────────────────────────────────────────────────────────────────
+
+✓ Funciona en cualquier dominio (automático)
+✓ Soporta HTTP y HTTPS sin cambios
+✓ WebSocket no conflictúa con otros servicios
+✓ Nginx maneja todo el tráfico (seguridad)
+✓ PM2 auto-reinicia procesos si fallan
+✓ Variables de entorno separadas por ambiente
+✓ Logs centralizados
+✓ Fácil de escalar
+
+
+🔐 SEGURIDAD - CAMBIAR ANTES DE PRODUCCIÓN:
+────────────────────────────────────────────────────────────────────────────────
+
+⚠️  backend/.env (CRÍTICO):
+    JWT_SECRET=tu_jwt_secret_bien_seguro_aqui
+    DB_PASS=tu_contraseña_segura_aqui
+
+⚠️  nginx.conf:
+    server_name tu_dominio.com www.tu_dominio.com;
+
+⚠️  ecosystem.config.js:
+    cwd: '/home/ubuntu/sir-angular/...' (verificar rutas)
+
+
+📞 VERIFICACIÓN POST-DESPLIEGUE:
+────────────────────────────────────────────────────────────────────────────────
+
+# Ver procesos activos
+pm2 status
+
+# Ver logs
+pm2 logs sir-backend
+pm2 logs sir-frontend
+
+# Probar conectividad
+curl http://tu_vps/
+curl http://tu_vps/api/
+curl http://tu_vps:6000/  # WebSocket
+
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                           ¡LISTO PARA PRODUCCIÓN!                             ║
+╚════════════════════════════════════════════════════════════════════════════════╝
