@@ -316,21 +316,24 @@ export class ReservasDynamicComponent implements OnInit {
           message: copied
             ? 'Imagen de la reserva copiada al portapapeles.'
             : 'No se pudo copiar la imagen en este navegador. Usa el PDF que ya se descargó.',
-          loading: false
+            autoClose: true,
+            autoCloseTime: 4000
         });
       } else {
         this.navbar.alert.set({
           title: 'PDF descargado',
           message: `Esta reserva genera ${pages} páginas, por eso no se copia imagen. Envía el PDF.`,
-          loading: false
+          autoClose: true,
+          autoCloseTime: 4000
         });
       }
     } catch (e) {
       console.error(e);
       this.navbar.alert.set({
+        type: 'error',
         title: 'Error',
         message: 'No se pudo generar el archivo. Revisa consola.',
-        loading: false
+        autoClose: true,
       });
     } finally {
       this.isLoading = false;
