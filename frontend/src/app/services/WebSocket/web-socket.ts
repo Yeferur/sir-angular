@@ -1,12 +1,10 @@
 import { Injectable, NgZone } from '@angular/core';
 import { ReplaySubject } from 'rxjs';
-import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
   private ws: WebSocket | null = null;
 
-  // ReplaySubject(1) evita perder mensajes si llegan antes de suscribirse
   public messages$ = new ReplaySubject<any>(1);
 
   private reconnectTimer: any = null;
@@ -23,7 +21,6 @@ export class WebSocketService {
     this.currentToken = token;
     this.manualClose = false;
 
-    // Evitar abrir 2 sockets
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -34,13 +31,13 @@ export class WebSocketService {
     }
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.hostname;
 
-const wsUrl = !environment.production
-  ? `${proto}://localhost:4000/ws`
-  : `${proto}://${window.location.host}/ws`;
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
 
-this.ws = new WebSocket(wsUrl);
-
+    const wsUrl = isLocal
+      ? `${proto}://localhost:4000/ws`
+      : `${proto}://${window.location.host}/ws`;
 
     this.ws = new WebSocket(wsUrl);
 
@@ -59,7 +56,6 @@ this.ws = new WebSocket(wsUrl);
         return;
       }
 
-      // Si backend dice auth inválida, cerrar y NO reconectar
       if (data.type === 'error') {
         console.error('❌ WS error:', data.message);
 
@@ -73,7 +69,6 @@ this.ws = new WebSocket(wsUrl);
         return;
       }
 
-      // ✅ emitir dentro de Angular
       this.ngZone.run(() => this.messages$.next(data));
     };
 
@@ -88,7 +83,6 @@ this.ws = new WebSocket(wsUrl);
 
     this.ws.onerror = (err) => {
       console.error('❌ WebSocket error', err);
-      // onerror no trae detalle; onclose con code/reason es más útil
     };
   }
 
