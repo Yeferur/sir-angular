@@ -63,7 +63,7 @@ export class PermisosService {
   private menuSubject = new BehaviorSubject<MenuItem[]>([]);
   public menu$ = this.menuSubject.asObservable();
 
-  // ✅ estado de carga (para que el layout espere)
+  // estado de carga
   private readySubject = new BehaviorSubject<boolean>(false);
   public ready$ = this.readySubject.asObservable();
 
@@ -73,24 +73,18 @@ export class PermisosService {
   // CARGA RÁPIDA: localStorage + backend
   // =====================================================
 
-  /**
-   * Carga permisos + menú para la sesión actual.
-   * - Primero intenta localStorage (instantáneo)
-   * - Luego refresca desde backend (si hay token)
-   * Retorna Promise para usar con await en layout.
-   */
   async loadSessionData(options?: { token?: string | null }): Promise<void> {
-    // 1) intenta hidratar desde localStorage (evita pantalla negra)
+    // 1) hidratar desde localStorage
     this.cargarPermisosDesdeLocalStorage();
 
-    // 2) si no hay token, igual marcamos ready (no hay nada que cargar)
+    // 2) si no hay token, listo
     const token = options?.token ?? this.getTokenFromStorage();
     if (!token) {
       this.readySubject.next(true);
       return;
     }
 
-    // 3) refresca desde backend (paralelo)
+    // 3) refresca desde backend
     try {
       await firstValueFrom(
         forkJoin({
@@ -101,14 +95,12 @@ export class PermisosService {
 
       this.readySubject.next(true);
     } catch (e) {
-      // si algo falla, no bloquees UI (ya hay cache localStorage posiblemente)
       console.error('[PermisosService] loadSessionData error:', e);
       this.readySubject.next(true);
     }
   }
 
   private getTokenFromStorage(): string | null {
-    // ajusta si guardas token con otro key
     return localStorage.getItem('token') || localStorage.getItem('auth_token');
   }
 
@@ -116,9 +108,6 @@ export class PermisosService {
   // ENDPOINTS USUARIO ACTUAL
   // =====================================================
 
-  /**
-   * Obtener permisos del usuario actual
-   */
   obtenerMisPermisos(): Observable<{ permisos: Permiso[] }> {
     return this.http.get<{ permisos: Permiso[] }>(`${this.baseUrl}/me/permisos`).pipe(
       tap(response => {
@@ -129,9 +118,6 @@ export class PermisosService {
     );
   }
 
-  /**
-   * Obtener menú dinámico del usuario actual
-   */
   obtenerMiMenu(): Observable<{ menu: MenuItem[] }> {
     return this.http.get<{ menu: MenuItem[] }>(`${this.baseUrl}/me/menu`).pipe(
       tap(response => {
@@ -139,6 +125,26 @@ export class PermisosService {
         localStorage.setItem('user_menu', JSON.stringify(response.menu || []));
       })
     );
+  }
+
+  // =====================================================
+  // ✅ LOGIN INMEDIATO (SIN REFRESH)
+  // =====================================================
+
+  /**
+   * Se llama justo después del /login para hidratar al instante.
+   */
+  setSessionData(permisos: string[] = [], menu: MenuItem[] = []): void {
+    const safePermisos = Array.isArray(permisos) ? permisos : [];
+    const safeMenu = Array.isArray(menu) ? menu : [];
+
+    this.permisosSubject.next(safePermisos);
+    this.menuSubject.next(safeMenu);
+
+    localStorage.setItem('user_permissions', JSON.stringify(safePermisos));
+    localStorage.setItem('user_menu', JSON.stringify(safeMenu));
+
+    this.readySubject.next(true);
   }
 
   // =====================================================

@@ -1,64 +1,70 @@
-import { ChangeDetectorRef, Component, inject } from '@angular/core';
-import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
-
+import { Component, inject, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/Login/login-service';
+import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
+import { PermisosService } from '../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-login',
+  standalone: true,
   imports: [FormsModule],
   templateUrl: './login.html',
   styleUrl: './login.css'
 })
-export class LoginContentComponent {
-  // --- Propiedades del Componente ---
+export class LoginContentComponent implements OnInit, OnDestroy {
   username = '';
   password = '';
   error = '';
   isLoading = false;
   showPassword = false;
+  isDarkMode: boolean = true;
 
-  // --- Inyección de Servicios ---
   private auth = inject(AuthService);
   private navbar = inject(DynamicIslandGlobalService);
-  isDarkMode: boolean;
+  private permisosService = inject(PermisosService);
+  private cdr = inject(ChangeDetectorRef);
 
-  /**
-   * Maneja el envío del formulario de login.
-   */
+  private observer?: MutationObserver;
+
   login() {
     this.error = '';
+
     if (!this.username || !this.password) {
       this.error = 'Por favor, complete todos los campos.';
       return;
     }
 
     this.isLoading = true;
+
     this.auth.login(this.username, this.password).subscribe({
       next: () => {
         this.isLoading = false;
-        // Al iniciar sesión correctamente, esperamos un momento para mostrar
-        // una posible animación de éxito y luego cerramos la vista de login.
-        setTimeout(() => {
-          this.navbar.mode.set(''); // Vuelve al estado compacto de la navbar
-        }, 1500);
+        this.permisosService.cargarPermisosDesdeLocalStorage();
+        this.navbar.mode.set('');
+        this.cdr.markForCheck();
       },
       error: (err) => {
         this.isLoading = false;
-        this.error = err.error?.error || 'Usuario o contraseña incorrectos.';
+        this.error = err?.error?.error || 'Usuario o contraseña incorrectos.';
+        this.cdr.markForCheck();
       }
     });
   }
 
   ngOnInit(): void {
-    // Lógica para detectar el tema (sin cambios)
     const theme = document.documentElement.getAttribute('data-theme');
     this.isDarkMode = theme !== 'light';
-    const observer = new MutationObserver(() => {
+
+    this.observer = new MutationObserver(() => {
       const updatedTheme = document.documentElement.getAttribute('data-theme');
       this.isDarkMode = updatedTheme !== 'light';
+      this.cdr.markForCheck();
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    this.observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  ngOnDestroy(): void {
+    this.observer?.disconnect();
   }
 }
-

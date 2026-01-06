@@ -31,84 +31,64 @@ export class App implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    // ✅ 0) Cargar permisos guardados
     this.permisosService.cargarPermisosDesdeLocalStorage();
 
-    // ✅ 1) Listener global de WS (UNA sola vez)
     this.ws.messages$
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg: any) => {
         const type = (msg?.type || '').toString();
-
-        // ✅ Acepta ambos por compatibilidad
         const isForce = type === 'forceLogout' || type === 'force-logout';
         const isLogout = type === 'logout';
 
         if (isForce) {
-          console.warn('🚪 Sesión cerrada remotamente.');
-
           this.navbar.alert.set({
             type: 'warning',
             title: 'Sesión Cerrada',
             message: 'Tu sesión fue cerrada en otro lugar o por un administrador.',
           });
 
-          // ✅ Cierre ordenado
           setTimeout(() => {
             this.navbar.alert.set(null);
             this.ws.disconnect();
             this.auth.logout();
             this.permisosService.limpiarPermisos();
             this.wsStarted = false;
+            this.cdr.markForCheck();
           }, 1500);
 
           return;
         }
 
         if (isLogout) {
-          console.log('✅ Logout recibido por WS');
           this.ws.disconnect();
           this.auth.logout();
           this.permisosService.limpiarPermisos();
           this.wsStarted = false;
+          this.cdr.markForCheck();
           return;
         }
       });
 
-    // ✅ 2) Estado de autenticación (evita emisiones repetidas iguales)
     this.auth.isLoggedIn()
-      .pipe(
-        distinctUntilChanged(),
-        takeUntil(this.destroy$)
-      )
+      .pipe(distinctUntilChanged(), takeUntil(this.destroy$))
       .subscribe((logged) => {
         this.loggedIn = logged;
         this.navbar.mode.set(logged ? '' : 'login');
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
 
         if (logged) {
           const token = this.auth.getToken();
-
-          // ✅ Conectar WS una sola vez por sesión
           if (token && !this.wsStarted) {
             this.ws.connect(token);
             this.wsStarted = true;
           }
-
-          // ✅ Cargar permisos/menú
-          this.permisosService.obtenerMisPermisos().subscribe({
-            error: (err) => console.error('Error al cargar permisos:', err)
-          });
-
-          this.permisosService.obtenerMiMenu().subscribe({
-            error: (err) => console.error('Error al cargar menú:', err)
-          });
-
+          this.permisosService.cargarPermisosDesdeLocalStorage();
+          this.permisosService.loadSessionData({ token }).catch(() => {});
         } else {
-          // ✅ Cierre limpio
           this.ws.disconnect();
           this.permisosService.limpiarPermisos();
           this.wsStarted = false;
+          this.cdr.markForCheck();
         }
       });
   }
