@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -30,7 +30,8 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   permisos: any[] = [];
   selectedPermisos: number[] = [];
 
-  isLoading = false;
+  isLoading = signal(false);
+  private pendingLoads = 0;
   errorMsg = '';
 
   showPassword = false;
@@ -75,6 +76,11 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // show loading until roles and permisos are fetched
+    this.isLoading.set(true);
+    // update navbar/global loading state
+    this.navbar('Cargando...', 'Cargando datos...', true, false);
+    this.pendingLoads = 0;
     this.loadRoles();
     this.loadPermisos();
     this.setupPasswordStrength();
@@ -109,29 +115,48 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   private loadRoles() {
+    this.pendingLoads++;
     this.permisosService.obtenerRoles().subscribe({
       next: (r) => {
         this.roles = r.roles || [];
         this.cdr.markForCheck();
+        this.pendingLoads--;
+        this.checkLoadingFinish();
       },
       error: () => {
         this.roles = [];
         this.cdr.markForCheck();
+        this.pendingLoads--;
+        this.checkLoadingFinish();
       }
     });
   }
 
   private loadPermisos() {
+    this.pendingLoads++;
     this.permisosService.obtenerPermisos().subscribe({
       next: (res) => {
         this.permisos = res.permisos || [];
         this.cdr.markForCheck();
+        this.pendingLoads--;
+        this.checkLoadingFinish();
       },
       error: () => {
         this.permisos = [];
         this.cdr.markForCheck();
+        this.pendingLoads--;
+        this.checkLoadingFinish();
       }
     });
+  }
+
+  private checkLoadingFinish() {
+    if (this.pendingLoads <= 0) {
+      this.isLoading.set(false);
+      // clear navbar/global loading state
+      this.global.alert.set(null);
+      this.cdr.markForCheck();
+    }
   }
 
   onRolChange() {
@@ -290,20 +315,20 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   private confirmCreateUser(payload: any) {
-    if (this.isLoading) return;
-    this.isLoading = true;
+    if (this.isLoading()) return;
+    this.isLoading.set(true);
     this.navbar('Creando usuario...', 'Guardando información, por favor espera.', true);
     this.cdr.markForCheck();
 
     this.usuariosService.crearUsuario(payload).subscribe({
       next: () => {
-        this.isLoading = false;
+        this.isLoading.set(false);
         this.navbar('Usuario creado', 'El usuario se creó correctamente.', false);
         this.cdr.markForCheck();
         this.router.navigate(['/Usuarios']);
       },
       error: (err: any) => {
-        this.isLoading = false;
+        this.isLoading.set(false);
         this.errorMsg = err?.error?.error || 'Error creando usuario';
         this.navbar('Error', this.errorMsg, false);
         this.cdr.markForCheck();
