@@ -2,9 +2,9 @@
   <!-- ENCABEZADO DE LA PÁGINA -->
   <div class="page-header">
     <h1>Aforos</h1>
-    <div class="form-group">
+      <div class="form-group">
       <label for="fecha" class="form-label">Fecha:</label>
-      <input id="fecha" class="form-input" type="date" [value]="fecha" (change)="onFechaChange($event)" />
+      <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha" [value]="fecha" (change)="onFechaChange($event)" />
     </div>
   </div>
 
@@ -109,9 +109,9 @@
                 {{ mostrarDetallesCombinada ? 'Ocultar Detalles' : 'Ver Detalles' }}
               </button>
             }
-            @if (!editando[5] && !mostrarDetallesCombinada) {
-              <button class="btn-secondary" (click)="activarEdicion(5)">Editar</button>
-            }
+              @if (!editando[5] && !mostrarDetallesCombinada) {
+                <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false" class="btn-secondary" (click)="activarEdicion(5)">Editar</button>
+              }
             @if (editando[5]) {
               <button class="btn-secondary" (click)="editando[5] = false">Cancelar</button>
               <button class="btn-primary" (click)="guardarAforo(combinedTour!)">Guardar</button>
@@ -159,9 +159,10 @@
               </div>
             </div>
 
-            <div class="card-footer">
+            <!-- Footer: mostrar solo si el usuario tiene permiso de editar o está en modo edición -->
+            <div *ngIf="canEditarAforo() || editando[tour.Id_Tour]" class="card-footer">
               @if (!editando[tour.Id_Tour]) {
-                <button class="btn-secondary" (click)="activarEdicion(tour.Id_Tour)">Editar</button>
+                <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false" class="btn-secondary" (click)="activarEdicion(tour.Id_Tour)">Editar</button>
               }
               @if (editando[tour.Id_Tour]) {
                 <button class="btn-secondary" (click)="editando[tour.Id_Tour] = false">Cancelar</button>

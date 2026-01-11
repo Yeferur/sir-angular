@@ -6,8 +6,8 @@
   <div class="avatar-placeholder">
     <i class="bx bx-user"></i>
   </div>
-  <button class="menu-button" (click)="toggleSidebar()">
-    <i class="bx bx-menu"></i>
+  <button class="menu-button" [class.active]="isSidebarOpen()" (click)="toggleSidebar()">
+    <i class="bx" [class.bx-menu]="!isSidebarOpen()" [class.bx-x]="isSidebarOpen()"></i>
   </button>
 </div>
 
@@ -40,6 +40,7 @@
       <div class="submenu">
         <a *appPermiso="'RESERVAS.CREAR'" routerLink="/Reservas/NuevaReserva" (click)="clickPage()">Nueva Reserva</a>
         <a *appPermiso="'RESERVAS.LEER'" routerLink="/Reservas/VerReservas" (click)="clickPage()">Ver Reservas</a>
+        <a *appPermiso="'RESERVAS.LEER'" routerLink="/" (click)="clickPage()">Confirmación de viaje</a>
       </div>
     </div>
 
@@ -78,8 +79,8 @@
       <a (click)="toggleMenu(5)" class="link"><i class="bx bx-list-check"></i><span>Programación</span><i
           class="bx bx-chevron-down"></i></a>
       <div class="submenu">
-        <a *appPermiso="'PROGRAMACION.CREAR'" routerLink="/Transfer/NuevoTransfer" (click)="clickPage()">Nuevo Transfer</a>
-        <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" (click)="clickPage()">Listado</a>
+        <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" (click)="clickPage()">Generar listados</a>
+        <a *appPermiso="'PROGRAMACION.CREAR'" routerLink="/Transfer/NuevoTransfer" (click)="clickPage()">Ver listados</a>
       </div>
     </div>
 
@@ -96,7 +97,7 @@
       <div class="submenu">
         <a routerLink="/" (click)="clickPage()">Perfil</a>
         <a *appPermiso="'USUARIOS.GESTIONAR_ROLES'" routerLink="/Usuarios" (click)="clickPage()">Administrar Usuarios</a>
-        <a *appPermiso="'USUARIOS.CREAR'" routerLink="/" (click)="clickPage()">Crear Usuarios</a>
+        <a *appPermiso="'USUARIOS.CREAR'" routerLink="/Usuarios/NuevoUsuario" (click)="clickPage()">Crear Usuarios</a>
         <a routerLink="/" (click)="clickPage()">Ayuda</a>
         <a (click)="toggleTheme()">
           Tema: {{ isDarkMode ? 'Oscuro' : 'Claro' }}

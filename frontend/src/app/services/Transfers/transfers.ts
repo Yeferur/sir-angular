@@ -38,11 +38,5 @@ export class TransferService {
   getMonedas(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl.replace('/api','')}/api/monedas`);
   }
-
-  // Temporal: deshabilitado para pruebas de la app - no eliminar, solo ocultar
-  // Para reactivar, restaurar la llamada HTTP y eliminar el `of(...)` siguiente.
-  checkWhatsApp(phone: string): Observable<any> {
-    return of({ disabled: true, exists: false, message: 'Verificación WhatsApp deshabilitada temporalmente' });
-    // return this.http.post<any>(`${this.apiUrl}/phone/check-whatsapp`, { phone });
-  }
 }
+

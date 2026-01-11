@@ -96,6 +96,42 @@ async function registrarAccion({
   ipAddress = null,
   userAgent = null
 }) {
+  // Resolver tipoAccion si viene como 'CREAR_O_ACTUALIZAR'
+  let finalAccion = tipoAccion;
+  if (tipoAccion === 'CREAR_O_ACTUALIZAR') {
+    if (!idRegistro || idRegistro === 0) {
+      finalAccion = 'CREAR';
+    } else {
+      try {
+        const [pkRows] = await db.query(
+          "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_KEY = 'PRI' LIMIT 1",
+          [tablaAfectada]
+        );
+        const pkCol = pkRows && pkRows[0] && pkRows[0].COLUMN_NAME;
+        if (pkCol) {
+          const [exists] = await db.query(
+            `SELECT 1 FROM \`${tablaAfectada}\` WHERE \`${pkCol}\` = ? LIMIT 1`,
+            [idRegistro]
+          );
+          finalAccion = (exists && exists.length) ? 'ACTUALIZAR' : 'CREAR';
+        } else {
+          const guessed = `Id_${tablaAfectada.slice(0, -1)}`;
+          try {
+            const [exists2] = await db.query(
+              `SELECT 1 FROM \`${tablaAfectada}\` WHERE \`${guessed}\` = ? LIMIT 1`,
+              [idRegistro]
+            );
+            finalAccion = (exists2 && exists2.length) ? 'ACTUALIZAR' : 'CREAR';
+          } catch (e) {
+            finalAccion = 'CREAR_O_ACTUALIZAR';
+          }
+        }
+      } catch (e) {
+        finalAccion = 'CREAR_O_ACTUALIZAR';
+      }
+    }
+  }
+
   const query = `
     INSERT INTO historial (
       Id_Usuario,
@@ -108,7 +144,7 @@ async function registrarAccion({
 
   const params = [
     userId,
-    tipoAccion,
+    finalAccion,
     tablaAfectada,
     idRegistro
   ];

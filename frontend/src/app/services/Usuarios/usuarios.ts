@@ -108,4 +108,12 @@ private actualizarEstados(msg: any) {
     return this.http.post(`${environment.apiUrl}/forceLogout`, { userId });
   }
 
+  // Crear usuario (admin). If payload is FormData, post as multipart/form-data
+  crearUsuario(payload: any): Observable<any> {
+    if (payload instanceof FormData) {
+      return this.http.post(`${environment.apiUrl}/usuarios`, payload);
+    }
+    return this.http.post(`${environment.apiUrl}/usuarios`, payload);
+  }
+
 }

@@ -3,9 +3,9 @@
   <!-- ENCABEZADO -->
   <div class="page-header">
     <h1>Programación</h1>
-    <div class="form-group">
+      <div class="form-group">
       <label for="fecha" class="form-label">Fecha de Operación:</label>
-      <input id="fecha" class="form-input" type="date" [(ngModel)]="fechaSeleccionada" (change)="cargarToursDelDia()" />
+      <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha" [(ngModel)]="fechaSeleccionada" (change)="cargarToursDelDia()" />
     </div>
   </div>
 

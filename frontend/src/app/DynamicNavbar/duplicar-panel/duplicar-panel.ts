@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
 
 import { FormsModule } from '@angular/forms';
 import { Reservas } from '../../services/Reservas/reservas';
@@ -29,7 +30,7 @@ type DuplicarPanelProps = {
 @Component({
   selector: 'app-duplicar-panel',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, FlatpickrInputDirective],
   templateUrl: './duplicar-panel.html',
   styleUrls: ['./duplicar-panel.css'],
 })

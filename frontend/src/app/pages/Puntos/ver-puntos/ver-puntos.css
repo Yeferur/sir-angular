@@ -2,7 +2,7 @@
 
 /* Igual patrón que ver-tours/inicio */
 .page-container{
-  max-width: 1600px;
+
   margin: 28px auto 60px;
   padding: 0 18px;
   animation: fadeInScale .5s ease-out;

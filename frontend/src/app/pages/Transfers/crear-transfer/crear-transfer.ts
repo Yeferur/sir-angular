@@ -287,27 +287,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   checkWhatsappForReserva(): void {
-    const indic = this.form.get('IndicativoReserva')?.value || '';
-    const tel = this.form.get('TelefonoReserva')?.value || '';
-    const full = `${indic}${tel}`.replace(/\s+/g, '');
-    if (!tel) {
-      this.navbar.alert.set({ title: 'Número no válido', type: 'warning', message: 'Ingresa un teléfono para verificar.', autoClose: true });
-      return;
-    }
-
-    this.transferSvc.checkWhatsApp(full).subscribe({
-      next: (res) => {
-        if (res?.disabled) {
-          this.navbar.alert.set({ title: 'Verificación WhatsApp', type: 'info', message: 'Verificación deshabilitada temporalmente', autoClose: true });
-        } else {
-          const exists = !!res?.exists;
-          this.navbar.alert.set({ title: 'Verificación WhatsApp', type: exists ? 'success' : 'info', message: exists ? 'Número con WhatsApp' : 'Número no encontrado en WhatsApp', autoClose: true });
-        }
-      },
-      error: (err) => {
-        this.navbar.alert.set({ title: 'Error verificación', type: 'error', message: (err as any)?.message || 'Error al verificar WhatsApp', autoClose: true });
-      }
-    });
+    // WhatsApp verification removed — no operation.
   }
 
   private loadRangos(): void {
@@ -377,42 +357,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       return;
     }
 
-    // Verificar WhatsApp del reportante antes de mostrar confirmación
-    const indic = this.form.get('IndicativoReserva')?.value || '';
-    const tel = this.form.get('TelefonoReserva')?.value || '';
-    const full = `${indic}${tel}`.replace(/\s+/g, '');
-    if (!tel) {
-      this.navbar.alert.set({ title: 'Número no válido', type: 'warning', message: 'Ingresa un teléfono para verificar.', autoClose: true });
-      return;
-    }
-
-    try {
-      const res = await firstValueFrom(this.transferSvc.checkWhatsApp(full));
-      if (!res?.disabled) {
-        const exists = !!res?.exists;
-        if (!exists) {
-          this.navbar.alert.set({
-            title: 'WhatsApp no disponible',
-            type: 'error',
-            message: 'El número de reserva no parece tener WhatsApp. Verifica antes de guardar.',
-            autoClose: false,
-          });
-          return;
-        }
-      }
-    } catch (err) {
-      this.navbar.alert.set({
-        title: 'Error verificación',
-        type: 'error',
-        message: (err as any)?.message || 'Error al verificar WhatsApp',
-        autoClose: false,
-        buttons: [
-          { text: 'Reintentar', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.onSubmit(); } },
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
-        ]
-      });
-      return;
-    }
+    // WhatsApp verification removed — proceeding without check
 
     this.navbar.alert.set({
       title: '¿Crear transfer?',

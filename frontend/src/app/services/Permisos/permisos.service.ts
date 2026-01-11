@@ -86,11 +86,10 @@ export class PermisosService {
 
     // 3) refresca desde backend
     try {
+      // Solo solicitamos los permisos desde backend.
+      // El menú se mantiene estático/en el layout y no depende de la tabla `modulos`.
       await firstValueFrom(
-        forkJoin({
-          permisos: this.obtenerMisPermisos().pipe(catchError(() => of({ permisos: [] as Permiso[] }))),
-          menu: this.obtenerMiMenu().pipe(catchError(() => of({ menu: [] as MenuItem[] }))),
-        }).pipe(map(() => true))
+        this.obtenerMisPermisos().pipe(catchError(() => of({ permisos: [] as Permiso[] })), map(() => true))
       );
 
       this.readySubject.next(true);

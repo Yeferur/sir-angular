@@ -15,6 +15,7 @@ import { Usuarios } from './pages/Usuarios/usuarios/usuarios';
 import { CrearTransferComponent } from './pages/Transfers/crear-transfer/crear-transfer';
 import { VerTransfersComponent } from './pages/Transfers/ver-transfers/ver-transfers';
 import { VerHistorialComponent } from './pages/Historial/ver-historial/ver-historial';
+import { CrearUsuarioComponent } from './pages/Usuarios/crear-usuario/crear-usuario';
 
 export const routes: Routes = [
   { path: '', component: Inicio, title: 'SIR · Inicio' },
@@ -35,6 +36,7 @@ export const routes: Routes = [
   { path: 'Programacion/Listado', component: Listado, title: 'SIR · Programación' },
 
   { path: 'Usuarios', component: Usuarios, title: 'SIR · Usuarios' },
+  { path: 'Usuarios/NuevoUsuario', component: CrearUsuarioComponent, title: 'SIR · Nuevo Usuario' },
 
   { path: 'Tours/NuevoTour', component: CrearTourComponent, title: 'SIR · Nuevo Tour' },
   { path: 'Tours/VerTours', component: VerToursComponent, title: 'SIR · Ver Tours' },

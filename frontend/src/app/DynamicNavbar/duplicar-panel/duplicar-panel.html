@@ -13,7 +13,7 @@
 
   <div class="field">
     <label>Fecha</label>
-    <input type="date" [(ngModel)]="Fecha_Tour" />
+    <input type="text" appFlatpickrInput [(ngModel)]="Fecha_Tour" [fpOptions]="{ dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', disableMobile: true, altInputClass: 'form-input flatpickr-input flatpickr-alt' }" />
   </div>
 
   <div class="field">

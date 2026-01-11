@@ -133,8 +133,10 @@
         <div class="form-group">
           <label class="form-label">Desde</label>
           <input
-            type="date"
+            type="text"
             class="form-input"
+            appFlatpickrInput
+            [fpOptions]="fpOptionsFecha"
             [value]="filters().FechaInicio"
             (change)="updateFilter('FechaInicio', $any($event.target).value)"
             />
@@ -144,8 +146,10 @@
         <div class="form-group">
           <label class="form-label">Hasta</label>
           <input
-            type="date"
+            type="text"
             class="form-input"
+            appFlatpickrInput
+            [fpOptions]="fpOptionsFecha"
             [value]="filters().FechaFin"
             (change)="updateFilter('FechaFin', $any($event.target).value)"
             />

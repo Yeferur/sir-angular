@@ -13,118 +13,120 @@
     <div class="main-content">
 
       <!-- CARD 1: INFO BÁSICA -->
-      <div class="card">
-        <div class="card-header header-row">
-          <div class="header-title">
-            <h2>Información del tour</h2>
-          </div>
-        </div>
+<!-- CARD 1: INFO BÁSICA (IGUAL QUE CREAR) -->
+<div class="card">
+  <div class="card-header header-row">
+    <div class="header-title">
+      <h2>Información del tour</h2>
+    </div>
+  </div>
 
-        <div class="form-grid">
-          <div class="form-group full-width">
-            <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
-            <input
-              formControlName="Nombre_Tour"
-              type="text"
-              class="form-input"
-              maxlength="255"
-              placeholder="Ej: Guatapé"
-              [ngClass]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid ? 'errorInput' : ''"
-            />
-            @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
-              <div class="errorMessage">Ingresa un nombre válido.</div>
-            }
-          </div>
+  <div class="form-grid">
+    <div class="form-group full-width">
+      <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
+      <input
+        formControlName="Nombre_Tour"
+        type="text"
+        class="form-input"
+        maxlength="255"
+        placeholder="Ej: Guatapé"
+        [ngClass]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid ? 'errorInput' : ''"
+      />
+      @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
+        <div class="errorMessage">Ingresa un nombre válido.</div>
+      }
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Abreviación <span class="required-star">*</span></label>
-            <input
-              formControlName="Abreviacion"
-              type="text"
-              class="form-input"
-              maxlength="50"
-              placeholder="Ej: TG"
-              [ngClass]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid ? 'errorInput' : ''"
-            />
-            @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
-              <div class="errorMessage">La abreviación es obligatoria.</div>
-            }
-          </div>
+    <div class="form-group">
+      <label class="form-label">Abreviación <span class="required-star">*</span></label>
+      <input
+        formControlName="Abreviacion"
+        type="text"
+        class="form-input"
+        maxlength="50"
+        placeholder="Ej: TG"
+        [ngClass]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid ? 'errorInput' : ''"
+      />
+      @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
+        <div class="errorMessage">La abreviación es obligatoria.</div>
+      }
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Cupo Base <span class="required-star">*</span></label>
-            <input
-              formControlName="Cupo_Base"
-              type="number"
-              class="form-input"
-              min="0"
-              placeholder="0"
-              [ngClass]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid ? 'errorInput' : ''"
-            />
-            @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
-              <div class="errorMessage">El cupo base es obligatorio.</div>
-            }
-          </div>
+    <div class="form-group">
+      <label class="form-label">Cupo Base <span class="required-star">*</span></label>
+      <input
+        formControlName="Cupo_Base"
+        type="number"
+        class="form-input"
+        min="0"
+        placeholder="0"
+        [ngClass]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid ? 'errorInput' : ''"
+      />
+      @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
+        <div class="errorMessage">El cupo base es obligatorio.</div>
+      }
+    </div>
 
-          <div class="form-group full-width">
-            <label class="form-label">Copiar Horarios de Tour Existente (Opcional)</label>
-            <select formControlName="Id_Tour_Origen" class="form-input">
-              <option [ngValue]="null">Pendiente</option>
-              @for (tour of toursExistentes; track tour.Id_Tour) {
-                <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-              }
-            </select>
-            <small class="form-hint">
-              Si seleccionas un tour, se copiarán sus horarios. Si no, todos los horarios quedarán en “Pendiente”.
-            </small>
-          </div>
+    <div class="form-group full-width">
+      <label class="form-label">Copiar Horarios de Tour Existente (Opcional)</label>
+      <select formControlName="Id_Tour_Origen" class="form-input">
+        <option [ngValue]="null">Pendiente</option>
+        @for (tour of toursExistentes; track tour.Id_Tour) {
+          <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+        }
+      </select>
+      <small class="form-hint">
+        Si seleccionas un tour, se copiarán sus horarios. Si no, todos los horarios quedarán en “Pendiente”.
+      </small>
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Comisión Hotel</label>
-            <input formControlName="Comision_Hotel" type="number" class="form-input" min="0" placeholder="0" />
-          </div>
+    <div class="form-group">
+      <label class="form-label">Comisión Hotel</label>
+      <input formControlName="Comision_Hotel" type="number" class="form-input" min="0" placeholder="0" />
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Comisión Agencia</label>
-            <input formControlName="Comision_Agencia" type="number" class="form-input" min="0" placeholder="0" />
-          </div>
+    <div class="form-group">
+      <label class="form-label">Comisión Agencia</label>
+      <input formControlName="Comision_Agencia" type="number" class="form-input" min="0" placeholder="0" />
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Comisión Freelance</label>
-            <input formControlName="Comision_Freelance" type="number" class="form-input" min="0" placeholder="0" />
-          </div>
+    <div class="form-group">
+      <label class="form-label">Comisión Freelance</label>
+      <input formControlName="Comision_Freelance" type="number" class="form-input" min="0" placeholder="0" />
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Latitud <span class="required-star">*</span></label>
-            <input
-              formControlName="Latitud"
-              type="number"
-              class="form-input"
-              step="any"
-              placeholder="6.24..."
-              [ngClass]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid ? 'errorInput' : ''"
-            />
-            @if (form.get('Latitud')?.touched && form.get('Latitud')?.invalid) {
-              <div class="errorMessage">Latitud inválida.</div>
-            }
-          </div>
+    <div class="form-group">
+      <label class="form-label">Latitud <span class="required-star">*</span></label>
+      <input
+        formControlName="Latitud"
+        type="number"
+        class="form-input"
+        step="any"
+        placeholder="6.24..."
+        [ngClass]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid ? 'errorInput' : ''"
+      />
+      @if (form.get('Latitud')?.touched && form.get('Latitud')?.invalid) {
+        <div class="errorMessage">Latitud inválida.</div>
+      }
+    </div>
 
-          <div class="form-group">
-            <label class="form-label">Longitud <span class="required-star">*</span></label>
-            <input
-              formControlName="Longitud"
-              type="number"
-              class="form-input"
-              step="any"
-              placeholder="-75.57..."
-              [ngClass]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid ? 'errorInput' : ''"
-            />
-            @if (form.get('Longitud')?.touched && form.get('Longitud')?.invalid) {
-              <div class="errorMessage">Longitud inválida.</div>
-            }
-          </div>
-        </div>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Longitud <span class="required-star">*</span></label>
+      <input
+        formControlName="Longitud"
+        type="number"
+        class="form-input"
+        step="any"
+        placeholder="-75.57..."
+        [ngClass]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid ? 'errorInput' : ''"
+      />
+      @if (form.get('Longitud')?.touched && form.get('Longitud')?.invalid) {
+        <div class="errorMessage">Longitud inválida.</div>
+      }
+    </div>
+  </div>
+</div>
+
 
       <!-- CARD 2: PLANES + PRECIOS (IGUAL QUE CREAR) -->
 <!-- CARD 2: PLANES + PRECIOS -->
@@ -156,7 +158,6 @@
               formControlName="Nombre_Plan"
               class="form-input"
               placeholder="Ej: Plan básico / Premium"
-              [readonly]="i === 0"
               [ngClass]="planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid ? 'errorInput' : ''"
             />
             @if (planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid) {
@@ -169,15 +170,15 @@
         </div>
 
         <div class="plan-controls">
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="AllowNino" (change)="togglePassengerType(i, 'NINO')" />
-            Permite Niño
-          </label>
+          <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowNino')?.value"
+            (click)="planCtrl.get('AllowNino')?.setValue(!planCtrl.get('AllowNino')?.value); togglePassengerType(i, 'NINO')">
+            <span class="perm-codigo">Permite Niño</span>
+          </button>
 
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="AllowInfante" (change)="togglePassengerType(i, 'INFANTE')" />
-            Permite Infante
-          </label>
+          <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowInfante')?.value"
+            (click)="planCtrl.get('AllowInfante')?.setValue(!planCtrl.get('AllowInfante')?.value); togglePassengerType(i, 'INFANTE')">
+            <span class="perm-codigo">Permite Infante</span>
+          </button>
         </div>
 
         <div formArrayName="monedas" class="plan-monedas">
@@ -299,8 +300,7 @@
               </div>
 
               <div class="button-row header-actions">
-                <button type="button" class="btn-secondary" (click)="toggleAllBaseDays(true)">Todos</button>
-                <button type="button" class="btn-secondary" (click)="toggleAllBaseDays(false)">Ninguno</button>
+                <button type="button" class="btn-secondary btn-toggle" (click)="toggleAllBaseDaysToggle()">{{ areAllBaseDaysSelected() ? 'Ninguno' : 'Todos' }}</button>
               </div>
             </div>
 
@@ -361,8 +361,9 @@
                   <div>
                     <label class="form-label">Fecha inicio <span class="required-star">*</span></label>
                     <input
-                      type="date"
+                      type="text"
                       class="form-input"
+                      appFlatpickrInput [fpOptions]="fpOptionsFecha"
                       formControlName="Fecha_Inicio"
                       [ngClass]="tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid ? 'errorInput' : ''"
                     />
@@ -374,8 +375,9 @@
                   <div>
                     <label class="form-label">Fecha fin <span class="required-star">*</span></label>
                     <input
-                      type="date"
+                      type="text"
                       class="form-input"
+                      appFlatpickrInput [fpOptions]="fpOptionsFecha"
                       formControlName="Fecha_Fin"
                       [ngClass]="tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid ? 'errorInput' : ''"
                     />
@@ -395,8 +397,7 @@
                   <div class="section-header-row">
                     <div class="form-label">Días de operación de la temporada <span class="required-star">*</span></div>
                     <div class="button-row header-actions">
-                      <button type="button" class="btn-secondary" (click)="toggleAllSeasonDays(ti, true)">Todos</button>
-                      <button type="button" class="btn-secondary" (click)="toggleAllSeasonDays(ti, false)">Ninguno</button>
+                      <button type="button" class="btn-secondary btn-toggle" (click)="toggleAllSeasonDaysToggle(ti)">{{ areAllSeasonDaysSelected(ti) ? 'Ninguno' : 'Todos' }}</button>
                     </div>
                   </div>
 

@@ -17,7 +17,6 @@ const rutasRoutes = require('./routes/Programacion/rutas.routes');
 const sesionesRoutes = require('./routes/Usuarios/usuarios.routes');
 const toursRoutes = require('./routes/Tours/tours.routes');
 const transfersRoutes = require('./routes/Transfers/transfers.routes');
-const phoneRoutes = require('./routes/phone.routes');
 const historialNewRoutes = require('./routes/Historial/historial.routes');
 const permisosRoutes = require('./routes/Permisos/permisos.routes');
 
@@ -33,7 +32,6 @@ app.use('/api', programacionRoutes);
 app.use('/api', rutasRoutes);
 app.use('/api', sesionesRoutes);
 app.use('/api', transfersRoutes);
-app.use('/api', phoneRoutes);
 app.use('/api/tours', toursRoutes);
 app.use('/api/historial', historialNewRoutes);
 app.use('/api', permisosRoutes);

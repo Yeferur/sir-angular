@@ -168,6 +168,14 @@
   border-color: var(--accent-blue);
 }
 
+/* Compact toggle used for select-all / clear-all in days header */
+.btn-toggle {
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: .95rem;
+  min-width: 90px;
+}
+
 /* Botón Peligro (Eliminar) */
 .btn-icon-delete {
   width: 32px;
@@ -222,6 +230,42 @@
   padding-top: 15px;
   border-top: 1px dashed var(--border-color);
 }
+
+/* Perm-style buttons (same visual language as Crear Usuario) */
+.perm-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  cursor: pointer;
+  transition: background .15s, transform .08s, border-color .12s;
+  text-align: left;
+}
+.perm-btn:hover {
+  border-color: color-mix(in srgb, var(--accent-blue) 45%, var(--separator-color));
+  transform: translateY(-1px);
+}
+.perm-codigo {
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--text-primary);
+}
+.perm-desc {
+  color: var(--text-secondary);
+  font-size: .85rem;
+  line-height: 1.25;
+}
+.perm-btn.active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-tertiary));
+  border-color: var(--accent-blue);
+  transform: none;
+}
+.perm-btn.active .perm-codigo { color: var(--text-primary); }
+.perm-btn.active .perm-desc { color: var(--text-secondary); }
 
 .checkbox-inline {
   display: flex;
@@ -324,9 +368,12 @@
   gap: 10px;
 }
 
+/* Make day chips visually match the perm-btn style (compact card-like chips) */
 .day-chip {
   cursor: pointer;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .day-chip input {
@@ -335,24 +382,26 @@
 
 .day-chip span {
   display: inline-block;
-  padding: 8px 16px;
-  border-radius: 50px;
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  font-size: var(--small-font-size);
-  font-weight: 1000;
-  transition: all 0.2s;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  color: var(--text-primary);
+  font-size: .95rem;
+  font-weight: 700;
+  transition: background .15s, transform .08s, border-color .12s;
+}
+
+.day-chip:hover span {
+  border-color: color-mix(in srgb, var(--accent-blue) 45%, var(--separator-color));
+  transform: translateY(-1px);
 }
 
 .day-chip input:checked + span {
-  background-color: var(--accent);
-  color: var(--text-color);
-  border-color: var(--accent);
-}
-
-.day-chip span:hover {
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-tertiary));
+  border-color: var(--accent-blue);
+  transform: none;
+  color: var(--text-primary);
 }
 
 /* Temporadas */

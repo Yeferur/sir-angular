@@ -1063,44 +1063,13 @@ private applyDisponibilidadToDatepicker() {
         type: 'error',
         title: 'Campos inválidos',
         message: msg,
-        autoClose: false,
+        autoClose: true,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
       });
       return;
     }
 
-    // ===== Verificar WhatsApp del reportante antes de continuar =====
-    const indic = this.form.get('Indicativo')?.value || '';
-    const telReportante = this.form.get('Telefono_Reportante')?.value || '';
-    const fullPhone = `${indic}${telReportante}`.replace(/\s+/g, '');
-    try {
-      const res = await firstValueFrom(this.transferSvc.checkWhatsApp(fullPhone));
-      if (!res?.disabled) {
-        const exists = !!res?.exists;
-        if (!exists) {
-          this.navbar.alert.set({
-            type: 'error',
-            title: 'WhatsApp no disponible',
-            message: 'El número del reportante no parece tener WhatsApp. Verifica antes de guardar la reserva.',
-            autoClose: false,
-            buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
-          });
-          return;
-        }
-      }
-    } catch (err) {
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error verificación WhatsApp',
-        message: 'No fue posible verificar WhatsApp. Intenta de nuevo.',
-        autoClose: false,
-        buttons: [
-          { text: 'Reintentar', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.onSubmit(); } },
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
-        ]
-      });
-      return;
-    }
+    // WhatsApp verification removed — proceeding without check
 
     // Validar que haya al menos un pasajero
     if (this.pasajeros.length === 0) {

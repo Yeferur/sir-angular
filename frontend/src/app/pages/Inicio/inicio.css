@@ -15,9 +15,6 @@
 }
 
 .page-container {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 20px; /* Añadido padding para espaciado en bordes */
   animation: fadeInScale 0.5s ease-out;
 }
 
@@ -40,35 +37,11 @@
 
 .page-header .form-group {
   display: flex;
-  align-items: center;
   gap: 10px;
   flex-wrap: wrap; /* Permite que el label y el input se ajusten */
 }
 
-.form-label {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
 
-.form-input {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--separator-color);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-size: .95rem;
-  font-family: var(--font-family);
-  color: var(--text-primary);
-  min-width: 200px; /* Ancho mínimo para el input */
-  animation: fadeInScale 0.3s ease-out;
-}
-
-.form-input:focus,
-.form-select:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-  background-color: var(--bg-secondary);
-}
 /*
 ========================================
   SECCIONES Y TÍTULOS
@@ -157,7 +130,7 @@
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   opacity: 0;
   transform: translateY(20px);
-  /* Animación de entrada escalonada */
+  height: 240px;
   animation: cardFadeInUp 0.5s ease-out forwards;
   animation-delay: calc(var(--animation-order, 0) * 80ms);
 }

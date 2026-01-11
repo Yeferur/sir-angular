@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
+import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -66,10 +68,148 @@ type DisponibilidadPayload = {
   templateUrl: './crear-tour.html',
   styleUrls: ['./crear-tour.css'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FlatpickrInputDirective],
 })
 export class CrearTourComponent implements OnInit {
   isLoading = false;
+
+fpOptionsFecha: Partial<FlatpickrOptions> = {
+  dateFormat: 'Y-m-d',
+  altInput: true,
+  altFormat: 'd/m/Y',
+  allowInput: false,
+  disableMobile: true,
+  monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
+  
+  altInputClass: 'form-input flatpickr-input flatpickr-alt',
+
+  onReady: (_sel, _str, inst: any) => {
+    // ✅ SSR guard ANTES DE TODO
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const cal: HTMLElement = inst?.calendarContainer;
+    if (!cal) return;
+
+    cal.classList.add('sir-flatpickr');
+
+    // util: clamp día al máximo del mes
+    const clampDay = (y: number, m: number, d: number) => {
+      const last = new Date(y, m + 1, 0).getDate(); // último día del mes
+      return Math.min(Math.max(d, 1), last);
+    };
+
+    // --- Inyectar select en el header estable (flatpickr-month) ---
+    let yearDiv: HTMLDivElement | null = null;
+    let yearSelect: HTMLSelectElement | null = null;
+
+    const ensureYearSelect = () => {
+      // contenedor header
+      const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
+      if (!monthWrap) return null;
+
+      // elimina el input numérico (cuando exista)
+      const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
+      if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
+
+      // preferimos insertar dentro del pill .flatpickr-current-month
+      const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
+      const container = curMonth ?? monthWrap;
+
+      // evita duplicados
+      yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
+      if (yearSelect) return yearSelect;
+
+      // elimina cualquier wrapper previo para mantener DOM limpio
+      const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
+      if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
+
+      yearSelect = document.createElement('select');
+      yearSelect.className = 'sir-year-select';
+      yearSelect.setAttribute('aria-label', 'Seleccionar año');
+
+      try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
+      return yearSelect;
+    };
+
+    const buildYears = (centerYear: number) => {
+      const sel = ensureYearSelect();
+      if (!sel) return;
+
+      const start = centerYear - 20;
+      const end = centerYear + 20;
+
+      sel.innerHTML = '';
+      for (let y = end; y >= start; y--) {
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        sel.appendChild(opt);
+      }
+      sel.value = String(centerYear);
+    };
+
+    const syncSelectValue = () => {
+      const sel = ensureYearSelect();
+      if (!sel) return;
+
+      const y = inst.currentYear ?? new Date().getFullYear();
+      const exists = !!sel.querySelector(`option[value="${y}"]`);
+      if (!exists) buildYears(y);
+      sel.value = String(y);
+    };
+
+    const getSafeDay = () => {
+      const d: Date | undefined = inst.selectedDates?.[0];
+      return d ? d.getDate() : 1;
+    };
+
+    const onChange = () => {
+      const sel = ensureYearSelect();
+      if (!sel) return;
+
+      const y = Number(sel.value);
+      const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
+      const day = clampDay(y, m, getSafeDay());
+
+      const newDate = new Date(y, m, day);
+
+      // siempre mueve la vista
+      if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
+
+      // solo setea si ya había selección
+      if (inst.selectedDates?.length) {
+        inst.setDate(newDate, true); // true => triggerChange para reactive forms
+      }
+    };
+
+    // init
+    buildYears(inst.currentYear ?? new Date().getFullYear());
+    syncSelectValue();
+
+    // listeners
+    const sel0 = ensureYearSelect();
+    sel0?.addEventListener('change', onChange);
+
+    // hook sin pisar otros callbacks
+    const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
+      const prev = inst.config[key];
+      const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
+      inst.config[key] = [...arr, fn];
+    };
+
+    // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
+    wrap('onMonthChange', () => syncSelectValue());
+    wrap('onYearChange', () => syncSelectValue());
+
+    // cleanup
+    const prevOnDestroy = inst.config.onDestroy;
+    const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
+    inst.config.onDestroy = [
+      ...destroyArr,
+      () => sel0?.removeEventListener('change', onChange)
+    ];
+  }
+};
 
   toursExistentes: Tour[] = [];
   monedas: MonedaVM[] = [];
@@ -177,7 +317,7 @@ export class CrearTourComponent implements OnInit {
   private initBasePlan(): void {
     if (this.plans.length > 0) return;
 
-    this.plans.push(this.createPlanGroup('Plan básico', true));
+    this.plans.push(this.createPlanGroup('Plan básico', false));
 
     // Aplica reglas de validación desde el inicio
     this.applyPassengerRules(0, 'NINO');
@@ -488,11 +628,37 @@ toggleAllBaseDays(value: boolean): void {
   });
 }
 
+  // Toggle: if all selected -> clear all, otherwise set all
+  areAllBaseDaysSelected(): boolean {
+    const base = this.diasBaseFG;
+    const keys = Object.keys(base.controls).filter((k) => !base.get(k)?.disabled);
+    if (keys.length === 0) return false;
+    return keys.every((k) => !!base.get(k)?.value);
+  }
+
+  toggleAllBaseDaysToggle(): void {
+    const all = this.areAllBaseDaysSelected();
+    this.toggleAllBaseDays(!all);
+  }
+
 toggleAllSeasonDays(tempIndex: number, value: boolean): void {
   const t = this.temporadasFA.at(tempIndex) as FormGroup;
   const dias = t.get('dias') as FormGroup;
   Object.keys(dias.controls).forEach((k) => dias.get(k)?.setValue(value));
 }
+
+  areAllSeasonDaysSelected(tempIndex: number): boolean {
+    const t = this.temporadasFA.at(tempIndex) as FormGroup;
+    const dias = t.get('dias') as FormGroup;
+    const keys = Object.keys(dias.controls);
+    if (keys.length === 0) return false;
+    return keys.every((k) => !!dias.get(k)?.value);
+  }
+
+  toggleAllSeasonDaysToggle(tempIndex: number): void {
+    const all = this.areAllSeasonDaysSelected(tempIndex);
+    this.toggleAllSeasonDays(tempIndex, !all);
+  }
 
 getTemporadaDiasKeys(tempIndex: number): DiaSemana[] {
   const t = this.temporadasFA.at(tempIndex) as FormGroup;

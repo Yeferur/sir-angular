@@ -34,7 +34,8 @@
 }
 
 .field select,
-.field input[type="date"],
+.field input.flatpickr-input,
+.field input.flatpickr-alt,
 .field textarea {
     background-color: var(--bg-tertiary);
     border: 1px solid var(--separator-color);

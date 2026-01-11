@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Servidor: 127.0.0.1:3306
--- Tiempo de generación: 14-12-2025 a las 21:07:27
--- Versión del servidor: 9.1.0
--- Versión de PHP: 8.3.14
+-- Host: 127.0.0.1:3306
+-- Generation Time: Jan 11, 2026 at 03:33 AM
+-- Server version: 9.1.0
+-- PHP Version: 8.3.14
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Base de datos: `sir2`
+-- Database: `sir2`
 --
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `aforos`
+-- Table structure for table `aforos`
 --
 
 DROP TABLE IF EXISTS `aforos`;
@@ -35,32 +35,21 @@ CREATE TABLE IF NOT EXISTS `aforos` (
   `Fecha_Aforo` date DEFAULT NULL,
   PRIMARY KEY (`Id_Aforo`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Volcado de datos para la tabla `aforos`
---
-
-INSERT INTO `aforos` (`Id_Aforo`, `Id_Tour`, `Cupo`, `Fecha_Aforo`) VALUES
-(1, 5, 115, '2025-11-13'),
-(2, 5, 114, '2025-11-13'),
-(3, 5, 115, '2025-11-13'),
-(4, 2, 22, '2025-11-13'),
-(5, 5, 114, '2025-11-26');
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `asignacion_buses`
+-- Table structure for table `asignacion_buses`
 --
 
 DROP TABLE IF EXISTS `asignacion_buses`;
 CREATE TABLE IF NOT EXISTS `asignacion_buses` (
   `Id_Asignacion` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Placa_Bus` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Placa_Bus` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Capacidad` int DEFAULT '0',
   `Cantidad_Pasajeros` int DEFAULT '0',
-  `Guia` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Guia` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Id_Tour` bigint UNSIGNED DEFAULT NULL,
   `Fecha_Creacion` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Asignacion`),
@@ -70,18 +59,18 @@ CREATE TABLE IF NOT EXISTS `asignacion_buses` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `canales_reservas`
+-- Table structure for table `canales_reservas`
 --
 
 DROP TABLE IF EXISTS `canales_reservas`;
 CREATE TABLE IF NOT EXISTS `canales_reservas` (
   `Id_Canal` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nombre_Canal` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre_Canal` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Canal`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `canales_reservas`
+-- Dumping data for table `canales_reservas`
 --
 
 INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
@@ -99,16 +88,16 @@ INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `detalle_historial`
+-- Table structure for table `detalle_historial`
 --
 
 DROP TABLE IF EXISTS `detalle_historial`;
 CREATE TABLE IF NOT EXISTS `detalle_historial` (
   `Id_Detalle` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Historial` bigint UNSIGNED NOT NULL,
-  `Columna` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Valor_Anterior` text COLLATE utf8mb4_unicode_ci,
-  `Valor_Nuevo` text COLLATE utf8mb4_unicode_ci,
+  `Columna` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Valor_Anterior` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Valor_Nuevo` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`Id_Detalle`),
   KEY `Id_Historial` (`Id_Historial`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -116,15 +105,15 @@ CREATE TABLE IF NOT EXISTS `detalle_historial` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `historial`
+-- Table structure for table `historial`
 --
 
 DROP TABLE IF EXISTS `historial`;
 CREATE TABLE IF NOT EXISTS `historial` (
   `Id_Historial` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Tabla` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tabla` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Id_Registro` bigint DEFAULT NULL,
-  `Accion` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Accion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Id_Usuario` bigint UNSIGNED DEFAULT NULL,
   `Fecha_Hora_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Historial`),
@@ -134,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `historial` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `horarios`
+-- Table structure for table `horarios`
 --
 
 DROP TABLE IF EXISTS `horarios`;
@@ -142,14 +131,14 @@ CREATE TABLE IF NOT EXISTS `horarios` (
   `Id_Horario` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Punto` bigint UNSIGNED DEFAULT NULL,
   `Id_Tour` bigint UNSIGNED DEFAULT NULL,
-  `Hora_Salida` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Hora_Salida` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Horario`),
   KEY `Id_Punto` (`Id_Punto`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=5601 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8926 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `horarios`
+-- Dumping data for table `horarios`
 --
 
 INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALUES
@@ -5176,16 +5165,6 @@ INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALU
 (5018, 289, 8, '8:20 - 8:30 AM'),
 (5019, 289, 9, '9:00 AM'),
 (5020, 289, 10, '8:20 - 8:30 AM'),
-(5021, 375, 1, 'Pendiente'),
-(5022, 375, 2, 'Pendiente'),
-(5023, 375, 3, 'Pendiente'),
-(5024, 375, 4, 'Pendiente'),
-(5025, 375, 5, 'Pendiente'),
-(5026, 375, 6, 'Pendiente'),
-(5027, 375, 7, 'Pendiente'),
-(5028, 375, 8, 'Pendiente'),
-(5029, 375, 9, 'Pendiente'),
-(5030, 375, 10, 'Pendiente'),
 (5031, 40, 1, '4:00 - 4:10 AM'),
 (5032, 40, 2, '7:00 - 7:10 AM'),
 (5033, 40, 3, '8:00 - 8:10 AM'),
@@ -5755,20 +5734,647 @@ INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALU
 (5597, 313, 7, '5:20 - 5:30 PM'),
 (5598, 313, 8, '8:20 - 8:30 AM'),
 (5599, 313, 9, '9:00 AM'),
-(5600, 313, 10, '8:20 - 8:30 AM');
+(5600, 313, 10, '8:20 - 8:30 AM'),
+(8299, 1, 19, 'EST. POBLADO'),
+(8300, 2, 19, 'EST. POBLADO'),
+(8301, 3, 19, 'EST. POBLADO'),
+(8302, 4, 19, 'LLEGA AL 47 STREET'),
+(8303, 5, 19, 'EST. POBLADO'),
+(8304, 6, 19, '6:50 AM'),
+(8305, 7, 19, 'EST. POBLADO'),
+(8306, 8, 19, '7:00 - 7:10 AM'),
+(8307, 9, 19, '7:00 - 7:10 AM'),
+(8308, 10, 19, '7:00 - 7:10 AM'),
+(8309, 11, 19, '7:00 - 7:10 AM'),
+(8310, 12, 19, '7:00 - 7:10 AM'),
+(8311, 13, 19, '7:00 - 7:10 AM'),
+(8312, 14, 19, '7:00 - 7:10 AM'),
+(8313, 15, 19, '7:00 - 7:10 AM'),
+(8314, 16, 19, '7:00 - 7:10 AM'),
+(8315, 17, 19, '7:00 - 7:10 AM'),
+(8316, 18, 19, 'Pendiente'),
+(8317, 19, 19, '7:00 - 7:10 AM'),
+(8318, 20, 19, '7:00 A 7:10 AM'),
+(8319, 21, 19, '7:00 - 7:10 AM'),
+(8320, 22, 19, '7:00 - 7:10 AM'),
+(8321, 23, 19, '7:00 - 7:10 AM'),
+(8322, 24, 19, '7:00 - 7:10 AM'),
+(8323, 25, 19, '7:00 - 7:10 AM'),
+(8324, 26, 19, '7:00 - 7:10 AM'),
+(8325, 27, 19, '7:00 - 7:10 AM'),
+(8326, 28, 19, '7:00 - 7:10 AM'),
+(8327, 29, 19, '7:00 - 7:10 AM'),
+(8328, 30, 19, '7:00 - 7:10 AM'),
+(8329, 31, 19, '7:00 - 7:10 AM'),
+(8330, 32, 19, '7:00 - 7:10 AM'),
+(8331, 33, 19, '7:00 - 7:10 AM'),
+(8332, 34, 19, '7:00 - 7:10 AM'),
+(8333, 35, 19, '7:00 - 7:10 AM'),
+(8334, 36, 19, '7:00 - 7:10 AM'),
+(8335, 37, 19, '7:00 - 7:10 AM'),
+(8336, 38, 19, '7:00 - 7:10 AM'),
+(8337, 39, 19, '7:00 - 7:10 AM'),
+(8338, 40, 19, '7:00 - 7:10 AM'),
+(8339, 41, 19, '7:00 - 7:10 AM'),
+(8340, 42, 19, 'Pendiente'),
+(8341, 43, 19, '7:00 - 7:10 AM'),
+(8342, 44, 19, '7:00 - 7:10 AM'),
+(8343, 45, 19, '7:00 - 7:10 AM'),
+(8344, 46, 19, 'Pendiente'),
+(8345, 47, 19, 'Pendiente'),
+(8346, 48, 19, 'Pendiente'),
+(8347, 49, 19, '7:00 - 7:10 AM'),
+(8348, 50, 19, '7:00 - 7:10 AM'),
+(8349, 51, 19, '7:00 - 7:10 AM'),
+(8350, 52, 19, '7:00 - 7:10 AM'),
+(8351, 53, 19, '7:00 - 7:10 AM'),
+(8352, 54, 19, '7:00 - 7:10 AM'),
+(8353, 55, 19, '7:00 - 7:10 AM'),
+(8354, 56, 19, '7:00 - 7:10 AM'),
+(8355, 57, 19, '7:00 - 7:10 AM'),
+(8356, 58, 19, '7:00 - 7:10 AM'),
+(8357, 59, 19, '7:00 - 7:10 AM'),
+(8358, 60, 19, '7:00 - 7:10 AM'),
+(8359, 61, 19, '7:00 - 7:10 AM'),
+(8360, 62, 19, '7:00 - 7:10 AM'),
+(8361, 63, 19, 'Pendiente'),
+(8362, 64, 19, '7:00 A 7:10 AM'),
+(8363, 65, 19, '7:00 - 7:10 AM'),
+(8364, 66, 19, 'Pendiente'),
+(8365, 67, 19, '7:00 - 7:10 AM'),
+(8366, 68, 19, '7:00 - 7:10 AM'),
+(8367, 69, 19, '7:10 - 7:20 AM'),
+(8368, 70, 19, '7:10 - 7:20 AM'),
+(8369, 71, 19, 'Pendiente'),
+(8370, 72, 19, '7:00 - 7:10 AM'),
+(8371, 73, 19, '7:00 - 7:10 AM'),
+(8372, 74, 19, '7:00 - 7:10 AM'),
+(8373, 75, 19, '7:00 - 7:10 AM'),
+(8374, 76, 19, '7:00 - 7:10 AM'),
+(8375, 77, 19, '7:00 - 7:10 AM'),
+(8376, 78, 19, 'Pendiente'),
+(8377, 79, 19, '7:00 - 7:10 AM'),
+(8378, 80, 19, '7:00 A 7:10 AM'),
+(8379, 81, 19, '7:00 - 7:10 AM'),
+(8380, 82, 19, '7:00 - 7:10 AM'),
+(8381, 83, 19, '7:00 - 7:10 AM'),
+(8382, 84, 19, 'Pendiente'),
+(8383, 85, 19, '7:00 - 7:10 AM'),
+(8384, 86, 19, 'Pendiente'),
+(8385, 87, 19, '7:00 - 7:10 AM'),
+(8386, 88, 19, '7:10 - 7:20 AM'),
+(8387, 89, 19, 'Pendiente'),
+(8388, 90, 19, '7:20 - 7:30 AM'),
+(8389, 91, 19, '7:20 - 7:30 AM'),
+(8390, 92, 19, '7:30 - 7:40 AM'),
+(8391, 93, 19, '7:10 - 7:20 AM'),
+(8392, 94, 19, '7:20 - 7:30 AM'),
+(8393, 95, 19, '7:30 - 7:40 AM'),
+(8394, 96, 19, '7:20 - 7:30 AM'),
+(8395, 97, 19, '7:20 - 7:30 AM'),
+(8396, 98, 19, '7:30 - 7:40 AM'),
+(8397, 99, 19, '7:10 - 7:20 AM'),
+(8398, 100, 19, 'Pendiente'),
+(8399, 101, 19, 'Pendiente'),
+(8400, 102, 19, '7:20 - 7:30 AM'),
+(8401, 103, 19, '7:20 - 7:30 AM'),
+(8402, 104, 19, '7:30 - 7:40 AM'),
+(8403, 105, 19, '7:30 - 7:40 AM'),
+(8404, 106, 19, '7:20 - 7:30 AM'),
+(8405, 107, 19, '7:20 - 7:30 AM'),
+(8406, 108, 19, '7:10 - 7:20 AM'),
+(8407, 109, 19, '8:10 - 8:20 AM'),
+(8408, 110, 19, '7:10 - 7:20 AM'),
+(8409, 111, 19, '7:20 - 7:30 AM'),
+(8410, 112, 19, '7:30 - 7:40 AM'),
+(8411, 113, 19, '7:30 - 7:40 AM'),
+(8412, 114, 19, '7:30 - 7:40 AM'),
+(8413, 115, 19, '7:30 - 7:40 AM'),
+(8414, 116, 19, '7:30 - 7:40 AM'),
+(8415, 117, 19, '7:30 - 7:40 AM'),
+(8416, 118, 19, '7:10 - 7:20 AM'),
+(8417, 119, 19, '7:20 - 7:30  AM'),
+(8418, 120, 19, '8:10 - 8:20 AM'),
+(8419, 121, 19, '7:40 - 7:50 AM'),
+(8420, 122, 19, '7:20 - 7:30  AM'),
+(8421, 123, 19, '7:20 - 7:30 AM'),
+(8422, 124, 19, '7:20 - 7:30  AM'),
+(8423, 125, 19, 'Pendiente'),
+(8424, 126, 19, '7:20 - 7:30 AM'),
+(8425, 127, 19, '7:40 - 7:50 AM'),
+(8426, 128, 19, '7:10 - 7:20 AM'),
+(8427, 129, 19, '7:30 - 7:40 AM'),
+(8428, 130, 19, '7:30 - 7:40 AM'),
+(8429, 131, 19, '7:20 - 7:30 AM'),
+(8430, 132, 19, '7:20 - 7:30 AM'),
+(8431, 133, 19, '7:20 - 7:30 AM'),
+(8432, 134, 19, '7:20 - 7:30 AM'),
+(8433, 135, 19, '7:20 - 7:30 AM'),
+(8434, 136, 19, 'Pendiente'),
+(8435, 137, 19, '7:20 - 7:30 AM'),
+(8436, 138, 19, '7:20 - 7:30 AM'),
+(8437, 139, 19, 'Pendiente'),
+(8438, 140, 19, '7:10 - 7:20 AM'),
+(8439, 141, 19, 'Pendiente'),
+(8440, 142, 19, 'Pendiente'),
+(8441, 143, 19, '7:20 - 7:30 AM'),
+(8442, 144, 19, '7:10 - 7:20 AM'),
+(8443, 145, 19, '7:30 - 7:40 AM'),
+(8444, 146, 19, '7:30- 7:40 AM'),
+(8445, 147, 19, '7:20 - 7:30 AM'),
+(8446, 148, 19, '7:20 - 7:30 AM'),
+(8447, 149, 19, 'Pendiente'),
+(8448, 150, 19, '7:20 - 7:30 AM'),
+(8449, 151, 19, '7:30 - 7:40 AM'),
+(8450, 152, 19, '7:50 - 8:00 AM'),
+(8451, 153, 19, 'Pendiente'),
+(8452, 154, 19, '7:20 - 7:30 AM'),
+(8453, 155, 19, '7:20 - 7:30 AM'),
+(8454, 156, 19, 'Pendiente'),
+(8455, 157, 19, '7:20 - 7:30 AM'),
+(8456, 158, 19, 'Pendiente'),
+(8457, 159, 19, '7:30 - 7:40 AM'),
+(8458, 160, 19, '7:30 - 7:40 AM'),
+(8459, 161, 19, 'Pendiente'),
+(8460, 162, 19, 'Pendiente'),
+(8461, 163, 19, 'Pendiente'),
+(8462, 164, 19, 'Pendiente'),
+(8463, 165, 19, 'Pendiente'),
+(8464, 166, 19, 'Pendiente'),
+(8465, 167, 19, 'Pendiente'),
+(8466, 168, 19, '7:20 - 7:30 AM'),
+(8467, 169, 19, '7:10 - 7:20 AM'),
+(8468, 170, 19, 'Pendiente'),
+(8469, 171, 19, '7:40 - 7:50 AM'),
+(8470, 172, 19, '7:20 - 7:30 AM'),
+(8471, 173, 19, '7:10 - 7:20 AM'),
+(8472, 174, 19, 'Pendiente'),
+(8473, 175, 19, '7:40 - 7:50 AM'),
+(8474, 176, 19, '7:30 - 7:40 AM'),
+(8475, 177, 19, 'Pendiente'),
+(8476, 178, 19, '7:40 - 7:50 AM'),
+(8477, 179, 19, '7:10 - 7:20 AM'),
+(8478, 180, 19, '7:10 - 7:20 AM'),
+(8479, 181, 19, '7:40 - 7:50 AM'),
+(8480, 182, 19, '7:30 - 7:40 AM'),
+(8481, 183, 19, '7:20 - 7:30 AM'),
+(8482, 184, 19, 'Pendiente'),
+(8483, 185, 19, '7:40 - 7:50 AM'),
+(8484, 186, 19, '7:20 - 7:30 AM'),
+(8485, 187, 19, '7:20 - 7:30 AM'),
+(8486, 188, 19, 'Pendiente'),
+(8487, 189, 19, '7:40 - 7:50 AM'),
+(8488, 190, 19, '7:40 - 7:50 AM'),
+(8489, 191, 19, '7:20 - 7:30 AM'),
+(8490, 192, 19, '8:00 AM'),
+(8491, 193, 19, '7:20 - 7:30 AM'),
+(8492, 194, 19, '7:30 - 7:40 AM'),
+(8493, 195, 19, '7:20 - 7:30 AM'),
+(8494, 196, 19, '7:40 - 7:50 AM'),
+(8495, 197, 19, '7:20 - 7:30 AM'),
+(8496, 198, 19, '7:30 - 7:40 AM'),
+(8497, 199, 19, '7:30 - 7:40 AM'),
+(8498, 200, 19, '7:30 - 7:40 AM'),
+(8499, 201, 19, 'Pendiente'),
+(8500, 202, 19, 'Pendiente'),
+(8501, 203, 19, '7:10 - 7:20 AM'),
+(8502, 204, 19, '7:10 - 7:20 AM'),
+(8503, 205, 19, '7:20 - 7:30 AM'),
+(8504, 206, 19, '7:20 - 7:30 AM'),
+(8505, 207, 19, '7:20 - 7:30 AM'),
+(8506, 208, 19, '7:20 - 7:30 AM'),
+(8507, 209, 19, '7:20 - 7:30 AM'),
+(8508, 210, 19, '7:00 - 7:10 AM'),
+(8509, 211, 19, 'PARQUE POBLADO 7:00 '),
+(8510, 212, 19, 'Pendiente'),
+(8511, 213, 19, '7:20 - 7:30 AM'),
+(8512, 214, 19, '7:00 - 7:10 AM'),
+(8513, 215, 19, '7:00 - 7:10 AM'),
+(8514, 216, 19, '7:10 - 7:20  AM '),
+(8515, 217, 19, '7:20 - 7:30 AM'),
+(8516, 218, 19, '7:10 - 7:20  AM '),
+(8517, 219, 19, '7:10 - 7:20  AM '),
+(8518, 220, 19, 'Pendiente'),
+(8519, 221, 19, '7:00 - 7:10 AM'),
+(8520, 222, 19, '7:10 - 7:20  AM '),
+(8521, 223, 19, '7:00 - 7:10 AM'),
+(8522, 224, 19, '7:10 - 7:20  AM '),
+(8523, 225, 19, '7:00 - 7:10 AM'),
+(8524, 226, 19, '7:20 - 7:30 AM'),
+(8525, 227, 19, '7:00 A 7:10 AM'),
+(8526, 228, 19, '7:20 - 7:30 AM'),
+(8527, 229, 19, '7:00 - 7:10 AM'),
+(8528, 230, 19, '7:10 - 7:20 AM'),
+(8529, 231, 19, '7:10 - 7:20 AM'),
+(8530, 232, 19, '7:00 - 7:10 AM'),
+(8531, 233, 19, '7:00 - 7:10 AM'),
+(8532, 234, 19, '7:00 - 7:10 AM'),
+(8533, 235, 19, '7:00 - 7:10 AM'),
+(8534, 236, 19, '7:20 - 7:30 AM'),
+(8535, 237, 19, '7:00 - 7:10 AM'),
+(8536, 238, 19, '7:00 - 7:10 AM'),
+(8537, 239, 19, '7:00 - 7:10 AM'),
+(8538, 240, 19, '7:20 - 7:30 AM'),
+(8539, 241, 19, '7:30 - 7:40 AM'),
+(8540, 242, 19, '7:10 - 7:20 AM'),
+(8541, 243, 19, '7:10 - 7:20 AM'),
+(8542, 244, 19, '7:10 - 7:10 AM'),
+(8543, 245, 19, '7:10 - 7:20 AM'),
+(8544, 246, 19, '7:10 - 7:20 AM'),
+(8545, 247, 19, '7:00 - 7:10 AM'),
+(8546, 248, 19, '7:10 - 7:20 AM'),
+(8547, 249, 19, '7:10 - 7:20 AM'),
+(8548, 250, 19, '7:00 - 7:10 AM'),
+(8549, 251, 19, '7:00 - 7:10 AM'),
+(8550, 252, 19, '7:10 - 7:20 AM'),
+(8551, 253, 19, '7:20 - 7:30 AM'),
+(8552, 254, 19, '7:10 - 7:20 AM'),
+(8553, 255, 19, '7:00 - 7:10 AM'),
+(8554, 256, 19, '7:20 - 7:30 AM'),
+(8555, 257, 19, '7:00 - 7:10 AM'),
+(8556, 258, 19, '7:00 A 7:10 AM'),
+(8557, 259, 19, '7:00 - 7:10 AM'),
+(8558, 260, 19, '7:10 - 7:20 AM'),
+(8559, 261, 19, '7:10 - 7:20 AM'),
+(8560, 262, 19, '7:00 - 7:10 AM'),
+(8561, 263, 19, '7:20 - 7:30 AM'),
+(8562, 264, 19, '6:50 - 7:00 AM'),
+(8563, 265, 19, '7:20 - 7:30 AM'),
+(8564, 266, 19, '7:10 - 7:20 AM'),
+(8565, 267, 19, 'Pendiente'),
+(8566, 268, 19, '7:30 - 7:40 AM'),
+(8567, 269, 19, '7:20 - 7:30 AM'),
+(8568, 270, 19, '7:10 - 7:20 AM'),
+(8569, 271, 19, '7:20 - 7:30 AM'),
+(8570, 272, 19, '7:40 - 7:50 AM'),
+(8571, 273, 19, '7:40 - 7:50 AM'),
+(8572, 274, 19, '7:10 - 7:20 AM '),
+(8573, 275, 19, '7:10 A 7:20 AM'),
+(8574, 276, 19, '7:10 - 7:20 AM'),
+(8575, 277, 19, '7:20 - 7:30 AM'),
+(8576, 278, 19, '7:10 - 7:20 AM'),
+(8577, 279, 19, '7:30 - 7:40 AM'),
+(8578, 280, 19, '7:20 - 7:30AM'),
+(8579, 281, 19, '7:20 - 7:30 AM'),
+(8580, 282, 19, '7:10 - 7:20 AM'),
+(8581, 283, 19, '7:10 - 7:20 AM'),
+(8582, 284, 19, '7:20 - 7:30 AM'),
+(8583, 285, 19, '7:10 - 7:20 AM'),
+(8584, 286, 19, '7:20 - 7:30 AM'),
+(8585, 287, 19, '7:10 - 7:20 AM'),
+(8586, 288, 19, '7:40 - 7:50 AM'),
+(8587, 289, 19, '7:20 - 7:30 AM'),
+(8588, 290, 19, '7:20 - 7:30 AM'),
+(8589, 291, 19, '7:10 - 7:20 AM'),
+(8590, 292, 19, '7:30 - 7:40 AM'),
+(8591, 293, 19, '7:20 A 7:30 AM'),
+(8592, 294, 19, '7:30 - 7:40 AM'),
+(8593, 295, 19, '7:30 - 7:40 AM'),
+(8594, 296, 19, '7:20 - 7:30 AM'),
+(8595, 297, 19, '7:10 - 7:20 AM'),
+(8596, 298, 19, '7:20 - 7:30 AM'),
+(8597, 299, 19, '7:00 - 7:10 AM'),
+(8598, 300, 19, '7:20 - 7:30 AM'),
+(8599, 301, 19, '7:30 - 7:40 AM'),
+(8600, 302, 19, '7:40 - 7:50 AM'),
+(8601, 303, 19, '7:00 - 7:10 AM'),
+(8602, 304, 19, '7:10 - 7:20 AM'),
+(8603, 305, 19, '7:30 - 7:40 AM'),
+(8604, 306, 19, '7:20 - 7:30 AM'),
+(8605, 307, 19, '7:30 - 7:40 AM'),
+(8606, 308, 19, '7:20 - 7:30 AM'),
+(8607, 309, 19, '7:20 - 7:30 AM'),
+(8608, 310, 19, '7:10 - 7:20 AM'),
+(8609, 311, 19, 'Pendiente'),
+(8610, 312, 19, '7:30 - 7:40 AM'),
+(8611, 313, 19, '7:20 - 7:30 AM'),
+(8612, 314, 19, '7:10 - 7:20 AM'),
+(8613, 315, 19, 'Pendiente'),
+(8614, 316, 19, 'Pendiente'),
+(8615, 317, 19, 'Pendiente'),
+(8616, 318, 19, 'Pendiente'),
+(8617, 319, 19, 'Pendiente'),
+(8618, 320, 19, 'Pendiente'),
+(8619, 321, 19, '7:00 - 7:10 AM'),
+(8620, 322, 19, '7:20 - 7:30 AM'),
+(8621, 323, 19, '7:30 - 7:40 AM'),
+(8622, 324, 19, '7:20 - 7:30 AM'),
+(8623, 325, 19, '7:30 - 7:40 AM'),
+(8624, 326, 19, '7:00 - 7:10 AM'),
+(8625, 327, 19, 'Pendiente'),
+(8626, 328, 19, '7:10 - 7:20 AM'),
+(8627, 329, 19, '7:30 - 7:40 AM'),
+(8628, 330, 19, '7:20 - 7:30 AM'),
+(8629, 331, 19, '7:20 - 7:30 AM'),
+(8630, 332, 19, '7:20 - 7:30 AM'),
+(8631, 333, 19, '7:30 - 7:40 AM'),
+(8632, 334, 19, '7:30 - 7:40 AM'),
+(8633, 335, 19, '7:20 - 7:30 AM'),
+(8634, 336, 19, '7:30 - 7:40 AM'),
+(8635, 337, 19, '7:20 AM'),
+(8636, 338, 19, 'Pendiente'),
+(8637, 339, 19, '7:30 - 7:40 AM'),
+(8638, 340, 19, '7:30 - 7:40 AM'),
+(8639, 341, 19, 'ESTACION FLORESTA'),
+(8640, 342, 19, '7:10 - 7:20 AM'),
+(8641, 343, 19, '7:30 - 7:40 AM'),
+(8642, 344, 19, 'ESTACION FLORESTA'),
+(8643, 345, 19, '7:20 - 7:30 AM'),
+(8644, 346, 19, '7:30 - 7:40 AM'),
+(8645, 347, 19, '7:10 - 7:20 AM'),
+(8646, 348, 19, '7:30 - 7:40 AM'),
+(8647, 349, 19, '7:30 - 7:40 AM'),
+(8648, 350, 19, '7:10 - 7:20 AM'),
+(8649, 351, 19, '7:20 - 7:30 AM'),
+(8650, 352, 19, '7:20 - 7:30 AM'),
+(8651, 353, 19, '7:20 - 7:30 AM'),
+(8652, 354, 19, '7:20 - 7:30 AM'),
+(8653, 355, 19, '7:20 - 7:30 AM'),
+(8654, 356, 19, '7:10 - 7:20 AM'),
+(8655, 357, 19, '7:20 - 7:30 AM'),
+(8656, 358, 19, 'ESTACION FLORESTA'),
+(8657, 359, 19, '7:20 - 7:30 AM'),
+(8658, 360, 19, '7:30 - 7:40 AM'),
+(8659, 361, 19, '7:10 - 7:20 AM'),
+(8660, 362, 19, '7:20 - 7:30 AM'),
+(8661, 363, 19, '7:10 - 7:20 AM'),
+(8662, 364, 19, '7:20 - 7:30 AM'),
+(8663, 365, 19, '7:20 - 7:30 AM'),
+(8664, 366, 19, '7:20 - 7:30 AM'),
+(8665, 367, 19, '7:30 - 7:40 AM'),
+(8666, 368, 19, '7:10 - 7:20 AM '),
+(8667, 369, 19, '7:30 - 7:40 AM'),
+(8668, 370, 19, '7:30 - 7:40 AM'),
+(8669, 371, 19, '7:10 - 7:20  AM '),
+(8670, 372, 19, '7:20 - 7:30 AM'),
+(8671, 373, 19, '7:20 - 7:30 AM'),
+(8672, 374, 19, '7:30 - 7:40 AM'),
+(8673, 375, 19, 'ESTACION FLORESTA'),
+(8674, 376, 19, '7:20 - 7:30 AM'),
+(8675, 377, 19, '7:40 - 7:50 AM'),
+(8676, 378, 19, '7:20 - 7:30 AM'),
+(8677, 379, 19, 'EST. FLORESTA'),
+(8678, 380, 19, '7:20 - 7:30 AM'),
+(8679, 381, 19, '7:30 - 7:40 AM'),
+(8680, 382, 19, 'Pendiente'),
+(8681, 383, 19, '7:20 - 7:30 AM'),
+(8682, 384, 19, '7:20 - 7:30 AM'),
+(8683, 385, 19, '7:20 - 7:30 AM'),
+(8684, 386, 19, '7:20 - 7:30 AM'),
+(8685, 387, 19, '7:30 - 7:40 AM'),
+(8686, 388, 19, '7:00 - 7:10 AM'),
+(8687, 389, 19, '7:30 - 7:40 AM'),
+(8688, 390, 19, '7:30 - 7:40 AM'),
+(8689, 391, 19, '7:10 - 7:20 AM'),
+(8690, 392, 19, '7:20 - 7:30 AM'),
+(8691, 393, 19, '7:20 - 7:30 AM'),
+(8692, 394, 19, '7:10 - 7:20 AM'),
+(8693, 395, 19, 'Pendiente'),
+(8694, 396, 19, '7:30 - 7:40 AM'),
+(8695, 397, 19, '7:00 - 7:10 AM'),
+(8696, 398, 19, '7:20 - 7:30 AM'),
+(8697, 399, 19, 'ESTACION FLORESTA'),
+(8698, 400, 19, '7:20 - 7:30 AM'),
+(8699, 401, 19, '7:50 - 8:00AM'),
+(8700, 402, 19, '7:30 - 7:40 AM'),
+(8701, 403, 19, '7:20 - 7:30 AM'),
+(8702, 404, 19, '7:20 - 7:30 AM'),
+(8703, 405, 19, '7:10 - 7:20 AM'),
+(8704, 406, 19, '7:40 - 7:50AM'),
+(8705, 407, 19, '7:20 - 7:30 AM'),
+(8706, 408, 19, '7:30 - 7:40 AM'),
+(8707, 409, 19, '7:40 - 7:50AM'),
+(8708, 410, 19, '7:30 - 7:40 AM'),
+(8709, 411, 19, '7:10 - 7:20 AM'),
+(8710, 412, 19, '7:40 - 7:50 AM'),
+(8711, 413, 19, '7:30 - 7:40 AM'),
+(8712, 414, 19, '7:10 - 7:20 AM'),
+(8713, 415, 19, '7:30 - 7:40 AM'),
+(8714, 416, 19, '7:30 - 7:40 AM'),
+(8715, 417, 19, '7:20 - 7:30 AM'),
+(8716, 418, 19, '7:30 - 7:40 AM'),
+(8717, 419, 19, '7:20 - 7:30 AM'),
+(8718, 420, 19, '7:40 - 7:50 AM'),
+(8719, 421, 19, '7:30 - 7:40 AM'),
+(8720, 422, 19, '7:20 - 7:30 AM'),
+(8721, 423, 19, '7:20 - 7:30 AM'),
+(8722, 424, 19, '7:20 - 7:30 AM'),
+(8723, 425, 19, '7:30 - 7:40 AM'),
+(8724, 426, 19, '7:30 - 7:40 AM'),
+(8725, 427, 19, '7:10 - 7:20 AM'),
+(8726, 428, 19, '7:20 - 7:30 AM'),
+(8727, 429, 19, '7:20 - 7:30  AM'),
+(8728, 430, 19, '7:00 - 7:10 AM'),
+(8729, 431, 19, '7:30 - 7:40 AM'),
+(8730, 432, 19, '7:30 - 7:40 AM'),
+(8731, 433, 19, '7:00 A 7:10 AM'),
+(8732, 434, 19, '7:30 - 7:40 AM'),
+(8733, 435, 19, '7:20 - 7:30  AM'),
+(8734, 436, 19, '7:30 - 7:40 AM'),
+(8735, 437, 19, '7:30 - 7:40 AM'),
+(8736, 438, 19, '7:20 - 7:30 AM'),
+(8737, 439, 19, 'Pendiente'),
+(8738, 440, 19, '7:40 - 7:50 AM'),
+(8739, 441, 19, '7:20 - 7:30 AM'),
+(8740, 442, 19, '7:20 - 7:30 AM'),
+(8741, 443, 19, '7:20 - 7:30 AM'),
+(8742, 444, 19, '7:20 - 7:30 AM'),
+(8743, 445, 19, '7:00 - 7:10 AM'),
+(8744, 446, 19, '7:20 - 7:30 AM'),
+(8745, 447, 19, '7:20 - 7:30 AM'),
+(8746, 448, 19, 'Pendiente'),
+(8747, 449, 19, '7:40 - 7:50 AM'),
+(8748, 450, 19, '7:30 - 7:40 AM'),
+(8749, 451, 19, 'Pendiente'),
+(8750, 452, 19, '7:40 - 7:50 AM'),
+(8751, 453, 19, '7:40 - 7:50 AM'),
+(8752, 454, 19, '7:40 - 7:50 AM'),
+(8753, 455, 19, '7:40 - 7:50 AM'),
+(8754, 456, 19, '7:40 - 7:50 AM'),
+(8755, 457, 19, '7:40 - 7:50 AM'),
+(8756, 458, 19, '7:40 - 7:50 AM'),
+(8757, 459, 19, '7:40 - 7:50 AM'),
+(8758, 460, 19, '7:40 - 7:50 AM'),
+(8759, 461, 19, '7:40 - 7:50 AM'),
+(8760, 462, 19, '7:40 - 7:50 AM'),
+(8761, 463, 19, '7:40 - 7:50 AM'),
+(8762, 464, 19, '7:30 - 7:40 AM'),
+(8763, 465, 19, '7:40 - 7:50 AM'),
+(8764, 466, 19, '7:40 - 7:50 AM'),
+(8765, 467, 19, '7:40 - 7:50 AM'),
+(8766, 468, 19, '7:40 - 7:50 AM'),
+(8767, 469, 19, '7:40 - 7:50 AM'),
+(8768, 470, 19, '7:40 - 7:50 AM'),
+(8769, 471, 19, '7:10 - 7:20  AM '),
+(8770, 472, 19, '7:40 - 7:50 AM'),
+(8771, 473, 19, '7:40 - 7:50 AM'),
+(8772, 474, 19, '7:40 - 7:50 AM'),
+(8773, 475, 19, 'Pendiente'),
+(8774, 476, 19, '7:40 - 7:50 AM'),
+(8775, 477, 19, '7:40 - 7:50 AM'),
+(8776, 478, 19, '7:40 - 7:50 AM'),
+(8777, 479, 19, '7:40 - 7:50 AM'),
+(8778, 480, 19, '7:40 - 7:50 AM'),
+(8779, 481, 19, '7:40 - 7:50 AM'),
+(8780, 482, 19, '7:40 - 7:50 AM'),
+(8781, 483, 19, '7:40 - 7:50 AM'),
+(8782, 484, 19, '7:40 - 7:50 AM'),
+(8783, 485, 19, '7:40 - 7:50 AM'),
+(8784, 486, 19, '7:40 - 7:50 AM'),
+(8785, 487, 19, '7:40 - 7:50 AM'),
+(8786, 488, 19, '7:40 - 7:50 AM'),
+(8787, 489, 19, '7:40 - 7:50 AM'),
+(8788, 490, 19, '7:40 - 7:50 AM'),
+(8789, 491, 19, '7:40 - 7:50 AM'),
+(8790, 492, 19, '7:40 - 7:50 AM'),
+(8791, 493, 19, '7:40 - 7:50 AM'),
+(8792, 494, 19, '7:40 - 7:50 AM'),
+(8793, 495, 19, '7:40 - 7:50 AM'),
+(8794, 496, 19, '7:40 - 7:50 AM'),
+(8795, 497, 19, '7:40 - 7:50 AM'),
+(8796, 498, 19, '7:40 - 7:50 AM'),
+(8797, 499, 19, '7:40 - 7:50 AM'),
+(8798, 500, 19, '7:40 - 7:50 AM'),
+(8799, 501, 19, '7:50 - 8:00AM'),
+(8800, 502, 19, '7:40 - 7:50AM'),
+(8801, 503, 19, '7:40 - 7:50AM'),
+(8802, 504, 19, '7:40 - 7:50AM'),
+(8803, 505, 19, '7:40 - 7:50AM'),
+(8804, 506, 19, '7:40 - 7:50AM'),
+(8805, 507, 19, '7:40 - 7:50AM'),
+(8806, 508, 19, '7:40 - 7:50 AM'),
+(8807, 509, 19, 'Pendiente'),
+(8808, 510, 19, '7:20 - 7:30 AM'),
+(8809, 511, 19, '7:40 - 7:50 AM'),
+(8810, 512, 19, '7:40 - 7:50 AM'),
+(8811, 513, 19, '7:40 - 7:50 AM'),
+(8812, 514, 19, '7:40 - 7:50 AM'),
+(8813, 515, 19, '7:40 - 7:50 AM'),
+(8814, 516, 19, '7:40 - 7:50 AM'),
+(8815, 517, 19, '7:40 - 7:50 AM'),
+(8816, 518, 19, '7:40 - 7:50 AM'),
+(8817, 519, 19, '7:40 - 7:50 AM'),
+(8818, 520, 19, '7:40 - 7:50 AM'),
+(8819, 521, 19, '7:40 - 7:50 AM'),
+(8820, 522, 19, '7:40 - 7:50 AM'),
+(8821, 523, 19, '7:40 - 7:50 AM'),
+(8822, 524, 19, '7:40 - 7:50 AM'),
+(8823, 525, 19, '7:40 - 7:50 AM'),
+(8824, 526, 19, '7:40 - 7:50 AM'),
+(8825, 527, 19, '7:40 - 7:50 AM'),
+(8826, 528, 19, '7:40 - 7:50 AM'),
+(8827, 529, 19, '7:40 - 7:50 AM'),
+(8828, 530, 19, '7:40 - 7:50 AM'),
+(8829, 531, 19, '7:40 - 7:50 AM'),
+(8830, 532, 19, '7:40 - 7:50 AM'),
+(8831, 533, 19, '7:40 - 7:50 AM'),
+(8832, 534, 19, '7:40 - 7:50 AM'),
+(8833, 535, 19, '7:40 - 7:50 AM'),
+(8834, 536, 19, '7:40 - 7:50 AM'),
+(8835, 537, 19, '7:20 - 7:30 AM'),
+(8836, 538, 19, '7:40 - 7:50 AM'),
+(8837, 539, 19, '7:40 - 7:50 AM'),
+(8838, 540, 19, '7:50 - 8:00AM'),
+(8839, 541, 19, 'Pendiente'),
+(8840, 542, 19, '7:40 - 7:50AM'),
+(8841, 543, 19, 'LLEGA AL 47 STREET'),
+(8842, 544, 19, '8:00 - 8:10 AM'),
+(8843, 545, 19, '7:40 - 7:50AM'),
+(8844, 546, 19, '7:40 - 7:50AM'),
+(8845, 547, 19, 'LLEGA AL 47 STREET'),
+(8846, 548, 19, '7:40 - 7:50AM'),
+(8847, 549, 19, '47 STREET'),
+(8848, 550, 19, '47 STREET'),
+(8849, 551, 19, 'Pendiente'),
+(8850, 552, 19, '8:20 - 8:30 AM'),
+(8851, 553, 19, '47 STREET'),
+(8852, 554, 19, '7:40 - 7:50 AM'),
+(8853, 555, 19, '7:40 - 7:50 AM'),
+(8854, 556, 19, '47 STREET'),
+(8855, 557, 19, '7:40 - 7:50 AM'),
+(8856, 558, 19, '47 STREET'),
+(8857, 559, 19, 'LLEGA AL 47 STREET'),
+(8858, 560, 19, '8:00 - 8:10 AM'),
+(8859, 561, 19, 'LLEGA AL 47 STREET'),
+(8860, 562, 19, '7:40 - 7:50 AM'),
+(8861, 563, 19, '7:40 - 7:50 AM'),
+(8862, 564, 19, '7:20 - 7:30 AM'),
+(8863, 565, 19, '7:40 - 7:50 AM'),
+(8864, 566, 19, '7:40 - 7:50 AM'),
+(8865, 567, 19, '7:40 - 7:50 AM'),
+(8866, 568, 19, 'LLEGAR AL HOTEL 47 S'),
+(8867, 569, 19, '47 STREET 7:40 AM'),
+(8868, 570, 19, '7:40 - 7:50 AM'),
+(8869, 571, 19, '7:40 - 7:50 AM'),
+(8870, 572, 19, '8:30 - 8:40 AM'),
+(8871, 573, 19, '47 STREET'),
+(8872, 574, 19, '7:40 - 7:50 AM'),
+(8873, 575, 19, '47 STREET'),
+(8874, 576, 19, '7:30 - 7:40 AM'),
+(8875, 577, 19, '7:40 - 7:50 AM'),
+(8876, 578, 19, '47 STREET'),
+(8877, 579, 19, 'LLEGA AL 47 STREET'),
+(8878, 580, 19, '8:10 AM'),
+(8879, 581, 19, 'Pendiente'),
+(8880, 582, 19, '7:40 - 7:50 AM'),
+(8881, 583, 19, '7:40 - 7:50 AM'),
+(8882, 584, 19, '7:50 - 8:00 AM'),
+(8883, 585, 19, '7:40 - 7:50 AM'),
+(8884, 586, 19, '7:40 - 7:50 AM'),
+(8885, 587, 19, '7:40 - 7:50 AM'),
+(8886, 588, 19, 'Pendiente'),
+(8887, 589, 19, 'Pendiente'),
+(8888, 590, 19, 'Pendiente'),
+(8889, 591, 19, '7:40 - 7:50 AM'),
+(8890, 592, 19, '7:10 - 7:20 AM'),
+(8891, 593, 19, '7:40 - 7:50 AM'),
+(8892, 594, 19, '7:40 - 7:50 AM'),
+(8893, 595, 19, '7:40 - 7:50 AM'),
+(8894, 596, 19, '7:40 - 7:50 AM'),
+(8895, 597, 19, '7:40 - 7:50 AM'),
+(8896, 598, 19, '7:40 - 7:50 AM'),
+(8897, 599, 19, '7:40 - 7:50 AM'),
+(8898, 600, 19, '7:40 - 7:50 AM'),
+(8899, 601, 19, '7:40 - 7:50 AM'),
+(8900, 602, 19, '7:30 - 7:40 AM'),
+(8901, 603, 19, '7:40 - 7:50 AM'),
+(8902, 604, 19, '7:40 - 7:50 AM'),
+(8903, 605, 19, 'Pendiente'),
+(8904, 606, 19, 'Pendiente'),
+(8905, 607, 19, '8:20 - 8:30 AM '),
+(8906, 608, 19, 'Pendiente'),
+(8907, 609, 19, 'PENDIENTE'),
+(8908, 610, 19, 'PENDIENTE'),
+(8909, 611, 19, 'Pendiente'),
+(8910, 612, 19, 'PENDIENTE'),
+(8911, 613, 19, '7:10 - 7:20 AM'),
+(8912, 614, 19, 'EST. POBLADO'),
+(8913, 615, 19, 'PENDIENTE'),
+(8914, 616, 19, 'Pendiente'),
+(8915, 617, 19, 'Pendiente'),
+(8916, 618, 19, 'Pendiente'),
+(8917, 619, 19, 'EST. POBLADO'),
+(8918, 620, 19, 'EST. POBLADO'),
+(8919, 621, 19, 'EST. POBLADO'),
+(8920, 622, 19, 'EST. POBLADO'),
+(8921, 623, 19, 'EST. POBLADO'),
+(8922, 624, 19, 'EST. POBLADO'),
+(8923, 625, 19, 'EST. POBLADO'),
+(8924, 626, 19, 'EST. POBLADO'),
+(8925, 627, 19, 'EST. POBLADO');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `logs_sistema`
+-- Table structure for table `logs_sistema`
 --
 
 DROP TABLE IF EXISTS `logs_sistema`;
 CREATE TABLE IF NOT EXISTS `logs_sistema` (
   `Id_Log` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nivel` enum('INFO','WARNING','ERROR','CRITICAL') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'INFO',
-  `Descripcion` text COLLATE utf8mb4_unicode_ci,
-  `Modulo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nivel` enum('INFO','WARNING','ERROR','CRITICAL') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'INFO',
+  `Descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Modulo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Id_Usuario` bigint UNSIGNED DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Log`),
@@ -5779,17 +6385,17 @@ CREATE TABLE IF NOT EXISTS `logs_sistema` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `mensajes`
+-- Table structure for table `mensajes`
 --
 
 DROP TABLE IF EXISTS `mensajes`;
 CREATE TABLE IF NOT EXISTS `mensajes` (
   `Id_Mensaje` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Emisor` bigint UNSIGNED DEFAULT NULL,
-  `Emisor` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Titulo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Cuerpo` text COLLATE utf8mb4_unicode_ci,
-  `Prioridad` enum('BAJA','MEDIA','ALTA') COLLATE utf8mb4_unicode_ci DEFAULT 'MEDIA',
+  `Emisor` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Cuerpo` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Prioridad` enum('BAJA','MEDIA','ALTA') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'MEDIA',
   `Fecha_Envio` datetime DEFAULT NULL,
   PRIMARY KEY (`Id_Mensaje`),
   KEY `Id_Emisor` (`Id_Emisor`)
@@ -5798,7 +6404,7 @@ CREATE TABLE IF NOT EXISTS `mensajes` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `mensaje_destinatario`
+-- Table structure for table `mensaje_destinatario`
 --
 
 DROP TABLE IF EXISTS `mensaje_destinatario`;
@@ -5815,20 +6421,58 @@ CREATE TABLE IF NOT EXISTS `mensaje_destinatario` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `monedas`
+-- Table structure for table `modulos`
+--
+
+DROP TABLE IF EXISTS `modulos`;
+CREATE TABLE IF NOT EXISTS `modulos` (
+  `Id_Modulo` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Nombre_Modulo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Codigo_Modulo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Icono` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Ruta` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Orden` int DEFAULT '0',
+  `Activo` tinyint(1) DEFAULT '1',
+  PRIMARY KEY (`Id_Modulo`),
+  UNIQUE KEY `ux_modulos_codigo` (`Codigo_Modulo`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `modulos`
+--
+
+INSERT INTO `modulos` (`Id_Modulo`, `Nombre_Modulo`, `Codigo_Modulo`, `Descripcion`, `Icono`, `Ruta`, `Orden`, `Activo`) VALUES
+(1, 'Inicio', 'INICIO', NULL, NULL, NULL, 1, 1),
+(2, 'Historial', 'HISTORIAL', NULL, NULL, NULL, 2, 1),
+(3, 'Informes', 'INFORMES', NULL, NULL, NULL, 3, 1),
+(4, 'Reservas', 'RESERVAS', NULL, NULL, NULL, 4, 1),
+(5, 'Transfers', 'TRANSFERS', NULL, NULL, NULL, 5, 1),
+(6, 'Tours', 'TOURS', NULL, NULL, NULL, 6, 1),
+(7, 'Puntos de Encuentro', 'PUNTOS', NULL, NULL, NULL, 7, 1),
+(8, 'Programación', 'PROGRAMACION', NULL, NULL, NULL, 8, 1),
+(9, 'Configuración', 'CONFIGURACION', NULL, NULL, NULL, 9, 1),
+(10, 'Comisiones', 'COMISIONES', NULL, NULL, NULL, 10, 1),
+(11, 'Seguros', 'SEGUROS', NULL, NULL, NULL, 11, 1),
+(12, 'Pagos', 'PAGOS', NULL, NULL, NULL, 12, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `monedas`
 --
 
 DROP TABLE IF EXISTS `monedas`;
 CREATE TABLE IF NOT EXISTS `monedas` (
   `Id_Moneda` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Codigo` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Nombre_Moneda` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Codigo` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre_Moneda` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Moneda`),
   UNIQUE KEY `ux_monedas_codigo` (`Codigo`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `monedas`
+-- Dumping data for table `monedas`
 --
 
 INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
@@ -5839,34 +6483,52 @@ INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pagos_reservas`
+-- Table structure for table `pagos_reservas`
 --
 
 DROP TABLE IF EXISTS `pagos_reservas`;
 CREATE TABLE IF NOT EXISTS `pagos_reservas` (
   `Id_Pago` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Id_Reserva` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Id_Reserva` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Monto` decimal(12,2) NOT NULL,
   `Tipo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Pago` datetime DEFAULT NULL,
-  `Observaciones` text COLLATE utf8mb4_unicode_ci,
-  `Ruta_Comprobante` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Ruta_Comprobante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Pago`),
   KEY `Id_Reserva` (`Id_Reserva`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `pagos_reservas`
+-- Dumping data for table `pagos_reservas`
 --
 
 INSERT INTO `pagos_reservas` (`Id_Pago`, `Id_Reserva`, `Monto`, `Tipo`, `Fecha_Pago`, `Observaciones`, `Ruta_Comprobante`) VALUES
 (2, 'TG54289', 218000.00, 'Pago Completo', '2025-11-12 05:20:46', NULL, 'uploads/reservas/TG54289/comprobante_TG54289.pdf'),
-(17, 'TG16121', 1199000.00, 'Pago Directo', '2025-11-13 02:04:14', NULL, 'N/A');
+(17, 'TG16121', 1199000.00, 'Pago Directo', '2025-11-13 02:04:14', NULL, 'N/A'),
+(18, 'RSV1002', 557000.00, 'Pago Directo', '2025-12-14 16:27:05', NULL, 'N/A'),
+(19, 'TG87479', 535000.00, 'Pago Completo', '2025-12-17 00:04:19', NULL, 'uploads/reservas/TG87479/comprobante_TG87479.pdf'),
+(20, 'TRC63407', 535000.00, 'Pago Directo', '2025-12-17 02:43:50', NULL, 'N/A'),
+(21, 'TRC80570', 535000.00, 'Pago Directo', '2025-12-17 02:45:16', NULL, 'N/A'),
+(22, 'TRC46725', 535000.00, 'Pago Directo', '2025-12-17 02:49:21', NULL, 'N/A'),
+(23, 'TRC35269', 525000.00, 'Pago Directo', '2025-12-17 03:03:32', NULL, 'N/A'),
+(24, 'TRC23330', 525000.00, 'Pago Directo', '2025-12-17 03:04:19', NULL, 'N/A'),
+(25, 'THN19735', 535000.00, 'Pago Directo', '2025-12-17 03:21:34', NULL, 'N/A'),
+(26, 'TRC19954', 525000.00, 'Pago Directo', '2025-12-17 03:22:57', NULL, 'N/A'),
+(27, 'TRC49243', 525000.00, 'Pago Directo', '2025-12-17 03:24:06', NULL, 'N/A'),
+(28, 'THN79604', 535000.00, 'Pago Directo', '2025-12-17 03:25:26', NULL, 'N/A'),
+(29, 'TSA31308', 535000.00, 'Pago Directo', '2025-12-17 03:27:15', NULL, 'N/A'),
+(30, 'THN46505', 535000.00, 'Pago Directo', '2025-12-17 03:31:58', NULL, 'N/A'),
+(31, 'CTG64816', 535000.00, 'Pago Directo', '2025-12-17 03:35:17', NULL, 'N/A'),
+(32, 'TS38497', 535000.00, 'Pago Directo', '2025-12-17 03:38:39', NULL, 'N/A'),
+(33, 'TDL74991', 535000.00, 'Pago Directo', '2025-12-17 03:41:21', NULL, 'N/A'),
+(34, 'THN42155', 525000.00, 'Pago Directo', '2025-12-17 03:54:51', NULL, 'N/A'),
+(35, 'CTG96919', 525000.00, 'Pago Directo', '2025-12-17 03:56:45', NULL, 'N/A');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pagos_transfers`
+-- Table structure for table `pagos_transfers`
 --
 
 DROP TABLE IF EXISTS `pagos_transfers`;
@@ -5874,11 +6536,11 @@ CREATE TABLE IF NOT EXISTS `pagos_transfers` (
   `Id_Pago` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Transfer` bigint UNSIGNED NOT NULL,
   `Monto` decimal(12,2) NOT NULL,
-  `Metodo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Metodo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Pago` datetime DEFAULT NULL,
-  `Estado` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Observaciones` text COLLATE utf8mb4_unicode_ci,
-  `Pago_Comprobante` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Pago_Comprobante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Pago`),
   KEY `Id_Transfer` (`Id_Transfer`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -5886,17 +6548,17 @@ CREATE TABLE IF NOT EXISTS `pagos_transfers` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pasajeros`
+-- Table structure for table `pasajeros`
 --
 
 DROP TABLE IF EXISTS `pasajeros`;
 CREATE TABLE IF NOT EXISTS `pasajeros` (
   `Id_Pasajero` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Id_Reserva` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Nombre_Pasajero` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `DNI` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Telefono_Pasajero` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Tipo_Pasajero` enum('ADULTO','NINO','INFANTE') COLLATE utf8mb4_unicode_ci DEFAULT 'ADULTO',
+  `Id_Reserva` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre_Pasajero` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `DNI` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Telefono_Pasajero` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Tipo_Pasajero` enum('ADULTO','NINO','INFANTE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'ADULTO',
   `Precio_Tour` decimal(10,0) NOT NULL DEFAULT '0',
   `Precio_Pasajero` decimal(10,0) NOT NULL DEFAULT '0',
   `Comision` decimal(10,0) NOT NULL DEFAULT '0',
@@ -5905,10 +6567,10 @@ CREATE TABLE IF NOT EXISTS `pasajeros` (
   PRIMARY KEY (`Id_Pasajero`),
   KEY `Id_Reserva` (`Id_Reserva`),
   KEY `Id_Punto` (`Id_Punto`)
-) ENGINE=InnoDB AUTO_INCREMENT=773 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=899 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `pasajeros`
+-- Dumping data for table `pasajeros`
 --
 
 INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, `Telefono_Pasajero`, `Tipo_Pasajero`, `Precio_Tour`, `Precio_Pasajero`, `Comision`, `Id_Punto`, `Confirmacion`) VALUES
@@ -5926,74 +6588,246 @@ INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, 
 (769, 'TG16121', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 8, 0),
 (770, 'TG16121', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 8, 0),
 (771, 'TG16121', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 8, 0),
-(772, 'TG16121', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 8, 0);
+(772, 'TG16121', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 8, 0),
+(773, 'RSV1001', 'Pedro Alvarez', '10000001', '3201111111', 'ADULTO', 229000, 229000, 0, 1, 1),
+(774, 'RSV1001', 'Lucia Alvarez', '10000002', '3201111112', 'NINO', 99000, 99000, 0, 1, 1),
+(778, 'RSV1003', 'Miguel Torres', '10000006', '3203333331', 'ADULTO', 229000, 229000, 0, 3, 1),
+(779, 'RSV1004', 'Ana Ruiz', '10000007', '3204444441', 'ADULTO', 229000, 229000, 0, 4, 1),
+(780, 'RSV1004', 'Luis Ruiz', '10000008', '3204444442', 'NINO', 99000, 99000, 0, 4, 1),
+(781, 'RSV1004', 'Valeria Ruiz', '10000009', '3204444443', 'NINO', 99000, 99000, 0, 4, 1),
+(782, 'RSV1005', 'Camila Gomez', '10000010', '3205555551', 'ADULTO', 229000, 229000, 0, 5, 1),
+(783, 'RSV1006', 'Esteban Lopez', '10000011', '3206666661', 'ADULTO', 229000, 229000, 0, 6, 1),
+(784, 'RSV1007', 'Juliana Restrepo', '10000012', '3207777771', 'ADULTO', 229000, 229000, 0, 7, 1),
+(785, 'RSV1008', 'Sebastian Cardona', '10000013', '3208888881', 'ADULTO', 229000, 229000, 0, 8, 1),
+(786, 'RSV1008', 'Paula Cardona', '10000014', '3208888882', 'NINO', 99000, 99000, 0, 8, 1),
+(787, 'RSV1009', 'Ricardo Giraldo', '10000015', '3209999991', 'ADULTO', 229000, 229000, 0, 9, 1),
+(788, 'RSV1010', 'Natalia Zapata', '10000016', '3210000001', 'ADULTO', 229000, 229000, 0, 10, 1),
+(789, 'RSV1011', 'Andres Castaño', '10000017', '3211111111', 'ADULTO', 229000, 229000, 0, 1, 1),
+(790, 'RSV1012', 'Camila Salazar', '10000018', '3212222221', 'ADULTO', 229000, 229000, 0, 2, 1),
+(791, 'RSV1012', 'Felipe Salazar', '10000019', '3212222222', 'NINO', 99000, 99000, 0, 2, 1),
+(792, 'RSV1013', 'Felipe Restrepo', '10000020', '3213333331', 'ADULTO', 229000, 229000, 0, 3, 1),
+(793, 'RSV1014', 'Daniela Mejia', '10000021', '3214444441', 'ADULTO', 229000, 229000, 0, 4, 1),
+(794, 'RSV1015', 'Esteban Villa', '10000022', '3215555551', 'ADULTO', 229000, 229000, 0, 5, 1),
+(795, 'RSV1016', 'Juliana Hoyos', '10000023', '3216666661', 'ADULTO', 229000, 229000, 0, 6, 1),
+(796, 'RSV1017', 'Sebastian Cano', '10000024', '3217777771', 'ADULTO', 229000, 229000, 0, 7, 1),
+(797, 'RSV1018', 'Paula Cardona', '10000025', '3218888881', 'ADULTO', 229000, 229000, 0, 8, 1),
+(798, 'RSV1019', 'Ricardo Giraldo', '10000026', '3219999991', 'ADULTO', 229000, 229000, 0, 9, 1),
+(799, 'RSV1020', 'Natalia Zapata', '10000027', '3220000001', 'ADULTO', 229000, 229000, 0, 10, 1),
+(800, 'RSV1002', 'Juanita Perez', '10000003', '3202222221', 'ADULTO', 0, 229000, 23000, 2, 1),
+(801, 'RSV1002', 'Carlos Perez', '10000004', '3202222222', 'NINO', 0, 99000, 23000, 2, 1),
+(802, 'RSV1002', 'Sofia Perez', '10000005', '3202222223', 'ADULTO', 0, 229000, 23000, 2, 1),
+(803, 'TG87479', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(804, 'TG87479', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(805, 'TG87479', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(806, 'TG87479', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(807, 'TG87479', '', NULL, NULL, 'INFANTE', 10000, 10000, 0, 121, 0),
+(808, 'TG87479', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(809, 'TRC63407', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(810, 'TRC63407', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(811, 'TRC63407', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(812, 'TRC63407', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(813, 'TRC63407', '', NULL, NULL, 'INFANTE', 10000, 10000, 0, 121, 0),
+(814, 'TRC63407', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(815, 'TRC80570', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(816, 'TRC80570', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(817, 'TRC80570', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(818, 'TRC80570', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(819, 'TRC80570', '', NULL, NULL, 'INFANTE', 10000, 10000, 0, 121, 0),
+(820, 'TRC80570', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(821, 'TRC46725', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(822, 'TRC46725', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(823, 'TRC46725', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(824, 'TRC46725', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(825, 'TRC46725', '', NULL, NULL, 'INFANTE', 10000, 10000, 0, 121, 0),
+(826, 'TRC46725', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(827, 'TRC35269', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(828, 'TRC35269', '', NULL, NULL, 'NINO', 229000, 99000, 24000, 121, 0),
+(829, 'TRC35269', '', NULL, NULL, 'NINO', 229000, 99000, 24000, 121, 0),
+(830, 'TRC35269', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(831, 'TRC35269', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(832, 'TRC23330', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(833, 'TRC23330', '', NULL, NULL, 'NINO', 229000, 99000, 24000, 121, 0),
+(834, 'TRC23330', '', NULL, NULL, 'NINO', 229000, 99000, 24000, 121, 0),
+(835, 'TRC23330', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(836, 'TRC23330', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(837, 'THN19735', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(838, 'THN19735', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(839, 'THN19735', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(840, 'THN19735', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(841, 'THN19735', '', NULL, NULL, 'NINO', 10000, 10000, 0, 121, 0),
+(842, 'THN19735', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(843, 'TRC19954', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(844, 'TRC19954', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(845, 'TRC19954', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(846, 'TRC19954', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(847, 'TRC19954', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(848, 'TRC49243', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(849, 'TRC49243', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(850, 'TRC49243', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(851, 'TRC49243', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(852, 'TRC49243', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(853, 'THN79604', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(854, 'THN79604', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(855, 'THN79604', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(856, 'THN79604', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(857, 'THN79604', '', NULL, NULL, 'NINO', 10000, 10000, 0, 121, 0),
+(858, 'THN79604', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(859, 'TSA31308', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(860, 'TSA31308', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(861, 'TSA31308', '', NULL, NULL, 'NINO', 99000, 99000, 23000, 121, 0),
+(862, 'TSA31308', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(863, 'TSA31308', '', NULL, NULL, 'INFANTE', 10000, 10000, 0, 121, 0),
+(864, 'TSA31308', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(865, 'THN46505', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(866, 'THN46505', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(867, 'THN46505', '', NULL, NULL, 'ADULTO', 99000, 99000, 23000, 121, 0),
+(868, 'THN46505', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(869, 'THN46505', '', NULL, NULL, 'NINO', 10000, 10000, 0, 121, 0),
+(870, 'THN46505', '', NULL, NULL, 'ADULTO', 109000, 109000, 23000, 121, 0),
+(871, 'CTG64816', '', NULL, NULL, 'ADULTO', 109000, 109000, 24000, 121, 0),
+(872, 'CTG64816', '', NULL, NULL, 'ADULTO', 99000, 99000, 24000, 121, 0),
+(873, 'CTG64816', '', NULL, NULL, 'ADULTO', 99000, 99000, 24000, 121, 0),
+(874, 'CTG64816', '', NULL, NULL, 'ADULTO', 109000, 109000, 24000, 121, 0),
+(875, 'CTG64816', '', NULL, NULL, 'ADULTO', 10000, 10000, 24000, 121, 0),
+(876, 'CTG64816', '', NULL, NULL, 'ADULTO', 109000, 109000, 24000, 121, 0),
+(877, 'TS38497', '', NULL, NULL, 'ADULTO', 109000, 109000, 15000, 121, 0),
+(878, 'TS38497', '', NULL, NULL, 'ADULTO', 99000, 99000, 15000, 121, 0),
+(879, 'TS38497', '', NULL, NULL, 'ADULTO', 99000, 99000, 15000, 121, 0),
+(880, 'TS38497', '', NULL, NULL, 'ADULTO', 109000, 109000, 15000, 121, 0),
+(881, 'TS38497', '', NULL, NULL, 'ADULTO', 10000, 10000, 15000, 121, 0),
+(882, 'TS38497', '', NULL, NULL, 'ADULTO', 109000, 109000, 15000, 121, 0),
+(883, 'TDL74991', '', NULL, NULL, 'ADULTO', 109000, 109000, 12000, 121, 0),
+(884, 'TDL74991', '', NULL, NULL, 'ADULTO', 99000, 99000, 12000, 121, 0),
+(885, 'TDL74991', '', NULL, NULL, 'ADULTO', 99000, 99000, 12000, 121, 0),
+(886, 'TDL74991', '', NULL, NULL, 'ADULTO', 109000, 109000, 12000, 121, 0),
+(887, 'TDL74991', '', NULL, NULL, 'ADULTO', 10000, 10000, 12000, 121, 0),
+(888, 'TDL74991', '', NULL, NULL, 'ADULTO', 109000, 109000, 12000, 121, 0),
+(889, 'THN42155', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(890, 'THN42155', '', NULL, NULL, 'ADULTO', 229000, 99000, 24000, 121, 0),
+(891, 'THN42155', '', NULL, NULL, 'ADULTO', 229000, 99000, 24000, 121, 0),
+(892, 'THN42155', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(893, 'THN42155', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(894, 'CTG96919', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(895, 'CTG96919', '', NULL, NULL, 'ADULTO', 229000, 99000, 24000, 121, 0),
+(896, 'CTG96919', '', NULL, NULL, 'ADULTO', 229000, 99000, 24000, 121, 0),
+(897, 'CTG96919', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0),
+(898, 'CTG96919', '', NULL, NULL, 'ADULTO', 229000, 109000, 24000, 121, 0);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `permisos`
+-- Table structure for table `permisos`
 --
 
 DROP TABLE IF EXISTS `permisos`;
 CREATE TABLE IF NOT EXISTS `permisos` (
   `Id_Permiso` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Codigo` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Descripcion` text COLLATE utf8mb4_unicode_ci,
+  `Id_Modulo` bigint UNSIGNED NOT NULL,
+  `Accion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Codigo_Permiso` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Permiso`),
-  UNIQUE KEY `ux_permisos_codigo` (`Codigo`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `ux_permisos_codigo` (`Codigo_Permiso`),
+  KEY `idx_permisos_modulo` (`Id_Modulo`)
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `permisos`
+--
+
+INSERT INTO `permisos` (`Id_Permiso`, `Id_Modulo`, `Accion`, `Codigo_Permiso`, `Descripcion`) VALUES
+(1, 1, 'LEER', 'INICIO.LEER', 'Acceder a Inicio'),
+(2, 1, 'ACTUALIZAR_AFORO', 'INICIO.ACTUALIZAR_AFORO', 'Actualizar aforos'),
+(3, 2, 'LEER', 'HISTORIAL.LEER', 'Ver historial'),
+(4, 3, 'LEER', 'INFORMES.LEER', 'Ver informes'),
+(5, 4, 'LEER', 'RESERVAS.LEER', 'Ver reservas'),
+(6, 4, 'CREAR', 'RESERVAS.CREAR', 'Crear reservas'),
+(7, 4, 'ACTUALIZAR', 'RESERVAS.ACTUALIZAR', 'Actualizar reservas'),
+(8, 4, 'ELIMINAR', 'RESERVAS.ELIMINAR', 'Eliminar reservas'),
+(9, 5, 'LEER', 'TRANSFERS.LEER', 'Ver transfers'),
+(10, 5, 'CREAR', 'TRANSFERS.CREAR', 'Crear transfers'),
+(11, 5, 'ACTUALIZAR', 'TRANSFERS.ACTUALIZAR', 'Actualizar transfers'),
+(12, 5, 'ELIMINAR', 'TRANSFERS.ELIMINAR', 'Eliminar transfers'),
+(13, 6, 'LEER', 'TOURS.LEER', 'Ver tours'),
+(14, 6, 'CREAR', 'TOURS.CREAR', 'Crear tours'),
+(15, 6, 'ACTUALIZAR', 'TOURS.ACTUALIZAR', 'Actualizar tours'),
+(16, 6, 'ELIMINAR', 'TOURS.ELIMINAR', 'Eliminar tours'),
+(17, 7, 'LEER', 'PUNTOS.LEER', 'Ver puntos'),
+(18, 7, 'CREAR', 'PUNTOS.CREAR', 'Crear puntos'),
+(19, 7, 'ACTUALIZAR', 'PUNTOS.ACTUALIZAR', 'Actualizar puntos'),
+(20, 7, 'ELIMINAR', 'PUNTOS.ELIMINAR', 'Eliminar puntos'),
+(21, 8, 'LEER', 'PROGRAMACION.LEER', 'Ver listados/programación'),
+(22, 8, 'CREAR', 'PROGRAMACION.CREAR', 'Crear listados/programación'),
+(23, 8, 'ACTUALIZAR', 'PROGRAMACION.ACTUALIZAR', 'Actualizar listados/programación'),
+(24, 8, 'ELIMINAR', 'PROGRAMACION.ELIMINAR', 'Eliminar listados/programación'),
+(25, 9, 'LEER', 'USUARIOS.LEER', 'Ver usuarios'),
+(26, 9, 'CREAR', 'USUARIOS.CREAR', 'Crear usuarios'),
+(27, 9, 'ACTUALIZAR', 'USUARIOS.ACTUALIZAR', 'Actualizar usuarios'),
+(28, 9, 'ELIMINAR', 'USUARIOS.ELIMINAR', 'Eliminar usuarios'),
+(29, 10, 'LEER', 'COMISIONES.LEER', 'Ver comisiones'),
+(30, 10, 'CREAR', 'COMISIONES.CREAR', 'Crear comisiones'),
+(31, 10, 'ACTUALIZAR', 'COMISIONES.ACTUALIZAR', 'Actualizar comisiones'),
+(32, 10, 'ELIMINAR', 'COMISIONES.ELIMINAR', 'Eliminar comisiones'),
+(33, 11, 'LEER', 'SEGUROS.LEER', 'Ver seguros'),
+(34, 11, 'CREAR', 'SEGUROS.CREAR', 'Crear seguros'),
+(35, 11, 'ACTUALIZAR', 'SEGUROS.ACTUALIZAR', 'Actualizar seguros'),
+(36, 11, 'ELIMINAR', 'SEGUROS.ELIMINAR', 'Eliminar seguros'),
+(37, 12, 'LEER', 'PAGOS.LEER', 'Ver pagos'),
+(38, 12, 'CREAR', 'PAGOS.CREAR', 'Registrar pagos'),
+(39, 12, 'ACTUALIZAR', 'PAGOS.ACTUALIZAR', 'Actualizar pagos'),
+(40, 12, 'ELIMINAR', 'PAGOS.ELIMINAR', 'Eliminar pagos');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `permisos_usuarios`
---
-
-DROP TABLE IF EXISTS `permisos_usuarios`;
-CREATE TABLE IF NOT EXISTS `permisos_usuarios` (
-  `Id_PermisoUsuario` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Id_Usuario` bigint UNSIGNED NOT NULL,
-  `Id_Permiso` bigint UNSIGNED NOT NULL,
-  PRIMARY KEY (`Id_PermisoUsuario`),
-  UNIQUE KEY `ux_perm_user` (`Id_Usuario`,`Id_Permiso`),
-  KEY `Id_Usuario` (`Id_Usuario`),
-  KEY `Id_Permiso` (`Id_Permiso`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `planes_tours`
+-- Table structure for table `planes_tours`
 --
 
 DROP TABLE IF EXISTS `planes_tours`;
 CREATE TABLE IF NOT EXISTS `planes_tours` (
   `Id_Plan` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Tour` bigint UNSIGNED NOT NULL,
-  `Nombre_Plan` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Plan` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Plan`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `planes_tours`
+--
+
+INSERT INTO `planes_tours` (`Id_Plan`, `Id_Tour`, `Nombre_Plan`) VALUES
+(1, 1, 'Plan básico'),
+(3, 3, 'Plan básico'),
+(4, 4, 'Plan básico'),
+(5, 5, 'Plan básico'),
+(6, 6, 'Plan básico'),
+(7, 7, 'Plan básico'),
+(8, 8, 'Plan básico'),
+(9, 9, 'Plan básico'),
+(10, 10, 'Plan básico'),
+(12, 19, 'Plan básico'),
+(13, 2, 'Plan básico');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `puntos`
+-- Table structure for table `puntos`
 --
 
 DROP TABLE IF EXISTS `puntos`;
 CREATE TABLE IF NOT EXISTS `puntos` (
   `Id_Punto` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nombre_Punto` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Sector` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Direccion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Punto` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Sector` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Direccion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Latitud` decimal(10,7) DEFAULT NULL,
   `Longitud` decimal(10,7) DEFAULT NULL,
   PRIMARY KEY (`Id_Punto`)
-) ENGINE=InnoDB AUTO_INCREMENT=628 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=632 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `puntos`
+-- Dumping data for table `puntos`
 --
 
 INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `Latitud`, `Longitud`) VALUES
@@ -6629,20 +7463,20 @@ INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `Latitu
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `recordatorios`
+-- Table structure for table `recordatorios`
 --
 
 DROP TABLE IF EXISTS `recordatorios`;
 CREATE TABLE IF NOT EXISTS `recordatorios` (
   `Id_Recordatorio` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Usuario` bigint UNSIGNED DEFAULT NULL,
-  `Titulo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Descripcion` text COLLATE utf8mb4_unicode_ci,
+  `Titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `Fecha` datetime DEFAULT NULL,
-  `Recurrencia` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Intervalo` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Recurrencia` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Intervalo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Recordar_Todo_El_Dia` tinyint(1) DEFAULT '0',
-  `Intervalo_Todo_El_Dia` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Intervalo_Todo_El_Dia` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Siguiente_Trigger` datetime DEFAULT NULL,
   `Activo` tinyint(1) DEFAULT '1',
   PRIMARY KEY (`Id_Recordatorio`),
@@ -6652,89 +7486,222 @@ CREATE TABLE IF NOT EXISTS `recordatorios` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `reservas`
+-- Table structure for table `reservas`
 --
 
 DROP TABLE IF EXISTS `reservas`;
 CREATE TABLE IF NOT EXISTS `reservas` (
-  `Id_Reserva` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Tipo_Reserva` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Id_Reserva` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tipo_Reserva` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Id_Horario` bigint UNSIGNED DEFAULT NULL,
   `Fecha_Tour` date DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   `Id_Canal` bigint UNSIGNED DEFAULT NULL,
-  `Idioma_Reserva` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Telefono_Reportante` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Nombre_Reportante` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Estado` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Observaciones` text COLLATE utf8mb4_unicode_ci,
-  `Placa_Bus` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Idioma_Reserva` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Telefono_Reportante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Reportante` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Placa_Bus` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Orden_Ruta` int DEFAULT NULL,
-  `Id_Tour` bigint UNSIGNED DEFAULT NULL,
   PRIMARY KEY (`Id_Reserva`),
   KEY `Id_Horario` (`Id_Horario`),
   KEY `Id_Canal` (`Id_Canal`),
-  KEY `Id_Tour` (`Id_Tour`),
-  KEY `idx_reservas_fecha_tour` (`Fecha_Tour`,`Id_Tour`)
+  KEY `idx_reservas_fecha_tour` (`Fecha_Tour`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `reservas`
+-- Dumping data for table `reservas`
 --
 
-INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`, `Fecha_Registro`, `Id_Canal`, `Idioma_Reserva`, `Telefono_Reportante`, `Nombre_Reportante`, `Estado`, `Observaciones`, `Placa_Bus`, `Orden_Ruta`, `Id_Tour`) VALUES
-('TG16121', 'Grupal', 2054, '2025-11-13', '2025-11-12 03:07:04', 2, 'ESPAÑOL', '1234567898', 'yo', 'Pendiente', '', NULL, NULL, 2),
-('TG54289', 'Grupal', 2054, '2025-11-13', '2025-11-12 05:20:46', 1, 'ESPAÑOL', '3216465444', 'yo', 'Pendiente', 'prueba', NULL, NULL, 2);
+INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`, `Fecha_Registro`, `Id_Canal`, `Idioma_Reserva`, `Telefono_Reportante`, `Nombre_Reportante`, `Estado`, `Observaciones`, `Placa_Bus`, `Orden_Ruta`) VALUES
+('CTG64816', 'Grupal', 1425, '2025-12-25', '2025-12-17 03:35:16', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('CTG96919', 'Grupal', 1425, '2025-12-23', '2025-12-17 03:56:44', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('RSV1001', 'Grupal', 2054, '2025-12-20', '2025-12-14 16:14:36', 1, 'ESPAÑOL', '3001111111', 'Juan Perez', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1002', 'Grupal', 2, '2025-12-20', '2025-12-14 16:14:36', 2, 'INGLÉS', '3002222222', 'Maria Gomez', 'Confirmada', 'Pago directo', NULL, NULL),
+('RSV1003', 'Grupal', 2056, '2025-12-20', '2025-12-14 16:14:36', 3, 'ESPAÑOL', '3003333333', 'Carlos Ruiz', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1004', 'Grupal', 2057, '2025-12-20', '2025-12-14 16:14:36', 4, 'ESPAÑOL', '3004444444', 'Ana Torres', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1005', 'Grupal', 2058, '2025-12-20', '2025-12-14 16:14:36', 5, 'INGLÉS', '3005555555', 'Luis Martinez', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1006', 'Grupal', 2059, '2025-12-20', '2025-12-14 16:14:36', 6, 'ESPAÑOL', '3006666666', 'Laura Castro', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1007', 'Grupal', 2060, '2025-12-20', '2025-12-14 16:14:36', 7, 'ESPAÑOL', '3007777777', 'Pedro Lopez', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1008', 'Grupal', 2061, '2025-12-20', '2025-12-14 16:14:36', 8, 'INGLÉS', '3008888888', 'Sofia Jimenez', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1009', 'Grupal', 2062, '2025-12-20', '2025-12-14 16:14:36', 9, 'ESPAÑOL', '3009999999', 'Miguel Angel', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1010', 'Grupal', 2063, '2025-12-20', '2025-12-14 16:14:36', 10, 'ESPAÑOL', '3010000000', 'Valentina Rios', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1011', 'Grupal', 2064, '2025-12-20', '2025-12-14 16:14:36', 1, 'ESPAÑOL', '3011111111', 'Andres Castaño', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1012', 'Grupal', 2065, '2025-12-20', '2025-12-14 16:14:36', 2, 'INGLÉS', '3012222222', 'Camila Salazar', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1013', 'Grupal', 2066, '2025-12-20', '2025-12-14 16:14:36', 3, 'ESPAÑOL', '3013333333', 'Felipe Restrepo', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1014', 'Grupal', 2067, '2025-12-20', '2025-12-14 16:14:36', 4, 'ESPAÑOL', '3014444444', 'Daniela Mejia', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1015', 'Grupal', 2068, '2025-12-20', '2025-12-14 16:14:36', 5, 'INGLÉS', '3015555555', 'Esteban Villa', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1016', 'Grupal', 2069, '2025-12-20', '2025-12-14 16:14:36', 6, 'ESPAÑOL', '3016666666', 'Juliana Hoyos', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1017', 'Grupal', 2070, '2025-12-20', '2025-12-14 16:14:36', 7, 'ESPAÑOL', '3017777777', 'Sebastian Cano', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1018', 'Grupal', 2071, '2025-12-20', '2025-12-14 16:14:36', 8, 'INGLÉS', '3018888888', 'Paula Cardona', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1019', 'Grupal', 2072, '2025-12-20', '2025-12-14 16:14:36', 9, 'ESPAÑOL', '3019999999', 'Ricardo Giraldo', 'Pendiente', 'Pago directo', NULL, NULL),
+('RSV1020', 'Grupal', 2073, '2025-12-20', '2025-12-14 16:14:36', 10, 'ESPAÑOL', '3020000000', 'Natalia Zapata', 'Pendiente', 'Pago directo', NULL, NULL),
+('TDL74991', 'Grupal', 1429, '2025-12-29', '2025-12-17 03:41:21', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TG16121', 'Grupal', 2054, '2025-11-13', '2025-11-12 03:07:04', 2, 'ESPAÑOL', '1234567898', 'yo', 'Pendiente', '', NULL, NULL),
+('TG54289', 'Grupal', 2054, '2025-11-13', '2025-11-12 05:20:46', 1, 'ESPAÑOL', '3216465444', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TG87479', 'Grupal', 1424, '2025-12-20', '2025-12-17 00:04:18', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('THN19735', 'Grupal', 1424, '2025-12-21', '2025-12-17 03:21:33', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('THN42155', 'Grupal', 1427, '2025-12-22', '2025-12-17 03:54:50', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('THN46505', 'Grupal', 1427, '2025-12-23', '2025-12-17 03:31:58', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('THN79604', 'Grupal', 1424, '2025-12-22', '2025-12-17 03:25:25', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC19954', 'Grupal', 1424, '2025-12-21', '2025-12-17 03:22:56', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC23330', 'Grupal', 1423, '2025-12-21', '2025-12-17 03:04:19', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC35269', 'Grupal', 1423, '2025-12-21', '2025-12-17 03:03:32', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC46725', 'Grupal', 1424, '2025-12-21', '2025-12-17 02:49:21', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC49243', 'Grupal', 1424, '2025-12-22', '2025-12-17 03:24:05', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC63407', 'Grupal', 1424, '2025-12-22', '2025-12-17 02:43:49', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TRC80570', 'Grupal', 1424, '2025-12-22', '2025-12-17 02:45:16', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TS38497', 'Grupal', 1428, '2025-12-26', '2025-12-17 03:38:39', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
+('TSA31308', 'Grupal', 1424, '2025-12-22', '2025-12-17 03:27:14', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `servicios_transfer`
+-- Table structure for table `roles`
+--
+
+DROP TABLE IF EXISTS `roles`;
+CREATE TABLE IF NOT EXISTS `roles` (
+  `Id_Rol` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Nombre_Rol` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Activo` tinyint(1) DEFAULT '1',
+  `Fecha_Creacion` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Rol`),
+  UNIQUE KEY `ux_roles_nombre` (`Nombre_Rol`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Creacion`) VALUES
+(1, 'Administrador', 'Acceso total', 1, '2026-01-05 04:43:28'),
+(2, 'Asesor', 'Acceso por permisos', 1, '2026-01-05 04:43:28');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rol_permisos`
+--
+
+DROP TABLE IF EXISTS `rol_permisos`;
+CREATE TABLE IF NOT EXISTS `rol_permisos` (
+  `Id_Rol_Permiso` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Rol` bigint UNSIGNED NOT NULL,
+  `Id_Permiso` bigint UNSIGNED NOT NULL,
+  `Fecha_Asignacion` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Rol_Permiso`),
+  UNIQUE KEY `ux_rol_permisos` (`Id_Rol`,`Id_Permiso`),
+  KEY `idx_rol_permisos_permiso` (`Id_Permiso`)
+) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `rol_permisos`
+--
+
+INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asignacion`) VALUES
+(1, 1, 1, '2026-01-10 20:43:57'),
+(2, 1, 2, '2026-01-10 20:43:57'),
+(3, 1, 3, '2026-01-10 20:43:57'),
+(4, 1, 4, '2026-01-10 20:43:57'),
+(5, 1, 5, '2026-01-10 20:43:57'),
+(6, 1, 6, '2026-01-10 20:43:57'),
+(7, 1, 7, '2026-01-10 20:43:57'),
+(8, 1, 8, '2026-01-10 20:43:57'),
+(9, 1, 9, '2026-01-10 20:43:57'),
+(10, 1, 10, '2026-01-10 20:43:57'),
+(11, 1, 11, '2026-01-10 20:43:57'),
+(12, 1, 12, '2026-01-10 20:43:57'),
+(13, 1, 13, '2026-01-10 20:43:57'),
+(14, 1, 14, '2026-01-10 20:43:57'),
+(15, 1, 15, '2026-01-10 20:43:57'),
+(16, 1, 16, '2026-01-10 20:43:57'),
+(17, 1, 17, '2026-01-10 20:43:57'),
+(18, 1, 18, '2026-01-10 20:43:57'),
+(19, 1, 19, '2026-01-10 20:43:57'),
+(20, 1, 20, '2026-01-10 20:43:57'),
+(21, 1, 21, '2026-01-10 20:43:57'),
+(22, 1, 22, '2026-01-10 20:43:57'),
+(23, 1, 23, '2026-01-10 20:43:57'),
+(24, 1, 24, '2026-01-10 20:43:57'),
+(25, 1, 25, '2026-01-10 20:43:57'),
+(26, 1, 26, '2026-01-10 20:43:57'),
+(27, 1, 27, '2026-01-10 20:43:57'),
+(28, 1, 28, '2026-01-10 20:43:57'),
+(29, 1, 29, '2026-01-10 20:43:57'),
+(30, 1, 30, '2026-01-10 20:43:57'),
+(31, 1, 31, '2026-01-10 20:43:57'),
+(32, 1, 32, '2026-01-10 20:43:57'),
+(33, 1, 33, '2026-01-10 20:43:57'),
+(34, 1, 34, '2026-01-10 20:43:57'),
+(35, 1, 35, '2026-01-10 20:43:57'),
+(36, 1, 36, '2026-01-10 20:43:57'),
+(37, 1, 37, '2026-01-10 20:43:57'),
+(38, 1, 38, '2026-01-10 20:43:57'),
+(39, 1, 39, '2026-01-10 20:43:57'),
+(40, 1, 40, '2026-01-10 20:43:57'),
+(64, 2, 1, '2026-01-10 20:43:57'),
+(67, 2, 5, '2026-01-10 20:43:57'),
+(68, 2, 6, '2026-01-10 20:43:57'),
+(69, 2, 7, '2026-01-10 20:43:57'),
+(70, 2, 9, '2026-01-10 20:43:57'),
+(71, 2, 10, '2026-01-10 20:43:57'),
+(72, 2, 11, '2026-01-10 20:43:57'),
+(73, 2, 13, '2026-01-10 20:43:57'),
+(74, 2, 17, '2026-01-10 20:43:57');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `servicios_transfer`
 --
 
 DROP TABLE IF EXISTS `servicios_transfer`;
 CREATE TABLE IF NOT EXISTS `servicios_transfer` (
   `Id_Servicio` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nombre_Servicio` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre_Servicio` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Servicio`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `servicios_transfer`
+--
+
+INSERT INTO `servicios_transfer` (`Id_Servicio`, `Nombre_Servicio`) VALUES
+(1, 'Hotel/Aeropuerto'),
+(2, 'Aeropuerto/Hotel'),
+(3, 'Otro');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `sesiones`
+-- Table structure for table `sesiones`
 --
 
 DROP TABLE IF EXISTS `sesiones`;
 CREATE TABLE IF NOT EXISTS `sesiones` (
   `Id_Sesion` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Usuario` bigint UNSIGNED NOT NULL,
-  `Token` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Token` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Inicio` datetime DEFAULT NULL,
   `Fecha_Expira` datetime DEFAULT NULL,
   PRIMARY KEY (`Id_Sesion`),
   KEY `Id_Usuario` (`Id_Usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Volcado de datos para la tabla `sesiones`
---
-
-INSERT INTO `sesiones` (`Id_Sesion`, `Id_Usuario`, `Token`, `Fecha_Inicio`, `Fecha_Expira`) VALUES
-(31, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJyb2xlIjoiQ29uc3VsdG9yX1RHX0NUR19TRl9DVCIsImlhdCI6MTc2NTQyODA1MywiZXhwIjoxNzY2MDMyODUzfQ.LJk5ddgDBpZPNq8YlscfhwTjUsKM7ue4keCCUfGGcb0', '2025-12-10 23:40:53', '2025-12-17 23:40:53'),
-(32, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJyb2xlIjoiQ29uc3VsdG9yX1RHX0NUR19TRl9DVCIsImlhdCI6MTc2NTc0MjUxMywiZXhwIjoxNzY2MzQ3MzEzfQ.W7VEuYbaPi5W5eKF1mG6fdYKtVFmfA_4iWKPiO5kyfs', '2025-12-14 15:01:53', '2025-12-21 15:01:53');
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours`
+-- Table structure for table `tours`
 --
 
 DROP TABLE IF EXISTS `tours`;
 CREATE TABLE IF NOT EXISTS `tours` (
   `Id_Tour` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nombre_Tour` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Abreviacion` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Tour` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Abreviacion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Comision_Hotel` decimal(10,0) DEFAULT '0',
   `Comision_Agencia` decimal(10,0) DEFAULT '0',
   `Comision_Freelance` decimal(10,0) DEFAULT '0',
@@ -6742,10 +7709,10 @@ CREATE TABLE IF NOT EXISTS `tours` (
   `Latitud` decimal(10,7) DEFAULT NULL,
   `Longitud` decimal(10,7) DEFAULT NULL,
   PRIMARY KEY (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tours`
+-- Dumping data for table `tours`
 --
 
 INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, `Comision_Agencia`, `Comision_Freelance`, `Cupo_Base`, `Latitud`, `Longitud`) VALUES
@@ -6758,59 +7725,96 @@ INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, 
 (7, 'TOUR DE LUCES', 'TDL', 15000, 15000, 15000, 38, NULL, NULL),
 (8, 'PABLO ESCOBAR', 'TPE', 25000, 25000, 25000, 15, 6.2107740, -75.5580550),
 (9, 'TOUR DE COMPRAS', 'TDC', 0, 0, 0, 15, NULL, NULL),
-(10, 'COFFEE TOUR', 'COF', 20000, 20000, 20000, 38, NULL, NULL);
+(10, 'COFFEE TOUR', 'COF', 20000, 20000, 20000, 38, NULL, NULL),
+(19, 'prueba', 'p', 0, 0, 0, 20, 1.0000000, 1.0000000);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_dias`
+-- Table structure for table `tours_dias`
 --
 
 DROP TABLE IF EXISTS `tours_dias`;
 CREATE TABLE IF NOT EXISTS `tours_dias` (
   `Id_TourDia` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Tour` bigint UNSIGNED NOT NULL,
-  `Dia_Semana` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Dia_Semana` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_TourDia`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tours_dias`
+--
+
+INSERT INTO `tours_dias` (`Id_TourDia`, `Id_Tour`, `Dia_Semana`) VALUES
+(6, 19, 'jueves'),
+(7, 19, 'viernes'),
+(8, 19, 'sabado'),
+(9, 19, 'domingo'),
+(10, 2, 'lunes'),
+(11, 2, 'martes'),
+(12, 2, 'miercoles'),
+(13, 2, 'jueves'),
+(14, 2, 'viernes'),
+(15, 2, 'sabado'),
+(16, 2, 'domingo');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_temporadas`
+-- Table structure for table `tours_temporadas`
 --
 
 DROP TABLE IF EXISTS `tours_temporadas`;
 CREATE TABLE IF NOT EXISTS `tours_temporadas` (
   `Id_Temporada` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Tour` bigint UNSIGNED NOT NULL,
-  `Nombre_Temporada` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Temporada` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Inicio` date DEFAULT NULL,
   `Fecha_Fin` date DEFAULT NULL,
   PRIMARY KEY (`Id_Temporada`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tours_temporadas`
+--
+
+INSERT INTO `tours_temporadas` (`Id_Temporada`, `Id_Tour`, `Nombre_Temporada`, `Fecha_Inicio`, `Fecha_Fin`) VALUES
+(2, 19, 'Temporada alta', '2026-01-01', '2026-01-30');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_temporada_dias`
+-- Table structure for table `tours_temporada_dias`
 --
 
 DROP TABLE IF EXISTS `tours_temporada_dias`;
 CREATE TABLE IF NOT EXISTS `tours_temporada_dias` (
   `Id_Temporada_Dia` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Temporada` bigint UNSIGNED NOT NULL,
-  `Dia_Semana` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Dia_Semana` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Temporada_Dia`),
   KEY `Id_Temporada` (`Id_Temporada`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `tours_temporada_dias`
+--
+
+INSERT INTO `tours_temporada_dias` (`Id_Temporada_Dia`, `Id_Temporada`, `Dia_Semana`) VALUES
+(8, 2, 'martes'),
+(9, 2, 'miercoles'),
+(10, 2, 'jueves'),
+(11, 2, 'viernes'),
+(12, 2, 'sabado'),
+(13, 2, 'domingo');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tour_precios`
+-- Table structure for table `tour_precios`
 --
 
 DROP TABLE IF EXISTS `tour_precios`;
@@ -6819,81 +7823,96 @@ CREATE TABLE IF NOT EXISTS `tour_precios` (
   `Id_Tour` bigint UNSIGNED NOT NULL,
   `Id_Plan` bigint UNSIGNED DEFAULT NULL,
   `Id_Moneda` bigint UNSIGNED DEFAULT NULL,
-  `Tipo_Pasajero` enum('ADULTO','NINO','INFANTE') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tipo_Pasajero` enum('ADULTO','NINO','INFANTE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Precio` decimal(12,0) NOT NULL,
   PRIMARY KEY (`Id_PrecioTour`),
   KEY `Id_Tour` (`Id_Tour`),
   KEY `Id_Plan` (`Id_Plan`),
   KEY `Id_Moneda` (`Id_Moneda`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=76 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tour_precios`
+-- Dumping data for table `tour_precios`
 --
 
 INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, `Tipo_Pasajero`, `Precio`) VALUES
-(1, 1, NULL, 1, 'ADULTO', 229000),
-(2, 2, NULL, 1, 'ADULTO', 109000),
-(3, 3, NULL, 1, 'ADULTO', 99000),
-(4, 4, NULL, 1, 'ADULTO', 109000),
-(5, 5, NULL, 1, 'ADULTO', 269000),
-(6, 6, NULL, 1, 'ADULTO', 109000),
-(7, 7, NULL, 1, 'ADULTO', 79000),
-(8, 8, NULL, 1, 'ADULTO', 269000),
-(9, 9, NULL, 1, 'ADULTO', 70000),
-(10, 10, NULL, 1, 'ADULTO', 199000),
-(16, 1, NULL, 1, 'NINO', 229000),
-(17, 2, NULL, 1, 'NINO', 99000),
-(18, 3, NULL, 1, 'NINO', 89000),
-(19, 4, NULL, 1, 'NINO', 99000),
-(20, 5, NULL, 1, 'NINO', 259000),
-(21, 6, NULL, 1, 'NINO', 109000),
-(22, 7, NULL, 1, 'NINO', 69000),
-(23, 8, NULL, 1, 'NINO', 259000),
-(24, 9, NULL, 1, 'NINO', 70000),
-(25, 10, NULL, 1, 'NINO', 179000),
-(31, 2, NULL, 1, 'INFANTE', 10000),
-(32, 3, NULL, 1, 'INFANTE', 10000),
-(33, 4, NULL, 1, 'INFANTE', 10000),
-(34, 5, NULL, 1, 'INFANTE', 10000),
-(35, 6, NULL, 1, 'INFANTE', 10000),
-(36, 7, NULL, 1, 'INFANTE', 10000),
-(37, 8, NULL, 1, 'INFANTE', 10000),
-(38, 9, NULL, 1, 'INFANTE', 10000),
-(39, 10, NULL, 1, 'INFANTE', 10000);
+(1, 1, 1, 1, 'ADULTO', 229000),
+(3, 3, 3, 1, 'ADULTO', 99000),
+(4, 4, 4, 1, 'ADULTO', 109000),
+(5, 5, 5, 1, 'ADULTO', 269000),
+(6, 6, 6, 1, 'ADULTO', 109000),
+(7, 7, 7, 1, 'ADULTO', 79000),
+(8, 8, 8, 1, 'ADULTO', 269000),
+(9, 9, 9, 1, 'ADULTO', 70000),
+(10, 10, 10, 1, 'ADULTO', 199000),
+(16, 1, 1, 1, 'NINO', 229000),
+(18, 3, 3, 1, 'NINO', 89000),
+(19, 4, 4, 1, 'NINO', 99000),
+(20, 5, 5, 1, 'NINO', 259000),
+(21, 6, 6, 1, 'NINO', 109000),
+(22, 7, 7, 1, 'NINO', 69000),
+(23, 8, 8, 1, 'NINO', 259000),
+(24, 9, 9, 1, 'NINO', 70000),
+(25, 10, 10, 1, 'NINO', 179000),
+(32, 3, 3, 1, 'INFANTE', 10000),
+(33, 4, 4, 1, 'INFANTE', 10000),
+(34, 5, 5, 1, 'INFANTE', 10000),
+(35, 6, 6, 1, 'INFANTE', 10000),
+(36, 7, 7, 1, 'INFANTE', 10000),
+(37, 8, 8, 1, 'INFANTE', 10000),
+(38, 9, 9, 1, 'INFANTE', 10000),
+(39, 10, 10, 1, 'INFANTE', 10000),
+(58, 19, 12, 1, 'ADULTO', 2000),
+(59, 19, 12, 1, 'NINO', 0),
+(60, 19, 12, 1, 'INFANTE', 0),
+(61, 19, 12, 2, 'ADULTO', 200),
+(62, 19, 12, 2, 'NINO', 0),
+(63, 19, 12, 2, 'INFANTE', 0),
+(64, 19, 12, 3, 'ADULTO', 200),
+(65, 19, 12, 3, 'NINO', 0),
+(66, 19, 12, 3, 'INFANTE', 0),
+(67, 2, 13, 1, 'ADULTO', 109000),
+(68, 2, 13, 1, 'NINO', 99000),
+(69, 2, 13, 1, 'INFANTE', 10000),
+(70, 2, 13, 2, 'ADULTO', 0),
+(71, 2, 13, 2, 'NINO', 0),
+(72, 2, 13, 2, 'INFANTE', 0),
+(73, 2, 13, 3, 'ADULTO', 0),
+(74, 2, 13, 3, 'NINO', 0),
+(75, 2, 13, 3, 'INFANTE', 0);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers`
+-- Table structure for table `transfers`
 --
 
 DROP TABLE IF EXISTS `transfers`;
 CREATE TABLE IF NOT EXISTS `transfers` (
   `Id_Transfer` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Nombre_Titular` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `DNI` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Telefono_Titular` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Titular` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `DNI` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Telefono_Titular` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Id_Rango` bigint UNSIGNED DEFAULT NULL,
   `Id_Servicio` bigint UNSIGNED DEFAULT NULL,
-  `Punto_Salida` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Punto_Destino` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Punto_Salida` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Punto_Destino` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Transfer` date DEFAULT NULL,
   `Hora_Recogida` time DEFAULT NULL,
-  `Nombre_Reportante` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Telefono_Reportante` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Reportante` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Telefono_Reportante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
-  `Estado` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Observaciones` text COLLATE utf8mb4_unicode_ci,
+  `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`Id_Transfer`),
   KEY `Id_Rango` (`Id_Rango`),
   KEY `Id_Servicio` (`Id_Servicio`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers_precios`
+-- Table structure for table `transfers_precios`
 --
 
 DROP TABLE IF EXISTS `transfers_precios`;
@@ -6905,196 +7924,235 @@ CREATE TABLE IF NOT EXISTS `transfers_precios` (
   PRIMARY KEY (`Id_PrecioTransfer`),
   KEY `Id_Rango` (`Id_Rango`),
   KEY `Id_Moneda` (`Id_Moneda`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `transfers_precios`
+--
+
+INSERT INTO `transfers_precios` (`Id_PrecioTransfer`, `Id_Rango`, `Id_Moneda`, `Precio`) VALUES
+(1, 1, 1, 120000.00),
+(2, 1, 2, 32.00),
+(3, 1, 3, 30.00),
+(4, 2, 1, 250000.00),
+(5, 2, 2, 65.00),
+(6, 2, 3, 60.00);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers_rangos`
+-- Table structure for table `transfers_rangos`
 --
 
 DROP TABLE IF EXISTS `transfers_rangos`;
 CREATE TABLE IF NOT EXISTS `transfers_rangos` (
   `Id_Rango` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Descripcion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Minimo` int DEFAULT NULL,
   `Maximo` int DEFAULT NULL,
   PRIMARY KEY (`Id_Rango`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `transfers_rangos`
+--
+
+INSERT INTO `transfers_rangos` (`Id_Rango`, `Descripcion`, `Minimo`, `Maximo`) VALUES
+(1, '1-3 personas', 1, 3),
+(2, '4-12 personas', 4, 12);
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `usuarios`
+-- Table structure for table `usuarios`
 --
 
 DROP TABLE IF EXISTS `usuarios`;
 CREATE TABLE IF NOT EXISTS `usuarios` (
   `Id_Usuario` bigint UNSIGNED NOT NULL,
-  `Nombres_Apellidos` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Telefono_Usuario` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Usuario` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Correo` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Contrasena` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `Rol` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombres_Apellidos` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Telefono_Usuario` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Usuario` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Correo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Avatar` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Contrasena` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Id_Rol` bigint UNSIGNED DEFAULT NULL,
   `Activo` tinyint(1) DEFAULT '1',
   `Fecha_Creacion` datetime DEFAULT CURRENT_TIMESTAMP,
   `Fecha_Actualizacion` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Usuario`),
   UNIQUE KEY `ux_usuarios_usuario` (`Usuario`),
-  UNIQUE KEY `ux_usuarios_correo` (`Correo`)
+  UNIQUE KEY `ux_usuarios_correo` (`Correo`),
+  KEY `idx_usuarios_rol` (`Id_Rol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `usuarios`
+-- Dumping data for table `usuarios`
 --
 
-INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `Usuario`, `Correo`, `Contrasena`, `Rol`, `Activo`, `Fecha_Creacion`, `Fecha_Actualizacion`) VALUES
-(71676626, 'Carlos Castro Jaramillo', '3117885599', '71676626', 'gerencia@viajesmaxitours.com', '$2a$08$4HF2tCzXyV9g.XEGx1gMOupjzg4cYJUcG3Zcx1p1/8aj5LfjRN7vu', 'Administrador', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1000099025, 'Vanessa Ardila Castaño', '3023224295', 'Asesor5Maxi', 'carmenardilacasta@gmail.com', '$2a$08$mfMti2B6fZkOghNMieYaleNdMyctUw2.j6mLcGZPmt0RUAsXOTI6S', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1000549795, 'Nayerlly Araque Cardona', '573232866379', 'Asesor13Maxi', 'araquenayerlly@gmail.com', '$2a$08$3VbtoV1T7TfWYgC8cdDCSeztGiz3g788NDIx2mrlPiDduqMreQAUe', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1001390323, 'Evelin Dayana Arboleda Montes', '3234917551', 'Asesor10Maxi', 'evelindayanaarboledamontes@gmail.com', '$2a$08$CU4mQf.WoBsOnNVFYizPpOFIvfH48RIDXTyL1rniNee6zvQsXbw5G', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1006209620, 'Laura Sofía Galvis Pérez', '3022664504', 'Sofiagalvis77', 'lauragalvis777@gmail.com', '$2a$08$jVtQ/Z2wJJSWFLeEl/JzBOq6Q/rQsMweMeGJszjo6ISJ3dDrgFENm', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1007055270, 'Valentina Raigosa Posada', '3113442660', 'Asesor11Maxi', 'valeriaroigoza4@gmail.com', '$2a$08$8M.TH9ymkGO9ACOpy41uPuwKvSOSamtn227M/JGL.fya4j9b8LuBC', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1007055418, 'Elizabeth Quiceno Echeverri', '3004799654', 'Asesor7Maxi', 'eli1234quic@gmail.com', '$2a$08$6ZR.UUis8M96j1fg7oLBOuCzQY6qn7ueUW3FXWmemC54nPWv7zNTO', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1007115042, 'Adelaida García Buitrago', '3217589137', 'portolaureles', 'Adelaida.garcia1007@gmail.com', '$2a$08$X9NyFaPH4mH3g5yGLgLauOmfVAZwg.ocOWgf4ghkCaxn9g2I701Aa', 'Consultor_TG_CTG_SF_CT', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1018372156, 'Yeferson Urrego', '3025783379', 'yefer321', 'urregoyeferson@icloud.com', '$2a$08$KmTvP77WxG7LVkxVZrnRFut61fRgESqHw/8Frodhz.nhFT.BR5gBm', 'SuperAsesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1018372157, 'Yeferson Urrego Henao', '3025783379', 'yefer123', 'urregoyeferson2@gmail.com', '$2a$08$7nh3MeBwYdNlubGZZjjHYeD7C.3A8KQxQ/LaC12ZFrtwp//GXJguS', 'Consultor_TG_CTG_SF_CT', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1020426193, 'Jhonathan Castro López', '3244091934', 'j.castro1989', 'j.castro@viajesmaxitours.com', '$2a$08$kQmJYav.SYHBu6Qd4rE00.5Lg/TNLe2cqvoi0zVtFvhgsgfoifFV6', 'Administrador', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1022145000, 'Karen Paulina Usuga Isaza', '3175517945', 'Asesor2Maxi', 'Paulinamaxitours@gmail.com', '$2a$08$mY2Bkoq0HhYLbOlZIyTNJOHN/aCc3kgaywRdt72ZAOPmAeIXoC8Zi', 'SuperAsesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1036648398, 'Jeferson Andrés Restrepo Moreno', '3195429639', 'Asesor4Maxi', 'jeferson.restrepo@gmail.com', '$2a$08$oVE9AUxEjpXvBlFRoqESo.hEb8i5JhKjYE4VZhJzx7At01tZ87Hci', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1037948093, 'Daniel Grisales Herrera', '3208280985', 'D.grisalesh1593', 'dagdj1593@gmail.com', '$2a$08$A1V9YRBFpzMbq1KoWMAiweKSR9Q/XljrG9OkmqChlNB/Wn3z6fHBu', 'Administrador', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1041230712, 'Julián Esteban Galeano Giraldo', '3122304356', 'portomarinilla', 'julesggo22@gmail.com', '$2a$08$cnaJUV4psxMJTPRV1TamEujcq64Qq.IojD2D7jjWdnkHPZv9k5O9e', 'Consultor_TG_CTG', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1047496358, 'Sharon Daniela Velaides Orellano', '3045522611', 'Asesor8Maxi', 'sharonvel97@hotmail.com', '$2a$08$VqmqooGD8eb8sSVgEOzA7OyIEHcgEAxX2dKg/yK9lvD7e3Yx2mg/C', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1128436633, 'Alejandra García Villada', '3103537158', 'Asesor3Maxi', 'alejandragarciavillada14@gmail.com', '$2a$08$s6n/vd50iwOg.hyY67HKhO0l1TOPrBDnHuVupuuNXhmHkJ.HviBQ2', 'Asesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34'),
-(1128444233, 'KAREN DAHIANA RAIGOSA POSADA', '3217593888', 'Asesor6Maxi', 'karen.raigosa1226@gmail.com', '$2a$08$vIbOgJunBA9mJCGr19.NHeix7DP9quhCQqwMlqZDaUbNw8aCxSUUi', 'SuperAsesor', 1, '2025-09-24 01:39:34', '2025-09-24 01:39:34');
+INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `Usuario`, `Correo`, `Avatar`, `Contrasena`, `Id_Rol`, `Activo`, `Fecha_Creacion`, `Fecha_Actualizacion`) VALUES
+(71676626, 'Carlos Castro Jaramillo', '3117885599', '71676626', 'gerencia@viajesmaxitours.com', NULL, '$2a$08$4HF2tCzXyV9g.XEGx1gMOupjzg4cYJUcG3Zcx1p1/8aj5LfjRN7vu', 1, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1000099025, 'Vanessa Ardila Castaño', '3023224295', 'Asesor5Maxi', 'carmenardilacasta@gmail.com', NULL, '$2a$08$mfMti2B6fZkOghNMieYaleNdMyctUw2.j6mLcGZPmt0RUAsXOTI6S', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1000549795, 'Nayerlly Araque Cardona', '573232866379', 'Asesor13Maxi', 'araquenayerlly@gmail.com', NULL, '$2a$08$3VbtoV1T7TfWYgC8cdDCSeztGiz3g788NDIx2mrlPiDduqMreQAUe', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1001390323, 'Evelin Dayana Arboleda Montes', '3234917551', 'Asesor10Maxi', 'evelindayanaarboledamontes@gmail.com', NULL, '$2a$08$CU4mQf.WoBsOnNVFYizPpOFIvfH48RIDXTyL1rniNee6zvQsXbw5G', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1006209620, 'Laura Sofía Galvis Pérez', '3022664504', 'Sofiagalvis77', 'lauragalvis777@gmail.com', NULL, '$2a$08$jVtQ/Z2wJJSWFLeEl/JzBOq6Q/rQsMweMeGJszjo6ISJ3dDrgFENm', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1007055270, 'Valentina Raigosa Posada', '3113442660', 'Asesor11Maxi', 'valeriaroigoza4@gmail.com', NULL, '$2a$08$8M.TH9ymkGO9ACOpy41uPuwKvSOSamtn227M/JGL.fya4j9b8LuBC', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1007055418, 'Elizabeth Quiceno Echeverri', '3004799654', 'Asesor7Maxi', 'eli1234quic@gmail.com', NULL, '$2a$08$6ZR.UUis8M96j1fg7oLBOuCzQY6qn7ueUW3FXWmemC54nPWv7zNTO', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1007115042, 'Adelaida García Buitrago', '3217589137', 'portolaureles', 'Adelaida.garcia1007@gmail.com', NULL, '$2a$08$X9NyFaPH4mH3g5yGLgLauOmfVAZwg.ocOWgf4ghkCaxn9g2I701Aa', 2, 1, '2025-09-24 01:39:34', '2026-01-10 20:37:41'),
+(1018372156, 'Yeferson Urrego', '3025783379', 'yefer321', 'urregoyeferson@icloud.com', NULL, '$2a$08$KmTvP77WxG7LVkxVZrnRFut61fRgESqHw/8Frodhz.nhFT.BR5gBm', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1018372157, 'Yeferson Urrego Henao', '3025783379', 'yefer123', 'urregoyeferson2@gmail.com', NULL, '$2a$08$7nh3MeBwYdNlubGZZjjHYeD7C.3A8KQxQ/LaC12ZFrtwp//GXJguS', 1, 1, '2025-09-24 01:39:34', '2026-01-10 21:37:27'),
+(1020426193, 'Jhonathan Castro López', '3244091934', 'j.castro1989', 'j.castro@viajesmaxitours.com', NULL, '$2a$08$kQmJYav.SYHBu6Qd4rE00.5Lg/TNLe2cqvoi0zVtFvhgsgfoifFV6', 1, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1022145000, 'Karen Paulina Usuga Isaza', '3175517945', 'Asesor2Maxi', 'Paulinamaxitours@gmail.com', NULL, '$2a$08$mY2Bkoq0HhYLbOlZIyTNJOHN/aCc3kgaywRdt72ZAOPmAeIXoC8Zi', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1036648398, 'Jeferson Andrés Restrepo Moreno', '3195429639', 'Asesor4Maxi', 'jeferson.restrepo@gmail.com', NULL, '$2a$08$oVE9AUxEjpXvBlFRoqESo.hEb8i5JhKjYE4VZhJzx7At01tZ87Hci', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1037948093, 'Daniel Grisales Herrera', '3208280985', 'D.grisalesh1593', 'dagdj1593@gmail.com', NULL, '$2a$08$A1V9YRBFpzMbq1KoWMAiweKSR9Q/XljrG9OkmqChlNB/Wn3z6fHBu', 1, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1041230712, 'Julián Esteban Galeano Giraldo', '3122304356', 'portomarinilla', 'julesggo22@gmail.com', NULL, '$2a$08$cnaJUV4psxMJTPRV1TamEujcq64Qq.IojD2D7jjWdnkHPZv9k5O9e', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1047496358, 'Sharon Daniela Velaides Orellano', '3045522611', 'Asesor8Maxi', 'sharonvel97@hotmail.com', NULL, '$2a$08$VqmqooGD8eb8sSVgEOzA7OyIEHcgEAxX2dKg/yK9lvD7e3Yx2mg/C', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1128436633, 'Alejandra García Villada', '3103537158', 'Asesor3Maxi', 'alejandragarciavillada14@gmail.com', NULL, '$2a$08$s6n/vd50iwOg.hyY67HKhO0l1TOPrBDnHuVupuuNXhmHkJ.HviBQ2', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1128444233, 'KAREN DAHIANA RAIGOSA POSADA', '3217593888', 'Asesor6Maxi', 'karen.raigosa1226@gmail.com', NULL, '$2a$08$vIbOgJunBA9mJCGr19.NHeix7DP9quhCQqwMlqZDaUbNw8aCxSUUi', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28');
+
+-- --------------------------------------------------------
 
 --
--- Restricciones para tablas volcadas
+-- Table structure for table `usuario_permisos`
+--
+
+DROP TABLE IF EXISTS `usuario_permisos`;
+CREATE TABLE IF NOT EXISTS `usuario_permisos` (
+  `Id_Usuario_Permiso` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Usuario` bigint UNSIGNED NOT NULL,
+  `Id_Permiso` bigint UNSIGNED NOT NULL,
+  `Tipo` enum('ALLOW','DENY') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Fecha_Asignacion` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Usuario_Permiso`),
+  UNIQUE KEY `ux_usuario_permisos` (`Id_Usuario`,`Id_Permiso`),
+  KEY `idx_usuario_permisos_permiso` (`Id_Permiso`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Constraints for dumped tables
 --
 
 --
--- Filtros para la tabla `aforos`
+-- Constraints for table `aforos`
 --
 ALTER TABLE `aforos`
   ADD CONSTRAINT `fk_aforos_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `asignacion_buses`
+-- Constraints for table `asignacion_buses`
 --
 ALTER TABLE `asignacion_buses`
   ADD CONSTRAINT `fk_asignbus_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `detalle_historial`
+-- Constraints for table `detalle_historial`
 --
 ALTER TABLE `detalle_historial`
   ADD CONSTRAINT `fk_detalle_historial` FOREIGN KEY (`Id_Historial`) REFERENCES `historial` (`Id_Historial`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `historial`
+-- Constraints for table `historial`
 --
 ALTER TABLE `historial`
   ADD CONSTRAINT `fk_historial_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `horarios`
+-- Constraints for table `horarios`
 --
 ALTER TABLE `horarios`
   ADD CONSTRAINT `fk_horarios_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_horarios_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `logs_sistema`
+-- Constraints for table `logs_sistema`
 --
 ALTER TABLE `logs_sistema`
   ADD CONSTRAINT `fk_log_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `mensajes`
+-- Constraints for table `mensajes`
 --
 ALTER TABLE `mensajes`
   ADD CONSTRAINT `fk_mensajes_emisor` FOREIGN KEY (`Id_Emisor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `mensaje_destinatario`
+-- Constraints for table `mensaje_destinatario`
 --
 ALTER TABLE `mensaje_destinatario`
   ADD CONSTRAINT `fk_mensajedest_mensaje` FOREIGN KEY (`Id_Mensaje`) REFERENCES `mensajes` (`Id_Mensaje`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_mensajedest_receptor` FOREIGN KEY (`Receptor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pagos_reservas`
+-- Constraints for table `pagos_reservas`
 --
 ALTER TABLE `pagos_reservas`
   ADD CONSTRAINT `fk_pagosreserva_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pagos_transfers`
+-- Constraints for table `pagos_transfers`
 --
 ALTER TABLE `pagos_transfers`
   ADD CONSTRAINT `fk_pagostransfers_transfer` FOREIGN KEY (`Id_Transfer`) REFERENCES `transfers` (`Id_Transfer`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pasajeros`
+-- Constraints for table `pasajeros`
 --
 ALTER TABLE `pasajeros`
   ADD CONSTRAINT `fk_pasajeros_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pasajeros_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `permisos_usuarios`
---
-ALTER TABLE `permisos_usuarios`
-  ADD CONSTRAINT `fk_permuser_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_permuser_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Filtros para la tabla `planes_tours`
+-- Constraints for table `planes_tours`
 --
 ALTER TABLE `planes_tours`
   ADD CONSTRAINT `fk_planes_tours` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `recordatorios`
+-- Constraints for table `recordatorios`
 --
 ALTER TABLE `recordatorios`
   ADD CONSTRAINT `fk_recordatorios_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `reservas`
+-- Constraints for table `reservas`
 --
 ALTER TABLE `reservas`
   ADD CONSTRAINT `fk_reservas_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_reservas_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `sesiones`
+-- Constraints for table `rol_permisos`
+--
+ALTER TABLE `rol_permisos`
+  ADD CONSTRAINT `fk_rol_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_rol_permisos_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `sesiones`
 --
 ALTER TABLE `sesiones`
   ADD CONSTRAINT `fk_sesiones_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_dias`
+-- Constraints for table `tours_dias`
 --
 ALTER TABLE `tours_dias`
   ADD CONSTRAINT `fk_toursdias_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_temporadas`
+-- Constraints for table `tours_temporadas`
 --
 ALTER TABLE `tours_temporadas`
   ADD CONSTRAINT `fk_temporada_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_temporada_dias`
+-- Constraints for table `tours_temporada_dias`
 --
 ALTER TABLE `tours_temporada_dias`
   ADD CONSTRAINT `fk_tempdias_temporada` FOREIGN KEY (`Id_Temporada`) REFERENCES `tours_temporadas` (`Id_Temporada`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tour_precios`
+-- Constraints for table `tour_precios`
 --
 ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
@@ -7102,18 +8160,30 @@ ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `transfers`
+-- Constraints for table `transfers`
 --
 ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `transfers_precios`
+-- Constraints for table `transfers_precios`
 --
 ALTER TABLE `transfers_precios`
   ADD CONSTRAINT `fk_pt_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pt_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `usuarios`
+--
+ALTER TABLE `usuarios`
+  ADD CONSTRAINT `fk_usuarios_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `usuario_permisos`
+--
+ALTER TABLE `usuario_permisos`
+  ADD CONSTRAINT `fk_usuario_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

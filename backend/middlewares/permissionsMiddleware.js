@@ -153,10 +153,10 @@ function requireAdmin() {
         });
       }
 
-      // Los administradores tienen permisos sobre USUARIOS.GESTIONAR_ROLES
+      // Los administradores tienen permisos sobre USUARIOS.LEER
       const permisos = await obtenerPermisosUsuario(req.user.id);
 
-      if (!permisos.includes('USUARIOS.GESTIONAR_ROLES')) {
+      if (!permisos.includes('USUARIOS.LEER')) {
         return res.status(403).json({
           error: 'Acceso denegado',
           mensaje: 'Solo administradores pueden acceder a este recurso'

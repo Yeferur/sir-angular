@@ -49,6 +49,7 @@
   max-width: 1200px;
   margin: auto;
   animation: fadeIn 0.5s ease;
+  padding-top: 20px;
 }
 
 /* === ENCABEZADO Y BARRA DE BÚSQUEDA === */
