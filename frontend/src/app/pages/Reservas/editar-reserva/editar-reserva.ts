@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -37,6 +37,7 @@ export class EditarReservaComponent implements OnInit {
   private navbar = inject(DynamicIslandGlobalService);
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
+  private injector = inject(Injector);
 
   // Estado
   isLoading = signal<boolean>(true);
@@ -300,14 +301,14 @@ export class EditarReservaComponent implements OnInit {
 
     // React to Id_Reserva changes from the Dynamic Navbar: if user clicks "Editar" there,
     // the navbar service will set Id_Reserva; when it changes, reload this editor with the new id.
-    effect(() => {
+    runInInjectionContext(this.injector, () => effect(() => {
       const navId = this.navbar.Id_Reserva();
       if (navId && navId !== this.reservaId()) {
         // load new reservation into the editor
         this.reservaId.set(navId);
         this.cargarReservaExistente(navId).then(() => this.cdr.markForCheck());
       }
-    });
+    }));
 
     this.isLoading.set(false);
     this.cdr.markForCheck();

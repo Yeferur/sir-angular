@@ -56,7 +56,8 @@
             Fecha del Tour <span class="required-star">*</span>
           </label>
 
-          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha" formControlName="Fecha_Tour"
+          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+            formControlName="Fecha_Tour"
             [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
             (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
 
@@ -230,17 +231,17 @@
 
   @for (pasajero of pasajeros.controls; let i = $index; track i) {
   <div [formGroupName]="i" class="passenger-card" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value">
-      <div class="passenger-header">
-        <div class="passenger-title">
-          <h4>{{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }} {{ tipoIndex(i) }}</h4>
+    <div class="passenger-header">
+      <div class="passenger-title">
+        <h4>{{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }} {{ tipoIndex(i) }}</h4>
 
-          <span class="passenger-pill" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value">
-            {{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }}
-          </span>
-        </div>
-
-        <button type="button" class="btn-icon-delete" (click)="eliminarPasajero(i)">✕</button>
+        <span class="passenger-pill" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value">
+          {{ displayTipo(pasajero.get('Tipo_Pasajero')?.value) }}
+        </span>
       </div>
+
+      <button type="button" class="btn-icon-delete" (click)="eliminarPasajero(i)">✕</button>
+    </div>
 
     <div class="passenger-body">
       <div class="form-group">
@@ -555,12 +556,18 @@
       </div>
     </div>
 
-    <button type="button" class="btn-save-summary" (click)="onSubmit()">
-      Guardar Reserva
-    </button>
-    <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
-      Duplicar Reserva
-    </button>
+    <div class="summary-actions">
+      <div class="summary-btn">
+        <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
+          Duplicar Reserva
+        </button>
+      </div>
+      <div class="summary-btn">
+        <button type="button" class="btn-save-summary" (click)="onSubmit()">
+          Guardar Reserva
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 

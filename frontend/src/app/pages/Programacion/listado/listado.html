@@ -3,94 +3,266 @@
   <!-- ENCABEZADO -->
   <div class="page-header">
     <h1>Programación</h1>
-      <div class="form-group">
+    <div class="form-group">
       <label for="fecha" class="form-label">Fecha de Operación:</label>
-      <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha" [(ngModel)]="fechaSeleccionada" (change)="cargarToursDelDia()" />
+      <input
+        id="fecha"
+        class="form-input"
+        type="text"
+        appFlatpickrInput
+        [fpOptions]="fpOptionsFecha"
+        [(ngModel)]="fechaSeleccionada"
+        (change)="cargarToursDelDia()" />
     </div>
   </div>
 
   <!-- SPINNER -->
-  <div *ngIf="cargando" class="loading-state">
-    <div class="spinner"></div>
-    <p>Cargando...</p>
-  </div>
+  @if (cargando) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando...</p>
+    </div>
+  }
 
   <!-- DASHBOARD -->
-  <section *ngIf="!cargando && modoVista === 'dashboard'" class="dashboard-section">
-    <div *ngIf="toursDelDia.length === 0" class="empty-state">
-      <h3>No hay tours para la fecha seleccionada.</h3>
-      <p>Elige otra fecha para ver la programación.</p>
-    </div>
-
-    <div class="capacity-dashboard" *ngIf="toursDelDia.length > 0">
-      <div class="capacity-card" *ngFor="let tour of toursDelDia"
-        (click)="tour.planGenerado ? generarPlan(tour) : generarPlan(tour)"
-        [class.generated]="tour.estado === 'Generado'">
-        <div class="card-content">
-          <div class="stats-container">
-            <div class="card-header">
-              <h2 class="tour-name">{{ tour.NombreTour }}</h2>
-              <span class="badge" [ngClass]="tour.estado | lowercase">{{ tour.estado || 'Pendiente' }}</span>
-            </div>
-            <div *ngIf="tour.estado === 'Pendiente'">
-              <p class="stat-main">Pendiente</p>
-              <p class="stat-secondary">Clic para generar plan logístico</p>
-            </div>
-            <div *ngIf="tour.estado === 'Generado'">
-              <p class="stat-main">{{ tour.totalPasajeros || 0 }} <span class="stat-label">Pasajeros</span></p>
-              <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
-            </div>
-          </div>
+  @if (!cargando && modoVista === 'dashboard') {
+    <section class="dashboard-section">
+      @if (toursDelDia.length === 0) {
+        <div class="empty-state">
+          <h3>No hay tours para la fecha seleccionada.</h3>
+          <p>Elige otra fecha para ver la programación.</p>
         </div>
-        <div class="card-footer">
-          <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Listo para generar' }}</span>
-          <span class="arrow-icon">→</span>
-        </div>
-      </div>
-    </div>
-  </section>
+      }
 
-  <!-- EDITOR DE LISTADOS -->
-  <section *ngIf="!cargando && modoVista === 'editor' && planSeleccionado" class="editor-section">
-    <div class="editor-header">
-      <div class="editor-title">
-        <h3>Editor de Listado</h3>
-        <p>{{ tourSeleccionado?.NombreTour }}</p>
-      </div>
-      <div class="editor-actions">
-        <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
-        <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
-      </div>
-    </div>
+      @if (toursDelDia.length > 0) {
+        <div class="capacity-dashboard">
+          @for (tour of toursDelDia; track tour.Id_Tour) {
+            <div
+              class="capacity-card"
+              (click)="generarPlan(tour)"
+              [class.generated]="tour.estado === 'Generado'">
 
-    <div class="editor-board" cdkDropListGroup>
-      <div class="bus-column" *ngFor="let bus of planSeleccionado.buses; let i = index">
-        <div class="bus-header">
-          <input type="text" class="form-input placa-input" placeholder="Placa del Bus" [(ngModel)]="bus.id">
-          <span class="bus-occupancy">{{ bus.ocupados }} / {{ bus.capacidad }} Pax</span>
-          <button class="btn-secondary" style="margin-top: 0.5rem" (click)="verMapa(bus)">Ver Mapa</button>
-        </div>
-        <div class="bus-body" cdkDropList [id]="'bus-' + i" [cdkDropListData]="bus.reservas"
-          (cdkDropListDropped)="drop($event)">
-          <div *ngIf="bus.reservas.length === 0" class="drop-placeholder">
-            <span>Arrastra reservas aquí</span>
-          </div>
-          <ng-container *ngFor="let reserva of bus.reservas; let i = index">
-            <div *ngIf="mostrarEncabezadoPunto(bus.reservas, i)" class="punto-header">
-              {{ reserva.NombrePunto }}
-            </div>
+              <div class="card-content">
+                <div class="stats-container">
+                  <div class="card-header">
+                    <h2 class="tour-name">{{ tour.NombreTour }}</h2>
+                    <span class="badge" [ngClass]="(tour.estado || 'Pendiente') | lowercase">
+                      {{ tour.estado || 'Pendiente' }}
+                    </span>
+                  </div>
 
-            <div class="reserva-card" cdkDrag>
-              <div class="reserva-details">
-                <span>#{{ reserva.Id_Reserva }}</span>
-                <span class="reserva-pax">{{ reserva.NumeroPasajeros }} Pax</span>
+                  @if (tour.estado === 'Pendiente') {
+                    <p class="stat-main">Pendiente</p>
+                    <p class="stat-secondary">Clic para generar plan logístico</p>
+                  }
+
+                  @if (tour.estado === 'Generado') {
+                    <p class="stat-main">
+                      {{ tour.totalPasajeros || 0 }}
+                      <span class="stat-label">Pasajeros</span>
+                    </p>
+                    <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
+                  }
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Listo para generar' }}</span>
+                <span class="arrow-icon">→</span>
               </div>
             </div>
-          </ng-container>
+          }
+        </div>
+      }
+    </section>
+  }
 
+  <!-- EDITOR MASTER–DETAIL -->
+  @if (!cargando && modoVista === 'editor' && planSeleccionado) {
+    <section class="editor-section">
+
+      <div class="editor-header">
+        <div class="editor-title">
+          <h3>Editor de Listado</h3>
+          <p>{{ tourSeleccionado?.NombreTour }}</p>
+        </div>
+        <div class="editor-actions">
+          <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
+          <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
+          <button class="btn-primary" (click)="descargarTodosLosListados()">Descargar todos (Excel)</button>
         </div>
       </div>
-    </div>
-  </section>
-</div>
 
+      <div class="md-layout" cdkDropListGroup>
+
+        <!-- LEFT: BUS LIST (drop targets) -->
+        <aside class="md-sidebar">
+          <div class="sidebar-card">
+            
+
+            <div class="bus-list">
+
+              @for (bus of planSeleccionado.buses; track $index; let i = $index) {
+                <div
+                  class="bus-item"
+                  [class.active]="i === activeBusIndex"
+                  (click)="selectBus(i)"
+                  cdkDropList
+                  [id]="'busdrop-' + i"
+                  [cdkDropListData]="bus.reservas"
+                  [cdkDropListConnectedTo]="connectedDropLists"
+                  (cdkDropListDropped)="dropReserva($event)"
+                >
+                  <div class="bus-item-top">
+                    <div class="bus-item-title">
+                      <span class="dot ok"></span>
+                      <span class="bus-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
+                    </div>
+                    <div class="bus-item-right">
+                      {{ bus.ocupados }} / {{ bus.capacidad }} pax
+                    </div>
+                  </div>
+
+                  <div class="bus-item-mid">
+                    <input class="form-input small" placeholder="Placa" [(ngModel)]="bus.id" />
+                    <input class="form-input small" placeholder="Guía" [(ngModel)]="bus.guia" />
+                  </div>
+
+                  <div class="bus-item-bottom">
+                    <span>{{ bus.reservas.length }} reservas</span>
+                    <div class="bus-actions">
+                      <button class="btn-secondary" (click)="verMapa(bus)">Ver mapa</button>
+                      <button class="btn-primary" (click)="descargarListadoBus(i)">Descargar</button>
+                    </div>
+                  </div>
+
+                  <div class="bus-progress">
+                    <span [style.width.%]="bus.capacidad ? (bus.ocupados / bus.capacidad) * 100 : 0"></span>
+                  </div>
+                </div>
+              }
+
+              <!-- Nuevo bus drop -->
+              <div
+                class="bus-item newbus"
+                [class.hidden]="!isDragging"
+                cdkDropList
+                id="new-bus"
+                [cdkDropListData]="newBusDropData"
+                [cdkDropListConnectedTo]="connectedDropLists"
+                (cdkDropListDropped)="dropReserva($event)"
+              >
+                <div class="bus-item-top">
+                  <div class="bus-item-title">
+                    <span class="dot"></span>
+                    <span class="bus-name">Nuevo bus</span>
+                  </div>
+                  <div class="bus-item-right">Opcional</div>
+                </div>
+                <div class="bus-item-bottom">
+                  <span>Suelta aquí para crear otro bus</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </aside>
+
+        <!-- RIGHT: ROUTE + STOPS -->
+        <main class="md-main">
+
+          <!-- Route card -->
+          <section class="main-card">
+            <div class="main-card-header">
+              <div class="main-card-title">
+                <div class="t">Ruta del bus</div>
+                <div class="s">Orden de los puntos de encuentro</div>
+              </div>
+            </div>
+
+            <!-- Stops order (draggable) -->
+            <div
+              class="route-list"
+              cdkDropList
+              id="route-order"
+              [cdkDropListData]="activeStops"
+              cdkDropListLockAxis="y"
+              (cdkDropListDropped)="dropStop($event)"
+            >
+              @for (stop of activeStops; track stop.key; let p = $index) {
+                <div class="route-item" cdkDrag cdkDragLockAxis="y">
+                  <div class="route-left" cdkDragHandle>
+                    <span class="route-index">{{ p + 1 }}</span>
+                    <div class="route-info">
+                      <div class="route-name">{{ stop.NombrePunto }}</div>
+                      <div class="route-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</div>
+                    </div>
+                  </div>
+                  <div class="route-handle">⋮⋮</div>
+                </div>
+              }
+            </div>
+          </section>
+
+          <!-- Stops + reservas (solo para ver; reservas se mueven entre buses desde la izquierda) -->
+          <section class="main-card">
+            <div class="main-card-header">
+              <div class="main-card-title">
+                <div class="t">Puntos de encuentro y reservas</div>
+                <div class="s">Arrastra una reserva y suéltala en otro bus (panel izquierdo).</div>
+              </div>
+              <div class="main-card-actions">
+                <button class="btn-secondary" (click)="prevBus()">Anterior</button>
+                <button class="btn-primary" (click)="nextBus()">Siguiente</button>
+              </div>
+            </div>
+
+            <!-- Active bus reservations: un solo droplist fuente -->
+            <div
+              class="stops-grid"
+              cdkDropList
+              id="active-bus"
+              [cdkDropListData]="activeBus?.reservas"
+              [cdkDropListConnectedTo]="connectedDropLists"
+              [cdkDropListSortingDisabled]="true"
+              (cdkDropListDropped)="dropReserva($event)"
+            >
+              @for (stop of activeStops; track stop.key; let p = $index) {
+                <div class="stop-card">
+                  <div class="stop-header">
+                    <div class="stop-left">
+                      <span class="stop-index">{{ p + 1 }}</span>
+                      <div class="stop-title">
+                        <span class="stop-name">{{ stop.NombrePunto }}</span>
+                        <span class="stop-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="stop-body">
+                    @if (stop.reservas.length === 0) {
+                      <div class="empty-mini">Sin reservas en esta parada</div>
+                    }
+
+                    @for (reserva of stop.reservas; track reserva.Id_Reserva) {
+                      <!-- OJO: los drags están dentro del dropList "active-bus" (fuente) -->
+                      <div class="reserva-card" cdkDrag (cdkDragStarted)="onDragStarted()" (cdkDragEnded)="onDragEnded()">
+                        <div class="reserva-details">
+                          <span>#{{ reserva.Id_Reserva }}</span>
+                          <span class="reserva-pax">{{ reserva.NumeroPasajeros }} Pax</span>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+          </section>
+        </main>
+
+      </div>
+    </section>
+  }
+
+</div>

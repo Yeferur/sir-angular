@@ -29,6 +29,7 @@ export interface Bus {
   ocupados: number;
   reservas: Reserva[];
   recorridoKm: number;
+  guia?: string;
 }
 
 /**

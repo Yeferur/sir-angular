@@ -992,7 +992,7 @@ input[type=number] {
 /* Estado expandido (card) */
 .floating-summary[data-state="expanded"] {
   width: clamp(320px, 95vw, 500px);
-  height: 550px;
+  height: 410px;
   border-radius: 24px;
   bottom: 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
@@ -1092,7 +1092,6 @@ input[type=number] {
   font-size: 0.98rem;
   font-weight: 600;
   padding: 12px 14px;
-  margin: 4px 0 10px;
   cursor: pointer;
   transition:
     background-color 0.2s ease,
@@ -1110,7 +1109,6 @@ input[type=number] {
 /* Botón elegante para duplicar reserva (centrado y gris) */
 .btn-duplicate {
   display: block;
-  margin: 12px auto 0;
   width: 90%;
   max-width: 420px;
   border: 1px solid rgba(0,0,0,0.06);
@@ -1279,4 +1277,86 @@ input[type=number] {
   .payments-right{
     grid-column: auto;
   }
+}
+
+
+.summary-actions{
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+}
+
+.summary-btn{
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color .2s, box-shadow .2s;
+}
+
+/* ========================
+   FIX: Responsive tweaks for floating summary on small screens
+   Ensure the floating summary fits and expands correctly without overflowing
+   ======================== */
+@media (max-width: 768px) {
+  .floating-summary {
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 900px;
+    bottom: 12px;
+    z-index: 9999;
+  }
+
+  .floating-summary[data-state="expanded"] {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    border-radius: 12px;
+  }
+
+  .floating-summary .summary-expanded {
+    max-height: 65vh;
+    overflow: auto;
+    box-sizing: border-box;
+  }
+
+  .floating-summary .summary-collapsed {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .floating-summary {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    bottom: 12px;
+    border-radius: 12px;
+    z-index: 10000;
+  }
+
+  .floating-summary[data-state="expanded"] {
+    height: 620px;
+    max-height: 80vh;
+    padding: 8px;
+  }
+
+  .floating-summary .summary-expanded {
+    padding: 8px;
+  }
+
+  /* Make buttons and text slightly smaller to fit */
+  .floating-summary .summary-total { font-size: 1.4rem; }
+  .floating-summary .summary-item { gap: 8px; }
 }

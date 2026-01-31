@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: '/api' // URL relativa - funciona en desarrollo y producción
+  apiUrl: 'http://localhost:4000/api' // En desarrollo apuntar al backend (ajusta puerto si es necesario)
 };

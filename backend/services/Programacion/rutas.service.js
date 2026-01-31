@@ -1,154 +1,103 @@
 const fs = require('fs');
 const path = require('path');
+const { ordenarParadas } = require('./routeEngine.service');
 
-// Coordenadas de referencia (Estación Poblado)
-const puntoBase = { lat: 6.21362087702617, lon: -75.57835125972284 };
+const GRAFO = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'grafo_antioquia.json'), 'utf8')
+);
 
-// Cargar grafo JSON
-const rutaGrafo = path.join(process.cwd(), 'grafo_antioquia.json');
-const grafo = JSON.parse(fs.readFileSync(rutaGrafo, 'utf8'));
+const PUNTO_BASE = { lat: 6.212757856694648, lon: -75.57759200491337 };
 
-// DESPUÉS (Correcto)
-const R = 6371000; // Radio de la Tierra en metros
-
-// ============================
-// Haversine
-// ============================
 function haversine(lat1, lon1, lat2, lon2) {
-  const toRad = deg => deg * Math.PI / 180;
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ============================
-// Encontrar nodo más cercano
-// ============================
-function encontrarNodoMasCercano(lat, lon) {
-  let minDist = Infinity;
-  let nodoCercano = null;
-
-  for (const [id, nodo] of Object.entries(grafo.nodes)) {
-    const dist = haversine(lat, lon, nodo.lat, nodo.lon);
-    if (dist < minDist) {
-      minDist = dist;
-      nodoCercano = id;
+function nodoCercano(lat, lon) {
+  let min = Infinity;
+  let best = null;
+  for (const id in GRAFO.nodes) {
+    const n = GRAFO.nodes[id];
+    const d = haversine(lat, lon, n.lat, n.lon);
+    if (d < min) {
+      min = d;
+      best = id;
     }
   }
-
-  // Comprobar si la distancia en METROS es mayor a 5 KM (5000 metros)
-  if (minDist > 5000) { 
-    // Corregir el mensaje para mostrar la distancia en KM
-    console.warn(`⚠️ Punto muy alejado del grafo (${(minDist / 1000).toFixed(2)} km): { lat: ${lat}, lon: ${lon} }`);
-    return null;
-  }
-
-  return nodoCercano;
+  return best;
 }
 
-// ============================
-// A* pathfinding
-// ============================
-function buscarRuta(latInicio, lonInicio, latDestino, lonDestino) {
-  const inicio = encontrarNodoMasCercano(latInicio, lonInicio);
-  const destino = encontrarNodoMasCercano(latDestino, lonDestino);
+function aStar(inicio, fin) {
+  const start = nodoCercano(inicio.lat, inicio.lon);
+  const goal = nodoCercano(fin.lat, fin.lng ?? fin.lon);
 
-  if (!inicio || !destino) {
-    console.error(`❌ Nodo inválido: inicio=${inicio}, destino=${destino}`);
-    return null;
-  }
+  const open = new Set([start]);
+  const came = {};
+  const g = { [start]: 0 };
+  const f = { [start]: 0 };
 
-  if (!grafo.nodes[inicio]?.neighbors?.length) {
-    console.warn(`⚠️ Nodo de inicio sin vecinos: ${inicio}`);
-    return null;
-  }
-
-  if (!grafo.nodes[destino]?.neighbors?.length) {
-    console.warn(`⚠️ Nodo de destino sin vecinos: ${destino}`);
-    return null;
-  }
-
-  const abiertos = new Set([inicio]);
-  const cerrados = new Set();
-  const g = { [inicio]: 0 };
-  const f = { [inicio]: haversine(latInicio, lonInicio, latDestino, lonDestino) };
-  const padres = {};
-
-  while (abiertos.size > 0) {
-    const actual = [...abiertos].reduce((a, b) => f[a] < f[b] ? a : b);
-
-    if (actual === destino) {
-      const ruta = [];
-      let nodo = actual;
-      while (nodo) {
-        ruta.unshift(grafo.nodes[nodo]);
-        nodo = padres[nodo];
+  while (open.size) {
+    const current = [...open].reduce((a, b) => f[a] < f[b] ? a : b);
+    if (current === goal) {
+      const path = [];
+      let c = current;
+      while (c) {
+        path.unshift(GRAFO.nodes[c]);
+        c = came[c];
       }
-      return ruta;
+      return path;
     }
 
-    abiertos.delete(actual);
-    cerrados.add(actual);
-
-    for (const vecino of grafo.nodes[actual].neighbors || []) {
-      if (cerrados.has(vecino.id)) continue;
-
-      const tentativeG = g[actual] + vecino.distance;
-      if (!g[vecino.id] || tentativeG < g[vecino.id]) {
-        padres[vecino.id] = actual;
-        g[vecino.id] = tentativeG;
-
-        const heur = haversine(
-          grafo.nodes[vecino.id].lat,
-          grafo.nodes[vecino.id].lon,
-          latDestino,
-          lonDestino
-        );
-        f[vecino.id] = tentativeG + heur;
-        abiertos.add(vecino.id);
+    open.delete(current);
+    for (const n of GRAFO.nodes[current].neighbors) {
+      const t = g[current] + n.distance;
+      if (g[n.id] === undefined || t < g[n.id]) {
+        came[n.id] = current;
+        g[n.id] = t;
+        f[n.id] = t;
+        open.add(n.id);
       }
     }
   }
-
-  return null;
+  return [];
 }
 
-// ============================
-// Ruta completa entre varios puntos
-// ============================
-async function calcularRutaEntrePuntos(puntos) {
-  const rutaCompleta = [];
-
-  let origen = puntoBase;
-
-  for (const punto of puntos) {
-    if (!punto.lat || (!punto.lon && punto.lng === undefined)) {
-      console.warn("❌ Punto inválido:", punto);
-      continue;
-    }
-
-    const destino = {
-      lat: parseFloat(punto.lat),
-      lon: parseFloat(punto.lon || punto.lng)
-    };
-
-    const subruta = buscarRuta(origen.lat, origen.lon, destino.lat, destino.lon);
-
-    if (!subruta) {
-      console.warn("❌ No se encontró subruta entre:", origen, destino);
-      continue;
-    }
-
-    if (rutaCompleta.length > 0) subruta.shift(); // Evita duplicar nodo anterior
-    rutaCompleta.push(...subruta);
-    origen = destino;
+async function generarRuta(puntos, tour) {
+  if (!tour?.Latitud || !tour?.Longitud) {
+    throw new Error('El tour no tiene coordenadas');
   }
 
-  return rutaCompleta;
+  const ordenadas = await ordenarParadas({
+    puntos,
+    destino: { lat: tour.Latitud, lng: tour.Longitud }
+  });
+
+  const ruta = [];
+  let actual = { lat: PUNTO_BASE.lat, lon: PUNTO_BASE.lon };
+
+  for (const p of ordenadas) {
+    const tramo = aStar(actual, p);
+    if (ruta.length) tramo.shift();
+    ruta.push(...tramo);
+    actual = { lat: p.lat, lon: p.lng };
+  }
+
+  const tramoFinal = aStar(actual, {
+    lat: tour.Latitud,
+    lon: tour.Longitud
+  });
+
+  tramoFinal.shift();
+  ruta.push(...tramoFinal);
+
+  return ruta;
 }
 
-module.exports = {
-  calcularRutaEntrePuntos,
-};
+module.exports = { generarRuta };

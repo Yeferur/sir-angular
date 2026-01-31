@@ -1,225 +1,254 @@
-// backend/services/listado.service.js
-const db = require('../../database/db');
+const db = require('../../database/db'); // Asegúrate de que la ruta a tu conexión de DB sea correcta
+const fs = require('fs').promises;
+const path = require('path');
 
-const CAPACIDADES_BUSES = [18,23,25,27,38,39,40,41,43];
-const MAX_DESVIO_KM = 3; // configurable
+// =================================================================
+// --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
+// =================================================================
+const CONFIG = {
+    CAPACIDADES_BUSES: [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a,b) => a - b), // Ordenar de menor a mayor
+    PUNTO_BASE: { lat: 6.212757856694648, lon: -75.57759200491337, NombrePunto: 'Punto Base' },
+    GRAFO_PATH: 'grafo_antioquia.json',
+};
 
-function calcularDistancia(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const toRad = deg => deg * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+const R_TIERRA = 6371;
+let grafoCache = null;
 
-function ordenarPorDistanciaIncremental(reservas) {
-  if (reservas.length <= 1) return reservas;
-  const resultado = [];
-  const sinVisitar = [...reservas];
-  let actual = sinVisitar.shift();
-  resultado.push(actual);
-
-  while (sinVisitar.length > 0) {
-    const siguienteIndex = sinVisitar.reduce((minIdx, r, i) => {
-      const distMin = calcularDistancia(
-        actual.Latitud, actual.Longitud,
-        sinVisitar[minIdx].Latitud, sinVisitar[minIdx].Longitud
-      );
-      const distActual = calcularDistancia(
-        actual.Latitud, actual.Longitud,
-        r.Latitud, r.Longitud
-      );
-      return distActual < distMin ? i : minIdx;
-    }, 0);
-    actual = sinVisitar.splice(siguienteIndex, 1)[0];
-    resultado.push(actual);
-  }
-  return resultado;
-}
-
+// =================================================================
+// --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
+// =================================================================
 async function obtenerReservas(fecha, idTour) {
-  const sql = `
-    SELECT r.Id_Reserva, r.NumeroPasajeros, r.Id_Punto, r.TourReserva, r.Ruta,
-           p.Posicion, p.Latitud, p.Longitud, p.NombrePunto
-    FROM reservas r
-    JOIN puntos p ON p.Id_Punto = r.Id_Punto
-    WHERE r.FechaReserva = ?
-      AND r.TourReserva = ?
-      AND r.Estado IN ('Pendiente','PendienteDatos','Confirmada','Completada')
-      AND r.TipoReserva = 'Grupal'
-  `;
-  const [rows] = await db.query(sql, [fecha, idTour]);
-  return rows.map(r => ({ ...r, NumeroPasajeros: parseInt(r.NumeroPasajeros, 10) }));
+        // Adaptado a la nueva estructura: pasajeros por reserva, puntos por pasajero
+        // Se agrupa por reserva y se cuenta el número de pasajeros
+        const sql = `
+            SELECT r.Id_Reserva, h.Id_Tour, r.Fecha_Tour, r.Estado, r.Tipo_Reserva,
+                         COUNT(p.Id_Pasajero) AS NumeroPasajeros,
+                         MIN(p.Id_Punto) AS Id_Punto, -- Tomamos el primer punto de los pasajeros
+                         MIN(pt.Latitud) AS Latitud, MIN(pt.Longitud) AS Longitud, MIN(pt.Nombre_Punto) AS NombrePunto
+            FROM reservas r
+            LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+            JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+            LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+            WHERE r.Fecha_Tour = ? AND h.Id_Tour = ?
+                AND r.Estado IN ('Pendiente', 'Confirmada', 'PendienteDatos', 'Completada')
+                AND r.Tipo_Reserva = 'Grupal'
+            GROUP BY r.Id_Reserva
+        `;
+        try {
+                const [rows] = await db.query(sql, [fecha, idTour]);
+                return rows.map(r => ({
+                        ...r,
+                        NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
+                        Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
+                        Longitud: r.Longitud ? parseFloat(r.Longitud) : null
+                }));
+        } catch (error) {
+                console.error("Error al obtener reservas:", error);
+                throw new Error("Fallo al contactar la base de datos de reservas.");
+        }
 }
 
-function generarCombinaciones(capacidades, total) {
-  const resultados = [];
-  const backtrack = (comb, start) => {
-    const suma = comb.reduce((a, b) => a + b, 0);
-    if (suma >= total) {
-      resultados.push([...comb]);
-      return;
+function haversine(lat1, lon1, lat2, lon2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R_TIERRA * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// =================================================================
+// --- NÚCLEO DE LA LÓGICA DE CLUSTERING ---
+// =================================================================
+
+/**
+ * Agrupa las reservas en clusters geográficos, donde cada cluster representa la ruta de un bus.
+ * @param {Array<Object>} reservas - Todas las reservas a planificar.
+ * @returns {Array<Object>} Un array de clusters, cada uno con sus reservas y total de pasajeros.
+ */
+// En la función crearClustersDeRutas, la corrección es esta:
+
+function crearClustersDeRutas(reservas) {
+    const clusters = [];
+    const paradasSinAsignar = new Set(reservas);
+    const maxCapacidadBus = Math.max(...CONFIG.CAPACIDADES_BUSES);
+
+    // ✅ Inicia con el punto base estandarizado
+    let puntoDePartidaSeed = { lat: CONFIG.PUNTO_BASE.lat, lon: CONFIG.PUNTO_BASE.lon };
+
+    while (paradasSinAsignar.size > 0) {
+        let seedReserva = null;
+        let minSeedDist = Infinity;
+        for (const parada of paradasSinAsignar) {
+            // Usa el punto de partida estandarizado
+            const dist = haversine(puntoDePartidaSeed.lat, puntoDePartidaSeed.lon, parada.Latitud, parada.Longitud);
+            if (dist < minSeedDist) {
+                minSeedDist = dist;
+                seedReserva = parada;
+            }
+        }
+        
+        // Si no se encuentra una semilla (caso muy raro), salir para evitar crash
+        if (!seedReserva) break;
+
+        const clusterActual = {
+            reservas: [seedReserva],
+            totalPasajeros: seedReserva.NumeroPasajeros
+        };
+        paradasSinAsignar.delete(seedReserva);
+        let ultimoPuntoDelCluster = seedReserva;
+
+        // ... el resto del bucle interno sigue igual ...
+        let seguirAgregando = true;
+        while (seguirAgregando && paradasSinAsignar.size > 0) {
+            // ... código para agregar paradas cercanas ...
+             let paradaMasCercana = null;
+            let minParadaDist = Infinity;
+
+            for (const parada of paradasSinAsignar) {
+                const dist = haversine(ultimoPuntoDelCluster.Latitud, ultimoPuntoDelCluster.Longitud, parada.Latitud, parada.Longitud);
+                if (dist < minParadaDist) {
+                    minParadaDist = dist;
+                    paradaMasCercana = parada;
+                }
+            }
+
+            if (paradaMasCercana && clusterActual.totalPasajeros + paradaMasCercana.NumeroPasajeros <= maxCapacidadBus) {
+                clusterActual.reservas.push(paradaMasCercana); // Corregido
+                clusterActual.totalPasajeros += paradaMasCercana.NumeroPasajeros;
+                ultimoPuntoDelCluster = paradaMasCercana;
+                paradasSinAsignar.delete(paradaMasCercana);
+            } else {
+                seguirAgregando = false; 
+            }
+        }
+
+
+        clusters.push(clusterActual);
+        // ✅ ¡CORRECCIÓN CLAVE! Al actualizar el punto de partida, lo estandarizamos a {lat, lon}
+        puntoDePartidaSeed = { lat: seedReserva.Latitud, lon: seedReserva.Longitud };
     }
-    for (let i = start; i < capacidades.length; i++) {
-      comb.push(capacidades[i]);
-      backtrack(comb, i); // permitir repetir buses
-      comb.pop();
+
+    return clusters;
+}
+
+/**
+ * Asigna el bus más pequeño y eficiente que pueda manejar la carga de pasajeros de un cluster.
+ * @param {number} totalPasajeros - El número de pasajeros en el cluster.
+ * @returns {number|null} La capacidad del bus ideal, o null si ninguno es suficientemente grande.
+ */
+function asignarMejorBus(totalPasajeros) {
+    for (const capacidad of CONFIG.CAPACIDADES_BUSES) {
+        if (capacidad >= totalPasajeros) {
+            return capacidad;
+        }
     }
-  };
-  backtrack([], 0);
-  resultados.sort((a, b) => (
-    a.length - b.length || // priorizar menos buses
-    a.reduce((x, y) => x + y) - b.reduce((x, y) => x + y) // luego menor capacidad total
-  ));
-  return resultados;
+    // Esto solo ocurriría si un solo grupo de reserva excede la capacidad máxima,
+    // lo cual debería ser validado en la entrada de datos.
+    return null;
+}
+
+/**
+ * Optimiza el orden de las paradas de un bus usando el algoritmo 2-opt para rutas más cortas.
+ * @param {Array<Object>} paradas - Las paradas (reservas) asignadas a un bus.
+ * @returns {Array<Object>} Las paradas en un orden de ruta optimizado.
+ */
+function optimizarRuta2Opt(paradas) {
+    if (paradas.length < 3) return paradas;
+    
+    let rutaActual = [CONFIG.PUNTO_BASE, ...paradas];
+    let mejora = true;
+
+    while (mejora) {
+        mejora = false;
+        for (let i = 1; i < rutaActual.length - 2; i++) {
+            for (let k = i + 1; k < rutaActual.length - 1; k++) {
+                const p1 = rutaActual[i-1], p2 = rutaActual[i];
+                const p3 = rutaActual[k], p4 = rutaActual[k+1];
+
+                const distOriginal = haversine(p1.Latitud, p1.Longitud, p2.Latitud, p2.Longitud) + haversine(p3.Latitud, p3.Longitud, p4.Latitud, p4.Longitud);
+                const distNueva = haversine(p1.Latitud, p1.Longitud, p3.Latitud, p3.Longitud) + haversine(p2.Latitud, p2.Longitud, p4.Latitud, p4.Longitud);
+
+                if (distNueva < distOriginal) {
+                    const segmentoInvertido = rutaActual.slice(i, k + 1).reverse();
+                    rutaActual = [...rutaActual.slice(0, i), ...segmentoInvertido, ...rutaActual.slice(k + 1)];
+                    mejora = true;
+                }
+            }
+        }
+    }
+    return rutaActual.slice(1); // Remover el punto base del inicio
 }
 
 
-function asignarReservasInicial(reservas, combinacion) {
-  const buses = combinacion.map(cap => ({ capacidad: cap, ocupados: 0, reservas: [] }));
-  const sinAsignar = [];
-  for (const reserva of reservas) {
-    let asignado = false;
-    for (const bus of buses) {
-      if (bus.ocupados + reserva.NumeroPasajeros <= bus.capacidad) {
-        bus.reservas.push(reserva);
-        bus.ocupados += reserva.NumeroPasajeros;
-        asignado = true;
-        break;
-      }
+async function generarPlanLogistico(fecha, idTour) {
+    try {
+        const reservas = await obtenerReservas(fecha, idTour);
+        if (reservas.length === 0) {
+            return { analisis: { fecha, idTour, totalPasajeros: 0, totalReservas: 0 }, sugerencias: [], mensaje: "No hay pasajeros para planificar." };
+        }
+
+        const totalPasajeros = reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
+
+        // 1. Agrupar todas las reservas en clusters geográficos
+        const clusters = crearClustersDeRutas(reservas);
+
+        // 2. Procesar cada cluster en paralelo para asignarle un bus y optimizar su ruta
+        const promesasDeBuses = clusters.map(async (cluster, index) => {
+            const capacidadBus = asignarMejorBus(cluster.totalPasajeros);
+            if (!capacidadBus) {
+                // Devolver un error si un cluster no puede ser atendido
+                return { error: `El cluster ${index+1} con ${cluster.totalPasajeros} pasajeros excede la capacidad máxima de los buses.` };
+            }
+
+            const rutaOptimizada = optimizarRuta2Opt(cluster.reservas);
+            
+            let distanciaRuta = 0;
+            let puntoAnterior = { lat: CONFIG.PUNTO_BASE.lat, lon: CONFIG.PUNTO_BASE.lon };
+            for(const parada of rutaOptimizada) {
+                distanciaRuta += haversine(puntoAnterior.lat, puntoAnterior.lon, parada.Latitud, parada.Longitud);
+                puntoAnterior = { lat: parada.Latitud, lon: parada.Longitud };
+            }
+            
+            return {
+                capacidad: capacidadBus,
+                ocupados: cluster.totalPasajeros,
+                porcentajeOcupacion: ((cluster.totalPasajeros / capacidadBus) * 100).toFixed(1) + '%',
+                reservas: rutaOptimizada,
+                distanciaKm: parseFloat(distanciaRuta.toFixed(2))
+            };
+        });
+
+        const busesListos = await Promise.all(promesasDeBuses);
+        
+        // Manejar posibles errores de asignación
+        const busesConError = busesListos.filter(b => b.error);
+        if (busesConError.length > 0) {
+            const mensajeError = busesConError.map(b => b.error).join('; ');
+            throw new Error(mensajeError);
+        }
+
+        // 3. Consolidar los resultados en la sugerencia final
+        const sugerenciaFinal = {
+            combinacion: busesListos.map(b => b.capacidad).sort((a,b) => a - b),
+            buses: busesListos,
+            totalBuses: busesListos.length,
+            distanciaTotalKm: parseFloat(busesListos.reduce((sum, b) => sum + b.distanciaKm, 0).toFixed(2))
+        };
+        
+        sugerenciaFinal.buses.sort((a,b) => a.distanciaKm - b.distanciaKm);
+
+        return {
+            analisis: { fecha, idTour, totalPasajeros, totalReservas: reservas.length },
+            sugerencias: [sugerenciaFinal], // Se genera una única solución optimizada
+            mensaje: `Se generó un plan logístico óptimo con ${sugerenciaFinal.totalBuses} buses.`
+        };
+
+    } catch (error) {
+        console.error("Fallo crítico en la generación del plan logístico:", error);
+        return { error: true, sugerencias: [], mensaje: error.message || "Ocurrió un error inesperado al procesar la solicitud." };
     }
-    if (!asignado) sinAsignar.push(reserva);
-  }
-  return { buses, sinAsignar };
 }
-
-function intentarReubicarPorCercania(sinAsignar, buses) {
-  const reubicadas = [];
-  const sinAsignarFinal = [];
-
-  for (const reserva of sinAsignar) {
-    let mejorOpcion = null;
-    let minDistancia = Infinity;
-    for (const bus of buses) {
-      if (bus.ocupados + reserva.NumeroPasajeros > bus.capacidad) continue;
-      const ultima = bus.reservas[bus.reservas.length - 1];
-      const dist = calcularDistancia(
-        ultima.Latitud, ultima.Longitud,
-        reserva.Latitud, reserva.Longitud
-      );
-      if (dist < minDistancia) {
-        minDistancia = dist;
-        mejorOpcion = bus;
-      }
-    }
-    if (mejorOpcion && minDistancia <= MAX_DESVIO_KM) {
-      mejorOpcion.reservas.push(reserva);
-      mejorOpcion.ocupados += reserva.NumeroPasajeros;
-      reubicadas.push({ reserva, bus: mejorOpcion, distanciaExtraKm: minDistancia });
-    } else {
-      sinAsignarFinal.push({ reserva, sugerencias: mejorOpcion ? { bus: mejorOpcion, distanciaExtraKm: minDistancia } : null });
-    }
-  }
-  return { reubicadas, sinAsignarFinal };
-}
-
-async function generarListados(fecha, idsTour, maxOpciones = 5) {
-  const idTour = idsTour[0];
-  let reservas = await obtenerReservas(fecha, idTour);
-  reservas.sort((a, b) => a.Posicion - b.Posicion);
-  reservas = ordenarPorDistanciaIncremental(reservas);
-  const totalPasajeros = reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
-  const combinaciones = generarCombinaciones(CAPACIDADES_BUSES, totalPasajeros);
-
-  const sugerencias = [];
-
-  for (const combinacion of combinaciones) {
-    const { buses, sinAsignar } = asignarReservasInicial(reservas, combinacion);
-    const { reubicadas, sinAsignarFinal } = intentarReubicarPorCercania(sinAsignar, buses);
-
-    if (sinAsignarFinal.length > 0) continue; // ❌ ignorar combinaciones incompletas
-
-    const totalDesvio = reubicadas.reduce((sum, r) => sum + r.distanciaExtraKm, 0);
-    const totalAsignadas = reservas.length;
-
-    sugerencias.push({
-      combinacion,
-      buses,
-      totalBuses: combinacion.length,
-      totalDesvioKm: totalDesvio,
-      porcentajeAsignado: 100,
-      reubicadas,
-      sinAsignar: [],
-    });
-
-    if (sugerencias.length >= maxOpciones) break; // ✅ ya tenemos suficientes buenas opciones
-  }
-
-  sugerencias.sort((a, b) => (
-    a.totalBuses - b.totalBuses ||
-    a.totalDesvioKm - b.totalDesvioKm
-  ));
-
-  return {
-    fecha,
-    tour: idTour,
-    totalPasajeros,
-    sugerencias,
-    mensaje: sugerencias.length > 0
-      ? 'Se encontraron combinaciones óptimas sin reservas sin asignar.'
-      : 'No se encontraron combinaciones que asignen todas las reservas. Intenta manualmente.'
-  };
-}
-
-
-async function generarListadoManual(fecha, tour, combinacionManual) {
-  const reservas = await obtenerReservas(fecha, tour);
-
-  // Ordenar reservas por algún criterio (p. ej., ubicación)
-  const reservasOrdenadas = ordenarPorDistanciaIncremental(reservas);
-
-  const buses = combinacionManual.map((bus, i) => ({
-    id: i + 1,
-    placa: bus.placa,
-    capacidad: bus.capacidad,
-    guia: bus.guia,
-    reservas: [],
-    ocupados: 0
-  }));
-
-  const sinAsignar = [];
-
-  for (const reserva of reservasOrdenadas) {
-    const cupo = reserva.NumeroPasajeros;
-
-    // Buscar el primer bus que tenga espacio suficiente
-    const busDisponible = buses.find(b => b.capacidad - b.ocupados >= cupo);
-
-    if (busDisponible) {
-      busDisponible.reservas.push(reserva);
-      busDisponible.ocupados += cupo;
-    } else {
-      sinAsignar.push({ reserva, motivo: 'Sin cupo en buses manuales' });
-    }
-  }
-
-  const totalPasajeros = reservas.reduce((acc, r) => acc + r.NumeroPasajeros, 0);
-
-  return {
-    fecha,
-    tour,
-    totalPasajeros,
-    combinacionUsada: combinacionManual.map(b => b.capacidad),
-    buses,
-    sinAsignar
-  };
-}
-
 
 module.exports = {
-  generarListados,
-  generarListadoManual
+    generarPlanLogistico
 };

@@ -1,6 +1,7 @@
 const db = require('../../database/db'); // Asegúrate de que la ruta a tu conexión de DB sea correcta
 const fs = require('fs').promises;
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
@@ -66,70 +67,126 @@ function haversine(lat1, lon1, lat2, lon2) {
  * @returns {Array<Object>} Un array de clusters, cada uno con sus reservas y total de pasajeros.
  */
 // En la función crearClustersDeRutas, la corrección es esta:
-
-function crearClustersDeRutas(reservas) {
+function dbscan(reservas, epsKm, minPts) {
     const clusters = [];
-    const paradasSinAsignar = new Set(reservas);
-    const maxCapacidadBus = Math.max(...CONFIG.CAPACIDADES_BUSES);
+    const visited = new Set();
+    const assigned = new Map();
 
-    // ✅ Inicia con el punto base estandarizado
-    let puntoDePartidaSeed = { lat: CONFIG.PUNTO_BASE.lat, lon: CONFIG.PUNTO_BASE.lon };
-
-    while (paradasSinAsignar.size > 0) {
-        let seedReserva = null;
-        let minSeedDist = Infinity;
-        for (const parada of paradasSinAsignar) {
-            // Usa el punto de partida estandarizado
-            const dist = haversine(puntoDePartidaSeed.lat, puntoDePartidaSeed.lon, parada.Latitud, parada.Longitud);
-            if (dist < minSeedDist) {
-                minSeedDist = dist;
-                seedReserva = parada;
+    function regionQuery(p) {
+        const vecinos = [];
+        for (const q of reservas) {
+            if (haversine(p.Latitud, p.Longitud, q.Latitud, q.Longitud) <= epsKm) {
+                vecinos.push(q);
             }
         }
-        
-        // Si no se encuentra una semilla (caso muy raro), salir para evitar crash
-        if (!seedReserva) break;
+        return vecinos;
+    }
 
-        const clusterActual = {
-            reservas: [seedReserva],
-            totalPasajeros: seedReserva.NumeroPasajeros
-        };
-        paradasSinAsignar.delete(seedReserva);
-        let ultimoPuntoDelCluster = seedReserva;
+    function expandCluster(p, vecinos, cluster) {
+        cluster.push(p);
+        assigned.set(p, cluster);
 
-        // ... el resto del bucle interno sigue igual ...
-        let seguirAgregando = true;
-        while (seguirAgregando && paradasSinAsignar.size > 0) {
-            // ... código para agregar paradas cercanas ...
-             let paradaMasCercana = null;
-            let minParadaDist = Infinity;
-
-            for (const parada of paradasSinAsignar) {
-                const dist = haversine(ultimoPuntoDelCluster.Latitud, ultimoPuntoDelCluster.Longitud, parada.Latitud, parada.Longitud);
-                if (dist < minParadaDist) {
-                    minParadaDist = dist;
-                    paradaMasCercana = parada;
+        for (let i = 0; i < vecinos.length; i++) {
+            const v = vecinos[i];
+            if (!visited.has(v)) {
+                visited.add(v);
+                const vecinosV = regionQuery(v);
+                if (vecinosV.length >= minPts) {
+                    vecinos.push(...vecinosV.filter(x => !vecinos.includes(x)));
                 }
             }
-
-            if (paradaMasCercana && clusterActual.totalPasajeros + paradaMasCercana.NumeroPasajeros <= maxCapacidadBus) {
-                clusterActual.reservas.push(paradaMasCercana); // Corregido
-                clusterActual.totalPasajeros += paradaMasCercana.NumeroPasajeros;
-                ultimoPuntoDelCluster = paradaMasCercana;
-                paradasSinAsignar.delete(paradaMasCercana);
-            } else {
-                seguirAgregando = false; 
+            if (!assigned.has(v)) {
+                cluster.push(v);
+                assigned.set(v, cluster);
             }
         }
+    }
 
+    for (const p of reservas) {
+        if (visited.has(p)) continue;
+        visited.add(p);
 
-        clusters.push(clusterActual);
-        // ✅ ¡CORRECCIÓN CLAVE! Al actualizar el punto de partida, lo estandarizamos a {lat, lon}
-        puntoDePartidaSeed = { lat: seedReserva.Latitud, lon: seedReserva.Longitud };
+        const vecinos = regionQuery(p);
+        if (vecinos.length < minPts) {
+            clusters.push([p]);
+            assigned.set(p, [p]);
+        } else {
+            const cluster = [];
+            expandCluster(p, vecinos, cluster);
+            clusters.push(cluster);
+        }
     }
 
     return clusters;
 }
+
+function crearClustersDeRutas(reservas) {
+    const zonas = dbscan(reservas, 1.5, 2);
+    const clustersFinales = [];
+
+    for (const zona of zonas) {
+        const pendientes = new Set(zona);
+
+        while (pendientes.size > 0) {
+            let seed = null;
+            let minDist = Infinity;
+
+            for (const r of pendientes) {
+                const d = haversine(CONFIG.PUNTO_BASE.lat, CONFIG.PUNTO_BASE.lon, r.Latitud, r.Longitud);
+                if (d < minDist) {
+                    minDist = d;
+                    seed = r;
+                }
+            }
+
+            if (!seed) break;
+
+            const cluster = {
+                reservas: [seed],
+                totalPasajeros: seed.NumeroPasajeros
+            };
+
+            pendientes.delete(seed);
+            let ultimo = seed;
+
+            let crecer = true;
+            while (crecer && pendientes.size > 0) {
+                let siguiente = null;
+                let mejorScore = Infinity;
+
+                for (const r of pendientes) {
+                    const nuevaCarga = cluster.totalPasajeros + r.NumeroPasajeros;
+                    const busDisponible = CONFIG.CAPACIDADES_BUSES.find(c => c >= nuevaCarga);
+                    if (!busDisponible) continue;
+
+                    const d = haversine(ultimo.Latitud, ultimo.Longitud, r.Latitud, r.Longitud);
+                    const desperdicio = busDisponible - nuevaCarga;
+                    const score = d + desperdicio * 0.05;
+
+                    if (score < mejorScore) {
+                        mejorScore = score;
+                        siguiente = r;
+                    }
+                }
+
+                if (siguiente) {
+                    cluster.reservas.push(siguiente);
+                    cluster.totalPasajeros += siguiente.NumeroPasajeros;
+                    pendientes.delete(siguiente);
+                    ultimo = siguiente;
+                } else {
+                    crecer = false;
+                }
+            }
+
+            clustersFinales.push(cluster);
+        }
+    }
+
+    return clustersFinales;
+}
+
+
 
 /**
  * Asigna el bus más pequeño y eficiente que pueda manejar la carga de pasajeros de un cluster.
@@ -250,5 +307,205 @@ async function generarPlanLogistico(fecha, idTour) {
 }
 
 module.exports = {
-    generarPlanLogistico
+    generarPlanLogistico,
+    generarExcelListadoBus
 };
+
+/**
+ * Genera un archivo Excel para un listado de un bus específico.
+ * Estructura similar al exportador existente, adaptada a nuestros datos.
+ * @param {Object} params
+ * @param {string} params.fecha
+ * @param {number} params.idTour
+ * @param {Object} params.bus - Bus con reservas del plan
+ * @param {string} [params.nombreTour]
+ * @returns {Promise<Buffer>} Buffer XLSX
+ */
+async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
+    if (!bus || !Array.isArray(bus.reservas) || bus.reservas.length === 0) {
+        throw new Error('El bus no contiene reservas para exportar.');
+    }
+
+    const reservaIds = bus.reservas.map(r => r.Id_Reserva).filter(Boolean);
+    if (reservaIds.length === 0) throw new Error('No se encontraron Id_Reserva válidos en el bus.');
+
+    // Consulta principal de reservas con datos básicos y conteo de pasajeros
+    const reservasSql = `
+        SELECT 
+            r.Id_Reserva,
+            r.Estado,
+            r.Tipo_Reserva,
+            r.Fecha_Tour,
+            r.Idioma_Reserva AS IdiomaReserva,
+            r.Nombre_Reportante AS NombreReporta,
+            r.Observaciones,
+            COUNT(p.Id_Pasajero) AS NumeroPasajeros,
+            pt.Nombre_Punto AS PuntoEncuentro
+        FROM reservas r
+        LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+        LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+        WHERE r.Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
+        GROUP BY r.Id_Reserva
+    `;
+
+    // Consulta de pasajeros agregados por reserva
+    const pasajerosSql = `
+        SELECT 
+            Id_Reserva,
+            GROUP_CONCAT(Nombre_Pasajero SEPARATOR ', ') AS Nombre_Pasajero,
+            GROUP_CONCAT(DNI SEPARATOR ', ') AS DNI,
+            GROUP_CONCAT(Telefono_Pasajero SEPARATOR ', ') AS Telefono_Pasajero
+        FROM pasajeros
+        WHERE Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
+        GROUP BY Id_Reserva
+    `;
+
+    let reservasRows = [];
+    let pasajerosRows = [];
+    try {
+        const [rRows] = await db.query(reservasSql, reservaIds);
+        reservasRows = rRows || [];
+        const [pRows] = await db.query(pasajerosSql, reservaIds);
+        pasajerosRows = pRows || [];
+    } catch (err) {
+        console.error('Error DB al preparar datos de listado:', err);
+        throw new Error('Fallo al obtener datos para el listado.');
+    }
+
+    const pasajerosIndex = new Map(pasajerosRows.map(x => [x.Id_Reserva, x]));
+    const reservasIndex = new Map((reservasRows || []).map(x => [x.Id_Reserva, x]));
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('LISTADO');
+
+    const borderThin = { style: 'thin' };
+
+    // Definir columnas similares (solo las que garantizamos)
+    const columns = [
+        { header: 'NOMBRE DEL PASAJERO', key: 'NombrePasajero', width: 40 },
+        { header: 'DNI/PASAPORTE', key: 'IdPas', width: 16 },
+        { header: 'TELEFONO', key: 'TelefonoPasajero', width: 18 },
+        { header: '# PAX', key: 'NumeroPasajeros', width: 10 },
+        { header: 'PUNTO DE ENCUENTRO', key: 'PuntoEncuentro', width: 24 },
+        { header: 'OBSERVACIONES', key: 'Observaciones', width: 30 },
+        { header: 'IDIOMA', key: 'IdiomaReserva', width: 12 },
+        { header: 'TIPO DE RESERVA', key: 'Tipo_Reserva', width: 18 },
+        { header: 'ESTADO DE RESERVA', key: 'Estado', width: 18 },
+    ];
+
+    worksheet.columns = columns;
+
+    // Fila 1: Fecha y Tour
+    const fechaTour = fecha ? `Fecha: ${fecha}` : 'Fecha: N/A';
+    const nombre = nombreTour ? nombreTour : 'Tour';
+    const headerRowDate = worksheet.getCell(1, 1);
+    headerRowDate.value = fechaTour;
+    headerRowDate.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRowDate.font = { bold: true };
+    headerRowDate.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+    headerRowDate.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+
+    const richText = [];
+    const texto = nombre;
+    if (texto.includes('RIO CLARO')) {
+        const parts = texto.split('RIO CLARO');
+        if (parts[0]) richText.push({ text: parts[0], font: { bold: true } });
+        richText.push({ text: 'RIO CLARO', font: { bold: true, color: { argb: 'FF00FF00' } } });
+        if (parts[1]) richText.push({ text: parts[1], font: { bold: true } });
+    } else {
+        richText.push({ text: texto, font: { bold: true } });
+    }
+    const headerRowTour = worksheet.getCell(1, 2);
+    headerRowTour.value = { richText };
+    worksheet.mergeCells(1, 2, 1, columns.length);
+    headerRowTour.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRowTour.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+
+    // Fila 2: encabezados
+    const headerRow2 = worksheet.getRow(2);
+    headerRow2.values = columns.map(col => col.header);
+    headerRow2.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+        cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    });
+
+    let totalPasajeros = 0;
+
+    // Agregar filas por reserva respetando el orden de bus.reservas (reservaIds)
+    for (const id of reservaIds) {
+        const r = reservasIndex.get(id);
+        if (!r) continue; // Saltar si por alguna razón la reserva no vino en la consulta
+
+        const paxAgg = pasajerosIndex.get(r.Id_Reserva) || {};
+        const nombres = paxAgg.Nombre_Pasajero ? String(paxAgg.Nombre_Pasajero).split(', ') : [''];
+        const ids = paxAgg.DNI ? String(paxAgg.DNI).split(', ') : [''];
+        const tels = paxAgg.Telefono_Pasajero ? String(paxAgg.Telefono_Pasajero).split(', ') : [''];
+
+        const startRow = worksheet.rowCount + 1;
+        nombres.forEach((nombre, idx) => {
+            const data = {
+                NombrePasajero: nombre,
+                IdPas: ids[idx] || '',
+                TelefonoPasajero: tels[idx] || '',
+            };
+            if (idx === 0) {
+                Object.assign(data, {
+                    NumeroPasajeros: r.NumeroPasajeros || 0,
+                    PuntoEncuentro: r.PuntoEncuentro || '',
+                    Observaciones: r.Observaciones || '',
+                    IdiomaReserva: r.IdiomaReserva || '',
+                    Tipo_Reserva: r.Tipo_Reserva || '',
+                    Estado: r.Estado || '',
+                });
+            }
+            worksheet.addRow(data);
+        });
+        const endRow = worksheet.rowCount;
+        // Merge columnas para datos comunes
+        worksheet.mergeCells(`D${startRow}:D${endRow}`);
+        worksheet.mergeCells(`E${startRow}:E${endRow}`);
+        worksheet.mergeCells(`F${startRow}:F${endRow}`);
+        worksheet.mergeCells(`G${startRow}:G${endRow}`);
+        worksheet.mergeCells(`H${startRow}:H${endRow}`);
+        worksheet.mergeCells(`I${startRow}:I${endRow}`);
+        aplicarBordesBloque(worksheet, startRow, endRow, 1, columns.length);
+
+        totalPasajeros += parseInt(r.NumeroPasajeros || 0, 10);
+    }
+
+    // Fila total de pasajeros
+    const totalRowIndex = worksheet.rowCount + 1;
+    const totalRow = worksheet.getRow(totalRowIndex);
+    totalRow.getCell(4).value = totalPasajeros;
+    totalRow.getCell(4).font = { bold: true };
+    totalRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+    totalRow.getCell(4).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    totalRow.getCell(1).value = 'Total de Pasajeros';
+    totalRow.getCell(1).font = { bold: true };
+    totalRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+    totalRow.getCell(1).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    totalRow.height = 20;
+
+    worksheet.eachRow(row => { row.alignment = { vertical: 'middle', horizontal: 'center' }; });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer;
+}
+
+function aplicarBordesBloque(worksheet, startRow, endRow, startColumn, endColumn) {
+    for (let row = startRow; row <= endRow; row++) {
+        for (let col = startColumn; col <= endColumn; col++) {
+            const cell = worksheet.getCell(row, col);
+            cell.border = {
+                left: { style: 'thin' },
+                right: { style: 'thin' },
+                ...(row === startRow ? { top: { style: 'thin' } } : {}),
+                ...(row === endRow ? { bottom: { style: 'thin' } } : {}),
+            };
+        }
+    }
+}

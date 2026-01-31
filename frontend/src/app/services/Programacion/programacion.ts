@@ -50,4 +50,11 @@ export class ProgramacionDashboardService {
     // Deberías tener un endpoint específico para guardar el resultado final.
     return this.http.post(`${this.apiUrl}/guardar-listado`, listadoConfirmado);
   }
+
+  /**
+   * Exporta un listado (bus) a Excel y devuelve un Blob para descarga.
+   */
+  exportarListadoBus(payload: { fecha: string; idTour: number; bus: any; nombreTour?: string }): Observable<Blob> {
+    return this.http.post(`${this.apiUrl}/exportar-listado-bus`, payload, { responseType: 'blob' });
+  }
 }

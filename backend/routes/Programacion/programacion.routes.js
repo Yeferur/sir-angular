@@ -7,7 +7,8 @@ const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 // Importamos el nuevo controlador inteligente
 const {
     generarPlanLogisticoController,
-    generarPlanAsistidoController
+    generarPlanAsistidoController,
+    exportarListadoBusController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -40,6 +41,18 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.CREAR'),
     generarPlanAsistidoController
+);
+
+/**
+ * @route   POST /api/programacion/exportar-listado-bus
+ * @desc    Exporta a Excel el listado de un bus (archivo individual)
+ * @access  Private
+ */
+router.post(
+    '/exportar-listado-bus',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    exportarListadoBusController
 );
 
 

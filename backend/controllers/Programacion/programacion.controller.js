@@ -39,6 +39,33 @@ exports.generarPlanLogisticoController = async (req, res) => {
 };
 
 /**
+ * Exporta el listado de un bus en formato Excel (XLSX).
+ * Body: { fecha: 'YYYY-MM-DD', idTour: number, bus: {...}, nombreTour?: string }
+ */
+exports.exportarListadoBusController = async (req, res) => {
+    const { fecha, idTour, bus, nombreTour } = req.body || {};
+
+    if (!fecha || !idTour || !bus) {
+        return res.status(400).json({ error: 'Se requiere fecha, idTour y bus en el cuerpo.' });
+    }
+
+    try {
+        const buffer = await cerebro.generarExcelListadoBus({ fecha, idTour, bus, nombreTour });
+
+        const placa = bus.id ? String(bus.id).replace(/\s+/g, '_') : 'Bus';
+        const tourName = nombreTour ? String(nombreTour).replace(/\s+/g, '_') : 'Tour';
+        const fileName = `${fecha}_${tourName}_${placa}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Error al exportar listado de bus:', error);
+        res.status(500).json({ error: 'Error al generar el archivo.' });
+    }
+};
+
+/**
  * Controlador para generar un plan en "Modo Asistido" con una flota manual.
  * Recibe fecha, idTour y flotaManual desde el cuerpo de la petición.
  */
