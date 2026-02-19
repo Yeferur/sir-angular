@@ -79,7 +79,12 @@ export class Listado implements OnInit {
   };
 
   cargarToursDelDia(): void {
-
+this.navbar.alert.set({
+  title: 'Cargando',
+  message: 'Cargando tours del día',
+  loading: true,
+  autoClose: false
+})
 
     // Obtener tours
     this.programacionService.getTours().pipe(
@@ -224,13 +229,18 @@ export class Listado implements OnInit {
           return resultado;
         });
 
+        this.navbar.alert.set(null);
 
         this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error al cargar tours del día', err);
         this.toursDelDia = [];
-        this.cargando = false;
+        this.navbar.alert.set({
+          title: 'Error',
+          message: 'Error al cargar tours del día',
+          type: 'error'
+        });
         this.cdr.markForCheck();
       }
     });

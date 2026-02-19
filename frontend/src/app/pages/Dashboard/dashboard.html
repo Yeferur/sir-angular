@@ -1,116 +1,140 @@
 <div class="dashboard-container">
 
-    <!-- Header & Filters -->
-    <header class="dashboard-header animate-fade-in">
-        <div>
-            <h1>Panel de Control</h1>
-        </div>
+  <!-- Header & Filters -->
+  <header class="dashboard-header animate-fade-in">
+    <div>
+      <h1>Panel de Control</h1>
+    </div>
 
-        <div class="filters">
-            <div class="input-group">
-                <label>Desde</label>
-                <input type="date" [(ngModel)]="startDate" (change)="applyFilters()">
-            </div>
-            <div class="input-group">
-                <label>Hasta</label>
-                <input type="date" [(ngModel)]="endDate" (change)="applyFilters()">
-            </div>
-        </div>
-    </header>
+    <div class="filters">
+      <div class="input-group">
+        <label>Desde</label>
+        <input type="date" [(ngModel)]="startDate" (change)="applyFilters()">
+      </div>
+      <div class="input-group">
+        <label>Hasta</label>
+        <input type="date" [(ngModel)]="endDate" (change)="applyFilters()">
+      </div>
+    </div>
+  </header>
 
-    <!-- KPI Cards -->
-    <section class="kpi-grid animate-fade-in-up">
+  <!-- KPI Cards -->
+  <section class="kpi-grid animate-fade-in-up">
 
-        <div class="kpi-card income">
-            <div class="icon-box">
-                <i class="bx bx-dollar-circle"></i>
-            </div>
-            <div class="kpi-info">
-                <h3>Ingresos Totales</h3>
-                <span class="value">{{ totalIngresos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
-                <span class="subtext">Reservas + Tours</span>
-            </div>
-        </div>
+    <div class="kpi-card income">
+      <div class="icon-box">
+        <i class="bx bx-dollar-circle"></i>
+      </div>
+      <div class="kpi-info">
+        <h3>Ingresos Totales</h3>
+        <span class="value">{{ totalIngresos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
+        <span class="subtext">Reservas + Tours</span>
+      </div>
+    </div>
 
-        <div class="kpi-card bookings">
-            <div class="icon-box">
-                <i class="bx bx-calendar-check"></i>
-            </div>
-            <div class="kpi-info">
-                <h3>Reservas Activas</h3>
-                <span class="value">{{ totalReservas }}</span>
-                <span class="subtext">No canceladas</span>
-            </div>
-        </div>
+    <div class="kpi-card bookings">
+      <div class="icon-box">
+        <i class="bx bx-calendar-check"></i>
+      </div>
+      <div class="kpi-info">
+        <h3>Reservas Activas</h3>
+        <span class="value">{{ totalReservas }}</span>
+        <span class="subtext">No canceladas</span>
+      </div>
+    </div>
 
-        <div class="kpi-card passengers">
-            <div class="icon-box">
-                <i class="bx bx-user-voice"></i>
-            </div>
-            <div class="kpi-info">
-                <h3>Pasajeros</h3>
-                <span class="value">{{ totalPasajeros }}</span>
-                <span class="subtext">Confirmados y pendientes</span>
-            </div>
-        </div>
+    <div class="kpi-card passengers">
+      <div class="icon-box">
+        <i class="bx bx-user-voice"></i>
+      </div>
+      <div class="kpi-info">
+        <h3>Pasajeros</h3>
+        <span class="value">{{ totalPasajeros }}</span>
+        <span class="subtext">Confirmados y pendientes</span>
+      </div>
+    </div>
 
-        <div class="kpi-card transfers">
-            <div class="icon-box">
-                <i class="bx bx-car"></i>
-            </div>
-            <div class="kpi-info">
-                <h3>Transfers</h3>
-                <span class="value">{{ totalTransfers }}</span>
-                <span class="subtext">Servicios realizados</span>
-            </div>
-        </div>
+    <div class="kpi-card transfers">
+      <div class="icon-box">
+        <i class="bx bx-car"></i>
+      </div>
+      <div class="kpi-info">
+        <h3>Transfers</h3>
+        <span class="value">{{ totalTransfers }}</span>
+        <span class="subtext">Servicios realizados</span>
+      </div>
+    </div>
 
-    </section>
+  </section>
 
-    <!-- Charts Layout -->
-    <section class="charts-grid animate-fade-in-up delay-1">
+  <!-- Charts Layout -->
+  <section class="charts-grid animate-fade-in-up delay-1">
 
-        <!-- Main Income Chart -->
-        <div class="chart-card wide">
-            <div class="card-header">
-                <h3>Tendencia de Ingresos</h3>
-                <span class="card-subtitle">Comportamiento anual</span>
-            </div>
-            <apx-chart [series]="incomeChartOptions.series" [chart]="incomeChartOptions.chart"
-                [xaxis]="incomeChartOptions.xaxis" [stroke]="incomeChartOptions.stroke"
-                [tooltip]="incomeChartOptions.tooltip" [dataLabels]="incomeChartOptions.dataLabels"
-                [fill]="incomeChartOptions.fill" [colors]="incomeChartOptions.colors" [grid]="incomeChartOptions.grid"
-                [yaxis]="incomeChartOptions.yaxis"></apx-chart>
-        </div>
+    <!-- Main Income Chart -->
+    <div class="chart-card wide">
+      <div class="card-header">
+        <h3>Tendencia de Ingresos</h3>
+        <span class="card-subtitle">Comportamiento anual</span>
+      </div>
 
-        <!-- Tour Occupancy -->
-        <div class="chart-card">
-            <div class="card-header">
-                <h3>Top Destinos</h3>
-                <span class="card-subtitle">Pasajeros por Tour</span>
-            </div>
-            <apx-chart [series]="occupancyChartOptions.series" [chart]="occupancyChartOptions.chart"
-                [plotOptions]="occupancyChartOptions.plotOptions" [xaxis]="occupancyChartOptions.xaxis"
-                [colors]="occupancyChartOptions.colors" [dataLabels]="occupancyChartOptions.dataLabels"
-                [grid]="occupancyChartOptions.grid" [yaxis]="occupancyChartOptions.yaxis"
-                [tooltip]="occupancyChartOptions.tooltip"></apx-chart>
-        </div>
+      <apx-chart
+        #chartIncome
+        [series]="incomeChartOptions.series"
+        [chart]="incomeChartOptions.chart"
+        [xaxis]="incomeChartOptions.xaxis"
+        [stroke]="incomeChartOptions.stroke"
+        [tooltip]="incomeChartOptions.tooltip"
+        [dataLabels]="incomeChartOptions.dataLabels"
+        [fill]="incomeChartOptions.fill"
+        [colors]="incomeChartOptions.colors"
+        [grid]="incomeChartOptions.grid"
+        [yaxis]="incomeChartOptions.yaxis">
+      </apx-chart>
+    </div>
 
-        <!-- Passenger Status -->
-        <div class="chart-card">
-            <div class="card-header">
-                <h3>Estado Pasajeros</h3>
-                <span class="card-subtitle">Distribución por estatus</span>
-            </div>
-            <div class="donut-container">
-                <apx-chart [series]="passengerChartOptions.series" [chart]="passengerChartOptions.chart"
-                    [labels]="passengerChartOptions.labels" [colors]="passengerChartOptions.colors"
-                    [legend]="passengerChartOptions.legend" [plotOptions]="passengerChartOptions.plotOptions"
-                    [dataLabels]="passengerChartOptions.dataLabels"
-                    [tooltip]="passengerChartOptions.tooltip"></apx-chart>
-            </div>
-        </div>
+    <!-- Tour Occupancy -->
+    <div class="chart-card">
+      <div class="card-header">
+        <h3>Top Destinos</h3>
+        <span class="card-subtitle">Pasajeros por Tour</span>
+      </div>
 
-    </section>
+      <apx-chart
+        #chartOccupancy
+        [series]="occupancyChartOptions.series"
+        [chart]="occupancyChartOptions.chart"
+        [plotOptions]="occupancyChartOptions.plotOptions"
+        [xaxis]="occupancyChartOptions.xaxis"
+        [colors]="occupancyChartOptions.colors"
+        [dataLabels]="occupancyChartOptions.dataLabels"
+        [grid]="occupancyChartOptions.grid"
+        [yaxis]="occupancyChartOptions.yaxis"
+        [tooltip]="occupancyChartOptions.tooltip">
+      </apx-chart>
+    </div>
+
+    <!-- Passenger Status -->
+    <div class="chart-card">
+      <div class="card-header">
+        <h3>Estado Pasajeros</h3>
+        <span class="card-subtitle">Distribución por estatus</span>
+      </div>
+
+      <div class="donut-container">
+        <apx-chart
+          #chartPassengers
+          [series]="passengerChartOptions.series"
+          [chart]="passengerChartOptions.chart"
+          [labels]="passengerChartOptions.labels"
+          [colors]="passengerChartOptions.colors"
+          [legend]="passengerChartOptions.legend"
+          [plotOptions]="passengerChartOptions.plotOptions"
+          [dataLabels]="passengerChartOptions.dataLabels"
+          [tooltip]="passengerChartOptions.tooltip">
+        </apx-chart>
+      </div>
+    </div>
+
+  </section>
 
 </div>

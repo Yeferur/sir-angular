@@ -88,7 +88,6 @@ async function obtenerDatosInicio(fecha) {
 
   try {
     const estadosParams = ESTADOS_VALIDOS.slice(); // copia
-    console.log(toursQuery)
     const [tours] = await db.query(
       toursQuery,
       [
