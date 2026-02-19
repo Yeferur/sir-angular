@@ -88,7 +88,15 @@ export class BusMapa implements OnInit, OnDestroy {
       return;
     }
 
-    this.routingControl = L.Routing.control({
+    const globalL = (window as any).L;
+    const Routing = (L as any).Routing || globalL?.Routing;
+
+    if (!Routing) {
+      console.warn('Leaflet Routing Machine no disponible');
+      return;
+    }
+
+    this.routingControl = Routing.control({
       waypoints: valid,
       router: this.orsRouter(this.apiKeyORS),
       addWaypoints: false,
@@ -156,7 +164,7 @@ export class BusMapa implements OnInit, OnDestroy {
               },
               inputWaypoints: wps,
               actualWaypoints: wps,
-              
+
             }]);
           })
           .catch(err => done.call(ctx, err, null));

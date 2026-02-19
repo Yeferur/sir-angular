@@ -92,7 +92,7 @@ export class Mapa implements OnInit, OnDestroy {
     const agrupados = Array.from(puntosAgrupados.values());
 
     // ─── Verificar e insertar Estación Poblado ───────────────
-  
+
     const baseLat = 6.212757856694648;
     const baseLng = -75.57759200491337;
     const baseKey = `${baseLat.toFixed(5)},${baseLng.toFixed(5)}`;
@@ -124,7 +124,21 @@ export class Mapa implements OnInit, OnDestroy {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
 
-    this.routingControl = L.Routing.control({
+    const globalL = (window as any).L;
+    const Routing = (L as any).Routing || globalL?.Routing;
+
+    if (!Routing) {
+      this.global.alert.set({
+        type: 'error',
+        title: 'Error de mapa',
+        message: 'No se pudo cargar el módulo de rutas (Leaflet Routing Machine).',
+        autoCloseTime: 5000,
+        autoClose: true
+      });
+      return;
+    }
+
+    this.routingControl = Routing.control({
       waypoints,
       router: this.orsRouter(this.apiKeyORS),
       addWaypoints: false,
