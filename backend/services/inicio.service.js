@@ -1,7 +1,7 @@
 const db = require('../database/db');
 
 // Estados admitidos (normalizamos con UPPER para tolerar mayúsc/minúsc)
-const ESTADOS_VALIDOS = ['PENDIENTE','PENDIENTEDATOS','CONFIRMADA','COMPLETADA'];
+const ESTADOS_VALIDOS = ['PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
 
 async function obtenerDatosInicio(fecha) {
   // TOURS: cupo del día (aforos) con fallback a Cupo_Base,
@@ -28,10 +28,19 @@ async function obtenerDatosInicio(fecha) {
           WHERE h.Id_Tour = t.Id_Tour AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
             AND r.Fecha_Tour = ?
             AND UPPER(r.Tipo_Reserva) = 'GRUPAL'
-            AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(()=>'?').join(',')})
+            AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
           GROUP BY r.Id_Reserva
         ) x
       ), 0) AS NumeroPasajeros,
+      COALESCE((
+        SELECT COUNT(r.Id_Reserva)
+        FROM reservas r
+        JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        WHERE h.Id_Tour = t.Id_Tour
+          AND r.Fecha_Tour = ?
+          AND UPPER(r.Tipo_Reserva) = 'GRUPAL'
+          AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+      ), 0) AS totalReservas,
       COALESCE((
         SELECT COUNT(*)
         FROM reservas r
@@ -39,7 +48,7 @@ async function obtenerDatosInicio(fecha) {
         WHERE h.Id_Tour = t.Id_Tour
           AND r.Fecha_Tour = ?
           AND UPPER(r.Tipo_Reserva) = 'PRIVADA'
-          AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(()=>'?').join(',')})
+          AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
       ), 0) AS totalPrivados
     FROM tours t
   `;
@@ -79,15 +88,24 @@ async function obtenerDatosInicio(fecha) {
 
   try {
     const estadosParams = ESTADOS_VALIDOS.slice(); // copia
-
+    console.log(toursQuery)
     const [tours] = await db.query(
       toursQuery,
       [
         fecha,                 // aforos.Fecha_Aforo
         fecha, ...estadosParams, // pasajeros GRUPAL
+        fecha, ...estadosParams, // reservas GRUPAL (nuevo)
         fecha, ...estadosParams  // count PRV
       ]
     );
+
+    // Normalize numeric fields to avoid string concatenation in frontend
+    for (const t of tours) {
+      t.cupos = Number(t.cupos) || 0;
+      t.NumeroPasajeros = Number(t.NumeroPasajeros) || 0;
+      t.totalReservas = Number(t.totalReservas) || 0;
+      t.totalPrivados = Number(t.totalPrivados) || 0;
+    }
 
     const [transfers] = await db.query(transferQuery, [fecha]);
     const [privadosRaw] = await db.query(privadosQuery, [fecha]);
@@ -98,7 +116,7 @@ async function obtenerDatosInicio(fecha) {
       if (!privadosMap[p.Id_Tour]) privadosMap[p.Id_Tour] = [];
       privadosMap[p.Id_Tour].push({
         Id_Reserva: p.Id_Reserva,
-        NumeroPasajeros: p.NumeroPasajeros
+        NumeroPasajeros: Number(p.NumeroPasajeros) || 0
       });
     }
 
@@ -155,7 +173,7 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
     await conn.commit();
 
     try {
-      await recordHistorial({ conexion: conn, tabla: 'aforos', id_registro: Id_Tour, accion: 'CREAR_O_ACTUALIZAR', id_usuario: userId, detalles: [ { columna: 'Fecha_Aforo', anterior: null, nuevo: Fecha }, { columna: 'Cupo', anterior: previoCupo, nuevo: NuevoCupo } ] });
+      await recordHistorial({ conexion: conn, tabla: 'aforos', id_registro: Id_Tour, accion: 'CREAR_O_ACTUALIZAR', id_usuario: userId, detalles: [{ columna: 'Fecha_Aforo', anterior: null, nuevo: Fecha }, { columna: 'Cupo', anterior: previoCupo, nuevo: NuevoCupo }] });
     } catch (errRec) { console.error('Failed to write historial for guardarAforo:', errRec); }
 
     // 4. Emitir evento WebSocket a los usuarios activos (después del commit)
@@ -171,7 +189,7 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
     return { success: true, message: 'Aforo actualizado exitosamente.' };
   } catch (e) {
     await conn.rollback();
-    try { await logSistema({ mensaje: `guardarAforo error: ${e.message || e}`, meta: { Id_Tour, Fecha, NuevoCupo } }); } catch (_) {}
+    try { await logSistema({ mensaje: `guardarAforo error: ${e.message || e}`, meta: { Id_Tour, Fecha, NuevoCupo } }); } catch (_) { }
     throw e;
   } finally {
     conn.release();

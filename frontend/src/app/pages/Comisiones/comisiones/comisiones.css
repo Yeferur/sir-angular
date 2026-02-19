@@ -1,0 +1,264 @@
+/* Inheriting base styles from global or copied from confirmacion.css to ensure consistency */
+
+:host {
+    display: block;
+}
+
+.page-container {
+    margin: auto;
+    padding: 20px;
+    padding-bottom: 100px;
+    animation: fadeIn 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* HEADER */
+.header-top {
+    margin-bottom: 24px;
+}
+
+.header-top h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary, #1a1a1a);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: var(--text-secondary, #666);
+    margin-top: 6px;
+}
+
+/* FILTERS */
+.filters-container {
+    background-color: var(--bg-secondary, #fff);
+    border: 1px solid var(--separator-color, #eee);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary, #666);
+}
+
+.input-control {
+    background-color: var(--bg-tertiary, #f5f5f7);
+    border: 1px solid var(--separator-color, #e0e0e0);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 1rem;
+    color: var(--text-primary, #333);
+    outline: none;
+    height: 48px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.btn-search {
+    height: 48px;
+    padding: 0 32px;
+    background-color: var(--accent-blue, #2b6dff);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+}
+
+.btn-search:hover {
+    transform: translateY(-1px);
+}
+
+/* TABLE */
+.table-container {
+    background-color: var(--bg-secondary, #fff);
+    border-radius: 16px;
+    border: 1px solid var(--separator-color, #eee);
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+.thead {
+    background-color: var(--bg-tertiary, #f9f9f9);
+    border-bottom: 1px solid var(--separator-color, #eee);
+}
+
+.th {
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary, #666);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.th-center {
+    text-align: center;
+}
+
+.tbody tr {
+    border-bottom: 1px solid var(--separator-color, #eee);
+}
+
+.tbody tr:last-child {
+    border-bottom: none;
+}
+
+.tbody tr:hover {
+    background-color: var(--bg-tertiary, #f5f7fa);
+}
+
+.td {
+    padding: 16px 20px;
+    vertical-align: middle;
+    color: var(--text-primary, #333);
+    font-size: 0.95rem;
+}
+
+.td-center {
+    text-align: center;
+}
+
+.td-reserva {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--accent-blue, #2b6dff);
+    background: rgba(43, 109, 255, 0.08);
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.passenger-name {
+    display: block;
+    font-weight: 600;
+}
+
+.contact-sub {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.badge-confirmed {
+    background-color: #28a745;
+}
+
+.badge-pending {
+    background-color: #ccc;
+    color: #555;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #888;
+}
+
+/* FLOATING BUTTON */
+.floating-save-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #0f8b4d;
+    /* Excel green */
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 40px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 8px 20px rgba(16, 124, 65, 0.3);
+    z-index: 100;
+    transition: all 0.3s;
+    animation: slideUp 0.5s backwards;
+}
+
+.floating-save-btn:hover {
+    transform: translate(-50%, -4px);
+    box-shadow: 0 12px 24px rgba(16, 124, 65, 0.4);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,74 @@
+<div class="page-container">
+
+    <div class="header-top">
+        <div>
+            <h1>Seguros</h1>
+        </div>
+    </div>
+
+    <div class="filters-container">
+        <div class="filter-group">
+            <label class="label">Fecha del Tour</label>
+            <input type="date" [(ngModel)]="fecha" class="input-control">
+        </div>
+
+        <div class="filter-group">
+            <label class="label">Tour</label>
+            <select [(ngModel)]="idTour" class="input-control">
+                <option value="">Todos los Tours</option>
+                @for (t of tours; track t.Id_Tour) {
+                <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+                }
+            </select>
+        </div>
+
+        <button (click)="buscar()" [disabled]="loading" class="btn-search">
+            @if (loading) {
+            <span class="spinner-sm"></span>
+            }
+            @if (!loading) {
+            <span>Buscar</span>
+            }
+        </button>
+    </div>
+
+    <div class="table-container">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead class="thead">
+                    <tr>
+                        <th class="th">Fecha de viaje</th>
+                        <th class="th">Tour</th>
+                        <th class="th">Nombre del Pasajero</th>
+                        <th class="th">DNI/Pasaporte</th>
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    @for (item of seguros; track item.Id_Reserva + '-' + item.IdPas) {
+                    <tr>
+                        <td class="td">{{ item.Fecha_Tour | date:'dd/MM/yyyy' }}</td>
+                        <td class="td">{{ item.Nombre_Tour }}</td>
+                        <td class="td">
+                            <span class="passenger-name">{{ item.Nombre_Pasajero }}</span>
+                        </td>
+                        <td class="td">{{ item.IdPas }}</td>
+                    </tr>
+                    }
+                    @if (seguros.length === 0 && !loading) {
+                    <tr>
+                        <td colspan="4" class="empty-state">No se encontraron registros</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Floating Excel Button -->
+@if (seguros.length > 0) {
+<button class="floating-save-btn" (click)="descargarExcel()">
+    Descargar Excel
+</button>
+}

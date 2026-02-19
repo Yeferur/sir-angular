@@ -15,23 +15,27 @@ const cerebro = require('../../services/Programacion/programacion.service');
  */
 exports.generarPlanLogisticoController = async (req, res) => {
     // Extraemos los datos del cuerpo de la petición (body) en lugar de la query.
-    const { fecha, idTour } = req.body;
+    // Soporte para idsTours (array) o idTour (legacy/single)
+    const { fecha, idTour, idsTours } = req.body;
 
-    if (!fecha || !idTour) {
+    // Normalizar a una variable 'tours' que sea lo que pasemos al servicio
+    const tours = idsTours || idTour;
+
+    if (!fecha || !tours) {
         return res.status(400).json({
-            error: 'Petición inválida. Se requiere "fecha" y "idTour" en el cuerpo de la solicitud.'
+            error: 'Petición inválida. Se requiere "fecha" y "idsTours" (o "idTour") en el cuerpo de la solicitud.'
         });
     }
 
     try {
-        console.log(`[INFO] Iniciando generación de plan para Tour: ${idTour}, Fecha: ${fecha}`);
-        const resultado = await cerebro.generarPlanLogistico(fecha, idTour);
-        console.log(`[SUCCESS] Plan generado para Tour: ${idTour}. Se encontraron ${resultado.sugerencias.length} sugerencias.`);
+        console.log(`[INFO] Iniciando generación de plan para Tours: ${JSON.stringify(tours)}, Fecha: ${fecha}`);
+        const resultado = await cerebro.generarPlanLogistico(fecha, tours);
+        console.log(`[SUCCESS] Plan generado para Tours: ${JSON.stringify(tours)}.`);
 
         res.status(200).json(resultado);
 
     } catch (error) {
-        console.error(`[ERROR] Falló la generación del plan para Tour: ${idTour}, Fecha: ${fecha}`, error);
+        console.error(`[ERROR] Falló la generación del plan para Tours: ${JSON.stringify(tours)}, Fecha: ${fecha}`, error);
         res.status(500).json({
             error: 'Error interno del servidor al generar el plan logístico.'
         });
@@ -62,6 +66,48 @@ exports.exportarListadoBusController = async (req, res) => {
     } catch (error) {
         console.error('Error al exportar listado de bus:', error);
         res.status(500).json({ error: 'Error al generar el archivo.' });
+    }
+};
+
+/**
+ * Consulta listado guardado y reservas sin asignar.
+ * Body: { fecha: 'YYYY-MM-DD', idTour: number }
+ */
+exports.obtenerListadoFinalController = async (req, res) => {
+    const { fecha, idTour, idsTours } = req.body || {};
+    const tours = idsTours || idTour;
+
+    if (!fecha || !tours) {
+        return res.status(400).json({ error: 'Se requiere fecha e idsTours (o idTour) en el cuerpo.' });
+    }
+
+    try {
+        const resultado = await cerebro.obtenerListadoFinal({ fecha, idsTours: tours });
+        res.status(200).json(resultado);
+    } catch (error) {
+        console.error('Error al consultar listado final:', error);
+        res.status(500).json({ error: 'Error interno al consultar el listado.' });
+    }
+};
+
+/**
+ * Guarda el listado final confirmado.
+ * Body: { fecha: 'YYYY-MM-DD', idTour: number, buses: [...] }
+ */
+exports.guardarListadoFinalController = async (req, res) => {
+    const { fecha, idTour, idsTours, buses } = req.body || {};
+    const tours = idsTours || idTour;
+
+    if (!fecha || !tours || !Array.isArray(buses)) {
+        return res.status(400).json({ error: 'Se requiere fecha, idsTours (o idTour) y buses en el cuerpo.' });
+    }
+
+    try {
+        const resultado = await cerebro.guardarListadoFinal({ fecha, idsTours: tours, buses });
+        res.status(200).json(resultado);
+    } catch (error) {
+        console.error('Error al guardar listado final:', error);
+        res.status(500).json({ error: 'Error interno al guardar el listado.' });
     }
 };
 

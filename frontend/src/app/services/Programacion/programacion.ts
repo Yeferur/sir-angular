@@ -1,8 +1,16 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { PlanLogistico, PlanAsistidoPayload } from '../../interfaces/Programacion/reservas';
+
+interface ListadoPayload {
+  fecha: string;
+  idTour?: number;
+  idsTours?: number[];
+  buses?: any[];
+}
 
 @Injectable({
   providedIn: 'root'
@@ -17,8 +25,12 @@ export class ProgramacionDashboardService {
    * @returns Observable con la lista de tours.
    */
   getTours(): Observable<any[]> {
-    // Asumo que tienes un endpoint para obtener los tours. Ajústalo si es necesario.
-    return this.http.get<any[]>(`${this.apiUrl}/tours`);
+    return this.http.get<any[]>(`${this.apiUrl}/tours`).pipe(
+      map(tours => tours.map(tour => ({
+        ...tour,
+        NombreTour: tour.Nombre_Tour
+      })))
+    );
   }
 
   /**
@@ -27,8 +39,13 @@ export class ProgramacionDashboardService {
    * @param idTour - El ID del tour.
    * @returns Observable con las sugerencias del plan logístico.
    */
-  generarPlanLogistico(fecha: string, idTour: number): Observable<PlanLogistico> {
-    const payload = { fecha, idTour };
+  generarPlanLogistico(fecha: string, idTour: number | number[]): Observable<PlanLogistico> {
+    const payload: any = { fecha };
+    if (Array.isArray(idTour)) {
+      payload.idsTours = idTour;
+    } else {
+      payload.idTour = idTour;
+    }
     return this.http.post<PlanLogistico>(`${this.apiUrl}/plan-logistico`, payload);
   }
 
@@ -46,9 +63,16 @@ export class ProgramacionDashboardService {
    * @param listadoConfirmado - El objeto del listado final a guardar.
    * @returns Observable de la respuesta del servidor.
    */
-  guardarListadoFinal(listadoConfirmado: any): Observable<any> {
+  guardarListadoFinal(listadoConfirmado: ListadoPayload): Observable<any> {
     // Deberías tener un endpoint específico para guardar el resultado final.
     return this.http.post(`${this.apiUrl}/guardar-listado`, listadoConfirmado);
+  }
+
+  /**
+   * Consulta si existe un listado guardado para fecha/tour.
+   */
+  obtenerListadoFinal(payload: ListadoPayload): Observable<any> {
+    return this.http.post(`${this.apiUrl}/listado-existente`, payload);
   }
 
   /**

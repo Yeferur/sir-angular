@@ -18,6 +18,8 @@ export interface Reserva {
   Posicion: number;
   Latitud: string;
   Longitud: string;
+  Placa_Bus?: string | null;
+  Orden_Ruta?: number | null;
 }
 
 /**
@@ -76,6 +78,7 @@ export interface TourProgramacion {
   planGenerado: PlanLogistico | null;
   totalPasajeros?: number;
   totalReservas?: number;
+  reservasSinAsignar?: Reserva[];
 }
 
 /**

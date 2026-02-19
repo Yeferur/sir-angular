@@ -4,194 +4,196 @@
   <div class="page-header">
     <div>
       <h1>Editar Reserva</h1>
-      <p class="subtitle">Ajusta los detalles de la reserva y guarda los cambios.</p>
+   <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     </div>
   </div>
   <div class="main-content">
 
-    <!-- DETALLES DEL VIAJE -->
-    <div class="card">
-      <div class="card-header">
-        <h2>Detalles del Viaje</h2>
-      </div>
+    <div class="top-section-grid">
+      <!-- DETALLES DEL VIAJE -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Detalles del Viaje</h2>
+        </div>
 
-      <div class="form-grid">
-        <!-- Tour -->
-        <div class="form-group">
-          <label class="form-label">
-            Tour <span class="required-star">*</span>
-          </label>
+        <div class="form-grid">
+          <!-- Tour -->
+          <div class="form-group">
+            <label class="form-label">
+              Tour <span class="required-star">*</span>
+            </label>
 
-          <select class="form-select"
-            [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
-            formControlName="SelectTour"
-            (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar(); autollenarPrecios();">
-            <option value="" disabled>Seleccionar un tour...</option>
+            <select class="form-select"
+              [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
+              formControlName="SelectTour"
+              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar(); autollenarPrecios();">
+              <option value="" disabled>Seleccionar un tour...</option>
 
-            @for (tour of tours(); track tour.Id_Tour) {
-            <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+              @for (tour of tours(); track tour.Id_Tour) {
+              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+              }
+            </select>
+
+            @if (form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid) {
+            <div class="errorMessage">Selecciona un tour.</div>
             }
-          </select>
+          </div>
 
-          @if (form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid) {
-          <div class="errorMessage">Selecciona un tour.</div>
+          <!-- Plan (si hay más de uno) -->
+          @if (planes().length > 1) {
+          <div class="form-group">
+            <label class="form-label">Plan</label>
+            <select class="form-select" formControlName="Id_Plan" (change)="onPlanMonedaChange()">
+              @for (p of planes(); track p.Id_Plan) {
+              <option [value]="p.Id_Plan">{{ p.Nombre_Plan }}</option>
+              }
+            </select>
+          </div>
           }
-        </div>
 
-        <!-- Plan (si hay más de uno) -->
-        @if (planes().length > 1) {
-        <div class="form-group">
-          <label class="form-label">Plan</label>
-          <select class="form-select" formControlName="Id_Plan" (change)="onPlanMonedaChange()">
-            @for (p of planes(); track p.Id_Plan) {
-            <option [value]="p.Id_Plan">{{ p.Nombre_Plan }}</option>
+          <!-- Fecha -->
+          <div class="form-group">
+            <label class="form-label">
+              Fecha del Tour <span class="required-star">*</span>
+            </label>
+
+            <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+              formControlName="Fecha_Tour"
+              [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
+              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+
+            @if (form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid) {
+            <div class="errorMessage">Selecciona una fecha válida.</div>
             }
-          </select>
-        </div>
-        }
+          </div>
 
-        <!-- Fecha -->
-        <div class="form-group">
-          <label class="form-label">
-            Fecha del Tour <span class="required-star">*</span>
-          </label>
+          <!-- Idioma -->
+          <div class="form-group">
+            <label class="form-label">Idioma</label>
+            <select class="form-select" formControlName="Idioma_Reserva">
+              <option value="ESPAÑOL">Español</option>
+              <option value="INGLÉS">Inglés</option>
+            </select>
+          </div>
 
-          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-            formControlName="Fecha_Tour"
-            [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
-            (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+          <!-- Moneda -->
+          <div class="form-group">
+            <label class="form-label">Moneda</label>
+            <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
+              @for (m of monedas(); track m.Id_Moneda) {
+              <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
+              }
+            </select>
+          </div>
 
-          @if (form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid) {
-          <div class="errorMessage">Selecciona una fecha válida.</div>
-          }
-        </div>
+          <!-- Puntos -->
+          <div class="form-group full-width">
+            <label class="form-label">
+              Puntos de Encuentro (máx. 3) <span class="required-star">*</span>
+            </label>
 
-        <!-- Idioma -->
-        <div class="form-group">
-          <label class="form-label">Idioma</label>
-          <select class="form-select" formControlName="Idioma_Reserva">
-            <option value="ESPAÑOL">Español</option>
-            <option value="INGLÉS">Inglés</option>
-          </select>
-        </div>
-
-        <!-- Moneda -->
-        <div class="form-group">
-          <label class="form-label">Moneda</label>
-          <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
-            @for (m of monedas(); track m.Id_Moneda) {
-            <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
-            }
-          </select>
-        </div>
-
-        <!-- Puntos -->
-        <div class="form-group full-width">
-          <label class="form-label">
-            Puntos de Encuentro (máx. 3) <span class="required-star">*</span>
-          </label>
-
-          <div class="punto-autocomplete-wrapper">
-            <!-- Tokens seleccionados -->
-            @if (puntosSeleccionados().length > 0) {
-            <div class="punto-tokens-container">
-              @for (punto of puntosSeleccionados(); let i = $index; track punto.Id_Punto ?? i) {
-              <div class="punto-token">
-                <span>
-                  {{ i === 0 ? 'Principal: ' : '' }}{{ punto.NombrePunto }}
-                </span>
-                <button type="button" class="remove-token-btn" (click)="eliminarPunto(punto)">✕</button>
+            <div class="punto-autocomplete-wrapper">
+              <!-- Tokens seleccionados -->
+              @if (puntosSeleccionados().length > 0) {
+              <div class="punto-tokens-container">
+                @for (punto of puntosSeleccionados(); let i = $index; track punto.Id_Punto ?? i) {
+                <div class="punto-token">
+                  <span>
+                    {{ i === 0 ? 'Principal: ' : '' }}{{ punto.NombrePunto }}
+                  </span>
+                  <button type="button" class="remove-token-btn" (click)="eliminarPunto(punto)">✕</button>
+                </div>
+                }
               </div>
               }
+
+              <!-- Buscador (solo si hay espacio para más puntos) -->
+              @if (puntosSeleccionados().length < 3) { <div class="form-group">
+                <input type="text" class="form-input" placeholder="Buscar y añadir punto..." #puntoInput
+                  (input)="onPuntoSearch($event)" />
+
+                @if (puntoBusquedaResults().length > 0) {
+                <ul class="autocomplete-list">
+                  @for (result of puntoBusquedaResults(); track result.Id_Punto) {
+                  <li (click)="seleccionarPunto(result, puntoInput)">
+                    {{ result.NombrePunto }}
+                  </li>
+                  }
+                </ul>
+                }
             </div>
             }
 
-            <!-- Buscador (solo si hay espacio para más puntos) -->
-            @if (puntosSeleccionados().length < 3) { <div class="form-group">
-              <input type="text" class="form-input" placeholder="Buscar y añadir punto..." #puntoInput
-                (input)="onPuntoSearch($event)" />
-
-              @if (puntoBusquedaResults().length > 0) {
-              <ul class="autocomplete-list">
-                @for (result of puntoBusquedaResults(); track result.Id_Punto) {
-                <li (click)="seleccionarPunto(result, puntoInput)">
-                  {{ result.NombrePunto }}
-                </li>
-                }
-              </ul>
-              }
+            <!-- Aviso cuando no hay punto seleccionado -->
+            @if (form.get('Puntos')?.touched && puntosSeleccionados().length === 0) {
+            <div class="errorMessage">
+              Selecciona al menos un punto de encuentro.
+            </div>
+            }
           </div>
-          }
+        </div>
+      </div>
+    </div>
 
-          <!-- Aviso cuando no hay punto seleccionado -->
-          @if (form.get('Puntos')?.touched && puntosSeleccionados().length === 0) {
-          <div class="errorMessage">
-            Selecciona al menos un punto de encuentro.
-          </div>
+    <!-- RESPONSABLE -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Responsable</h2>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">
+            ¿Quién reporta? <span class="required-star">*</span>
+          </label>
+
+          <input type="text" class="form-input"
+            [ngClass]="form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid ? 'errorInput' : ''"
+            formControlName="Nombre_Reportante" />
+
+          @if (form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid) {
+          <div class="errorMessage">Nombre de quien reporta es requerido.</div>
           }
+        </div>
+
+        <!-- Canal -->
+        <div class="form-group">
+          <label class="form-label">Canal / Categoría</label>
+          <select class="form-select" formControlName="Id_Canal" (change)="recalcularComisionesPorCanal()">
+            @for (canal of canales(); track canal.Id_Canal) {
+            <option [value]="canal.Id_Canal">
+              {{ canal.Nombre_Canal }}
+            </option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            Teléfono <span class="required-star">*</span>
+          </label>
+
+          <div class="phone-input-group">
+            <input type="text" class="form-input phone-prefix" formControlName="Indicativo" />
+
+            <input type="tel" class="form-input phone-number"
+              [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
+              formControlName="Telefono_Reportante" />
+          </div>
+
+          @if (form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid) {
+          <div class="errorMessage">Teléfono inválido (10 dígitos).</div>
+          }
+        </div>
+
+        <div class="form-group full-width">
+          <label class="form-label">Observaciones</label>
+          <textarea class="form-input" formControlName="Observaciones"></textarea>
         </div>
       </div>
     </div>
   </div>
 
-</div>
-
-<!-- RESPONSABLE -->
-<div class="card">
-  <div class="card-header">
-    <h2>Responsable</h2>
-  </div>
-
-  <div class="form-grid">
-    <div class="form-group">
-      <label class="form-label">
-        ¿Quién reporta? <span class="required-star">*</span>
-      </label>
-
-      <input type="text" class="form-input"
-        [ngClass]="form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid ? 'errorInput' : ''"
-        formControlName="Nombre_Reportante" />
-
-      @if (form.get('Nombre_Reportante')?.touched && form.get('Nombre_Reportante')?.invalid) {
-      <div class="errorMessage">Nombre de quien reporta es requerido.</div>
-      }
-    </div>
-
-    <!-- Canal -->
-    <div class="form-group">
-      <label class="form-label">Canal / Categoría</label>
-      <select class="form-select" formControlName="Id_Canal" (change)="recalcularComisionesPorCanal()">
-        @for (canal of canales(); track canal.Id_Canal) {
-        <option [value]="canal.Id_Canal">
-          {{ canal.Nombre_Canal }}
-        </option>
-        }
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">
-        Teléfono <span class="required-star">*</span>
-      </label>
-
-      <div class="phone-input-group">
-        <input type="text" class="form-input phone-prefix" formControlName="Indicativo" />
-
-        <input type="tel" class="form-input phone-number"
-          [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
-          formControlName="Telefono_Reportante" />
-      </div>
-
-      @if (form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid) {
-      <div class="errorMessage">Teléfono inválido (10 dígitos).</div>
-      }
-    </div>
-
-    <div class="form-group full-width">
-      <label class="form-label">Observaciones</label>
-      <textarea class="form-input" formControlName="Observaciones"></textarea>
-    </div>
-  </div>
 </div>
 
 <!-- PASAJEROS -->
@@ -482,13 +484,10 @@
 <!-- SIDEBAR / RESUMEN FLOTANTE INFERIOR -->
 <div class="floating-summary" [attr.data-state]="openSummary ? 'expanded' : 'compact'">
 
-  <!-- ESTADO COMPACTO -->
+  <!-- COMPACTO -->
   <div class="summary-collapsed" (click)="toggleSummary()">
     <div class="summary-left">
-      <span class="badge">
-        {{ form.get('Tipo_Reserva')?.value || 'Grupal' }}
-      </span>
-
+      <span class="badge">{{ form.get('Tipo_Reserva')?.value || 'Grupal' }}</span>
       <span class="meta">
         {{ pasajerosConAsiento() || 0 }} pax ·
         {{ pendientePorPagar() | number:'1.0-0' }} {{ monedaCodigo() }}
@@ -500,75 +499,79 @@
     </button>
   </div>
 
-  <!-- ESTADO EXPANDIDO -->
-  <div class="summary-expanded">
+  <!-- EXPANDIDO -->
+  <div class="summary-expanded" role="dialog" aria-label="Resumen">
     <div class="summary-expanded-header">
       <h2>Resumen</h2>
-      <button class="btn-icon-delete" type="button" aria-label="Cerrar resumen"
-        (click)="toggleSummary(false)">✕</button>
+      <button class="btn-icon-delete" type="button" aria-label="Cerrar resumen" (click)="toggleSummary(false)">✕</button>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Tipo de Reserva</label>
-      <div class="segmented-control">
-        <button type="button" [class.active]="form.get('Tipo_Reserva')?.value === 'Grupal'"
-          (click)="form.get('Tipo_Reserva')?.setValue('Grupal')">
-          Grupal
-        </button>
-        <button type="button" [class.active]="form.get('Tipo_Reserva')?.value === 'Privada'"
-          (click)="form.get('Tipo_Reserva')?.setValue('Privada')">
-          Privada
-        </button>
+    <div class="summary-content">
+      <div class="form-group">
+        <label class="form-label">Tipo de Reserva</label>
+        <div class="segmented-control">
+          <button type="button"
+            [class.active]="form.get('Tipo_Reserva')?.value === 'Grupal'"
+            (click)="form.get('Tipo_Reserva')?.setValue('Grupal')">
+            Grupal
+          </button>
+
+          <button type="button"
+            [class.active]="form.get('Tipo_Reserva')?.value === 'Privada'"
+            (click)="form.get('Tipo_Reserva')?.setValue('Privada')">
+            Privada
+          </button>
+        </div>
+      </div>
+
+      <div class="summary-totals">
+        <div class="summary-item">
+          <label class="form-label">Número de Pasajeros</label>
+          <span class="summary-value">{{ pasajerosConAsiento() || '—' }}</span>
+        </div>
+
+        <div class="summary-item">
+          <label class="form-label">Horario</label>
+          <span class="summary-value">{{ horaSalida() || '—' }}</span>
+        </div>
+
+        <div class="summary-item">
+          <label class="form-label">Total Neto ({{ monedaCodigo() }})</label>
+          <span class="summary-value">{{ totalNeto() | number:'1.0-0' }}</span>
+        </div>
+
+        <div class="summary-item">
+          <label class="form-label">Comisión ({{ monedaCodigo() }})</label>
+          <span class="summary-value">{{ comisionTotal() | number:'1.0-0' }}</span>
+        </div>
+
+        @if (form.get('FormaPago')?.value === 'Abono') {
+          <div class="summary-item">
+            <label class="form-label">Total Abonos ({{ monedaCodigo() }})</label>
+            <span class="summary-value">{{ totalAbonos() | number:'1.0-0' }}</span>
+          </div>
+        }
+
+        <div class="summary-item total-row">
+          <label class="form-label">Pendiente ({{ monedaCodigo() }})</label>
+          <span class="summary-value summary-total">{{ pendientePorPagar() | number:'1.0-0' }}</span>
+        </div>
       </div>
     </div>
 
-    <div class="summary-totals">
-      <div class="summary-item">
-        <label class="form-label">Número de Pasajeros</label>
-        <span class="summary-value">{{ pasajerosConAsiento() || '—' }}</span>
-      </div>
-
-      <div class="summary-item">
-        <label class="form-label">Horario</label>
-        <span class="summary-value">{{ horaSalida() || '—' }}</span>
-      </div>
-
-      <div class="summary-item">
-        <label class="form-label">Total Neto ({{ monedaCodigo() }})</label>
-        <span class="summary-value">{{ totalNeto() | number:'1.0-0' }}</span>
-      </div>
-
-      <div class="summary-item">
-        <label class="form-label">Comisión ({{ monedaCodigo() }})</label>
-        <span class="summary-value">{{ comisionTotal() | number:'1.0-0' }}</span>
-      </div>
-
-      @if (form.get('FormaPago')?.value === 'Abono') {
-      <div class="summary-item">
-        <label class="form-label">Total Abonos ({{ monedaCodigo() }})</label>
-        <span class="summary-value">{{ totalAbonos() | number:'1.0-0' }}</span>
-      </div>
-      }
-
-      <div class="summary-item total-row">
-        <label class="form-label">Pendiente ({{ monedaCodigo() }})</label>
-        <span class="summary-value summary-total">{{ pendientePorPagar() | number:'1.0-0' }}</span>
-      </div>
-    </div>
-
-    <div class="summary-actions">
-      <div class="summary-btn">
+    <div class="summary-actions" [class.two-actions]="showDuplicate">
+      @if (showDuplicate) {
         <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
           Duplicar Reserva
         </button>
-      </div>
-      <div class="summary-btn">
-        <button type="button" class="btn-save-summary" (click)="onSubmit()">
-          Guardar Reserva
-        </button>
-      </div>
+      }
+
+      <button type="button" class="btn-save-summary" (click)="onSubmit()">
+        Guardar Reserva
+      </button>
     </div>
   </div>
 </div>
+
 
 }

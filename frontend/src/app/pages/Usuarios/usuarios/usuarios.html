@@ -1,25 +1,132 @@
-<div class="usuarios-container">
-  @for (user of usuarios(); track user.id_user) {
-    <div class="usuario-card">
-      <div class="info">
-        <div class="name">{{ user.name }} {{ user.apellidos }}</div>
-        <div class="email">{{ user.email }}</div>
-      </div>
-      <div class="acciones">
-        <div
-          class="estado"
-        [ngClass]="{
-          'estado-activa': estados().get(user.id_user.toString()) === 'activa',
-          'estado-inactiva': estados().get(user.id_user.toString()) === 'inactiva',
-          'estado-cerrada': estados().get(user.id_user.toString()) === 'cerrada'
-        }">
-          <span class="dot">●</span>
-          <span class="label">{{ estados().get(user.id_user.toString()) }}</span>
+<div class="page-container">
+  <!-- ENCABEZADO Y KPI CARDS -->
+  <div class="dashboard-header">
+    <div class="header-top">
+      <h1>Administrar Usuarios</h1>
+      <a class="btn-primary-create" routerLink="/Usuarios/NuevoUsuario">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"></path>
+        </svg>
+        <span>Nuevo Usuario</span>
+      </a>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon users-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 13v-2H7V8l-5 4 5 4v-3z"></path>
+            <path
+              d="M20 3h-9c-1.103 0-2 .897-2 2v4h2V5h9v14h-9v-4H9v4c0 1.103.897 2 2 2h9c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2z">
+            </path>
+          </svg>
         </div>
-        <button class="cerrar-sesion-btn" (click)="forzarCierreSesion(user.id_user)">
-          Forzar Cierre
-        </button>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ totalUsers() }}</span>
+          <span class="kpi-label">Usuarios Totales</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon active-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z">
+            </path>
+            <path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-value">{{ activeSessions() }}</span>
+          <span class="kpi-label">Sesiones Activas</span>
+        </div>
       </div>
     </div>
-  }
+  </div>
+
+  <!-- BARRA DE BÚSQUEDA -->
+  <div class="toolbar">
+    <div class="search-container">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M10 18a7.952 7.952 0 0 0 4.897-1.688l4.396 4.396 1.414-1.414-4.396-4.396A7.952 7.952 0 0 0 18 10c0-4.411-3.589-8-8-8s-8 3.589-8 8 3.589 8 8 8zm0-14c3.309 0 6 2.691 6 6s-2.691 6-6 6-6-2.691-6-6 2.691-6 6-6z">
+        </path>
+      </svg>
+      <input type="text" class="search-input" placeholder="Buscar usuario..."
+        (input)="onSearchInput($any($event.target).value)" autocomplete="off" />
+    </div>
+  </div>
+
+  <!-- FILTROS O ESTADÍSTICAS OPCIONALES (placeholder) -->
+
+  <!-- ÁREA DE RESULTADOS -->
+  <div class="results-area">
+    @if (filteredUsuarios().length > 0) {
+    <div class="results-list">
+      @for (user of filteredUsuarios(); track user.id_user) {
+      <div class="result-item">
+        <div class="item-status">
+          <div class="status-dot" [ngClass]="{
+                      'status-activa': estados().get(user.id_user.toString()) === 'activa',
+                      'status-inactiva': estados().get(user.id_user.toString()) === 'inactiva',
+                      'status-cerrada': estados().get(user.id_user.toString()) === 'cerrada'
+                    }" [title]="estados().get(user.id_user.toString())"></div>
+        </div>
+
+        <div class="item-main-info">
+          <span class="item-title">{{ user.name }} {{ user.apellidos }}</span>
+          <span class="item-subtitle">{{ user.email }}</span>
+        </div>
+
+        <div class="item-secondary-info">
+          <span class="username-badge">@{{ user.username }}</span>
+        </div>
+
+        <div class="item-actions">
+          <!-- Botón Editar -->
+          <button class="action-btn edit" [routerLink]="['/Usuarios/Editar', user.id_user]" title="Editar">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="m7 17.013 4.413-.015 9.632-9.54c.378-.378.586-.88.586-1.414s-.208-1.036-.586-1.414l-1.586-1.586c-.756-.756-2.075-.752-2.828-.003L7 12.583v4.43zM18.045 4.458l1.589 1.583-1.597 1.582-1.586-1.585 1.594-1.58zM9 13.417l6.03-5.973 1.586 1.586-6.029 5.971L9 15.006v-1.589z">
+              </path>
+              <path
+                d="M5 21h14c1.103 0 2-.897 2-2v-8.668l-2 2V19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2z">
+              </path>
+            </svg>
+          </button>
+
+          <!-- Botón Forzar Cierre (Siempre visible, deshabilitado si no activa) -->
+          <button class="action-btn logout" [disabled]="estados().get(user.id_user.toString()) !== 'activa'"
+            [class.disabled]="estados().get(user.id_user.toString()) !== 'activa'"
+            (click)="forzarCierreSesion(user.id_user)" title="Forzar Cierre de Sesión">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 13v-2H7V8l-5 4 5 4v-3z"></path>
+              <path
+                d="M20 3h-9c-1.103 0-2 .897-2 2v4h2V5h9v14h-9v-4H9v4c0 1.103.897 2 2 2h9c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2z">
+              </path>
+            </svg>
+          </button>
+
+          <!-- Botón Eliminar -->
+          <button class="action-btn delete" (click)="eliminarUsuario(user.id_user)" title="Eliminar">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M5 20a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8h2V6h-4V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H3v2h2zM9 4h6v2H9zM8 8h9v12H7V8z">
+              </path>
+              <path d="M9 10h2v8H9zm4 0h2v8h-2z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      }
+    </div>
+    }
+
+    @if (filteredUsuarios().length === 0) {
+    <div class="empty-state">
+      <p>No se encontraron usuarios.</p>
+    </div>
+    }
+  </div>
 </div>

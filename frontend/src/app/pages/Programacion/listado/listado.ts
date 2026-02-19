@@ -4,9 +4,11 @@ import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
+import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { forkJoin, switchMap, of } from 'rxjs';
 
 type ViewStop = {
   key: string;
@@ -24,6 +26,7 @@ type ViewStop = {
 })
 export class Listado implements OnInit {
   private programacionService = inject(ProgramacionDashboardService);
+  private inicioService = inject(InicioService);
   private cdr = inject(ChangeDetectorRef);
   private navbar = inject(DynamicIslandGlobalService);
 
@@ -40,6 +43,8 @@ export class Listado implements OnInit {
   isDragging = false;
   newBusDropData: Reserva[] = [];
 
+  reservasSinAsignar: Reserva[] = [];
+
   activeBusIndex = 0;
   activeStops: ViewStop[] = [];
 
@@ -50,9 +55,11 @@ export class Listado implements OnInit {
     this.cargarToursDelDia();
   }
 
-  get activeBus(): Bus | null {
-    if (!this.planSeleccionado?.buses?.length) return null;
-    return this.planSeleccionado.buses[this.activeBusIndex] ?? this.planSeleccionado.buses[0] ?? null;
+
+
+
+  get totalPaxUnassigned(): number {
+    return (this.reservasSinAsignar || []).reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
   }
 
   fpOptionsFecha: Partial<FlatpickrOptions> = {
@@ -72,24 +79,166 @@ export class Listado implements OnInit {
   };
 
   cargarToursDelDia(): void {
-    this.cargando = true;
-    this.toursDelDia = [];
-    this.programacionService.getTours().subscribe({
-      next: (tours) => {
-        this.toursDelDia = tours.map(t => ({ ...t, estado: 'Pendiente' }));
-        this.cargando = false;
+
+
+    // Obtener tours
+    this.programacionService.getTours().pipe(
+      switchMap(tours => {
+        // Obtener datos del día y listados para los tours
+        const listadoObservables: { [key: number]: any } = {};
+
+        // Detectar si existen 1 y 5 para consultar su listado combinado
+        const tiene1 = tours.some(t => t.Id_Tour === 1);
+        const tiene5 = tours.some(t => t.Id_Tour === 5);
+
+        tours.forEach(tour => {
+
+          if ((tour.Id_Tour === 1 || tour.Id_Tour === 5) && tiene1 && tiene5) {
+            // Consultamos usando el array [1, 5]
+            // Solo lo hacemos una vez (e.g. cuando id=5) para no duplicar llamada
+            if (tour.Id_Tour === 5) {
+              listadoObservables[5] = this.programacionService.obtenerListadoFinal({
+                fecha: this.fechaSeleccionada,
+                idsTours: [1, 5]
+              } as any);
+            }
+
+          } else {
+            listadoObservables[tour.Id_Tour] = this.programacionService.obtenerListadoFinal({
+              fecha: this.fechaSeleccionada,
+              idTour: tour.Id_Tour
+            });
+          }
+        });
+        return forkJoin({
+          tours: of(tours), // Mantener referencia a tours  
+          datosDelDia: this.inicioService.getDatosInicio(this.fechaSeleccionada),
+          listados: tours.length > 0 ? forkJoin(listadoObservables) : of({})
+        });
+      })
+    ).subscribe({
+      next: (result: any) => {
+        const tours = result.tours;
+        const datosDelDia = result.datosDelDia;
+        const listados = result.listados || {};
+
+        // Crear mapa de pasajeros y reservas por tour desde datosDelDia
+        const pasajerosPorTour = new Map<number, number>();
+        const reservasPorTour = new Map<number, number>();
+
+        datosDelDia.tours.forEach((tour: any) => {
+          pasajerosPorTour.set(tour.Id_Tour, tour.NumeroPasajeros || 0);
+          reservasPorTour.set(tour.Id_Tour, tour.totalReservas || 0);
+        });
+
+        // Actualizar tours con estado y datos
+        const tiene1 = tours.some((t: any) => t.Id_Tour === 1);
+        const tiene5 = tours.some((t: any) => t.Id_Tour === 5);
+        let toursProcesados = [];
+
+        if (tiene1 && tiene5) {
+          const t1 = tours.find((t: any) => t.Id_Tour === 1);
+          const t5 = tours.find((t: any) => t.Id_Tour === 5);
+
+          // Procesar tours que NO son 1 ni 5
+          const otrosTours = tours.filter((t: any) => t.Id_Tour !== 1 && t.Id_Tour !== 5);
+          toursProcesados = [...otrosTours];
+
+          // Crear Combinado
+          const pax1 = pasajerosPorTour.get(1) || 0;
+          const pax5 = pasajerosPorTour.get(5) || 0;
+          const totalPaxCombinado = pax1 + pax5;
+
+          const res1 = reservasPorTour.get(1) || 0;
+          const res5 = reservasPorTour.get(5) || 0;
+          const totalResCombinado = res1 + res5;
+
+          // Listado combinado se guardó bajo la key 5 en el observable
+          const datosListado = listados[5];
+          const existeListado = datosListado?.exists || false;
+
+          let estado: 'Pendiente' | 'Generado' = 'Pendiente';
+          if (totalPaxCombinado === 0) estado = 'Pendiente';
+          else if (existeListado) estado = 'Generado';
+
+          // Objeto Tour combinado
+          const tourCombinado: TourProgramacion & { idsTours?: number[] } = {
+            Id_Tour: 5, // Usamos 5 como ID principal para la UI (o un ID ficticio, pero 5 ayuda a mantener compatibilidad)
+            NombreTour: `${t1.Nombre_Tour} Y ${t5.Nombre_Tour}`,
+            idsTours: [1, 5], // Propiedad extra para identificar que es combinado
+            estado,
+            planGenerado: null,
+            totalPasajeros: totalPaxCombinado,
+            totalReservas: totalResCombinado,
+            reservasSinAsignar: datosListado?.reservasSinAsignar || []
+          };
+
+          if (existeListado && datosListado.buses) {
+            const totalReservas = datosListado.buses.reduce((sum: number, b: any) => sum + (b.reservas?.length || 0), 0)
+              + (datosListado.reservasSinAsignar || []).length;
+            tourCombinado.totalReservas = totalReservas;
+          }
+
+          // Agregamos el combinado al inicio o donde corresponda (ordenado por ID usualmente)
+          toursProcesados.push(tourCombinado);
+          toursProcesados.sort((a, b) => a.Id_Tour - b.Id_Tour);
+
+        } else {
+          toursProcesados = tours;
+        }
+
+        // Actualizar tours con estado y datos (ahora iteramos sobre toursProcesados)
+        this.toursDelDia = toursProcesados.map((tour: any) => {
+          // Si es el combinado ya viene procesado
+          if (tour.idsTours) return tour;
+
+          const totalPasajeros = pasajerosPorTour.get(tour.Id_Tour) || 0;
+          const totalReservas = reservasPorTour.get(tour.Id_Tour) || 0;
+          const datosListado = listados[tour.Id_Tour];
+          const existeListado = datosListado?.exists || false;
+
+          let estado: 'Pendiente' | 'Generado' | 'Confirmado' | 'Error' = 'Pendiente';
+
+          if (totalPasajeros === 0) {
+            estado = 'Pendiente';
+          } else if (existeListado) {
+            estado = 'Generado';
+          }
+
+          const resultado: TourProgramacion = {
+            ...tour,
+            nombre: tour.Nombre_Tour,
+            estado,
+            planGenerado: null,
+            totalPasajeros: totalPasajeros,
+            totalReservas: totalReservas,
+            reservasSinAsignar: datosListado?.reservasSinAsignar || []
+          };
+
+          if (existeListado && datosListado.buses) {
+            const totalReservas = datosListado.buses.reduce((sum: number, b: any) => sum + (b.reservas?.length || 0), 0)
+              + (datosListado.reservasSinAsignar || []).length;
+            resultado.totalReservas = totalReservas;
+          }
+
+          return resultado;
+        });
+
+
         this.cdr.markForCheck();
       },
       error: (err) => {
-        console.error('Error al cargar tours', err);
+        console.error('Error al cargar tours del día', err);
+        this.toursDelDia = [];
         this.cargando = false;
+        this.cdr.markForCheck();
       }
     });
   }
 
   generarPlan(tour: TourProgramacion): void {
     this.navbar.alert.set({
-      title: 'Generando plan...',
+      title: 'Consultando listados...',
       message: 'Por favor espera un momento.',
       loading: true,
       autoClose: false
@@ -97,27 +246,32 @@ export class Listado implements OnInit {
 
     this.tourSeleccionado = tour;
 
-    this.programacionService.generarPlanLogistico(this.fechaSeleccionada, tour.Id_Tour).subscribe({
-      next: (plan) => {
-        tour.planGenerado = plan;
-        tour.estado = 'Generado';
-        tour.totalPasajeros = plan.analisis.totalPasajeros;
-        tour.totalReservas = plan.analisis.totalReservas;
+    const payload: any = {
+      fecha: this.fechaSeleccionada
+    };
 
-        this.navbar.alert.set(null);
+    // Chequear si es combinado
+    if ((tour as any).idsTours) {
+      payload.idsTours = (tour as any).idsTours;
+    } else {
+      payload.idTour = tour.Id_Tour;
+    }
 
-        this.planSeleccionado = JSON.parse(JSON.stringify(plan.sugerencias[0]));
-        this.modoVista = 'editor';
+    this.programacionService.obtenerListadoFinal(payload).subscribe({
+      next: (data) => {
+        if (data?.exists) {
+          this.navbar.alert.set(null);
+          const sugerencia = this.construirSugerenciaDesdeListado(data);
+          this.aplicarPlan(tour, sugerencia, data.reservasSinAsignar || []);
+          this.mostrarAlertaReservasSinAsignar(tour, data.reservasSinAsignar || []);
+          return;
+        }
 
-        this.activeBusIndex = 0;
-        this.stopOrderByBus.clear();
-        this.rebuildActiveStops();
-
-        this.cdr.markForCheck();
+        this.generarPlanDesdeCero(tour);
       },
       error: (err) => {
-        console.error(`Error al generar plan para ${tour.NombreTour}`, err);
-        this.cargando = false;
+        console.error('Error al consultar listados', err);
+        this.generarPlanDesdeCero(tour);
       }
     });
   }
@@ -125,6 +279,7 @@ export class Listado implements OnInit {
   volverAlDashboard(): void {
     this.modoVista = 'dashboard';
     this.planSeleccionado = null;
+    this.reservasSinAsignar = [];
     this.tourSeleccionado = null;
     this.activeBusIndex = 0;
     this.activeStops = [];
@@ -133,10 +288,26 @@ export class Listado implements OnInit {
 
   selectBus(i: number): void {
     if (!this.planSeleccionado) return;
-    if (i < 0 || i >= this.planSeleccionado.buses.length) return;
+    // Allow -1 for unassigned
+    if (i !== -1 && (i < 0 || i >= this.planSeleccionado.buses.length)) return;
     this.activeBusIndex = i;
     this.rebuildActiveStops();
     this.cdr.markForCheck();
+  }
+
+  get activeBus(): Bus | null {
+    if (this.activeBusIndex === -1) {
+      const reservas = this.reservasSinAsignar || [];
+      return {
+        id: 'Sin Asignar',
+        capacidad: 0,
+        ocupados: reservas.reduce((s, r) => s + (r.NumeroPasajeros || 0), 0),
+        reservas: reservas,
+        recorridoKm: 0
+      };
+    }
+    if (!this.planSeleccionado?.buses) return null;
+    return this.planSeleccionado.buses[this.activeBusIndex];
   }
 
   prevBus(): void {
@@ -159,6 +330,7 @@ export class Listado implements OnInit {
     const ids = this.planSeleccionado.buses.map((_, i) => `busdrop-${i}`);
     ids.push('new-bus');
     ids.push('active-bus');
+    ids.push('unassigned-bus');
     return ids;
   }
 
@@ -194,6 +366,25 @@ export class Listado implements OnInit {
     if (!reserva) return;
 
     // Crear nuevo bus
+    if (event.container.id === 'unassigned-bus') {
+      transferArrayItem(
+        event.previousContainer.data,
+        this.reservasSinAsignar,
+        event.previousIndex,
+        event.currentIndex
+      );
+      this.recalcularOcupacion();
+      this.removerBusesVacios();
+      // Si el bus activo era el unassigned, reconstruir
+      if (this.activeBusIndex === -1) this.rebuildActiveStops();
+      // Si el bus origen se vació y se borró, ajustar index
+      if (this.activeBusIndex >= this.planSeleccionado.buses.length) {
+        this.activeBusIndex = this.planSeleccionado.buses.length - 1;
+      }
+      this.cdr.markForCheck();
+      return;
+    }
+
     if (event.container.id === 'new-bus') {
       transferArrayItem(
         event.previousContainer.data,
@@ -209,8 +400,12 @@ export class Listado implements OnInit {
       this.removerBusesVacios();
 
       // si removimos buses y el index cambió, lo ajustamos
-      this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
-      if (this.activeBusIndex < 0) this.activeBusIndex = 0;
+      // si removimos buses y el index cambió, lo ajustamos
+      // FIX: allow -1
+      if (this.activeBusIndex !== -1) {
+        this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
+        if (this.activeBusIndex < 0) this.activeBusIndex = 0;
+      }
 
       this.rebuildActiveStops();
       this.cdr.markForCheck();
@@ -253,8 +448,12 @@ export class Listado implements OnInit {
     this.recalcularOcupacion();
     this.removerBusesVacios();
 
-    this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
-    if (this.activeBusIndex < 0) this.activeBusIndex = 0;
+    this.removerBusesVacios();
+
+    if (this.activeBusIndex !== -1) {
+      this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
+      if (this.activeBusIndex < 0) this.activeBusIndex = 0;
+    }
 
     this.rebuildActiveStops();
     this.cdr.markForCheck();
@@ -267,35 +466,43 @@ export class Listado implements OnInit {
   guardarListadoFinal(): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
 
-    const placas = this.planSeleccionado.buses.map(b => b.id);
-    if (placas.some(p => !p || p.trim() === '')) {
-      this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Las placas de los buses no pueden estar vacías.', autoClose: true, autoCloseTime: 2000 });
-      return;
-    }
+    this.planSeleccionado.buses = this.planSeleccionado.buses.map((b, i) => {
+      const placa = (b.id || '').trim();
+      return {
+        ...b,
+        id: placa.length ? placa : `Bus ${i + 1}`
+      };
+    });
 
+    const placas = this.planSeleccionado.buses.map(b => b.id);
     const placasUnicas = new Set(placas);
     if (placasUnicas.size !== placas.length) {
       this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Las placas de los buses deben ser únicas.', autoClose: true, autoCloseTime: 2000 });
       return;
     }
 
-    const payload = {
+    const payload: any = {
       fecha: this.fechaSeleccionada,
-      idTour: this.tourSeleccionado.Id_Tour,
       buses: this.planSeleccionado.buses
     };
+
+    if ((this.tourSeleccionado as any).idsTours) {
+      payload.idsTours = (this.tourSeleccionado as any).idsTours;
+    } else {
+      payload.idTour = this.tourSeleccionado.Id_Tour;
+    }
 
     this.cargando = true;
     this.programacionService.guardarListadoFinal(payload).subscribe({
       next: () => {
         this.cargando = false;
-        this.navbar.alert.set({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.' });
+        this.navbar.alert.set({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
         this.volverAlDashboard();
       },
       error: (err) => {
         this.cargando = false;
         console.error('Error al guardar', err);
-        this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.' });
+        this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.', autoClose: true, autoCloseTime: 4000 });
       }
     });
   }
@@ -340,6 +547,126 @@ export class Listado implements OnInit {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  private generarPlanDesdeCero(tour: TourProgramacion): void {
+    this.navbar.alert.set({
+      title: 'Generando plan...',
+      message: 'Por favor espera un momento.',
+      loading: true,
+      autoClose: false
+    });
+
+    const payloadGen: any = { fecha: this.fechaSeleccionada };
+    if ((tour as any).idsTours) {
+      payloadGen.idsTours = (tour as any).idsTours;
+    } else {
+      payloadGen.idTour = tour.Id_Tour;
+    }
+
+    // Adaptamos generarPlanLogistico para aceptar payload objeto o (fecha, id)
+    // Pero el servicio `generarPlanLogistico` actual firma es (fecha, idTour).
+    // Necesitamos modificar esa llamada o sobrecargar.
+    // Como ProgramacionDashboardService.generarPlanLogistico espera (fecha, idTour),
+    // y ahora queremos pasar idsTours.
+    // OPCION: Pasar el array en el 2do argumento y confiar que el servicio lo mande.
+    // El servicio hace: `payload = { fecha, idTour }`. Si paso idTour = [1,5], payload={fecha, idTour: [1,5]}.
+    // El backend espera `idsTours` o `idTour`.
+
+    // Mejor solución rápida: Si es array, pasarlo como idTour en la función existente, 
+    // PERO el servicio frontend dice `generarPlanLogistico(fecha: string, idTour: number)`.
+    // TypeScript se quejará si paso array.
+    // Debemos modificar el servicio frontend si queremos tipado correcto, o castear a `any`.
+
+    this.programacionService.generarPlanLogistico(this.fechaSeleccionada, ((tour as any).idsTours || tour.Id_Tour) as any).subscribe({
+      next: (plan) => {
+        tour.planGenerado = plan;
+        tour.estado = 'Generado';
+        tour.totalPasajeros = plan.analisis.totalPasajeros;
+        tour.totalReservas = plan.analisis.totalReservas;
+
+        this.navbar.alert.set(null);
+
+        this.reservasSinAsignar = [];
+        this.planSeleccionado = JSON.parse(JSON.stringify(plan.sugerencias[0]));
+        this.modoVista = 'editor';
+
+        this.activeBusIndex = 0;
+        this.stopOrderByBus.clear();
+        this.rebuildActiveStops();
+
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error(`Error al generar plan para ${tour.NombreTour}`, err);
+        this.cargando = false;
+      }
+    });
+  }
+
+  private construirSugerenciaDesdeListado(data: any): Sugerencia {
+    const buses = Array.isArray(data?.buses) ? data.buses : [];
+    const combinacion = buses.map((b: Bus) => b.capacidad || 0).sort((a: number, b: number) => a - b);
+    const totalCapacidad = buses.reduce((sum: number, b: Bus) => sum + (b.capacidad || 0), 0);
+    const totalOcupados = buses.reduce((sum: number, b: Bus) => sum + (b.ocupados || 0), 0);
+    const ocupacionPromedio = totalCapacidad ? totalOcupados / totalCapacidad : 0;
+
+    return {
+      combinacion,
+      buses,
+      costoTotalKm: 0,
+      ocupacionPromedio,
+      totalBuses: buses.length,
+      reservasSinAsignar: data?.reservasSinAsignar || []
+    };
+  }
+
+  private aplicarPlan(tour: TourProgramacion, sugerencia: Sugerencia, reservasSinAsignar: Reserva[]): void {
+    tour.estado = 'Generado';
+
+    const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0)
+      + reservasSinAsignar.reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
+    const totalReservas = sugerencia.buses.reduce((sum, b) => sum + (b.reservas?.length || 0), 0)
+      + reservasSinAsignar.length;
+
+    tour.totalPasajeros = totalPasajeros;
+    tour.totalReservas = totalReservas;
+
+    this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
+    this.reservasSinAsignar = reservasSinAsignar || [];
+    this.modoVista = 'editor';
+
+    this.activeBusIndex = 0;
+    this.stopOrderByBus.clear();
+    this.rebuildActiveStops();
+
+    this.cdr.markForCheck();
+  }
+
+  private mostrarAlertaReservasSinAsignar(tour: TourProgramacion, reservas: Reserva[]): void {
+    if (!reservas?.length) return;
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Reservas sin asignar',
+      message: `Se encontraron ${reservas.length} reservas nuevas sin asignar.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Regenerar listado',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.generarPlanDesdeCero(tour);
+          }
+        },
+        {
+          text: 'Mantener listado',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        }
+      ]
+    });
   }
 
   crearNuevoBus(reserva: Reserva): void {
@@ -404,47 +731,47 @@ export class Listado implements OnInit {
     }
   }
 
-private groupStops(reservas: Reserva[], preferredOrder?: string[]): ViewStop[] {
-  const map = new Map<string, ViewStop>();
-  const appearanceOrder: string[] = [];
+  private groupStops(reservas: Reserva[], preferredOrder?: string[]): ViewStop[] {
+    const map = new Map<string, ViewStop>();
+    const appearanceOrder: string[] = [];
 
-  for (const r of reservas) {
-    const nombre = r.NombrePunto || 'Sin punto';
+    for (const r of reservas) {
+      const nombre = r.NombrePunto || 'Sin punto';
 
-    if (!map.has(nombre)) {
-      map.set(nombre, {
-        key: `stop-${nombre}`,
-        NombrePunto: nombre,
-        reservas: [],
-        totalPax: 0
-      });
-      appearanceOrder.push(nombre);
+      if (!map.has(nombre)) {
+        map.set(nombre, {
+          key: `stop-${nombre}`,
+          NombrePunto: nombre,
+          reservas: [],
+          totalPax: 0
+        });
+        appearanceOrder.push(nombre);
+      }
+
+      const stop = map.get(nombre)!;
+      stop.reservas.push(r);
+      stop.totalPax += r.NumeroPasajeros || 0;
     }
 
-    const stop = map.get(nombre)!;
-    stop.reservas.push(r);
-    stop.totalPax += r.NumeroPasajeros || 0;
-  }
+    const stops = Array.from(map.values());
 
-  const stops = Array.from(map.values());
+    // Si el usuario ya reordenó paradas, respetar ese orden
+    if (preferredOrder?.length) {
+      const rank = new Map(preferredOrder.map((n, i) => [n, i]));
+      stops.sort((a, b) =>
+        (rank.get(a.NombrePunto) ?? 999) - (rank.get(b.NombrePunto) ?? 999)
+      );
+      return stops;
+    }
 
-  // Si el usuario ya reordenó paradas, respetar ese orden
-  if (preferredOrder?.length) {
-    const rank = new Map(preferredOrder.map((n, i) => [n, i]));
-    stops.sort((a, b) =>
-      (rank.get(a.NombrePunto) ?? 999) - (rank.get(b.NombrePunto) ?? 999)
+    // ⬇️ ORDEN ORIGINAL (primera aparición)
+    stops.sort(
+      (a, b) =>
+        appearanceOrder.indexOf(a.NombrePunto) -
+        appearanceOrder.indexOf(b.NombrePunto)
     );
+
     return stops;
   }
-
-  // ⬇️ ORDEN ORIGINAL (primera aparición)
-  stops.sort(
-    (a, b) =>
-      appearanceOrder.indexOf(a.NombrePunto) -
-      appearanceOrder.indexOf(b.NombrePunto)
-  );
-
-  return stops;
-}
 
 }

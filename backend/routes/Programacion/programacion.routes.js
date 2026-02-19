@@ -8,7 +8,9 @@ const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 const {
     generarPlanLogisticoController,
     generarPlanAsistidoController,
-    exportarListadoBusController
+    exportarListadoBusController,
+    guardarListadoFinalController,
+    obtenerListadoFinalController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -53,6 +55,30 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     exportarListadoBusController
+);
+
+/**
+ * @route   POST /api/programacion/guardar-listado
+ * @desc    Guarda el listado final confirmado
+ * @access  Private
+ */
+router.post(
+    '/guardar-listado',
+    authMiddleware,
+    checkPermission('PROGRAMACION.CREAR'),
+    guardarListadoFinalController
+);
+
+/**
+ * @route   POST /api/programacion/listado-existente
+ * @desc    Consulta listado guardado y reservas sin asignar
+ * @access  Private
+ */
+router.post(
+    '/listado-existente',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    obtenerListadoFinalController
 );
 
 

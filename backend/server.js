@@ -35,6 +35,17 @@ app.use('/api', transfersRoutes);
 app.use('/api/tours', toursRoutes);
 app.use('/api/historial', historialNewRoutes);
 app.use('/api', permisosRoutes);
+const dashboardRoutes = require('./routes/Dashboard/dashboard.routes');
+app.use('/api/dashboard', dashboardRoutes);
+
+const confirmacionRoutes = require('./routes/Confirmacion/confirmacion.routes');
+app.use('/api/confirmacion', confirmacionRoutes);
+
+const comisionesRoutes = require('./routes/Comisiones/comisiones.routes');
+app.use('/api/comisiones', comisionesRoutes);
+
+const segurosRoutes = require('./routes/Seguros/seguros.routes');
+app.use('/api/seguros', segurosRoutes);
 
 // ✅ Crear server HTTP (para compartir con WS)
 const HTTP_PORT = Number(process.env.PORT || 4000);

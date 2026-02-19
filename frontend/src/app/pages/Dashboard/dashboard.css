@@ -1,0 +1,254 @@
+/* Dashboard Container */
+.dashboard-container {
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    min-height: 100vh;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+}
+
+.dashboard-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.dashboard-header p {
+    margin: 0.5rem 0 0;
+    color: #a3a3a3;
+    font-size: 0.95rem;
+}
+
+/* Filters */
+.filters {
+    display: flex;
+    gap: 1rem;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group label {
+    font-size: 0.75rem;
+    color: #a3a3a3;
+    margin-bottom: 0.25rem;
+}
+
+.input-group input {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    color: #fff;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.input-group input:focus {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.1);
+}
+
+/* KPI Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: #161618;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 4px solid transparent;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* KPI Variants */
+.kpi-card.income {
+    border-bottom-color: #ffd700;
+}
+
+.kpi-card.bookings {
+    border-bottom-color: #00E396;
+}
+
+.kpi-card.passengers {
+    border-bottom-color: #008FFB;
+}
+
+.kpi-card.transfers {
+    border-bottom-color: #775DD0;
+}
+
+.icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    margin-right: 1.25rem;
+}
+
+.income .icon-box {
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.1);
+}
+
+.bookings .icon-box {
+    color: #00E396;
+    background: rgba(0, 227, 150, 0.1);
+}
+
+.passengers .icon-box {
+    color: #008FFB;
+    background: rgba(0, 143, 251, 0.1);
+}
+
+.transfers .icon-box {
+    color: #775DD0;
+    background: rgba(119, 93, 208, 0.1);
+}
+
+.kpi-info h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #a3a3a3;
+}
+
+.kpi-info .value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0.25rem 0;
+    color: #fff;
+}
+
+.kpi-info .subtext {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* Charts Grid */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.chart-card {
+    background: #161618;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 1.5rem;
+    min-height: 400px;
+}
+
+.chart-card.wide {
+    grid-column: 1 / -1;
+}
+
+.card-header {
+    margin-bottom: 1.5rem;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.card-subtitle {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.donut-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 320px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .filters {
+        flex-direction: column;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+
+/* Animations */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-fade-in-up {
+    opacity: 0;
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.delay-1 {
+    animation-delay: 0.2s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -234,7 +234,7 @@
                             <button type="button" class="perm-btn" (click)="togglePermiso(p.Id_Permiso)"
                                 [class.active]="selectedPermisos.includes(p.Id_Permiso)">
                                 <span class="perm-codigo">{{ p.Descripcion }}</span>
-                   
+
                             </button>
                             }
                         </div>
@@ -243,13 +243,11 @@
                 </div>
 
                 <div class="actions-end">
-                    <button class="btn-primary" type="submit" [disabled]="isLoading">
-                        {{ isLoading ? 'Creando...' : 'Crear usuario' }}
+                    <button class="btn-primary" type="submit" [disabled]="isLoading()">
+                        {{ isLoading() ? 'Creando...' : 'Crear usuario' }}
                     </button>
 
-                    @if (errorMsg) {
-                    <div class="errorMessage" style="margin-top:8px">{{ errorMsg }}</div>
-                    }
+
                 </div>
             </div>
 

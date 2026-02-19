@@ -1,0 +1,449 @@
+:host {
+    display: block;
+}
+
+/* === LAYOUT & ANIMACIONES === */
+.page-container {
+
+    margin: auto;
+    padding-top: 20px;
+    padding-bottom: 100px;
+    /* Espacio para el footer fijo */
+    animation: fadeIn 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* === HEADER === */
+.header-top {
+    margin-bottom: 24px;
+}
+
+.header-top h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+}
+
+/* === FILTROS (Estilo Card/Panel) === */
+.filters-container {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--separator-color);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-left: 2px;
+}
+
+/* Inputs consistentes con crear-reserva.css */
+.input-control {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--separator-color);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 1rem;
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+    height: 48px;
+    /* Altura fija para alineación */
+    box-sizing: border-box;
+}
+
+.input-control:focus {
+    border-color: var(--accent-blue);
+    background-color: var(--bg-secondary);
+    box-shadow: 0 0 0 3px rgba(43, 109, 255, 0.15);
+}
+
+/* Botón Buscar consistente con btn-primary */
+.btn-search {
+    height: 48px;
+    padding: 0 24px;
+    background-color: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: filter 0.2s, transform 0.15s;
+}
+
+.btn-search:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.btn-search:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* === TABLA DE RESULTADOS === */
+.table-container {
+    background-color: var(--bg-secondary);
+    border-radius: 16px;
+    border: 1px solid var(--separator-color);
+    overflow: hidden;
+    /* Para el border-radius */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+    /* Evita que se rompa en móviles */
+}
+
+.thead {
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--separator-color);
+}
+
+.th {
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.th-center {
+    text-align: center;
+}
+
+.tbody tr {
+    border-bottom: 1px solid var(--separator-color);
+    transition: background-color 0.15s ease;
+}
+
+.tbody tr:last-child {
+    border-bottom: none;
+}
+
+.tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.td {
+    padding: 16px 20px;
+    vertical-align: middle;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.td-center {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Estilos de Celdas Específicos */
+.td-reserva {
+    font-family: var(--font-family-mono, monospace);
+    /* Si tienes una fuente mono */
+    font-weight: 600;
+    color: var(--accent-blue);
+    font-size: 0.95rem;
+    background: rgba(43, 109, 255, 0.08);
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.reporter-name {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.passenger-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 1rem;
+}
+
+/* === BADGES (Coinciden con crear-reserva.css) === */
+.badge {
+    display: inline-flex;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #fff;
+    line-height: 1;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Colores unificados con tu sistema */
+.badge-adulto {
+    background-color: var(--accent-blue, #2b6dff);
+}
+
+.badge-nino {
+    background-color: #f39c12;
+    /* Naranja usado en crear-reserva */
+}
+
+.badge-infante {
+    background-color: #28a745;
+    /* Verde usado en crear-reserva */
+}
+
+.contact-info {
+    font-weight: 500;
+}
+
+.contact-sub {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+}
+
+/* === TOGGLE SWITCH (Estilo iOS Premium) === */
+.toggle-switch {
+    display: inline-flex;
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.toggle-bg {
+    width: 52px;
+    height: 30px;
+    background-color: var(--bg-tertiary);
+    /* Gris apagado */
+    border: 1px solid var(--separator-color);
+    border-radius: 999px;
+    position: relative;
+    transition: background-color 0.3s cubic-bezier(0.4, 0.0, 0.2, 1), border-color 0.3s;
+}
+
+.toggle-dot {
+    width: 24px;
+    height: 24px;
+    background-color: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Efecto rebote suave */
+}
+
+/* Estados Activos del Toggle */
+.toggle-checkbox:checked+.toggle-bg {
+    background-color: var(--accent-green);
+    border-color: var(--accent-green);
+}
+
+.toggle-checkbox:checked+.toggle-bg .toggle-dot {
+    transform: translateX(22px);
+}
+
+/* Header Checkbox (Estilo simple pero alineado) */
+.header-checkbox-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.header-checkbox-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.header-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-green);
+    cursor: pointer;
+}
+
+/* === FOOTER FLOTANTE (Estilo "Glassmorphism") === */
+/* === BOTÓN FLOTANTE (Estilo "Crear Reserva") === */
+.floating-save-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    background-color: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    /* Pill shape */
+    padding: 14px 40px;
+
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 900;
+
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Rebote suave */
+
+    animation: slideUpFade 0.5s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+
+@keyframes slideUpFade {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.floating-save-btn:hover:not(:disabled) {
+    transform: translate(-50%, -4px);
+    filter: brightness(1.05);
+}
+
+.floating-save-btn:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: translateX(-50%);
+    /* Reset transform sin hover */
+}
+
+/* === EMPTY STATE === */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* === SPINNER === */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+    .header-top h1 {
+        font-size: 2rem;
+    }
+
+    .filters-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+    }
+
+    .filter-group {
+        min-width: 100%;
+    }
+
+    .btn-search {
+        width: 100%;
+    }
+
+    /* Ajustes tabla móvil */
+    .td,
+    .th {
+        padding: 12px 14px;
+    }
+
+    .badge {
+        margin-top: 4px;
+        /* Stack badges on mobile if needed */
+    }
+}
+
+/* === SEPARACIÓN ENTRE RESERVAS === */
+.reservation-separator td {
+    border-top: 3px solid var(--accent-blue) !important;
+}

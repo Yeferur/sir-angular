@@ -1,9 +1,7 @@
 /*
   ========================================
-  ESTILOS DE DYNAMIC NAVBAR ACTUALIZADOS
+  ESTILOS DE DYNAMIC NAVBAR (PREMIUM ANIMATIONS)
   ========================================
-  El estado [data-state="full-screen"] ahora se encarga
-  de la transición a pantalla completa para el login.
 */
 :host {
   position: fixed;
@@ -13,8 +11,7 @@
   z-index: 900;
   display: flex;
   justify-content: center;
-  /* Importante: deshabilita eventos de puntero por defecto */
-  pointer-events: none;
+  pointer-events: none; /* Eventos pasan a través del contenedor */
 }
 
 .navbar-container {
@@ -31,24 +28,33 @@
   justify-content: center;
   align-items: center;
   background-color: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.8));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 
+    0 0 0 1px rgba(0,0,0,0.05),
+    0 8px 40px rgba(0, 0, 0, 0.25);
   color: var(--text-primary);
-  /* Habilita eventos de puntero solo en la isla */
   pointer-events: all;
+  overflow: hidden;
 
-  transition: width 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    height 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    border-radius 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    top 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+  /* OPTIMIZACIÓN DE RENDIMIENTO */
+  will-change: width, height, border-radius, transform, top;
+  transform: translateZ(0); 
+  backface-visibility: hidden;
+
+  /* FÍSICA "SNAPPY" (iOS STYLE) */
+  transition: 
+    width 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    height 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    border-radius 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    top 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 0.3s ease;
 }
 
 .island-content {
   width: 100%;
   height: 100%;
-  overflow: hidden;
   position: relative;
 }
 
@@ -59,9 +65,28 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  
+  /* ANIMACIÓN DE ENTRADA (POP) */
+  animation: islandContentEnter 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  opacity: 0;
+  transform: scale(0.95);
+  will-change: transform, opacity, filter;
 }
 
-/* Alert overlay styles: sits above other activity content */
+@keyframes islandContentEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Alert overlay styles */
 .alert-overlay {
   position: absolute;
   inset: 0;
@@ -77,13 +102,15 @@
 
 /* === ESTADOS DE LA ISLA === */
 
+/* Compacto */
 .navbar-container[data-state="compact"] .dynamic-island {
   width: 180px;
   height: 50px;
-  border-radius: 22px;
+  border-radius: 25px;
   top: 0;
 }
 
+/* Cupos */
 .navbar-container[data-state="cupos"] .dynamic-island {
   width: clamp(320px, 95vw, 350px);
   height: 80px;
@@ -91,142 +118,83 @@
   top: 0;
 }
 
+/* Alerta */
 .navbar-container[data-state="alert"] .dynamic-island {
   width: clamp(320px, 95vw, 500px);
   height: 350px;
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
+/* Loading */
 .navbar-container[data-state="loading"] .dynamic-island {
   width: clamp(320px, 95vw, 400px);
   height: 180px;
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
+/* Reserva */
 .navbar-container[data-state="reserva"] .dynamic-island {
   width: clamp(320px, 95vw, 1100px);
-  /* más adaptable en pantallas chicas y mejor para pantallas grandes */
   height: min(95vh, 1000px);
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
+/* Mapa */
 .navbar-container[data-state="mapa"] .dynamic-island {
   width: clamp(320px, 95vw, 1400px);
-  /* más adaptable en pantallas chicas y mejor para pantallas grandes */
   height: min(95vh, 1000px);
-  /* limita la altura al 80% del alto de la pantalla, máximo 600px */
-  border-radius: 24px;
+  border-radius: 28px;
   top: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-/* ESTADO DE PANTALLA COMPLETA (PARA LOGIN) */
+/* Full Screen (Login) */
 .navbar-container[data-state="full-screen"] .dynamic-island {
   width: 100vw;
   height: 100vh;
   border-radius: 0;
-  /* Sin bordes redondeados en pantalla completa */
   top: -10px;
-  /* Compensa el 'top: 10px' del :host */
   background-color: var(--bg-primary);
-  /* Fondo sólido para el login */
+  border: none;
 }
 
+/* Sugerencias */
 .navbar-container[data-state="sugerencias"] .dynamic-island {
   width: clamp(320px, 95vw, 600px);
-  /* más adaptable en pantallas chicas y mejor para pantallas grandes */
   height: min(95vh, 1000px);
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
-/* === WIDGETS LATERALES === */
-.sidebar-widget {
-  display: flex;
-  gap: 10px;
-  position: absolute;
-  top: 0;
-  height: 44px;
-  align-items: center;
-  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.5s ease;
-}
-
-.sidebar-widget.left {
-  right: calc(50% + 100px);
-}
-
-.sidebar-widget.right {
-  left: calc(50% + 100px);
-}
-
-.navbar-container:not([data-state="compact"]) .sidebar-widget {
-  transform: translateY(-20px);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.quick-button {
-  padding: 6px 14px;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-decoration: none;
-  pointer-events: all;
-  transition: background-color 0.2s, transform 0.2s;
-}
-
-.quick-button:hover {
-  background-color: var(--bg-secondary);
-  transform: scale(1.1);
-}
-
-.logo {
-  height: 70%;
-  object-fit: contain;
-}
-
-@media (max-width: 900px) {
-.sidebar-widget {
-  display: none;
-}
-}
-
-/* === PREVIEW (COMPROBANTE / PDF / IMG) === */
+/* Preview */
 .navbar-container[data-state="preview"] .dynamic-island {
   width: clamp(360px, 90vw, 1100px);
   height: min(85vh, 900px);
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 14px;
   top: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-/* Estado para paneles personalizados (duplicar, formularios pequeños) */
+/* Panel */
 .navbar-container[data-state="panel"] .dynamic-island {
   width: clamp(320px, 95vw, 500px);
   height: 550px;
-  border-radius: 24px;
+  border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
-.navbar-container[data-state="preview"] .island-content {
-  height: 100%;
-}
-
+.navbar-container[data-state="preview"] .island-content { height: 100%; }
 .navbar-container[data-state="preview"] .activity-content {
   position: relative;
   display: flex;
@@ -243,8 +211,56 @@
   align-items: center;
   padding-bottom: 8px;
 }
-
 .preview-body {
   flex: 1 1 auto;
-  min-height: 0; /* allow flex child to shrink properly */
+  min-height: 0;
+}
+
+/* === WIDGETS LATERALES === */
+.sidebar-widget {
+  display: flex;
+  gap: 10px;
+  position: absolute;
+  top: 0;
+  height: 44px;
+  align-items: center;
+  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.5s ease;
+}
+
+.sidebar-widget.left { right: calc(50% + 100px); }
+.sidebar-widget.right { left: calc(50% + 100px); }
+
+.navbar-container:not([data-state="compact"]) .sidebar-widget {
+  transform: translateY(-20px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.quick-button {
+  padding: 8px 16px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  pointer-events: all;
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border: 1px solid transparent;
+}
+
+.quick-button:hover {
+  background-color: var(--bg-secondary);
+  transform: scale(1.05);
+  border-color: var(--separator-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.logo {
+  height: 70%;
+  object-fit: contain;
+}
+
+@media (max-width: 900px) {
+  .sidebar-widget { display: none; }
 }

@@ -7,7 +7,7 @@ const ExcelJS = require('exceljs');
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
 // =================================================================
 const CONFIG = {
-    CAPACIDADES_BUSES: [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a,b) => a - b), // Ordenar de menor a mayor
+    CAPACIDADES_BUSES: [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b), // Ordenar de menor a mayor
     PUNTO_BASE: { lat: 6.212757856694648, lon: -75.57759200491337, NombrePunto: 'Punto Base' },
     GRAFO_PATH: 'grafo_antioquia.json',
 };
@@ -18,10 +18,13 @@ let grafoCache = null;
 // =================================================================
 // --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
 // =================================================================
-async function obtenerReservas(fecha, idTour) {
-        // Adaptado a la nueva estructura: pasajeros por reserva, puntos por pasajero
-        // Se agrupa por reserva y se cuenta el número de pasajeros
-        const sql = `
+async function obtenerReservas(fecha, idsTours) {
+    // Normalizar a array si viene un solo ID
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+
+    // Adaptado a la nueva estructura: pasajeros por reserva, puntos por pasajero
+    // Se agrupa por reserva y se cuenta el número de pasajeros
+    const sql = `
             SELECT r.Id_Reserva, h.Id_Tour, r.Fecha_Tour, r.Estado, r.Tipo_Reserva,
                          COUNT(p.Id_Pasajero) AS NumeroPasajeros,
                          MIN(p.Id_Punto) AS Id_Punto, -- Tomamos el primer punto de los pasajeros
@@ -30,23 +33,25 @@ async function obtenerReservas(fecha, idTour) {
             LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
             JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
             LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
-            WHERE r.Fecha_Tour = ? AND h.Id_Tour = ?
+            WHERE r.Fecha_Tour = ? AND h.Id_Tour IN (?)
                 AND r.Estado IN ('Pendiente', 'Confirmada', 'PendienteDatos', 'Completada')
                 AND r.Tipo_Reserva = 'Grupal'
             GROUP BY r.Id_Reserva
         `;
-        try {
-                const [rows] = await db.query(sql, [fecha, idTour]);
-                return rows.map(r => ({
-                        ...r,
-                        NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
-                        Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
-                        Longitud: r.Longitud ? parseFloat(r.Longitud) : null
-                }));
-        } catch (error) {
-                console.error("Error al obtener reservas:", error);
-                throw new Error("Fallo al contactar la base de datos de reservas.");
-        }
+
+
+    try {
+        const [rows] = await db.query(sql, [fecha, tours]);
+        return rows.map(r => ({
+            ...r,
+            NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
+            Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
+            Longitud: r.Longitud ? parseFloat(r.Longitud) : null
+        }));
+    } catch (error) {
+        console.error("Error al obtener reservas:", error);
+        throw new Error("Fallo al contactar la base de datos de reservas.");
+    }
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -211,7 +216,7 @@ function asignarMejorBus(totalPasajeros) {
  */
 function optimizarRuta2Opt(paradas) {
     if (paradas.length < 3) return paradas;
-    
+
     let rutaActual = [CONFIG.PUNTO_BASE, ...paradas];
     let mejora = true;
 
@@ -219,8 +224,8 @@ function optimizarRuta2Opt(paradas) {
         mejora = false;
         for (let i = 1; i < rutaActual.length - 2; i++) {
             for (let k = i + 1; k < rutaActual.length - 1; k++) {
-                const p1 = rutaActual[i-1], p2 = rutaActual[i];
-                const p3 = rutaActual[k], p4 = rutaActual[k+1];
+                const p1 = rutaActual[i - 1], p2 = rutaActual[i];
+                const p3 = rutaActual[k], p4 = rutaActual[k + 1];
 
                 const distOriginal = haversine(p1.Latitud, p1.Longitud, p2.Latitud, p2.Longitud) + haversine(p3.Latitud, p3.Longitud, p4.Latitud, p4.Longitud);
                 const distNueva = haversine(p1.Latitud, p1.Longitud, p3.Latitud, p3.Longitud) + haversine(p2.Latitud, p2.Longitud, p4.Latitud, p4.Longitud);
@@ -237,11 +242,11 @@ function optimizarRuta2Opt(paradas) {
 }
 
 
-async function generarPlanLogistico(fecha, idTour) {
+async function generarPlanLogistico(fecha, idsTours) {
     try {
-        const reservas = await obtenerReservas(fecha, idTour);
+        const reservas = await obtenerReservas(fecha, idsTours);
         if (reservas.length === 0) {
-            return { analisis: { fecha, idTour, totalPasajeros: 0, totalReservas: 0 }, sugerencias: [], mensaje: "No hay pasajeros para planificar." };
+            return { analisis: { fecha, idsTours, totalPasajeros: 0, totalReservas: 0 }, sugerencias: [], mensaje: "No hay pasajeros para planificar." };
         }
 
         const totalPasajeros = reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
@@ -254,18 +259,18 @@ async function generarPlanLogistico(fecha, idTour) {
             const capacidadBus = asignarMejorBus(cluster.totalPasajeros);
             if (!capacidadBus) {
                 // Devolver un error si un cluster no puede ser atendido
-                return { error: `El cluster ${index+1} con ${cluster.totalPasajeros} pasajeros excede la capacidad máxima de los buses.` };
+                return { error: `El cluster ${index + 1} con ${cluster.totalPasajeros} pasajeros excede la capacidad máxima de los buses.` };
             }
 
             const rutaOptimizada = optimizarRuta2Opt(cluster.reservas);
-            
+
             let distanciaRuta = 0;
             let puntoAnterior = { lat: CONFIG.PUNTO_BASE.lat, lon: CONFIG.PUNTO_BASE.lon };
-            for(const parada of rutaOptimizada) {
+            for (const parada of rutaOptimizada) {
                 distanciaRuta += haversine(puntoAnterior.lat, puntoAnterior.lon, parada.Latitud, parada.Longitud);
                 puntoAnterior = { lat: parada.Latitud, lon: parada.Longitud };
             }
-            
+
             return {
                 capacidad: capacidadBus,
                 ocupados: cluster.totalPasajeros,
@@ -276,7 +281,7 @@ async function generarPlanLogistico(fecha, idTour) {
         });
 
         const busesListos = await Promise.all(promesasDeBuses);
-        
+
         // Manejar posibles errores de asignación
         const busesConError = busesListos.filter(b => b.error);
         if (busesConError.length > 0) {
@@ -286,16 +291,16 @@ async function generarPlanLogistico(fecha, idTour) {
 
         // 3. Consolidar los resultados en la sugerencia final
         const sugerenciaFinal = {
-            combinacion: busesListos.map(b => b.capacidad).sort((a,b) => a - b),
+            combinacion: busesListos.map(b => b.capacidad).sort((a, b) => a - b),
             buses: busesListos,
             totalBuses: busesListos.length,
             distanciaTotalKm: parseFloat(busesListos.reduce((sum, b) => sum + b.distanciaKm, 0).toFixed(2))
         };
-        
-        sugerenciaFinal.buses.sort((a,b) => a.distanciaKm - b.distanciaKm);
+
+        sugerenciaFinal.buses.sort((a, b) => a.distanciaKm - b.distanciaKm);
 
         return {
-            analisis: { fecha, idTour, totalPasajeros, totalReservas: reservas.length },
+            analisis: { fecha, idsTours, totalPasajeros, totalReservas: reservas.length },
             sugerencias: [sugerenciaFinal], // Se genera una única solución optimizada
             mensaje: `Se generó un plan logístico óptimo con ${sugerenciaFinal.totalBuses} buses.`
         };
@@ -306,9 +311,159 @@ async function generarPlanLogistico(fecha, idTour) {
     }
 }
 
+async function guardarListadoFinal({ fecha, idsTours, buses }) {
+    if (!fecha || !idsTours || !Array.isArray(buses)) {
+        throw new Error('Datos inválidos para guardar el listado.');
+    }
+
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+    // Usamos el primer ID como "principal" para asociar la asignación (o el 5 si está presente, pero simplifiquemos a el primero)
+    // O mejor, guardamos en `Id_Tour` el ID del primer tour, pero limpiamos para TODOS.
+    // IMPORTANTE: Si es 1 y 5, guardaremos bajo 5 (si viene [1, 5] el "principal" podría ser cualquiera, 
+    // pero para consistencia usemos el mayor o el que venga definido).
+    // Asumiremos que el frontend envíaIdsTours. El backend asociará al primer ID del array como referencia.
+    const primaryTourId = tours.includes(5) ? 5 : tours[0];
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // 1. Limpiar asignaciones en reservas para TODOS los tours involucrados
+        await conn.query(
+            `
+            UPDATE reservas r
+            JOIN horarios h ON h.Id_Horario = r.Id_Horario
+            SET r.Placa_Bus = NULL, r.Orden_Ruta = NULL
+            WHERE r.Fecha_Tour = ? AND h.Id_Tour IN (?)
+            `,
+            [fecha, tours]
+        );
+
+        // 2. Eliminar asignaciones de buses previas (del ID principal y posibles secundarios si existieran "huerfanos")
+        // Para evitar duplicados, borramos de todos los IDs involucrados
+        await conn.query(
+            `
+            DELETE FROM asignacion_buses
+            WHERE Id_Tour IN (?) AND DATE(Fecha_Creacion) = DATE(?)
+            `,
+            [tours, fecha]
+        );
+
+        const fechaCreacion = `${fecha} 00:00:00`;
+        let reservasActualizadas = 0;
+
+        for (let i = 0; i < buses.length; i++) {
+            const bus = buses[i] || {};
+            const placa = String(bus.id || '').trim() || `Bus ${i + 1}`;
+            const capacidad = Number(bus.capacidad || 0);
+            const cantidad = Number(bus.ocupados || 0);
+            const guia = bus.guia ? String(bus.guia).trim() : null;
+
+            // Insertar SIEMPRE asociado al primaryTourId para mantener un "owner" del plan
+            await conn.query(
+                `
+                INSERT INTO asignacion_buses
+                (Placa_Bus, Capacidad, Cantidad_Pasajeros, Guia, Id_Tour, Fecha_Creacion)
+                VALUES (?, ?, ?, ?, ?, ?)
+                `,
+                [placa, capacidad, cantidad, guia || null, primaryTourId, fechaCreacion]
+            );
+
+            if (Array.isArray(bus.reservas)) {
+                for (let r = 0; r < bus.reservas.length; r++) {
+                    const reserva = bus.reservas[r];
+                    const idReserva = reserva?.Id_Reserva;
+                    if (!idReserva) continue;
+
+                    await conn.query(
+                        `UPDATE reservas SET Placa_Bus = ?, Orden_Ruta = ? WHERE Id_Reserva = ?`,
+                        [placa, r + 1, idReserva]
+                    );
+                    reservasActualizadas += 1;
+                }
+            }
+        }
+
+        await conn.commit();
+        return { ok: true, buses: buses.length, reservas: reservasActualizadas };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
+async function obtenerListadoFinal({ fecha, idsTours }) {
+    if (!fecha || !idsTours) {
+        throw new Error('Datos inválidos para consultar el listado.');
+    }
+
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+
+    const [busesRows] = await db.query(
+        `
+        SELECT Id_Asignacion, Placa_Bus, Capacidad, Cantidad_Pasajeros, Guia
+        FROM asignacion_buses
+        WHERE Id_Tour IN (?) AND DATE(Fecha_Creacion) = DATE(?)
+        ORDER BY Id_Asignacion ASC
+        `,
+        [tours, fecha]
+    );
+
+    if (!busesRows.length) {
+        return { exists: false, buses: [], reservasSinAsignar: [] };
+    }
+
+    const reservas = await obtenerReservasConPlaca(fecha, tours);
+    const placasSet = new Set(
+        busesRows
+            .map(b => (b.Placa_Bus ? String(b.Placa_Bus).trim() : ''))
+            .filter(Boolean)
+    );
+
+    const reservasPorPlaca = new Map();
+    const reservasSinAsignar = [];
+
+    for (const r of reservas) {
+        const placa = r.Placa_Bus ? String(r.Placa_Bus).trim() : '';
+        if (!placa || !placasSet.has(placa)) {
+            reservasSinAsignar.push(r);
+            continue;
+        }
+        if (!reservasPorPlaca.has(placa)) reservasPorPlaca.set(placa, []);
+        reservasPorPlaca.get(placa).push(r);
+    }
+
+    const buses = busesRows.map((row, index) => {
+        const placa = row.Placa_Bus ? String(row.Placa_Bus).trim() : `Bus ${index + 1}`;
+        const reservasBus = reservasPorPlaca.get(placa) || [];
+        reservasBus.sort((a, b) => (a.Orden_Ruta || 0) - (b.Orden_Ruta || 0));
+
+        const ocupados = reservasBus.reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
+
+        return {
+            id: placa,
+            capacidad: Number(row.Capacidad || 0),
+            ocupados,
+            reservas: reservasBus,
+            recorridoKm: 0,
+            guia: row.Guia || ''
+        };
+    });
+
+    return {
+        exists: true,
+        buses,
+        reservasSinAsignar
+    };
+}
+
 module.exports = {
     generarPlanLogistico,
-    generarExcelListadoBus
+    generarExcelListadoBus,
+    guardarListadoFinal,
+    obtenerListadoFinal
 };
 
 /**
@@ -507,5 +662,39 @@ function aplicarBordesBloque(worksheet, startRow, endRow, startColumn, endColumn
                 ...(row === endRow ? { bottom: { style: 'thin' } } : {}),
             };
         }
+    }
+}
+
+async function obtenerReservasConPlaca(fecha, idsTours) {
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+
+    const sql = `
+        SELECT r.Id_Reserva, h.Id_Tour, r.Fecha_Tour, r.Estado, r.Tipo_Reserva,
+             r.Placa_Bus, r.Orden_Ruta,
+             COUNT(p.Id_Pasajero) AS NumeroPasajeros,
+             MIN(p.Id_Punto) AS Id_Punto,
+             MIN(pt.Latitud) AS Latitud, MIN(pt.Longitud) AS Longitud, MIN(pt.Nombre_Punto) AS NombrePunto
+        FROM reservas r
+        LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+        LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+        WHERE r.Fecha_Tour = ? AND h.Id_Tour IN (?)
+        AND r.Estado IN ('Pendiente', 'Confirmada', 'PendienteDatos', 'Completada')
+        AND r.Tipo_Reserva = 'Grupal'
+        GROUP BY r.Id_Reserva
+    `;
+    try {
+        const [rows] = await db.query(sql, [fecha, tours]);
+        return rows.map(r => ({
+            ...r,
+            NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
+            Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
+            Longitud: r.Longitud ? parseFloat(r.Longitud) : null,
+            Placa_Bus: r.Placa_Bus ? String(r.Placa_Bus).trim() : null,
+            Orden_Ruta: r.Orden_Ruta ? Number(r.Orden_Ruta) : null
+        }));
+    } catch (error) {
+        console.error("Error al obtener reservas con placa:", error);
+        throw new Error("Fallo al contactar la base de datos de reservas.");
     }
 }

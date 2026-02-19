@@ -22,56 +22,56 @@ export class UsuariosService {
   // Guarda la última lista de sesiones activas en la DB
   private sesionesDB = new Set<string>();
 
-constructor(
-  private ws: WebSocketService,
-  private http: HttpClient
-) {
-  // Cargar al iniciar
-  this.loadUsuariosYEstados();
+  constructor(
+    private ws: WebSocketService,
+    private http: HttpClient
+  ) {
+    // Cargar al iniciar
+    this.loadUsuariosYEstados();
 
-  // Escuchar WebSocket
-  this.ws.messages$.subscribe(msg => {
-    if (msg.type === 'usuarios_conectados_actualizados') {
-      console.log('📨 Mensaje WebSocket recibido:', msg);
-      this.actualizarEstados(msg);
-    }
-  });
-
-}
-
-private actualizarEstados(msg: any) {
-  // Vuelve a cargar las sesiones de DB
-  this.http.get<{ usuarios: Usuario[], sesiones: { id_user: string }[] }>(
-    `${environment.apiUrl}/usuarios-sesiones`
-  ).subscribe(data => {
-    this.usuarios.set(data.usuarios);
-    
-    // Convertir arrays a String de forma consistente
-    const usuariosWS = msg.usuarios.map((x: any) => String(x));
-    const sesionesDBActuales = new Set(data.sesiones.map(s => String(s.id_user)));
-
-    const nuevosEstados = new Map<string, EstadoSesion>();
-
-    for (const user of data.usuarios) {
-      const id = String(user.id_user);
-      const enWebSocket = usuariosWS.includes(id);
-      const enDB = sesionesDBActuales.has(id);
-
-      console.log('id', id, '| enWebSocket:', enWebSocket, '| enDB:', enDB);
-
-      if (enWebSocket && enDB) {
-        nuevosEstados.set(id, 'activa');
-      } else if (!enWebSocket && enDB) {
-        nuevosEstados.set(id, 'inactiva');
-      } else {
-        nuevosEstados.set(id, 'cerrada');
+    // Escuchar WebSocket
+    this.ws.messages$.subscribe(msg => {
+      if (msg.type === 'usuarios_conectados_actualizados') {
+        console.log('📨 Mensaje WebSocket recibido:', msg);
+        this.actualizarEstados(msg);
       }
-    }
+    });
 
-    console.log('✅ Nuevo Map de estados:', nuevosEstados);
-    this.estados.set(nuevosEstados);
-  });
-}
+  }
+
+  private actualizarEstados(msg: any) {
+    // Vuelve a cargar las sesiones de DB
+    this.http.get<{ usuarios: Usuario[], sesiones: { id_user: string }[] }>(
+      `${environment.apiUrl}/usuarios-sesiones`
+    ).subscribe(data => {
+      this.usuarios.set(data.usuarios);
+
+      // Convertir arrays a String de forma consistente
+      const usuariosWS = msg.usuarios.map((x: any) => String(x));
+      const sesionesDBActuales = new Set(data.sesiones.map(s => String(s.id_user)));
+
+      const nuevosEstados = new Map<string, EstadoSesion>();
+
+      for (const user of data.usuarios) {
+        const id = String(user.id_user);
+        const enWebSocket = usuariosWS.includes(id);
+        const enDB = sesionesDBActuales.has(id);
+
+        console.log('id', id, '| enWebSocket:', enWebSocket, '| enDB:', enDB);
+
+        if (enWebSocket && enDB) {
+          nuevosEstados.set(id, 'activa');
+        } else if (!enWebSocket && enDB) {
+          nuevosEstados.set(id, 'inactiva');
+        } else {
+          nuevosEstados.set(id, 'cerrada');
+        }
+      }
+
+      console.log('✅ Nuevo Map de estados:', nuevosEstados);
+      this.estados.set(nuevosEstados);
+    });
+  }
 
 
 
@@ -114,6 +114,21 @@ private actualizarEstados(msg: any) {
       return this.http.post(`${environment.apiUrl}/usuarios`, payload);
     }
     return this.http.post(`${environment.apiUrl}/usuarios`, payload);
+  }
+
+  // Obtener usuario por ID
+  obtenerUsuario(id: string): Observable<any> {
+    return this.http.get(`${environment.apiUrl}/usuarios/${id}`);
+  }
+
+  // Actualizar usuario
+  actualizarUsuario(id: string, payload: any): Observable<any> {
+    return this.http.put(`${environment.apiUrl}/usuarios/${id}`, payload);
+  }
+
+  // Eliminar usuario
+  eliminarUsuario(id: string): Observable<any> {
+    return this.http.delete(`${environment.apiUrl}/usuarios/${id}`);
   }
 
 }

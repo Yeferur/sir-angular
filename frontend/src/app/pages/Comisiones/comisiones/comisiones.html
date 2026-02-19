@@ -1,0 +1,80 @@
+<div class="page-container">
+
+    <div class="header-top">
+        <h1>Comisiones</h1>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-container">
+        <div class="filter-group">
+            <label class="label">Fecha</label>
+            <input type="date" class="input-control" [(ngModel)]="fecha">
+        </div>
+
+        <div class="filter-group">
+            <label class="label">Tour</label>
+            <select class="input-control" [(ngModel)]="idTour">
+                <option value="">Todos los Tours</option>
+                @for (t of tours; track t.Id_Tour) {
+                <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+                }
+            </select>
+        </div>
+
+        <button class="btn-search" (click)="buscar()" [disabled]="loading">
+            @if (!loading) {
+            <span>Buscar</span>
+            }
+            @if (loading) {
+            <span class="spinner-sm"></span>
+            }
+        </button>
+    </div>
+
+    <!-- Results Table -->
+    <div class="table-container">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead class="thead">
+                    <tr>
+                        <th class="th">Reserva</th>
+                        <th class="th">Tour</th>
+                        <th class="th">Pasajero</th>
+                        <th class="th">Reporta</th>
+                        <th class="th">Precio</th>
+                        <th class="th">Comisión</th>
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    @for (item of comisiones; track item.Id_Reserva + '-' + item.IdPas) {
+                    <tr>
+                        <td class="td"><span class="td-reserva">{{ item.Id_Reserva }}</span></td>
+                        <td class="td">{{ item.Nombre_Tour }}</td>
+                        <td class="td">
+                            <span class="passenger-name">{{ item.Nombre_Pasajero }}</span>
+                            <span class="contact-sub">{{ item.IdPas }}</span>
+                        </td>
+                        <td class="td">{{ item.Nombre_Reportante }}</td>
+                        <td class="td">{{ item.Precio_Tour | currency }}</td>
+                        <td class="td">{{ item.Comision | currency }}</td>
+                    </tr>
+                    }
+                    @if (comisiones.length === 0 && !loading) {
+                    <tr>
+                        <td colspan="8" class="empty-state">No se encontraron registros</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+@if (comisiones.length > 0) {
+<!-- Floating Excel Button -->
+<button class="floating-save-btn" (click)="descargarExcel()">
+    <i class="fas fa-file-excel" style="margin-right: 8px;"></i>
+    Descargar Excel
+</button>
+}

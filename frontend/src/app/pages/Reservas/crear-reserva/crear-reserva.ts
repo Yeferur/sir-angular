@@ -22,6 +22,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 })
 export class CrearReservaComponent implements OnInit {
   openSummary = false;
+  showDuplicate = false;
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
@@ -715,121 +716,121 @@ export class CrearReservaComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
-private applyDisponibilidadToDatepicker() {
-  const dispo = this.disponibilidadActual;
+  private applyDisponibilidadToDatepicker() {
+    const dispo = this.disponibilidadActual;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  // helper: normaliza a “solo fecha”
-  const onlyDate = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    // helper: normaliza a “solo fecha”
+    const onlyDate = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
 
-  const normalizeDiaToWeekday = (d: string) => {
-    if (!d) return null;
-    const s = String(d).trim().toLowerCase();
-    switch (s) {
-      case 'lunes': return 1;
-      case 'martes': return 2;
-      case 'miercoles':
-      case 'miércoles': return 3;
-      case 'jueves': return 4;
-      case 'viernes': return 5;
-      case 'sabado':
-      case 'sábado': return 6;
-      case 'domingo': return 0;
-      default: return null;
+    const normalizeDiaToWeekday = (d: string) => {
+      if (!d) return null;
+      const s = String(d).trim().toLowerCase();
+      switch (s) {
+        case 'lunes': return 1;
+        case 'martes': return 2;
+        case 'miercoles':
+        case 'miércoles': return 3;
+        case 'jueves': return 4;
+        case 'viernes': return 5;
+        case 'sabado':
+        case 'sábado': return 6;
+        case 'domingo': return 0;
+        default: return null;
+      }
+    };
+
+    // Si no hay dispo: solo bloquea pasado
+    if (!dispo) {
+      this.fpOptionsFecha = { ...this.fpOptionsFecha, minDate: today, disable: [] };
+
+      const fp = this.fechaFp?.instance;
+      if (fp) {
+        fp.set('minDate', today);
+        fp.set('disable', []);
+        fp.redraw();
+      }
+
+      this.cdr.markForCheck();
+      return;
     }
-  };
 
-  // Si no hay dispo: solo bloquea pasado
-  if (!dispo) {
-    this.fpOptionsFecha = { ...this.fpOptionsFecha, minDate: today, disable: [] };
+    // modo
+    const modoRaw = (dispo.Modo || 'TODO_EL_AÑO').toString().toUpperCase();
+    const modoNorm = modoRaw.replace(/Ñ/g, 'N').replace(/Á/g, 'A').replace(/É/g, 'E').replace(/Í/g, 'I').replace(/Ó/g, 'O').replace(/Ú/g, 'U');
 
-    const fp = this.fechaFp?.instance;
-    if (fp) {
-      fp.set('minDate', today);
-      fp.set('disable', []);
-      fp.redraw();
-    }
+    const diasBaseSet = new Set<number>(
+      (dispo.Dias_Base || [])
+        .map((d: string) => normalizeDiaToWeekday(d))
+        .filter((x: any) => x !== null)
+    );
 
-    this.cdr.markForCheck();
-    return;
-  }
-
-  // modo
-  const modoRaw = (dispo.Modo || 'TODO_EL_AÑO').toString().toUpperCase();
-  const modoNorm = modoRaw.replace(/Ñ/g, 'N').replace(/Á/g, 'A').replace(/É/g, 'E').replace(/Í/g, 'I').replace(/Ó/g, 'O').replace(/Ú/g, 'U');
-
-  const diasBaseSet = new Set<number>(
-    (dispo.Dias_Base || [])
-      .map((d: string) => normalizeDiaToWeekday(d))
-      .filter((x: any) => x !== null)
-  );
-
-  const temporadas = Array.isArray(dispo.Temporadas)
-    ? dispo.Temporadas.map((t: any) => ({
+    const temporadas = Array.isArray(dispo.Temporadas)
+      ? dispo.Temporadas.map((t: any) => ({
         inicio: t.Fecha_Inicio ? new Date(t.Fecha_Inicio) : null,
         fin: t.Fecha_Fin ? new Date(t.Fecha_Fin) : null,
         dias: (t.Dias || [])
           .map((d: string) => normalizeDiaToWeekday(d))
           .filter((x: any) => x !== null) as number[],
       }))
-    : [];
+      : [];
 
-  const isAllowed = (date: Date) => {
-    const d = onlyDate(date);
-    const wk = d.getDay();
-    if (d < today) return false;
-    for (const t of temporadas) {
-      if (!t.inicio || !t.fin) continue;
+    const isAllowed = (date: Date) => {
+      const d = onlyDate(date);
+      const wk = d.getDay();
+      if (d < today) return false;
+      for (const t of temporadas) {
+        if (!t.inicio || !t.fin) continue;
 
-      const ini = onlyDate(t.inicio);
-      const fin = onlyDate(t.fin);
+        const ini = onlyDate(t.inicio);
+        const fin = onlyDate(t.fin);
 
-      if (d >= ini && d <= fin) {
-        if (!t.dias || t.dias.length === 0) return true;
-        return t.dias.includes(wk);
+        if (d >= ini && d <= fin) {
+          if (!t.dias || t.dias.length === 0) return true;
+          return t.dias.includes(wk);
+        }
+      }
+
+      if (modoNorm === 'SOLO_TEMPORADAS') return false;
+
+      if (diasBaseSet.size > 0) return diasBaseSet.has(wk);
+
+      // ❌ nunca permitir por defecto
+      return false;
+    };
+
+    const disableFn = (date: Date) => !isAllowed(date);
+
+    // 1) Actualiza options (por si tu template los usa)
+    this.fpOptionsFecha = {
+      ...this.fpOptionsFecha,
+      minDate: today,
+      disable: [disableFn],
+    };
+
+    // 2) 🔥 ACTUALIZA LA INSTANCIA YA CREADA (esto es lo que te faltaba)
+    const fp = this.fechaFp?.instance;
+    if (fp) {
+      fp.set('minDate', today);
+      fp.set('disable', [disableFn]);
+      fp.redraw();
+    }
+
+    // 3) Limpia fecha inválida si quedó seleccionada/typed
+    const cur = this.form.get('Fecha_Tour')?.value;
+    if (cur) {
+      // si viene como string en el formato interno, mejor validar con flatpickr si existe:
+      const curDate = fp?.parseDate ? fp.parseDate(cur, 'Y-m-d') : new Date(cur);
+      if (curDate && disableFn(curDate)) {
+        this.form.get('Fecha_Tour')?.setValue(null);
+        fp?.clear();
       }
     }
 
-    if (modoNorm === 'SOLO_TEMPORADAS') return false;
-
-    if (diasBaseSet.size > 0) return diasBaseSet.has(wk);
-
-    // ❌ nunca permitir por defecto
-    return false;
-  };
-
-  const disableFn = (date: Date) => !isAllowed(date);
-
-  // 1) Actualiza options (por si tu template los usa)
-  this.fpOptionsFecha = {
-    ...this.fpOptionsFecha,
-    minDate: today,
-    disable: [disableFn],
-  };
-
-  // 2) 🔥 ACTUALIZA LA INSTANCIA YA CREADA (esto es lo que te faltaba)
-  const fp = this.fechaFp?.instance;
-  if (fp) {
-    fp.set('minDate', today);
-    fp.set('disable', [disableFn]);
-    fp.redraw();
+    this.cdr.markForCheck();
   }
-
-  // 3) Limpia fecha inválida si quedó seleccionada/typed
-  const cur = this.form.get('Fecha_Tour')?.value;
-  if (cur) {
-    // si viene como string en el formato interno, mejor validar con flatpickr si existe:
-    const curDate = fp?.parseDate ? fp.parseDate(cur, 'Y-m-d') : new Date(cur);
-    if (curDate && disableFn(curDate)) {
-      this.form.get('Fecha_Tour')?.setValue(null);
-      fp?.clear();
-    }
-  }
-
-  this.cdr.markForCheck();
-}
 
 
 
@@ -1509,6 +1510,11 @@ private applyDisponibilidadToDatepicker() {
   private verReservaDuplicada(idReserva: string) {
 
     this.navbar.Id_Reserva.set(idReserva);
+  }
+
+  duplicarReserva() {
+    // No implementado en creación, pero requerido por el template compartido/estandarizado
+    console.warn('duplicarReserva no está implementado en CrearReservaComponent');
   }
 
 }

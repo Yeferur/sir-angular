@@ -1,26 +1,45 @@
-/* Sidebar - Diseño base */
+/*
+  ========================================
+  SIDEBAR PREMIUM (ESTILO DOCK/ISLA FLOTANTE)
+  ========================================
+*/
+
+/* 📌 Diseño base: Isla Flotante con Glassmorphism */
 .sidebar {
   position: fixed;
-  left: -280px; /* Oculto por defecto en pantallas pequeñas */
-  top: 0;
+  left: -320px; /* Oculto por defecto en móviles */
+  top: 15px; /* Separado del borde superior */
+  height: calc(100vh - 30px); /* Separado del borde inferior */
   width: 280px;
-  height: 100vh;
-  background-color: var(--primary-bg);
-  color: var(--font-color);
+  
+  /* Glassmorphism */
+  background-color: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.8));
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
+  border-radius: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  transition: left 0.3s ease-in-out, background-color 0.4s ease-in-out;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
   overflow-x: hidden;
   overflow-y: auto;
-  z-index: 1000; /* Asegura que esté sobre la `top-bar` */
-  scrollbar-width: none;
-  border-radius: 10px;
+  z-index: 1000;
+  scrollbar-width: none; /* Firefox */
+  
+  /* Física de movimiento snappy */
+  transition: 
+    width 0.5s cubic-bezier(0.23, 1, 0.32, 1), 
+    left 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 0.4s ease;
 }
 
-/* Mostrar el sidebar cuando está activo */
+.sidebar::-webkit-scrollbar { display: none; }
+
+/* En móviles, cuando se abre, queda flotando a la izquierda */
 .sidebar.open {
-  left: 0;
+  left: 15px; 
 }
 
 /* 📌 Zona de usuario */
@@ -28,264 +47,218 @@
   width: 100%;
   display: flex;
   align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid var(--secondary-bg);
-  transition: opacity var(--transition-time), transform var(--transition-time);
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--separator-color);
 }
 
 .avatar-placeholder-large {
-  width: 50px;
-  height: 50px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+  background: linear-gradient(135deg, var(--accent-blue), #3A00FF);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
+  margin-right: 14px;
   flex-shrink: 0;
-  font-size: 28px;
+  font-size: 22px;
   color: white;
+  box-shadow: 0 4px 10px rgba(10, 132, 255, 0.3);
 }
 
-.user-section img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  margin-right: 10px;
-  transition: transform var(--transition-time);
-}
-
-/* 📌 Mostrar información del usuario siempre en pantallas pequeñas */
 .user-info {
   display: flex;
   flex-direction: column;
-  opacity: 1;
-  transform: translateX(0);
-  transition: opacity var(--transition-time), transform var(--transition-time);
+  min-width: 0;
+  transition: opacity 0.3s ease;
 }
 
-.user-info h4,
-.user-info p {
+.user-info h4 {
   margin: 0;
-  font-size: 13px;
-  color: var(--font-color);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 📌 En pantallas grandes, solo mostrar info en hover */
-@media (min-width: 767px) {
-  .user-info {
-    display: none;
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-
-  .sidebar:hover .user-info {
-    display: flex;
-    opacity: 1;
-    transform: translateX(0);
-  }
+.user-info p {
+  margin: 2px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 📌 Menú */
+/* 📌 Menú y Botones (Estilo Píldora) */
 .menu {
   width: 100%;
-  padding: 5px 0;
+  padding: 16px 0;
   flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .menu a {
   display: flex;
   align-items: center;
-  padding: 10px;
-  color: var(--font-color);
+  padding: 12px 14px;
+  margin: 0 12px; /* Separado de los bordes */
+  color: var(--text-primary);
   text-decoration: none;
-  transition: background-color var(--transition-time), padding-left var(--transition-time);
-  margin: 3px 0;
-  border-radius: 5px;
-  font-size: 14px;
+  border-radius: 14px; /* Forma de píldora/cápsula suave */
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  cursor: pointer;
 }
 
 .menu a:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--bg-tertiary);
+  transform: translateX(4px);
 }
 
 .menu i {
-  font-size: 20px;
-  min-width: 50px;
-  text-align: center;
+  font-size: 22px;
+  min-width: 36px;
+  color: var(--text-secondary);
+  transition: color 0.2s;
 }
 
-/* 📌 Mostrar los textos SIEMPRE en pantallas pequeñas */
+.menu a:hover i {
+  color: var(--accent-blue);
+}
+
 .menu span {
-  opacity: 1;
-  transform: translateX(0);
   white-space: nowrap;
-}
-
-/* 📌 En pantallas grandes, ocultar los textos hasta que haya hover */
-@media (min-width: 767px) {
-  .menu span {
-    opacity: 0;
-    transform: translateX(-20px);
-    transition: opacity var(--transition-time), transform var(--transition-time);
-  }
-
-  .sidebar:hover .menu span {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 /* 📌 Submenús */
 .submenu {
   max-height: 0;
   overflow: hidden;
+  display: flex;
   flex-direction: column;
-  transition: max-height var(--transition-time);
-}
-
-.menu-item {
-  cursor: pointer;
+  gap: 2px;
+  transition: max-height 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .menu-item.active > .submenu {
-  max-height: 300px;
-}
-
-.menu-item > a {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  max-height: 400px;
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .menu-item > a i:last-child {
   margin-left: auto;
-  transition: transform var(--transition-time);
+  font-size: 18px;
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .menu-item.active > a i:last-child {
   transform: rotate(180deg);
+  color: var(--accent-blue);
 }
 
 .submenu a {
-  padding-left: 20px;
-  background-color: var(--secondary-bg);
-  font-size: 13px;
+  padding-left: 50px; /* Indentación visual */
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.submenu a:hover {
+  color: var(--text-primary);
 }
 
 /* 📌 Botón de Logout */
 .logout {
   width: 100%;
-  text-align: center;
-  border-top: 1px solid var(--secondary-bg);
-  padding: 10px 0;
+  padding: 16px 12px;
+  border-top: 1px solid var(--separator-color);
   position: sticky;
   bottom: 0;
-  background-color: var(--primary-bg);
-  z-index: 1;
+  background-color: transparent;
 }
 
 .logout .Logout_link {
-  color: var(--font-color);
-  text-decoration: none;
-  transition: color var(--transition-time), background-color var(--transition-time);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 69, 58, 0.1);
+  color: var(--accent-red);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .logout .Logout_link:hover {
-  color: var(--font-color-hover);
+  background: var(--accent-red);
+  color: #fff;
+  transform: scale(0.98);
 }
+.logout .Logout_link:hover i { color: #fff; }
 
-/* 📌 Barra superior en móviles */
+/* 📌 Barra superior (Móvil) */
 .top-bar {
   display: flex;
   position: fixed;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
   width: 100%;
-  height: 60px;
-  background-color: transparent;
+  height: 70px;
+  background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.8));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--separator-color);
   align-items: center;
   justify-content: space-between;
-  padding: 0 15px;
-  z-index: 200; /* Ahora el sidebar tendrá un z-index mayor */
-}
-
-.top-bar .avatar-placeholder {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  color: white;
-  flex-shrink: 0;
-}
-
-.top-bar .avatar {
-  border-radius: 50%;
+  padding: 0 20px;
+  z-index: 900;
 }
 
 .top-bar .menu-button {
-  background: var(--primary-bg);
+  background: var(--bg-tertiary);
   border: none;
-  border-radius: 5px;
-  color: var(--font-color);
+  border-radius: 12px;
+  color: var(--text-primary);
   font-size: 24px;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  width: 36px;
-  padding: 0;
-  transition: transform 0.3s ease, background-color 0.3s ease;
+  transition: transform 0.2s;
 }
+.top-bar .menu-button:active { transform: scale(0.9); }
 
-.top-bar .menu-button:hover {
-  background: var(--hover-bg);
-  transform: scale(1.1);
-}
-
-.top-bar .menu-button:active {
-  transform: scale(0.95);
-}
-
-.top-bar .menu-button i {
-  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.top-bar .menu-button.active i {
-  transform: rotate(90deg);
-}
-
-.top-bar .logo {
-  height: 40px;
-}
-
-/* 📌 Sidebar en pantallas grandes */
+/* 📌 Desktop (Comportamiento Flotante Inteligente) */
 @media (min-width: 767px) {
-  .top-bar {
-    display: none;
-  }
+  .top-bar { display: none; }
+  
   .sidebar {
-    left: 0;
-    width: 70px;
-    transition: width var(--transition-time), background-color 0.4s ease-in-out;
+    left: 15px; /* Siempre visible, flotando a la izquierda */
+    width: 80px; /* Estado colapsado */
   }
 
+  .user-info, .menu span, .menu-item > a i:last-child {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  /* Al pasar el mouse, se expande el dock */
   .sidebar:hover {
     width: 280px;
+    box-shadow: 0 10px 50px rgba(0,0,0,0.4);
   }
-}
 
-/* 📌 Ocultar barra de desplazamiento en Webkit */
-.sidebar::-webkit-scrollbar {
-  display: none;
+  .sidebar:hover .user-info, 
+  .sidebar:hover .menu span, 
+  .sidebar:hover .menu-item > a i:last-child {
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0.1s;
+  }
 }

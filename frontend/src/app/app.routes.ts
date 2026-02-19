@@ -16,9 +16,16 @@ import { CrearTransferComponent } from './pages/Transfers/crear-transfer/crear-t
 import { VerTransfersComponent } from './pages/Transfers/ver-transfers/ver-transfers';
 import { VerHistorialComponent } from './pages/Historial/ver-historial/ver-historial';
 import { CrearUsuarioComponent } from './pages/Usuarios/crear-usuario/crear-usuario';
+import { EditarUsuarioComponent } from './pages/Usuarios/editar-usuario/editar-usuario';
+import { ConfirmacionComponent } from './pages/Confirmacion/confirmacion/confirmacion';
+import { ComisionesComponent } from './pages/Comisiones/comisiones/comisiones';
+import { SegurosComponent } from './pages/Seguros/seguros/seguros';
+import { DashboardComponent } from './pages/Dashboard/dashboard';
 
 export const routes: Routes = [
   { path: '', component: Inicio, title: 'SIR · Inicio' },
+
+  { path: 'Dashboard', component: DashboardComponent, title: 'SIR · Dashboard' },
 
   { path: 'Historial', component: VerHistorialComponent, title: 'SIR · Historial' },
 
@@ -35,8 +42,13 @@ export const routes: Routes = [
 
   { path: 'Programacion/Listado', component: Listado, title: 'SIR · Programación' },
 
+  { path: 'Reservas/Confirmacion', component: ConfirmacionComponent, title: 'SIR · Confirmación de Viaje' },
+  { path: 'Comisiones', component: ComisionesComponent, title: 'SIR · Comisiones' },
+  { path: 'Seguros', component: SegurosComponent, title: 'SIR · Seguros' },
+
   { path: 'Usuarios', component: Usuarios, title: 'SIR · Usuarios' },
   { path: 'Usuarios/NuevoUsuario', component: CrearUsuarioComponent, title: 'SIR · Nuevo Usuario' },
+  { path: 'Usuarios/Editar/:id', component: EditarUsuarioComponent, title: 'SIR · Editar Usuario' },
 
   { path: 'Tours/NuevoTour', component: CrearTourComponent, title: 'SIR · Nuevo Tour' },
   { path: 'Tours/VerTours', component: VerToursComponent, title: 'SIR · Ver Tours' },
