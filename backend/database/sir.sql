@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Servidor: 127.0.0.1:3306
--- Tiempo de generación: 31-01-2026 a las 22:53:38
--- Versión del servidor: 9.1.0
--- Versión de PHP: 8.3.14
+-- Host: 127.0.0.1:3306
+-- Generation Time: Feb 19, 2026 at 12:54 AM
+-- Server version: 9.1.0
+-- PHP Version: 8.3.14
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Base de datos: `sir2`
+-- Database: `sir2`
 --
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `aforos`
+-- Table structure for table `aforos`
 --
 
 DROP TABLE IF EXISTS `aforos`;
@@ -35,12 +35,19 @@ CREATE TABLE IF NOT EXISTS `aforos` (
   `Fecha_Aforo` date DEFAULT NULL,
   PRIMARY KEY (`Id_Aforo`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `aforos`
+--
+
+INSERT INTO `aforos` (`Id_Aforo`, `Id_Tour`, `Cupo`, `Fecha_Aforo`) VALUES
+(1, 5, 130, '2026-01-22');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `asignacion_buses`
+-- Table structure for table `asignacion_buses`
 --
 
 DROP TABLE IF EXISTS `asignacion_buses`;
@@ -54,12 +61,34 @@ CREATE TABLE IF NOT EXISTS `asignacion_buses` (
   `Fecha_Creacion` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Asignacion`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `asignacion_buses`
+--
+
+INSERT INTO `asignacion_buses` (`Id_Asignacion`, `Placa_Bus`, `Capacidad`, `Cantidad_Pasajeros`, `Guia`, `Id_Tour`, `Fecha_Creacion`) VALUES
+(32, 'Bus 1', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(33, 'Bus 2', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(34, 'Bus 3', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(35, 'Bus 4', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(36, 'Bus 5', 27, 26, NULL, 2, '2026-01-22 00:00:00'),
+(37, 'Bus 6', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(38, 'Bus 7', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(39, 'Bus 8', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(40, 'Bus 9', 43, 43, NULL, 2, '2026-01-22 00:00:00'),
+(41, 'Bus 10', 23, 20, NULL, 2, '2026-01-22 00:00:00'),
+(42, 'Bus 11', 23, 23, NULL, 2, '2026-01-22 00:00:00'),
+(43, 'Bus 12', 38, 30, NULL, 2, '2026-01-22 00:00:00'),
+(44, 'Bus 13', 18, 14, NULL, 2, '2026-01-22 00:00:00'),
+(45, 'Bus 14', 18, 8, NULL, 2, '2026-01-22 00:00:00'),
+(46, 'Bus 15', 18, 16, NULL, 2, '2026-01-22 00:00:00'),
+(47, 'Bus 1', 18, 7, NULL, 1, '2026-01-22 00:00:00');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `canales_reservas`
+-- Table structure for table `canales_reservas`
 --
 
 DROP TABLE IF EXISTS `canales_reservas`;
@@ -70,7 +99,7 @@ CREATE TABLE IF NOT EXISTS `canales_reservas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `canales_reservas`
+-- Dumping data for table `canales_reservas`
 --
 
 INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
@@ -88,7 +117,7 @@ INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `detalle_historial`
+-- Table structure for table `detalle_historial`
 --
 
 DROP TABLE IF EXISTS `detalle_historial`;
@@ -100,12 +129,44 @@ CREATE TABLE IF NOT EXISTS `detalle_historial` (
   `Valor_Nuevo` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`Id_Detalle`),
   KEY `Id_Historial` (`Id_Historial`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `detalle_historial`
+--
+
+INSERT INTO `detalle_historial` (`Id_Detalle`, `Id_Historial`, `Columna`, `Valor_Anterior`, `Valor_Nuevo`) VALUES
+(1, 1, 'Nombres_Apellidos', 'Yeferson Urrego', 'Yeferson Urrego'),
+(2, 2, 'Nombres_Apellidos', 'Yeferson Urrego', 'Yeferson Urrego'),
+(3, 3, 'Nombres_Apellidos', 'Jhonathan Castro López', 'Jhonathan Castro López'),
+(4, 4, 'Nombres_Apellidos', 'Yeferson Urrego Henao', 'Yeferson Urrego Henao'),
+(5, 5, 'Nombres_Apellidos', 'Carlos Castro Jaramillo', 'Carlos Castro Jaramillo'),
+(6, 6, 'Nombres_Apellidos', 'Vanessa Ardila Castaño', 'Vanessa Ardila Castaño'),
+(7, 7, 'Nombres_Apellidos', 'Nayerlly Araque Cardona', 'Nayerlly Araque Cardona'),
+(8, 8, 'Nombres_Apellidos', 'Evelin Dayana Arboleda Montes', 'Evelin Dayana Arboleda Montes'),
+(9, 9, 'Nombres_Apellidos', 'Laura Sofía Galvis Pérez', 'Laura Sofía Galvis Pérez'),
+(10, 10, 'Nombres_Apellidos', 'Valentina Raigosa Posada', 'Valentina Raigosa Posada'),
+(11, 11, 'Nombres_Apellidos', 'Valentina Raigosa Posada', 'Valentina Raigosa Posada'),
+(12, 12, 'Nombres_Apellidos', 'Valentina Raigosa Posada', 'Valentina Raigosa Posada'),
+(13, 13, 'Nombres_Apellidos', 'Valentina Raigosa Posada', 'Valentina Raigosa Posada'),
+(14, 14, 'Nombres_Apellidos', 'Elizabeth Quiceno Echeverri', 'Elizabeth Quiceno Echeverri'),
+(15, 15, 'Nombres_Apellidos', 'Adelaida García Buitrago', 'Adelaida García Buitrago'),
+(16, 16, 'Nombres_Apellidos', 'Karen Paulina Usuga Isaza', 'Karen Paulina Usuga Isaza'),
+(17, 17, 'Nombres_Apellidos', 'Jeferson Andrés Restrepo Moreno', 'Jeferson Andrés Restrepo Moreno'),
+(18, 18, 'Nombres_Apellidos', 'Daniel Grisales Herrera', 'Daniel Grisales Herrera'),
+(19, 19, 'Nombres_Apellidos', 'Julián Esteban Galeano Giraldo', 'Julián Esteban Galeano Giraldo'),
+(20, 20, 'Nombres_Apellidos', 'Sharon Daniela Velaides Orellano', 'Sharon Daniela Velaides Orellano'),
+(21, 21, 'Nombres_Apellidos', 'Alejandra García Villada', 'Alejandra García Villada'),
+(22, 22, 'Nombres_Apellidos', 'KAREN DAHIANA RAIGOSA POSADA', 'KAREN DAHIANA RAIGOSA POSADA'),
+(23, 23, 'Nombres_Apellidos', 'Yeferson Urrego', 'Yeferson Urrego'),
+(24, 24, 'Nombres_Apellidos', 'Yeferson Urrego', 'Yeferson Urrego'),
+(25, 25, 'Fecha_Aforo', '', '2026-01-22'),
+(26, 25, 'Cupo', '', '130');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `historial`
+-- Table structure for table `historial`
 --
 
 DROP TABLE IF EXISTS `historial`;
@@ -118,12 +179,43 @@ CREATE TABLE IF NOT EXISTS `historial` (
   `Fecha_Hora_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Historial`),
   KEY `Id_Usuario` (`Id_Usuario`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `historial`
+--
+
+INSERT INTO `historial` (`Id_Historial`, `Tabla`, `Id_Registro`, `Accion`, `Id_Usuario`, `Fecha_Hora_Registro`) VALUES
+(1, 'usuarios', 1018372156, 'ACTUALIZAR', 1018372157, '2026-02-17 13:58:02'),
+(2, 'usuarios', 1018372156, 'ACTUALIZAR', 1018372157, '2026-02-17 14:00:16'),
+(3, 'usuarios', 1020426193, 'ACTUALIZAR', 1018372157, '2026-02-17 14:01:58'),
+(4, 'usuarios', 1018372157, 'ACTUALIZAR', 1018372157, '2026-02-17 14:04:08'),
+(5, 'usuarios', 71676626, 'ACTUALIZAR', 1018372157, '2026-02-17 14:05:41'),
+(6, 'usuarios', 1000099025, 'ACTUALIZAR', 1018372157, '2026-02-17 14:06:33'),
+(7, 'usuarios', 1000549795, 'ACTUALIZAR', 1018372157, '2026-02-17 14:06:44'),
+(8, 'usuarios', 1001390323, 'ACTUALIZAR', 1018372157, '2026-02-17 14:06:56'),
+(9, 'usuarios', 1006209620, 'ACTUALIZAR', 1018372157, '2026-02-17 14:12:32'),
+(10, 'usuarios', 1007055270, 'ACTUALIZAR', 1018372157, '2026-02-17 14:12:49'),
+(11, 'usuarios', 1007055270, 'ACTUALIZAR', 1018372157, '2026-02-17 14:12:58'),
+(12, 'usuarios', 1007055270, 'ACTUALIZAR', 1018372157, '2026-02-17 14:15:13'),
+(13, 'usuarios', 1007055270, 'ACTUALIZAR', 1018372157, '2026-02-17 14:15:30'),
+(14, 'usuarios', 1007055418, 'ACTUALIZAR', 1018372157, '2026-02-17 14:15:47'),
+(15, 'usuarios', 1007115042, 'ACTUALIZAR', 1018372157, '2026-02-17 14:15:58'),
+(16, 'usuarios', 1022145000, 'ACTUALIZAR', 1018372157, '2026-02-17 14:16:34'),
+(17, 'usuarios', 1036648398, 'ACTUALIZAR', 1018372157, '2026-02-17 14:16:43'),
+(18, 'usuarios', 1037948093, 'ACTUALIZAR', 1018372157, '2026-02-17 14:16:53'),
+(19, 'usuarios', 1041230712, 'ACTUALIZAR', 1018372157, '2026-02-17 14:17:05'),
+(20, 'usuarios', 1047496358, 'ACTUALIZAR', 1018372157, '2026-02-17 14:17:13'),
+(21, 'usuarios', 1128436633, 'ACTUALIZAR', 1018372157, '2026-02-17 14:17:24'),
+(22, 'usuarios', 1128444233, 'ACTUALIZAR', 1018372157, '2026-02-17 14:17:33'),
+(23, 'usuarios', 1018372156, 'ACTUALIZAR', 1018372157, '2026-02-17 14:30:16'),
+(24, 'usuarios', 1018372156, 'ACTUALIZAR', 1018372157, '2026-02-17 14:30:33'),
+(25, 'aforos', 5, 'CREAR', 1018372157, '2026-02-17 15:33:37');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `horarios`
+-- Table structure for table `horarios`
 --
 
 DROP TABLE IF EXISTS `horarios`;
@@ -138,7 +230,7 @@ CREATE TABLE IF NOT EXISTS `horarios` (
 ) ENGINE=InnoDB AUTO_INCREMENT=8926 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `horarios`
+-- Dumping data for table `horarios`
 --
 
 INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALUES
@@ -6366,7 +6458,7 @@ INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALU
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `logs_sistema`
+-- Table structure for table `logs_sistema`
 --
 
 DROP TABLE IF EXISTS `logs_sistema`;
@@ -6385,7 +6477,7 @@ CREATE TABLE IF NOT EXISTS `logs_sistema` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `mensajes`
+-- Table structure for table `mensajes`
 --
 
 DROP TABLE IF EXISTS `mensajes`;
@@ -6404,7 +6496,7 @@ CREATE TABLE IF NOT EXISTS `mensajes` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `mensaje_destinatario`
+-- Table structure for table `mensaje_destinatario`
 --
 
 DROP TABLE IF EXISTS `mensaje_destinatario`;
@@ -6421,7 +6513,7 @@ CREATE TABLE IF NOT EXISTS `mensaje_destinatario` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `modulos`
+-- Table structure for table `modulos`
 --
 
 DROP TABLE IF EXISTS `modulos`;
@@ -6439,7 +6531,7 @@ CREATE TABLE IF NOT EXISTS `modulos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `modulos`
+-- Dumping data for table `modulos`
 --
 
 INSERT INTO `modulos` (`Id_Modulo`, `Nombre_Modulo`, `Codigo_Modulo`, `Descripcion`, `Icono`, `Ruta`, `Orden`, `Activo`) VALUES
@@ -6459,7 +6551,7 @@ INSERT INTO `modulos` (`Id_Modulo`, `Nombre_Modulo`, `Codigo_Modulo`, `Descripci
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `monedas`
+-- Table structure for table `monedas`
 --
 
 DROP TABLE IF EXISTS `monedas`;
@@ -6472,7 +6564,7 @@ CREATE TABLE IF NOT EXISTS `monedas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `monedas`
+-- Dumping data for table `monedas`
 --
 
 INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
@@ -6483,7 +6575,7 @@ INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pagos_reservas`
+-- Table structure for table `pagos_reservas`
 --
 
 DROP TABLE IF EXISTS `pagos_reservas`;
@@ -6500,7 +6592,7 @@ CREATE TABLE IF NOT EXISTS `pagos_reservas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `pagos_reservas`
+-- Dumping data for table `pagos_reservas`
 --
 
 INSERT INTO `pagos_reservas` (`Id_Pago`, `Id_Reserva`, `Monto`, `Tipo`, `Fecha_Pago`, `Observaciones`, `Ruta_Comprobante`) VALUES
@@ -6528,7 +6620,7 @@ INSERT INTO `pagos_reservas` (`Id_Pago`, `Id_Reserva`, `Monto`, `Tipo`, `Fecha_P
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pagos_transfers`
+-- Table structure for table `pagos_transfers`
 --
 
 DROP TABLE IF EXISTS `pagos_transfers`;
@@ -6548,7 +6640,7 @@ CREATE TABLE IF NOT EXISTS `pagos_transfers` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `pasajeros`
+-- Table structure for table `pasajeros`
 --
 
 DROP TABLE IF EXISTS `pasajeros`;
@@ -6570,7 +6662,7 @@ CREATE TABLE IF NOT EXISTS `pasajeros` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1672 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `pasajeros`
+-- Dumping data for table `pasajeros`
 --
 
 INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, `Telefono_Pasajero`, `Tipo_Pasajero`, `Precio_Tour`, `Precio_Pasajero`, `Comision`, `Id_Punto`, `Confirmacion`) VALUES
@@ -6852,486 +6944,486 @@ INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, 
 (1036, 'CTG94203', 'VANESSA MENA AVILES', '603270471', '', 'ADULTO', 0, 0, 0, 583, 0),
 (1037, 'CTG94203', 'ROSVELTH ADRIÁN VILLALOBOS MENA', '604970895', '', 'ADULTO', 0, 0, 0, 583, 0),
 (1038, 'CTG94203', 'ANELI SOFÍA VILLALOBOS MENA', '122740086', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1039, 'TG10146', 'ELIZABETH LEMA ', '1711749638 ', '593 998577288 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1040, 'TG10146', 'NANTHAR FAREZ ', '1722165618 ', '593995400750', 'ADULTO', 0, 0, 0, 87, 0),
-(1041, 'TG10146', 'TAMY BELTRAN ', '1751394212', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1042, 'TG10146', 'BRYAN MIER ', '0401792619 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1043, 'TG10871', '​LEYDI PAOLA LUCIO VALENCIA ', '1114488752 ', '573166217306', 'ADULTO', 0, 0, 0, 544, 0),
-(1044, 'TG10871', 'DANIELA RODRÍGUEZ GÓMEZ  ', '1143874643  ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1045, 'TG10871', 'LAURA NATALIA OROZCO OROZCO  ', '1061782554 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1046, 'TG10871', 'LIZETH FERNANDA MARÍN DE JESÚS  ', '1151941420 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1047, 'TG10964', 'OSCARY SANTIAGO ', '594098358 ', '+1 7872422376', 'ADULTO', 0, 0, 0, 410, 0),
-(1048, 'TG10964', 'NOE PANTOJA ', 'A68818123 ', '', 'ADULTO', 0, 0, 0, 410, 0),
-(1049, 'TG11565', 'HAROLD SNEIDER DÍAZ RODRÍGUEZ  ', '1024574431 ', '57 3115372347', 'ADULTO', 0, 0, 0, 6, 0),
-(1050, 'TG11565', 'ANA MARÍA PRADA RINCON ', '1022433610', '57 3207501457 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1051, 'TG11706', 'MARCELA PALACIOS ', 'A06235776 ', '50375359994 ', 'ADULTO', 0, 0, 0, 449, 0),
-(1052, 'TG11706', 'LORENA PALACIOS ', 'A00209453 ', '', 'ADULTO', 0, 0, 0, 449, 0),
-(1053, 'TG12399', 'BRISLEINYS AYNARA PARRA CARDOZO  ', '185079792 ', '58 412-4830749', 'ADULTO', 0, 0, 0, 306, 0),
-(1054, 'TG12399', 'LINO ERNESTO ALVAREZ GOMEZ', '185065986', '', 'ADULTO', 0, 0, 0, 306, 0),
-(1055, 'TG13084', 'MARIA GARCES ', 'N21574489', '+525541832707', 'ADULTO', 0, 0, 0, 333, 0),
-(1056, 'TG13084', 'JORGE VILLALBA ', 'N22351751', '', 'ADULTO', 0, 0, 0, 333, 0),
-(1057, 'TG13484', 'ENRIQUE KAY AÑEZ  ', 'FE48527 ', '59176699184', 'ADULTO', 0, 0, 0, 127, 0),
-(1058, 'TG13484', 'RAFAEL KAY VACA  ', 'PENDIENTE ', '', 'ADULTO', 0, 0, 0, 127, 0),
-(1059, 'TG14221', 'LEIDY JOHANNA DURÁN MANTILLA ', '1095809066', '57 3176518743  ', 'ADULTO', 0, 0, 0, 337, 0),
-(1060, 'TG14221', 'SANDRA PATRICIA MANTILLA PARRA  ', '63483797', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1061, 'TG14221', 'YOLANDA MANTILLA OJEDA ', '28131511 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1062, 'TG14221', 'ALICIA FUENTES DE DURÁN  ', '37801228 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1063, 'TG14312', 'KIMBERLLY VARGAS', 'PA1420583', '507 6002-2145', 'ADULTO', 0, 0, 0, 192, 0),
-(1064, 'TG14312', 'LATOYA MORAIS', 'PA1228808', '507 6761-7167', 'ADULTO', 0, 0, 0, 192, 0),
-(1065, 'TG15086', 'CARLA VANESSA POZO BELTRÁN ', '0919842948 ', '593992395977', 'ADULTO', 0, 0, 0, 335, 0),
-(1066, 'TG15086', 'LUCCIANA ROMINA CHANG POZO ', '0931618490 ', '', 'ADULTO', 0, 0, 0, 335, 0),
-(1067, 'TG15656', 'CLAIRE QUIRK', 'PW7038335 ', '+44 7936 450686', 'ADULTO', 0, 0, 0, 207, 0),
-(1068, 'TG15656', 'EMMA MCCORMACK ', 'PF7878905 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1069, 'TG15656', 'CALUM TEAM ', '135584491 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1070, 'TG15656', 'JOHN REGAN ', '135043459 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1071, 'TG15656', 'BEN NIPPARD ', '560174700 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1072, 'TG15656', 'SIOBHAN ANDERSON ', '145822261 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1073, 'TG15656', 'SINEAD DUGGAN ', 'PP5398629 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1074, 'TG15656', 'SARAH MICHALEK ', 'FE5807553 ', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1075, 'TG15656', 'DOMINIKA KUBERA ', 'FJ0209302', '', 'ADULTO', 0, 0, 0, 207, 0),
-(1076, 'TG16266', 'ALEJANDRA NORMA FIGUEROA ', 'A58361174', '15512008303', 'ADULTO', 0, 0, 0, 337, 0),
-(1077, 'TG16266', 'KARINA CONSTANZA FLORES', '664623378', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1078, 'TG18165', 'STEPHANIA SANDOVAL', 'P11007967 ', '507 6627-6702', 'ADULTO', 0, 0, 0, 574, 0),
-(1079, 'TG18165', 'RODRIGO SILVA ', 'P15912739 ', '', 'ADULTO', 0, 0, 0, 574, 0),
-(1080, 'TG18722', 'ANDERSSON JEFFREY ÁVILA CONDIA ', '1193220071 ', '+573102273603', 'ADULTO', 0, 0, 0, 87, 0),
-(1081, 'TG18722', 'YADIRA ANDREA VARGAS MOJICA  ', '1057598494', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1082, 'TG19119', 'DANIELA DÍAZ GIL, ', '1110285993 ', '573043193451 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1083, 'TG19119', 'LIVEIDA IVONNE GIL DORADO, ', '66987082 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1084, 'TG19119', 'EDISON ADOLFO RAIGOZA ', '94453072 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1085, 'TG20585', 'KARLA GARCIA', '0704910306', '593939689192', 'ADULTO', 0, 0, 0, 230, 0),
-(1086, 'TG20585', ' CRISTOPHER VILLAROEL', '093032129', '', 'ADULTO', 0, 0, 0, 230, 0),
-(1087, 'TG21462', 'ROXY YULEIDY PEÑALOZA ROCHA   ', '1070608718  ', '57 3006968838 ', 'ADULTO', 0, 0, 0, 39, 0),
-(1088, 'TG21462', 'JUAN PABLO MARULANDA PÉREZ   ', '1030631419', '', 'ADULTO', 0, 0, 0, 39, 0),
-(1089, 'TG21524', 'DANIEL GUTIÉRREZ SERNA  ', '1006875881', '573045617966', 'ADULTO', 0, 0, 0, 580, 0),
-(1090, 'TG21524', 'ANA SOFÍA ZULUAGA ', '1193205022 ', '573045617966', 'ADULTO', 0, 0, 0, 580, 0),
-(1091, 'TG21524', 'EVA MARÍA BOTIA ', '51618380', '573045617966', 'ADULTO', 0, 0, 0, 580, 0),
-(1092, 'TG22311', 'DUVAN SANTIAGO MENDOZA TABORDA', '1000003680', '+573202549755', 'ADULTO', 0, 0, 0, 571, 0),
-(1093, 'TG22311', 'VANESSA CAROLINA CADENA OTALORA', '1001203428', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1094, 'TG22311', 'DIEGO ALEJANDRO MENDOZA TABORDA', '1233901512', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1095, 'TG22311', 'LICETH NORELA SUATERNA ACOSTA', '1001197718', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1096, 'TG22311', 'JUAN PABLO PIRAQUIVE MANCHEGO', '1010019285', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1097, 'TG22311', 'MAIKOL SANTIAGO PEREZ FUENTES', '1233888250', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1098, 'TG22856', 'MICHELLE GORDON', 'A03952804', '+19789943446', 'ADULTO', 0, 0, 0, 168, 0),
-(1099, 'TG22856', 'AUDREY DZMURA', 'A73887651', '', 'ADULTO', 0, 0, 0, 168, 0),
-(1100, 'TG22856', 'ANTOINETTE CONANT', 'A62784656', '', 'ADULTO', 0, 0, 0, 168, 0),
-(1101, 'TG22856', 'MADISON HOOKS', '549047457', '', 'ADULTO', 0, 0, 0, 168, 0),
-(1102, 'TG23423', 'DYLAN UMAÑA', 'B01231369', '506 8872 4564', 'ADULTO', 0, 0, 0, 460, 0),
-(1103, 'TG23423', 'ARIANA ALVARADO MADRIGAL ', 'B00740079', '', 'ADULTO', 0, 0, 0, 460, 0),
-(1104, 'TG23942', 'CRISTABELL WONG', '0930391529', '593979097737', 'ADULTO', 0, 0, 0, 87, 0),
-(1105, 'TG23942', 'GUSTAVO VÁZQUEZ', '0927473397', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1106, 'TG23942', 'BEIYING WONG', '0924539117', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1107, 'TG23942', ' MARÍA JOSÉ LUCAS', '0931031736', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1108, 'TG23942', 'JOHANNA AGUIRRE', '0926231002', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1109, 'TG23942', 'DENNIS FRANCO', '0955805767', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1110, 'TG23942', 'ADRIANA PIURE CUSQUE', '0950372342', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1111, 'TG23942', 'ELVIA CUSQUE ROVALINO', '0909441479', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1112, 'TG23942', 'LUIS PIURE TILER', '0909334591', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1113, 'TG23975', 'FABIÁN FELIPE LOAIZA RODRÍGUEZ  ', '1234190825 ', '57 317 8352288', 'ADULTO', 0, 0, 0, 544, 0),
-(1114, 'TG23975', 'YENNI ALEXANDRA RAMOS OJEDA  ', '1144193041 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1115, 'TG24769', 'FRANKLIN JAVIER ALVARENGA SORTO ', 'E1042442 ', '+504-98117460', 'ADULTO', 0, 0, 0, 6, 0),
-(1116, 'TG24769', 'MARÍA ISABEL ACOSTA SANTAMARÍA ', 'E1893146 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1117, 'TG25485', 'MARIA CHAVEZ', 'PA1021856', '+507 6383-5599', 'ADULTO', 0, 0, 0, 330, 0),
-(1118, 'TG25485', 'JORGE NAVARRO', 'PA1138398', '', 'ADULTO', 0, 0, 0, 330, 0),
-(1119, 'TG25777', 'LEIDY TATIANA RODRÍGUEZ SARMIENTO ', '1010202298 ', '573202000218', 'ADULTO', 0, 0, 0, 544, 0),
-(1120, 'TG25777', 'MARIA XIMENA GARAY QUEVEDO ', '1073238350 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1121, 'TG25814', 'GILBERT YESID HOYOS CASTRO', '1007384397', '573019222154', 'ADULTO', 0, 0, 0, 288, 0),
-(1122, 'TG26099', 'MARIANA ARANGO BARRERA ', '​1014596579 ', '​57 3114406359 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1123, 'TG26099', 'JUAN SEBASTIAN CORTES MORALES ', '1014990963 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1124, 'TG26099', 'VALENTINA ARANGO BARRERA ', '1193071866 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1125, 'TG26548', 'EVELYN JANNIS PERALTA SÁNCHEZ', 'N20767092', '+52 662 361 7573', 'ADULTO', 0, 0, 0, 609, 0),
-(1126, 'TG26548', 'GILBERTO LOPEZ CORDOVA', 'LPCRGL96042726H200', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1127, 'TG26548', 'JAIRO IVAN CANO LOPEZ', 'CNLPJR95092526H500', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1128, 'TG26548', 'KAREN SALOMON VALENZUELA', 'N20766960', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1129, 'TG26548', 'KASANDRA SALOMON VALENZUELA', 'N20766971', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1130, 'TG26548', 'LARISSA YAZDETH QUIÑONEZ VALENZUELA', 'QNVLLR99071026M900', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1131, 'TG26548', 'LUIS FERNANDO VALENZUELA LOPEZ', 'VLLPLS96090826H700', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1132, 'TG26548', 'MARIA DEL CARMEN PEREZ VALENZUELA', 'N08932899', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1133, 'TG26548', 'ROBERTO MISSAEL CERDA CASTILLO', 'N00974537', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1134, 'TG26548', 'ROXANA ARELI ALLENDE VALENZUELA', 'N09854429', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1135, 'TG26548', 'VIDIDIANA NEVAREZ PALMA', 'N20766795', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1136, 'TG26548', 'YOLANDA AVILEZ VALDEZ', 'G41487563', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1137, 'TG26548', 'YOLANDA JAZMINE RINCON', '557716739', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1138, 'TG26548', 'RIGOBERTO RINCON', 'A68359629', '', 'ADULTO', 0, 0, 0, 609, 0),
-(1139, 'TG29169', 'MARIA CATALINA ROJAS MONTAÑO', '1015465140', '+573168689506', 'ADULTO', 0, 0, 0, 353, 0),
-(1140, 'TG29169', 'ANGGI CAROLINA RODRIGUEZ', '1032486002', '', 'ADULTO', 0, 0, 0, 353, 0),
-(1141, 'TG29169', 'EDISSON ORLANDO ROJAS', '1016029531', '', 'ADULTO', 0, 0, 0, 353, 0),
-(1142, 'TG29794', 'CAMILA MALDONADO', 'A4101100 ', '+593 99 976 2487 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1143, 'TG29794', 'KEVIN TORRES ', 'A3914229', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1144, 'TG31569', 'MARIA OLGA CUCAITA', '52310731', '573002280672 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1145, 'TG31569', 'JHON FREDDY OSPITIA ', '80370280 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1146, 'TG31622', 'VICTOR CHAPMAN VALERA ', 'RD8427356', '18098015408', 'ADULTO', 0, 0, 0, 470, 0),
-(1147, 'TG31622', 'BELLANILDA ARIAS GONZALEZ ', 'RD6523758', '', 'ADULTO', 0, 0, 0, 470, 0),
-(1148, 'TG31817', 'DARLIN FLOREZ', '1016723811  ', '573138102372', 'ADULTO', 0, 0, 0, 544, 0),
-(1149, 'TG31817', 'GLORIA AMPARO GOMEZ CRUZ  ', '29185667 ', '57 3104482034 ', 'ADULTO', 0, 0, 0, 544, 0),
-(1150, 'TG32227', 'MARIA ROJAS', '1001456281 ', '+57 315 2514796', 'ADULTO', 0, 0, 0, 6, 0),
-(1151, 'TG32227', 'MARIANA SOSSA', '1001456281 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1152, 'TG32671', 'SAMANTHA CEVALLOS ', '1721434353 ', '+593 98 463 1295', 'ADULTO', 0, 0, 0, 59, 0),
-(1153, 'TG32671', 'DOMÉNICA CEVALLOS ', '1726076332 ', '', 'ADULTO', 0, 0, 0, 59, 0),
-(1154, 'TG32965', 'DIANA MARCELA MEDRANO RUBIANO ', '1000784303 ', '57 3005703258 ', 'ADULTO', 0, 0, 0, 306, 0),
-(1155, 'TG32965', 'YURANI CASTAÑEDA PATIÑO ', '1194430199 ', '', 'ADULTO', 0, 0, 0, 306, 0),
-(1156, 'TG32965', 'KAREN ANDREA RAMIREZ ACOSTA', '1016113879 ', '', 'ADULTO', 0, 0, 0, 306, 0),
-(1157, 'TG33048', 'JUAN DAVID MÉNDEZ ESPÍNDOLA  ', '1098070261 ', '573167862010', 'ADULTO', 0, 0, 0, 580, 0),
-(1158, 'TG33048', 'LUZ ESNAIRA VEGA ACEVEDO  ', '1005371879 ', '', 'ADULTO', 0, 0, 0, 580, 0),
-(1159, 'TG33459', 'AMIRA REYES DÍAZ ', '39151487 ', '57 3173512412 ', 'ADULTO', 0, 0, 0, 304, 0),
-(1160, 'TG33459', 'JOSÉ ANTONIO OROZCO MARRUGO ', '73111564 ', '57 3053456925', 'ADULTO', 0, 0, 0, 304, 0),
-(1161, 'TG33568', 'JOSÉ DANIEL DUARTE MORENO  ', '1003966561  ', '57 312 5896502', 'ADULTO', 0, 0, 0, 6, 0),
-(1162, 'TG33568', 'HENERIETH PERDOMO BARRIOS  ', '1077845314 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1163, 'TG33568', 'JUAN DAVID CASTRO GUERRERO  ', '1007349693', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1164, 'TG33568', 'MARÍA PAULA MÉNDEZ BARRERA ', '1078266161 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1165, 'TG33568', 'JUAN ANDRÉS CADAVID BARRERA ', '1108333412', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1166, 'TG33590', 'ANGIE PAOLA GONZALEZ BERNAL  ', '1.116.642.004 ', '+573112491219', 'ADULTO', 0, 0, 0, 470, 0),
-(1167, 'TG33590', 'KAREN MAYERLI FARFÁN TAY ', '1.118.528.175 ', '+573132151749', 'ADULTO', 0, 0, 0, 470, 0),
-(1168, 'TG33851', '​SCARLET SUSANA SUMBA UZHO  ', '0950898825  ', '593992333362', 'ADULTO', 0, 0, 0, 91, 0),
-(1169, 'TG33851', 'KATHERINE MILENA MORAN GAMBOA  ', '0952831592 ', '', 'ADULTO', 0, 0, 0, 91, 0),
-(1170, 'TG33851', 'MINA MORAN JUAN JOSE  ', '0953856028 ', '', 'ADULTO', 0, 0, 0, 91, 0),
-(1171, 'TG33851', 'MARÍA GUADALUPE CEDEÑO CONTRERAS  ', '0952786994 ', '', 'ADULTO', 0, 0, 0, 91, 0),
-(1172, 'TG34222', 'PAMELA MORALES ', 'C06329089 ', '503 7056 1808', 'ADULTO', 0, 0, 0, 87, 0),
-(1173, 'TG35303', 'JOSE FERRUFINO', 'F628919', '+50431984049', 'ADULTO', 0, 0, 0, 372, 0),
-(1174, 'TG35303', 'FATIMA TORRES', 'F935624', '', 'ADULTO', 0, 0, 0, 372, 0),
-(1175, 'TG35303', 'JEFFREY FERRUFINO', 'A27091642', '', 'ADULTO', 0, 0, 0, 372, 0),
-(1176, 'TG35303', 'ZANDY VALENCIA', '111210210668121', '', 'ADULTO', 0, 0, 0, 372, 0),
-(1177, 'TG35309', 'LUZ PIEDAD ACEVEDO PATIÑO', '43095665 ', '573014706648', 'ADULTO', 0, 0, 0, 337, 0),
-(1178, 'TG35309', 'THOMAS CAMILO VANEGAS ACEVEDO', '1025641781 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1179, 'TG35321', 'JOSE GREGORIO KOUBBE ', '164282672', '584128358717', 'ADULTO', 0, 0, 0, 6, 0),
-(1180, 'TG35321', 'CHARBEL JOSE KOUBBE ', '164282740', '584242416875', 'ADULTO', 0, 0, 0, 6, 0),
-(1181, 'TG35425', 'JOSSELYN MAGAÑA ', 'B04885793 ', '+503 7024 5830 ', 'ADULTO', 0, 0, 0, 271, 0),
-(1182, 'TG35425', 'JOSE CUELLAR ', 'B05380643 ', '', 'ADULTO', 0, 0, 0, 271, 0),
-(1183, 'TG35425', 'HAVI CASTILLO ', 'A058777952   ', '', 'ADULTO', 0, 0, 0, 271, 0),
-(1184, 'TG35749', 'MARIA JOSE ACOSTA ', '1803604691', '593 983059255 ', 'ADULTO', 0, 0, 0, 455, 0),
-(1185, 'TG35749', 'AVIER DAVID ORTIZ COKA', '1804739132 ', '593 995971166 ', 'ADULTO', 0, 0, 0, 455, 0),
-(1186, 'TG37222', 'BYRON TOLEDO ', '092347933-1 ', '+593 96 792 3537', 'ADULTO', 0, 0, 0, 87, 0),
-(1187, 'TG37912', 'FENNA KETTING  ', 'NSKD5R529 ', '31622420950 ', 'ADULTO', 0, 0, 0, 9, 0),
-(1188, 'TG38571', 'PEDRO ENRIQUE RINCÓN RODRÍGUEZ ', 'PA1408440 ', '507 6671-3299', 'ADULTO', 0, 0, 0, 6, 0),
-(1189, 'TG38571', 'DIANA CAROLINA QUINTERO DÍAZ', 'PA1440424 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1190, 'TG38841', 'YARA INDIRA WALD RIVERA ', 'PA1142413 ', '50762601040', 'ADULTO', 0, 0, 0, 542, 0),
-(1191, 'TG38841', 'YELMIS YUISETH CASTILLO CARRERA ', 'PA0827200 ', '', 'ADULTO', 0, 0, 0, 542, 0),
-(1192, 'TG39010', 'YOLANDA CAMPOS ', '582054796', '+13236336544', 'ADULTO', 0, 0, 0, 107, 0),
-(1193, 'TG39010', 'SAMANTHA CAMPOS', 'A71653859', '', 'ADULTO', 0, 0, 0, 107, 0),
-(1194, 'TG39010', 'NADIA ROMERO', '595819513', '', 'ADULTO', 0, 0, 0, 107, 0),
-(1195, 'TG39010', 'NADIA SORTO', '656876788', '', 'ADULTO', 0, 0, 0, 107, 0),
-(1196, 'TG39022', 'DIANA MERCEDES PARDO TOMALA', '0925496580', '+59396222031', 'ADULTO', 0, 0, 0, 134, 0),
-(1197, 'TG39022', 'ANDRE ELIAS MENDONA', '0920029576', '+59396222031', 'ADULTO', 0, 0, 0, 134, 0),
-(1198, 'TG39200', 'GRACIELA GODÍNEZ ', '300173687 ', '502 5444 4817', 'ADULTO', 0, 0, 0, 574, 0),
-(1199, 'TG39200', 'SERGIO GODÍNEZ  ', '221587225 ', '', 'ADULTO', 0, 0, 0, 574, 0),
-(1200, 'TG40853', 'FRANCHESKA HDEZ  ', 'XDD608609 ', ' ‪+34 625 18 10 75', 'ADULTO', 0, 0, 0, 337, 0),
-(1201, 'TG40853', 'SONIA MOZO  ', 'PAY 372306 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1202, 'TG40853', 'ERIKA YOJANA PEREZ MORALES', '43752686 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1203, 'TG41109', 'EMILY VEGA AVENDAÑO', '1023022813', '573107776171', 'ADULTO', 0, 0, 0, 6, 0),
-(1204, 'TG41109', 'LUIS FELIPE CAMPOS CASTIBLANCO', '1022968455', '573118473173', 'ADULTO', 0, 0, 0, 6, 0),
-(1205, 'TG41109', 'ANGIE PAOLA AVENDAÑO CASTIBLANCO', '1023004765', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1206, 'TG41109', 'EDNA MARGARITA CALDERON GOMEZ', '39801807', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1207, 'TG41489', 'STEFHANY DE BRITO ', '195528273   ', ' +58 412-0113975 ', 'ADULTO', 0, 0, 0, 270, 0),
-(1208, 'TG41489', 'VALENTINA RODRÍGUEZ ', '172790462', '', 'ADULTO', 0, 0, 0, 270, 0),
-(1209, 'TG41591', 'SUJEEVEN JEGANATHAN ', 'N8341616 ', '94721000000', 'ADULTO', 0, 0, 0, 148, 0),
-(1210, 'TG41591', 'SHABITHA AMARASINGHAM', 'CFC425905 ', '', 'ADULTO', 0, 0, 0, 148, 0),
-(1211, 'TG41837', 'DAYALIZ MICHELL PINEDA GIL ', ' 29908480', '584247374576', 'ADULTO', 0, 0, 0, 346, 0),
-(1212, 'TG41837', 'EDGAR VELASCO  ', '  28195358', '584247374576', 'ADULTO', 0, 0, 0, 346, 0),
-(1213, 'TG42282', 'ANABEL HERNÁNDEZ  ', '569728951 ', '+19152167273', 'ADULTO', 0, 0, 0, 31, 0),
-(1214, 'TG42477', 'LAUREN CANTILLO BEDOYA ', '1143413282 ', '3006491118 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1215, 'TG42477', 'SKARLIN DAYANA PÉREZ MEZA ', '1143408686 ', '3023330959 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1216, 'TG42477', 'YARLYS PAOLA ARTEAGA PADILLA ', '1007469900 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1217, 'TG42477', 'YULIS CABARCAS PIMENTEL ', '30871938 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1218, 'TG42677', 'GABRIEL VELAZCO  ', '1148217425 ', '+58 414-0748536', 'ADULTO', 0, 0, 0, 6, 0),
-(1219, 'TG42677', 'MARIANGEL MEDINA  ', '30339248 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1220, 'TG43742', 'MIGUEL PITTI', 'PA1437295', '507 6598-8698', 'ADULTO', 0, 0, 0, 535, 0),
-(1221, 'TG43742', 'MADELINE SANCHEZ', 'PA1437252', '', 'ADULTO', 0, 0, 0, 535, 0),
-(1222, 'TG43742', 'THIAGO PITTI', 'PA1437251', 'INFANTE', 'INFANTE', 0, 0, 0, 535, 0),
-(1223, 'TG46025', 'JHONATTAN FERNANDO APONTE GAMBOA ', '1001330199', '+57 321 9697197', 'ADULTO', 0, 0, 0, 6, 0),
-(1224, 'TG46025', 'DAVID HERNAN CASALLAS BURGOS', '1015993002', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1225, 'TG46025', 'QUILES ARLEY GONZALEZ RUBIANO', '1000856635', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1226, 'TG46025', 'FAIHD ENRIQUE PINEDA DUQUE', '1046812108', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1227, 'TG46025', 'MARIA JOSE GENES MARTINEZ', '1028881095', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1228, 'TG46260', 'NIKLAS HEITMAN ', 'C1N25C9PN ', '34611706387 ', 'ADULTO', 0, 0, 0, 73, 0),
-(1229, 'TG46260', 'EVA VANEGAS ', '1193394758 ', '', 'ADULTO', 0, 0, 0, 73, 0),
-(1230, 'TG46365', 'OSCAR IVÁN AGUILAR DE LEÓN', '217309305', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1231, 'TG46365', 'JOSÉ MIGUEL PAZ PAZ', '261162128 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1232, 'TG46365', 'CLAUDIA LORENA GARCÍA', '313366071 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1233, 'TG46365', 'CHRISTOFER WILFREDO BULUX DE LEÓN', '322764998 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1234, 'TG46365', 'ALDO EDUARDO AGUILAR DE LEÓN', '276022475 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1235, 'TG46365', 'MYNOR DANIEL GARCÍA OROZCO', '351537228 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1236, 'TG46365', 'BYRON NICOLAS PEDROZA DUARTE', '1054285169', '50256191588', 'ADULTO', 0, 0, 0, 187, 0),
-(1237, 'TG46598', 'MARIA RAMIREZ  ', 'G39791930 ', '18056890589 ', 'ADULTO', 0, 0, 0, 210, 0),
-(1238, 'TG47353', 'CAROLINA ELVIRA ATENCIO LEZCANO ', '4-97-1353 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1239, 'TG47353', 'MARGOTH ISELA SUIRA ATENCIO ', '4-268-705 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1240, 'TG47353', 'ZULEIKA VIANETH SUIRA ATENCIO DE MIRANDA ', '4-292-164 ', '507 65758356', 'ADULTO', 0, 0, 0, 497, 0),
-(1241, 'TG47353', 'SUSAN CAROLINA MIRANDA SUIRA ', '8-1012-706 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1242, 'TG47353', 'SULANI MARGOTH MIRANDA SUIRA ', '4-802-525', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1243, 'TG48187', 'DALIS RAMOS ', '45483935', '573053361274', 'ADULTO', 0, 0, 0, 242, 0),
-(1244, 'TG48187', 'MARY FERNANDEZ ', '1143342145', '', 'ADULTO', 0, 0, 0, 242, 0),
-(1245, 'TG48753', 'WILSON ESPINOZA AROCA ', '0955067368 ', '593 98 244 1949 ', 'ADULTO', 0, 0, 0, 127, 0),
-(1246, 'TG48753', 'MICHELLE RODRÍGUEZ MERCHÁN  ', '0930339551', '', 'ADULTO', 0, 0, 0, 127, 0),
-(1247, 'TG48818', 'ANA SOLANGEL QUINTERO  ', '32401915', '3014932175 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1248, 'TG49399', 'LIZBETH IVANNE MOSQUERA LAYEDRA ', 'A9997261 ', '+5 93994636390 ', 'ADULTO', 0, 0, 0, 571, 0),
-(1249, 'TG49399', 'ADRIAN ALEJANDRO VILLAALVA SANCHEZ  ', ' 172167017 - 0 ', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1250, 'TG50128', 'ROBERTO JOSUE RODRÍGUEZ POVEDA ', 'A8059922 ', '593990040183', 'ADULTO', 0, 0, 0, 87, 0),
-(1251, 'TG50128', 'GABRIELA ELIZABETH ALVEAR RICHARDS', 'A8105133 ', '593990040183', 'ADULTO', 0, 0, 0, 87, 0),
-(1252, 'TG50128', 'EMMA HERNANDEZ ', 'A8088464 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1253, 'TG50128', 'ARIANNA ZÚÑIGA PESANTES  ', 'A9221675 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1254, 'TG50128', 'JANETH LIMONES ZAMBRANO ', 'A9338760 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1255, 'TG50128', 'DAVID ADRIAN ORDÓÑEZ MENDIETA', 'A8416444 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1256, 'TG50128', ' JHOSELYN ARIANNA SANCHEZ PAREDES ', 'A8539862 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1257, 'TG51057', 'ANDREA AYALA', '1016001678 ', '573108301786', 'ADULTO', 0, 0, 0, 6, 0),
-(1258, 'TG51057', 'IVÁN AYALA', '1016076046 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1259, 'TG51057', 'SANDRA MEDINA', '1073254785 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1260, 'TG51162', 'BRIAM CONTRERAS', '1.129.536.611 ', '3002983334 ', 'ADULTO', 0, 0, 0, 460, 0),
-(1261, 'TG51162', 'MATIAS CONTRERAS', '1.046.710.776 ', '', 'ADULTO', 0, 0, 0, 460, 0),
-(1262, 'TG51301', 'VERA KATHARINA SCHUMANN', 'C1RVW794F', '49 179 4701331 ', 'ADULTO', 0, 0, 0, 10, 0),
-(1263, 'TG52037', 'SARAI PIMENTEL ', 'RD8820150 ', '+1 8492294343', 'ADULTO', 0, 0, 0, 542, 0),
-(1264, 'TG52037', 'RUTH RAMIREZ ', 'RD6715795 ', '+1 809 7608245', 'ADULTO', 0, 0, 0, 542, 0),
-(1265, 'TG53606', 'DANIELA MEZA  ', 'N 114155506', '3027467665 ', 'ADULTO', 0, 0, 0, 187, 0),
-(1266, 'TG53690', 'GILSON DE MIRANDA', 'GK708733', '553199978493', 'ADULTO', 0, 0, 0, 242, 0),
-(1267, 'TG53690', 'CLAUDIA SIQUEIRA ', 'FR937369', '', 'ADULTO', 0, 0, 0, 242, 0),
-(1268, 'TG54524', 'SHARYN SMITH ', 'PA1161449', '50761594214', 'ADULTO', 0, 0, 0, 87, 0),
-(1269, 'TG54524', 'YOISETH SERRACIN', 'PA1020141', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1270, 'TG54712', 'ALISON SAMANTHA MADRID GARCÉS  ', '1723569883', '593992796274 ', 'ADULTO', 0, 0, 0, 583, 0),
-(1271, 'TG54712', 'JOSÉ MATEO PARRA VIVAR', '0106928434', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1272, 'TG54712', 'ANA GABRIELA GUALLPA ZUÑA ', '0104432097', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1273, 'TG54712', 'CRISTOPHER STALIN ALEMAN SIGÜENZA ', '0107627507', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1274, 'TG54730', 'ANDREA CAROLINA CARRILLO ROSALES ', '1002243172 ', '573135490810', 'ADULTO', 0, 0, 0, 544, 0),
-(1275, 'TG54730', 'ARES LEONARDO CARRILLO ROSALES ', '1004378500 ', '573135490810', 'ADULTO', 0, 0, 0, 544, 0),
-(1276, 'TG54730', 'LEONARDO CARRILLO ROMERO', '88197420', '573135490810', 'ADULTO', 0, 0, 0, 544, 0),
-(1277, 'TG54796', 'KAREN ILEANA BONILLA DE PORTILLO  ', 'B00076886 ', '503 61804423 ', 'ADULTO', 0, 0, 0, 402, 0),
-(1278, 'TG54796', 'MITZI DARIA PORTILLO BONILLA  ', 'B06610682 ', '', 'ADULTO', 0, 0, 0, 402, 0),
-(1279, 'TG54796', 'ILEANA NICOLE PORTILLO BONILLA  ', 'B05713888', '', 'ADULTO', 0, 0, 0, 402, 0),
-(1280, 'TG54857', 'KARLA VALERIA ECHEVERRÍA ESPIN ', 'A4291763 ', '573016842190', 'ADULTO', 0, 0, 0, 6, 0),
-(1281, 'TG55259', 'JAIME JOSÉ SALAZAR GRANDA ', '0706148210', '593959924285', 'ADULTO', 0, 0, 0, 6, 0),
-(1282, 'TG55259', 'THAIS VALENTINA PALADINES REY ', '0707108981', '593959924285', 'ADULTO', 0, 0, 0, 6, 0),
-(1283, 'TG55259', 'ANGELINA DAMARIS GONZALES SOTO ', '0750958282', '593959924285', 'ADULTO', 0, 0, 0, 6, 0),
-(1284, 'TG55274', 'ANDREA RAMÍREZ MENÉNDEZ   ', 'C05641427 ', '50377420968', 'ADULTO', 0, 0, 0, 176, 0),
-(1285, 'TG55274', 'TANIA GABRIELLA RIVERA VALENCIA ', 'A05445910', '', 'ADULTO', 0, 0, 0, 176, 0),
-(1286, 'TG55274', 'ADRIANA MARÍA PÉREZ ', 'C05438811', '', 'ADULTO', 0, 0, 0, 176, 0),
-(1287, 'TG55881', 'MARÍA JOSÉ CEVALLOS CRUZ  ', '1723408017 ', '593 96 019 3559 ', 'ADULTO', 0, 0, 0, 171, 0),
-(1288, 'TG55881', 'SEBASTIAN ALEJANDRO GUAÑA GORDILLO ', '1715544308 ', '', 'ADULTO', 0, 0, 0, 171, 0),
-(1289, 'TG57699', 'MIGUEL RICARDO GALICIA URRUTIA  ', '110101 377608076  ', '502 4978-3893 ', 'ADULTO', 0, 0, 0, 544, 0),
-(1290, 'TG57699', 'SERGIO ARTURO CASITLLO LÓPEZ ', '110101 392885212 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1291, 'TG58564', 'INGRID SULENY PATIÑO HERNÁNDEZ ', '1.000.116.754 ', '+573118160978', 'ADULTO', 0, 0, 0, 580, 0),
-(1292, 'TG58564', 'DORALISIS GAVIRIA HERNÁNDEZ  ', '41472720 ', '', 'ADULTO', 0, 0, 0, 580, 0),
-(1293, 'TG59146', 'JULIANA ROMERO ', '1042250183', '573023998334', 'ADULTO', 0, 0, 0, 580, 0),
-(1294, 'TG59146', 'LAURA ESCOBAR', '1139426309', '573023998334', 'ADULTO', 0, 0, 0, 580, 0),
-(1295, 'TG59146', 'JAVIER DE LA CRUZ', '1044622259', '573023998334', 'ADULTO', 0, 0, 0, 580, 0),
-(1296, 'TG59416', 'SHAHT SMIT', '640227902 ', '15103648949', 'ADULTO', 0, 0, 0, 246, 0),
-(1297, 'TG59416', ' SHAHT NEHA', '640227903 ', '', 'ADULTO', 0, 0, 0, 246, 0),
-(1298, 'TG60772', 'LINA YEPES', '1093226879 ', '324 5938114 ', 'ADULTO', 0, 0, 0, 544, 0),
-(1299, 'TG60772', 'SARA GONZALEZ', '1088828113 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1300, 'TG60772', 'KYRIAN RODRIGUEZ', 'B06747821 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1301, 'TG60772', 'KEVIN BRIONES', 'A8997038 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1302, 'TG61379', 'ANTHONY JOSEPH ALARCÓN TORRES  ', '2300407182 ', '‪+593 99 487 2833', 'ADULTO', 0, 0, 0, 59, 0),
-(1303, 'TG61601', 'JHOANNY REYES ', '163159009 ', '584122577028', 'ADULTO', 0, 0, 0, 6, 0),
-(1304, 'TG61601', 'MARÍA MALDONADO ', '168870848 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1305, 'TG61612', 'ESTEBAN GARCES', 'A8969531 ', '+593 99 782 3846', 'ADULTO', 0, 0, 0, 81, 0),
-(1306, 'TG61612', 'AMANDA ROJAS', '171001505', '', 'ADULTO', 0, 0, 0, 81, 0),
-(1307, 'TG61631', 'LIZETH CAMARGO', '1.022.372.160', '+573162671600', 'ADULTO', 0, 0, 0, 372, 0),
-(1308, 'TG61631', 'ANA GOMEZ', '1.018.510.920', '', 'ADULTO', 0, 0, 0, 372, 0),
-(1309, 'TG61663', 'IRENE CEDEÑO', 'PA1228927', '507 66599376 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1310, 'TG61663', 'GERMÁN SÁNCHEZ FERNÁNDEZ ', 'PA1278692', '507 65363105 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1311, 'TG61663', 'FERMIN CEDEÑO CASTILLO ', 'PA1104713', '507 66769525 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1312, 'TG61663', 'GERMAN SÁNCHEZ CEDEÑO', 'PA1278693', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1313, 'TG61663', 'DANIELA SÁNCHEZ CEDEÑO ', 'PA1278728', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1314, 'TG61791', 'MARÍA TERESA BRICEÑO BRICEÑO ', 'V- 29.638.425', '58 4247560431 ​', 'ADULTO', 0, 0, 0, 6, 0),
-(1315, 'TG61791', 'MARÍA JOSÉ URDANETA BECERRA ', '​V- 28.297.195', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1316, 'TG61791', 'DANIEL ALEJANDRO URDANETA BECERRA ', 'V- 27.675.026', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1317, 'TG61791', 'MARÍA FERNANDA MOLINA MORENO', '1.091.382.371', '', 'ADULTO', 0, 0, 0, 6, 0);
+(1039, 'TG10146', 'ELIZABETH LEMA ', '1711749638 ', '593 998577288 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1040, 'TG10146', 'NANTHAR FAREZ ', '1722165618 ', '593995400750', 'ADULTO', 0, 0, 0, 87, 1),
+(1041, 'TG10146', 'TAMY BELTRAN ', '1751394212', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1042, 'TG10146', 'BRYAN MIER ', '0401792619 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1043, 'TG10871', '​LEYDI PAOLA LUCIO VALENCIA ', '1114488752 ', '573166217306', 'ADULTO', 0, 0, 0, 544, 1),
+(1044, 'TG10871', 'DANIELA RODRÍGUEZ GÓMEZ  ', '1143874643  ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1045, 'TG10871', 'LAURA NATALIA OROZCO OROZCO  ', '1061782554 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1046, 'TG10871', 'LIZETH FERNANDA MARÍN DE JESÚS  ', '1151941420 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1047, 'TG10964', 'OSCARY SANTIAGO ', '594098358 ', '+1 7872422376', 'ADULTO', 0, 0, 0, 410, 1),
+(1048, 'TG10964', 'NOE PANTOJA ', 'A68818123 ', '', 'ADULTO', 0, 0, 0, 410, 1),
+(1049, 'TG11565', 'HAROLD SNEIDER DÍAZ RODRÍGUEZ  ', '1024574431 ', '57 3115372347', 'ADULTO', 0, 0, 0, 6, 1),
+(1050, 'TG11565', 'ANA MARÍA PRADA RINCON ', '1022433610', '57 3207501457 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1051, 'TG11706', 'MARCELA PALACIOS ', 'A06235776 ', '50375359994 ', 'ADULTO', 0, 0, 0, 449, 1),
+(1052, 'TG11706', 'LORENA PALACIOS ', 'A00209453 ', '', 'ADULTO', 0, 0, 0, 449, 1),
+(1053, 'TG12399', 'BRISLEINYS AYNARA PARRA CARDOZO  ', '185079792 ', '58 412-4830749', 'ADULTO', 0, 0, 0, 306, 1),
+(1054, 'TG12399', 'LINO ERNESTO ALVAREZ GOMEZ', '185065986', '', 'ADULTO', 0, 0, 0, 306, 1),
+(1055, 'TG13084', 'MARIA GARCES ', 'N21574489', '+525541832707', 'ADULTO', 0, 0, 0, 333, 1),
+(1056, 'TG13084', 'JORGE VILLALBA ', 'N22351751', '', 'ADULTO', 0, 0, 0, 333, 1),
+(1057, 'TG13484', 'ENRIQUE KAY AÑEZ  ', 'FE48527 ', '59176699184', 'ADULTO', 0, 0, 0, 127, 1),
+(1058, 'TG13484', 'RAFAEL KAY VACA  ', 'PENDIENTE ', '', 'ADULTO', 0, 0, 0, 127, 1),
+(1059, 'TG14221', 'LEIDY JOHANNA DURÁN MANTILLA ', '1095809066', '57 3176518743  ', 'ADULTO', 0, 0, 0, 337, 1),
+(1060, 'TG14221', 'SANDRA PATRICIA MANTILLA PARRA  ', '63483797', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1061, 'TG14221', 'YOLANDA MANTILLA OJEDA ', '28131511 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1062, 'TG14221', 'ALICIA FUENTES DE DURÁN  ', '37801228 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1063, 'TG14312', 'KIMBERLLY VARGAS', 'PA1420583', '507 6002-2145', 'ADULTO', 0, 0, 0, 192, 1),
+(1064, 'TG14312', 'LATOYA MORAIS', 'PA1228808', '507 6761-7167', 'ADULTO', 0, 0, 0, 192, 1),
+(1065, 'TG15086', 'CARLA VANESSA POZO BELTRÁN ', '0919842948 ', '593992395977', 'ADULTO', 0, 0, 0, 335, 1),
+(1066, 'TG15086', 'LUCCIANA ROMINA CHANG POZO ', '0931618490 ', '', 'ADULTO', 0, 0, 0, 335, 1),
+(1067, 'TG15656', 'CLAIRE QUIRK', 'PW7038335 ', '+44 7936 450686', 'ADULTO', 0, 0, 0, 207, 1),
+(1068, 'TG15656', 'EMMA MCCORMACK ', 'PF7878905 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1069, 'TG15656', 'CALUM TEAM ', '135584491 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1070, 'TG15656', 'JOHN REGAN ', '135043459 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1071, 'TG15656', 'BEN NIPPARD ', '560174700 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1072, 'TG15656', 'SIOBHAN ANDERSON ', '145822261 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1073, 'TG15656', 'SINEAD DUGGAN ', 'PP5398629 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1074, 'TG15656', 'SARAH MICHALEK ', 'FE5807553 ', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1075, 'TG15656', 'DOMINIKA KUBERA ', 'FJ0209302', '', 'ADULTO', 0, 0, 0, 207, 1),
+(1076, 'TG16266', 'ALEJANDRA NORMA FIGUEROA ', 'A58361174', '15512008303', 'ADULTO', 0, 0, 0, 337, 1),
+(1077, 'TG16266', 'KARINA CONSTANZA FLORES', '664623378', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1078, 'TG18165', 'STEPHANIA SANDOVAL', 'P11007967 ', '507 6627-6702', 'ADULTO', 0, 0, 0, 574, 1),
+(1079, 'TG18165', 'RODRIGO SILVA ', 'P15912739 ', '', 'ADULTO', 0, 0, 0, 574, 1),
+(1080, 'TG18722', 'ANDERSSON JEFFREY ÁVILA CONDIA ', '1193220071 ', '+573102273603', 'ADULTO', 0, 0, 0, 87, 1),
+(1081, 'TG18722', 'YADIRA ANDREA VARGAS MOJICA  ', '1057598494', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1082, 'TG19119', 'DANIELA DÍAZ GIL, ', '1110285993 ', '573043193451 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1083, 'TG19119', 'LIVEIDA IVONNE GIL DORADO, ', '66987082 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1084, 'TG19119', 'EDISON ADOLFO RAIGOZA ', '94453072 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1085, 'TG20585', 'KARLA GARCIA', '0704910306', '593939689192', 'ADULTO', 0, 0, 0, 230, 1),
+(1086, 'TG20585', ' CRISTOPHER VILLAROEL', '093032129', '', 'ADULTO', 0, 0, 0, 230, 1),
+(1087, 'TG21462', 'ROXY YULEIDY PEÑALOZA ROCHA   ', '1070608718  ', '57 3006968838 ', 'ADULTO', 0, 0, 0, 39, 1),
+(1088, 'TG21462', 'JUAN PABLO MARULANDA PÉREZ   ', '1030631419', '', 'ADULTO', 0, 0, 0, 39, 1),
+(1089, 'TG21524', 'DANIEL GUTIÉRREZ SERNA  ', '1006875881', '573045617966', 'ADULTO', 0, 0, 0, 580, 1),
+(1090, 'TG21524', 'ANA SOFÍA ZULUAGA ', '1193205022 ', '573045617966', 'ADULTO', 0, 0, 0, 580, 1),
+(1091, 'TG21524', 'EVA MARÍA BOTIA ', '51618380', '573045617966', 'ADULTO', 0, 0, 0, 580, 1),
+(1092, 'TG22311', 'DUVAN SANTIAGO MENDOZA TABORDA', '1000003680', '+573202549755', 'ADULTO', 0, 0, 0, 571, 1),
+(1093, 'TG22311', 'VANESSA CAROLINA CADENA OTALORA', '1001203428', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1094, 'TG22311', 'DIEGO ALEJANDRO MENDOZA TABORDA', '1233901512', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1095, 'TG22311', 'LICETH NORELA SUATERNA ACOSTA', '1001197718', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1096, 'TG22311', 'JUAN PABLO PIRAQUIVE MANCHEGO', '1010019285', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1097, 'TG22311', 'MAIKOL SANTIAGO PEREZ FUENTES', '1233888250', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1098, 'TG22856', 'MICHELLE GORDON', 'A03952804', '+19789943446', 'ADULTO', 0, 0, 0, 168, 1),
+(1099, 'TG22856', 'AUDREY DZMURA', 'A73887651', '', 'ADULTO', 0, 0, 0, 168, 1),
+(1100, 'TG22856', 'ANTOINETTE CONANT', 'A62784656', '', 'ADULTO', 0, 0, 0, 168, 1),
+(1101, 'TG22856', 'MADISON HOOKS', '549047457', '', 'ADULTO', 0, 0, 0, 168, 1),
+(1102, 'TG23423', 'DYLAN UMAÑA', 'B01231369', '506 8872 4564', 'ADULTO', 0, 0, 0, 460, 1),
+(1103, 'TG23423', 'ARIANA ALVARADO MADRIGAL ', 'B00740079', '', 'ADULTO', 0, 0, 0, 460, 1),
+(1104, 'TG23942', 'CRISTABELL WONG', '0930391529', '593979097737', 'ADULTO', 0, 0, 0, 87, 1),
+(1105, 'TG23942', 'GUSTAVO VÁZQUEZ', '0927473397', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1106, 'TG23942', 'BEIYING WONG', '0924539117', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1107, 'TG23942', ' MARÍA JOSÉ LUCAS', '0931031736', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1108, 'TG23942', 'JOHANNA AGUIRRE', '0926231002', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1109, 'TG23942', 'DENNIS FRANCO', '0955805767', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1110, 'TG23942', 'ADRIANA PIURE CUSQUE', '0950372342', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1111, 'TG23942', 'ELVIA CUSQUE ROVALINO', '0909441479', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1112, 'TG23942', 'LUIS PIURE TILER', '0909334591', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1113, 'TG23975', 'FABIÁN FELIPE LOAIZA RODRÍGUEZ  ', '1234190825 ', '57 317 8352288', 'ADULTO', 0, 0, 0, 544, 1),
+(1114, 'TG23975', 'YENNI ALEXANDRA RAMOS OJEDA  ', '1144193041 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1115, 'TG24769', 'FRANKLIN JAVIER ALVARENGA SORTO ', 'E1042442 ', '+504-98117460', 'ADULTO', 0, 0, 0, 6, 1),
+(1116, 'TG24769', 'MARÍA ISABEL ACOSTA SANTAMARÍA ', 'E1893146 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1117, 'TG25485', 'MARIA CHAVEZ', 'PA1021856', '+507 6383-5599', 'ADULTO', 0, 0, 0, 330, 1),
+(1118, 'TG25485', 'JORGE NAVARRO', 'PA1138398', '', 'ADULTO', 0, 0, 0, 330, 1),
+(1119, 'TG25777', 'LEIDY TATIANA RODRÍGUEZ SARMIENTO ', '1010202298 ', '573202000218', 'ADULTO', 0, 0, 0, 544, 1),
+(1120, 'TG25777', 'MARIA XIMENA GARAY QUEVEDO ', '1073238350 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1121, 'TG25814', 'GILBERT YESID HOYOS CASTRO', '1007384397', '573019222154', 'ADULTO', 0, 0, 0, 288, 1),
+(1122, 'TG26099', 'MARIANA ARANGO BARRERA ', '​1014596579 ', '​57 3114406359 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1123, 'TG26099', 'JUAN SEBASTIAN CORTES MORALES ', '1014990963 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1124, 'TG26099', 'VALENTINA ARANGO BARRERA ', '1193071866 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1125, 'TG26548', 'EVELYN JANNIS PERALTA SÁNCHEZ', 'N20767092', '+52 662 361 7573', 'ADULTO', 0, 0, 0, 609, 1),
+(1126, 'TG26548', 'GILBERTO LOPEZ CORDOVA', 'LPCRGL96042726H200', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1127, 'TG26548', 'JAIRO IVAN CANO LOPEZ', 'CNLPJR95092526H500', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1128, 'TG26548', 'KAREN SALOMON VALENZUELA', 'N20766960', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1129, 'TG26548', 'KASANDRA SALOMON VALENZUELA', 'N20766971', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1130, 'TG26548', 'LARISSA YAZDETH QUIÑONEZ VALENZUELA', 'QNVLLR99071026M900', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1131, 'TG26548', 'LUIS FERNANDO VALENZUELA LOPEZ', 'VLLPLS96090826H700', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1132, 'TG26548', 'MARIA DEL CARMEN PEREZ VALENZUELA', 'N08932899', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1133, 'TG26548', 'ROBERTO MISSAEL CERDA CASTILLO', 'N00974537', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1134, 'TG26548', 'ROXANA ARELI ALLENDE VALENZUELA', 'N09854429', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1135, 'TG26548', 'VIDIDIANA NEVAREZ PALMA', 'N20766795', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1136, 'TG26548', 'YOLANDA AVILEZ VALDEZ', 'G41487563', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1137, 'TG26548', 'YOLANDA JAZMINE RINCON', '557716739', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1138, 'TG26548', 'RIGOBERTO RINCON', 'A68359629', '', 'ADULTO', 0, 0, 0, 609, 1),
+(1139, 'TG29169', 'MARIA CATALINA ROJAS MONTAÑO', '1015465140', '+573168689506', 'ADULTO', 0, 0, 0, 353, 1),
+(1140, 'TG29169', 'ANGGI CAROLINA RODRIGUEZ', '1032486002', '', 'ADULTO', 0, 0, 0, 353, 1),
+(1141, 'TG29169', 'EDISSON ORLANDO ROJAS', '1016029531', '', 'ADULTO', 0, 0, 0, 353, 1),
+(1142, 'TG29794', 'CAMILA MALDONADO', 'A4101100 ', '+593 99 976 2487 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1143, 'TG29794', 'KEVIN TORRES ', 'A3914229', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1144, 'TG31569', 'MARIA OLGA CUCAITA', '52310731', '573002280672 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1145, 'TG31569', 'JHON FREDDY OSPITIA ', '80370280 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1146, 'TG31622', 'VICTOR CHAPMAN VALERA ', 'RD8427356', '18098015408', 'ADULTO', 0, 0, 0, 470, 1),
+(1147, 'TG31622', 'BELLANILDA ARIAS GONZALEZ ', 'RD6523758', '', 'ADULTO', 0, 0, 0, 470, 1),
+(1148, 'TG31817', 'DARLIN FLOREZ', '1016723811  ', '573138102372', 'ADULTO', 0, 0, 0, 544, 1),
+(1149, 'TG31817', 'GLORIA AMPARO GOMEZ CRUZ  ', '29185667 ', '57 3104482034 ', 'ADULTO', 0, 0, 0, 544, 1),
+(1150, 'TG32227', 'MARIA ROJAS', '1001456281 ', '+57 315 2514796', 'ADULTO', 0, 0, 0, 6, 1),
+(1151, 'TG32227', 'MARIANA SOSSA', '1001456281 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1152, 'TG32671', 'SAMANTHA CEVALLOS ', '1721434353 ', '+593 98 463 1295', 'ADULTO', 0, 0, 0, 59, 1),
+(1153, 'TG32671', 'DOMÉNICA CEVALLOS ', '1726076332 ', '', 'ADULTO', 0, 0, 0, 59, 1),
+(1154, 'TG32965', 'DIANA MARCELA MEDRANO RUBIANO ', '1000784303 ', '57 3005703258 ', 'ADULTO', 0, 0, 0, 306, 1),
+(1155, 'TG32965', 'YURANI CASTAÑEDA PATIÑO ', '1194430199 ', '', 'ADULTO', 0, 0, 0, 306, 1),
+(1156, 'TG32965', 'KAREN ANDREA RAMIREZ ACOSTA', '1016113879 ', '', 'ADULTO', 0, 0, 0, 306, 1),
+(1157, 'TG33048', 'JUAN DAVID MÉNDEZ ESPÍNDOLA  ', '1098070261 ', '573167862010', 'ADULTO', 0, 0, 0, 580, 1),
+(1158, 'TG33048', 'LUZ ESNAIRA VEGA ACEVEDO  ', '1005371879 ', '', 'ADULTO', 0, 0, 0, 580, 1),
+(1159, 'TG33459', 'AMIRA REYES DÍAZ ', '39151487 ', '57 3173512412 ', 'ADULTO', 0, 0, 0, 304, 1),
+(1160, 'TG33459', 'JOSÉ ANTONIO OROZCO MARRUGO ', '73111564 ', '57 3053456925', 'ADULTO', 0, 0, 0, 304, 1),
+(1161, 'TG33568', 'JOSÉ DANIEL DUARTE MORENO  ', '1003966561  ', '57 312 5896502', 'ADULTO', 0, 0, 0, 6, 1),
+(1162, 'TG33568', 'HENERIETH PERDOMO BARRIOS  ', '1077845314 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1163, 'TG33568', 'JUAN DAVID CASTRO GUERRERO  ', '1007349693', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1164, 'TG33568', 'MARÍA PAULA MÉNDEZ BARRERA ', '1078266161 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1165, 'TG33568', 'JUAN ANDRÉS CADAVID BARRERA ', '1108333412', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1166, 'TG33590', 'ANGIE PAOLA GONZALEZ BERNAL  ', '1.116.642.004 ', '+573112491219', 'ADULTO', 0, 0, 0, 470, 1),
+(1167, 'TG33590', 'KAREN MAYERLI FARFÁN TAY ', '1.118.528.175 ', '+573132151749', 'ADULTO', 0, 0, 0, 470, 1),
+(1168, 'TG33851', '​SCARLET SUSANA SUMBA UZHO  ', '0950898825  ', '593992333362', 'ADULTO', 0, 0, 0, 91, 1),
+(1169, 'TG33851', 'KATHERINE MILENA MORAN GAMBOA  ', '0952831592 ', '', 'ADULTO', 0, 0, 0, 91, 1),
+(1170, 'TG33851', 'MINA MORAN JUAN JOSE  ', '0953856028 ', '', 'ADULTO', 0, 0, 0, 91, 1),
+(1171, 'TG33851', 'MARÍA GUADALUPE CEDEÑO CONTRERAS  ', '0952786994 ', '', 'ADULTO', 0, 0, 0, 91, 1),
+(1172, 'TG34222', 'PAMELA MORALES ', 'C06329089 ', '503 7056 1808', 'ADULTO', 0, 0, 0, 87, 1),
+(1173, 'TG35303', 'JOSE FERRUFINO', 'F628919', '+50431984049', 'ADULTO', 0, 0, 0, 372, 1),
+(1174, 'TG35303', 'FATIMA TORRES', 'F935624', '', 'ADULTO', 0, 0, 0, 372, 1),
+(1175, 'TG35303', 'JEFFREY FERRUFINO', 'A27091642', '', 'ADULTO', 0, 0, 0, 372, 1),
+(1176, 'TG35303', 'ZANDY VALENCIA', '111210210668121', '', 'ADULTO', 0, 0, 0, 372, 1),
+(1177, 'TG35309', 'LUZ PIEDAD ACEVEDO PATIÑO', '43095665 ', '573014706648', 'ADULTO', 0, 0, 0, 337, 1),
+(1178, 'TG35309', 'THOMAS CAMILO VANEGAS ACEVEDO', '1025641781 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1179, 'TG35321', 'JOSE GREGORIO KOUBBE ', '164282672', '584128358717', 'ADULTO', 0, 0, 0, 6, 1),
+(1180, 'TG35321', 'CHARBEL JOSE KOUBBE ', '164282740', '584242416875', 'ADULTO', 0, 0, 0, 6, 1),
+(1181, 'TG35425', 'JOSSELYN MAGAÑA ', 'B04885793 ', '+503 7024 5830 ', 'ADULTO', 0, 0, 0, 271, 1),
+(1182, 'TG35425', 'JOSE CUELLAR ', 'B05380643 ', '', 'ADULTO', 0, 0, 0, 271, 1),
+(1183, 'TG35425', 'HAVI CASTILLO ', 'A058777952   ', '', 'ADULTO', 0, 0, 0, 271, 1),
+(1184, 'TG35749', 'MARIA JOSE ACOSTA ', '1803604691', '593 983059255 ', 'ADULTO', 0, 0, 0, 455, 1),
+(1185, 'TG35749', 'AVIER DAVID ORTIZ COKA', '1804739132 ', '593 995971166 ', 'ADULTO', 0, 0, 0, 455, 1),
+(1186, 'TG37222', 'BYRON TOLEDO ', '092347933-1 ', '+593 96 792 3537', 'ADULTO', 0, 0, 0, 87, 1),
+(1187, 'TG37912', 'FENNA KETTING  ', 'NSKD5R529 ', '31622420950 ', 'ADULTO', 0, 0, 0, 9, 1),
+(1188, 'TG38571', 'PEDRO ENRIQUE RINCÓN RODRÍGUEZ ', 'PA1408440 ', '507 6671-3299', 'ADULTO', 0, 0, 0, 6, 1),
+(1189, 'TG38571', 'DIANA CAROLINA QUINTERO DÍAZ', 'PA1440424 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1190, 'TG38841', 'YARA INDIRA WALD RIVERA ', 'PA1142413 ', '50762601040', 'ADULTO', 0, 0, 0, 542, 1),
+(1191, 'TG38841', 'YELMIS YUISETH CASTILLO CARRERA ', 'PA0827200 ', '', 'ADULTO', 0, 0, 0, 542, 1),
+(1192, 'TG39010', 'YOLANDA CAMPOS ', '582054796', '+13236336544', 'ADULTO', 0, 0, 0, 107, 1),
+(1193, 'TG39010', 'SAMANTHA CAMPOS', 'A71653859', '', 'ADULTO', 0, 0, 0, 107, 1),
+(1194, 'TG39010', 'NADIA ROMERO', '595819513', '', 'ADULTO', 0, 0, 0, 107, 1),
+(1195, 'TG39010', 'NADIA SORTO', '656876788', '', 'ADULTO', 0, 0, 0, 107, 1),
+(1196, 'TG39022', 'DIANA MERCEDES PARDO TOMALA', '0925496580', '+59396222031', 'ADULTO', 0, 0, 0, 134, 1),
+(1197, 'TG39022', 'ANDRE ELIAS MENDONA', '0920029576', '+59396222031', 'ADULTO', 0, 0, 0, 134, 1),
+(1198, 'TG39200', 'GRACIELA GODÍNEZ ', '300173687 ', '502 5444 4817', 'ADULTO', 0, 0, 0, 574, 1),
+(1199, 'TG39200', 'SERGIO GODÍNEZ  ', '221587225 ', '', 'ADULTO', 0, 0, 0, 574, 1),
+(1200, 'TG40853', 'FRANCHESKA HDEZ  ', 'XDD608609 ', ' ‪+34 625 18 10 75', 'ADULTO', 0, 0, 0, 337, 1),
+(1201, 'TG40853', 'SONIA MOZO  ', 'PAY 372306 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1202, 'TG40853', 'ERIKA YOJANA PEREZ MORALES', '43752686 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1203, 'TG41109', 'EMILY VEGA AVENDAÑO', '1023022813', '573107776171', 'ADULTO', 0, 0, 0, 6, 1),
+(1204, 'TG41109', 'LUIS FELIPE CAMPOS CASTIBLANCO', '1022968455', '573118473173', 'ADULTO', 0, 0, 0, 6, 1),
+(1205, 'TG41109', 'ANGIE PAOLA AVENDAÑO CASTIBLANCO', '1023004765', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1206, 'TG41109', 'EDNA MARGARITA CALDERON GOMEZ', '39801807', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1207, 'TG41489', 'STEFHANY DE BRITO ', '195528273   ', ' +58 412-0113975 ', 'ADULTO', 0, 0, 0, 270, 1),
+(1208, 'TG41489', 'VALENTINA RODRÍGUEZ ', '172790462', '', 'ADULTO', 0, 0, 0, 270, 1),
+(1209, 'TG41591', 'SUJEEVEN JEGANATHAN ', 'N8341616 ', '94721000000', 'ADULTO', 0, 0, 0, 148, 1),
+(1210, 'TG41591', 'SHABITHA AMARASINGHAM', 'CFC425905 ', '', 'ADULTO', 0, 0, 0, 148, 1),
+(1211, 'TG41837', 'DAYALIZ MICHELL PINEDA GIL ', ' 29908480', '584247374576', 'ADULTO', 0, 0, 0, 346, 1),
+(1212, 'TG41837', 'EDGAR VELASCO  ', '  28195358', '584247374576', 'ADULTO', 0, 0, 0, 346, 1),
+(1213, 'TG42282', 'ANABEL HERNÁNDEZ  ', '569728951 ', '+19152167273', 'ADULTO', 0, 0, 0, 31, 1),
+(1214, 'TG42477', 'LAUREN CANTILLO BEDOYA ', '1143413282 ', '3006491118 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1215, 'TG42477', 'SKARLIN DAYANA PÉREZ MEZA ', '1143408686 ', '3023330959 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1216, 'TG42477', 'YARLYS PAOLA ARTEAGA PADILLA ', '1007469900 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1217, 'TG42477', 'YULIS CABARCAS PIMENTEL ', '30871938 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1218, 'TG42677', 'GABRIEL VELAZCO  ', '1148217425 ', '+58 414-0748536', 'ADULTO', 0, 0, 0, 6, 1),
+(1219, 'TG42677', 'MARIANGEL MEDINA  ', '30339248 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1220, 'TG43742', 'MIGUEL PITTI', 'PA1437295', '507 6598-8698', 'ADULTO', 0, 0, 0, 535, 1),
+(1221, 'TG43742', 'MADELINE SANCHEZ', 'PA1437252', '', 'ADULTO', 0, 0, 0, 535, 1),
+(1222, 'TG43742', 'THIAGO PITTI', 'PA1437251', 'INFANTE', 'INFANTE', 0, 0, 0, 535, 1),
+(1223, 'TG46025', 'JHONATTAN FERNANDO APONTE GAMBOA ', '1001330199', '+57 321 9697197', 'ADULTO', 0, 0, 0, 6, 1),
+(1224, 'TG46025', 'DAVID HERNAN CASALLAS BURGOS', '1015993002', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1225, 'TG46025', 'QUILES ARLEY GONZALEZ RUBIANO', '1000856635', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1226, 'TG46025', 'FAIHD ENRIQUE PINEDA DUQUE', '1046812108', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1227, 'TG46025', 'MARIA JOSE GENES MARTINEZ', '1028881095', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1228, 'TG46260', 'NIKLAS HEITMAN ', 'C1N25C9PN ', '34611706387 ', 'ADULTO', 0, 0, 0, 73, 1),
+(1229, 'TG46260', 'EVA VANEGAS ', '1193394758 ', '', 'ADULTO', 0, 0, 0, 73, 1),
+(1230, 'TG46365', 'OSCAR IVÁN AGUILAR DE LEÓN', '217309305', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1231, 'TG46365', 'JOSÉ MIGUEL PAZ PAZ', '261162128 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1232, 'TG46365', 'CLAUDIA LORENA GARCÍA', '313366071 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1233, 'TG46365', 'CHRISTOFER WILFREDO BULUX DE LEÓN', '322764998 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1234, 'TG46365', 'ALDO EDUARDO AGUILAR DE LEÓN', '276022475 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1235, 'TG46365', 'MYNOR DANIEL GARCÍA OROZCO', '351537228 ', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1236, 'TG46365', 'BYRON NICOLAS PEDROZA DUARTE', '1054285169', '50256191588', 'ADULTO', 0, 0, 0, 187, 1),
+(1237, 'TG46598', 'MARIA RAMIREZ  ', 'G39791930 ', '18056890589 ', 'ADULTO', 0, 0, 0, 210, 1),
+(1238, 'TG47353', 'CAROLINA ELVIRA ATENCIO LEZCANO ', '4-97-1353 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1239, 'TG47353', 'MARGOTH ISELA SUIRA ATENCIO ', '4-268-705 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1240, 'TG47353', 'ZULEIKA VIANETH SUIRA ATENCIO DE MIRANDA ', '4-292-164 ', '507 65758356', 'ADULTO', 0, 0, 0, 497, 1),
+(1241, 'TG47353', 'SUSAN CAROLINA MIRANDA SUIRA ', '8-1012-706 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1242, 'TG47353', 'SULANI MARGOTH MIRANDA SUIRA ', '4-802-525', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1243, 'TG48187', 'DALIS RAMOS ', '45483935', '573053361274', 'ADULTO', 0, 0, 0, 242, 1),
+(1244, 'TG48187', 'MARY FERNANDEZ ', '1143342145', '', 'ADULTO', 0, 0, 0, 242, 1),
+(1245, 'TG48753', 'WILSON ESPINOZA AROCA ', '0955067368 ', '593 98 244 1949 ', 'ADULTO', 0, 0, 0, 127, 1),
+(1246, 'TG48753', 'MICHELLE RODRÍGUEZ MERCHÁN  ', '0930339551', '', 'ADULTO', 0, 0, 0, 127, 1),
+(1247, 'TG48818', 'ANA SOLANGEL QUINTERO  ', '32401915', '3014932175 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1248, 'TG49399', 'LIZBETH IVANNE MOSQUERA LAYEDRA ', 'A9997261 ', '+5 93994636390 ', 'ADULTO', 0, 0, 0, 571, 1),
+(1249, 'TG49399', 'ADRIAN ALEJANDRO VILLAALVA SANCHEZ  ', ' 172167017 - 0 ', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1250, 'TG50128', 'ROBERTO JOSUE RODRÍGUEZ POVEDA ', 'A8059922 ', '593990040183', 'ADULTO', 0, 0, 0, 87, 1),
+(1251, 'TG50128', 'GABRIELA ELIZABETH ALVEAR RICHARDS', 'A8105133 ', '593990040183', 'ADULTO', 0, 0, 0, 87, 1),
+(1252, 'TG50128', 'EMMA HERNANDEZ ', 'A8088464 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1253, 'TG50128', 'ARIANNA ZÚÑIGA PESANTES  ', 'A9221675 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1254, 'TG50128', 'JANETH LIMONES ZAMBRANO ', 'A9338760 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1255, 'TG50128', 'DAVID ADRIAN ORDÓÑEZ MENDIETA', 'A8416444 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1256, 'TG50128', ' JHOSELYN ARIANNA SANCHEZ PAREDES ', 'A8539862 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1257, 'TG51057', 'ANDREA AYALA', '1016001678 ', '573108301786', 'ADULTO', 0, 0, 0, 6, 1),
+(1258, 'TG51057', 'IVÁN AYALA', '1016076046 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1259, 'TG51057', 'SANDRA MEDINA', '1073254785 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1260, 'TG51162', 'BRIAM CONTRERAS', '1.129.536.611 ', '3002983334 ', 'ADULTO', 0, 0, 0, 460, 1),
+(1261, 'TG51162', 'MATIAS CONTRERAS', '1.046.710.776 ', '', 'ADULTO', 0, 0, 0, 460, 1),
+(1262, 'TG51301', 'VERA KATHARINA SCHUMANN', 'C1RVW794F', '49 179 4701331 ', 'ADULTO', 0, 0, 0, 10, 1),
+(1263, 'TG52037', 'SARAI PIMENTEL ', 'RD8820150 ', '+1 8492294343', 'ADULTO', 0, 0, 0, 542, 1),
+(1264, 'TG52037', 'RUTH RAMIREZ ', 'RD6715795 ', '+1 809 7608245', 'ADULTO', 0, 0, 0, 542, 1),
+(1265, 'TG53606', 'DANIELA MEZA  ', 'N 114155506', '3027467665 ', 'ADULTO', 0, 0, 0, 187, 1),
+(1266, 'TG53690', 'GILSON DE MIRANDA', 'GK708733', '553199978493', 'ADULTO', 0, 0, 0, 242, 1),
+(1267, 'TG53690', 'CLAUDIA SIQUEIRA ', 'FR937369', '', 'ADULTO', 0, 0, 0, 242, 1),
+(1268, 'TG54524', 'SHARYN SMITH ', 'PA1161449', '50761594214', 'ADULTO', 0, 0, 0, 87, 1),
+(1269, 'TG54524', 'YOISETH SERRACIN', 'PA1020141', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1270, 'TG54712', 'ALISON SAMANTHA MADRID GARCÉS  ', '1723569883', '593992796274 ', 'ADULTO', 0, 0, 0, 583, 1),
+(1271, 'TG54712', 'JOSÉ MATEO PARRA VIVAR', '0106928434', '', 'ADULTO', 0, 0, 0, 583, 1),
+(1272, 'TG54712', 'ANA GABRIELA GUALLPA ZUÑA ', '0104432097', '', 'ADULTO', 0, 0, 0, 583, 1),
+(1273, 'TG54712', 'CRISTOPHER STALIN ALEMAN SIGÜENZA ', '0107627507', '', 'ADULTO', 0, 0, 0, 583, 1),
+(1274, 'TG54730', 'ANDREA CAROLINA CARRILLO ROSALES ', '1002243172 ', '573135490810', 'ADULTO', 0, 0, 0, 544, 1),
+(1275, 'TG54730', 'ARES LEONARDO CARRILLO ROSALES ', '1004378500 ', '573135490810', 'ADULTO', 0, 0, 0, 544, 1),
+(1276, 'TG54730', 'LEONARDO CARRILLO ROMERO', '88197420', '573135490810', 'ADULTO', 0, 0, 0, 544, 1),
+(1277, 'TG54796', 'KAREN ILEANA BONILLA DE PORTILLO  ', 'B00076886 ', '503 61804423 ', 'ADULTO', 0, 0, 0, 402, 1),
+(1278, 'TG54796', 'MITZI DARIA PORTILLO BONILLA  ', 'B06610682 ', '', 'ADULTO', 0, 0, 0, 402, 1),
+(1279, 'TG54796', 'ILEANA NICOLE PORTILLO BONILLA  ', 'B05713888', '', 'ADULTO', 0, 0, 0, 402, 1),
+(1280, 'TG54857', 'KARLA VALERIA ECHEVERRÍA ESPIN ', 'A4291763 ', '573016842190', 'ADULTO', 0, 0, 0, 6, 1),
+(1281, 'TG55259', 'JAIME JOSÉ SALAZAR GRANDA ', '0706148210', '593959924285', 'ADULTO', 0, 0, 0, 6, 1),
+(1282, 'TG55259', 'THAIS VALENTINA PALADINES REY ', '0707108981', '593959924285', 'ADULTO', 0, 0, 0, 6, 1),
+(1283, 'TG55259', 'ANGELINA DAMARIS GONZALES SOTO ', '0750958282', '593959924285', 'ADULTO', 0, 0, 0, 6, 1),
+(1284, 'TG55274', 'ANDREA RAMÍREZ MENÉNDEZ   ', 'C05641427 ', '50377420968', 'ADULTO', 0, 0, 0, 176, 1),
+(1285, 'TG55274', 'TANIA GABRIELLA RIVERA VALENCIA ', 'A05445910', '', 'ADULTO', 0, 0, 0, 176, 1),
+(1286, 'TG55274', 'ADRIANA MARÍA PÉREZ ', 'C05438811', '', 'ADULTO', 0, 0, 0, 176, 1),
+(1287, 'TG55881', 'MARÍA JOSÉ CEVALLOS CRUZ  ', '1723408017 ', '593 96 019 3559 ', 'ADULTO', 0, 0, 0, 171, 1),
+(1288, 'TG55881', 'SEBASTIAN ALEJANDRO GUAÑA GORDILLO ', '1715544308 ', '', 'ADULTO', 0, 0, 0, 171, 1),
+(1289, 'TG57699', 'MIGUEL RICARDO GALICIA URRUTIA  ', '110101 377608076  ', '502 4978-3893 ', 'ADULTO', 0, 0, 0, 544, 1),
+(1290, 'TG57699', 'SERGIO ARTURO CASITLLO LÓPEZ ', '110101 392885212 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1291, 'TG58564', 'INGRID SULENY PATIÑO HERNÁNDEZ ', '1.000.116.754 ', '+573118160978', 'ADULTO', 0, 0, 0, 580, 1),
+(1292, 'TG58564', 'DORALISIS GAVIRIA HERNÁNDEZ  ', '41472720 ', '', 'ADULTO', 0, 0, 0, 580, 1),
+(1293, 'TG59146', 'JULIANA ROMERO ', '1042250183', '573023998334', 'ADULTO', 0, 0, 0, 580, 1),
+(1294, 'TG59146', 'LAURA ESCOBAR', '1139426309', '573023998334', 'ADULTO', 0, 0, 0, 580, 1),
+(1295, 'TG59146', 'JAVIER DE LA CRUZ', '1044622259', '573023998334', 'ADULTO', 0, 0, 0, 580, 1),
+(1296, 'TG59416', 'SHAHT SMIT', '640227902 ', '15103648949', 'ADULTO', 0, 0, 0, 246, 1),
+(1297, 'TG59416', ' SHAHT NEHA', '640227903 ', '', 'ADULTO', 0, 0, 0, 246, 1),
+(1298, 'TG60772', 'LINA YEPES', '1093226879 ', '324 5938114 ', 'ADULTO', 0, 0, 0, 544, 1),
+(1299, 'TG60772', 'SARA GONZALEZ', '1088828113 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1300, 'TG60772', 'KYRIAN RODRIGUEZ', 'B06747821 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1301, 'TG60772', 'KEVIN BRIONES', 'A8997038 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1302, 'TG61379', 'ANTHONY JOSEPH ALARCÓN TORRES  ', '2300407182 ', '‪+593 99 487 2833', 'ADULTO', 0, 0, 0, 59, 1),
+(1303, 'TG61601', 'JHOANNY REYES ', '163159009 ', '584122577028', 'ADULTO', 0, 0, 0, 6, 1),
+(1304, 'TG61601', 'MARÍA MALDONADO ', '168870848 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1305, 'TG61612', 'ESTEBAN GARCES', 'A8969531 ', '+593 99 782 3846', 'ADULTO', 0, 0, 0, 81, 1),
+(1306, 'TG61612', 'AMANDA ROJAS', '171001505', '', 'ADULTO', 0, 0, 0, 81, 1),
+(1307, 'TG61631', 'LIZETH CAMARGO', '1.022.372.160', '+573162671600', 'ADULTO', 0, 0, 0, 372, 1),
+(1308, 'TG61631', 'ANA GOMEZ', '1.018.510.920', '', 'ADULTO', 0, 0, 0, 372, 1),
+(1309, 'TG61663', 'IRENE CEDEÑO', 'PA1228927', '507 66599376 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1310, 'TG61663', 'GERMÁN SÁNCHEZ FERNÁNDEZ ', 'PA1278692', '507 65363105 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1311, 'TG61663', 'FERMIN CEDEÑO CASTILLO ', 'PA1104713', '507 66769525 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1312, 'TG61663', 'GERMAN SÁNCHEZ CEDEÑO', 'PA1278693', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1313, 'TG61663', 'DANIELA SÁNCHEZ CEDEÑO ', 'PA1278728', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1314, 'TG61791', 'MARÍA TERESA BRICEÑO BRICEÑO ', 'V- 29.638.425', '58 4247560431 ​', 'ADULTO', 0, 0, 0, 6, 1),
+(1315, 'TG61791', 'MARÍA JOSÉ URDANETA BECERRA ', '​V- 28.297.195', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1316, 'TG61791', 'DANIEL ALEJANDRO URDANETA BECERRA ', 'V- 27.675.026', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1317, 'TG61791', 'MARÍA FERNANDA MOLINA MORENO', '1.091.382.371', '', 'ADULTO', 0, 0, 0, 6, 1);
 INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, `Telefono_Pasajero`, `Tipo_Pasajero`, `Precio_Tour`, `Precio_Pasajero`, `Comision`, `Id_Punto`, `Confirmacion`) VALUES
-(1318, 'TG61791', 'REINALDO ANDRÉS LARA LLANES', 'V- 27.327.417', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1319, 'TG61791', 'DIEGO ENRIQUE VILLASMIL PAULINO', '1.127.340.958', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1320, 'TG62431', 'JOSE MARÍA ARAGÓN GÓMEZ  ', ' PAI O70107 ', '34 620 34 93 19', 'ADULTO', 0, 0, 0, 87, 0),
-(1321, 'TG62431', 'ALEJANDRO JOSE LEON CUERVO ', '1233693609', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1322, 'TG63270', 'JORGE JOSUÉ RAMÍREZ GURUMENDI  ', '0931861090 ', '593999196275 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1323, 'TG63270', 'ROMINA FIORELLA BERMEO ALMEIDA  ', '0952475986 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1324, 'TG63270', 'CHRISTIAN ALBERTO BERMEO ALMEIDA  ', '0952475838 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1325, 'TG63641', 'OGDALYS CUBILLA ', 'PA1308444', '50763560102', 'ADULTO', 0, 0, 0, 49, 0),
-(1326, 'TG63641', ' CÉSAR AMAYA ', '167148313', '50763560102', 'ADULTO', 0, 0, 0, 49, 0),
-(1327, 'TG64626', 'LILIANA ANDREA PALOMINO BENÍTEZ  ', '1140885668 ', '593 99 970 1592 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1328, 'TG64626', 'JOSEPH E BLASCHKE ', '0931001770 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1329, 'TG64626', 'SALOMÉ SÁNCHEZ PALOMINO  ', '1091985954 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1330, 'TG64710', 'ANA LUISA SUÁREZ ROSAS ', 'N07290931 ', '573015686252', 'ADULTO', 0, 0, 0, 576, 0),
-(1331, 'TG64710', 'LEONARDO GÓMEZ SUÁREZ ', 'N16289077 ', '', 'ADULTO', 0, 0, 0, 576, 0),
-(1332, 'TG64710', 'JESUS ARTURO GÓMEZ CORDERO ', 'N06602164 ', '', 'ADULTO', 0, 0, 0, 576, 0),
-(1333, 'TG64710', 'ANGEL DAVID JIMÉNEZ SUÁREZ  ', 'N22356145', '', 'ADULTO', 0, 0, 0, 576, 0),
-(1334, 'TG64710', 'ARIANA DANAE VELÁSQUEZ SUÁREZ ', 'N07290946', 'INFANTE', 'INFANTE', 0, 0, 0, 576, 0),
-(1335, 'TG64810', 'EDWARD FELIPE RODRIGUEZ GARCIA  ', '1000805358 ', '57 314 3922471', 'ADULTO', 0, 0, 0, 192, 0),
-(1336, 'TG64810', 'MARÍA VALENTINA BERNAL BOLÍVAR  ', '1023972699', '', 'ADULTO', 0, 0, 0, 192, 0),
-(1337, 'TG65754', 'NEFTALÍ SALGADO ', 'D4814157 ', '+1858.952.2010 ', 'ADULTO', 0, 0, 0, 209, 0),
-(1338, 'TG65754', 'MATTHEW FERNANDEZ ', 'F655553074060 ', '+1 786-566-1321 ', 'ADULTO', 0, 0, 0, 209, 0),
-(1339, 'TG65754', 'DIEGO MIRANDA REYES ', '304430281 ', '+1915.319.7500 ', 'ADULTO', 0, 0, 0, 209, 0),
-(1340, 'TG65754', 'ALEX FERNANDEZ ', '318034399 ', '+1 (786) 999-9396 ', 'ADULTO', 0, 0, 0, 209, 0),
-(1341, 'TG66789', 'MARIO ALEJANDRO CASTIBLANCO HERNANDEZ', '1032454463 ', '573025521273', 'ADULTO', 0, 0, 0, 347, 0),
-(1342, 'TG66789', 'NICOL VANEGAS  BARRAGAN  ', '1030678351 ', '57 3209377524 ', 'ADULTO', 0, 0, 0, 347, 0),
-(1343, 'TG66789', 'LAURA SOFÍA CASTIBLANCO HERNÁNDEZ  ', '1010962844 ', '', 'ADULTO', 0, 0, 0, 347, 0),
-(1344, 'TG66789', 'LUIS ANGEL DAZA CASTILLO  ', '1007194770 ', '', 'ADULTO', 0, 0, 0, 347, 0),
-(1345, 'TG67143', 'CAROL SALAZAR PAZ ', '125082632', '51940178578', 'ADULTO', 0, 0, 0, 118, 0),
-(1346, 'TG67143', 'GANDHI OROZCO BRICEÑO', '125082637 ', '', 'ADULTO', 0, 0, 0, 118, 0),
-(1347, 'TG67297', 'PAULA ERENDIRA CUCA GÓNGORA', 'N10174449 ', '52 7227647569 ', 'ADULTO', 0, 0, 0, 118, 0),
-(1348, 'TG67297', 'ANAHI GARCIA PEREZ', 'N19951654 ', '', 'ADULTO', 0, 0, 0, 118, 0),
-(1349, 'TG68867', 'JOSEPH MORALES ESQUIVEL ', 'B00933399 ', '50683503669 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1350, 'TG68867', 'RUTH ESQUIVEL HERRERA', 'B01300889 ', '50660673053', 'ADULTO', 0, 0, 0, 6, 0),
-(1351, 'TG69320', 'MARÍA JOSÉ OCANDO CHIRINOS', '163266268', '584121294895', 'ADULTO', 0, 0, 0, 6, 0),
-(1352, 'TG69320', 'AMANDA CRISTINA AÑEZ OLMOS', '162795435', '584121294895', 'ADULTO', 0, 0, 0, 6, 0),
-(1353, 'TG69436', 'NOHEMY VERÓNICA VELEZ MONTENEGRO ', '0107408445 ', '593 99 991 3153', 'ADULTO', 0, 0, 0, 59, 0),
-(1354, 'TG69436', 'OMAR ALEXIS JAUREGUI CALDERON ', '1094507026 ', '', 'ADULTO', 0, 0, 0, 59, 0),
-(1355, 'TG69436', 'ALEJANDRO DARÍO ARTEAGA YEPEZ   ', '1727086777', '', 'ADULTO', 0, 0, 0, 59, 0),
-(1356, 'TG69436', 'NICOLÁS ESPARZA  ', '1759741265 ', '', 'ADULTO', 0, 0, 0, 59, 0),
-(1357, 'TG70126', 'MARIA CARO MONTES', 'N04352282', '+52 6862215802', 'ADULTO', 0, 0, 0, 230, 0),
-(1358, 'TG70126', 'TEREZA GUADALUPE CARO', 'N10558869', '', 'ADULTO', 0, 0, 0, 230, 0),
-(1359, 'TG70845', 'GABRIO PAOLACCI    ', 'YA9919584   ', '+393290530699', 'ADULTO', 0, 0, 0, 26, 0),
-(1360, 'TG71459', 'JOSÉ ANDRÉS GARCÍA ', 'PA1447033 ', '507 63147842 ', 'ADULTO', 0, 0, 0, 536, 0),
-(1361, 'TG71687', 'BLANCA PECINA', 'N02970348', '+528114864153', 'ADULTO', 0, 0, 0, 333, 0),
-(1362, 'TG71687', 'FRANCISCO MARIN', 'N02970295', '', 'ADULTO', 0, 0, 0, 333, 0),
-(1363, 'TG71856', 'JEAN CARLOS MADIEDO RODRÍGUEZ', '1007724717', '', 'ADULTO', 0, 0, 0, 394, 0),
-(1364, 'TG71856', 'NICOLE ELENA PÉREZ GUZMÁN ', '1235039778', '573107275870', 'ADULTO', 0, 0, 0, 394, 0),
-(1365, 'TG71856', 'MARÍA PAULA VERGARA RODRÍGUEZ', '1069483705', '', 'ADULTO', 0, 0, 0, 394, 0),
-(1366, 'TG71856', 'KAREN MARGARITA MADIEDO RODRÍGUEZ ', '1047478887', '', 'ADULTO', 0, 0, 0, 394, 0),
-(1367, 'TG71942', 'ROLANDO ALBERTO EMANUEL PANIAGUA OLIVARES ', '112201342276263 ', '50232153466', 'ADULTO', 0, 0, 0, 189, 0),
-(1368, 'TG71942', 'JOSUÉ DAVID PANIAGUA OLIVARES ', '112201342417851 ', '', 'ADULTO', 0, 0, 0, 189, 0),
-(1369, 'TG72825', 'LISSA MARÍA GÓMEZ ESCOBEDO  ', '110101302243259 ', '502 5202 0211 ', 'ADULTO', 0, 0, 0, 497, 0),
-(1370, 'TG72825', 'JOSÉ VICTOR PACAY SUCHITE  ', '110101299477851  ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1371, 'TG72825', 'DIEGO JAVIER GÓMEZ CASTELLANOS  ', '110101274888742 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1372, 'TG72825', 'FRANCISCO ALEJANDRO PACAY SÚCHITE  ', '110101386280312 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1373, 'TG72825', 'BERTHA CAROLINA ESCOBEDO ALVAREZ ', '110101160773342', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1374, 'TG72825', 'JOSE ANDRE GOMEZ ESCOBEDO ', '110101299280675 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1375, 'TG72825', 'EDUARDO JOSÉ GÓMEZ CASTELLANOS  ', '110101356057682 ', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1376, 'TG72825', 'GILBERTO HAROLDO MOLLINEDO ENRIQUEZ ', '111601236421875', '', 'ADULTO', 0, 0, 0, 497, 0),
-(1377, 'TG73145', 'ALEXIS SANDOVAL', 'PA1126038', '+507 6764-7883', 'ADULTO', 0, 0, 0, 329, 0),
-(1378, 'TG73145', 'MARLENE CORDOBA', 'PA1123289', '', 'ADULTO', 0, 0, 0, 329, 0),
-(1379, 'TG73145', 'LORENA SALDAÑA', 'PA1439953', '', 'ADULTO', 0, 0, 0, 329, 0),
-(1380, 'TG73145', 'ALESKA MARTINEZ', 'PA1439907', '', 'ADULTO', 0, 0, 0, 329, 0),
-(1381, 'TG73145', 'YENILKA CORDOBA', 'PA0949894', '', 'ADULTO', 0, 0, 0, 329, 0),
-(1382, 'TG73145', 'YENIVET DIAZ', 'PA0949768', '', 'ADULTO', 0, 0, 0, 329, 0),
-(1383, 'TG74595', 'JOSÉ CHICA ', '0926857327 ', '+593 96 792 3537 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1384, 'TG74595', 'ASTRID REVILLA ', '096322711-1 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1385, 'TG74793', 'NOAH DAVID CHAVES UMAÑA', 'B00544278', '506 70119858  ', 'ADULTO', 0, 0, 0, 6, 0),
-(1386, 'TG74793', 'MARTA EUGENIA UMAÑA RIVERA ', 'B01492534 ', '506 89282111  ', 'ADULTO', 0, 0, 0, 6, 0),
-(1387, 'TG74793', 'DAVID CHAVES UMAÑA  ', 'B0052580276 ', 'NIÑO', 'NINO', 0, 0, 0, 6, 0),
-(1388, 'TG74793', 'Pasajero Migrado', NULL, NULL, 'ADULTO', 0, 0, 0, 6, 0),
-(1389, 'TG75163', 'ANGIE PAOLA SANTIAGO SANTIAGO  ', '1.002.012.486 ', '57 3006646660 ', 'ADULTO', 0, 0, 0, 337, 0),
-(1390, 'TG75163', 'RUTH VIRGINIA SANTIAGO SANTIAGO ', '1.002.013.944 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1391, 'TG75163', 'MYRIAM SANTIAGO SANTIAGO ', '22.581.028 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1392, 'TG75332', 'KATHERYNE MERIZALDE', '026338054  ', '593 96 792 3537', 'ADULTO', 0, 0, 0, 87, 0),
-(1393, 'TG75332', 'NICOLE MERIZALDE', 'A9724460 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1394, 'TG75332', 'JULIANA MONTERO ', '093205705-2 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1395, 'TG75498', 'MARIA PAULINA BELTRÁN AGAMEZ  ', '1104404038 ', '57 321 6742801', 'ADULTO', 0, 0, 0, 377, 0),
-(1396, 'TG75498', 'JUAN DAVID OLAYA ', '1002201595', '', 'ADULTO', 0, 0, 0, 377, 0),
-(1397, 'TG75498', 'CLARA PATRICIA BUELVAS AGAMEZ ', '1104422336 ', '', 'ADULTO', 0, 0, 0, 377, 0),
-(1398, 'TG75498', 'ANNIE AGAMEZ  CAMPILLO  ', '34950212 ', '', 'ADULTO', 0, 0, 0, 377, 0),
-(1399, 'TG75520', 'CATALIN NEGRAIA ', 'P984935DP ', '+18196649806', 'ADULTO', 0, 0, 0, 445, 0),
-(1400, 'TG75520', 'GIANINA NEGRAIA ', 'P984922DP ', '', 'ADULTO', 0, 0, 0, 445, 0),
-(1401, 'TG75861', 'JOEL GUEVARA', '1128163', '573043647400', 'ADULTO', 0, 0, 0, 474, 0),
-(1402, 'TG75861', 'JOSÉ GUEVARA', '1377417', '', 'ADULTO', 0, 0, 0, 474, 0),
-(1403, 'TG76124', 'CRISTINA MORA', 'G187083', '50662149841', 'ADULTO', 0, 0, 0, 6, 0),
-(1404, 'TG76124', 'ANA ROSA AMADOR', 'B01014365', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1405, 'TG76124', 'THIAGO MORA', 'B01013806', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1406, 'TG77693', 'KEVIN ANDRES GONZALEZ ', '1006795402 ', '+57 315 5183405', 'ADULTO', 0, 0, 0, 544, 0),
-(1407, 'TG77693', 'GABRIEL SAAVEDRA ', '1005655554 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1408, 'TG77693', 'GABRIELA OBANDO ', '1000018605 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1409, 'TG77693', 'KAROLL GONZALEZ ', '1122508128 ', '', 'ADULTO', 0, 0, 0, 544, 0),
-(1410, 'TG78849', 'RONALDO MOLINA ', '1126425065 ', '57 300 7971742 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1411, 'TG78849', 'ARIANA PAOLA LÓPEZ ROCHA', '1043127426', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1412, 'TG79145', 'ALEXIS MAURICIO ALMENDÁREZ MADRID  ', 'E1896387  ', '50495637982 ', 'ADULTO', 0, 0, 0, 335, 0),
-(1413, 'TG79145', 'NORMA YOLIBETH ALMENDARES VASQUEZ  ', 'E1085857', '', 'ADULTO', 0, 0, 0, 335, 0),
-(1414, 'TG79301', 'MARIA A MALONEY ', '591725880 ', '+1 (646) 2366671', 'ADULTO', 0, 0, 0, 362, 0),
-(1415, 'TG79640', 'GABRIELA GRISEL ARVELÁEZ MEZA PASAPORTE', '171187175 ', '584144917895', 'ADULTO', 0, 0, 0, 246, 0),
-(1416, 'TG79640', 'CARLOS PÉREZ VEGA ', '161356655', '584144917895', 'ADULTO', 0, 0, 0, 246, 0),
-(1417, 'TG81234', 'DANISA CARVAJAL', 'B00802382', '+506 7243 5055', 'ADULTO', 0, 0, 0, 454, 0),
-(1418, 'TG81234', 'MELISSA GONZALEZ', 'B01468165', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1419, 'TG81234', 'ALEXANDER PPRTUGUEZ', 'B01460121', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1420, 'TG81234', 'FRANCELA CORTES', '', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1421, 'TG81234', 'LIZETH ARIAS', 'B00706281', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1422, 'TG81234', 'GRACIELA MARIN', 'G304180', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1423, 'TG81234', 'JULIETH ARTAVIA', 'B01285034', '', 'ADULTO', 0, 0, 0, 454, 0),
-(1424, 'TG81670', 'LINA TATIANA SÁNCHEZ ARÉVALO  ', '1026278966 ', '573103199914', 'ADULTO', 0, 0, 0, 192, 0),
-(1425, 'TG81670', 'GABRIELA SANCHEZ ARÉVALO  ', '1193230685 ', '', 'ADULTO', 0, 0, 0, 192, 0),
-(1426, 'TG81670', 'SANDRA MILENA ROJAS ARANGO  ', '1026278323 ', '', 'ADULTO', 0, 0, 0, 192, 0),
-(1427, 'TG81670', 'AURA STEFFANIA PEÑA CUBIDES  ', '1026572629 ', '', 'ADULTO', 0, 0, 0, 192, 0),
-(1428, 'TG81676', 'KAREN BERENISSE CORTEZ DIAZ  ', 'N11841894 ', '+52 55 4041 5044 ', 'ADULTO', 0, 0, 0, 324, 0),
-(1429, 'TG82057', 'KAREN VIVIANA MATEUS TAPIAS  ', '1101696746 ', '573133008384', 'ADULTO', 0, 0, 0, 6, 0),
-(1430, 'TG82057', 'RANSES MATEUS', '91454333 ', '318 8456520 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1431, 'TG82660', 'LORENA FADUL  ', '1000149405 ', '573012433019', 'ADULTO', 0, 0, 0, 196, 0),
-(1432, 'TG82660', '⁠PAOLA GUZMÁN  ', '1019110296 ', '', 'ADULTO', 0, 0, 0, 196, 0),
-(1433, 'TG82660', 'CATHERINE RUBIANOGROOT  ', '1020777057 ', '', 'ADULTO', 0, 0, 0, 196, 0),
-(1434, 'TG82660', 'DANIEL ESTEVEZ', '1020765461 ', '', 'ADULTO', 0, 0, 0, 196, 0),
-(1435, 'TG82757', 'KATHERINE PAOLA MARTINEZ STRAUBE ', '302116540 ', '502 53727304  ', 'ADULTO', 0, 0, 0, 460, 0),
-(1436, 'TG82757', 'KARIN JOHANNA MARTINEZ ORREGO ', '249917602 ', '', 'ADULTO', 0, 0, 0, 460, 0),
-(1437, 'TG83105', 'CLAUDIA LANDINEZ', '32733926 ', '+57 312 2037957 ', 'ADULTO', 0, 0, 0, 6, 0),
-(1438, 'TG83105', ' YESENIA MARIA BELTRÁN LÓPEZ ', 'D8420137 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1439, 'TG83105', 'SHANTEL MARIE PEREZ  ', 'D9291881 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1440, 'TG83105', 'JESSICA STEPHANIE HERNANDEZ ', 'UP628797 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1441, 'TG83683', 'ORIANA FLOREZ QUINTERO', '1102885478', '573007915814', 'ADULTO', 0, 0, 0, 489, 0),
-(1442, 'TG83683', 'ANDRES PÉREZ BALANTA ', '1193444717', '573007915814', 'ADULTO', 0, 0, 0, 489, 0),
-(1443, 'TG84225', 'CINTHIA MARTINEZ', 'G27350584', '52 5519546752', 'ADULTO', 0, 0, 0, 230, 0),
-(1444, 'TG84225', 'LAURA BRISEÑO', 'G22572759', '', 'ADULTO', 0, 0, 0, 230, 0),
-(1445, 'TG84350', 'LUISA FERNANDA PACHÓN MARTÍNEZ  ', '52.735.598 ', '57 3204420556 ', 'ADULTO', 0, 0, 0, 204, 0),
-(1446, 'TG84350', 'LAURA ANDREA RIAÑO ', '1021675662 ', '', 'ADULTO', 0, 0, 0, 204, 0),
-(1447, 'TG84576', 'ORFA MARIELA DIAZ PEREZ ', '338831495 ', '+502 49083714 ', 'ADULTO', 0, 0, 0, 460, 0),
-(1448, 'TG84576', 'NORMA JEANNETTE DIAZ PEREZ ', '174563809 ', '', 'ADULTO', 0, 0, 0, 460, 0),
-(1449, 'TG85465', 'HUMBERTO MUÑOZ MORA  ', '43229831', '51948207462', 'ADULTO', 0, 0, 0, 283, 0),
-(1450, 'TG85465', 'GABY MENDEZ LAZARO  ', '45122569', '', 'ADULTO', 0, 0, 0, 283, 0),
-(1451, 'TG85933', 'LUIS ISAAC ANDRADE LOOR ', '1316589025 ', '593981017560', 'ADULTO', 0, 0, 0, 6, 0),
-(1452, 'TG85933', 'MARÍA EMILIA GUILLÉN GARCÍA ', '1311710188 ', '593992949748', 'ADULTO', 0, 0, 0, 6, 0),
-(1453, 'TG85933', 'MARÍA NATHALY FIGUEROA GUILLÉN  ', '1308328556 ', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1454, 'TG86620', 'CHRISTIAN HERNÁNDEZ', 'G32769921 ', '52 1 55 4177 3792', 'ADULTO', 0, 0, 0, 87, 0),
-(1455, 'TG86620', 'ALAN REYES', 'N22354789 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1456, 'TG87293', 'KAROL SILVANA GÓMEZ RUEDA ', '1.098.788.406 ', '573118321638', 'ADULTO', 0, 0, 0, 337, 0),
-(1457, 'TG87293', 'ENMANUEL COLMENARES VELÁSQUEZ ', '169607702 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1458, 'TG87911', 'JOSE KOHAMA ', 'A58315425 ', '+1 5165134390', 'ADULTO', 0, 0, 0, 87, 0),
-(1459, 'TG87911', 'REBEKA KOHAMA ', 'A72566522', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1460, 'TG88134', 'JUAN RICARDO DEOSSA ', '1037650403 ', '573206111763', 'ADULTO', 0, 0, 0, 6, 0),
-(1461, 'TG88134', 'KAREN RODRÍGUEZ ', '1085332653', '573206111763', 'ADULTO', 0, 0, 0, 6, 0),
-(1462, 'TG88250', 'JULIÁN DAVID ESCOBAR FIGUEROA  ', '1084846071  ', '57 316 2802157', 'ADULTO', 0, 0, 0, 6, 0),
-(1463, 'TG88250', 'MELANY NARVÁEZ  ', '1084846467', '', 'ADULTO', 0, 0, 0, 6, 0),
-(1464, 'TG89176', 'SABRINA GUTENBRUNNER', 'U7326198  ', ':+436769618750 ', 'ADULTO', 0, 0, 0, 9, 0),
-(1465, 'TG89436', 'ANDRES GARCIA', '0921455622 ', '+57 316 8418108 ', 'ADULTO', 0, 0, 0, 87, 0),
-(1466, 'TG89436', 'GERALDINE CALL', '0958239097 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1467, 'TG89436', 'NAOMI TERAN', '0955706452 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1468, 'TG89436', 'MARIA MORENO', '20520879 ', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1469, 'TG89842', 'ANDREA MORALES QUEZADA         ', 'B0672515 ', '+5930984461782', 'ADULTO', 0, 0, 0, 154, 0),
-(1470, 'TG89842', 'GUSTAVO ROBERTO JARA ESPINOZA        ', 'A4310668 ', '', 'ADULTO', 0, 0, 0, 154, 0),
-(1471, 'TG90277', 'GLORIA KIMBERLYN DÍAZ SILVA', '124565505 ', '51948325350 ', 'ADULTO', 0, 0, 0, 390, 0),
-(1472, 'TG90277', 'ELMER DÍAZ ZAMORA ', '124565560 ', '51948325350 ', 'ADULTO', 0, 0, 0, 390, 0),
-(1473, 'TG90277', ' GLORIA BETTY SILVA MEGO ', '124565585 ', '', 'ADULTO', 0, 0, 0, 390, 0),
-(1474, 'TG91380', 'PAUL ALEJANDRO SÁNCHEZ ', '12075378 ', '+51 994 006 169', 'ADULTO', 0, 0, 0, 580, 0),
-(1475, 'TG91380', ' LISSET VALERA ', '15559065 ', '', 'ADULTO', 0, 0, 0, 580, 0),
-(1476, 'TG91380', 'GABRIELA SANCHEZ VALERA   ', '27395375', '', 'ADULTO', 0, 0, 0, 580, 0),
-(1477, 'TG91380', 'LISBETH HUAMAN MONTALVO   ', '79543733', '', 'ADULTO', 0, 0, 0, 580, 0),
-(1478, 'TG91761', 'RODRIGO JAVIER LOGROÑO VALENCIA ', '1725264053 ', '+593 99 552 8642', 'ADULTO', 0, 0, 0, 79, 0),
-(1479, 'TG91761', 'DIANA ESTEFANIA VACA CAÑAS', '1725151177', '', 'ADULTO', 0, 0, 0, 79, 0),
-(1480, 'TG94242', 'NICOLE BERTEL JIMÉNEZ', '1043646455', '+57 3003243326', 'ADULTO', 0, 0, 0, 571, 0),
-(1481, 'TG94242', 'KARLA QUIROZ GARCÍA', '1047484665', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1482, 'TG94242', 'ANDREA VALDELAMAR CARMONA', '1043971399', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1483, 'TG94242', 'KARIME GÓMEZ JIMÉNEZ', '1043971255', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1484, 'TG94242', 'JESÚS GÓMEZ DÍAZ', '1002246085', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1485, 'TG94242', 'MÍA LUNA ARBELAEZ', '1043973942', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1486, 'TG94242', 'SARA SIMANCAS MORALES', '1043974930', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1487, 'TG94242', 'JUAN DAVID SIERRA MARTÍNEZ', '1043655432', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1488, 'TG94242', 'LORENA FONTALVO DÍAZ', '1047406941', '', 'ADULTO', 0, 0, 0, 571, 0),
-(1489, 'TG94795', 'ANTONY RUIZ', '169190463', '+502 5677 0159', 'ADULTO', 0, 0, 0, 583, 0),
-(1490, 'TG94795', 'JOSE AVALOS', '220189641', '+502 3523 1794', 'ADULTO', 0, 0, 0, 583, 0),
-(1491, 'TG94795', 'GARY VELAZQUEZ', '210566809', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1492, 'TG95245', 'EISLER ANTONIO OCAMPO ALEMÁN', '16795729 ', '57 3165343989 ', 'ADULTO', 0, 0, 0, 487, 0),
-(1493, 'TG95245', 'HERMILDA YESENIA LÓPEZ MOLINA', '29115151 ', '57 3168558526 ', 'ADULTO', 0, 0, 0, 487, 0),
-(1494, 'TG95245', 'BRANDON STEVEN OCAMPO LÓPEZ', '1006053135 ', '', 'ADULTO', 0, 0, 0, 487, 0),
-(1495, 'TG96555', 'ARBELAEZ GRISEL                                                                                     ', '171187175  ', '584144917895', 'ADULTO', 0, 0, 0, 246, 0),
-(1496, 'TG96555', 'PEREZ YOLFRAN', '161356655 ', '', 'ADULTO', 0, 0, 0, 246, 0),
-(1497, 'TG97172', 'NICOL NATALIA GONZÁLEZ MORA ', '1000007838 ', '57 3207851099', 'ADULTO', 0, 0, 0, 93, 0),
-(1498, 'TG97172', 'ANDREA ISABELA APONTE MORA ', '1005027164 ', '57 310 5038062 ', 'ADULTO', 0, 0, 0, 93, 0),
-(1499, 'TG97172', 'SEBASTIÁN BERMÚDEZ PARRAO  ', '1000941791 ', '', 'ADULTO', 0, 0, 0, 93, 0),
-(1500, 'TG97614', 'MARIA PAULA YCAZA SERRANO', '0927243980', '593 988686140', 'ADULTO', 0, 0, 0, 87, 0),
-(1501, 'TG97614', 'CARLOS VEGA', '0930844436', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1502, 'TG97614', 'MILENA MARIN', '0955203815', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1503, 'TG97614', 'CALEB MURILLO', '0925730186', '', 'ADULTO', 0, 0, 0, 87, 0),
-(1504, 'TG99003', 'WEIMAR STUART MORENO TOVAR ', '1000595328 ', '57 3175909356  ', 'ADULTO', 0, 0, 0, 49, 0),
-(1505, 'TG99003', 'DANIEL MATEO MORENO TOVAR  ', '1000594094 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1506, 'TG99003', 'ANGIE CAROLINA OSPINA LEGUIZAMON ', '1001188209 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1507, 'TG99003', 'SANDRA PATRICIA TOVAR JIMÉNEZ ', '52624364 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1508, 'TG99003', 'ROSALBA JIMÉNEZ RODRÍGUEZ   ', '41504236  ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1509, 'TG99003', 'JUAN GONZALO TOVAR RODRÍGUEZ  ', '17145925 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1510, 'TG99003', 'GABRIEL ANTONIO PÉREZ MÉNDEZ  ', '1000272016 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1511, 'TG99003', 'XIMENA OLAYA GONZÁLEZ  ', '1020487743 ', '', 'ADULTO', 0, 0, 0, 49, 0),
-(1512, 'TG99446', '573217194353', '166500394 ', '58 414-1706867 ', 'ADULTO', 0, 0, 0, 583, 0),
-(1513, 'TG99446', 'LUZNELSIN GARCIA ALARCON  ', '166500365 ', '', 'ADULTO', 0, 0, 0, 583, 0),
-(1514, 'TG99680', 'MICHELL DAYANA SAMACÁ BELLO ', '1.005.372.402 ', '573105654858', 'ADULTO', 0, 0, 0, 337, 0),
-(1515, 'TG99680', 'VALENTHINA MARTÍNEZ DELGADO ', '1005541262 ', '', 'ADULTO', 0, 0, 0, 337, 0),
-(1516, 'TG99805', 'JAMET CASTRO AYALA', '1001871726', '573045913279', 'ADULTO', 0, 0, 0, 278, 0),
-(1517, 'TG99805', 'SHIRLY JOHANNA BELEÑO BOOM. ', '1043119402', '', 'ADULTO', 0, 0, 0, 278, 0),
+(1318, 'TG61791', 'REINALDO ANDRÉS LARA LLANES', 'V- 27.327.417', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1319, 'TG61791', 'DIEGO ENRIQUE VILLASMIL PAULINO', '1.127.340.958', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1320, 'TG62431', 'JOSE MARÍA ARAGÓN GÓMEZ  ', ' PAI O70107 ', '34 620 34 93 19', 'ADULTO', 0, 0, 0, 87, 1),
+(1321, 'TG62431', 'ALEJANDRO JOSE LEON CUERVO ', '1233693609', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1322, 'TG63270', 'JORGE JOSUÉ RAMÍREZ GURUMENDI  ', '0931861090 ', '593999196275 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1323, 'TG63270', 'ROMINA FIORELLA BERMEO ALMEIDA  ', '0952475986 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1324, 'TG63270', 'CHRISTIAN ALBERTO BERMEO ALMEIDA  ', '0952475838 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1325, 'TG63641', 'OGDALYS CUBILLA ', 'PA1308444', '50763560102', 'ADULTO', 0, 0, 0, 49, 1),
+(1326, 'TG63641', ' CÉSAR AMAYA ', '167148313', '50763560102', 'ADULTO', 0, 0, 0, 49, 1),
+(1327, 'TG64626', 'LILIANA ANDREA PALOMINO BENÍTEZ  ', '1140885668 ', '593 99 970 1592 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1328, 'TG64626', 'JOSEPH E BLASCHKE ', '0931001770 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1329, 'TG64626', 'SALOMÉ SÁNCHEZ PALOMINO  ', '1091985954 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1330, 'TG64710', 'ANA LUISA SUÁREZ ROSAS ', 'N07290931 ', '573015686252', 'ADULTO', 0, 0, 0, 576, 1),
+(1331, 'TG64710', 'LEONARDO GÓMEZ SUÁREZ ', 'N16289077 ', '', 'ADULTO', 0, 0, 0, 576, 1),
+(1332, 'TG64710', 'JESUS ARTURO GÓMEZ CORDERO ', 'N06602164 ', '', 'ADULTO', 0, 0, 0, 576, 1),
+(1333, 'TG64710', 'ANGEL DAVID JIMÉNEZ SUÁREZ  ', 'N22356145', '', 'ADULTO', 0, 0, 0, 576, 1),
+(1334, 'TG64710', 'ARIANA DANAE VELÁSQUEZ SUÁREZ ', 'N07290946', 'INFANTE', 'INFANTE', 0, 0, 0, 576, 1),
+(1335, 'TG64810', 'EDWARD FELIPE RODRIGUEZ GARCIA  ', '1000805358 ', '57 314 3922471', 'ADULTO', 0, 0, 0, 192, 1),
+(1336, 'TG64810', 'MARÍA VALENTINA BERNAL BOLÍVAR  ', '1023972699', '', 'ADULTO', 0, 0, 0, 192, 1),
+(1337, 'TG65754', 'NEFTALÍ SALGADO ', 'D4814157 ', '+1858.952.2010 ', 'ADULTO', 0, 0, 0, 209, 1),
+(1338, 'TG65754', 'MATTHEW FERNANDEZ ', 'F655553074060 ', '+1 786-566-1321 ', 'ADULTO', 0, 0, 0, 209, 1),
+(1339, 'TG65754', 'DIEGO MIRANDA REYES ', '304430281 ', '+1915.319.7500 ', 'ADULTO', 0, 0, 0, 209, 1),
+(1340, 'TG65754', 'ALEX FERNANDEZ ', '318034399 ', '+1 (786) 999-9396 ', 'ADULTO', 0, 0, 0, 209, 1),
+(1341, 'TG66789', 'MARIO ALEJANDRO CASTIBLANCO HERNANDEZ', '1032454463 ', '573025521273', 'ADULTO', 0, 0, 0, 347, 1),
+(1342, 'TG66789', 'NICOL VANEGAS  BARRAGAN  ', '1030678351 ', '57 3209377524 ', 'ADULTO', 0, 0, 0, 347, 1),
+(1343, 'TG66789', 'LAURA SOFÍA CASTIBLANCO HERNÁNDEZ  ', '1010962844 ', '', 'ADULTO', 0, 0, 0, 347, 1),
+(1344, 'TG66789', 'LUIS ANGEL DAZA CASTILLO  ', '1007194770 ', '', 'ADULTO', 0, 0, 0, 347, 1),
+(1345, 'TG67143', 'CAROL SALAZAR PAZ ', '125082632', '51940178578', 'ADULTO', 0, 0, 0, 118, 1),
+(1346, 'TG67143', 'GANDHI OROZCO BRICEÑO', '125082637 ', '', 'ADULTO', 0, 0, 0, 118, 1),
+(1347, 'TG67297', 'PAULA ERENDIRA CUCA GÓNGORA', 'N10174449 ', '52 7227647569 ', 'ADULTO', 0, 0, 0, 118, 1),
+(1348, 'TG67297', 'ANAHI GARCIA PEREZ', 'N19951654 ', '', 'ADULTO', 0, 0, 0, 118, 1),
+(1349, 'TG68867', 'JOSEPH MORALES ESQUIVEL ', 'B00933399 ', '50683503669 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1350, 'TG68867', 'RUTH ESQUIVEL HERRERA', 'B01300889 ', '50660673053', 'ADULTO', 0, 0, 0, 6, 1),
+(1351, 'TG69320', 'MARÍA JOSÉ OCANDO CHIRINOS', '163266268', '584121294895', 'ADULTO', 0, 0, 0, 6, 1),
+(1352, 'TG69320', 'AMANDA CRISTINA AÑEZ OLMOS', '162795435', '584121294895', 'ADULTO', 0, 0, 0, 6, 1),
+(1353, 'TG69436', 'NOHEMY VERÓNICA VELEZ MONTENEGRO ', '0107408445 ', '593 99 991 3153', 'ADULTO', 0, 0, 0, 59, 1),
+(1354, 'TG69436', 'OMAR ALEXIS JAUREGUI CALDERON ', '1094507026 ', '', 'ADULTO', 0, 0, 0, 59, 1),
+(1355, 'TG69436', 'ALEJANDRO DARÍO ARTEAGA YEPEZ   ', '1727086777', '', 'ADULTO', 0, 0, 0, 59, 1),
+(1356, 'TG69436', 'NICOLÁS ESPARZA  ', '1759741265 ', '', 'ADULTO', 0, 0, 0, 59, 1),
+(1357, 'TG70126', 'MARIA CARO MONTES', 'N04352282', '+52 6862215802', 'ADULTO', 0, 0, 0, 230, 1),
+(1358, 'TG70126', 'TEREZA GUADALUPE CARO', 'N10558869', '', 'ADULTO', 0, 0, 0, 230, 1),
+(1359, 'TG70845', 'GABRIO PAOLACCI    ', 'YA9919584   ', '+393290530699', 'ADULTO', 0, 0, 0, 26, 1),
+(1360, 'TG71459', 'JOSÉ ANDRÉS GARCÍA ', 'PA1447033 ', '507 63147842 ', 'ADULTO', 0, 0, 0, 536, 1),
+(1361, 'TG71687', 'BLANCA PECINA', 'N02970348', '+528114864153', 'ADULTO', 0, 0, 0, 333, 1),
+(1362, 'TG71687', 'FRANCISCO MARIN', 'N02970295', '', 'ADULTO', 0, 0, 0, 333, 1),
+(1363, 'TG71856', 'JEAN CARLOS MADIEDO RODRÍGUEZ', '1007724717', '', 'ADULTO', 0, 0, 0, 394, 1),
+(1364, 'TG71856', 'NICOLE ELENA PÉREZ GUZMÁN ', '1235039778', '573107275870', 'ADULTO', 0, 0, 0, 394, 1),
+(1365, 'TG71856', 'MARÍA PAULA VERGARA RODRÍGUEZ', '1069483705', '', 'ADULTO', 0, 0, 0, 394, 1),
+(1366, 'TG71856', 'KAREN MARGARITA MADIEDO RODRÍGUEZ ', '1047478887', '', 'ADULTO', 0, 0, 0, 394, 1),
+(1367, 'TG71942', 'ROLANDO ALBERTO EMANUEL PANIAGUA OLIVARES ', '112201342276263 ', '50232153466', 'ADULTO', 0, 0, 0, 189, 1),
+(1368, 'TG71942', 'JOSUÉ DAVID PANIAGUA OLIVARES ', '112201342417851 ', '', 'ADULTO', 0, 0, 0, 189, 1),
+(1369, 'TG72825', 'LISSA MARÍA GÓMEZ ESCOBEDO  ', '110101302243259 ', '502 5202 0211 ', 'ADULTO', 0, 0, 0, 497, 1),
+(1370, 'TG72825', 'JOSÉ VICTOR PACAY SUCHITE  ', '110101299477851  ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1371, 'TG72825', 'DIEGO JAVIER GÓMEZ CASTELLANOS  ', '110101274888742 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1372, 'TG72825', 'FRANCISCO ALEJANDRO PACAY SÚCHITE  ', '110101386280312 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1373, 'TG72825', 'BERTHA CAROLINA ESCOBEDO ALVAREZ ', '110101160773342', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1374, 'TG72825', 'JOSE ANDRE GOMEZ ESCOBEDO ', '110101299280675 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1375, 'TG72825', 'EDUARDO JOSÉ GÓMEZ CASTELLANOS  ', '110101356057682 ', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1376, 'TG72825', 'GILBERTO HAROLDO MOLLINEDO ENRIQUEZ ', '111601236421875', '', 'ADULTO', 0, 0, 0, 497, 1),
+(1377, 'TG73145', 'ALEXIS SANDOVAL', 'PA1126038', '+507 6764-7883', 'ADULTO', 0, 0, 0, 329, 1),
+(1378, 'TG73145', 'MARLENE CORDOBA', 'PA1123289', '', 'ADULTO', 0, 0, 0, 329, 1),
+(1379, 'TG73145', 'LORENA SALDAÑA', 'PA1439953', '', 'ADULTO', 0, 0, 0, 329, 1),
+(1380, 'TG73145', 'ALESKA MARTINEZ', 'PA1439907', '', 'ADULTO', 0, 0, 0, 329, 1),
+(1381, 'TG73145', 'YENILKA CORDOBA', 'PA0949894', '', 'ADULTO', 0, 0, 0, 329, 1),
+(1382, 'TG73145', 'YENIVET DIAZ', 'PA0949768', '', 'ADULTO', 0, 0, 0, 329, 1),
+(1383, 'TG74595', 'JOSÉ CHICA ', '0926857327 ', '+593 96 792 3537 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1384, 'TG74595', 'ASTRID REVILLA ', '096322711-1 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1385, 'TG74793', 'NOAH DAVID CHAVES UMAÑA', 'B00544278', '506 70119858  ', 'ADULTO', 0, 0, 0, 6, 1),
+(1386, 'TG74793', 'MARTA EUGENIA UMAÑA RIVERA ', 'B01492534 ', '506 89282111  ', 'ADULTO', 0, 0, 0, 6, 1),
+(1387, 'TG74793', 'DAVID CHAVES UMAÑA  ', 'B0052580276 ', 'NIÑO', 'NINO', 0, 0, 0, 6, 1),
+(1388, 'TG74793', 'Pasajero Migrado', NULL, NULL, 'ADULTO', 0, 0, 0, 6, 1),
+(1389, 'TG75163', 'ANGIE PAOLA SANTIAGO SANTIAGO  ', '1.002.012.486 ', '57 3006646660 ', 'ADULTO', 0, 0, 0, 337, 1),
+(1390, 'TG75163', 'RUTH VIRGINIA SANTIAGO SANTIAGO ', '1.002.013.944 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1391, 'TG75163', 'MYRIAM SANTIAGO SANTIAGO ', '22.581.028 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1392, 'TG75332', 'KATHERYNE MERIZALDE', '026338054  ', '593 96 792 3537', 'ADULTO', 0, 0, 0, 87, 1),
+(1393, 'TG75332', 'NICOLE MERIZALDE', 'A9724460 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1394, 'TG75332', 'JULIANA MONTERO ', '093205705-2 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1395, 'TG75498', 'MARIA PAULINA BELTRÁN AGAMEZ  ', '1104404038 ', '57 321 6742801', 'ADULTO', 0, 0, 0, 377, 1),
+(1396, 'TG75498', 'JUAN DAVID OLAYA ', '1002201595', '', 'ADULTO', 0, 0, 0, 377, 1),
+(1397, 'TG75498', 'CLARA PATRICIA BUELVAS AGAMEZ ', '1104422336 ', '', 'ADULTO', 0, 0, 0, 377, 1),
+(1398, 'TG75498', 'ANNIE AGAMEZ  CAMPILLO  ', '34950212 ', '', 'ADULTO', 0, 0, 0, 377, 1),
+(1399, 'TG75520', 'CATALIN NEGRAIA ', 'P984935DP ', '+18196649806', 'ADULTO', 0, 0, 0, 445, 1),
+(1400, 'TG75520', 'GIANINA NEGRAIA ', 'P984922DP ', '', 'ADULTO', 0, 0, 0, 445, 1),
+(1401, 'TG75861', 'JOEL GUEVARA', '1128163', '573043647400', 'ADULTO', 0, 0, 0, 474, 1),
+(1402, 'TG75861', 'JOSÉ GUEVARA', '1377417', '', 'ADULTO', 0, 0, 0, 474, 1),
+(1403, 'TG76124', 'CRISTINA MORA', 'G187083', '50662149841', 'ADULTO', 0, 0, 0, 6, 1),
+(1404, 'TG76124', 'ANA ROSA AMADOR', 'B01014365', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1405, 'TG76124', 'THIAGO MORA', 'B01013806', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1406, 'TG77693', 'KEVIN ANDRES GONZALEZ ', '1006795402 ', '+57 315 5183405', 'ADULTO', 0, 0, 0, 544, 1),
+(1407, 'TG77693', 'GABRIEL SAAVEDRA ', '1005655554 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1408, 'TG77693', 'GABRIELA OBANDO ', '1000018605 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1409, 'TG77693', 'KAROLL GONZALEZ ', '1122508128 ', '', 'ADULTO', 0, 0, 0, 544, 1),
+(1410, 'TG78849', 'RONALDO MOLINA ', '1126425065 ', '57 300 7971742 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1411, 'TG78849', 'ARIANA PAOLA LÓPEZ ROCHA', '1043127426', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1412, 'TG79145', 'ALEXIS MAURICIO ALMENDÁREZ MADRID  ', 'E1896387  ', '50495637982 ', 'ADULTO', 0, 0, 0, 335, 1),
+(1413, 'TG79145', 'NORMA YOLIBETH ALMENDARES VASQUEZ  ', 'E1085857', '', 'ADULTO', 0, 0, 0, 335, 1),
+(1414, 'TG79301', 'MARIA A MALONEY ', '591725880 ', '+1 (646) 2366671', 'ADULTO', 0, 0, 0, 362, 1),
+(1415, 'TG79640', 'GABRIELA GRISEL ARVELÁEZ MEZA PASAPORTE', '171187175 ', '584144917895', 'ADULTO', 0, 0, 0, 246, 1),
+(1416, 'TG79640', 'CARLOS PÉREZ VEGA ', '161356655', '584144917895', 'ADULTO', 0, 0, 0, 246, 1),
+(1417, 'TG81234', 'DANISA CARVAJAL', 'B00802382', '+506 7243 5055', 'ADULTO', 0, 0, 0, 454, 1),
+(1418, 'TG81234', 'MELISSA GONZALEZ', 'B01468165', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1419, 'TG81234', 'ALEXANDER PPRTUGUEZ', 'B01460121', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1420, 'TG81234', 'FRANCELA CORTES', '', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1421, 'TG81234', 'LIZETH ARIAS', 'B00706281', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1422, 'TG81234', 'GRACIELA MARIN', 'G304180', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1423, 'TG81234', 'JULIETH ARTAVIA', 'B01285034', '', 'ADULTO', 0, 0, 0, 454, 1),
+(1424, 'TG81670', 'LINA TATIANA SÁNCHEZ ARÉVALO  ', '1026278966 ', '573103199914', 'ADULTO', 0, 0, 0, 192, 1),
+(1425, 'TG81670', 'GABRIELA SANCHEZ ARÉVALO  ', '1193230685 ', '', 'ADULTO', 0, 0, 0, 192, 1),
+(1426, 'TG81670', 'SANDRA MILENA ROJAS ARANGO  ', '1026278323 ', '', 'ADULTO', 0, 0, 0, 192, 1),
+(1427, 'TG81670', 'AURA STEFFANIA PEÑA CUBIDES  ', '1026572629 ', '', 'ADULTO', 0, 0, 0, 192, 1),
+(1428, 'TG81676', 'KAREN BERENISSE CORTEZ DIAZ  ', 'N11841894 ', '+52 55 4041 5044 ', 'ADULTO', 0, 0, 0, 324, 1),
+(1429, 'TG82057', 'KAREN VIVIANA MATEUS TAPIAS  ', '1101696746 ', '573133008384', 'ADULTO', 0, 0, 0, 6, 1),
+(1430, 'TG82057', 'RANSES MATEUS', '91454333 ', '318 8456520 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1431, 'TG82660', 'LORENA FADUL  ', '1000149405 ', '573012433019', 'ADULTO', 0, 0, 0, 196, 1),
+(1432, 'TG82660', '⁠PAOLA GUZMÁN  ', '1019110296 ', '', 'ADULTO', 0, 0, 0, 196, 1),
+(1433, 'TG82660', 'CATHERINE RUBIANOGROOT  ', '1020777057 ', '', 'ADULTO', 0, 0, 0, 196, 1),
+(1434, 'TG82660', 'DANIEL ESTEVEZ', '1020765461 ', '', 'ADULTO', 0, 0, 0, 196, 1),
+(1435, 'TG82757', 'KATHERINE PAOLA MARTINEZ STRAUBE ', '302116540 ', '502 53727304  ', 'ADULTO', 0, 0, 0, 460, 1),
+(1436, 'TG82757', 'KARIN JOHANNA MARTINEZ ORREGO ', '249917602 ', '', 'ADULTO', 0, 0, 0, 460, 1),
+(1437, 'TG83105', 'CLAUDIA LANDINEZ', '32733926 ', '+57 312 2037957 ', 'ADULTO', 0, 0, 0, 6, 1),
+(1438, 'TG83105', ' YESENIA MARIA BELTRÁN LÓPEZ ', 'D8420137 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1439, 'TG83105', 'SHANTEL MARIE PEREZ  ', 'D9291881 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1440, 'TG83105', 'JESSICA STEPHANIE HERNANDEZ ', 'UP628797 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1441, 'TG83683', 'ORIANA FLOREZ QUINTERO', '1102885478', '573007915814', 'ADULTO', 0, 0, 0, 489, 1),
+(1442, 'TG83683', 'ANDRES PÉREZ BALANTA ', '1193444717', '573007915814', 'ADULTO', 0, 0, 0, 489, 1),
+(1443, 'TG84225', 'CINTHIA MARTINEZ', 'G27350584', '52 5519546752', 'ADULTO', 0, 0, 0, 230, 1),
+(1444, 'TG84225', 'LAURA BRISEÑO', 'G22572759', '', 'ADULTO', 0, 0, 0, 230, 1),
+(1445, 'TG84350', 'LUISA FERNANDA PACHÓN MARTÍNEZ  ', '52.735.598 ', '57 3204420556 ', 'ADULTO', 0, 0, 0, 204, 1),
+(1446, 'TG84350', 'LAURA ANDREA RIAÑO ', '1021675662 ', '', 'ADULTO', 0, 0, 0, 204, 1),
+(1447, 'TG84576', 'ORFA MARIELA DIAZ PEREZ ', '338831495 ', '+502 49083714 ', 'ADULTO', 0, 0, 0, 460, 1),
+(1448, 'TG84576', 'NORMA JEANNETTE DIAZ PEREZ ', '174563809 ', '', 'ADULTO', 0, 0, 0, 460, 1),
+(1449, 'TG85465', 'HUMBERTO MUÑOZ MORA  ', '43229831', '51948207462', 'ADULTO', 0, 0, 0, 283, 1),
+(1450, 'TG85465', 'GABY MENDEZ LAZARO  ', '45122569', '', 'ADULTO', 0, 0, 0, 283, 1),
+(1451, 'TG85933', 'LUIS ISAAC ANDRADE LOOR ', '1316589025 ', '593981017560', 'ADULTO', 0, 0, 0, 6, 1),
+(1452, 'TG85933', 'MARÍA EMILIA GUILLÉN GARCÍA ', '1311710188 ', '593992949748', 'ADULTO', 0, 0, 0, 6, 1),
+(1453, 'TG85933', 'MARÍA NATHALY FIGUEROA GUILLÉN  ', '1308328556 ', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1454, 'TG86620', 'CHRISTIAN HERNÁNDEZ', 'G32769921 ', '52 1 55 4177 3792', 'ADULTO', 0, 0, 0, 87, 1),
+(1455, 'TG86620', 'ALAN REYES', 'N22354789 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1456, 'TG87293', 'KAROL SILVANA GÓMEZ RUEDA ', '1.098.788.406 ', '573118321638', 'ADULTO', 0, 0, 0, 337, 1),
+(1457, 'TG87293', 'ENMANUEL COLMENARES VELÁSQUEZ ', '169607702 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1458, 'TG87911', 'JOSE KOHAMA ', 'A58315425 ', '+1 5165134390', 'ADULTO', 0, 0, 0, 87, 1),
+(1459, 'TG87911', 'REBEKA KOHAMA ', 'A72566522', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1460, 'TG88134', 'JUAN RICARDO DEOSSA ', '1037650403 ', '573206111763', 'ADULTO', 0, 0, 0, 6, 1),
+(1461, 'TG88134', 'KAREN RODRÍGUEZ ', '1085332653', '573206111763', 'ADULTO', 0, 0, 0, 6, 1),
+(1462, 'TG88250', 'JULIÁN DAVID ESCOBAR FIGUEROA  ', '1084846071  ', '57 316 2802157', 'ADULTO', 0, 0, 0, 6, 1),
+(1463, 'TG88250', 'MELANY NARVÁEZ  ', '1084846467', '', 'ADULTO', 0, 0, 0, 6, 1),
+(1464, 'TG89176', 'SABRINA GUTENBRUNNER', 'U7326198  ', ':+436769618750 ', 'ADULTO', 0, 0, 0, 9, 1),
+(1465, 'TG89436', 'ANDRES GARCIA', '0921455622 ', '+57 316 8418108 ', 'ADULTO', 0, 0, 0, 87, 1),
+(1466, 'TG89436', 'GERALDINE CALL', '0958239097 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1467, 'TG89436', 'NAOMI TERAN', '0955706452 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1468, 'TG89436', 'MARIA MORENO', '20520879 ', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1469, 'TG89842', 'ANDREA MORALES QUEZADA         ', 'B0672515 ', '+5930984461782', 'ADULTO', 0, 0, 0, 154, 1),
+(1470, 'TG89842', 'GUSTAVO ROBERTO JARA ESPINOZA        ', 'A4310668 ', '', 'ADULTO', 0, 0, 0, 154, 1),
+(1471, 'TG90277', 'GLORIA KIMBERLYN DÍAZ SILVA', '124565505 ', '51948325350 ', 'ADULTO', 0, 0, 0, 390, 1),
+(1472, 'TG90277', 'ELMER DÍAZ ZAMORA ', '124565560 ', '51948325350 ', 'ADULTO', 0, 0, 0, 390, 1),
+(1473, 'TG90277', ' GLORIA BETTY SILVA MEGO ', '124565585 ', '', 'ADULTO', 0, 0, 0, 390, 1),
+(1474, 'TG91380', 'PAUL ALEJANDRO SÁNCHEZ ', '12075378 ', '+51 994 006 169', 'ADULTO', 0, 0, 0, 580, 1),
+(1475, 'TG91380', ' LISSET VALERA ', '15559065 ', '', 'ADULTO', 0, 0, 0, 580, 1),
+(1476, 'TG91380', 'GABRIELA SANCHEZ VALERA   ', '27395375', '', 'ADULTO', 0, 0, 0, 580, 1),
+(1477, 'TG91380', 'LISBETH HUAMAN MONTALVO   ', '79543733', '', 'ADULTO', 0, 0, 0, 580, 1),
+(1478, 'TG91761', 'RODRIGO JAVIER LOGROÑO VALENCIA ', '1725264053 ', '+593 99 552 8642', 'ADULTO', 0, 0, 0, 79, 1),
+(1479, 'TG91761', 'DIANA ESTEFANIA VACA CAÑAS', '1725151177', '', 'ADULTO', 0, 0, 0, 79, 1),
+(1480, 'TG94242', 'NICOLE BERTEL JIMÉNEZ', '1043646455', '+57 3003243326', 'ADULTO', 0, 0, 0, 571, 1),
+(1481, 'TG94242', 'KARLA QUIROZ GARCÍA', '1047484665', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1482, 'TG94242', 'ANDREA VALDELAMAR CARMONA', '1043971399', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1483, 'TG94242', 'KARIME GÓMEZ JIMÉNEZ', '1043971255', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1484, 'TG94242', 'JESÚS GÓMEZ DÍAZ', '1002246085', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1485, 'TG94242', 'MÍA LUNA ARBELAEZ', '1043973942', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1486, 'TG94242', 'SARA SIMANCAS MORALES', '1043974930', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1487, 'TG94242', 'JUAN DAVID SIERRA MARTÍNEZ', '1043655432', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1488, 'TG94242', 'LORENA FONTALVO DÍAZ', '1047406941', '', 'ADULTO', 0, 0, 0, 571, 1),
+(1489, 'TG94795', 'ANTONY RUIZ', '169190463', '+502 5677 0159', 'ADULTO', 0, 0, 0, 583, 1),
+(1490, 'TG94795', 'JOSE AVALOS', '220189641', '+502 3523 1794', 'ADULTO', 0, 0, 0, 583, 1),
+(1491, 'TG94795', 'GARY VELAZQUEZ', '210566809', '', 'ADULTO', 0, 0, 0, 583, 1),
+(1492, 'TG95245', 'EISLER ANTONIO OCAMPO ALEMÁN', '16795729 ', '57 3165343989 ', 'ADULTO', 0, 0, 0, 487, 1),
+(1493, 'TG95245', 'HERMILDA YESENIA LÓPEZ MOLINA', '29115151 ', '57 3168558526 ', 'ADULTO', 0, 0, 0, 487, 1),
+(1494, 'TG95245', 'BRANDON STEVEN OCAMPO LÓPEZ', '1006053135 ', '', 'ADULTO', 0, 0, 0, 487, 1),
+(1495, 'TG96555', 'ARBELAEZ GRISEL                                                                                     ', '171187175  ', '584144917895', 'ADULTO', 0, 0, 0, 246, 1),
+(1496, 'TG96555', 'PEREZ YOLFRAN', '161356655 ', '', 'ADULTO', 0, 0, 0, 246, 1),
+(1497, 'TG97172', 'NICOL NATALIA GONZÁLEZ MORA ', '1000007838 ', '57 3207851099', 'ADULTO', 0, 0, 0, 93, 1),
+(1498, 'TG97172', 'ANDREA ISABELA APONTE MORA ', '1005027164 ', '57 310 5038062 ', 'ADULTO', 0, 0, 0, 93, 1),
+(1499, 'TG97172', 'SEBASTIÁN BERMÚDEZ PARRAO  ', '1000941791 ', '', 'ADULTO', 0, 0, 0, 93, 1),
+(1500, 'TG97614', 'MARIA PAULA YCAZA SERRANO', '0927243980', '593 988686140', 'ADULTO', 0, 0, 0, 87, 1),
+(1501, 'TG97614', 'CARLOS VEGA', '0930844436', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1502, 'TG97614', 'MILENA MARIN', '0955203815', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1503, 'TG97614', 'CALEB MURILLO', '0925730186', '', 'ADULTO', 0, 0, 0, 87, 1),
+(1504, 'TG99003', 'WEIMAR STUART MORENO TOVAR ', '1000595328 ', '57 3175909356  ', 'ADULTO', 0, 0, 0, 49, 1),
+(1505, 'TG99003', 'DANIEL MATEO MORENO TOVAR  ', '1000594094 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1506, 'TG99003', 'ANGIE CAROLINA OSPINA LEGUIZAMON ', '1001188209 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1507, 'TG99003', 'SANDRA PATRICIA TOVAR JIMÉNEZ ', '52624364 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1508, 'TG99003', 'ROSALBA JIMÉNEZ RODRÍGUEZ   ', '41504236  ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1509, 'TG99003', 'JUAN GONZALO TOVAR RODRÍGUEZ  ', '17145925 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1510, 'TG99003', 'GABRIEL ANTONIO PÉREZ MÉNDEZ  ', '1000272016 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1511, 'TG99003', 'XIMENA OLAYA GONZÁLEZ  ', '1020487743 ', '', 'ADULTO', 0, 0, 0, 49, 1),
+(1512, 'TG99446', '573217194353', '166500394 ', '58 414-1706867 ', 'ADULTO', 0, 0, 0, 583, 1),
+(1513, 'TG99446', 'LUZNELSIN GARCIA ALARCON  ', '166500365 ', '', 'ADULTO', 0, 0, 0, 583, 1),
+(1514, 'TG99680', 'MICHELL DAYANA SAMACÁ BELLO ', '1.005.372.402 ', '573105654858', 'ADULTO', 0, 0, 0, 337, 1),
+(1515, 'TG99680', 'VALENTHINA MARTÍNEZ DELGADO ', '1005541262 ', '', 'ADULTO', 0, 0, 0, 337, 1),
+(1516, 'TG99805', 'JAMET CASTRO AYALA', '1001871726', '573045913279', 'ADULTO', 0, 0, 0, 278, 1),
+(1517, 'TG99805', 'SHIRLY JOHANNA BELEÑO BOOM. ', '1043119402', '', 'ADULTO', 0, 0, 0, 278, 1),
 (1518, 'THN12694', 'ANTHONY PABON FLOREZ  ', '1090520977 ', '57 304 5572009', 'ADULTO', 0, 0, 0, 337, 0),
 (1519, 'THN12694', 'FERNANDA VILLANUEVA JIMÉNEZ  ', '1090529933 ', '', 'ADULTO', 0, 0, 0, 337, 0),
 (1520, 'THN12694', 'MATHIAS PABON VILLANUEVA ', 'TI 1094064391  ', '', 'ADULTO', 0, 0, 0, 337, 0),
@@ -7457,8 +7549,8 @@ INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, 
 (1640, 'THN99115', 'AYLEN RAFAEL HUAMAN ', '93984267', 'INFANTE', 'INFANTE', 0, 0, 0, 609, 0),
 (1641, 'TPE92178', 'MARCO CAMPOS', 'B00683000  ', '+50684624533', 'ADULTO', 0, 0, 0, 350, 0),
 (1642, 'TPE92178', 'MARIELA VENEGAS', 'B00682982  ', '', 'ADULTO', 0, 0, 0, 350, 0),
-(1643, 'TRC61386', 'DAIRINETH JIMÉNEZ ROBLES ', '1120738366  ', '3022787874  ', 'ADULTO', 0, 0, 0, 492, 0),
-(1644, 'TRC61386', 'FREDY ALEJANDRO MEJÍA ', '110101213034360 ', '', 'ADULTO', 0, 0, 0, 492, 0),
+(1643, 'TRC61386', 'DAIRINETH JIMÉNEZ ROBLES ', '1120738366  ', '3022787874  ', 'ADULTO', 0, 0, 0, 492, 1),
+(1644, 'TRC61386', 'FREDY ALEJANDRO MEJÍA ', '110101213034360 ', '', 'ADULTO', 0, 0, 0, 492, 1),
 (1645, 'TRC67917', 'ELIANIS ORELLANO ', '1139425522 ', '573042631394 ', 'ADULTO', 0, 0, 0, 337, 0),
 (1646, 'TRC67917', 'MELISSA BORJA ', '101609933 ', '573008616064 ', 'ADULTO', 0, 0, 0, 337, 0),
 (1647, 'TRC78328', 'NICOLAS TORRES AREVALO ', '1015452801 ', '573118535590', 'ADULTO', 0, 0, 0, 337, 0),
@@ -7490,7 +7582,7 @@ INSERT INTO `pasajeros` (`Id_Pasajero`, `Id_Reserva`, `Nombre_Pasajero`, `DNI`, 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `permisos`
+-- Table structure for table `permisos`
 --
 
 DROP TABLE IF EXISTS `permisos`;
@@ -7506,7 +7598,7 @@ CREATE TABLE IF NOT EXISTS `permisos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `permisos`
+-- Dumping data for table `permisos`
 --
 
 INSERT INTO `permisos` (`Id_Permiso`, `Id_Modulo`, `Accion`, `Codigo_Permiso`, `Descripcion`) VALUES
@@ -7554,7 +7646,7 @@ INSERT INTO `permisos` (`Id_Permiso`, `Id_Modulo`, `Accion`, `Codigo_Permiso`, `
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `planes_tours`
+-- Table structure for table `planes_tours`
 --
 
 DROP TABLE IF EXISTS `planes_tours`;
@@ -7567,7 +7659,7 @@ CREATE TABLE IF NOT EXISTS `planes_tours` (
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `planes_tours`
+-- Dumping data for table `planes_tours`
 --
 
 INSERT INTO `planes_tours` (`Id_Plan`, `Id_Tour`, `Nombre_Plan`) VALUES
@@ -7586,7 +7678,7 @@ INSERT INTO `planes_tours` (`Id_Plan`, `Id_Tour`, `Nombre_Plan`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `puntos`
+-- Table structure for table `puntos`
 --
 
 DROP TABLE IF EXISTS `puntos`;
@@ -7601,7 +7693,7 @@ CREATE TABLE IF NOT EXISTS `puntos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=632 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `puntos`
+-- Dumping data for table `puntos`
 --
 
 INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `Latitud`, `Longitud`) VALUES
@@ -8237,7 +8329,7 @@ INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `Latitu
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `recordatorios`
+-- Table structure for table `recordatorios`
 --
 
 DROP TABLE IF EXISTS `recordatorios`;
@@ -8260,7 +8352,7 @@ CREATE TABLE IF NOT EXISTS `recordatorios` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `reservas`
+-- Table structure for table `reservas`
 --
 
 DROP TABLE IF EXISTS `reservas`;
@@ -8285,7 +8377,7 @@ CREATE TABLE IF NOT EXISTS `reservas` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `reservas`
+-- Dumping data for table `reservas`
 --
 
 INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`, `Fecha_Registro`, `Id_Canal`, `Idioma_Reserva`, `Telefono_Reportante`, `Nombre_Reportante`, `Estado`, `Observaciones`, `Placa_Bus`, `Orden_Ruta`) VALUES
@@ -8355,177 +8447,177 @@ INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`
 ('RSV1019', 'Grupal', 2072, '2025-12-20', '2025-12-14 16:14:36', 9, 'ESPAÑOL', '3019999999', 'Ricardo Giraldo', 'Pendiente', 'Pago directo', NULL, NULL),
 ('RSV1020', 'Grupal', 2073, '2025-12-20', '2025-12-14 16:14:36', 10, 'ESPAÑOL', '3020000000', 'Natalia Zapata', 'Pendiente', 'Pago directo', NULL, NULL),
 ('TDL74991', 'Grupal', 1429, '2025-12-29', '2025-12-17 03:41:21', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
-('TG10146', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG10871', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG10964', 'Grupal', 578, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG11565', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG11706', 'Grupal', 2099, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG12399', 'Grupal', 5402, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG13084', 'Grupal', 2306, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG13484', 'Grupal', 1739, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG14221', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG14312', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG15086', 'Grupal', 2405, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG15656', 'Grupal', 2378, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TG10146', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 5),
+('TG10871', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 1),
+('TG10964', 'Grupal', 578, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 13),
+('TG11565', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 1),
+('TG11706', 'Grupal', 2099, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 11),
+('TG12399', 'Grupal', 5402, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 10),
+('TG13084', 'Grupal', 2306, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 11),
+('TG13484', 'Grupal', 1739, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 8),
+('TG14221', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 11),
+('TG14312', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 14', 1),
+('TG15086', 'Grupal', 2405, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 10),
+('TG15656', 'Grupal', 2378, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 7),
 ('TG16121', 'Grupal', 2054, '2025-11-13', '2025-11-12 03:07:04', 2, 'ESPAÑOL', '1234567898', 'yo', 'Pendiente', '', NULL, NULL),
-('TG16266', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG18165', 'Grupal', 2522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG18722', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG19119', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG20585', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG21462', 'Grupal', 4972, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG21524', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG22311', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG22856', 'Grupal', 2162, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG23423', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG23942', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG23975', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG24769', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG25485', 'Grupal', 2207, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG25777', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG25814', 'Grupal', 5002, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG26099', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG26548', 'Grupal', 4422, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG29169', 'Grupal', 2864, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG29794', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG31569', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG31622', 'Grupal', 3233, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG31817', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG32227', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG32671', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG32965', 'Grupal', 5402, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG33048', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG33459', 'Grupal', 5352, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG33568', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG33590', 'Grupal', 3233, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG33851', 'Grupal', 164, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG34222', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG35303', 'Grupal', 3260, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG35309', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG35321', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG35425', 'Grupal', 4542, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG35749', 'Grupal', 2288, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG37222', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG37912', 'Grupal', 2477, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG38571', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG38841', 'Grupal', 182, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG39010', 'Grupal', 560, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG39022', 'Grupal', 1838, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG39200', 'Grupal', 2522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG40853', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG41109', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG41489', 'Grupal', 4522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG41591', 'Grupal', 4742, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG41837', 'Grupal', 2648, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG42282', 'Grupal', 3917, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG42477', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG42677', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG43742', 'Grupal', 1874, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG46025', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG46260', 'Grupal', 1271, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG46365', 'Grupal', 2900, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG46598', 'Grupal', 2693, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG47353', 'Grupal', 65, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG48187', 'Grupal', 866, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG48753', 'Grupal', 1739, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG48818', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG49399', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG50128', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG51057', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG51162', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG51301', 'Grupal', 2684, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG52037', 'Grupal', 182, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG53606', 'Grupal', 2900, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG53690', 'Grupal', 866, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TG16266', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 10),
+('TG18165', 'Grupal', 2522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 13),
+('TG18722', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 7),
+('TG19119', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 9),
+('TG20585', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 2),
+('TG21462', 'Grupal', 4972, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 1),
+('TG21524', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 13', 1),
+('TG22311', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 1),
+('TG22856', 'Grupal', 2162, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 4),
+('TG23423', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 9),
+('TG23942', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 2),
+('TG23975', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 5),
+('TG24769', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 7),
+('TG25485', 'Grupal', 2207, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 1),
+('TG25777', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 6),
+('TG25814', 'Grupal', 5002, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 6),
+('TG26099', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 6),
+('TG26548', 'Grupal', 4422, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 15', 1),
+('TG29169', 'Grupal', 2864, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 3),
+('TG29794', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 8),
+('TG31569', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 14),
+('TG31622', 'Grupal', 3233, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 1),
+('TG31817', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 7),
+('TG32227', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 11),
+('TG32671', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 16),
+('TG32965', 'Grupal', 5402, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 9),
+('TG33048', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 13', 4),
+('TG33459', 'Grupal', 5352, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 7),
+('TG33568', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 3),
+('TG33590', 'Grupal', 3233, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 2),
+('TG33851', 'Grupal', 164, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 5),
+('TG34222', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 4),
+('TG35303', 'Grupal', 3260, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 7),
+('TG35309', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 15),
+('TG35321', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 13),
+('TG35425', 'Grupal', 4542, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 2),
+('TG35749', 'Grupal', 2288, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 6),
+('TG37222', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 6),
+('TG37912', 'Grupal', 2477, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 20),
+('TG38571', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 1),
+('TG38841', 'Grupal', 182, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 3),
+('TG39010', 'Grupal', 560, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 7),
+('TG39022', 'Grupal', 1838, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 11),
+('TG39200', 'Grupal', 2522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 14),
+('TG40853', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 12),
+('TG41109', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 5),
+('TG41489', 'Grupal', 4522, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 4),
+('TG41591', 'Grupal', 4742, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 8),
+('TG41837', 'Grupal', 2648, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 14),
+('TG42282', 'Grupal', 3917, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 17),
+('TG42477', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 9),
+('TG42677', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 6),
+('TG43742', 'Grupal', 1874, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 14),
+('TG46025', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 4),
+('TG46260', 'Grupal', 1271, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 1),
+('TG46365', 'Grupal', 2900, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 3),
+('TG46598', 'Grupal', 2693, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 1),
+('TG47353', 'Grupal', 65, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 4),
+('TG48187', 'Grupal', 866, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 11),
+('TG48753', 'Grupal', 1739, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 9),
+('TG48818', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 12),
+('TG49399', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 3),
+('TG50128', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 3),
+('TG51057', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 10),
+('TG51162', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 8),
+('TG51301', 'Grupal', 2684, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 19),
+('TG52037', 'Grupal', 182, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 4),
+('TG53606', 'Grupal', 2900, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 4),
+('TG53690', 'Grupal', 866, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 12),
 ('TG54289', 'Grupal', 2054, '2025-11-13', '2025-11-12 05:20:46', 1, 'ESPAÑOL', '3216465444', 'yo', 'Pendiente', 'prueba', NULL, NULL),
-('TG54524', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG54712', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG54730', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG54796', 'Grupal', 200, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG54857', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG55259', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG55274', 'Grupal', 2468, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG55881', 'Grupal', 2270, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG57699', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG58564', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG59146', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG59416', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG60772', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61379', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61601', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61612', 'Grupal', 3674, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61631', 'Grupal', 3260, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61663', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG61791', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG62431', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG63270', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG63641', 'Grupal', 83, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG64626', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG64710', 'Grupal', 2792, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG64810', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG65754', 'Grupal', 2576, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG66789', 'Grupal', 2657, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG67143', 'Grupal', 1262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG67297', 'Grupal', 1262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG68867', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG69320', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG69436', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG70126', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG70845', 'Grupal', 3872, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG71459', 'Grupal', 1964, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG71687', 'Grupal', 2306, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG71856', 'Grupal', 3836, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG71942', 'Grupal', 3116, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG72825', 'Grupal', 65, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG73145', 'Grupal', 2144, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG74595', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG74793', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG75163', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG75332', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG75498', 'Grupal', 3341, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG75520', 'Grupal', 1946, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG75861', 'Grupal', 3494, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG76124', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG77693', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG78849', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG79145', 'Grupal', 2405, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG79301', 'Grupal', 3035, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG79640', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG81234', 'Grupal', 2279, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG81670', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG81676', 'Grupal', 2081, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG82057', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG82660', 'Grupal', 3548, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG82757', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG83105', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG83683', 'Grupal', 5262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG84225', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG84350', 'Grupal', 2234, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG84576', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG85465', 'Grupal', 4872, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG85933', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG86620', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG87293', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TG54524', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 13),
+('TG54712', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 4),
+('TG54730', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 4),
+('TG54796', 'Grupal', 200, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 12),
+('TG54857', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 12),
+('TG55259', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 2),
+('TG55274', 'Grupal', 2468, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 5),
+('TG55881', 'Grupal', 2270, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 6),
+('TG57699', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 8),
+('TG58564', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 13', 5),
+('TG59146', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 13', 3),
+('TG59416', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 8),
+('TG60772', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 2),
+('TG61379', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 17),
+('TG61601', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 7),
+('TG61612', 'Grupal', 3674, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 2),
+('TG61631', 'Grupal', 3260, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 6),
+('TG61663', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 8),
+('TG61791', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 2),
+('TG62431', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 14),
+('TG63270', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 3),
+('TG63641', 'Grupal', 83, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 3),
+('TG64626', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 13),
+('TG64710', 'Grupal', 2792, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 12),
+('TG64810', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 14', 3),
+('TG65754', 'Grupal', 2576, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 6),
+('TG66789', 'Grupal', 2657, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 4),
+('TG67143', 'Grupal', 1262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 9),
+('TG67297', 'Grupal', 1262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 10),
+('TG68867', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 8),
+('TG69320', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 9),
+('TG69436', 'Grupal', 1361, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 15),
+('TG70126', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 3),
+('TG70845', 'Grupal', 3872, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 18),
+('TG71459', 'Grupal', 1964, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 15),
+('TG71687', 'Grupal', 2306, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 12),
+('TG71856', 'Grupal', 3836, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 3),
+('TG71942', 'Grupal', 3116, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 7),
+('TG72825', 'Grupal', 65, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 13),
+('TG73145', 'Grupal', 2144, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 8),
+('TG74595', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 15),
+('TG74793', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 8),
+('TG75163', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 8),
+('TG75332', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 11),
+('TG75498', 'Grupal', 3341, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 5),
+('TG75520', 'Grupal', 1946, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 1),
+('TG75861', 'Grupal', 3494, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 1),
+('TG76124', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 4),
+('TG77693', 'Grupal', 353, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 11', 3),
+('TG78849', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 10),
+('TG79145', 'Grupal', 2405, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 9),
+('TG79301', 'Grupal', 3035, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 6),
+('TG79640', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 9),
+('TG81234', 'Grupal', 2279, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 10),
+('TG81670', 'Grupal', 3476, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 14', 2),
+('TG81676', 'Grupal', 2081, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 8', 5),
+('TG82057', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 11),
+('TG82660', 'Grupal', 3548, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 5),
+('TG82757', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 7),
+('TG83105', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 9),
+('TG83683', 'Grupal', 5262, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 15', 2),
+('TG84225', 'Grupal', 3773, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 4),
+('TG84350', 'Grupal', 2234, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 10', 1),
+('TG84576', 'Grupal', 2549, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 5),
+('TG85465', 'Grupal', 4872, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 2),
+('TG85933', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 5),
+('TG86620', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 14),
+('TG87293', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 16),
 ('TG87479', 'Grupal', 1424, '2025-12-20', '2025-12-17 00:04:18', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
-('TG87911', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG88134', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG88250', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG89176', 'Grupal', 2477, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG89436', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG89842', 'Grupal', 5242, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG90277', 'Grupal', 3764, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG91380', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG91761', 'Grupal', 3566, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG94242', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG94795', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG95245', 'Grupal', 5222, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG96555', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG97172', 'Grupal', 236, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG97614', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG99003', 'Grupal', 83, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG99446', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG99680', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TG99805', 'Grupal', 4702, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TG87911', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 13),
+('TG88134', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 12),
+('TG88250', 'Grupal', 2432, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 13),
+('TG89176', 'Grupal', 2477, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 21),
+('TG89436', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 3', 10),
+('TG89842', 'Grupal', 5242, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 6),
+('TG90277', 'Grupal', 3764, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 11),
+('TG91380', 'Grupal', 3098, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 13', 2),
+('TG91761', 'Grupal', 3566, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 2', 14),
+('TG94242', 'Grupal', 2261, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 2),
+('TG94795', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 6),
+('TG95245', 'Grupal', 5222, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 2),
+('TG96555', 'Grupal', 1010, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 10),
+('TG97172', 'Grupal', 236, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 12),
+('TG97614', 'Grupal', 1118, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 4', 16),
+('TG99003', 'Grupal', 83, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 6', 2),
+('TG99446', 'Grupal', 3278, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 5', 5),
+('TG99680', 'Grupal', 2441, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 12', 7),
+('TG99805', 'Grupal', 4702, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 9', 5),
 ('THN12694', 'Grupal', 2444, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
 ('THN13252', 'Grupal', 1121, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
 ('THN13459', 'Grupal', 1958, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
@@ -8561,10 +8653,10 @@ INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`
 ('TRC35269', 'Grupal', 1423, '2025-12-21', '2025-12-17 03:03:32', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
 ('TRC46725', 'Grupal', 1424, '2025-12-21', '2025-12-17 02:49:21', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
 ('TRC49243', 'Grupal', 1424, '2025-12-22', '2025-12-17 03:24:05', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
-('TRC61386', 'Grupal', 5392, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TRC61386', 'Grupal', 5392, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 7', 3),
 ('TRC63407', 'Grupal', 1424, '2025-12-22', '2025-12-17 02:43:49', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
-('TRC67917', 'Grupal', 2440, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
-('TRC78328', 'Grupal', 2440, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
+('TRC67917', 'Grupal', 2440, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 1),
+('TRC78328', 'Grupal', 2440, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, 'Bus 1', 2),
 ('TRC80570', 'Grupal', 1424, '2025-12-22', '2025-12-17 02:45:16', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
 ('TS38497', 'Grupal', 1428, '2025-12-26', '2025-12-17 03:38:39', 2, 'ESPAÑOL', '1234567894', 'yo', 'Pendiente', 'prueba', NULL, NULL),
 ('TSA17349', 'Grupal', 4904, '2026-01-22', '2026-01-26 13:18:07', NULL, NULL, NULL, NULL, 'Confirmada', NULL, NULL, NULL),
@@ -8582,7 +8674,7 @@ INSERT INTO `reservas` (`Id_Reserva`, `Tipo_Reserva`, `Id_Horario`, `Fecha_Tour`
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `roles`
+-- Table structure for table `roles`
 --
 
 DROP TABLE IF EXISTS `roles`;
@@ -8597,7 +8689,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `roles`
+-- Dumping data for table `roles`
 --
 
 INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Creacion`) VALUES
@@ -8607,7 +8699,7 @@ INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Cre
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `rol_permisos`
+-- Table structure for table `rol_permisos`
 --
 
 DROP TABLE IF EXISTS `rol_permisos`;
@@ -8622,7 +8714,7 @@ CREATE TABLE IF NOT EXISTS `rol_permisos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `rol_permisos`
+-- Dumping data for table `rol_permisos`
 --
 
 INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asignacion`) VALUES
@@ -8679,7 +8771,7 @@ INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asi
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `servicios_transfer`
+-- Table structure for table `servicios_transfer`
 --
 
 DROP TABLE IF EXISTS `servicios_transfer`;
@@ -8690,7 +8782,7 @@ CREATE TABLE IF NOT EXISTS `servicios_transfer` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `servicios_transfer`
+-- Dumping data for table `servicios_transfer`
 --
 
 INSERT INTO `servicios_transfer` (`Id_Servicio`, `Nombre_Servicio`) VALUES
@@ -8701,7 +8793,7 @@ INSERT INTO `servicios_transfer` (`Id_Servicio`, `Nombre_Servicio`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `sesiones`
+-- Table structure for table `sesiones`
 --
 
 DROP TABLE IF EXISTS `sesiones`;
@@ -8713,22 +8805,20 @@ CREATE TABLE IF NOT EXISTS `sesiones` (
   `Fecha_Expira` datetime DEFAULT NULL,
   PRIMARY KEY (`Id_Sesion`),
   KEY `Id_Usuario` (`Id_Usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `sesiones`
+-- Dumping data for table `sesiones`
 --
 
 INSERT INTO `sesiones` (`Id_Sesion`, `Id_Usuario`, `Token`, `Fecha_Inicio`, `Fecha_Expira`) VALUES
-(1, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3Njg1OTY4NTcsImV4cCI6MTc2OTIwMTY1N30.Trpvy9fdKDU3uWuxQk8SZ98PKEIkSXIQ9kCwHOhXdeE', '2026-01-16 15:54:17', '2026-01-23 15:54:17'),
-(2, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3NjkyNDY2MDAsImV4cCI6MTc2OTg1MTQwMH0.duuarHrE3_0Ro4-pT_cC6zJuZRR21nrRg-Ce4MIkyNo', '2026-01-24 04:23:20', '2026-01-31 04:23:20'),
-(3, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3Njk0Mzg0NjksImV4cCI6MTc3MDA0MzI2OX0.HZXIVwQ4ZFY8BLyTwpqu3A3P7_82r_kuvhsT4THgZRc', '2026-01-26 09:41:09', '2026-02-02 09:41:09'),
-(4, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3Njk3MzIwNjgsImV4cCI6MTc3MDMzNjg2OH0.mWluzvo7Yu9YCfO1pm8BX6X9UJixtdgz9rrcExPLF4I', '2026-01-29 19:14:28', '2026-02-05 19:14:28');
+(24, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3NzE0NTg3MTMsImV4cCI6MTc3MjA2MzUxM30.SsXthvkJtjEN5RdoYuGNbc4mDil37JurthogfQmATEA', '2026-02-18 18:51:53', '2026-02-25 18:51:53'),
+(25, 1018372157, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTAxODM3MjE1NywidXNlcm5hbWUiOiJ5ZWZlcjEyMyIsIm5hbWUiOiJZZWZlcnNvbiBVcnJlZ28gSGVuYW8iLCJlbWFpbCI6InVycmVnb3llZmVyc29uMkBnbWFpbC5jb20iLCJpYXQiOjE3NzE0NTg5NTUsImV4cCI6MTc3MjA2Mzc1NX0.31SUG21MytaQe2v_wLolpd9hfnyWqGskB080dNdqHcs', '2026-02-18 18:55:55', '2026-02-25 18:55:55');
 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours`
+-- Table structure for table `tours`
 --
 
 DROP TABLE IF EXISTS `tours`;
@@ -8746,7 +8836,7 @@ CREATE TABLE IF NOT EXISTS `tours` (
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tours`
+-- Dumping data for table `tours`
 --
 
 INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, `Comision_Agencia`, `Comision_Freelance`, `Cupo_Base`, `Latitud`, `Longitud`) VALUES
@@ -8765,7 +8855,7 @@ INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_dias`
+-- Table structure for table `tours_dias`
 --
 
 DROP TABLE IF EXISTS `tours_dias`;
@@ -8778,7 +8868,7 @@ CREATE TABLE IF NOT EXISTS `tours_dias` (
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tours_dias`
+-- Dumping data for table `tours_dias`
 --
 
 INSERT INTO `tours_dias` (`Id_TourDia`, `Id_Tour`, `Dia_Semana`) VALUES
@@ -8797,7 +8887,7 @@ INSERT INTO `tours_dias` (`Id_TourDia`, `Id_Tour`, `Dia_Semana`) VALUES
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_temporadas`
+-- Table structure for table `tours_temporadas`
 --
 
 DROP TABLE IF EXISTS `tours_temporadas`;
@@ -8812,7 +8902,7 @@ CREATE TABLE IF NOT EXISTS `tours_temporadas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tours_temporadas`
+-- Dumping data for table `tours_temporadas`
 --
 
 INSERT INTO `tours_temporadas` (`Id_Temporada`, `Id_Tour`, `Nombre_Temporada`, `Fecha_Inicio`, `Fecha_Fin`) VALUES
@@ -8821,7 +8911,7 @@ INSERT INTO `tours_temporadas` (`Id_Temporada`, `Id_Tour`, `Nombre_Temporada`, `
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tours_temporada_dias`
+-- Table structure for table `tours_temporada_dias`
 --
 
 DROP TABLE IF EXISTS `tours_temporada_dias`;
@@ -8834,7 +8924,7 @@ CREATE TABLE IF NOT EXISTS `tours_temporada_dias` (
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tours_temporada_dias`
+-- Dumping data for table `tours_temporada_dias`
 --
 
 INSERT INTO `tours_temporada_dias` (`Id_Temporada_Dia`, `Id_Temporada`, `Dia_Semana`) VALUES
@@ -8848,7 +8938,7 @@ INSERT INTO `tours_temporada_dias` (`Id_Temporada_Dia`, `Id_Temporada`, `Dia_Sem
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tour_precios`
+-- Table structure for table `tour_precios`
 --
 
 DROP TABLE IF EXISTS `tour_precios`;
@@ -8866,7 +8956,7 @@ CREATE TABLE IF NOT EXISTS `tour_precios` (
 ) ENGINE=InnoDB AUTO_INCREMENT=76 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `tour_precios`
+-- Dumping data for table `tour_precios`
 --
 
 INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, `Tipo_Pasajero`, `Precio`) VALUES
@@ -8918,7 +9008,7 @@ INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, 
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers`
+-- Table structure for table `transfers`
 --
 
 DROP TABLE IF EXISTS `transfers`;
@@ -8946,7 +9036,7 @@ CREATE TABLE IF NOT EXISTS `transfers` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers_precios`
+-- Table structure for table `transfers_precios`
 --
 
 DROP TABLE IF EXISTS `transfers_precios`;
@@ -8961,7 +9051,7 @@ CREATE TABLE IF NOT EXISTS `transfers_precios` (
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `transfers_precios`
+-- Dumping data for table `transfers_precios`
 --
 
 INSERT INTO `transfers_precios` (`Id_PrecioTransfer`, `Id_Rango`, `Id_Moneda`, `Precio`) VALUES
@@ -8975,7 +9065,7 @@ INSERT INTO `transfers_precios` (`Id_PrecioTransfer`, `Id_Rango`, `Id_Moneda`, `
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `transfers_rangos`
+-- Table structure for table `transfers_rangos`
 --
 
 DROP TABLE IF EXISTS `transfers_rangos`;
@@ -8988,7 +9078,7 @@ CREATE TABLE IF NOT EXISTS `transfers_rangos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `transfers_rangos`
+-- Dumping data for table `transfers_rangos`
 --
 
 INSERT INTO `transfers_rangos` (`Id_Rango`, `Descripcion`, `Minimo`, `Maximo`) VALUES
@@ -8998,7 +9088,7 @@ INSERT INTO `transfers_rangos` (`Id_Rango`, `Descripcion`, `Minimo`, `Maximo`) V
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `usuarios`
+-- Table structure for table `usuarios`
 --
 
 DROP TABLE IF EXISTS `usuarios`;
@@ -9021,7 +9111,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Volcado de datos para la tabla `usuarios`
+-- Dumping data for table `usuarios`
 --
 
 INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `Usuario`, `Correo`, `Avatar`, `Contrasena`, `Id_Rol`, `Activo`, `Fecha_Creacion`, `Fecha_Actualizacion`) VALUES
@@ -9030,7 +9120,7 @@ INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `
 (1000549795, 'Nayerlly Araque Cardona', '573232866379', 'Asesor13Maxi', 'araquenayerlly@gmail.com', NULL, '$2a$08$3VbtoV1T7TfWYgC8cdDCSeztGiz3g788NDIx2mrlPiDduqMreQAUe', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
 (1001390323, 'Evelin Dayana Arboleda Montes', '3234917551', 'Asesor10Maxi', 'evelindayanaarboledamontes@gmail.com', NULL, '$2a$08$CU4mQf.WoBsOnNVFYizPpOFIvfH48RIDXTyL1rniNee6zvQsXbw5G', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
 (1006209620, 'Laura Sofía Galvis Pérez', '3022664504', 'Sofiagalvis77', 'lauragalvis777@gmail.com', NULL, '$2a$08$jVtQ/Z2wJJSWFLeEl/JzBOq6Q/rQsMweMeGJszjo6ISJ3dDrgFENm', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
-(1007055270, 'Valentina Raigosa Posada', '3113442660', 'Asesor11Maxi', 'valeriaroigoza4@gmail.com', NULL, '$2a$08$8M.TH9ymkGO9ACOpy41uPuwKvSOSamtn227M/JGL.fya4j9b8LuBC', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
+(1007055270, 'Valentina Raigosa Posada', '3113442660', 'Asesor11Maxi', 'valeriaroigoza4@gmail.com', NULL, '$2a$08$8M.TH9ymkGO9ACOpy41uPuwKvSOSamtn227M/JGL.fya4j9b8LuBC', 2, 1, '2025-09-24 01:39:34', '2026-02-17 14:12:58'),
 (1007055418, 'Elizabeth Quiceno Echeverri', '3004799654', 'Asesor7Maxi', 'eli1234quic@gmail.com', NULL, '$2a$08$6ZR.UUis8M96j1fg7oLBOuCzQY6qn7ueUW3FXWmemC54nPWv7zNTO', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
 (1007115042, 'Adelaida García Buitrago', '3217589137', 'portolaureles', 'Adelaida.garcia1007@gmail.com', NULL, '$2a$08$X9NyFaPH4mH3g5yGLgLauOmfVAZwg.ocOWgf4ghkCaxn9g2I701Aa', 2, 1, '2025-09-24 01:39:34', '2026-01-10 20:37:41'),
 (1018372156, 'Yeferson Urrego', '3025783379', 'yefer321', 'urregoyeferson@icloud.com', NULL, '$2a$08$KmTvP77WxG7LVkxVZrnRFut61fRgESqHw/8Frodhz.nhFT.BR5gBm', 2, 1, '2025-09-24 01:39:34', '2026-01-05 04:43:28'),
@@ -9047,7 +9137,7 @@ INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `usuario_permisos`
+-- Table structure for table `usuario_permisos`
 --
 
 DROP TABLE IF EXISTS `usuario_permisos`;
@@ -9060,133 +9150,425 @@ CREATE TABLE IF NOT EXISTS `usuario_permisos` (
   PRIMARY KEY (`Id_Usuario_Permiso`),
   UNIQUE KEY `ux_usuario_permisos` (`Id_Usuario`,`Id_Permiso`),
   KEY `idx_usuario_permisos_permiso` (`Id_Permiso`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=369 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Restricciones para tablas volcadas
+-- Dumping data for table `usuario_permisos`
+--
+
+INSERT INTO `usuario_permisos` (`Id_Usuario_Permiso`, `Id_Usuario`, `Id_Permiso`, `Tipo`, `Fecha_Asignacion`) VALUES
+(21, 1020426193, 2, 'ALLOW', '2026-02-17 14:01:59'),
+(22, 1020426193, 1, 'ALLOW', '2026-02-17 14:01:59'),
+(23, 1020426193, 3, 'ALLOW', '2026-02-17 14:01:59'),
+(24, 1020426193, 4, 'ALLOW', '2026-02-17 14:01:59'),
+(25, 1020426193, 7, 'ALLOW', '2026-02-17 14:01:59'),
+(26, 1020426193, 6, 'ALLOW', '2026-02-17 14:01:59'),
+(27, 1020426193, 8, 'ALLOW', '2026-02-17 14:01:59'),
+(28, 1020426193, 5, 'ALLOW', '2026-02-17 14:01:59'),
+(29, 1020426193, 11, 'ALLOW', '2026-02-17 14:01:59'),
+(30, 1020426193, 10, 'ALLOW', '2026-02-17 14:01:59'),
+(31, 1020426193, 12, 'ALLOW', '2026-02-17 14:01:59'),
+(32, 1020426193, 9, 'ALLOW', '2026-02-17 14:01:59'),
+(33, 1020426193, 15, 'ALLOW', '2026-02-17 14:01:59'),
+(34, 1020426193, 14, 'ALLOW', '2026-02-17 14:01:59'),
+(35, 1020426193, 16, 'ALLOW', '2026-02-17 14:01:59'),
+(36, 1020426193, 13, 'ALLOW', '2026-02-17 14:01:59'),
+(37, 1020426193, 19, 'ALLOW', '2026-02-17 14:01:59'),
+(38, 1020426193, 18, 'ALLOW', '2026-02-17 14:01:59'),
+(39, 1020426193, 20, 'ALLOW', '2026-02-17 14:01:59'),
+(40, 1020426193, 17, 'ALLOW', '2026-02-17 14:01:59'),
+(41, 1020426193, 23, 'ALLOW', '2026-02-17 14:01:59'),
+(42, 1020426193, 22, 'ALLOW', '2026-02-17 14:01:59'),
+(43, 1020426193, 24, 'ALLOW', '2026-02-17 14:01:59'),
+(44, 1020426193, 21, 'ALLOW', '2026-02-17 14:01:59'),
+(45, 1020426193, 27, 'ALLOW', '2026-02-17 14:01:59'),
+(46, 1020426193, 26, 'ALLOW', '2026-02-17 14:01:59'),
+(47, 1020426193, 28, 'ALLOW', '2026-02-17 14:01:59'),
+(48, 1020426193, 25, 'ALLOW', '2026-02-17 14:01:59'),
+(49, 1020426193, 31, 'ALLOW', '2026-02-17 14:01:59'),
+(50, 1020426193, 30, 'ALLOW', '2026-02-17 14:01:59'),
+(51, 1020426193, 32, 'ALLOW', '2026-02-17 14:01:59'),
+(52, 1020426193, 29, 'ALLOW', '2026-02-17 14:01:59'),
+(53, 1020426193, 35, 'ALLOW', '2026-02-17 14:01:59'),
+(54, 1020426193, 34, 'ALLOW', '2026-02-17 14:01:59'),
+(55, 1020426193, 36, 'ALLOW', '2026-02-17 14:01:59'),
+(56, 1020426193, 33, 'ALLOW', '2026-02-17 14:01:59'),
+(57, 1020426193, 39, 'ALLOW', '2026-02-17 14:01:59'),
+(58, 1020426193, 38, 'ALLOW', '2026-02-17 14:01:59'),
+(59, 1020426193, 40, 'ALLOW', '2026-02-17 14:01:59'),
+(60, 1020426193, 37, 'ALLOW', '2026-02-17 14:01:59'),
+(61, 1018372157, 2, 'ALLOW', '2026-02-17 14:04:08'),
+(62, 1018372157, 1, 'ALLOW', '2026-02-17 14:04:08'),
+(63, 1018372157, 3, 'ALLOW', '2026-02-17 14:04:08'),
+(64, 1018372157, 4, 'ALLOW', '2026-02-17 14:04:08'),
+(65, 1018372157, 7, 'ALLOW', '2026-02-17 14:04:08'),
+(66, 1018372157, 6, 'ALLOW', '2026-02-17 14:04:08'),
+(67, 1018372157, 8, 'ALLOW', '2026-02-17 14:04:08'),
+(68, 1018372157, 5, 'ALLOW', '2026-02-17 14:04:08'),
+(69, 1018372157, 11, 'ALLOW', '2026-02-17 14:04:08'),
+(70, 1018372157, 10, 'ALLOW', '2026-02-17 14:04:08'),
+(71, 1018372157, 12, 'ALLOW', '2026-02-17 14:04:08'),
+(72, 1018372157, 9, 'ALLOW', '2026-02-17 14:04:08'),
+(73, 1018372157, 15, 'ALLOW', '2026-02-17 14:04:08'),
+(74, 1018372157, 14, 'ALLOW', '2026-02-17 14:04:08'),
+(75, 1018372157, 16, 'ALLOW', '2026-02-17 14:04:08'),
+(76, 1018372157, 13, 'ALLOW', '2026-02-17 14:04:08'),
+(77, 1018372157, 19, 'ALLOW', '2026-02-17 14:04:08'),
+(78, 1018372157, 18, 'ALLOW', '2026-02-17 14:04:08'),
+(79, 1018372157, 20, 'ALLOW', '2026-02-17 14:04:08'),
+(80, 1018372157, 17, 'ALLOW', '2026-02-17 14:04:08'),
+(81, 1018372157, 23, 'ALLOW', '2026-02-17 14:04:08'),
+(82, 1018372157, 22, 'ALLOW', '2026-02-17 14:04:08'),
+(83, 1018372157, 24, 'ALLOW', '2026-02-17 14:04:08'),
+(84, 1018372157, 21, 'ALLOW', '2026-02-17 14:04:08'),
+(85, 1018372157, 27, 'ALLOW', '2026-02-17 14:04:08'),
+(86, 1018372157, 26, 'ALLOW', '2026-02-17 14:04:08'),
+(87, 1018372157, 28, 'ALLOW', '2026-02-17 14:04:08'),
+(88, 1018372157, 25, 'ALLOW', '2026-02-17 14:04:08'),
+(89, 1018372157, 31, 'ALLOW', '2026-02-17 14:04:08'),
+(90, 1018372157, 30, 'ALLOW', '2026-02-17 14:04:08'),
+(91, 1018372157, 32, 'ALLOW', '2026-02-17 14:04:08'),
+(92, 1018372157, 29, 'ALLOW', '2026-02-17 14:04:08'),
+(93, 1018372157, 35, 'ALLOW', '2026-02-17 14:04:08'),
+(94, 1018372157, 34, 'ALLOW', '2026-02-17 14:04:08'),
+(95, 1018372157, 36, 'ALLOW', '2026-02-17 14:04:08'),
+(96, 1018372157, 33, 'ALLOW', '2026-02-17 14:04:08'),
+(97, 1018372157, 39, 'ALLOW', '2026-02-17 14:04:08'),
+(98, 1018372157, 38, 'ALLOW', '2026-02-17 14:04:08'),
+(99, 1018372157, 40, 'ALLOW', '2026-02-17 14:04:08'),
+(100, 1018372157, 37, 'ALLOW', '2026-02-17 14:04:08'),
+(101, 71676626, 2, 'ALLOW', '2026-02-17 14:05:41'),
+(102, 71676626, 1, 'ALLOW', '2026-02-17 14:05:41'),
+(103, 71676626, 3, 'ALLOW', '2026-02-17 14:05:41'),
+(104, 71676626, 4, 'ALLOW', '2026-02-17 14:05:41'),
+(105, 71676626, 7, 'ALLOW', '2026-02-17 14:05:41'),
+(106, 71676626, 6, 'ALLOW', '2026-02-17 14:05:41'),
+(107, 71676626, 8, 'ALLOW', '2026-02-17 14:05:41'),
+(108, 71676626, 5, 'ALLOW', '2026-02-17 14:05:41'),
+(109, 71676626, 11, 'ALLOW', '2026-02-17 14:05:41'),
+(110, 71676626, 10, 'ALLOW', '2026-02-17 14:05:41'),
+(111, 71676626, 12, 'ALLOW', '2026-02-17 14:05:41'),
+(112, 71676626, 9, 'ALLOW', '2026-02-17 14:05:41'),
+(113, 71676626, 15, 'ALLOW', '2026-02-17 14:05:41'),
+(114, 71676626, 14, 'ALLOW', '2026-02-17 14:05:41'),
+(115, 71676626, 16, 'ALLOW', '2026-02-17 14:05:41'),
+(116, 71676626, 13, 'ALLOW', '2026-02-17 14:05:41'),
+(117, 71676626, 19, 'ALLOW', '2026-02-17 14:05:41'),
+(118, 71676626, 18, 'ALLOW', '2026-02-17 14:05:41'),
+(119, 71676626, 20, 'ALLOW', '2026-02-17 14:05:41'),
+(120, 71676626, 17, 'ALLOW', '2026-02-17 14:05:41'),
+(121, 71676626, 23, 'ALLOW', '2026-02-17 14:05:41'),
+(122, 71676626, 22, 'ALLOW', '2026-02-17 14:05:41'),
+(123, 71676626, 24, 'ALLOW', '2026-02-17 14:05:41'),
+(124, 71676626, 21, 'ALLOW', '2026-02-17 14:05:41'),
+(125, 71676626, 27, 'ALLOW', '2026-02-17 14:05:41'),
+(126, 71676626, 26, 'ALLOW', '2026-02-17 14:05:41'),
+(127, 71676626, 28, 'ALLOW', '2026-02-17 14:05:41'),
+(128, 71676626, 25, 'ALLOW', '2026-02-17 14:05:41'),
+(129, 71676626, 31, 'ALLOW', '2026-02-17 14:05:41'),
+(130, 71676626, 30, 'ALLOW', '2026-02-17 14:05:41'),
+(131, 71676626, 32, 'ALLOW', '2026-02-17 14:05:41'),
+(132, 71676626, 29, 'ALLOW', '2026-02-17 14:05:41'),
+(133, 71676626, 35, 'ALLOW', '2026-02-17 14:05:41'),
+(134, 71676626, 34, 'ALLOW', '2026-02-17 14:05:41'),
+(135, 71676626, 36, 'ALLOW', '2026-02-17 14:05:41'),
+(136, 71676626, 33, 'ALLOW', '2026-02-17 14:05:41'),
+(137, 71676626, 39, 'ALLOW', '2026-02-17 14:05:41'),
+(138, 71676626, 38, 'ALLOW', '2026-02-17 14:05:41'),
+(139, 71676626, 40, 'ALLOW', '2026-02-17 14:05:41'),
+(140, 71676626, 37, 'ALLOW', '2026-02-17 14:05:41'),
+(141, 1000099025, 1, 'ALLOW', '2026-02-17 14:06:34'),
+(142, 1000099025, 7, 'ALLOW', '2026-02-17 14:06:34'),
+(143, 1000099025, 6, 'ALLOW', '2026-02-17 14:06:34'),
+(144, 1000099025, 5, 'ALLOW', '2026-02-17 14:06:34'),
+(145, 1000099025, 11, 'ALLOW', '2026-02-17 14:06:34'),
+(146, 1000099025, 10, 'ALLOW', '2026-02-17 14:06:34'),
+(147, 1000099025, 9, 'ALLOW', '2026-02-17 14:06:34'),
+(148, 1000099025, 13, 'ALLOW', '2026-02-17 14:06:34'),
+(149, 1000099025, 17, 'ALLOW', '2026-02-17 14:06:34'),
+(150, 1000549795, 1, 'ALLOW', '2026-02-17 14:06:45'),
+(151, 1000549795, 7, 'ALLOW', '2026-02-17 14:06:45'),
+(152, 1000549795, 6, 'ALLOW', '2026-02-17 14:06:45'),
+(153, 1000549795, 5, 'ALLOW', '2026-02-17 14:06:45'),
+(154, 1000549795, 11, 'ALLOW', '2026-02-17 14:06:45'),
+(155, 1000549795, 10, 'ALLOW', '2026-02-17 14:06:45'),
+(156, 1000549795, 9, 'ALLOW', '2026-02-17 14:06:45'),
+(157, 1000549795, 13, 'ALLOW', '2026-02-17 14:06:45'),
+(158, 1000549795, 17, 'ALLOW', '2026-02-17 14:06:45'),
+(159, 1001390323, 1, 'ALLOW', '2026-02-17 14:06:57'),
+(160, 1001390323, 7, 'ALLOW', '2026-02-17 14:06:57'),
+(161, 1001390323, 6, 'ALLOW', '2026-02-17 14:06:57'),
+(162, 1001390323, 5, 'ALLOW', '2026-02-17 14:06:57'),
+(163, 1001390323, 11, 'ALLOW', '2026-02-17 14:06:57'),
+(164, 1001390323, 10, 'ALLOW', '2026-02-17 14:06:57'),
+(165, 1001390323, 9, 'ALLOW', '2026-02-17 14:06:57'),
+(166, 1001390323, 13, 'ALLOW', '2026-02-17 14:06:57'),
+(167, 1001390323, 17, 'ALLOW', '2026-02-17 14:06:57'),
+(168, 1006209620, 1, 'ALLOW', '2026-02-17 14:12:32'),
+(169, 1006209620, 7, 'ALLOW', '2026-02-17 14:12:32'),
+(170, 1006209620, 6, 'ALLOW', '2026-02-17 14:12:32'),
+(171, 1006209620, 5, 'ALLOW', '2026-02-17 14:12:32'),
+(172, 1006209620, 11, 'ALLOW', '2026-02-17 14:12:32'),
+(173, 1006209620, 10, 'ALLOW', '2026-02-17 14:12:32'),
+(174, 1006209620, 9, 'ALLOW', '2026-02-17 14:12:32'),
+(175, 1006209620, 13, 'ALLOW', '2026-02-17 14:12:32'),
+(176, 1006209620, 17, 'ALLOW', '2026-02-17 14:12:32'),
+(227, 1007055270, 1, 'ALLOW', '2026-02-17 14:15:31'),
+(228, 1007055270, 7, 'ALLOW', '2026-02-17 14:15:31'),
+(229, 1007055270, 6, 'ALLOW', '2026-02-17 14:15:31'),
+(230, 1007055270, 5, 'ALLOW', '2026-02-17 14:15:31'),
+(231, 1007055270, 11, 'ALLOW', '2026-02-17 14:15:31'),
+(232, 1007055270, 10, 'ALLOW', '2026-02-17 14:15:31'),
+(233, 1007055270, 9, 'ALLOW', '2026-02-17 14:15:31'),
+(234, 1007055270, 13, 'ALLOW', '2026-02-17 14:15:31'),
+(235, 1007055270, 17, 'ALLOW', '2026-02-17 14:15:31'),
+(236, 1007055418, 1, 'ALLOW', '2026-02-17 14:15:48'),
+(237, 1007055418, 7, 'ALLOW', '2026-02-17 14:15:48'),
+(238, 1007055418, 6, 'ALLOW', '2026-02-17 14:15:48'),
+(239, 1007055418, 5, 'ALLOW', '2026-02-17 14:15:48'),
+(240, 1007055418, 11, 'ALLOW', '2026-02-17 14:15:48'),
+(241, 1007055418, 10, 'ALLOW', '2026-02-17 14:15:48'),
+(242, 1007055418, 9, 'ALLOW', '2026-02-17 14:15:48'),
+(243, 1007055418, 13, 'ALLOW', '2026-02-17 14:15:48'),
+(244, 1007055418, 17, 'ALLOW', '2026-02-17 14:15:48'),
+(245, 1007115042, 1, 'ALLOW', '2026-02-17 14:15:58'),
+(246, 1007115042, 7, 'ALLOW', '2026-02-17 14:15:58'),
+(247, 1007115042, 6, 'ALLOW', '2026-02-17 14:15:58'),
+(248, 1007115042, 5, 'ALLOW', '2026-02-17 14:15:58'),
+(249, 1007115042, 11, 'ALLOW', '2026-02-17 14:15:58'),
+(250, 1007115042, 10, 'ALLOW', '2026-02-17 14:15:58'),
+(251, 1007115042, 9, 'ALLOW', '2026-02-17 14:15:58'),
+(252, 1007115042, 13, 'ALLOW', '2026-02-17 14:15:58'),
+(253, 1007115042, 17, 'ALLOW', '2026-02-17 14:15:58'),
+(254, 1022145000, 1, 'ALLOW', '2026-02-17 14:16:35'),
+(255, 1022145000, 7, 'ALLOW', '2026-02-17 14:16:35'),
+(256, 1022145000, 6, 'ALLOW', '2026-02-17 14:16:35'),
+(257, 1022145000, 5, 'ALLOW', '2026-02-17 14:16:35'),
+(258, 1022145000, 11, 'ALLOW', '2026-02-17 14:16:35'),
+(259, 1022145000, 10, 'ALLOW', '2026-02-17 14:16:35'),
+(260, 1022145000, 9, 'ALLOW', '2026-02-17 14:16:35'),
+(261, 1022145000, 13, 'ALLOW', '2026-02-17 14:16:35'),
+(262, 1022145000, 17, 'ALLOW', '2026-02-17 14:16:35'),
+(263, 1036648398, 1, 'ALLOW', '2026-02-17 14:16:43'),
+(264, 1036648398, 7, 'ALLOW', '2026-02-17 14:16:43'),
+(265, 1036648398, 6, 'ALLOW', '2026-02-17 14:16:43'),
+(266, 1036648398, 5, 'ALLOW', '2026-02-17 14:16:43'),
+(267, 1036648398, 11, 'ALLOW', '2026-02-17 14:16:43'),
+(268, 1036648398, 10, 'ALLOW', '2026-02-17 14:16:43'),
+(269, 1036648398, 9, 'ALLOW', '2026-02-17 14:16:43'),
+(270, 1036648398, 13, 'ALLOW', '2026-02-17 14:16:43'),
+(271, 1036648398, 17, 'ALLOW', '2026-02-17 14:16:43'),
+(272, 1037948093, 2, 'ALLOW', '2026-02-17 14:16:54'),
+(273, 1037948093, 1, 'ALLOW', '2026-02-17 14:16:54'),
+(274, 1037948093, 3, 'ALLOW', '2026-02-17 14:16:54'),
+(275, 1037948093, 4, 'ALLOW', '2026-02-17 14:16:54'),
+(276, 1037948093, 7, 'ALLOW', '2026-02-17 14:16:54'),
+(277, 1037948093, 6, 'ALLOW', '2026-02-17 14:16:54'),
+(278, 1037948093, 8, 'ALLOW', '2026-02-17 14:16:54'),
+(279, 1037948093, 5, 'ALLOW', '2026-02-17 14:16:54'),
+(280, 1037948093, 11, 'ALLOW', '2026-02-17 14:16:54'),
+(281, 1037948093, 10, 'ALLOW', '2026-02-17 14:16:54'),
+(282, 1037948093, 12, 'ALLOW', '2026-02-17 14:16:54'),
+(283, 1037948093, 9, 'ALLOW', '2026-02-17 14:16:54'),
+(284, 1037948093, 15, 'ALLOW', '2026-02-17 14:16:54'),
+(285, 1037948093, 14, 'ALLOW', '2026-02-17 14:16:54'),
+(286, 1037948093, 16, 'ALLOW', '2026-02-17 14:16:54'),
+(287, 1037948093, 13, 'ALLOW', '2026-02-17 14:16:54'),
+(288, 1037948093, 19, 'ALLOW', '2026-02-17 14:16:54'),
+(289, 1037948093, 18, 'ALLOW', '2026-02-17 14:16:54'),
+(290, 1037948093, 20, 'ALLOW', '2026-02-17 14:16:54'),
+(291, 1037948093, 17, 'ALLOW', '2026-02-17 14:16:54'),
+(292, 1037948093, 23, 'ALLOW', '2026-02-17 14:16:54'),
+(293, 1037948093, 22, 'ALLOW', '2026-02-17 14:16:54'),
+(294, 1037948093, 24, 'ALLOW', '2026-02-17 14:16:54'),
+(295, 1037948093, 21, 'ALLOW', '2026-02-17 14:16:54'),
+(296, 1037948093, 27, 'ALLOW', '2026-02-17 14:16:54'),
+(297, 1037948093, 26, 'ALLOW', '2026-02-17 14:16:54'),
+(298, 1037948093, 28, 'ALLOW', '2026-02-17 14:16:54'),
+(299, 1037948093, 25, 'ALLOW', '2026-02-17 14:16:54'),
+(300, 1037948093, 31, 'ALLOW', '2026-02-17 14:16:54'),
+(301, 1037948093, 30, 'ALLOW', '2026-02-17 14:16:54'),
+(302, 1037948093, 32, 'ALLOW', '2026-02-17 14:16:54'),
+(303, 1037948093, 29, 'ALLOW', '2026-02-17 14:16:54'),
+(304, 1037948093, 35, 'ALLOW', '2026-02-17 14:16:54'),
+(305, 1037948093, 34, 'ALLOW', '2026-02-17 14:16:54'),
+(306, 1037948093, 36, 'ALLOW', '2026-02-17 14:16:54'),
+(307, 1037948093, 33, 'ALLOW', '2026-02-17 14:16:54'),
+(308, 1037948093, 39, 'ALLOW', '2026-02-17 14:16:54'),
+(309, 1037948093, 38, 'ALLOW', '2026-02-17 14:16:54'),
+(310, 1037948093, 40, 'ALLOW', '2026-02-17 14:16:54'),
+(311, 1037948093, 37, 'ALLOW', '2026-02-17 14:16:54'),
+(312, 1041230712, 1, 'ALLOW', '2026-02-17 14:17:06'),
+(313, 1041230712, 7, 'ALLOW', '2026-02-17 14:17:06'),
+(314, 1041230712, 6, 'ALLOW', '2026-02-17 14:17:06'),
+(315, 1041230712, 5, 'ALLOW', '2026-02-17 14:17:06'),
+(316, 1041230712, 11, 'ALLOW', '2026-02-17 14:17:06'),
+(317, 1041230712, 10, 'ALLOW', '2026-02-17 14:17:06'),
+(318, 1041230712, 9, 'ALLOW', '2026-02-17 14:17:06'),
+(319, 1041230712, 13, 'ALLOW', '2026-02-17 14:17:06'),
+(320, 1041230712, 17, 'ALLOW', '2026-02-17 14:17:06'),
+(321, 1047496358, 1, 'ALLOW', '2026-02-17 14:17:14'),
+(322, 1047496358, 7, 'ALLOW', '2026-02-17 14:17:14'),
+(323, 1047496358, 6, 'ALLOW', '2026-02-17 14:17:14'),
+(324, 1047496358, 5, 'ALLOW', '2026-02-17 14:17:14'),
+(325, 1047496358, 11, 'ALLOW', '2026-02-17 14:17:14'),
+(326, 1047496358, 10, 'ALLOW', '2026-02-17 14:17:14'),
+(327, 1047496358, 9, 'ALLOW', '2026-02-17 14:17:14'),
+(328, 1047496358, 13, 'ALLOW', '2026-02-17 14:17:14'),
+(329, 1047496358, 17, 'ALLOW', '2026-02-17 14:17:14'),
+(330, 1128436633, 1, 'ALLOW', '2026-02-17 14:17:24'),
+(331, 1128436633, 7, 'ALLOW', '2026-02-17 14:17:24'),
+(332, 1128436633, 6, 'ALLOW', '2026-02-17 14:17:24'),
+(333, 1128436633, 5, 'ALLOW', '2026-02-17 14:17:24'),
+(334, 1128436633, 11, 'ALLOW', '2026-02-17 14:17:24'),
+(335, 1128436633, 10, 'ALLOW', '2026-02-17 14:17:24'),
+(336, 1128436633, 9, 'ALLOW', '2026-02-17 14:17:24'),
+(337, 1128436633, 13, 'ALLOW', '2026-02-17 14:17:24'),
+(338, 1128436633, 17, 'ALLOW', '2026-02-17 14:17:24'),
+(339, 1128444233, 1, 'ALLOW', '2026-02-17 14:17:33'),
+(340, 1128444233, 7, 'ALLOW', '2026-02-17 14:17:33'),
+(341, 1128444233, 6, 'ALLOW', '2026-02-17 14:17:33'),
+(342, 1128444233, 5, 'ALLOW', '2026-02-17 14:17:33'),
+(343, 1128444233, 11, 'ALLOW', '2026-02-17 14:17:33'),
+(344, 1128444233, 10, 'ALLOW', '2026-02-17 14:17:33'),
+(345, 1128444233, 9, 'ALLOW', '2026-02-17 14:17:33'),
+(346, 1128444233, 13, 'ALLOW', '2026-02-17 14:17:33'),
+(347, 1128444233, 17, 'ALLOW', '2026-02-17 14:17:33'),
+(360, 1018372156, 1, 'ALLOW', '2026-02-17 14:30:33'),
+(361, 1018372156, 7, 'ALLOW', '2026-02-17 14:30:33'),
+(362, 1018372156, 6, 'ALLOW', '2026-02-17 14:30:33'),
+(363, 1018372156, 5, 'ALLOW', '2026-02-17 14:30:33'),
+(364, 1018372156, 11, 'ALLOW', '2026-02-17 14:30:33'),
+(365, 1018372156, 10, 'ALLOW', '2026-02-17 14:30:33'),
+(366, 1018372156, 9, 'ALLOW', '2026-02-17 14:30:33'),
+(367, 1018372156, 13, 'ALLOW', '2026-02-17 14:30:33'),
+(368, 1018372156, 17, 'ALLOW', '2026-02-17 14:30:33');
+
+--
+-- Constraints for dumped tables
 --
 
 --
--- Filtros para la tabla `aforos`
+-- Constraints for table `aforos`
 --
 ALTER TABLE `aforos`
   ADD CONSTRAINT `fk_aforos_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `asignacion_buses`
+-- Constraints for table `asignacion_buses`
 --
 ALTER TABLE `asignacion_buses`
   ADD CONSTRAINT `fk_asignbus_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `detalle_historial`
+-- Constraints for table `detalle_historial`
 --
 ALTER TABLE `detalle_historial`
   ADD CONSTRAINT `fk_detalle_historial` FOREIGN KEY (`Id_Historial`) REFERENCES `historial` (`Id_Historial`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `historial`
+-- Constraints for table `historial`
 --
 ALTER TABLE `historial`
   ADD CONSTRAINT `fk_historial_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `horarios`
+-- Constraints for table `horarios`
 --
 ALTER TABLE `horarios`
   ADD CONSTRAINT `fk_horarios_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_horarios_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `logs_sistema`
+-- Constraints for table `logs_sistema`
 --
 ALTER TABLE `logs_sistema`
   ADD CONSTRAINT `fk_log_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `mensajes`
+-- Constraints for table `mensajes`
 --
 ALTER TABLE `mensajes`
   ADD CONSTRAINT `fk_mensajes_emisor` FOREIGN KEY (`Id_Emisor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `mensaje_destinatario`
+-- Constraints for table `mensaje_destinatario`
 --
 ALTER TABLE `mensaje_destinatario`
   ADD CONSTRAINT `fk_mensajedest_mensaje` FOREIGN KEY (`Id_Mensaje`) REFERENCES `mensajes` (`Id_Mensaje`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_mensajedest_receptor` FOREIGN KEY (`Receptor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pagos_reservas`
+-- Constraints for table `pagos_reservas`
 --
 ALTER TABLE `pagos_reservas`
   ADD CONSTRAINT `fk_pagosreserva_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pagos_transfers`
+-- Constraints for table `pagos_transfers`
 --
 ALTER TABLE `pagos_transfers`
   ADD CONSTRAINT `fk_pagostransfers_transfer` FOREIGN KEY (`Id_Transfer`) REFERENCES `transfers` (`Id_Transfer`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `pasajeros`
+-- Constraints for table `pasajeros`
 --
 ALTER TABLE `pasajeros`
   ADD CONSTRAINT `fk_pasajeros_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pasajeros_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `planes_tours`
+-- Constraints for table `planes_tours`
 --
 ALTER TABLE `planes_tours`
   ADD CONSTRAINT `fk_planes_tours` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `recordatorios`
+-- Constraints for table `recordatorios`
 --
 ALTER TABLE `recordatorios`
   ADD CONSTRAINT `fk_recordatorios_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `reservas`
+-- Constraints for table `reservas`
 --
 ALTER TABLE `reservas`
   ADD CONSTRAINT `fk_reservas_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `rol_permisos`
+-- Constraints for table `rol_permisos`
 --
 ALTER TABLE `rol_permisos`
   ADD CONSTRAINT `fk_rol_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_rol_permisos_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `sesiones`
+-- Constraints for table `sesiones`
 --
 ALTER TABLE `sesiones`
   ADD CONSTRAINT `fk_sesiones_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_dias`
+-- Constraints for table `tours_dias`
 --
 ALTER TABLE `tours_dias`
   ADD CONSTRAINT `fk_toursdias_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_temporadas`
+-- Constraints for table `tours_temporadas`
 --
 ALTER TABLE `tours_temporadas`
   ADD CONSTRAINT `fk_temporada_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tours_temporada_dias`
+-- Constraints for table `tours_temporada_dias`
 --
 ALTER TABLE `tours_temporada_dias`
   ADD CONSTRAINT `fk_tempdias_temporada` FOREIGN KEY (`Id_Temporada`) REFERENCES `tours_temporadas` (`Id_Temporada`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `tour_precios`
+-- Constraints for table `tour_precios`
 --
 ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
@@ -9194,27 +9576,27 @@ ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `transfers`
+-- Constraints for table `transfers`
 --
 ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `transfers_precios`
+-- Constraints for table `transfers_precios`
 --
 ALTER TABLE `transfers_precios`
   ADD CONSTRAINT `fk_pt_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pt_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `usuarios`
+-- Constraints for table `usuarios`
 --
 ALTER TABLE `usuarios`
   ADD CONSTRAINT `fk_usuarios_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Filtros para la tabla `usuario_permisos`
+-- Constraints for table `usuario_permisos`
 --
 ALTER TABLE `usuario_permisos`
   ADD CONSTRAINT `fk_usuario_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE;
