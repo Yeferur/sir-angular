@@ -41,7 +41,7 @@ export class Mapa implements OnInit, OnDestroy {
   private routingControl!: any;
   @ViewChild('mapaDiv') mapContainer!: ElementRef<HTMLDivElement>;
 
-  ngOnInit(): void {
+   ngOnInit(): void {
     const checkVisibility = () => {
       const el = this.mapContainer?.nativeElement;
       if (el && el.offsetHeight > 100 && el.offsetWidth > 100) {
@@ -77,6 +77,7 @@ export class Mapa implements OnInit, OnDestroy {
         lat < -90 || lat > 90 || lng < -180 || lng > 180
       ) continue;
 
+      
       const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
       if (!puntosAgrupados.has(key)) {
         puntosAgrupados.set(key, {
@@ -123,7 +124,7 @@ export class Mapa implements OnInit, OnDestroy {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
-
+    
     const globalL = (window as any).L;
     const Routing = (L as any).Routing || globalL?.Routing;
 
@@ -160,8 +161,7 @@ export class Mapa implements OnInit, OnDestroy {
             <ul style="margin: 0; padding-left: 18px;">${reservasHtml}</ul>
           </div>
         `;
-
-        return L.marker(wp.latLng, {
+                return L.marker(wp.latLng, {
           icon: L.icon({
             iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -204,7 +204,7 @@ export class Mapa implements OnInit, OnDestroy {
           headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({ coordinates: coords, instructions: false })
         })
-          .then(r => r.ok ? r.json() : Promise.reject(new Error(`ORS ${r.status}`)))
+           .then(r => r.ok ? r.json() : Promise.reject(new Error(`ORS ${r.status}`)))
           .then(json => {
             const feat = json.features?.[0];
             if (!feat) return done.call(ctx, new Error('Ruta no encontrada'));
@@ -228,3 +228,4 @@ export class Mapa implements OnInit, OnDestroy {
     };
   }
 }
+

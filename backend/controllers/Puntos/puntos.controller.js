@@ -1,4 +1,41 @@
 const { obtenerPuntos, obtenerPuntosQuery, obtenerHorario, obtenerHorariosPorPunto, obtenerPuntosPorDireccion, crearPunto, crearHorariosParaPunto, obtenerPuntoPorId, actualizarPunto, eliminarPunto } = require('../../services/Puntos/puntos.service');
+const ExcelJS = require('exceljs');
+
+exports.exportarPuntosExcel = async (req, res) => {
+  const q = req.query.q || '';
+  try {
+    const result = await obtenerPuntos({ page: 1, limit: 10000, q });
+    const puntos = result.rows || [];
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Puntos de Encuentro');
+
+    worksheet.columns = [
+      { header: 'ID del Punto', key: 'id', width: 15 },
+      { header: 'Nombre del Punto', key: 'nombre', width: 40 },
+      { header: 'Ruta', key: 'ruta', width: 20 },
+      { header: 'Posición', key: 'posicion', width: 15 }
+    ];
+
+    puntos.forEach(p => {
+      worksheet.addRow({
+        id: p.Id_Punto,
+        nombre: p.Nombre_Punto || p.NombrePunto,
+        ruta: p.ruta || 'PENDIENTE',
+        posicion: p.posicion !== undefined ? p.posicion : ''
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Puntos_Encuentro.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Error al exportar puntos a Excel:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
 
 exports.getPuntos = async (req, res) => {
   const page = req.query.page || 1;

@@ -22,7 +22,6 @@ import { DuplicarPanelComponent } from '../../../DynamicNavbar/duplicar-panel/du
   styleUrls: ['./editar-reserva.css'],
 })
 export class EditarReservaComponent implements OnInit {
-  showDuplicate = true;
 
   openSummary = false;
 
@@ -934,11 +933,11 @@ export class EditarReservaComponent implements OnInit {
               Id_Tour: targetTourId,
               Fecha_Tour: targetFecha,
               Observaciones: typeof Observaciones === 'string' ? Observaciones.trim() : null
-
+              
             });
             console.log('Duplicando reserva a', { Id_Tour: targetTourId, Fecha_Tour: targetFecha, Observaciones });
           }
-
+          
 
         }
       });
@@ -1109,7 +1108,7 @@ export class EditarReservaComponent implements OnInit {
   private abrirReservaEnNavbar(idReserva: string) {
 
     this.navbar.alert.set(null);
-    this.navbar.cuposInfo.set(null);
+this.navbar.cuposInfo.set(null);
     this.navbar.Id_Reserva.set(idReserva);
 
   }

@@ -113,7 +113,7 @@
 /* Cupos */
 .navbar-container[data-state="cupos"] .dynamic-island {
   width: clamp(320px, 95vw, 350px);
-  height: 80px;
+  height: 100px;
   border-radius: 30px;
   top: 0;
 }

@@ -32,7 +32,7 @@ export class InicioService {
   private ws = inject(WebSocketService);
   private zone = inject(NgZone);
   private baseUrl = environment.apiUrl;
-  
+
   // Signal para cambios en tiempo real
   aforoActualizado = signal<any>(null);
   reservaActualizada = signal<any>(null);

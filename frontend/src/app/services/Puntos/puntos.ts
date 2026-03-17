@@ -8,6 +8,8 @@ export interface Punto {
   IdPunto?: number;
   NombrePunto?: string; // camelCase used in front
   Nombre_Punto?: string; // snake_case from DB
+  ruta?: string;
+  posicion?: number;
   Latitud?: string | number;
   Longitud?: string | number;
   Sector?: string;
@@ -26,11 +28,17 @@ export class puntosService {
   private baseUrl = environment.apiUrl; // ej. 'http://localhost:4000/api'
 
   // Fetch paginated points. Returns an object with data and total count.
-getPuntos(page = 1, limit = 10, q = '') {
-  const params: any = { page: String(page), limit: String(limit) };
-  if (q.trim()) params.q = q.trim();
-  return this.http.get<{ data: Punto[]; total: number }>(`${this.baseUrl}/puntos`, { params });
-}
+  getPuntos(page = 1, limit = 10, q = '') {
+    const params: any = { page: String(page), limit: String(limit) };
+    if (q.trim()) params.q = q.trim();
+    return this.http.get<{ data: Punto[]; total: number }>(`${this.baseUrl}/puntos`, { params });
+  }
+
+  exportarExcel(q = ''): Observable<Blob> {
+    const params: any = {};
+    if (q.trim()) params.q = q.trim();
+    return this.http.get(`${this.baseUrl}/puntos/exportar`, { params, responseType: 'blob' });
+  }
 
 
   buscarPuntos(term: string): Observable<any[]> {
@@ -44,15 +52,15 @@ getPuntos(page = 1, limit = 10, q = '') {
   }
 
   obtenerDatosPuntoTour(idPunto: number, idTour: number): Observable<{ HoraSalida: string }> {
-  // Ajuste: el endpoint en el backend es '/puntos/horario'
-  const params = new HttpParams()
-    .set('Id_Punto', idPunto.toString())
-    .set('Id_Tour', idTour.toString());
-  return this.http.get<{ HoraSalida: string }>(
-    `${this.baseUrl}/puntos/horario`,
-    { params }
-  );
-}
+    // Ajuste: el endpoint en el backend es '/puntos/horario'
+    const params = new HttpParams()
+      .set('Id_Punto', idPunto.toString())
+      .set('Id_Tour', idTour.toString());
+    return this.http.get<{ HoraSalida: string }>(
+      `${this.baseUrl}/puntos/horario`,
+      { params }
+    );
+  }
 
   getHorariosPunto(idPunto: number): Observable<{ Id_Tour: number; HoraSalida: string }[]> {
     const params = new HttpParams().set('Id_Punto', idPunto.toString());

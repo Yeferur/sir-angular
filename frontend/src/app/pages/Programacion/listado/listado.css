@@ -755,3 +755,10 @@
   color: var(--text-secondary);
   animation: fadeIn .5s ease;
 }
+
+
+@media (max-width: 500px) {
+  .page-container {
+    padding-top: 20px;
+  }
+}

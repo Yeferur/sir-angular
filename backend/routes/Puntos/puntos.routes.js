@@ -1,9 +1,10 @@
 const express = require('express');
-const { getPuntos, getPuntosQuery, getPuntosByDireccion, getHorario, getHorariosPorPunto, createPunto, getPuntoById, updatePunto, deletePunto } = require('../../controllers/Puntos/puntos.controller');
+const { exportarPuntosExcel, getPuntos, getPuntosQuery, getPuntosByDireccion, getHorario, getHorariosPorPunto, createPunto, getPuntoById, updatePunto, deletePunto } = require('../../controllers/Puntos/puntos.controller');
 const router = express.Router();
 const { authMiddleware } = require('../../middlewares/authMiddleware');
 const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 
+router.get('/puntos/exportar', authMiddleware, checkPermission('PUNTOS.LEER'), exportarPuntosExcel);
 router.get('/puntos', authMiddleware, checkPermission('PUNTOS.LEER'), getPuntos);
 router.get('/puntos/query', authMiddleware, checkPermission('PUNTOS.LEER'), getPuntosQuery);
 router.get('/puntos/direccion', authMiddleware, checkPermission('PUNTOS.LEER'), getPuntosByDireccion);

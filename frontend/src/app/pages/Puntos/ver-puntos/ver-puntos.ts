@@ -84,7 +84,7 @@ export class VerPuntos implements OnInit {
     } as VM)
   );
 
-  ngOnInit(): void {}
+  ngOnInit(): void { }
 
   /* ===============================
      NAV
@@ -137,7 +137,7 @@ export class VerPuntos implements OnInit {
     this.puntosSvc.deletePunto(id).subscribe({
       next: () => {
         // animación opcional
-        try { (p as any)._deleting = true; } catch {}
+        try { (p as any)._deleting = true; } catch { }
 
         setTimeout(() => {
           // recargar lista
@@ -192,6 +192,36 @@ export class VerPuntos implements OnInit {
     if (this.page >= totalPages) return;
     this.page++;
     this.page$.next(this.page);
+  }
+
+  /* ===============================
+     EXCEL EXPORT
+     =============================== */
+  descargandoExcel = false;
+
+  descargarExcel() {
+    this.descargandoExcel = true;
+    this.puntosSvc.exportarExcel(this.searchTerm).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'Puntos_Encuentro.xlsx';
+        link.click();
+        URL.revokeObjectURL(url);
+        this.descargandoExcel = false;
+      },
+      error: (err: any) => {
+        console.error('Error al exportar puntos al Excel', err);
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron exportar los puntos desde el servidor.',
+          autoClose: false
+        });
+        this.descargandoExcel = false;
+      }
+    });
   }
 
   trackById(_: number, item: Punto) {

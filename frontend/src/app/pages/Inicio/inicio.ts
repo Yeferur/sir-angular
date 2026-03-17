@@ -89,143 +89,143 @@ export class Inicio implements OnInit {
     this.loadData();
   }
 
-fpOptionsFecha: Partial<FlatpickrOptions> = {
-  dateFormat: 'Y-m-d',
-  altInput: true,
-  altFormat: 'd/m/Y',
-  allowInput: false,
-  disableMobile: true,
-  monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-  
-  altInputClass: 'form-input flatpickr-input flatpickr-alt',
+  fpOptionsFecha: Partial<FlatpickrOptions> = {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+    disableMobile: true,
+    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
 
-  onReady: (_sel, _str, inst: any) => {
-    // ✅ SSR guard ANTES DE TODO
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    altInputClass: 'form-input flatpickr-input flatpickr-alt',
 
-    const cal: HTMLElement = inst?.calendarContainer;
-    if (!cal) return;
+    onReady: (_sel, _str, inst: any) => {
+      // ✅ SSR guard ANTES DE TODO
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-    cal.classList.add('sir-flatpickr');
+      const cal: HTMLElement = inst?.calendarContainer;
+      if (!cal) return;
 
-    // util: clamp día al máximo del mes
-    const clampDay = (y: number, m: number, d: number) => {
-      const last = new Date(y, m + 1, 0).getDate(); // último día del mes
-      return Math.min(Math.max(d, 1), last);
-    };
+      cal.classList.add('sir-flatpickr');
 
-    // --- Inyectar select en el header estable (flatpickr-month) ---
-    let yearDiv: HTMLDivElement | null = null;
-    let yearSelect: HTMLSelectElement | null = null;
+      // util: clamp día al máximo del mes
+      const clampDay = (y: number, m: number, d: number) => {
+        const last = new Date(y, m + 1, 0).getDate(); // último día del mes
+        return Math.min(Math.max(d, 1), last);
+      };
 
-    const ensureYearSelect = () => {
-      // contenedor header
-      const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-      if (!monthWrap) return null;
+      // --- Inyectar select en el header estable (flatpickr-month) ---
+      let yearDiv: HTMLDivElement | null = null;
+      let yearSelect: HTMLSelectElement | null = null;
 
-      // elimina el input numérico (cuando exista)
-      const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-      if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
+      const ensureYearSelect = () => {
+        // contenedor header
+        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
+        if (!monthWrap) return null;
 
-      // preferimos insertar dentro del pill .flatpickr-current-month
-      const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-      const container = curMonth ?? monthWrap;
+        // elimina el input numérico (cuando exista)
+        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
+        if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
 
-      // evita duplicados
-      yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-      if (yearSelect) return yearSelect;
+        // preferimos insertar dentro del pill .flatpickr-current-month
+        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
+        const container = curMonth ?? monthWrap;
 
-      // elimina cualquier wrapper previo para mantener DOM limpio
-      const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-      if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
+        // evita duplicados
+        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
+        if (yearSelect) return yearSelect;
 
-      yearSelect = document.createElement('select');
-      yearSelect.className = 'sir-year-select';
-      yearSelect.setAttribute('aria-label', 'Seleccionar año');
+        // elimina cualquier wrapper previo para mantener DOM limpio
+        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
+        if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
 
-      try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-      return yearSelect;
-    };
+        yearSelect = document.createElement('select');
+        yearSelect.className = 'sir-year-select';
+        yearSelect.setAttribute('aria-label', 'Seleccionar año');
 
-    const buildYears = (centerYear: number) => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
+        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
+        return yearSelect;
+      };
 
-      const start = centerYear - 20;
-      const end = centerYear + 20;
+      const buildYears = (centerYear: number) => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
 
-      sel.innerHTML = '';
-      for (let y = end; y >= start; y--) {
-        const opt = document.createElement('option');
-        opt.value = String(y);
-        opt.textContent = String(y);
-        sel.appendChild(opt);
-      }
-      sel.value = String(centerYear);
-    };
+        const start = centerYear - 20;
+        const end = centerYear + 20;
 
-    const syncSelectValue = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
+        sel.innerHTML = '';
+        for (let y = end; y >= start; y--) {
+          const opt = document.createElement('option');
+          opt.value = String(y);
+          opt.textContent = String(y);
+          sel.appendChild(opt);
+        }
+        sel.value = String(centerYear);
+      };
 
-      const y = inst.currentYear ?? new Date().getFullYear();
-      const exists = !!sel.querySelector(`option[value="${y}"]`);
-      if (!exists) buildYears(y);
-      sel.value = String(y);
-    };
+      const syncSelectValue = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
 
-    const getSafeDay = () => {
-      const d: Date | undefined = inst.selectedDates?.[0];
-      return d ? d.getDate() : 1;
-    };
+        const y = inst.currentYear ?? new Date().getFullYear();
+        const exists = !!sel.querySelector(`option[value="${y}"]`);
+        if (!exists) buildYears(y);
+        sel.value = String(y);
+      };
 
-    const onChange = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
+      const getSafeDay = () => {
+        const d: Date | undefined = inst.selectedDates?.[0];
+        return d ? d.getDate() : 1;
+      };
 
-      const y = Number(sel.value);
-      const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-      const day = clampDay(y, m, getSafeDay());
+      const onChange = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
 
-      const newDate = new Date(y, m, day);
+        const y = Number(sel.value);
+        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
+        const day = clampDay(y, m, getSafeDay());
 
-      // siempre mueve la vista
-      if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
+        const newDate = new Date(y, m, day);
 
-      // solo setea si ya había selección
-      if (inst.selectedDates?.length) {
-        inst.setDate(newDate, true); // true => triggerChange para reactive forms
-      }
-    };
+        // siempre mueve la vista
+        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
 
-    // init
-    buildYears(inst.currentYear ?? new Date().getFullYear());
-    syncSelectValue();
+        // solo setea si ya había selección
+        if (inst.selectedDates?.length) {
+          inst.setDate(newDate, true); // true => triggerChange para reactive forms
+        }
+      };
 
-    // listeners
-    const sel0 = ensureYearSelect();
-    sel0?.addEventListener('change', onChange);
+      // init
+      buildYears(inst.currentYear ?? new Date().getFullYear());
+      syncSelectValue();
 
-    // hook sin pisar otros callbacks
-    const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-      const prev = inst.config[key];
-      const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-      inst.config[key] = [...arr, fn];
-    };
+      // listeners
+      const sel0 = ensureYearSelect();
+      sel0?.addEventListener('change', onChange);
 
-    // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
-    wrap('onMonthChange', () => syncSelectValue());
-    wrap('onYearChange', () => syncSelectValue());
+      // hook sin pisar otros callbacks
+      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
+        const prev = inst.config[key];
+        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
+        inst.config[key] = [...arr, fn];
+      };
 
-    // cleanup
-    const prevOnDestroy = inst.config.onDestroy;
-    const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-    inst.config.onDestroy = [
-      ...destroyArr,
-      () => sel0?.removeEventListener('change', onChange)
-    ];
-  }
-};
+      // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
+      wrap('onMonthChange', () => syncSelectValue());
+      wrap('onYearChange', () => syncSelectValue());
+
+      // cleanup
+      const prevOnDestroy = inst.config.onDestroy;
+      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
+      inst.config.onDestroy = [
+        ...destroyArr,
+        () => sel0?.removeEventListener('change', onChange)
+      ];
+    }
+  };
 
   onFechaChange(event: Event) {
     this.fecha = (event.target as HTMLInputElement).value;
@@ -308,7 +308,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   guardarAforo(tour: Tour) {
     // seguridad: verificar permiso antes de intentar guardar
     if (!this.canEditarAforo()) {
-      this.global.alert.set({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.' , autoClose: true});
+      this.global.alert.set({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.', autoClose: true });
       return;
     }
 
