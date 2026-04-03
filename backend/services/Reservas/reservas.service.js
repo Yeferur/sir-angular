@@ -2,6 +2,8 @@
 const db = require('../../database/db');
 const fs = require('fs');
 const path = require('path');
+const websocketManager = require('../../websocketManager');
+const { recordHistorial, logSistema } = require('../Historial/logger');
 
 /* ===========================
  * HELPERS
@@ -24,6 +26,313 @@ async function generarIdReservaUnico(idTour) {
     intentos++;
   }
   throw new Error('No se pudo generar Id_Reserva único.');
+}
+
+function validarFechaTourBogota(fechaTourIso) {
+  if (!fechaTourIso) return;
+  
+  const hoyBogotaStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+
+  const hoyBogotaDate = new Date(`${hoyBogotaStr}T00:00:00`);
+  
+  const fechaRecibidaStr = String(fechaTourIso).split('T')[0];
+  const fechaRecibidaDate = new Date(`${fechaRecibidaStr}T00:00:00`);
+  
+  if (fechaRecibidaDate < hoyBogotaDate) {
+    const err = new Error(`La fecha reservada (${fechaRecibidaStr}) no puede ser pasada respecto a la fecha actual en America/Bogota.`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+const COMPROBANTE_FILE_RE = /^[a-zA-Z0-9._-]+$/;
+
+function rutaComprobanteRelativaSegura(idReserva, fileName) {
+  const safeName = String(fileName || '').trim();
+  if (!COMPROBANTE_FILE_RE.test(safeName)) return null;
+  return path.join('uploads', 'reservas', String(idReserva), safeName).replace(/\\/g, '/');
+}
+
+function normalizarRutaComprobanteExistente(input, idReserva) {
+  const value = String(input || '').trim().replace(/\\/g, '/');
+  if (!value || value === 'N/A') return value;
+
+  const expectedPrefix = `uploads/reservas/${String(idReserva)}/`;
+  if (!value.startsWith(expectedPrefix)) return '';
+
+  const fileName = path.basename(value);
+  if (!COMPROBANTE_FILE_RE.test(fileName)) return '';
+
+  return `${expectedPrefix}${fileName}`;
+}
+
+async function resolverComprobanteSeguroPorNombre(nombreArchivo) {
+  const fileName = String(nombreArchivo || '').trim();
+  if (!COMPROBANTE_FILE_RE.test(fileName)) return null;
+
+  const [rows] = await db.query(
+    `SELECT Ruta_Comprobante
+       FROM pagos_reservas
+      WHERE Ruta_Comprobante LIKE ?
+      ORDER BY Id_Pago DESC
+      LIMIT 1`,
+    [`%/${fileName}`]
+  );
+
+  if (!rows?.length) return null;
+
+  const relative = String(rows[0].Ruta_Comprobante || '').replace(/\\/g, '/');
+  if (!relative.startsWith('uploads/reservas/')) return null;
+
+  const uploadsRoot = path.resolve(__dirname, '../../uploads');
+  const absolutePath = path.resolve(__dirname, '../../', relative);
+  if (!(absolutePath === uploadsRoot || absolutePath.startsWith(`${uploadsRoot}${path.sep}`))) {
+    return null;
+  }
+
+  if (!fs.existsSync(absolutePath)) return null;
+
+  return { absolutePath };
+}
+
+const TOUR_PASSENGER_RULES = {
+  1: { allowInfantes: false, minChildAge: 5 },
+  5: { allowInfantes: true, minChildAge: 5 },
+};
+
+function normalizarTipoPasajero(tipo) {
+  return String(tipo || '').trim().toUpperCase();
+}
+
+function contarCuposSolicitados(pasajerosArray = []) {
+  return (pasajerosArray || []).reduce((acc, p) => {
+    const tipo = normalizarTipoPasajero(p?.Tipo_Pasajero);
+    return (tipo === 'ADULTO' || tipo === 'NINO') ? acc + 1 : acc;
+  }, 0);
+}
+
+function normalizarTourParaCupos(idTour) {
+  return (idTour == 1 || idTour == 5) ? 5 : Number(idTour);
+}
+
+function normalizarFechaYMD(fecha) {
+  if (!fecha) return '';
+  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
+  return String(fecha).slice(0, 10);
+}
+
+function distanciaHaversineKm(lat1, lon1, lat2, lon2) {
+  const toRad = (deg) => (Number(deg) * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+async function validarPuntosRecogidaLogistica(pasajeros, dbConnection) {
+  const lista = Array.isArray(pasajeros) ? pasajeros : [];
+  const idsUnicos = Array.from(
+    new Set(
+      lista
+        .map((p) => p?.Id_Punto)
+        .filter((id) => id !== undefined && id !== null && String(id).trim() !== '')
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id))
+    )
+  );
+
+  if (idsUnicos.length <= 1) return;
+
+  const placeholders = idsUnicos.map(() => '?').join(',');
+  const [rows] = await dbConnection.query(
+    `SELECT Id_Punto, ruta, Latitud, Longitud
+       FROM puntos
+      WHERE Id_Punto IN (${placeholders})`,
+    idsUnicos
+  );
+
+  const puntos = rows || [];
+
+  const rutasNoNulas = new Set(
+    puntos
+      .map((r) => (r?.ruta == null ? '' : String(r.ruta).trim()))
+      .filter((r) => r !== '')
+  );
+
+  if (rutasNoNulas.size > 1) {
+    throw new Error('Inviabilidad Logística: Todos los pasajeros de una misma reserva deben pertenecer a la misma ruta de recogida.');
+  }
+
+  for (let i = 0; i < puntos.length; i++) {
+    const lat1 = Number(puntos[i]?.Latitud);
+    const lon1 = Number(puntos[i]?.Longitud);
+    if (!Number.isFinite(lat1) || !Number.isFinite(lon1)) continue;
+
+    for (let j = i + 1; j < puntos.length; j++) {
+      const lat2 = Number(puntos[j]?.Latitud);
+      const lon2 = Number(puntos[j]?.Longitud);
+      if (!Number.isFinite(lat2) || !Number.isFinite(lon2)) continue;
+
+      const distancia = distanciaHaversineKm(lat1, lon1, lat2, lon2);
+      if (distancia > 6) {
+        throw new Error('Inviabilidad Logística: Los puntos de encuentro están demasiado separados (> 6km). Por favor, divida la reserva.');
+      }
+    }
+  }
+}
+
+function validarReglasPasajerosPorTour(payload) {
+  const cab = payload?.cabeceraReserva || {};
+  const tourId = Number(cab.Id_Tour || 0);
+  const rules = TOUR_PASSENGER_RULES[tourId];
+  if (!rules) return;
+
+  const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
+  for (const p of pasajerosArray) {
+    const tipo = normalizarTipoPasajero(p?.Tipo_Pasajero);
+
+    if (tipo === 'INFANTE' && rules.allowInfantes === false) {
+      const err = new Error(`El tour ${tourId} no permite pasajeros INFANTE.`);
+      err.status = 400;
+      err.errorCode = 'TOUR_RULE_INFANTE_NOT_ALLOWED';
+      throw err;
+    }
+
+    const edadRaw = p?.Edad ?? p?.Edad_Pasajero ?? p?.age ?? null;
+    if (tipo === 'NINO' && rules.minChildAge != null && edadRaw != null && Number(edadRaw) < Number(rules.minChildAge)) {
+      const err = new Error(`El tour ${tourId} requiere edad mínima de ${rules.minChildAge} años para tipo NINO.`);
+      err.status = 400;
+      err.errorCode = 'TOUR_RULE_MIN_AGE';
+      throw err;
+    }
+  }
+}
+
+async function ensureDisponibilidadTable(conn) {
+  await conn.query(
+    `CREATE TABLE IF NOT EXISTS Disponibilidad (
+      Id_Disponibilidad BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      Id_Tour BIGINT UNSIGNED NOT NULL,
+      Fecha_Tour DATE NOT NULL,
+      Cupos_Totales INT NOT NULL DEFAULT 0,
+      Cupos_Disponibles INT NOT NULL DEFAULT 0,
+      Updated_At DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (Id_Disponibilidad),
+      UNIQUE KEY ux_disponibilidad_tour_fecha (Id_Tour, Fecha_Tour)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+}
+
+async function obtenerCupoTotalBase(conn, idTour, fechaTour) {
+  const [cupoRows] = await conn.query(
+    `SELECT COALESCE(
+      (SELECT a.Cupo FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1),
+      (SELECT t.Cupo_Base FROM tours t WHERE t.Id_Tour = ? LIMIT 1)
+    ) AS CupoTotal`,
+    [idTour, fechaTour, idTour]
+  );
+  return Number(cupoRows?.[0]?.CupoTotal || 0);
+}
+
+async function contarOcupadosGrupales(conn, idTour, fechaTour, excludeReservaId = null) {
+  const sql = `
+    SELECT COALESCE(SUM(CASE WHEN px.Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Ocupados
+    FROM reservas res
+    LEFT JOIN horarios h ON h.Id_Horario = res.Id_Horario
+    LEFT JOIN pasajeros px ON px.Id_Reserva = res.Id_Reserva
+    WHERE h.Id_Tour = ?
+      AND res.Fecha_Tour = ?
+      AND (res.Estado IS NULL OR res.Estado <> 'Cancelada')
+      AND res.Tipo_Reserva = 'Grupal'
+      ${excludeReservaId ? 'AND res.Id_Reserva <> ?' : ''}`;
+
+  const params = excludeReservaId ? [idTour, fechaTour, excludeReservaId] : [idTour, fechaTour];
+  const [rows] = await conn.query(sql, params);
+  return Number(rows?.[0]?.Ocupados || 0);
+}
+
+async function obtenerCuposActualesReserva(conn, idReserva) {
+  const [rows] = await conn.query(
+    `SELECT COALESCE(SUM(CASE WHEN Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Cupos
+       FROM pasajeros
+      WHERE Id_Reserva = ?`,
+    [idReserva]
+  );
+  return Number(rows?.[0]?.Cupos || 0);
+}
+
+async function bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId = null) {
+  await ensureDisponibilidadTable(conn);
+
+  const [rows] = await conn.query(
+    `SELECT Cupos_Totales, Cupos_Disponibles
+       FROM Disponibilidad
+      WHERE Id_Tour = ? AND Fecha_Tour = ?
+      FOR UPDATE`,
+    [idTour, fechaTour]
+  );
+
+  if (rows?.length) {
+    return {
+      cuposTotales: Number(rows[0].Cupos_Totales || 0),
+      cuposDisponibles: Number(rows[0].Cupos_Disponibles || 0),
+    };
+  }
+
+  const cupoTotal = await obtenerCupoTotalBase(conn, idTour, fechaTour);
+  const ocupados = await contarOcupadosGrupales(conn, idTour, fechaTour, excludeReservaId);
+  const cuposDisponibles = Math.max(0, cupoTotal - ocupados);
+
+  await conn.query(
+    `INSERT INTO Disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
+     VALUES (?, ?, ?, ?)`,
+    [idTour, fechaTour, cupoTotal, cuposDisponibles]
+  );
+
+  const [rows2] = await conn.query(
+    `SELECT Cupos_Totales, Cupos_Disponibles
+       FROM Disponibilidad
+      WHERE Id_Tour = ? AND Fecha_Tour = ?
+      FOR UPDATE`,
+    [idTour, fechaTour]
+  );
+
+  return {
+    cuposTotales: Number(rows2?.[0]?.Cupos_Totales || 0),
+    cuposDisponibles: Number(rows2?.[0]?.Cupos_Disponibles || 0),
+  };
+}
+
+async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cantidadNueva, cantidadAnterior = 0, excludeReservaId = null }) {
+  const cupoInfo = await bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId);
+  const efectivos = Number(cupoInfo.cuposDisponibles || 0) + Number(cantidadAnterior || 0);
+
+  if (efectivos < Number(cantidadNueva || 0)) {
+    const err = new Error(`No hay cupos suficientes. Solicitados: ${cantidadNueva}, Disponibles: ${efectivos}`);
+    err.status = 409;
+    err.errorCode = 'OVERBOOKING_CONFLICT';
+    throw err;
+  }
+
+  const restantes = efectivos - Number(cantidadNueva || 0);
+  await conn.query(
+    `UPDATE Disponibilidad
+        SET Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
+      WHERE Id_Tour = ? AND Fecha_Tour = ?`,
+    [restantes, idTour, fechaTour]
+  );
+
+  return { cuposDisponibles: restantes, cuposTotales: cupoInfo.cuposTotales };
 }
 
 /* ===========================
@@ -268,7 +577,7 @@ async function obtenerMonedas() {
 }
 
 async function obtenerTours() {
-  const [rows] = await db.query('SELECT * FROM tours');
+  const [rows] = await db.query('SELECT * FROM tours WHERE Activo = 1');
   return rows;
 }
 
@@ -376,10 +685,11 @@ async function verificarCupos(Fecha, Id_Tour, Cantidad, Id_Reserva) {
     nombreTour = `${nombresMap[1] || 'Tour 1'} Y ${nombresMap[5] || 'Tour 5'}`;
   }
 
-  const disponibles = cupoTotal - ocupados;
-  console.log('disponibles', disponibles, "CupoTotal", cupoTotal, "Ocupados", ocupados, "Cantidad solicitada", Cantidad);
+  const disponiblesRaw = cupoTotal - ocupados;
+  const disponibles = Math.max(0, disponiblesRaw);
+  console.log('disponibles', disponiblesRaw, "CupoTotal", cupoTotal, "Ocupados", ocupados, "Cantidad solicitada", Cantidad);
   return {
-    disponible: disponibles >= Number(Cantidad || 0),
+    disponible: disponiblesRaw >= Number(Cantidad || 0),
     cupoTotal,
     ocupados,
     cuposDisponibles: disponibles,
@@ -390,16 +700,52 @@ async function verificarCupos(Fecha, Id_Tour, Cantidad, Id_Reserva) {
 /* ===========================
  * CREACIÓN (TRANSACCIÓN)
  * =========================== */
-async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = null) {
-  const conn = await db.getConnection();
+async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = null, clientIp = null) {
+  let conn;
   try {
     if (!payload || !payload.cabeceraReserva) {
       throw new Error('Payload inválido: falta cabeceraReserva');
     }
+    if (!payload.cabeceraReserva.Fecha_Tour) {
+      const err = new Error('La fecha del tour es obligatoria');
+      err.status = 400;
+      throw err;
+    }
+
+    validarReglasPasajerosPorTour(payload);
+    validarFechaTourBogota(payload.cabeceraReserva.Fecha_Tour);
+
+    conn = await db.getConnection();
+
+  await validarPuntosRecogidaLogistica(payload?.pasajeros, conn);
 
     await conn.beginTransaction();
 
     const r = payload.cabeceraReserva;
+    const tipoReserva = r.Tipo_Reserva || 'Grupal';
+    const pasajerosArray = Array.isArray(payload.pasajeros) ? payload.pasajeros : [];
+    const cantidadSolicitada = contarCuposSolicitados(pasajerosArray);
+
+    // Primera operación transaccional: bloqueo y verificación de disponibilidad.
+    if (tipoReserva.toLowerCase() === 'grupal' && cantidadSolicitada > 0) {
+      await validarYAplicarCuposTransaccional({
+        conn,
+        idTour: normalizarTourParaCupos(r.Id_Tour),
+        fechaTour: normalizarFechaYMD(r.Fecha_Tour),
+        cantidadNueva: cantidadSolicitada,
+      });
+    }
+
+    // --- CÁLCULO DE ESTADO DE RESERVA EN SERVER (SEGURO) ---
+    const pagosArray = Array.isArray(payload.pagos) ? payload.pagos : [];
+    const totalAbonado = pagosArray.reduce((sum, pag) => sum + Number(pag.Monto || 0), 0);
+    const totalVenta = pasajerosArray.reduce((sum, px) => sum + Number(px.Precio_Pasajero || 0), 0);
+    
+    let estadoCalculado = 'Pendiente';
+    if (pagosArray.some(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo') || (totalAbonado > 0 && totalAbonado >= totalVenta)) {
+      estadoCalculado = 'Confirmada';
+    }
+
     const idReserva = await generarIdReservaUnico(r.Id_Tour);
 
     await conn.query(
@@ -416,15 +762,15 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
         r.Idioma_Reserva || 'ESPAÑOL',
         r.Telefono_Reportante || null,
         r.Nombre_Reportante || null,
-        r.Estado || 'Pendiente',
+        estadoCalculado,
         r.Observaciones || null,
         r.Placa_Bus || null,
         r.Orden_Ruta || null,
       ]
     );
 
-    if (Array.isArray(payload.pasajeros)) {
-      for (const p of payload.pasajeros) {
+    if (pasajerosArray.length > 0) {
+      for (const p of pasajerosArray) {
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
@@ -449,9 +795,9 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
     const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(idReserva));
     fs.mkdirSync(baseDir, { recursive: true });
 
-    if (Array.isArray(payload.pagos)) {
+    if (pagosArray.length > 0) {
       let abonoIdx = 0;
-      for (const pago of payload.pagos) {
+      for (const pago of pagosArray) {
         const tipo = (pago.Tipo === 'Pago Directo' || pago.Tipo === 'Pago Completo' || pago.Tipo === 'Abono')
           ? pago.Tipo
           : 'Abono';
@@ -462,16 +808,13 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
           const field = pago.fileField;
           const f = field ? filesMap[field] : undefined;
           if (f && f.buffer) {
-            const ext = path.extname(f.originalname) || '.bin';
-            const fileName = (tipo === 'Pago Completo')
-              ? `comprobante_${idReserva}${ext}`
-              : `abono_${abonoIdx}_${idReserva}${ext}`;
+            const fileName = f.safeName || `${Date.now()}_${Math.random().toString(36).slice(2)}.bin`;
             const dest = path.join(baseDir, fileName);
             fs.writeFileSync(dest, f.buffer);
-            rutaComprobante = path.join('uploads', 'reservas', String(idReserva), fileName).replace(/\\/g, '/');
+            rutaComprobante = rutaComprobanteRelativaSegura(idReserva, fileName) || '';
             if (tipo === 'Abono') abonoIdx++;
           } else if (pago.Ruta_Comprobante) {
-            rutaComprobante = pago.Ruta_Comprobante;
+            rutaComprobante = normalizarRutaComprobanteExistente(pago.Ruta_Comprobante, idReserva);
           } else {
             rutaComprobante = '';
           }
@@ -493,21 +836,26 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
       }
     }
 
+    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: idReserva, accion: 'CREAR', id_usuario: userId, detalles: [ { columna: 'Id_Tour', anterior: null, nuevo: r.Id_Tour }, { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour }, { columna: 'Estado', anterior: null, nuevo: estadoCalculado } ] });
+
     await conn.commit();
-    try {
-      const { recordHistorial } = require('../Historial/logger');
-      await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: idReserva, accion: 'CREAR', id_usuario: userId, detalles: [ { columna: 'Id_Tour', anterior: null, nuevo: r.Id_Tour }, { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour } ] });
-    } catch (errRec) {
-      console.error('Failed to write historial for crearReserva:', errRec);
+
+    if (payload?.cabeceraReserva?.Fecha_Tour) {
+      websocketManager.broadcastReservaEvento({
+        type: 'reservaCreada',
+        Fecha_Tour: payload.cabeceraReserva.Fecha_Tour,
+        Id_Tour: payload.cabeceraReserva.Id_Tour,
+        Id_Reserva: idReserva || null,
+      });
     }
-    conn.release();
-    return { success: true, Id_Reserva: idReserva };
-  } catch (e) {
-    await conn.rollback();
-    await conn.rollback();
-    try { const { logSistema } = require('../Historial/logger'); await logSistema({ mensaje: `crearReserva error: ${e.message || e}`, meta: { payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
-    conn.release();
-    throw e;
+    
+    return { Id_Reserva: idReserva };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    try { await logSistema({ mensaje: `crearReserva error: ${error.message || error}`, meta: { payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
 }
 
@@ -663,14 +1011,72 @@ async function obtenerReservaDetalle(Id_Reserva) {
 /* ===========================
  * ACTUALIZACIÓN (TRANSACCIÓN)
  * =========================== */
-async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap = {}, userId = null) {
-  const conn = await db.getConnection();
+async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap = {}, userId = null, clientIp = null) {
+  let conn;
   try {
+    validarReglasPasajerosPorTour(payload);
+
+    conn = await db.getConnection();
+    await validarPuntosRecogidaLogistica(payload?.pasajeros, conn);
+    if (payload?.cabeceraReserva?.Fecha_Tour) {
+      validarFechaTourBogota(payload.cabeceraReserva.Fecha_Tour);
+    }
     await conn.beginTransaction();
 
-    // 1) Update cabecera (SIN Id_Moneda)
+    const [currentReservaRows] = await conn.query(
+      `SELECT Id_Reserva, Id_Tour, Fecha_Tour, Tipo_Reserva, Estado
+         FROM reservas
+        WHERE Id_Reserva = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [Id_Reserva]
+    );
+    if (!currentReservaRows?.length) {
+      const err = new Error('Reserva no encontrada');
+      err.status = 404;
+      err.errorCode = 'RESERVA_NOT_FOUND';
+      throw err;
+    }
+
+    const r = payload?.cabeceraReserva || {};
+    const currentReserva = currentReservaRows[0];
+    const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
+    const pagosArray = Array.isArray(payload?.pagos) ? payload.pagos : [];
+
+    const idTourFinal = Number(r.Id_Tour || currentReserva.Id_Tour);
+    const fechaTourFinal = normalizarFechaYMD(r.Fecha_Tour || currentReserva.Fecha_Tour);
+    const tipoReservaFinal = String(r.Tipo_Reserva || currentReserva.Tipo_Reserva || 'Grupal');
+
+    // Primera operación transaccional: bloqueo y verificación de disponibilidad.
+    if (tipoReservaFinal.toLowerCase() === 'grupal') {
+      const cuposAntes = await obtenerCuposActualesReserva(conn, Id_Reserva);
+      const cantidadSolicitada = payload?.pasajeros !== undefined
+        ? contarCuposSolicitados(pasajerosArray)
+        : cuposAntes;
+
+      await validarYAplicarCuposTransaccional({
+        conn,
+        idTour: normalizarTourParaCupos(idTourFinal),
+        fechaTour: fechaTourFinal,
+        cantidadNueva: cantidadSolicitada,
+        cantidadAnterior: cuposAntes,
+        excludeReservaId: Id_Reserva,
+      });
+    }
+
+    const estadoAnterior = currentReserva.Estado || null;
+
+    // --- CÁLCULO DE ESTADO DE RESERVA EN SERVER ---
+    const totalAbonado = pagosArray.reduce((sum, pag) => sum + Number(pag.Monto || 0), 0);
+    const totalVenta = pasajerosArray.reduce((sum, px) => sum + Number(px.Precio_Pasajero || 0), 0);
+    
+    let estadoCalculado = 'Pendiente';
+    if (pagosArray.some(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo') || (totalAbonado > 0 && totalAbonado >= totalVenta)) {
+      estadoCalculado = 'Confirmada';
+    }
+
+    // 1) Update cabecera
     if (payload?.cabeceraReserva) {
-      const r = payload.cabeceraReserva;
       const fields = [];
       const vals = [];
       const setIf = (col, val) => { fields.push(`${col} = ?`); vals.push(val); };
@@ -682,10 +1088,11 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       if (r.Idioma_Reserva !== undefined) setIf('Idioma_Reserva', r.Idioma_Reserva);
       if (r.Telefono_Reportante !== undefined) setIf('Telefono_Reportante', r.Telefono_Reportante);
       if (r.Nombre_Reportante !== undefined) setIf('Nombre_Reportante', r.Nombre_Reportante);
-      if (r.Estado !== undefined) setIf('Estado', r.Estado);
       if (r.Observaciones !== undefined) setIf('Observaciones', r.Observaciones);
       if (r.Id_Tour !== undefined) setIf('Id_Tour', r.Id_Tour);
-      // ❌ No existe r.Id_Moneda en reservas → NO actualizar
+      
+      // Estado calculado desde el backend
+      setIf('Estado', estadoCalculado);
 
       if (fields.length) {
         const sql = `UPDATE reservas SET ${fields.join(', ')} WHERE Id_Reserva = ?`;
@@ -694,10 +1101,10 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
     }
 
     // 2) Reemplazo total de pasajeros
-    if (Array.isArray(payload?.pasajeros)) {
+    if (pasajerosArray.length > 0 || payload.pasajeros !== undefined) {
       await conn.query('DELETE FROM pasajeros WHERE Id_Reserva = ?', [Id_Reserva]);
 
-      for (const p of payload.pasajeros) {
+      for (const p of pasajerosArray) {
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
@@ -723,30 +1130,26 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
     const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(Id_Reserva));
     fs.mkdirSync(baseDir, { recursive: true });
 
-    if (Array.isArray(payload?.pagos)) {
+    if (pagosArray.length > 0 || payload.pagos !== undefined) {
       let abonoIdx = 0;
-      // Solo eliminamos pagos previos si el array contiene exactamente un pago de tipo 'Pago Directo' o 'Pago Completo'
-      const pagosDirectoCompleto = payload.pagos.filter(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo');
-      if (pagosDirectoCompleto.length === 1 && payload.pagos.length === 1) {
+      const pagosDirectoCompleto = pagosArray.filter(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo');
+      if (pagosDirectoCompleto.length === 1 && pagosArray.length === 1) {
         await conn.query('DELETE FROM pagos_reservas WHERE Id_Reserva = ?', [Id_Reserva]);
       }
-      for (const pago of payload.pagos) {
+      for (const pago of pagosArray) {
         const tipo = (pago.Tipo === 'Pago Directo' || pago.Tipo === 'Pago Completo' || pago.Tipo === 'Abono') ? pago.Tipo : 'Abono';
         let rutaComprobante = 'N/A';
         if (tipo !== 'Pago Directo') {
           const field = pago.fileField;
           const f = field ? filesMap[field] : undefined;
           if (f && f.buffer) {
-            const ext = path.extname(f.originalname) || '.bin';
-            const fileName = (tipo === 'Pago Completo')
-              ? `comprobante_${Id_Reserva}${ext}`
-              : `abono_${abonoIdx}_${Id_Reserva}${ext}`;
+            const fileName = f.safeName || `${Date.now()}_${Math.random().toString(36).slice(2)}.bin`;
             const dest = path.join(baseDir, fileName);
             fs.writeFileSync(dest, f.buffer);
-            rutaComprobante = path.join('uploads', 'reservas', String(Id_Reserva), fileName).replace(/\\/g, '/');
+            rutaComprobante = rutaComprobanteRelativaSegura(Id_Reserva, fileName) || '';
             if (tipo === 'Abono') abonoIdx++;
-          } else if (pago.Ruta_Comprobante) {
-            rutaComprobante = pago.Ruta_Comprobante;
+          } else if (pago.Ruta_Comprobante || pago.SoporteUrl) {
+            rutaComprobante = normalizarRutaComprobanteExistente(pago.Ruta_Comprobante || pago.SoporteUrl, Id_Reserva);
           } else {
             rutaComprobante = '';
           }
@@ -767,12 +1170,26 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       }
     }
 
+    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva, accion: 'ACTUALIZAR', id_usuario: userId, detalles: [ { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado }, { columna: 'Id_Tour', anterior: currentReserva.Id_Tour, nuevo: idTourFinal }, { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal } ] });
+
     await conn.commit();
-    conn.release();
-  } catch (e) {
-    await conn.rollback();
-    conn.release();
-    throw e;
+
+    if (payload?.cabeceraReserva?.Fecha_Tour) {
+      websocketManager.broadcastReservaEvento({
+        type: 'reservaActualizada',
+        Fecha_Tour: payload.cabeceraReserva.Fecha_Tour,
+        Id_Tour: payload.cabeceraReserva.Id_Tour,
+        Id_Reserva,
+      });
+    }
+
+    return { Id_Reserva };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    try { await logSistema({ mensaje: `actualizarReserva error: ${error.message || error}`, meta: { Id_Reserva, payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
 }
 
@@ -793,11 +1210,10 @@ async function getPuntoByIdSvc(Id_Punto) {
 /* ===========================
  * VERIFICACIÓN DNI DUPLICADO
  * =========================== */
-async function verificarDniDuplicado(dni, fecha) {
+async function verificarDniDuplicado(dni, fecha, excludeReservaId) {
   if (!dni || !fecha) return { exists: false };
   
-  const [rows] = await db.query(
-    `SELECT 
+  const queryStr = `SELECT 
       r.Id_Reserva,
       r.Fecha_Tour,
       r.Estado,
@@ -810,10 +1226,12 @@ async function verificarDniDuplicado(dni, fecha) {
     JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-    WHERE p.DNI = ? AND r.Fecha_Tour = ?
-    LIMIT 1`,
-    [dni, fecha]
-  );
+    WHERE p.DNI = ? AND r.Fecha_Tour = ? ${excludeReservaId ? 'AND r.Id_Reserva != ?' : ''}
+    LIMIT 1`;
+
+  const params = excludeReservaId ? [dni, fecha, excludeReservaId] : [dni, fecha];
+  
+  const [rows] = await db.query(queryStr, params);
   
   if (rows.length > 0) {
     return {
@@ -823,6 +1241,88 @@ async function verificarDniDuplicado(dni, fecha) {
   }
   
   return { exists: false };
+}
+
+async function obtenerHistorialCambiosReserva(Id_Reserva, limit = 25) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 25, 100));
+
+  const [rows] = await db.query(
+    `SELECT
+      h.Id_Historial,
+      h.Id_Registro,
+      h.Id_Usuario,
+      h.Accion,
+      h.Fecha_Hora_Registro,
+      u.Nombres_Apellidos AS Usuario_Nombre,
+      d.Columna,
+      d.Valor_Anterior,
+      d.Valor_Nuevo
+    FROM historial h
+    LEFT JOIN usuarios u ON u.Id_Usuario = h.Id_Usuario
+    LEFT JOIN detalle_historial d ON d.Id_Historial = h.Id_Historial
+    WHERE h.Tabla = 'reservas'
+      AND CAST(h.Id_Registro AS CHAR) = ?
+    ORDER BY h.Fecha_Hora_Registro DESC, d.Id_Detalle ASC
+    LIMIT ?`,
+    [String(Id_Reserva), safeLimit * 10]
+  );
+
+  const grouped = new Map();
+
+  for (const row of rows || []) {
+    const key = Number(row.Id_Historial);
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        Id_Cambio: key,
+        Id_Reserva: String(row.Id_Registro || Id_Reserva),
+        Fecha_Registro: row.Fecha_Hora_Registro,
+        Id_Usuario: row.Id_Usuario,
+        Usuario_Nombre: row.Usuario_Nombre || (row.Id_Usuario ? `Usuario #${row.Id_Usuario}` : 'Sistema'),
+        accion: row.Accion || 'ACTUALIZAR',
+        estadoAnterior: null,
+        estadoNuevo: null,
+        cambios: [],
+      });
+    }
+
+    if (row.Columna) {
+      const item = grouped.get(key);
+      item.cambios.push({
+        columna: row.Columna,
+        anterior: row.Valor_Anterior,
+        nuevo: row.Valor_Nuevo,
+      });
+
+      const col = String(row.Columna || '').toUpperCase();
+      if (col === 'ESTADO') {
+        item.estadoAnterior = row.Valor_Anterior || null;
+        item.estadoNuevo = row.Valor_Nuevo || null;
+      }
+    }
+  }
+
+  return Array.from(grouped.values())
+    .slice(0, safeLimit)
+    .map((item) => {
+      let resumen = `Accion ${item.accion} sobre la reserva.`;
+      if (item.estadoAnterior !== item.estadoNuevo) {
+        resumen = `Estado cambio de ${item.estadoAnterior || 'Sin estado'} a ${item.estadoNuevo || 'Sin estado'}.`;
+      } else if (item.cambios.length > 0) {
+        resumen = `Se actualizaron ${item.cambios.length} campo(s) de la reserva.`;
+      }
+
+      return {
+        Id_Cambio: item.Id_Cambio,
+        Id_Reserva: item.Id_Reserva,
+        Fecha_Registro: item.Fecha_Registro,
+        Id_Usuario: item.Id_Usuario,
+        Usuario_Nombre: item.Usuario_Nombre,
+        estadoAnterior: item.estadoAnterior,
+        estadoNuevo: item.estadoNuevo,
+        accion: item.accion,
+        resumen,
+      };
+    });
 }
 
 module.exports = {
@@ -844,6 +1344,8 @@ module.exports = {
   obtenerReservaDetalle,
   obtenerComisiones,
   getPuntoByIdSvc,
+  resolverComprobanteSeguroPorNombre,
   // verificación
   verificarDniDuplicado,
+  obtenerHistorialCambiosReserva,
 };

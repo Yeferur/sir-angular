@@ -1,18 +1,19 @@
 const { obtenerDatosInicio, guardarAforo } = require('../services/inicio.service');
+const { sendSuccess, sendError } = require('../utils/responseEnvelope');
 
 exports.getInicioData = async (req, res) => {
   const fecha = req.query.fecha;
 
   if (!fecha) {
-    return res.status(400).json({ error: 'La fecha es obligatoria' });
+    return sendError(res, { status: 400, message: 'La fecha es obligatoria', errorCode: 'MISSING_PARAMS' });
   }
 
   try {
     const { tours, transfers } = await obtenerDatosInicio(fecha);
-    res.json({ tours, transfers });
+    return sendSuccess(res, { data: { tours, transfers }, message: 'Datos de inicio obtenidos correctamente' });
   } catch (error) {
     console.error('Error al obtener datos de inicio:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -22,16 +23,16 @@ exports.guardarAforo = async (req, res) => {
   // userId del usuario que actualiza el cupo (debe estar en req.user por el middleware de auth)
   const userId = req.user?.id;
   if (!Id_Tour || !Fecha || NuevoCupo == null) {
-    return res.status(400).json({ error: 'Faltan datos requeridos' });
+    return sendError(res, { status: 400, message: 'Faltan datos requeridos', errorCode: 'MISSING_PARAMS' });
   }
   try {
     const result = await guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId });
     if (!result.success) {
-      return res.status(400).json({ error: result.error });
+      return sendError(res, { status: 400, message: result.error || 'No se pudo guardar aforo', errorCode: 'BAD_REQUEST' });
     }
-    res.json({ message: result.message });
+    return sendSuccess(res, { data: null, message: result.message || 'Aforo guardado correctamente' });
   } catch (error) {
     console.error('Error al guardar aforo:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };

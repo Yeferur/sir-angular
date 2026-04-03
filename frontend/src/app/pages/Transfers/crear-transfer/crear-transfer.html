@@ -259,8 +259,8 @@
       </div>
     </div>
 
-    <button type="button" class="btn-save-summary" (click)="onSubmit()">
-      Guardar Transfer
+    <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()">
+      {{ isSubmitting() ? 'Guardando...' : 'Guardar Transfer' }}
     </button>
   </div>
 </div>

@@ -1,5 +1,4 @@
 import { Component, computed, inject, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 import { RouterLink } from '@angular/router';
 
@@ -36,7 +35,6 @@ import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 })
 export class DynamicNavbarComponent implements OnInit {
   private global = inject(DynamicIslandGlobalService);
-  private sanitizer = inject(DomSanitizer);
 
   // Exponer panel para el template
   panel = this.global.panel;
@@ -45,6 +43,7 @@ export class DynamicNavbarComponent implements OnInit {
   mode = this.global.mode;
   alert = this.global.alert;
   cuposInfo = this.global.cuposInfo;
+  toasts = this.global.toasts;
   reserva = this.global.Id_Reserva;
   mapa = this.global.puntos;
   sugerencias = this.global.sugerencias
@@ -68,12 +67,6 @@ export class DynamicNavbarComponent implements OnInit {
     return 'compact';
   });
 
-  safePreviewUrl = computed((): SafeResourceUrl | null => {
-    const u = this.global.previewUrl();
-    if (!u) return null;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(u);
-  });
-
   ngOnInit(): void {
     // Lógica para detectar el tema (sin cambios)
     const theme = document.documentElement.getAttribute('data-theme');
@@ -91,6 +84,10 @@ export class DynamicNavbarComponent implements OnInit {
 
   clearAlert() {
     this.global.alert.set(null);
+  }
+
+  dismissToast(id: string) {
+    this.global.dismissToast(id);
   }
 
   clearReserva() {

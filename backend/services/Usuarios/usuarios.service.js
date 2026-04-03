@@ -5,7 +5,7 @@ const db = require('../../database/db');
  */
 async function getAllUsers() {
   const [rows] = await db.query(
-    'SELECT Id_Usuario, Usuario, Nombres_Apellidos, Correo FROM usuarios'
+    'SELECT Id_Usuario, Usuario, Nombres_Apellidos, Correo FROM usuarios WHERE Activo = 1'
   );
 
   // Map DB columns to frontend expected shape

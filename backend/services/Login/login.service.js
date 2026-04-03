@@ -10,7 +10,7 @@ const wsManager = require('../../websocketManager');
  */
 async function findUserByUsername(username) {
   const [rows] = await db.query(
-    'SELECT * FROM usuarios WHERE Id_Usuario = ? OR Usuario = ? OR Correo = ?',
+    'SELECT * FROM usuarios WHERE Activo = 1 AND (Id_Usuario = ? OR Usuario = ? OR Correo = ?)',
     [username, username, username]
   );
   return rows[0];
@@ -77,7 +77,7 @@ async function logoutUserById(userId, isForced = false) {
 // Obtener usuario por ID
 async function getUserById(userId) {
   const [rows] = await db.query(
-    'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Rol, Activo FROM usuarios WHERE Id_Usuario = ?',
+    'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Id_Rol, Activo FROM usuarios WHERE Id_Usuario = ?',
     [userId]
   );
   return rows[0] || null;

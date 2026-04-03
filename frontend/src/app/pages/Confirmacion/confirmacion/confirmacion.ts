@@ -182,6 +182,8 @@ export class ConfirmacionComponent implements OnInit {
     }
 
     isLoading = false;
+    isSubmitting = false;
+    private savedConfirmaciones = new Map<number, number>();
 
     constructor(
         private toursService: Tours,
@@ -217,12 +219,7 @@ export class ConfirmacionComponent implements OnInit {
 
     search() {
         if (!this.filters.Id_Tour || !this.filters.Fecha) {
-            this.navbar.alert.set({
-                type: 'warning',
-                title: 'Faltan Filtros',
-                message: 'Por favor selecciona un tour y una fecha.',
-                autoClose: true
-            });
+            this.navbar.warningToast('Faltan filtros', 'Por favor selecciona un tour y una fecha.');
             return;
         }
 
@@ -235,24 +232,22 @@ export class ConfirmacionComponent implements OnInit {
                 // Convertir 1/0 a true/false para manejo más rápido en UI (opcional pero recomendado)
                 // Aquí mantenemos 1/0 pero aseguramos que la UI lo interprete bien
                 this.pasajeros = data.sort((a, b) => a.Id_Reserva - b.Id_Reserva);
+                this.savedConfirmaciones = new Map(
+                    this.pasajeros.map((p) => [Number(p.Id_Pasajero), Number(p.Confirmacion ? 1 : 0)])
+                );
                 this.checkAllStatus(); // Verificar estado inicial del "Select All"
 
                 this.isLoading = false;
 
                 if (this.pasajeros.length === 0) {
-                    this.navbar.alert.set({
-                        type: 'info',
-                        title: 'Sin Resultados',
-                        message: 'No hay pasajeros registrados para este tour.',
-                        autoClose: true
-                    });
+                    this.navbar.infoToast('Sin resultados', 'No hay pasajeros registrados para este tour.');
                 }
                 this.cdr.detectChanges(); // Actualización final
             },
             error: (err: any) => {
                 console.error('Error', err);
                 this.isLoading = false;
-                this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Error cargando pasajeros.' });
+                this.navbar.errorToast('Error', 'Error cargando pasajeros.');
                 this.cdr.detectChanges();
             }
         });
@@ -279,8 +274,9 @@ export class ConfirmacionComponent implements OnInit {
     }
 
     save() {
-        if (this.pasajeros.length === 0) return;
+        if (this.pasajeros.length === 0 || this.isSubmitting) return;
 
+        this.isSubmitting = true;
         this.isLoading = true;
         this.cdr.detectChanges();
 
@@ -291,50 +287,35 @@ export class ConfirmacionComponent implements OnInit {
 
         this.confirmacionService.saveConfirmacion(payload).subscribe({
             next: (res) => {
+                this.savedConfirmaciones = new Map(
+                    this.pasajeros.map((p) => [Number(p.Id_Pasajero), Number(p.Confirmacion ? 1 : 0)])
+                );
                 this.isLoading = false;
-                this.navbar.alert.set({
-                    type: 'success',
-                    title: 'Guardado',
-                    message: 'Confirmación actualizada correctamente.',
-                    autoClose: true,
-                    autoCloseTime: 1000
-                });
+                this.isSubmitting = false;
+                this.navbar.successToast('Guardado', 'Confirmación actualizada correctamente.');
                 this.cdr.detectChanges();
 
-                // Prompt for download
-                setTimeout(() => {
-                    this.navbar.alert.set({
-                        type: 'info', // Changed to info to be less "warning"
-                        title: 'Descargas',
-                        message: '¿Deseas descargar los reportes de Comisiones y Seguros?',
-                        buttons: [
-                            {
-                                text: 'No',
-                                style: 'secondary',
-                                onClick: () => this.navbar.alert.set(null)
-                            },
-                            {
-                                text: 'Sí',
-                                style: 'primary',
-                                onClick: () => {
-                                    const tourFound = this.toursList.find(t => t.Id_Tour == this.filters.Id_Tour);
-                                    const nombreTour = tourFound ? tourFound.Nombre_Tour : '';
-
-                                    this.comisionesService.exportarExcel(this.filters, nombreTour);
-                                    this.segurosService.exportarExcel(this.filters, nombreTour);
-                                    this.navbar.alert.set(null);
-                                }
-                            }
-                        ]
-                    });
-                    this.cdr.detectChanges();
-                }, 1500);
+                const tourFound = this.toursList.find(t => t.Id_Tour == this.filters.Id_Tour);
+                const nombreTour = tourFound ? tourFound.Nombre_Tour : '';
+                this.comisionesService.exportarExcel(this.filters, nombreTour);
+                this.segurosService.exportarExcel(this.filters, nombreTour);
+                this.navbar.infoToast('Reportes generados', 'Se descargaron Comisiones y Seguros.');
             },
             error: (err) => {
                 this.isLoading = false;
-                this.navbar.alert.set({ type: 'error', title: 'Error', message: 'No se pudo guardar.' });
+                this.isSubmitting = false;
+                this.navbar.errorToast('Error', 'No se pudo guardar.');
                 this.cdr.detectChanges();
             }
+        });
+    }
+
+    hasUnsavedChanges(): boolean {
+        if (!this.pasajeros?.length || this.isSubmitting) return false;
+        return this.pasajeros.some((p) => {
+            const prev = this.savedConfirmaciones.get(Number(p.Id_Pasajero)) ?? 0;
+            const current = Number(p.Confirmacion ? 1 : 0);
+            return prev !== current;
         });
     }
 }

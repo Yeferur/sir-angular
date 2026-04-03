@@ -9635,12 +9635,17 @@ CREATE TABLE IF NOT EXISTS `transfers` (
   `Hora_Recogida` time DEFAULT NULL,
   `Nombre_Reportante` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Telefono_Reportante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Valor` decimal(12,2) DEFAULT NULL,
+  `Id_Moneda` bigint UNSIGNED DEFAULT NULL,
+  `Vuelo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `TipoVuelo` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`Id_Transfer`),
   KEY `Id_Rango` (`Id_Rango`),
-  KEY `Id_Servicio` (`Id_Servicio`)
+  KEY `Id_Servicio` (`Id_Servicio`),
+  KEY `Id_Moneda` (`Id_Moneda`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -10190,7 +10195,8 @@ ALTER TABLE `tour_precios`
 --
 ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_transfers_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `transfers_precios`

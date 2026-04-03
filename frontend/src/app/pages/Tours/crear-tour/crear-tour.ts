@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { CommonModule } from '@angular/common';
@@ -72,6 +72,7 @@ type DisponibilidadPayload = {
 })
 export class CrearTourComponent implements OnInit {
   isLoading = false;
+  isSubmitting = signal(false);
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
@@ -740,7 +741,7 @@ const disponibilidad = this.buildDisponibilidadPayload();
    * Submit
    * --------------------------- */
   submitCreateTour(): void {
-    if (this.isLoading) return;
+    if (this.isSubmitting()) return;
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -823,32 +824,27 @@ const disponibilidad = this.buildDisponibilidadPayload();
   }
 
   private confirmCreateTour(): void {
-    if (this.isLoading) return;
-    this.isLoading = true;
+    if (this.isSubmitting()) return;
+    this.isSubmitting.set(true);
 
     const payload = this.buildCreateTourPayload();
 
     this.tours.crearTour(payload as any).subscribe({
       next: (resp: any) => {
-        this.navbar.alert?.set?.({
-          type: 'success',
-          title: 'Tour creado',
-          message: `Tour creado correctamente. ID: ${resp?.Id_Tour ?? 'N/A'}`,
-          autoClose: true,
-        });
-        setTimeout(() => this.router.navigate(['/Tours/VerTours']), 800);
+        this.navbar.needsRefresh.set('tours');
+        this.navbar.successToast('Tour creado', `Tour creado correctamente. ID: ${resp?.Id_Tour ?? 'N/A'}`);
+        this.form.markAsPristine();
+        this.router.navigate(['/Tours/VerTours']);
       },
       error: (err) => {
         console.error('Error al crear tour:', err);
-        this.navbar.alert?.set?.({
-          type: 'error',
-          title: 'Error',
-          message: err?.error?.error || err?.error?.message || 'Error al crear el tour',
-          autoClose: false,
-          buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
-        });
+        this.navbar.errorToast('Error al crear tour', err?.error?.error || err?.error?.message || 'Error al crear el tour');
       },
-      complete: () => (this.isLoading = false),
+      complete: () => this.isSubmitting.set(false),
     });
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 }

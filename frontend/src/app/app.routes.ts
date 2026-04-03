@@ -1,60 +1,135 @@
 import { Routes } from '@angular/router';
-import { Inicio } from './pages/Inicio/inicio';
-import { CrearTourComponent } from './pages/Tours/crear-tour/crear-tour';
-import { EditarTourComponent } from './pages/Tours/editar-tour/editar-tour';
-import { VerToursComponent } from './pages/Tours/ver-tours/ver-tours';
-import { PreciosTourComponent } from './pages/Tours/precios/precios';
-import { CrearReservaComponent } from './pages/Reservas/crear-reserva/crear-reserva';
-import { EditarReservaComponent } from './pages/Reservas/editar-reserva/editar-reserva';
-import { VerReservasComponent } from './pages/Reservas/ver-reservas/ver-reservas';
-import { VerPuntos } from './pages/Puntos/ver-puntos/ver-puntos';
-import { CrearPuntoComponent } from './pages/Puntos/crear-punto/crear-punto';
-import { EditarPuntoComponent } from './pages/Puntos/editar-punto/editar-punto';
-import { Listado } from './pages/Programacion/listado/listado';
-import { Usuarios } from './pages/Usuarios/usuarios/usuarios';
-import { CrearTransferComponent } from './pages/Transfers/crear-transfer/crear-transfer';
-import { VerTransfersComponent } from './pages/Transfers/ver-transfers/ver-transfers';
-import { VerHistorialComponent } from './pages/Historial/ver-historial/ver-historial';
-import { CrearUsuarioComponent } from './pages/Usuarios/crear-usuario/crear-usuario';
-import { EditarUsuarioComponent } from './pages/Usuarios/editar-usuario/editar-usuario';
-import { ConfirmacionComponent } from './pages/Confirmacion/confirmacion/confirmacion';
-import { ComisionesComponent } from './pages/Comisiones/comisiones/comisiones';
-import { SegurosComponent } from './pages/Seguros/seguros/seguros';
-import { DashboardComponent } from './pages/Dashboard/dashboard';
+import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 
 export const routes: Routes = [
-  { path: '', component: Inicio, title: 'SIR · Inicio' },
+  {
+    path: '',
+    loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    title: 'SIR · Inicio',
+  },
+  {
+    path: 'Dashboard',
+    loadComponent: () => import('./pages/Dashboard/dashboard').then((m) => m.DashboardComponent),
+    title: 'SIR · Dashboard',
+  },
+  {
+    path: 'Historial',
+    loadComponent: () => import('./pages/Historial/ver-historial/ver-historial').then((m) => m.VerHistorialComponent),
+    title: 'SIR · Historial',
+  },
 
-  { path: 'Dashboard', component: DashboardComponent, title: 'SIR · Dashboard' },
+  {
+    path: 'Reservas/NuevaReserva',
+    loadComponent: () => import('./pages/Reservas/crear-reserva/crear-reserva').then((m) => m.CrearReservaComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Nueva Reserva',
+  },
+  {
+    path: 'Reservas/VerReservas',
+    loadComponent: () => import('./pages/Reservas/ver-reservas/ver-reservas').then((m) => m.VerReservasComponent),
+    title: 'SIR · Ver Reservas',
+  },
+  {
+    path: 'Reservas/EditarReserva/:id',
+    loadComponent: () => import('./pages/Reservas/editar-reserva/editar-reserva').then((m) => m.EditarReservaComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Editar Reserva',
+  },
 
-  { path: 'Historial', component: VerHistorialComponent, title: 'SIR · Historial' },
+  {
+    path: 'Transfers/NuevoTransfer',
+    loadComponent: () => import('./pages/Transfers/crear-transfer/crear-transfer').then((m) => m.CrearTransferComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Nuevo Transfer',
+  },
+  {
+    path: 'Transfers/VerTransfers',
+    loadComponent: () => import('./pages/Transfers/ver-transfers/ver-transfers').then((m) => m.VerTransfersComponent),
+    title: 'SIR · Ver Transfers',
+  },
 
-  { path: 'Reservas/NuevaReserva', component: CrearReservaComponent, title: 'SIR · Nueva Reserva' },
-  { path: 'Reservas/VerReservas', component: VerReservasComponent, title: 'SIR · Ver Reservas' },
-  { path: 'Reservas/EditarReserva/:id', component: EditarReservaComponent, title: 'SIR · Editar Reserva' },
+  {
+    path: 'Puntos/VerPuntos',
+    loadComponent: () => import('./pages/Puntos/ver-puntos/ver-puntos').then((m) => m.VerPuntos),
+    title: 'SIR · Ver Puntos',
+  },
+  {
+    path: 'Puntos/NuevoPunto',
+    loadComponent: () => import('./pages/Puntos/crear-punto/crear-punto').then((m) => m.CrearPuntoComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Nuevo Punto',
+  },
+  {
+    path: 'Puntos/Editar/:id',
+    loadComponent: () => import('./pages/Puntos/editar-punto/editar-punto').then((m) => m.EditarPuntoComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Editar Punto',
+  },
 
-  { path: 'Transfers/NuevoTransfer', component: CrearTransferComponent, title: 'SIR · Nuevo Transfer' },
-  { path: 'Transfers/VerTransfers', component: VerTransfersComponent, title: 'SIR · Ver Transfers' },
+  {
+    path: 'Programacion/Listado',
+    loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    title: 'SIR · Programación',
+  },
 
-  { path: 'Puntos/VerPuntos', component: VerPuntos, title: 'SIR · Ver Puntos' },
-  { path: 'Puntos/NuevoPunto', component: CrearPuntoComponent, title: 'SIR · Nuevo Punto' },
-  { path: 'Puntos/Editar/:id', component: EditarPuntoComponent, title: 'SIR · Editar Punto' },
+  {
+    path: 'Reservas/Confirmacion',
+    loadComponent: () => import('./pages/Confirmacion/confirmacion/confirmacion').then((m) => m.ConfirmacionComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Confirmación de Viaje',
+  },
+  {
+    path: 'Comisiones',
+    loadComponent: () => import('./pages/Comisiones/comisiones/comisiones').then((m) => m.ComisionesComponent),
+    title: 'SIR · Comisiones',
+  },
+  {
+    path: 'Seguros',
+    loadComponent: () => import('./pages/Seguros/seguros/seguros').then((m) => m.SegurosComponent),
+    title: 'SIR · Seguros',
+  },
 
-  { path: 'Programacion/Listado', component: Listado, title: 'SIR · Programación' },
+  {
+    path: 'Usuarios',
+    loadComponent: () => import('./pages/Usuarios/usuarios/usuarios').then((m) => m.Usuarios),
+    title: 'SIR · Usuarios',
+  },
+  {
+    path: 'Usuarios/NuevoUsuario',
+    loadComponent: () => import('./pages/Usuarios/crear-usuario/crear-usuario').then((m) => m.CrearUsuarioComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Nuevo Usuario',
+  },
+  {
+    path: 'Usuarios/Editar/:id',
+    loadComponent: () => import('./pages/Usuarios/editar-usuario/editar-usuario').then((m) => m.EditarUsuarioComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Editar Usuario',
+  },
 
-  { path: 'Reservas/Confirmacion', component: ConfirmacionComponent, title: 'SIR · Confirmación de Viaje' },
-  { path: 'Comisiones', component: ComisionesComponent, title: 'SIR · Comisiones' },
-  { path: 'Seguros', component: SegurosComponent, title: 'SIR · Seguros' },
+  {
+    path: 'Tours/NuevoTour',
+    loadComponent: () => import('./pages/Tours/crear-tour/crear-tour').then((m) => m.CrearTourComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Nuevo Tour',
+  },
+  {
+    path: 'Tours/VerTours',
+    loadComponent: () => import('./pages/Tours/ver-tours/ver-tours').then((m) => m.VerToursComponent),
+    title: 'SIR · Ver Tours',
+  },
+  {
+    path: 'Tours/Editar/:id',
+    loadComponent: () => import('./pages/Tours/editar-tour/editar-tour').then((m) => m.EditarTourComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Editar Tour',
+  },
+  {
+    path: 'Tours/Precios/:id',
+    loadComponent: () => import('./pages/Tours/precios/precios').then((m) => m.PreciosTourComponent),
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Precios del Tour',
+  },
 
-  { path: 'Usuarios', component: Usuarios, title: 'SIR · Usuarios' },
-  { path: 'Usuarios/NuevoUsuario', component: CrearUsuarioComponent, title: 'SIR · Nuevo Usuario' },
-  { path: 'Usuarios/Editar/:id', component: EditarUsuarioComponent, title: 'SIR · Editar Usuario' },
-
-  { path: 'Tours/NuevoTour', component: CrearTourComponent, title: 'SIR · Nuevo Tour' },
-  { path: 'Tours/VerTours', component: VerToursComponent, title: 'SIR · Ver Tours' },
-  { path: 'Tours/Editar/:id', component: EditarTourComponent, title: 'SIR · Editar Tour' },
-  { path: 'Tours/Precios/:id', component: PreciosTourComponent, title: 'SIR · Precios del Tour' },
-
-  // opcional: 404
-  { path: '**', redirectTo: '' }
+  { path: '**', redirectTo: '' },
 ];

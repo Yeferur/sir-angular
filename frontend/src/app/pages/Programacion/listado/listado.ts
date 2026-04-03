@@ -589,17 +589,43 @@ this.navbar.alert.set({
     // Debemos modificar el servicio frontend si queremos tipado correcto, o castear a `any`.
 
     this.programacionService.generarPlanLogistico(this.fechaSeleccionada, ((tour as any).idsTours || tour.Id_Tour) as any).subscribe({
-      next: (plan) => {
-        tour.planGenerado = plan;
-        tour.estado = 'Generado';
-        tour.totalPasajeros = plan.analisis.totalPasajeros;
-        tour.totalReservas = plan.analisis.totalReservas;
+      next: (plan: any) => {
+        const esFormatoNuevo = Array.isArray(plan);
 
-        this.navbar.alert.set(null);
+        if (esFormatoNuevo) {
+          const sugerencia = this.construirSugerenciaDesdeListado({ buses: plan, reservasSinAsignar: [] });
+          const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0);
+          const totalReservas = sugerencia.buses.reduce((sum, b) => sum + (b.reservas?.length || 0), 0);
 
-        this.reservasSinAsignar = [];
-        this.planSeleccionado = JSON.parse(JSON.stringify(plan.sugerencias[0]));
-        this.modoVista = 'editor';
+          tour.planGenerado = {
+            analisis: {
+              fecha: this.fechaSeleccionada,
+              idTour: tour.Id_Tour,
+              totalPasajeros,
+              totalReservas
+            },
+            sugerencias: [sugerencia],
+            mensaje: 'Plan logistico generado correctamente'
+          } as any;
+          tour.estado = 'Generado';
+          tour.totalPasajeros = totalPasajeros;
+          tour.totalReservas = totalReservas;
+
+          this.navbar.alert.set(null);
+          this.reservasSinAsignar = [];
+          this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
+          this.modoVista = 'editor';
+        } else {
+          tour.planGenerado = plan;
+          tour.estado = 'Generado';
+          tour.totalPasajeros = plan?.analisis?.totalPasajeros || 0;
+          tour.totalReservas = plan?.analisis?.totalReservas || 0;
+
+          this.navbar.alert.set(null);
+          this.reservasSinAsignar = [];
+          this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
+          this.modoVista = 'editor';
+        }
 
         this.activeBusIndex = 0;
         this.stopOrderByBus.clear();

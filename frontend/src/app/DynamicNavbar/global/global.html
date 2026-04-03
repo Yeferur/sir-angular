@@ -73,7 +73,7 @@
             <!-- Contenido de Preview (comprobante u otros recursos) -->
             @if (islandState() === 'preview' && preview()) {
             <div class="activity-content">
-                <app-preview [url]="safePreviewUrl()" [rawUrl]="preview()" [title]="previewTitle()"></app-preview>
+                <app-preview [rawUrl]="preview()" [title]="previewTitle()"></app-preview>
             </div>
             }
 
@@ -91,5 +91,21 @@
 
     <div class="sidebar-widget right">
         <!-- Otros accesos rápidos -->
+    </div>
+
+    <div class="toast-viewport" aria-live="polite" aria-atomic="true">
+        @for (toast of toasts(); track toast.id) {
+        <div class="toast-item" [attr.data-type]="toast.type">
+            <div class="toast-body">
+                <strong class="toast-title">{{ toast.title }}</strong>
+                @if (toast.message) {
+                <p class="toast-message">{{ toast.message }}</p>
+                }
+            </div>
+            <button type="button" class="toast-close" (click)="dismissToast(toast.id)" aria-label="Cerrar notificacion">
+                ×
+            </button>
+        </div>
+        }
     </div>
 </div>

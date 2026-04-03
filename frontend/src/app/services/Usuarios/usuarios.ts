@@ -131,4 +131,42 @@ export class UsuariosService {
     return this.http.delete(`${environment.apiUrl}/usuarios/${id}`);
   }
 
+  removeUsuarioFromSignal(id: string): { user: Usuario | null; estado: EstadoSesion | undefined; index: number } {
+    const currentUsers = this.usuarios();
+    const index = currentUsers.findIndex((u) => String(u.id_user) === String(id));
+    if (index < 0) {
+      return { user: null, estado: undefined, index: -1 };
+    }
+
+    const user = currentUsers[index];
+    const estado = this.estados().get(String(id));
+
+    this.usuarios.update((list) => list.filter((u) => String(u.id_user) !== String(id)));
+    this.estados.update((map) => {
+      const next = new Map(map);
+      next.delete(String(id));
+      return next;
+    });
+
+    return { user, estado, index };
+  }
+
+  restoreUsuarioInSignal(user: Usuario, estado: EstadoSesion | undefined, index = -1): void {
+    this.usuarios.update((list) => {
+      const next = [...list];
+      if (index >= 0 && index <= next.length) {
+        next.splice(index, 0, user);
+      } else {
+        next.push(user);
+      }
+      return next;
+    });
+
+    this.estados.update((map) => {
+      const next = new Map(map);
+      next.set(String(user.id_user), estado || 'inactiva');
+      return next;
+    });
+  }
+
 }

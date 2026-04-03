@@ -2,76 +2,123 @@ const sesionesService = require('../../services/Usuarios/usuarios.service');
 const bcrypt = require('bcrypt');
 const db = require('../../database/db');
 const { recordHistorial } = require('../../services/Historial/logger');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 exports.obtenerUsuariosYSesiones = async (req, res) => {
   try {
     const usuarios = await sesionesService.getAllUsers();
     const sesiones = await sesionesService.getActiveSessions();
 
-    res.json({
-      usuarios,
-      sesiones
+    return sendSuccess(res, {
+      data: { usuarios, sesiones },
+      message: 'Usuarios y sesiones obtenidos correctamente',
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error consultando usuarios y sesiones' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error consultando usuarios y sesiones',
+      errorCode: 'INTERNAL_ERROR',
+    });
   }
 };
 
-// Obtener usuario por ID
 exports.obtenerUsuario = async (req, res) => {
   try {
     const { id } = req.params;
     const usuario = await sesionesService.getUserById(id);
-    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
-    res.json(usuario);
+    if (!usuario) {
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    return sendSuccess(res, {
+      data: usuario,
+      message: 'Usuario obtenido correctamente',
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error obteniendo usuario' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error obteniendo usuario',
+      errorCode: 'INTERNAL_ERROR',
+    });
   }
 };
 
-// Actualizar usuario
 exports.actualizarUsuario = async (req, res) => {
+  let conn;
   try {
-    const { id } = req.params; // ID de la URL
-    const { Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Activo, permisos } = req.body;
+    const { id } = req.params;
+    const {
+      Nombres_Apellidos,
+      Telefono_Usuario,
+      Usuario,
+      Correo,
+      Contrasena,
+      Id_Rol,
+      Activo,
+      permisos,
+    } = req.body;
 
     if (!Nombres_Apellidos || !Usuario || !Correo) {
-      return res.status(400).json({ error: 'Datos incompletos' });
+      return sendError(res, {
+        status: 400,
+        message: 'Datos incompletos',
+        errorCode: 'MISSING_PARAMS',
+      });
     }
 
-    // Verificar si el usuario existe
-    const current = await sesionesService.getUserById(id);
-    if (!current) return res.status(404).json({ error: 'Usuario no encontrado' });
+    conn = await db.getConnection();
+    await conn.beginTransaction();
 
-    // Verificar unicidad de Usuario y Correo (excluyendo el actual)
-    const [exists] = await db.query(
+    const [currentRows] = await conn.query(
+      'SELECT Id_Usuario, Nombres_Apellidos, Usuario, Correo, Activo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [id]
+    );
+
+    if (!currentRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    const current = currentRows[0];
+
+    const [exists] = await conn.query(
       'SELECT COUNT(*) as total FROM usuarios WHERE (Usuario = ? OR Correo = ?) AND Id_Usuario != ?',
       [Usuario, Correo, id]
     );
 
     if (exists[0].total > 0) {
-      return res.status(409).json({ error: 'Usuario o correo ya existen en otro registro' });
+      await conn.rollback();
+      return sendError(res, {
+        status: 409,
+        message: 'Usuario o correo ya existen en otro registro',
+        errorCode: 'DUPLICATE_USER',
+      });
     }
 
-    // Preparar update
     let hash = null;
     if (Contrasena && Contrasena.trim().length > 0) {
-      const saltRounds = 8;
-      hash = await bcrypt.hash(Contrasena, saltRounds);
+      hash = await bcrypt.hash(Contrasena, 8);
     }
 
-    // Obtener nombre del rol (Opcional, ya no se guarda en tabla usuarios pero sirve para lógica si se necesita)
-    // let RolName = null;
-    // if (Id_Rol) {
-    //   const [r] = await db.query('SELECT Nombre_Rol FROM roles WHERE Id_Rol = ?', [Id_Rol]);
-    //   if (r && r[0]) RolName = r[0].Nombre_Rol;
-    // }
-
-    // Query dinámica
     let updateQuery = 'UPDATE usuarios SET Nombres_Apellidos=?, Telefono_Usuario=?, Usuario=?, Correo=?, Id_Rol=?, Activo=?';
-    const params = [Nombres_Apellidos, Telefono_Usuario || null, Usuario, Correo, Id_Rol || null, (typeof Activo !== 'undefined' ? Activo : 1)];
+    const params = [
+      Nombres_Apellidos,
+      Telefono_Usuario || null,
+      Usuario,
+      Correo,
+      Id_Rol || null,
+      typeof Activo !== 'undefined' ? Activo : current.Activo,
+    ];
 
     if (hash) {
       updateQuery += ', Contrasena=?';
@@ -81,164 +128,246 @@ exports.actualizarUsuario = async (req, res) => {
     updateQuery += ' WHERE Id_Usuario=?';
     params.push(id);
 
-    await db.query(updateQuery, params);
+    await conn.query(updateQuery, params);
 
-    // Actualizar permisos (borrar y reinsertar)
     let permisosArray = permisos;
     if (typeof permisos === 'string') {
-      try { permisosArray = JSON.parse(permisos); } catch (e) { permisosArray = []; }
-    }
-
-    if (Array.isArray(permisosArray)) {
-      // Primero borrar los existentes
-      await db.query('DELETE FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
-
-      // Insertar nuevos si hay
-      if (permisosArray.length > 0) {
-        const insertPerm = `INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Fecha_Asignacion) VALUES ?`;
-        const rows = permisosArray.map(p => [id, p, new Date()]);
-        await db.query(insertPerm, [rows]);
+      try {
+        permisosArray = JSON.parse(permisos);
+      } catch (_err) {
+        permisosArray = [];
       }
     }
 
-    // Historial
+    if (Array.isArray(permisosArray)) {
+      await conn.query('DELETE FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
+
+      if (permisosArray.length > 0) {
+        const rows = permisosArray.map((p) => [id, p, 'ALLOW', new Date()]);
+        await conn.query(
+          'INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Tipo, Fecha_Asignacion) VALUES ?',
+          [rows]
+        );
+      }
+    }
+
     await recordHistorial({
+      conexion: conn,
       tabla: 'usuarios',
       id_registro: id,
       accion: 'ACTUALIZAR',
       id_usuario: req.user?.id || null,
       detalles: [
         { columna: 'Nombres_Apellidos', anterior: current.Nombres_Apellidos, nuevo: Nombres_Apellidos },
-        // Podríamos loguear más campos si se desea
-      ]
+        { columna: 'Usuario', anterior: current.Usuario, nuevo: Usuario },
+        { columna: 'Correo', anterior: current.Correo, nuevo: Correo },
+      ],
     });
 
-    res.json({ message: 'Usuario actualizado correctamente' });
+    await conn.commit();
 
+    return sendSuccess(res, {
+      data: null,
+      message: 'Usuario actualizado correctamente',
+    });
   } catch (err) {
+    if (conn) await conn.rollback();
     console.error('actualizarUsuario error:', err);
-    res.status(500).json({ error: 'Error actualizando usuario' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error actualizando usuario',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
-// Eliminar usuario
 exports.eliminarUsuario = async (req, res) => {
+  let conn;
   try {
     const { id } = req.params;
 
-    // Evitar auto-eliminación
-    if (req.user && req.user.id === id) {
-      return res.status(400).json({ error: 'No puedes eliminar tu propio usuario.' });
-    }
-
-    const current = await sesionesService.getUserById(id);
-    if (!current) return res.status(404).json({ error: 'Usuario no encontrado' });
-
-    try {
-      await sesionesService.deleteUser(id);
-
-      // Historial
-      await recordHistorial({
-        tabla: 'usuarios',
-        id_registro: id,
-        accion: 'ELIMINAR',
-        id_usuario: req.user?.id || null,
-        detalles: [
-          { columna: 'Id_Usuario', anterior: id, nuevo: null }
-        ]
+    if (req.user && String(req.user.id) === String(id)) {
+      return sendError(res, {
+        status: 400,
+        message: 'No puedes desactivar tu propio usuario.',
+        errorCode: 'BAD_REQUEST',
       });
-
-      res.json({ message: 'Usuario eliminado correctamente' });
-    } catch (dbErr) {
-      if (dbErr.code === 'ER_ROW_IS_REFERENCED_2') {
-        return res.status(409).json({ error: 'No se puede eliminar: El usuario tiene registros asociados (Reservas, Historial, etc.). Considere desactivarlo.' });
-      }
-      throw dbErr;
     }
 
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [currentRows] = await conn.query(
+      'SELECT Id_Usuario, Nombres_Apellidos, Activo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [id]
+    );
+
+    if (!currentRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    const current = currentRows[0];
+
+    if (Number(current.Activo) === 0) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 409,
+        message: 'El usuario ya se encuentra desactivado',
+        errorCode: 'USER_ALREADY_INACTIVE',
+      });
+    }
+
+    await conn.query('UPDATE usuarios SET Activo = 0 WHERE Id_Usuario = ?', [id]);
+    await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'usuarios',
+      id_registro: id,
+      accion: 'SOFT_DELETE',
+      id_usuario: req.user?.id || null,
+      detalles: [
+        { columna: 'Activo', anterior: current.Activo, nuevo: 0 },
+      ],
+    });
+
+    await conn.commit();
+
+    return sendSuccess(res, {
+      data: null,
+      message: 'Usuario desactivado correctamente',
+    });
   } catch (err) {
+    if (conn) await conn.rollback();
     console.error('eliminarUsuario error:', err);
-    res.status(500).json({ error: 'Error eliminando usuario' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error desactivando usuario',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
-// Crear nuevo usuario
 exports.crearUsuario = async (req, res) => {
+  let conn;
   try {
-    const { Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Activo, Avatar, permisos } = req.body;
+    const {
+      Id_Usuario,
+      Nombres_Apellidos,
+      Telefono_Usuario,
+      Usuario,
+      Correo,
+      Contrasena,
+      Id_Rol,
+      Activo,
+      Avatar,
+      permisos,
+    } = req.body;
 
     if (!Id_Usuario || !Nombres_Apellidos || !Usuario || !Correo || !Contrasena) {
-      return res.status(400).json({ error: 'Datos incompletos' });
+      return sendError(res, {
+        status: 400,
+        message: 'Datos incompletos',
+        errorCode: 'MISSING_PARAMS',
+      });
     }
 
-    // Verificar unicidad de Id_Usuario (DNI), Usuario y Correo
-    const [exists] = await db.query('SELECT COUNT(*) as total FROM usuarios WHERE Id_Usuario = ? OR Usuario = ? OR Correo = ?', [Id_Usuario, Usuario, Correo]);
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [exists] = await conn.query(
+      'SELECT COUNT(*) as total FROM usuarios WHERE Id_Usuario = ? OR Usuario = ? OR Correo = ?',
+      [Id_Usuario, Usuario, Correo]
+    );
+
     if (exists[0].total > 0) {
-      return res.status(409).json({ error: 'Id_Usuario, usuario o correo ya existen' });
+      await conn.rollback();
+      return sendError(res, {
+        status: 409,
+        message: 'Id_Usuario, usuario o correo ya existen',
+        errorCode: 'DUPLICATE_USER',
+      });
     }
 
-    // Hash password
-    const saltRounds = 8;
-    const hash = await bcrypt.hash(Contrasena, saltRounds);
+    const hash = await bcrypt.hash(Contrasena, 8);
 
-    // Obtener nombre del rol (Opcional, ya no se guarda en tabla usuarios pero sirve para lógica si se necesita)
-    // let RolName = null;
-    // if (Id_Rol) {
-    //   const [r] = await db.query('SELECT Nombre_Rol FROM roles WHERE Id_Rol = ?', [Id_Rol]);
-    //   if (r && r[0]) RolName = r[0].Nombre_Rol;
-    // }
-
-    // If a file was uploaded via multer, prefer that path
     let avatarPath = Avatar || null;
     if (req.file && req.file.filename) {
-      // Save the relative path to the uploaded file
       avatarPath = `/uploads/usuarios/${req.file.filename}`;
     }
 
-    // Insertar usuario usando Id_Usuario provisto (DNI)
-    const insertQuery = `INSERT INTO usuarios (Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Activo, Fecha_Creacion, Avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`;
-    const params = [Id_Usuario, Nombres_Apellidos, Telefono_Usuario || null, Usuario, Correo, hash, Id_Rol || null, (typeof Activo !== 'undefined' ? Activo : 1), avatarPath];
+    await conn.query(
+      'INSERT INTO usuarios (Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Activo, Fecha_Creacion, Avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
+      [
+        Id_Usuario,
+        Nombres_Apellidos,
+        Telefono_Usuario || null,
+        Usuario,
+        Correo,
+        hash,
+        Id_Rol || null,
+        typeof Activo !== 'undefined' ? Activo : 1,
+        avatarPath,
+      ]
+    );
 
-    await db.query(insertQuery, params);
-
-    // Si vienen permisos explícitos, intentar almacenarlos en usuario_permisos si la tabla existe
     let permisosArray = permisos;
     if (typeof permisos === 'string') {
-      try { permisosArray = JSON.parse(permisos); } catch (e) { permisosArray = []; }
-    }
-
-    if (Array.isArray(permisosArray) && permisosArray.length > 0) {
       try {
-        const [tbl] = await db.query("SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'usuario_permisos'");
-        if (tbl[0].cnt > 0) {
-          // Insertar permisos para el usuario (ignorar duplicados)
-          const insertPerm = `INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Fecha_Asignacion) VALUES ? ON DUPLICATE KEY UPDATE Id_Usuario=Id_Usuario`;
-          const rows = permisosArray.map(p => [Id_Usuario, p, new Date()]);
-          await db.query(insertPerm, [rows]);
-        }
-      } catch (permErr) {
-        console.error('Error guardando permisos de usuario (ignorado):', permErr);
+        permisosArray = JSON.parse(permisos);
+      } catch (_err) {
+        permisosArray = [];
       }
     }
 
-    // Registrar en historial (usamos el Id_Usuario como id_registro)
-    try {
-      await recordHistorial({
-        tabla: 'usuarios', id_registro: Id_Usuario, accion: 'CREAR', id_usuario: req.user?.id || null, detalles: [
-          { columna: 'Id_Usuario', anterior: null, nuevo: Id_Usuario },
-          { columna: 'Nombres_Apellidos', anterior: null, nuevo: Nombres_Apellidos },
-          { columna: 'Usuario', anterior: null, nuevo: Usuario },
-          { columna: 'Correo', anterior: null, nuevo: Correo },
-          { columna: 'Id_Rol', anterior: null, nuevo: Id_Rol || null }
-        ]
-      });
-    } catch (histErr) {
-      console.error('Error registrando historial al crear usuario:', histErr);
+    if (Array.isArray(permisosArray) && permisosArray.length > 0) {
+      const rows = permisosArray.map((p) => [Id_Usuario, p, 'ALLOW', new Date()]);
+      await conn.query(
+        'INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Tipo, Fecha_Asignacion) VALUES ? ON DUPLICATE KEY UPDATE Tipo = VALUES(Tipo), Fecha_Asignacion = VALUES(Fecha_Asignacion)',
+        [rows]
+      );
     }
 
-    res.status(201).json({ message: 'Usuario creado', id: Id_Usuario });
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'usuarios',
+      id_registro: Id_Usuario,
+      accion: 'CREAR',
+      id_usuario: req.user?.id || null,
+      detalles: [
+        { columna: 'Id_Usuario', anterior: null, nuevo: Id_Usuario },
+        { columna: 'Nombres_Apellidos', anterior: null, nuevo: Nombres_Apellidos },
+        { columna: 'Usuario', anterior: null, nuevo: Usuario },
+        { columna: 'Correo', anterior: null, nuevo: Correo },
+        { columna: 'Id_Rol', anterior: null, nuevo: Id_Rol || null },
+      ],
+    });
+
+    await conn.commit();
+
+    return sendSuccess(res, {
+      data: { id: Id_Usuario },
+      message: 'Usuario creado correctamente',
+      status: 201,
+    });
   } catch (err) {
+    if (conn) await conn.rollback();
     console.error('crearUsuario error:', err);
-    res.status(500).json({ error: 'Error creando usuario' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error creando usuario',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
   }
 };

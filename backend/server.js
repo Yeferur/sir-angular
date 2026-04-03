@@ -22,7 +22,6 @@ const permisosRoutes = require('./routes/Permisos/permisos.routes');
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', loginRoutes);
 app.use('/api', inicioRoutes);
@@ -48,15 +47,42 @@ const segurosRoutes = require('./routes/Seguros/seguros.routes');
 app.use('/api/seguros', segurosRoutes);
 
 // ✅ Crear server HTTP (para compartir con WS)
-const HTTP_PORT = Number(process.env.PORT || 4000);
+const DEFAULT_PORT = Number(process.env.PORT || 4000);
+const isDevelopment = process.env.NODE_ENV !== 'production';
 const server = http.createServer(app);
 
 // ✅ Iniciar WS en el MISMO server
 const { initWebSocket } = require('./websocket');
 initWebSocket(server);
 
-// ✅ Levantar server
-server.listen(HTTP_PORT, () => {
-  console.log(`✅ Backend HTTP corriendo en http://localhost:${HTTP_PORT}`);
-  console.log(`✅ WS corriendo en ws://localhost:${HTTP_PORT}/ws`);
+let activePort = DEFAULT_PORT;
+
+function startServer(port) {
+  activePort = port;
+  server.listen(port, () => {
+    console.log(`✅ Backend HTTP corriendo en http://localhost:${activePort}`);
+    console.log(`✅ WS corriendo en ws://localhost:${activePort}/ws`);
+  });
+}
+
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    if (isDevelopment && activePort === DEFAULT_PORT) {
+      const fallbackPort = DEFAULT_PORT + 1;
+      console.warn(
+        `⚠️ Puerto ${DEFAULT_PORT} en uso. Reintentando automaticamente en ${fallbackPort} (modo desarrollo).`
+      );
+      startServer(fallbackPort);
+      return;
+    }
+
+    console.error(`❌ Puerto ${activePort} en uso. Cierra el proceso previo o cambia PORT en .env.`);
+    process.exit(1);
+  }
+
+  console.error('❌ Error iniciando el servidor:', err);
+  process.exit(1);
 });
+
+// ✅ Levantar server
+startServer(DEFAULT_PORT);

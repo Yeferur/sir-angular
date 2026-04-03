@@ -1,19 +1,18 @@
 import { Component, Input, inject, OnChanges, SimpleChanges } from '@angular/core';
 
-import { SafeResourceUrl } from '@angular/platform-browser';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
+import { SafeApiResourceUrlPipe } from '../../shared/pipes/safe-api-resource-url.pipe';
 
 @Component({
   selector: 'app-preview',
   standalone: true,
-  imports: [],
+  imports: [SafeApiResourceUrlPipe],
   templateUrl: './preview.html',
   styleUrls: ['./preview.css'],
 })
 export class PreviewComponent {
   private global = inject(DynamicIslandGlobalService);
 
-  @Input() url: SafeResourceUrl | null = null; // sanitized url for iframe/img src
   @Input() rawUrl: string | null = null; // plain string used for download/open
   @Input() title: string | null = null;
 
@@ -21,7 +20,7 @@ export class PreviewComponent {
   error: string | null = null;
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['url']) {
+    if (changes['rawUrl']) {
       this.loading = true;
       this.error = null;
     }

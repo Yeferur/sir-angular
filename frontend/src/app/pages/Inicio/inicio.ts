@@ -6,11 +6,12 @@ import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { InicioService, Tour, Transfer } from '../../services/inicio';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 import { PermisosService } from '../../services/Permisos/permisos.service';
+import { AlertasCupoComponent } from './alertas-cupo/alertas-cupo';
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, PermisoDirective, FlatpickrInputDirective],
+  imports: [CommonModule, PermisoDirective, FlatpickrInputDirective, AlertasCupoComponent],
   templateUrl: './inicio.html',
   styleUrls: ['./inicio.css'],
 })
@@ -352,10 +353,15 @@ export class Inicio implements OnInit {
               next: (res) => {
                 this.editando[tour.Id_Tour] = false;
 
+                const successMessage =
+                  (typeof res === 'object' && res !== null && 'message' in res
+                    ? (res as { message?: string }).message
+                    : undefined) || 'Aforo actualizado exitosamente.';
+
                 this.global.alert.set({
                   type: 'success',
                   title: '¡Listo!',
-                  message: res.message || 'Aforo actualizado exitosamente.',
+                  message: successMessage,
                   autoClose: true,
                   autoCloseTime: 3000,
                 });
@@ -367,10 +373,16 @@ export class Inicio implements OnInit {
                 this.cdr.markForCheck();
               },
               error: (err) => {
+                const backendError =
+                  err?.error?.error ||
+                  err?.error?.message ||
+                  err?.message ||
+                  'No se pudo actualizar el aforo.';
+
                 this.global.alert.set({
                   type: 'error',
                   title: 'Error',
-                  message: err?.error?.error || 'No se pudo actualizar el aforo.',
+                  message: backendError,
                   autoClose: true,
                 });
                 this.cdr.markForCheck();

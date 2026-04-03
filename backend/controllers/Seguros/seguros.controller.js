@@ -1,13 +1,14 @@
 const segurosService = require('../../services/Seguros/seguros.service');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 async function listar(req, res) {
     try {
         const filtros = req.query;
         const data = await segurosService.listarSeguros(filtros);
-        res.json(data);
+        return sendSuccess(res, { data, message: 'Seguros obtenidos correctamente' });
     } catch (error) {
         console.error('Error al listar seguros:', error);
-        res.status(500).json({ error: 'Error interno al listar seguros' });
+        return sendError(res, { status: 500, message: 'Error interno al listar seguros', errorCode: 'INTERNAL_ERROR' });
     }
 }
 
@@ -18,7 +19,7 @@ async function exportarExcel(req, res) {
     } catch (error) {
         console.error('Error al exportar Excel de seguros:', error);
         if (!res.headersSent) {
-            res.status(500).json({ error: 'Error al generar el Excel' });
+            return sendError(res, { status: 500, message: 'Error al generar el Excel', errorCode: 'EXPORT_FAILED' });
         }
     }
 }

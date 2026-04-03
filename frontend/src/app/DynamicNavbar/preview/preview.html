@@ -6,7 +6,7 @@
     </div>
   </div>
 
-  @if (url) {
+  @if (rawUrl | safeApiResourceUrl; as safeUrl) {
     <div class="preview-content">
       <div class="preview-frame-wrapper">
         @if (loading) {
@@ -16,12 +16,12 @@
           </div>
         }
 
-        <iframe [src]="url" [title]="title || 'Preview'" frameborder="0" (load)="onLoad()" (error)="onError()"></iframe>
+        <iframe [attr.src]="safeUrl" [title]="title || 'Preview'" frameborder="0" (load)="onLoad()" (error)="onError()"></iframe>
       </div>
     </div>
   }
 
-  @if (!url) {
+  @if (!(rawUrl | safeApiResourceUrl)) {
     <div class="no-preview">No hay archivo para previsualizar.</div>
   }
 

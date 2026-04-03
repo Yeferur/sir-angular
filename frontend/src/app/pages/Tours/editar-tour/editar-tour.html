@@ -424,8 +424,8 @@
       </div>
 
       <div class="actions-end">
-        <button class="btn-primary" type="submit" [disabled]="isLoading || loadingData">
-          {{ isLoading ? 'Guardando...' : 'Guardar Cambios' }}
+        <button class="btn-primary" type="submit" [disabled]="isSubmitting() || loadingData">
+          {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
         </button>
       </div>
 

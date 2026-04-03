@@ -13,6 +13,7 @@ async function obtenerPermisosPorUsuario(userId) {
   const conexion = await pool.getConnection();
   try {
     // 1. Obtener permisos del rol
+    // Se agrega m.Orden al SELECT para que DISTINCT permita el ORDER BY
     const [permisosRol] = await conexion.query(`
       SELECT DISTINCT 
         p.Id_Permiso,
@@ -20,7 +21,8 @@ async function obtenerPermisosPorUsuario(userId) {
         p.Accion,
         m.Codigo_Modulo,
         m.Nombre_Modulo,
-        p.Descripcion
+        p.Descripcion,
+        m.Orden
       FROM usuarios u
       INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
       INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
@@ -33,6 +35,7 @@ async function obtenerPermisosPorUsuario(userId) {
     `, [userId]);
 
     // 2. Obtener permisos individuales adicionales (ALLOW)
+    // También agregamos m.Orden para mantener la consistencia
     const [permisosAdicionales] = await conexion.query(`
       SELECT 
         p.Id_Permiso,
@@ -40,7 +43,8 @@ async function obtenerPermisosPorUsuario(userId) {
         p.Accion,
         m.Codigo_Modulo,
         m.Nombre_Modulo,
-        p.Descripcion
+        p.Descripcion,
+        m.Orden
       FROM usuario_permisos up
       INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
       INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
@@ -63,12 +67,14 @@ async function obtenerPermisosPorUsuario(userId) {
       }
     }
 
-    return Array.from(permisosFinales.values());
+    // Retornamos el array de valores únicos
+    // Opcional: Podrías añadir un .sort() aquí si el orden es vital en el frontend
+    return Array.from(permisosFinales.values()).sort((a, b) => a.Orden - b.Orden);
   } finally {
+    // Liberar la conexión al pool
     conexion.release();
   }
 }
-
 /**
  * Verificar si un usuario tiene un permiso específico
  * Considera:

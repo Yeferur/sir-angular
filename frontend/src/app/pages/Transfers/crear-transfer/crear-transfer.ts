@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, ChangeDetectorRef } from '@angular/core';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { firstValueFrom } from 'rxjs';
-import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TransferService } from '../../../services/Transfers/transfers';
@@ -18,6 +18,7 @@ export class CrearTransferComponent implements OnInit {
 
   openSummary = false;
   isLoading = signal<boolean>(true);
+  isSubmitting = signal<boolean>(false);
 
   resultsServicioTransfer: any[] = [];
   servicioLoading = true;
@@ -175,6 +176,13 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     private cdr: ChangeDetectorRef,
   ) { }
 
+  private notSeleccionarValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = String(control.value ?? '').trim().toLowerCase();
+      return value === '' || value === 'seleccionar' ? { seleccionarInvalido: true } : null;
+    };
+  }
+
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
   }
@@ -190,9 +198,9 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Titular: ['', Validators.required],
       IndicativoTitular: [''],
       TelefonoTitular: [''],
-      Rango: ['Seleccionar', Validators.required],
+      Rango: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Moneda: ['COP'],
-      TipoServicio: ['Seleccionar', Validators.required],
+      TipoServicio: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Salida: ['', Validators.required],
       Llegada: ['', Validators.required],
       Fecha: ['', Validators.required],
@@ -282,7 +290,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       const msg = tipo === 'Internacional'
         ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
         : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
-      this.navbar.alert.set({ title: 'Anticipación recomendada', type: 'info', message: msg, autoClose: true });
+      this.navbar.infoToast('Anticipación recomendada', msg, 2500);
     });
   }
 
@@ -319,13 +327,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.transferSvc.getServicios().subscribe({
       next: (data) => { this.resultsServicioTransfer = Array.isArray(data) ? data : []; },
       error: () => {
-        this.navbar.alert.set({ title: 'Error', type: 'error', message: 'No se pudieron cargar los servicios de transfer.', autoClose: true });
+        this.navbar.errorToast('Error', 'No se pudieron cargar los servicios de transfer.');
       },
       complete: () => { this.servicioLoading = false; this.isLoading.set(false); }
     });
   }
 
   async onSubmit(): Promise<void> {
+      if (this.isSubmitting()) return;
+
     this.form.updateValueAndValidity({ emitEvent: false });
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -347,36 +357,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       const fields = invalid.map(f => friendly[f] || f);
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Campos inválidos',
-        message: msg,
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
-      });
+      this.navbar.warningToast('Campos inválidos', msg);
       return;
     }
 
-    // WhatsApp verification removed — proceeding without check
-
-    this.navbar.alert.set({
-      title: '¿Crear transfer?',
-      type: 'warning',
-      message: '¿Deseas crear este transfer?',
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-        { text: 'Sí, crear', style: 'primary', onClick: () => this.processSubmit() }
-      ]
-    });
+    this.processSubmit();
   }
 
   private processSubmit(): void {
-    this.navbar.alert.set({
-      title: 'Creando transfer...',
-      message: 'Por favor espera.',
-      loading: true,
-      autoClose: false
-    });
+    this.isSubmitting.set(true);
 
     const resolverEstadoYMotivo = (vals: any) => {
       const faltan: string[] = [];
@@ -404,7 +393,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     // validar campos de vuelo si aplica (se requiere tipo y número de vuelo)
     if (this.showFlightFields) {
       if (!this.form.value.Vuelo || !this.form.value.TipoVuelo) {
-        this.navbar.alert.set({ title: 'Falta información de vuelo', type: 'warning', message: 'Completa tipo de vuelo y número de vuelo.', autoClose: true });
+        this.navbar.warningToast('Falta información de vuelo', 'Completa tipo de vuelo y número de vuelo.');
+        this.isSubmitting.set(false);
         return;
       }
     }
@@ -432,12 +422,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
     this.transferSvc.crearTransfer(transferData).subscribe({
       next: (data) => {
-        this.navbar.alert.set({
-          title: 'Transfer creado',
-          type: 'success',
-          message: data?.message || 'Transfer creado correctamente.',
-          autoClose: true
-        });
+        this.navbar.successToast('Transfer creado', data?.message || 'Transfer creado correctamente.');
 
         this.form.reset({
           TipoServicio: 'Seleccionar',
@@ -445,21 +430,20 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           Moneda: 'COP',
           Valor: 0
         });
+        this.form.markAsPristine();
 
         this.toggleSummary(false);
       },
       error: () => {
-        this.navbar.alert.set({
-          title: 'Error',
-          type: 'error',
-          message: 'Hubo un error al crear el transfer.',
-          autoClose: true
-        });
+        this.navbar.errorToast('Error', 'Hubo un error al crear el transfer.');
       },
       complete: () => {
-        // si tu navbar usa alert modal, este null lo cierra
-        // pero ojo: si estás mostrando success con autoClose, puedes dejarlo quieto
+        this.isSubmitting.set(false);
       }
     });
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 }

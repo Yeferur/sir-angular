@@ -1,0 +1,23 @@
+@if (alertas().length > 0) {
+  <section class="critical-capacity-card">
+    <div class="critical-header">
+      <h3>Alertas de Cupo</h3>
+      <span class="counter">{{ totalCriticos() }} criticas</span>
+    </div>
+
+    <div class="alerts-list">
+      @for (item of alertas(); track item.idTour) {
+        <article class="alert-item" [attr.data-level]="item.severidad">
+          <div class="left">
+            <p class="tour">{{ item.nombreTour }}</p>
+            <p class="meta">Tour #{{ item.idTour }}</p>
+          </div>
+          <div class="right">
+            <span class="slots">{{ item.cuposDisponibles }}</span>
+            <span class="label">cupos</span>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+}

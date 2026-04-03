@@ -1,4 +1,4 @@
-@if (!isLoading()) {
+<div *ngIf="!isLoading()">
 
 <div class="booking-dashboard" [formGroup]="form">
   <div class="page-header">
@@ -194,8 +194,6 @@
     </div>
   </div>
 
-</div>
-
 <!-- PASAJEROS -->
 <div class="card" formArrayName="Pasajeros">
   <div class="card-header">
@@ -257,9 +255,12 @@
       </div>
 
       @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {
-      <div class="form-group">
+      <div class="form-group ">
         <label class="form-label">Teléfono</label>
-        <input type="text" class="form-input" formControlName="Telefono_Pasajero" />
+        <div class="phone-input-group">
+          <input type="text" class="form-input phone-prefix" formControlName="Indicativo_Pasajero" />
+          <input type="text" class="form-input" formControlName="Telefono_Pasajero" />
+        </div>
       </div>
       }
 
@@ -278,7 +279,7 @@
       @if (puntosSeleccionados().length > 1) {
       <div class="form-group">
         <label class="form-label">Punto de Encuentro</label>
-        <select class="form-select" formControlName="PuntoEncuentro">
+        <select class="form-select" formControlName="Id_Punto">
           @for (punto of puntosSeleccionados(); track punto.Id_Punto) {
           <option [value]="punto.Id_Punto">
             {{ punto.NombrePunto }}
@@ -476,6 +477,38 @@
   </div>
 </div>
 
+<div class="card forensic-card">
+  <div class="card-header">
+    <h2>Historial de Actividad</h2>
+  </div>
+
+  @if (historialLoading()) {
+    <div class="timeline-empty">Cargando historial forense...</div>
+  } @else if (historialError()) {
+    <div class="timeline-empty timeline-error">{{ historialError() }}</div>
+  } @else if (historialTimeline().length === 0) {
+    <div class="timeline-empty">Aun no hay cambios registrados para esta reserva.</div>
+  } @else {
+    <div class="timeline-list">
+      @for (cambio of historialTimeline(); track cambio.Id_Cambio) {
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-meta">
+              <span class="timeline-user">{{ cambio.Usuario_Nombre }}</span>
+              <span class="timeline-date">{{ cambio.Fecha_Registro | date:'short' }}</span>
+            </div>
+            <p class="timeline-summary">{{ cambio.resumen }}</p>
+            @if (cambio.estadoAnterior !== cambio.estadoNuevo) {
+              <p class="timeline-diff">Antes: {{ cambio.estadoAnterior || 'Sin estado' }} | Despues: {{ cambio.estadoNuevo || 'Sin estado' }}</p>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
 </div>
 
 <!-- MODAL PREVIEW (FUERA de label / fuera de summary-totals) -->
@@ -566,12 +599,12 @@
         </button>
       }
 
-      <button type="button" class="btn-save-summary" (click)="onSubmit()">
-        Guardar Reserva
+      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()">
+        {{ isSubmitting() ? 'Guardando...' : 'Guardar Reserva' }}
       </button>
     </div>
   </div>
 </div>
 
 
-}
+</div>

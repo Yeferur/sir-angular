@@ -10,6 +10,15 @@ export interface DynamicPanelState {
   props?: Record<string, any>;
   open: boolean;
 }
+
+export interface UiToast {
+  id: string;
+  type: 'success' | 'info' | 'error' | 'warning';
+  title: string;
+  message?: string;
+  durationMs: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -30,6 +39,10 @@ export class DynamicIslandGlobalService {
     autoClose?: boolean,
     autoCloseTime?: number
   } | null>(null);
+
+  toasts = signal<UiToast[]>([]);
+
+  needsRefresh = signal<string>('');
 
   puntos = signal<any>(null);
 
@@ -95,5 +108,34 @@ export class DynamicIslandGlobalService {
     } else {
       this.closePanel();
     }
+  }
+
+  showToast(toast: Omit<UiToast, 'id'>): string {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const safeDuration = Math.max(1000, Number(toast.durationMs || 3500));
+    const nextToast: UiToast = { ...toast, id, durationMs: safeDuration };
+    this.toasts.update((list) => [...list, nextToast]);
+    setTimeout(() => this.dismissToast(id), safeDuration);
+    return id;
+  }
+
+  dismissToast(id: string): void {
+    this.toasts.update((list) => list.filter((t) => t.id !== id));
+  }
+
+  successToast(title: string, message = '', durationMs = 3000): string {
+    return this.showToast({ type: 'success', title, message, durationMs });
+  }
+
+  infoToast(title: string, message = '', durationMs = 3000): string {
+    return this.showToast({ type: 'info', title, message, durationMs });
+  }
+
+  warningToast(title: string, message = '', durationMs = 3500): string {
+    return this.showToast({ type: 'warning', title, message, durationMs });
+  }
+
+  errorToast(title: string, message = '', durationMs = 4500): string {
+    return this.showToast({ type: 'error', title, message, durationMs });
   }
 }

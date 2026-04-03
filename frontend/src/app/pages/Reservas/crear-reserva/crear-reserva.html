@@ -262,9 +262,9 @@
         @if (puntosSeleccionados().length > 1) {
         <div class="form-group">
           <label class="form-label">Punto de Encuentro</label>
-          <select class="form-select" formControlName="PuntoEncuentro">
+          <select class="form-select" formControlName="Id_Punto">
             @for (punto of puntosSeleccionados(); track punto.Id_Punto) {
-            <option [value]="punto.Id_Punto" [selected]="punto.Id_Punto === form.get('Id_Punto')?.value">
+            <option [value]="punto.Id_Punto">
               {{ punto.NombrePunto }}
             </option>
             }
@@ -531,8 +531,8 @@
         </button>
       }
 
-      <button type="button" class="btn-save-summary" (click)="onSubmit()">
-        Guardar Reserva
+      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()">
+        {{ isSubmitting() ? 'Guardando...' : 'Guardar Reserva' }}
       </button>
     </div>
   </div>

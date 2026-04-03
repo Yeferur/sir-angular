@@ -8,6 +8,10 @@
     </div>
   </div>
 
+  @if (!isLoading) {
+    <app-alertas-cupo [tours]="tours"></app-alertas-cupo>
+  }
+
   <!-- SECCIÓN DE RESERVAS PRIVADAS -->
   @if (toursConPrivados.length > 0 && !isLoading) {
   <section style="margin-bottom: 2rem;">

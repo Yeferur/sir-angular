@@ -1,4 +1,5 @@
 const historialService = require('../../services/Historial/historial.service');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 // Obtener historial filtrado y paginado
 exports.getHistorial = async (req, res) => {
@@ -25,10 +26,10 @@ exports.getHistorial = async (req, res) => {
       limit: parseInt(limit)
     });
 
-    return res.json(result);
+    return sendSuccess(res, { data: result, message: 'Historial obtenido correctamente' });
   } catch (e) {
     console.error('Error obteniendo historial:', e);
-    return res.status(500).json({ error: 'Error obteniendo historial' });
+    return sendError(res, { status: 500, message: 'Error obteniendo historial', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -71,7 +72,7 @@ exports.exportHistorial = async (req, res) => {
     res.send(csv);
   } catch (e) {
     console.error('Error exportando historial:', e);
-    return res.status(500).json({ error: 'Error exportando historial' });
+    return sendError(res, { status: 500, message: 'Error exportando historial', errorCode: 'EXPORT_FAILED' });
   }
 };
 
@@ -81,12 +82,12 @@ exports.obtenerHistorial = async (req, res) => {
     const tabla = String(req.query.tabla || '').trim();
     const id = req.query.id ? Number(req.query.id) : null;
 
-    if (!tabla) return res.status(400).json({ error: 'Se requiere el parámetro tabla' });
+    if (!tabla) return sendError(res, { status: 400, message: 'Se requiere el parametro tabla', errorCode: 'MISSING_PARAMS' });
 
     const registros = await historialService.getHistorialByTableAndId(tabla, id);
-    res.json(registros);
+    return sendSuccess(res, { data: registros, message: 'Historial obtenido correctamente' });
   } catch (err) {
     console.error('Error obteniendo historial:', err);
-    res.status(500).json({ error: 'Error consultando historial' });
+    return sendError(res, { status: 500, message: 'Error consultando historial', errorCode: 'INTERNAL_ERROR' });
   }
 };

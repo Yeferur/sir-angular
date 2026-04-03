@@ -115,7 +115,7 @@
 </div>
 
 @if (pasajeros.length > 0) {
-<button (click)="save()" [disabled]="isLoading" class="floating-save-btn">
+<button (click)="save()" [disabled]="isLoading || isSubmitting" class="floating-save-btn">
     @if (isLoading) {
     <span class="spinner"></span>
     }

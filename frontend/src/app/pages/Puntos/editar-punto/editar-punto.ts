@@ -15,6 +15,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 })
 export class EditarPuntoComponent implements OnInit {
   isLoading = false;
+  isSubmitting = signal(false);
   successMsg = '';
   errorMsg = '';
 
@@ -66,14 +67,14 @@ export class EditarPuntoComponent implements OnInit {
         console.log('Punto cargado para edición:', p);
       },
       error: () => {
-        this.navbar.alert?.set?.({ type: 'error', title: 'Error', message: 'No se pudo cargar el punto', autoClose: false });
+        this.navbar.errorToast('Error', 'No se pudo cargar el punto');
       },
       complete: () => (this.isLoading = false)
     });
   }
 
 onSubmitGuardarCambios() {
-  if (this.isLoading) return;
+  if (this.isSubmitting()) return;
 
 
   if (this.form.invalid) {
@@ -89,36 +90,22 @@ onSubmitGuardarCambios() {
     const fields = invalid.map(f => friendly[f] || f);
     const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.alert?.set?.({
-      type: 'error',
-      title: 'Campos inválidos',
-      message: msg,
-      autoClose: false,
-      buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }]
-    });
+    this.navbar.warningToast('Campos inválidos', msg);
     return;
   }
 
   if (!this.puntoId) return;
 
-  this.navbar.alert?.set?.({
-    type: 'info',
-    title: 'Confirmar cambios',
-    message: '¿Deseas guardar los cambios de este punto?',
-    autoClose: false,
-    buttons: [
-      { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) },
-      { text: 'Guardar', style: 'primary', onClick: () => { this.navbar.alert?.set?.(null); this.guardarCambiosConfirmado(); } }
-    ]
-  });
+  this.guardarCambiosConfirmado();
 }
 
 private guardarCambiosConfirmado() {
-  if (this.isLoading) return;
+  if (this.isSubmitting()) return;
   if (!this.puntoId) return;
   if (this.form.invalid) return; // seguridad extra
 
   this.isLoading = true;
+  this.isSubmitting.set(true);
 
   const payload: any = { ...this.form.value };
   payload.horarios = (this.tours() || []).map((t: any) => ({
@@ -129,14 +116,18 @@ console.log('Payload para actualizar punto:', payload);
   this.puntos.updatePunto(this.puntoId, payload).subscribe({
     next: () => {
       this.successMsg = 'Punto actualizado correctamente';
-      this.navbar.alert?.set?.({ type: 'success', title: 'Punto actualizado', message: this.successMsg, autoClose: true });
-      setTimeout(() => this.router.navigate(['/Puntos/VerPuntos']), 700);
+      this.navbar.successToast('Punto actualizado', this.successMsg);
+      this.form.markAsPristine();
+      this.router.navigate(['/Puntos/VerPuntos']);
     },
     error: (err: any) => {
       this.errorMsg = err?.error?.message || 'Error al actualizar el punto';
-      this.navbar.alert?.set?.({ type: 'error', title: 'Error', message: this.errorMsg, autoClose: false });
+      this.navbar.errorToast('Error', this.errorMsg);
     },
-    complete: () => (this.isLoading = false)
+    complete: () => {
+      this.isLoading = false;
+      this.isSubmitting.set(false);
+    }
   });
 }
 
@@ -149,7 +140,6 @@ console.log('Payload para actualizar punto:', payload);
       this.isDuplicate = false;
       this.duplicatePoint = null;
       ctrl?.setErrors(null);
-      this.navbar.alert?.set?.(null);
       return;
     }
 
@@ -162,17 +152,20 @@ console.log('Payload para actualizar punto:', payload);
             this.isDuplicate = true;
             this.duplicatePoint = foundItem;
             ctrl?.setErrors({ duplicate: true });
-            this.navbar.alert?.set?.({ type: 'error', title: 'Punto duplicado', message: `${foundItem.Nombre_Punto || foundItem.NombrePunto || 'Punto'} — ${foundItem.Direccion || ''}`, autoClose: false, buttons: [{ text: 'Ver punto', style: 'primary', onClick: () => { this.navbar.alert?.set?.(null); this.router.navigate(['/Puntos/VerPuntos'], { queryParams: { q: foundItem.Direccion || '' } }); } }, { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }] });
+            this.navbar.warningToast('Punto duplicado', `${foundItem.Nombre_Punto || foundItem.NombrePunto || 'Punto'} - ${foundItem.Direccion || ''}`);
           } else {
             this.isDuplicate = false;
             this.duplicatePoint = null;
             ctrl?.setErrors(null);
-            this.navbar.alert?.set?.(null);
           }
         },
-        error: () => { this.isDuplicate = false; ctrl?.setErrors(null); this.navbar.alert?.set?.(null); }
+        error: () => { this.isDuplicate = false; ctrl?.setErrors(null); }
       });
     }, 450);
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 
   private normalizeAddr(s: string) {

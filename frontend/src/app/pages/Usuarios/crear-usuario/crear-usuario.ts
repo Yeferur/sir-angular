@@ -31,6 +31,8 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   selectedPermisos: number[] = [];
 
   isLoading = signal(false);
+  catalogLoading = signal(false);
+  isSubmitting = signal(false);
   private pendingLoads = 0;
   errorMsg = '';
 
@@ -76,10 +78,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // show loading until roles and permisos are fetched
-    this.isLoading.set(true);
-    // update navbar/global loading state
-    this.navbar('Cargando...', 'Cargando datos...', true, false);
+    this.catalogLoading.set(true);
     this.pendingLoads = 0;
     this.loadRoles();
     this.loadPermisos();
@@ -152,9 +151,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   private checkLoadingFinish() {
     if (this.pendingLoads <= 0) {
-      this.isLoading.set(false);
-      // clear navbar/global loading state
-      this.global.alert.set(null);
+      this.catalogLoading.set(false);
       this.cdr.markForCheck();
     }
   }
@@ -315,24 +312,31 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   private confirmCreateUser(payload: any) {
-    if (this.isLoading()) return;
+    if (this.isSubmitting()) return;
+    this.isSubmitting.set(true);
     this.isLoading.set(true);
-    this.navbar('Creando usuario...', 'Guardando información, por favor espera.', true);
     this.cdr.markForCheck();
 
     this.usuariosService.crearUsuario(payload).subscribe({
       next: () => {
+        this.form.markAsPristine();
+        this.isSubmitting.set(false);
         this.isLoading.set(false);
-        this.navbar('Usuario creado', 'El usuario se creó correctamente.', false);
+        this.global.successToast('Usuario creado', 'El usuario se creó correctamente.');
         this.cdr.markForCheck();
         this.router.navigate(['/Usuarios']);
       },
       error: (err: any) => {
+        this.isSubmitting.set(false);
         this.isLoading.set(false);
         this.errorMsg = err?.error?.error || 'Error creando usuario';
-        this.navbar('Error', this.errorMsg, false);
+        this.global.errorToast('Error', this.errorMsg);
         this.cdr.markForCheck();
       }
     });
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 }

@@ -34,6 +34,8 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     selectedPermisos: number[] = [];
 
     isLoading = signal(false);
+    catalogLoading = signal(false);
+    isSubmitting = signal(false);
     private pendingLoads = 0;
     errorMsg = '';
 
@@ -87,7 +89,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         }
 
         this.isLoading.set(true);
-        this.navbar('info', 'Cargando...', 'Obteniendo datos del usuario...', true, false);
+        this.catalogLoading.set(true);
         this.pendingLoads = 0;
 
         // Load dependencies and then user
@@ -195,7 +197,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         } else if (this.pendingLoads <= 0) {
             // All done
             this.isLoading.set(false);
-            this.global.alert.set(null);
+            this.catalogLoading.set(false);
             this.cdr.markForCheck();
         }
     }
@@ -347,22 +349,29 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     }
 
     private confirmUpdate(payload: any) {
-        if (this.isLoading() || !this.userId) return;
+        if (this.isSubmitting() || !this.userId) return;
+        this.isSubmitting.set(true);
         this.isLoading.set(true);
-        this.navbar('info', 'Guardando...', 'Actualizando usuario...', true);
 
         this.usuariosService.actualizarUsuario(this.userId, payload).subscribe({
             next: () => {
+                this.form.markAsPristine();
+                this.isSubmitting.set(false);
                 this.isLoading.set(false);
-                this.navbar('success', 'Actualizado', 'Usuario actualizado correctamente', false);
-                setTimeout(() => this.router.navigate(['/Usuarios']), 1500);
+                this.global.successToast('Actualizado', 'Usuario actualizado correctamente');
+                this.router.navigate(['/Usuarios']);
             },
             error: (err: any) => {
+                this.isSubmitting.set(false);
                 this.isLoading.set(false);
                 this.errorMsg = err?.error?.error || 'Error actualizando usuario';
-                this.navbar('error', 'Error', this.errorMsg, false);
+                this.global.errorToast('Error', this.errorMsg);
             }
         });
+    }
+
+    hasUnsavedChanges(): boolean {
+        return this.form?.dirty && !this.isSubmitting();
     }
 }
 

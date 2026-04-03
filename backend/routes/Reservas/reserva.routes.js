@@ -24,6 +24,7 @@ router.post('/reservas', authMiddleware, checkPermission('RESERVAS.CREAR'), rese
 
 // 🔽 Edición
 router.get('/reservas/:id/detalle', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getReservaDetalle);
+router.get('/reservas/:id/historial-cambios', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getReservaHistorialCambios);
 router.put('/reservas/:id', authMiddleware, checkPermission('RESERVAS.ACTUALIZAR'), reservasController.updateReserva);
 
 // (opcional) Punto por Id para hidratar tokens de puntos
@@ -31,5 +32,8 @@ router.get('/reservas/puntos/:id', authMiddleware, checkPermission('RESERVAS.LEE
 
 // Verificar DNI duplicado
 router.get('/reservas/verificar-dni', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.checkDniDuplicado);
+
+// Comprobante protegido (sin acceso directo a /uploads)
+router.get('/reservas/comprobante/:nombreArchivo', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getComprobanteSeguro);
 
 module.exports = router;

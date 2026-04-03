@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "prepare-vendor-scripts": "mkdir -p public/assets/vendor && cp node_modules/leaflet/dist/leaflet.js public/assets/vendor/leaflet.js && cp node_modules/leaflet-routing-machine/dist/leaflet-routing-machine.min.js public/assets/vendor/leaflet-routing-machine.min.js",
+    "prestart": "npm run prepare-vendor-scripts",
+    "prebuild": "npm run prepare-vendor-scripts",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",

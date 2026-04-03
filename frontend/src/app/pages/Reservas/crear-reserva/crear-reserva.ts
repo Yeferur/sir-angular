@@ -1,9 +1,10 @@
-import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, ViewChild, NgZone } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, ViewChild, NgZone, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { firstValueFrom, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
@@ -12,6 +13,7 @@ import {
   Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto,
 } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
 
 @Component({
   selector: 'app-crear-reserva',
@@ -36,8 +38,11 @@ export class CrearReservaComponent implements OnInit {
   private reservasSvc = inject(Reservas);
   private navbar = inject(DynamicIslandGlobalService);
   private zone = inject(NgZone);
+  private destroyRef = inject(DestroyRef);
+  private tourRules = inject(TourRulesService);
 
   isLoading = signal<boolean>(true);
+  isSubmitting = signal<boolean>(false);
   form!: FormGroup;
 
   // catálogos
@@ -62,6 +67,22 @@ export class CrearReservaComponent implements OnInit {
     const m = this.monedas().find(x => x.Id_Moneda === Number(id));
     return m?.Codigo || 'COP';
   });
+
+  isRioClaroTour(): boolean {
+    const idTour = Number(this.form?.get('SelectTour')?.value || 0);
+    if (!idTour) return false;
+
+    const tour = this.tours().find((t) => Number(t.Id_Tour) === idTour);
+    if (!tour) return idTour === 1;
+
+    const nombre = String((tour as any).Nombre_Tour || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+    const abreviacion = String((tour as any).Abreviacion || '').toUpperCase();
+
+    return idTour === 1 || nombre.includes('RIO CLARO') || abreviacion === 'TRC';
+  }
 
   // puntos de encuentro
   puntosSeleccionados = signal<Punto[]>([]);
@@ -248,7 +269,9 @@ export class CrearReservaComponent implements OnInit {
       // comprobante de pago (dinámico)
       ComprobantePago: [null],
     });
-    this.wsService.messages$.subscribe((msg: any) => {
+    this.wsService.messages$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg: any) => {
       this.zone.run(() => {
         const fecha = this.form.get('Fecha_Tour')?.value;
         const tour = this.form.get('SelectTour')?.value;
@@ -450,26 +473,18 @@ export class CrearReservaComponent implements OnInit {
         this.fpOptionsFecha = { ...this.fpOptionsFecha, disable: [] };
       }
 
-      if (this.isRioClaroTour()) {
-        const teniaInfantes = this.countByTipo('INFANTE') > 0;
-        if (teniaInfantes) {
-          this.removeInfantes();
-          this.navbar.alert.set({
-            type: 'warning',
-            title: 'Infantes no permitidos',
-            message: 'En Río Claro no se aceptan infantes (menores de 5 años). Han sido removidos.',
-            autoClose: true,
-          });
-        }
-        this.maybeShowNinosAgeReminder();
+      const teniaInfantes = this.countByTipo('INFANTE') > 0;
+      if (teniaInfantes && !this.tourRules.allowsPassengerType(idTour, 'INFANTE')) {
+        this.removeInfantes();
+        this.navbar.alert.set({
+          type: 'warning',
+          title: 'Infantes no permitidos',
+          message: 'En este tour no se aceptan infantes. Han sido removidos.',
+          autoClose: true,
+        });
       }
 
-      if (this.isHaciendaNapolesTour()) {
-        this.maybeShowHNChildrenPolicyOnce();
-      } else {
-        this.hnNinosPolicyShown = false;
-        this.hnInfantesPolicyShown = false;
-      }
+      this.tourRules.resetSession();
     } catch {
       this.navbar.alert.set({
         type: 'error',
@@ -549,32 +564,6 @@ export class CrearReservaComponent implements OnInit {
     return mismos.indexOf(ctrl) + 1;
   }
 
-  private hnNinosPolicyShown = false;
-  private hnInfantesPolicyShown = false;
-
-  isHaciendaNapolesTour(): boolean { return Number(this.form?.get('SelectTour')?.value) === 5; }
-
-  private maybeShowHNChildrenPolicyOnce(): void {
-    if (!this.isHaciendaNapolesTour()) { this.hnNinosPolicyShown = false; this.hnInfantesPolicyShown = false; return; }
-    const ninos = this.countByTipo('NINO');
-    const infantes = this.countByTipo('INFANTE');
-    if (ninos > 0 && !this.hnNinosPolicyShown) {
-      this.hnNinosPolicyShown = true;
-      this.navbar.alert.set({ type: 'info', title: 'Política de Niños', message: 'Niños ≥5 van como ADULTOS.', autoClose: true });
-    }
-    if (infantes > 0 && !this.hnInfantesPolicyShown) {
-      this.hnInfantesPolicyShown = true;
-      this.navbar.alert.set({ type: 'info', title: 'Política de Infantes', message: 'Infantes >1 año van como NIÑOS.', autoClose: true });
-    }
-    if (ninos > 0 && infantes > 0) {
-      this.navbar.alert.set({ type: 'info', title: 'Niños e Infantes', message: 'Niños ≥5 → ADULTOS; infantes >1 → NIÑOS.', autoClose: true });
-    }
-    if (ninos === 0 && infantes === 0) { this.hnNinosPolicyShown = false; this.hnInfantesPolicyShown = false; }
-  }
-
-  private ninosAlertShown = false;
-  isRioClaroTour(): boolean { return Number(this.form?.get('SelectTour')?.value) === 1; }
-
   private countByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
     return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
   }
@@ -585,18 +574,10 @@ export class CrearReservaComponent implements OnInit {
     this.autollenarPrecios();
     this.recalcularTotales();
   }
-  private maybeShowNinosAgeReminder(): void {
-    if (!this.isRioClaroTour()) { this.ninosAlertShown = false; return; }
-    const ninos = this.countByTipo('NINO');
-    if (ninos > 0 && !this.ninosAlertShown) {
-      this.ninosAlertShown = true;
-      this.navbar.alert.set({ type: 'info', title: 'Recuerda', message: 'Para este tour, los niños deben tener 5+ años.', autoClose: true });
-    }
-    if (ninos === 0) this.ninosAlertShown = false;
-  }
 
-  agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
-    if (tipo === 'INFANTE' && this.isRioClaroTour()) return;
+  agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE', omitirCalculos = false) {
+    const currentTourId = Number(this.form.get('SelectTour')?.value);
+    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
 
     const principalPunto = this.form.get('Id_Punto')?.value ?? null;
 
@@ -606,40 +587,68 @@ export class CrearReservaComponent implements OnInit {
       DNI: [''],
       Indicativo_Pasajero: ['+57'],
       Telefono_Pasajero: [''],
-      Id_Punto: [principalPunto],            // usar Id_Punto para DB
+      Id_Punto: [principalPunto],
       Confirmacion: [false],
-      PrecioRef: [0],            // = Precio_Tour (referencia fija)
-      Precio_Pasajero: [0, [Validators.min(0)]], // = editable por el usuario
+      PrecioRef: [0],
+      Precio_Pasajero: [0, [Validators.min(0)]],
       Comision: [0],
     });
 
-    this.pasajeros.push(fg);
-
-    // Suscribirse a cambios en DNI para verificación en tiempo real con debounce
     fg.get('DNI')?.valueChanges
       .pipe(
-        debounceTime(800), // Esperar 800ms después de que el usuario deje de escribir
-        distinctUntilChanged() // Solo si el valor cambió
+        debounceTime(800),
+        distinctUntilChanged(),
+        switchMap((dni: string) => {
+          if (!dni || dni.trim().length < 3) {
+            const ctrl = fg.get('DNI');
+            if (ctrl?.errors?.['duplicated']) {
+              const errs = { ...ctrl.errors };
+              delete errs['duplicated'];
+              ctrl.setErrors(Object.keys(errs).length ? errs : null);
+            }
+            return of(null);
+          }
+          const fecha = this.form.get('Fecha_Tour')?.value;
+          if (!fecha) return of(null);
+          return this.reservasSvc.verificarDniDuplicado(dni.trim(), fecha).pipe(
+            catchError(() => of(null))
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef)
       )
-      .subscribe((dni: string) => {
-        this.verificarDniDuplicado(dni, fg);
+      .subscribe((resultado: any) => {
+        if (!resultado) return;
+        const ctrl = fg.get('DNI');
+        if (resultado.exists && resultado.reserva) {
+          if (ctrl) {
+            const existing = ctrl.errors ? { ...ctrl.errors } : {};
+            existing['duplicated'] = { reserva: resultado.reserva };
+            ctrl.setErrors(existing);
+          }
+          const reserva = resultado.reserva;
+          this.navbar.alert.set({
+            type: 'warning',
+            title: 'Pasajero duplicado',
+            message: `El DNI ya está registrado en la reserva ${reserva.Id_Reserva} el ${this.form.get('Fecha_Tour')?.value}.`,
+            autoClose: true
+          });
+        }
       });
 
-    if (this.isHaciendaNapolesTour()) this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
+    this.pasajeros.push(fg);
 
-    this.autollenarPrecios();   // setea PrecioRef, Precio_Pasajero y Comision
-    this.recalcularTotales();
+    this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
+
+    if (!omitirCalculos) {
+      this.autollenarPrecios();
+      this.recalcularTotales();
+    }
   }
 
-
   eliminarPasajero(i: number) {
-    const tipo = this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value;
     this.pasajeros.removeAt(i);
     this.autollenarPrecios();
     this.recalcularTotales();
-    if (tipo === 'NINO') this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
   }
 
   adultosInputValue(): number { return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'ADULTO').length; }
@@ -647,22 +656,24 @@ export class CrearReservaComponent implements OnInit {
   infantesInputValue(): number { return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'INFANTE').length; }
 
   setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any) {
-    if (tipo === 'INFANTE' && this.isRioClaroTour()) return;
+    const currentTourId = Number(this.form.get('SelectTour')?.value);
+    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
     const n = Math.max(0, Number(val || 0));
     const cur = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
 
+    if (n === cur) return;
+
     if (n > cur) {
-      for (let i = 0; i < (n - cur); i++) this.agregarPasajero(tipo);
-    } else if (n < cur) {
+      for (let i = 0; i < (n - cur); i++) this.agregarPasajero(tipo, true);
+    } else {
       for (let i = cur - 1; i >= n; i--) {
         const idx = this.pasajeros.controls.findIndex(c => c.get('Tipo_Pasajero')?.value === tipo);
         if (idx >= 0) this.pasajeros.removeAt(idx);
       }
-      this.autollenarPrecios();
-      this.recalcularTotales();
     }
-    if (tipo === 'NINO') this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
+    
+    this.autollenarPrecios();
+    this.recalcularTotales();
   }
 
   async autollenarPrecios() {
@@ -961,6 +972,8 @@ export class CrearReservaComponent implements OnInit {
   }
 
   async onSubmit(): Promise<void> {
+    if (this.isSubmitting()) return;
+    this.isSubmitting.set(true);
     this.openSummary = false;
     // ===== Helpers locales =====
     const confirmar = (titulo: string, mensaje: string): Promise<boolean> =>
@@ -977,64 +990,7 @@ export class CrearReservaComponent implements OnInit {
         });
       });
 
-    const validarDatosPasajeros = (pax: Array<any>) => {
-      let faltanNombre = 0;
-      let faltanDni = 0;
-      let hayTelefonoPasajero = false;
-
-      for (const p of pax) {
-        const nombre = (p.Nombre_Pasajero ?? '').toString().trim();
-        const dni = (p.DNI ?? '').toString().trim();
-        const tel = (p.Telefono_Pasajero ?? '').toString().trim();
-
-        if (!nombre) faltanNombre++;
-        if (!dni) faltanDni++;
-        if (tel) hayTelefonoPasajero = true;
-      }
-
-      const okNombres = faltanNombre === 0;
-      const okDni = faltanDni === 0;
-
-      return {
-        ok: okNombres && okDni && hayTelefonoPasajero,
-        okNombres,
-        okDni,
-        hayTelefonoPasajero,
-        faltanNombre,
-        faltanDni,
-      };
-    };
-
-    const resolverEstadoYMotivo = (
-      pasajeros: Array<any>,
-      formaPago: 'Directo' | 'Completo' | 'Abono',
-      tieneComprobanteCompleto: boolean
-    ): { estado: 'Confirmada' | 'Pendiente'; subestado: 'de datos' | 'de pago' | null; motivo: string } => {
-      const val = validarDatosPasajeros(pasajeros);
-
-      if (!val.ok) {
-        const partes: string[] = [];
-        if (!val.okNombres) partes.push(`faltan ${val.faltanNombre} nombre(s)`);
-        if (!val.okDni) partes.push(`faltan ${val.faltanDni} DNI/pasaporte(s)`);
-        if (!val.hayTelefonoPasajero) partes.push('no hay ningún teléfono de pasajero');
-        const razon = `Faltan datos básicos de pasajeros: ${partes.join('; ')}.`;
-        return { estado: 'Pendiente', subestado: 'de datos', motivo: razon };
-      }
-
-      if (formaPago === 'Directo') {
-        return { estado: 'Confirmada', subestado: null, motivo: 'Pago directo y datos completos.' };
-      }
-
-      if (formaPago === 'Completo') {
-        if (tieneComprobanteCompleto) {
-          return { estado: 'Confirmada', subestado: null, motivo: 'Pago completo con comprobante y datos completos.' };
-        }
-        return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Falta el comprobante del pago completo.' };
-      }
-
-      // Abono
-      return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
-    };
+    // (Helpers transferidos a métodos privados de la clase)
 
     // ===== Validación del formulario ANTES de confirmar =====
     this.form.updateValueAndValidity({ emitEvent: false });
@@ -1067,6 +1023,7 @@ export class CrearReservaComponent implements OnInit {
         autoClose: true,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
       });
+      this.isSubmitting.set(false);
       return;
     }
 
@@ -1081,6 +1038,7 @@ export class CrearReservaComponent implements OnInit {
         autoClose: false,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
       });
+      this.isSubmitting.set(false);
       return;
     }
 
@@ -1100,6 +1058,7 @@ export class CrearReservaComponent implements OnInit {
           { text: 'Corregir DNI', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
         ]
       });
+      this.isSubmitting.set(false);
       return;
     }
 
@@ -1120,7 +1079,10 @@ export class CrearReservaComponent implements OnInit {
      ¿Deseas continuar?`
     );
 
-    if (!ok) return;
+    if (!ok) {
+      this.isSubmitting.set(false);
+      return;
+    }
 
     try {
 
@@ -1130,7 +1092,19 @@ export class CrearReservaComponent implements OnInit {
         DNI: c.get('DNI')?.value || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
-        Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
+        Id_Punto: (() => {
+          const rawIndividual = c.get('Id_Punto')?.value ?? c.get('PuntoEncuentro')?.value;
+          const parsedIndividual = rawIndividual !== null && rawIndividual !== undefined && rawIndividual !== ''
+            ? Number(rawIndividual)
+            : null;
+          if (Number.isFinite(parsedIndividual as number)) return parsedIndividual;
+
+          const rawGlobal = this.form.get('Id_Punto')?.value;
+          const parsedGlobal = rawGlobal !== null && rawGlobal !== undefined && rawGlobal !== ''
+            ? Number(rawGlobal)
+            : null;
+          return Number.isFinite(parsedGlobal as number) ? parsedGlobal : null;
+        })(),
         Confirmacion: false,
         Precio_Tour: Number(c.get('PrecioRef')?.value || 0),         // fijo por tipo
         Precio_Pasajero: Number(c.get('Precio_Pasajero')?.value || 0),   // editable (input)
@@ -1162,7 +1136,7 @@ export class CrearReservaComponent implements OnInit {
       }
 
       // ===== CABECERA (con Estado calculado) =====
-      const { estado, subestado, motivo } = resolverEstadoYMotivo(
+      const { estado, subestado, motivo } = this.resolverEstadoYMotivo(
         pax,
         forma,
         !!comprobanteCompletoFile
@@ -1186,7 +1160,9 @@ export class CrearReservaComponent implements OnInit {
       const payload = { cabeceraReserva: cab, pasajeros: pax, pagos };
       const res = await firstValueFrom(this.reservasSvc.crearReserva(payload, archivos));
 
-      if (res?.success) {
+      if (res?.Id_Reserva) {
+        this.navbar.needsRefresh.set('reservas');
+
         const estadoTexto = subestado ? `${estado} ${subestado}` : estado;
         this.navbar.alert.set({
           type: 'success',
@@ -1212,6 +1188,7 @@ export class CrearReservaComponent implements OnInit {
         this.form.reset();
         window.scrollTo({ top: 0, behavior: 'smooth' });
         this.openSummary = false;
+        this.form.markAsPristine();
         this.cdr.markForCheck();
       } else {
         this.navbar.alert.set({
@@ -1231,7 +1208,13 @@ export class CrearReservaComponent implements OnInit {
         autoClose: false,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
       });
+    } finally {
+      this.isSubmitting.set(false);
     }
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 
 
@@ -1350,13 +1333,10 @@ export class CrearReservaComponent implements OnInit {
   // ===================== Comprobante preview / actions =====================
   viewComprobante(url: string | null) {
     if (!url) return;
-    let href: string;
-    if ((url as string).startsWith('http')) href = url as string;
-    else {
-      const apiBase = (environment.apiUrl || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
-      const pathPart = (url as string).startsWith('/') ? (url as string) : `/${url}`;
-      href = `${apiBase}${pathPart}`;
-    }
+    const fileName = String(url).split('/').filter(Boolean).pop();
+    if (!fileName) return;
+    const apiBase = (environment.apiUrl || '').replace(/\/$/, '');
+    const href = `${apiBase}/reservas/comprobante/${encodeURIComponent(fileName)}`;
     this.navbar.openPreview(href, 'Vista previa del comprobante');
   }
 
@@ -1436,76 +1416,7 @@ export class CrearReservaComponent implements OnInit {
     return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
   }
 
-  // ====== Verificación DNI duplicado ======
-  private verificarDniDuplicado(dni: string, fg?: any) {
-    // limpiar/ignorar verificaciones cortas
-    if (!dni || dni.trim().length < 3) {
-      if (fg) {
-        const ctrl = fg.get('DNI');
-        const errs = ctrl?.errors ?? null;
-        if (errs && errs['duplicated']) {
-          delete errs['duplicated'];
-          const remaining = Object.keys(errs).length ? errs : null;
-          ctrl.setErrors(remaining);
-        }
-      }
-      return;
-    }
-
-    const fecha = this.form.get('Fecha_Tour')?.value;
-    if (!fecha) return; // No verificar si no hay fecha seleccionada
-
-    this.reservasSvc.verificarDniDuplicado(dni.trim(), fecha).subscribe({
-      next: (resultado) => {
-        const ctrl = fg?.get('DNI');
-        if (resultado.exists && resultado.reserva) {
-          // marcar error duplicated en el control para impedir submit
-          if (ctrl) {
-            const existing = ctrl.errors ? { ...ctrl.errors } : {};
-            existing['duplicated'] = { reserva: resultado.reserva };
-            ctrl.setErrors(existing);
-          }
-
-          const reserva = resultado.reserva;
-          this.navbar.alert.set({
-            type: 'warning',
-            title: 'Pasajero duplicado',
-            message: `El DNI ${dni} ya está registrado como ${reserva.Nombre_Pasajero} en la reserva ${reserva.Id_Reserva} (${reserva.Nombre_Tour}) el ${fecha}.`,
-            autoClose: false,
-            buttons: [
-              {
-                text: 'Ver Reserva',
-                style: 'primary',
-                onClick: () => {
-                  this.navbar.cuposInfo.set(null);
-                  this.navbar.alert.set(null);
-                  this.verReservaDuplicada(reserva.Id_Reserva);
-                }
-              },
-              {
-                text: 'Cancelar',
-                style: 'secondary',
-                onClick: () => this.navbar.alert.set(null)
-              }
-            ]
-          });
-        } else {
-          // eliminar error duplicated si existía
-          if (ctrl) {
-            const errs = ctrl.errors ?? null;
-            if (errs && errs['duplicated']) {
-              delete errs['duplicated'];
-              const remaining = Object.keys(errs).length ? errs : null;
-              ctrl.setErrors(remaining);
-            }
-          }
-        }
-      },
-      error: (err) => {
-        console.error('Error verificando DNI:', err);
-      }
-    });
-  }
+  // ====== Verificación DNI (Refactorizado con switchMap) ======
 
   private verReservaDuplicada(idReserva: string) {
 

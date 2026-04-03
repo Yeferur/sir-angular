@@ -9,7 +9,7 @@
           </div>
 
           <div class="header-actions">
-            <button class="btn-primary" type="submit" [disabled]="isLoading">{{ isLoading ? 'Guardando...' : 'Guardar cambios' }}</button>
+            <button class="btn-primary" type="submit" [disabled]="isSubmitting()">{{ isSubmitting() ? 'Guardando...' : 'Guardar cambios' }}</button>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 // backend/controllers/Programacion/programacion.controller.inteligente.js
 const cerebro = require('../../services/Programacion/programacion.service');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 /**
  * ===================================================================================
@@ -22,8 +23,10 @@ exports.generarPlanLogisticoController = async (req, res) => {
     const tours = idsTours || idTour;
 
     if (!fecha || !tours) {
-        return res.status(400).json({
-            error: 'Petición inválida. Se requiere "fecha" y "idsTours" (o "idTour") en el cuerpo de la solicitud.'
+        return sendError(res, {
+            status: 400,
+            message: 'Peticion invalida. Se requiere fecha e idsTours (o idTour).',
+            errorCode: 'MISSING_PARAMS'
         });
     }
 
@@ -32,12 +35,14 @@ exports.generarPlanLogisticoController = async (req, res) => {
         const resultado = await cerebro.generarPlanLogistico(fecha, tours);
         console.log(`[SUCCESS] Plan generado para Tours: ${JSON.stringify(tours)}.`);
 
-        res.status(200).json(resultado);
+        return sendSuccess(res, { data: resultado, message: 'Plan logistico generado correctamente' });
 
     } catch (error) {
         console.error(`[ERROR] Falló la generación del plan para Tours: ${JSON.stringify(tours)}, Fecha: ${fecha}`, error);
-        res.status(500).json({
-            error: 'Error interno del servidor al generar el plan logístico.'
+        return sendError(res, {
+            status: 500,
+            message: 'Error interno del servidor al generar el plan logistico.',
+            errorCode: 'INTERNAL_ERROR'
         });
     }
 };
@@ -50,7 +55,7 @@ exports.exportarListadoBusController = async (req, res) => {
     const { fecha, idTour, bus, nombreTour } = req.body || {};
 
     if (!fecha || !idTour || !bus) {
-        return res.status(400).json({ error: 'Se requiere fecha, idTour y bus en el cuerpo.' });
+        return sendError(res, { status: 400, message: 'Se requiere fecha, idTour y bus en el cuerpo.', errorCode: 'MISSING_PARAMS' });
     }
 
     try {
@@ -65,7 +70,7 @@ exports.exportarListadoBusController = async (req, res) => {
         res.send(buffer);
     } catch (error) {
         console.error('Error al exportar listado de bus:', error);
-        res.status(500).json({ error: 'Error al generar el archivo.' });
+        return sendError(res, { status: 500, message: 'Error al generar el archivo.', errorCode: 'EXPORT_FAILED' });
     }
 };
 
@@ -78,15 +83,15 @@ exports.obtenerListadoFinalController = async (req, res) => {
     const tours = idsTours || idTour;
 
     if (!fecha || !tours) {
-        return res.status(400).json({ error: 'Se requiere fecha e idsTours (o idTour) en el cuerpo.' });
+        return sendError(res, { status: 400, message: 'Se requiere fecha e idsTours (o idTour) en el cuerpo.', errorCode: 'MISSING_PARAMS' });
     }
 
     try {
         const resultado = await cerebro.obtenerListadoFinal({ fecha, idsTours: tours });
-        res.status(200).json(resultado);
+        return sendSuccess(res, { data: resultado, message: 'Listado final obtenido correctamente' });
     } catch (error) {
         console.error('Error al consultar listado final:', error);
-        res.status(500).json({ error: 'Error interno al consultar el listado.' });
+        return sendError(res, { status: 500, message: 'Error interno al consultar el listado.', errorCode: 'INTERNAL_ERROR' });
     }
 };
 
@@ -99,15 +104,15 @@ exports.guardarListadoFinalController = async (req, res) => {
     const tours = idsTours || idTour;
 
     if (!fecha || !tours || !Array.isArray(buses)) {
-        return res.status(400).json({ error: 'Se requiere fecha, idsTours (o idTour) y buses en el cuerpo.' });
+        return sendError(res, { status: 400, message: 'Se requiere fecha, idsTours (o idTour) y buses en el cuerpo.', errorCode: 'MISSING_PARAMS' });
     }
 
     try {
         const resultado = await cerebro.guardarListadoFinal({ fecha, idsTours: tours, buses });
-        res.status(200).json(resultado);
+        return sendSuccess(res, { data: resultado, message: 'Listado final guardado correctamente' });
     } catch (error) {
         console.error('Error al guardar listado final:', error);
-        res.status(500).json({ error: 'Error interno al guardar el listado.' });
+        return sendError(res, { status: 500, message: 'Error interno al guardar el listado.', errorCode: 'INTERNAL_ERROR' });
     }
 };
 
@@ -119,14 +124,18 @@ exports.generarPlanAsistidoController = async (req, res) => {
     const { fecha, idTour, flotaManual, reservasAncladas } = req.body;
 
     if (!fecha || !idTour || !flotaManual) {
-        return res.status(400).json({
-            error: 'Petición inválida. Se requiere "fecha", "idTour" y "flotaManual" en el cuerpo de la solicitud.'
+        return sendError(res, {
+            status: 400,
+            message: 'Peticion invalida. Se requiere fecha, idTour y flotaManual.',
+            errorCode: 'MISSING_PARAMS'
         });
     }
 
     if (!Array.isArray(flotaManual) || flotaManual.length === 0) {
-        return res.status(400).json({
-            error: 'El campo "flotaManual" debe ser un arreglo de capacidades de buses y no puede estar vacío.'
+        return sendError(res, {
+            status: 400,
+            message: 'El campo flotaManual debe ser un arreglo y no puede estar vacio.',
+            errorCode: 'BAD_REQUEST'
         });
     }
 
@@ -140,12 +149,14 @@ exports.generarPlanAsistidoController = async (req, res) => {
         );
         console.log(`[SUCCESS] Plan asistido generado para Tour: ${idTour}.`);
 
-        res.status(200).json(resultado);
+        return sendSuccess(res, { data: resultado, message: 'Plan asistido generado correctamente' });
 
     } catch (error) {
         console.error(`[ERROR] Falló la generación del plan asistido para Tour: ${idTour}`, error);
-        res.status(500).json({
-            error: 'Error interno del servidor al generar el plan con flota definida.'
+        return sendError(res, {
+            status: 500,
+            message: 'Error interno del servidor al generar el plan con flota definida.',
+            errorCode: 'INTERNAL_ERROR'
         });
     }
 };

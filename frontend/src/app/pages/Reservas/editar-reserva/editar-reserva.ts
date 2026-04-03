@@ -4,25 +4,30 @@ import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import {
-  Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto,
+  Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto, ReservaHistorialCambio,
 } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { DuplicarPanelComponent } from '../../../DynamicNavbar/duplicar-panel/duplicar-panel';
+import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef } from '@angular/core';
+import { of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, FlatpickrInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, FlatpickrInputDirective],
   templateUrl: './editar-reserva.html',
   styleUrls: ['./editar-reserva.css'],
 })
 export class EditarReservaComponent implements OnInit {
-
+showDuplicate: boolean = false;
   openSummary = false;
 
   toggleSummary(force?: boolean) {
@@ -38,9 +43,12 @@ export class EditarReservaComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
   private injector = inject(Injector);
+  private destroyRef = inject(DestroyRef);
+  private tourRules = inject(TourRulesService);
 
   // Estado
   isLoading = signal<boolean>(true);
+  isSubmitting = signal<boolean>(false);
   reservaId = signal<string | null>(null);
   form!: FormGroup;
 
@@ -63,9 +71,34 @@ export class EditarReservaComponent implements OnInit {
     return m?.Codigo || 'COP';
   });
 
+  isRioClaroTour(): boolean {
+    const idTour = Number(this.form?.get('SelectTour')?.value || 0);
+    if (!idTour) return false;
+
+    const tour = this.tours().find((t) => Number(t.Id_Tour) === idTour);
+    if (!tour) return idTour === 1;
+
+    const nombre = String((tour as any).Nombre_Tour || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+    const abreviacion = String((tour as any).Abreviacion || '').toUpperCase();
+
+    return idTour === 1 || nombre.includes('RIO CLARO') || abreviacion === 'TRC';
+  }
+
   // Puntos de encuentro (chips + búsqueda)
   puntosSeleccionados = signal<Punto[]>([]);
   puntoBusquedaResults = signal<Punto[]>([]);
+
+  historialActividad = signal<ReservaHistorialCambio[]>([]);
+  historialLoading = signal<boolean>(false);
+  historialError = signal<string | null>(null);
+  historialTimeline = computed(() =>
+    [...this.historialActividad()].sort(
+      (a, b) => new Date(b.Fecha_Registro).getTime() - new Date(a.Fecha_Registro).getTime()
+    )
+  );
 
   fpOptionsFecha: Partial<FlatpickrOptions> = {
     dateFormat: 'Y-m-d',
@@ -245,12 +278,14 @@ export class EditarReservaComponent implements OnInit {
       // Comprobante (pago completo)
       ComprobantePago: [null],
     });
-    this.wsService.messages$.subscribe((msg: any) => {
-      const fecha = this.form.get('Fecha_Tour')?.value;
-      const tour = this.form.get('SelectTour')?.value;
-      if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
-        this.CuposDisponiblesNavbar();
-      }
+    this.wsService.messages$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg: any) => {
+        const fecha = this.form.get('Fecha_Tour')?.value;
+        const tour = this.form.get('SelectTour')?.value;
+        if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
+          this.CuposDisponiblesNavbar();
+        }
     });
     try {
       // 1) catálogos en paralelo
@@ -289,14 +324,20 @@ export class EditarReservaComponent implements OnInit {
 
     this.reservaId.set(id);
     await this.cargarReservaExistente(id);
+    await this.cargarHistorialActividad(id);
 
     // Además, escuchar cambios en los parámetros de la ruta si Angular reutiliza el componente
-    this.route.paramMap.subscribe(pm => {
-      const newId = pm.get('Id_Reserva') ?? pm.get('id');
-      if (newId && newId !== this.reservaId()) {
-        this.reservaId.set(newId);
-        this.cargarReservaExistente(newId).then(() => this.cdr.markForCheck());
-      }
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(pm => {
+        const newId = pm.get('Id_Reserva') ?? pm.get('id');
+        if (newId && newId !== this.reservaId()) {
+          this.reservaId.set(newId);
+          Promise.all([
+            this.cargarReservaExistente(newId),
+            this.cargarHistorialActividad(newId),
+          ]).then(() => this.cdr.markForCheck());
+        }
     });
 
     // React to Id_Reserva changes from the Dynamic Navbar: if user clicks "Editar" there,
@@ -306,7 +347,10 @@ export class EditarReservaComponent implements OnInit {
       if (navId && navId !== this.reservaId()) {
         // load new reservation into the editor
         this.reservaId.set(navId);
-        this.cargarReservaExistente(navId).then(() => this.cdr.markForCheck());
+        Promise.all([
+          this.cargarReservaExistente(navId),
+          this.cargarHistorialActividad(navId),
+        ]).then(() => this.cdr.markForCheck());
       }
     }));
 
@@ -449,6 +493,22 @@ export class EditarReservaComponent implements OnInit {
     return 'Directo';
   }
 
+  private async cargarHistorialActividad(id: string): Promise<void> {
+    this.historialLoading.set(true);
+    this.historialError.set(null);
+
+    try {
+      const timeline = await firstValueFrom(this.reservasSvc.getReservaHistorial(id, 30));
+      this.historialActividad.set(timeline || []);
+    } catch (e) {
+      console.error('Error cargando historial forense de reserva:', e);
+      this.historialActividad.set([]);
+      this.historialError.set('No se pudo cargar el historial de actividad.');
+    } finally {
+      this.historialLoading.set(false);
+    }
+  }
+
   // ===================== Abonos helpers =====================
   private crearAbonoGroup(): FormGroup {
     return this.fb.group({
@@ -552,27 +612,16 @@ export class EditarReservaComponent implements OnInit {
       // IMPORTANTE: en edición, respeta precios traídos (no llames autollenar si no quieres pisar)
       this.recalcularTotales();
 
-      // Políticas específicas (igual que crear)
-      if (this.isRioClaroTour()) {
-        const teniaInfantes = this.countByTipo('INFANTE') > 0;
-        if (teniaInfantes) {
-          this.removeInfantes();
-          this.navbar.alert.set({ type: 'warning', title: 'Infantes no permitidos', message: 'En Río Claro no se aceptan infantes (menores de 5 años). Han sido removidos.', autoClose: true });
-        }
-        this.maybeShowNinosAgeReminder();
+      const teniaInfantes = this.countByTipo('INFANTE') > 0;
+      if (teniaInfantes && !this.tourRules.allowsPassengerType(idTour, 'INFANTE')) {
+        this.removeInfantes();
+        this.navbar.alert.set({ type: 'warning', title: 'Infantes no permitidos', message: 'En este tour no se aceptan infantes. Han sido removidos.', autoClose: true });
       }
-      if (this.isHaciendaNapolesTour()) this.maybeShowHNChildrenPolicyOnce(); else { this.hnNinosPolicyShown = false; this.hnInfantesPolicyShown = false; }
+
+      this.tourRules.resetSession();
 
     } catch {
       this.navbar.alert.set({ type: 'error', title: 'Error al cambiar tour', message: 'No se pudieron cargar los datos del tour seleccionado.', autoClose: false });
-    }
-
-    if (idTour === 5) {
-      const ninos = this.countByTipo('NINO');
-      const infantes = this.countByTipo('INFANTE');
-      if (ninos > 0 && infantes > 0) this.navbar.alert.set({ type: 'info', title: 'Política de Niños e Infantes', message: 'En Hacienda Nápoles, los niños ≥5 van como ADULTOS y los infantes >1 año como NIÑOS.', autoClose: true });
-      else if (infantes > 0) this.navbar.alert.set({ type: 'info', title: 'Política de Infantes', message: 'En Hacienda Nápoles, los infantes >1 año deben ser NIÑOS.', autoClose: true });
-      else if (ninos > 0) this.navbar.alert.set({ type: 'info', title: 'Política de Niños', message: 'En Hacienda Nápoles, niños ≥5 años deben ir como ADULTOS.', autoClose: true });
     }
   }
 
@@ -613,20 +662,6 @@ export class EditarReservaComponent implements OnInit {
     const mismos = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo);
     return mismos.indexOf(ctrl) + 1;
   }
-  private hnNinosPolicyShown = false;
-  private hnInfantesPolicyShown = false;
-  isHaciendaNapolesTour(): boolean { return Number(this.form?.get('SelectTour')?.value) === 5; }
-  private maybeShowHNChildrenPolicyOnce(): void {
-    if (!this.isHaciendaNapolesTour()) { this.hnNinosPolicyShown = false; this.hnInfantesPolicyShown = false; return; }
-    const ninos = this.countByTipo('NINO');
-    const infantes = this.countByTipo('INFANTE');
-    if (ninos > 0 && !this.hnNinosPolicyShown) { this.hnNinosPolicyShown = true; this.navbar.alert.set({ type: 'info', title: 'Política de Niños', message: 'Niños ≥5 van como ADULTOS.', autoClose: true }); }
-    if (infantes > 0 && !this.hnInfantesPolicyShown) { this.hnInfantesPolicyShown = true; this.navbar.alert.set({ type: 'info', title: 'Política de Infantes', message: 'Infantes >1 año van como NIÑOS.', autoClose: true }); }
-    if (ninos > 0 && infantes > 0) this.navbar.alert.set({ type: 'info', title: 'Niños e Infantes', message: 'Niños ≥5 → ADULTOS; infantes >1 → NIÑOS.', autoClose: true });
-    if (ninos === 0 && infantes === 0) { this.hnNinosPolicyShown = false; this.hnInfantesPolicyShown = false; }
-  }
-  private ninosAlertShown = false;
-  isRioClaroTour(): boolean { return Number(this.form?.get('SelectTour')?.value) === 1; }
   private countByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
     return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
   }
@@ -636,18 +671,11 @@ export class EditarReservaComponent implements OnInit {
     }
     this.recalcularTotales();
   }
-  private maybeShowNinosAgeReminder(): void {
-    if (!this.isRioClaroTour()) { this.ninosAlertShown = false; return; }
-    const ninos = this.countByTipo('NINO');
-    if (ninos > 0 && !this.ninosAlertShown) {
-      this.ninosAlertShown = true;
-      this.navbar.alert.set({ type: 'info', title: 'Recuerda', message: 'Para este tour, los niños deben tener 5+ años.', autoClose: true });
-    }
-    if (ninos === 0) this.ninosAlertShown = false;
-  }
 
   agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
-    if (tipo === 'INFANTE' && this.isRioClaroTour()) return;
+    const currentTourId = Number(this.form.get('SelectTour')?.value);
+    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
+
     const principalPunto = this.form.get('Id_Punto')?.value ?? null;
     const fg = this.fb.group({
       Tipo_Pasajero: [tipo, Validators.required],
@@ -661,20 +689,56 @@ export class EditarReservaComponent implements OnInit {
       Precio_Pasajero: [0, [Validators.min(0)]],
       Comision: [0],
     });
+
+    // Validación DNI en tiempo real
+    fg.get('DNI')?.valueChanges.pipe(
+      debounceTime(800),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+      switchMap((dniVal: string) => {
+        if (!dniVal || dniVal.length < 5) return of(null);
+        const fecha = this.form.get('Fecha_Tour')?.value;
+        if (!fecha) return of(null);
+        // excludeReservaId es el ID actual de la reserva
+        return (this.reservasSvc as any).verificarDniDuplicado(dniVal, fecha, this.reservaId() || undefined).pipe(
+          catchError(() => of(null))
+        );
+      })
+    ).subscribe((res: any) => {
+      if (res?.exists) {
+        const reservaId = res?.reserva?.Id_Reserva ?? '?';
+        fg.get('DNI')?.setErrors({ duplicadoEnBd: true });
+        this.navbar.alert.set({
+          type: 'warning',
+          title: 'Documento Duplicado',
+          message: `El documento ${fg.get('DNI')?.value} ya se encuentra reservado en otro tour para esta misma fecha (Reserva #${reservaId}).`,
+          autoClose: false,
+          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
+        });
+      } else {
+        const errs = fg.get('DNI')?.errors;
+        if (errs) {
+          delete errs['duplicadoEnBd'];
+          if (Object.keys(errs).length === 0) fg.get('DNI')?.setErrors(null);
+          else fg.get('DNI')?.setErrors(errs);
+        }
+      }
+    });
+
     this.pasajeros.push(fg);
-    if (this.isHaciendaNapolesTour()) this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
+    this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
+
     // Solo para NUEVOS: autollenar referencia inicial
     this.autollenarPrecios();
     this.recalcularTotales();
   }
 
   eliminarPasajero(i: number) {
+    const currentTourId = Number(this.form.get('SelectTour')?.value);
     const tipo = this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value;
     this.pasajeros.removeAt(i);
     this.recalcularTotales();
-    if (tipo === 'NINO') this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
+    if (tipo === 'NINO') this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
   }
 
   adultosInputValue(): number { return this.countByTipo('ADULTO'); }
@@ -682,20 +746,74 @@ export class EditarReservaComponent implements OnInit {
   infantesInputValue(): number { return this.countByTipo('INFANTE'); }
 
   setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any) {
-    if (tipo === 'INFANTE' && this.isRioClaroTour()) return;
+    const currentTourId = Number(this.form.get('SelectTour')?.value);
+    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
+    
     const n = Math.max(0, Number(val || 0));
     const cur = this.countByTipo(tipo);
 
-    if (n > cur) for (let i = 0; i < (n - cur); i++) this.agregarPasajero(tipo);
-    else if (n < cur) {
+    if (n > cur) {
+      for (let i = 0; i < (n - cur); i++) {
+        const fg = this.fb.group({
+          Tipo_Pasajero: [tipo, Validators.required],
+          Nombre_Pasajero: [''],
+          DNI: [''],
+          Indicativo_Pasajero: ['+57'],
+          Telefono_Pasajero: [''],
+          Id_Punto: [this.form.get('Id_Punto')?.value ?? null],
+          Confirmacion: [false],
+          PrecioRef: [0],
+          Precio_Pasajero: [0, [Validators.min(0)]],
+          Comision: [0],
+        });
+
+        // Validación DNI
+        fg.get('DNI')?.valueChanges.pipe(
+          debounceTime(800),
+          distinctUntilChanged(),
+          takeUntilDestroyed(this.destroyRef),
+          switchMap((dniVal: string) => {
+            if (!dniVal || dniVal.length < 5) return of(null);
+            const fecha = this.form.get('Fecha_Tour')?.value;
+            if (!fecha) return of(null);
+            return (this.reservasSvc as any).verificarDniDuplicado(dniVal, fecha, this.reservaId() || undefined).pipe(
+              catchError(() => of(null))
+            );
+          })
+        ).subscribe((res: any) => {
+          if (res?.exists) {
+            const reservaId = res?.reserva?.Id_Reserva ?? '?';
+            fg.get('DNI')?.setErrors({ duplicadoEnBd: true });
+            this.navbar.alert.set({
+              type: 'warning',
+              title: 'Documento Duplicado',
+              message: `El documento ${fg.get('DNI')?.value} ya se encuentra reservado en otro tour para esta misma fecha (Reserva #${reservaId}).`,
+              autoClose: false,
+              buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
+            });
+          } else {
+            const errs = fg.get('DNI')?.errors;
+            if (errs) {
+              delete errs['duplicadoEnBd'];
+              if (Object.keys(errs).length === 0) fg.get('DNI')?.setErrors(null);
+              else fg.get('DNI')?.setErrors(errs);
+            }
+          }
+        });
+
+        this.pasajeros.push(fg);
+      }
+      this.autollenarPrecios();
+      this.recalcularTotales();
+    } else if (n < cur) {
       for (let i = cur - 1; i >= n; i--) {
         const idx = this.pasajeros.controls.findIndex(c => c.get('Tipo_Pasajero')?.value === tipo);
         if (idx >= 0) this.pasajeros.removeAt(idx);
       }
       this.recalcularTotales();
     }
-    if (tipo === 'NINO') this.maybeShowHNChildrenPolicyOnce();
-    if (tipo === 'NINO') this.maybeShowNinosAgeReminder?.();
+
+    if (tipo === 'NINO') this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
   }
 
   async autollenarPrecios() {
@@ -855,40 +973,15 @@ export class EditarReservaComponent implements OnInit {
 
   // ===== Duplicar reserva =====
   async duplicarReserva(): Promise<void> {
-    // Forzar que el usuario escoja una nueva fecha (no permitir misma fecha)
-    // Preparar datos y abrir panel en la Dynamic Navbar para seleccionar Tour/Fecha
     this.openSummary = false;
     try {
-      // Ajustes previos: no copiar archivos, quitar confirmaciones
       this.abonos.clear();
       this.form.get('ComprobantePago')?.setValue(null);
       for (const fg of this.pasajeros.controls) fg.get('Confirmacion')?.setValue(false);
 
-      // Ajustes para Hacienda Nápoles (tipo mapping permanece)
-      if (this.isHaciendaNapolesTour()) {
-        for (const ctrl of this.pasajeros.controls) {
-          const tipo = ctrl.get('Tipo_Pasajero')?.value;
-          if (tipo === 'NINO') ctrl.get('Tipo_Pasajero')?.setValue('ADULTO');
-          else if (tipo === 'INFANTE') ctrl.get('Tipo_Pasajero')?.setValue('NINO');
-        }
-        this.maybeShowHNChildrenPolicyOnce();
-      }
-
-      // Si destino es Río Claro y hay infantes, pedir confirmación para eliminar o cancelar
-      if (Number(this.form.get('SelectTour')?.value) === 1 && this.countByTipo('INFANTE') > 0) {
-        const quitar = await this.confirmarOpciones('Infantes detectados', 'Hay pasajeros tipo INFANTE y Río Claro no los permite. ¿Eliminar infantes o cancelar duplicación?', [
-          { key: 'eliminar', text: 'Eliminar infantes' },
-          { key: 'cancelar', text: 'Cancelar' }
-        ]);
-        if (!quitar || quitar === 'cancelar') return;
-        if (quitar === 'eliminar') this.removeInfantes();
-      }
-
-      // Asegurar punto principal está seteado
       const principal = this.puntosSeleccionados()[0] ?? null;
       this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
 
-      // Abrir panel de duplicación en la barra dinámica
       this.navbar.openPanel({
         id: 'duplicar',
         title: 'Duplicar reserva',
@@ -902,43 +995,26 @@ export class EditarReservaComponent implements OnInit {
             const targetTourId = Number(Id_Tour);
             const targetFecha = String(Fecha_Tour || '').slice(0, 10);
 
-            // Cerrar el panel primero para que los alerts no queden detrás del panel
             this.navbar.closePanel();
-            await Promise.resolve(); // deja respirar el render
+            await Promise.resolve();
 
-            // 1) Validar fecha distinta (SIN tocar form)
-            const origFecha =
-              this.originalReserva?.Cabecera?.Fecha_Tour ??
-              this.originalReserva?.FechaReserva ??
-              this.form.get('Fecha_Tour')?.value;
-
+            const origFecha = this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva ?? this.form.get('Fecha_Tour')?.value;
             const origFechaNorm = String(origFecha || '').slice(0, 10);
 
             if (!targetFecha || targetFecha === origFechaNorm) {
-              this.navbar.alert.set({
-                type: 'warning',
-                title: 'Fecha inválida',
-                message: 'La fecha debe ser distinta a la original.',
-                autoClose: true
-              });
+              this.navbar.alert.set({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
               return;
             }
 
-            // 2) Restricciones (preguntas) usando los pasajeros actuales (SIN tocar form)
             const okRestricciones = await this.confirmarRestriccionesAntesDeDuplicar(targetTourId);
             if (!okRestricciones) return;
 
-            // 3) Crear duplicada (SIN tocar form original)
             await this.crearReservaDuplicada({
               Id_Tour: targetTourId,
               Fecha_Tour: targetFecha,
               Observaciones: typeof Observaciones === 'string' ? Observaciones.trim() : null
-              
             });
-            console.log('Duplicando reserva a', { Id_Tour: targetTourId, Fecha_Tour: targetFecha, Observaciones });
           }
-          
-
         }
       });
 
@@ -954,39 +1030,61 @@ export class EditarReservaComponent implements OnInit {
     try {
       const targetTourId = overrides.Id_Tour;
 
-      // 1) Construir pax desde el form, pero clonados
       let pax = this.pasajeros.controls.map(c => ({
         Nombre_Pasajero: c.get('Nombre_Pasajero')?.value || '',
         DNI: c.get('DNI')?.value || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
-        Confirmacion: false, // duplicada arranca en false
-        Precio_Tour: Number(c.get('PrecioRef')?.value || 0),
-        Precio_Pasajero: Number(c.get('Precio_Pasajero')?.value || 0),
-        Comision: Number(c.get('Comision')?.value || 0),
+        Confirmacion: false,
+        Precio_Tour: 0,
+        Precio_Pasajero: 0,
+        Comision: 0,
       }));
 
-      // 2) Aplicar restricciones SOLO a pax (no al form)
-      const ninos = pax.filter(p => p.Tipo_Pasajero === 'NINO').length;
-      const infantes = pax.filter(p => p.Tipo_Pasajero === 'INFANTE').length;
+      // Paso 1: Validar/Adaptar pasajeros a las reglas del Tour DESTINO
+      let removeInfantesCount = 0;
+      let adaptadosCount = 0;
+      pax = pax.filter(p => {
+        if (p.Tipo_Pasajero === 'INFANTE' && !this.tourRules.allowsPassengerType(targetTourId, 'INFANTE')) {
+          removeInfantesCount++;
+          return false;
+        }
+        return true;
+      });
 
-      // Río Claro: eliminar infantes (ya confirmado antes)
-      if (targetTourId === 1 && infantes > 0) {
-        pax = pax.filter(p => p.Tipo_Pasajero !== 'INFANTE');
+      pax = pax.map(p => {
+        const adp = this.tourRules.adaptPassengerType(targetTourId, p.Tipo_Pasajero);
+        if (adp !== p.Tipo_Pasajero) adaptadosCount++;
+        return { ...p, Tipo_Pasajero: adp };
+      });
+
+      // Paso 2: Fetch Precios Financieros Exactos del Catalogo
+      // Intentamos recuperar precios con el Plan Original. Si es undefined, lo mandamos null para que traiga el default del backend.
+      const idMoneda = Number(this.form.get('Id_Moneda')?.value || 1);
+      let idPlan = Number(this.form.get('Id_Plan')?.value || 0) || null;
+      let preciosNuevos: PrecioMap = {};
+      try {
+        preciosNuevos = await firstValueFrom(this.reservasSvc.getPrecios({ Id_Tour: targetTourId, Id_Plan: idPlan, Id_Moneda: idMoneda })) || {};
+      } catch {
+        preciosNuevos = await firstValueFrom(this.reservasSvc.getPrecios({ Id_Tour: targetTourId, Id_Plan: null, Id_Moneda: idMoneda })) || {};
       }
 
-      // Hacienda Nápoles: mapear (ya confirmado antes)
-      if (targetTourId === 5 && (ninos > 0 || infantes > 0)) {
-        pax = pax.map(p => {
-          if (p.Tipo_Pasajero === 'NINO') return { ...p, Tipo_Pasajero: 'ADULTO' };
-          if (p.Tipo_Pasajero === 'INFANTE') return { ...p, Tipo_Pasajero: 'NINO' };
-          return p;
-        });
-      }
+      const idCanal = Number(this.form.get('Id_Canal')?.value || 1);
+      let comisionesGlobal = {};
+      try {
+        comisionesGlobal = await firstValueFrom(this.reservasSvc.getComisiones(targetTourId, idCanal)) || {};
+      } catch {}
 
-      // 3) Cabecera SIN usar SelectTour/Fecha del form
-      // Determinar punto principal y recalcular Id_Horario para el tour destino
+      pax.forEach((p: any) => {
+        const precioReal = (preciosNuevos as any)[p.Tipo_Pasajero] ?? 0;
+        p.Precio_Tour = precioReal;
+        p.Precio_Pasajero = precioReal;
+        p.Comision = p.Tipo_Pasajero === 'INFANTE' ? 0 : ((comisionesGlobal as any)[p.Tipo_Pasajero] ?? 0);
+      });
+
+      const totalNeto = pax.reduce((acc, p) => acc + Number(p.Precio_Pasajero || 0), 0);
+
       const principal = this.puntosSeleccionados()[0] ?? null;
       const Id_Punto = principal?.Id_Punto ?? this.form.get('Id_Punto')?.value ?? null;
       let horarioId = this.form.get('Id_Horario')?.value || null;
@@ -994,16 +1092,14 @@ export class EditarReservaComponent implements OnInit {
         try {
           const horario = await firstValueFrom(this.reservasSvc.getHorarioPorPunto(Id_Punto, targetTourId));
           if (horario?.Id_Horario) horarioId = horario.Id_Horario;
-        } catch (e) {
-          console.warn('No se pudo recalcular horario para punto/tour destino', e);
-        }
+        } catch { }
       }
 
       const cab = {
         Tipo_Reserva: this.form.get('Tipo_Reserva')?.value,
         Id_Horario: horarioId,
         Fecha_Tour: overrides.Fecha_Tour,
-        Id_Canal: this.form.get('Id_Canal')?.value,
+        Id_Canal: idCanal,
         Idioma_Reserva: this.form.get('Idioma_Reserva')?.value,
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
         Nombre_Reportante: this.form.get('Nombre_Reportante')?.value,
@@ -1012,31 +1108,29 @@ export class EditarReservaComponent implements OnInit {
         Id_Punto: Id_Punto,
       };
 
-      // 4) Total del payload (sumando pax)
-      const totalNeto = pax.reduce((acc, p) => acc + Number(p.Precio_Pasajero || 0), 0);
-
       const payload: any = {
         cabeceraReserva: cab,
         pasajeros: pax,
         pagos: [{ Monto: totalNeto, Tipo: 'Pago Directo' }]
       };
-      console.log('Payload duplicada:', payload);
-      const res = await firstValueFrom(this.reservasSvc.crearReserva(payload, { abonos: [] }));
 
+      const res = await firstValueFrom(this.reservasSvc.crearReserva(payload, { abonos: [] }));
       const rAny: any = res as any;
-      const nuevoId =
-        rAny?.Id_Reserva ?? rAny?.id ?? rAny?.reservaId ?? rAny?.data?.Id_Reserva ?? null;
+      const nuevoId = rAny?.Id_Reserva ?? rAny?.id ?? rAny?.reservaId ?? null;
 
       if (!nuevoId) {
         this.navbar.alert.set({ type: 'success', title: 'Reserva creada', message: 'Reserva duplicada correctamente.', autoClose: true });
         return;
       }
 
-      // 5) Mostrar alert con botón que ABRE PANEL (NO navegar)
+      let extraMsg = '';
+      if (removeInfantesCount > 0) extraMsg += `\nNota: Se removieron ${removeInfantesCount} infantes no permitidos.`;
+      if (adaptadosCount > 0) extraMsg += `\nNota: Se reajustaron tarifas de ${adaptadosCount} menores por política del tour.`;
+
       this.navbar.alert.set({
         type: 'success',
-        title: 'Reserva creada',
-        message: `Reserva duplicada: ${nuevoId}`,
+        title: 'Reserva duplicada con éxito',
+        message: `ID de nueva reserva: ${nuevoId}${extraMsg}`,
         autoClose: false,
         buttons: [
           { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
@@ -1046,62 +1140,20 @@ export class EditarReservaComponent implements OnInit {
 
     } catch (err) {
       console.error(err);
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error',
-        message: 'No fue posible crear la reserva duplicada.',
-        autoClose: false
-      });
+      this.navbar.alert.set({ type: 'error', title: 'Error', message: 'No fue posible crear la reserva duplicada. Verifica tu conexión.', autoClose: false });
     }
   }
 
-
   private async confirmarRestriccionesAntesDeDuplicar(targetTourId: number): Promise<boolean> {
-    const ninos = this.countByTipo('NINO');
     const infantes = this.countByTipo('INFANTE');
-    const hayMenores = (ninos + infantes) > 0;
-
-    // Aviso general de edades (una sola vez)
-    if (hayMenores) {
-      this.navbar.alert.set({
-        type: 'warning',
-        title: 'Verifica edades',
-        message: 'Hay NIÑOS/INFANTES. Verifica que cumplan la edad mínima del tour.',
-        autoClose: true
-      });
-    }
-
-    // Río Claro (1): no permite INFANTE
-    if (targetTourId === 1 && infantes > 0) {
+    if (infantes > 0 && !this.tourRules.allowsPassengerType(targetTourId, 'INFANTE')) {
       const decision = await this.confirmarOpciones(
-        'Infantes no permitidos',
-        `Este tour NO permite INFANTES. Actualmente tienes ${infantes} infante(s). Desea eliminarlos y continuar o cancelar la duplicación?`,
-        [
-          { key: 'eliminar', text: 'Eliminar', style: 'primary' },
-        ]
+        'Infantes detectados',
+        `El tour destino NO acepta infantes. Tienes ${infantes} registrado(s). Serán ignorados de la clonación si continúas. ¿Continuar clonación?`,
+        [{ key: 'continuar', text: 'Sí, ignorar infantes', style: 'primary' }]
       );
-      if (decision !== 'eliminar') return false;
-
-      // OJO: esto modifica el form (pasajeros). Si NO quieres tocar el form original,
-      // NO borres aquí. En vez de eso, lo haremos en el payload (abajo).
-      // Así que solo confirmamos y seguimos.
-      return true;
+      if (decision !== 'continuar') return false;
     }
-
-    // Hacienda Nápoles (5): sugerir ajuste, pero preguntar
-    if (targetTourId === 5 && (ninos > 0 || infantes > 0)) {
-      const decision = await this.confirmarOpciones(
-        'Política: Hacienda Nápoles',
-        `Tienes ${ninos} niño(s) y ${infantes} infante(s).\n` +
-        `¿Deseas aplicar el ajuste sugerido (NIÑO→ADULTO, INFANTE→NIÑO) o cancelar?`,
-        [
-          { key: 'ajustar', text: 'Aplicar ajuste', style: 'primary' },
-        ]
-      );
-      if (decision !== 'ajustar') return false;
-      return true;
-    }
-
     return true;
   }
 
@@ -1114,11 +1166,14 @@ this.navbar.cuposInfo.set(null);
   }
 
   async onSubmit(): Promise<void> {
+    if (this.isSubmitting()) return;
+    this.isSubmitting.set(true);
     // Validación
     this.form.updateValueAndValidity({ emitEvent: false });
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.navbar.alert.set({ type: 'warning', title: 'Formulario incompleto', message: 'Revisa los campos obligatorios antes de guardar.', autoClose: true });
+      this.isSubmitting.set(false);
       return;
     }
 
@@ -1136,7 +1191,10 @@ this.navbar.cuposInfo.set(null);
       Total neto: ${this.monedaCodigo()} ${totalNeto}.
       ¿Deseas continuar?`
     );
-    if (!ok) return;
+    if (!ok) {
+      this.isSubmitting.set(false);
+      return;
+    }
 
     try {
       // Pasajeros payload
@@ -1159,29 +1217,48 @@ this.navbar.cuposInfo.set(null);
 
       const forma = this.form.get('FormaPago')?.value as 'Directo' | 'Completo' | 'Abono';
       let comprobanteCompletoFile: File | null = null;
+      let tieneComprobanteOUrl = false;
 
       if (forma === 'Directo') {
         pagos.push({ Monto: totalNeto, Tipo: 'Pago Directo' });
       } else if (forma === 'Completo') {
-        const file: File | null = this.form.get('ComprobantePago')?.value || null;
-        if (file) {
-          pagos.push({ Monto: totalNeto, Tipo: 'Pago Completo', fileField: 'comprobante_pago' });
-          archivos.completo = file;
-          comprobanteCompletoFile = file;
+        const cmpVal = this.form.get('ComprobantePago')?.value;
+        const pagoCompleto: any = { Monto: totalNeto, Tipo: 'Pago Completo' };
+        
+        if (cmpVal instanceof File) {
+          pagoCompleto.fileField = 'comprobante_pago';
+          archivos.completo = cmpVal;
+          comprobanteCompletoFile = cmpVal;
+          tieneComprobanteOUrl = true;
+        } else if (cmpVal?.SoporteUrl) {
+          pagoCompleto.SoporteUrl = cmpVal.SoporteUrl;
+          tieneComprobanteOUrl = true;
         }
+        pagos.push(pagoCompleto);
       } else if (forma === 'Abono') {
         this.abonos.controls.forEach((g, i) => {
           const monto = Number(g.get('Monto')?.value || 0);
-          const f: File | null = g.get('Comprobante')?.value || null;
+          const cmpVal = g.get('Comprobante')?.value;
           if (monto > 0) {
-            pagos.push({ Monto: monto, Tipo: 'Abono', fileField: `abono_${i}` });
-            archivos.abonos!.push(f);
+            const pagoAbono: any = { Monto: monto, Tipo: 'Abono' };
+            if (cmpVal instanceof File) {
+              pagoAbono.fileField = `abono_${i}`;
+              archivos.abonos!.push(cmpVal);
+              tieneComprobanteOUrl = true;
+            } else if (cmpVal?.SoporteUrl) {
+              pagoAbono.SoporteUrl = cmpVal.SoporteUrl;
+              archivos.abonos!.push(null);
+              tieneComprobanteOUrl = true;
+            } else {
+              archivos.abonos!.push(null);
+            }
+            pagos.push(pagoAbono);
           }
         });
       }
 
       // Estado sugerido (opcional)
-      const { estado, subestado } = this.resolverEstadoYMotivo(pax, forma, !!comprobanteCompletoFile);
+      const { estado, subestado } = this.resolverEstadoYMotivo(pax, forma, tieneComprobanteOUrl);
 
       // Cabecera
       const cab = {
@@ -1216,30 +1293,28 @@ this.navbar.cuposInfo.set(null);
         );
       }
 
-      if (res?.success) {
-        // Si guardamos una duplicación como nueva, salir del modo duplicado
-        if (this.isDuplicateMode) this.isDuplicateMode = false;
-        const estadoTexto = subestado ? `${estado} ${subestado}` : estado;
-        this.navbar.alert.set({
-          type: 'success',
-          title: 'Reserva actualizada',
-          message: `La reserva ${this.reservaId()} ha sido actualizada correctamente. Estado: ${estadoTexto}.`,
-          autoClose: false,
-          buttons: [
-            { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(String(this.reservaId()!)); } },
-          ],
-        });
-        this.cdr.markForCheck();
-      } else {
-        this.navbar.alert.set({
-          type: 'error',
-          title: 'No se pudo actualizar',
-          message: 'Revisa los datos e intenta nuevamente.',
-          autoClose: false,
-          buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-        });
+      // Si guardamos una duplicación como nueva, salir del modo duplicado
+      if (this.isDuplicateMode) this.isDuplicateMode = false;
+
+      const reservaActual = this.reservaId() || (res as any)?.Id_Reserva || cab.Id_Reserva;
+      const estadoTexto = subestado ? `${estado} ${subestado}` : estado;
+      this.navbar.alert.set({
+        type: 'success',
+        title: 'Reserva actualizada',
+        message: `La reserva ${reservaActual} ha sido actualizada correctamente. Estado: ${estadoTexto}.`,
+        autoClose: false,
+        buttons: [
+          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+          { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(String(reservaActual)); } },
+        ],
+      });
+
+      if (reservaActual) {
+        await this.cargarHistorialActividad(String(reservaActual));
       }
+
+      this.form.markAsPristine();
+      this.cdr.markForCheck();
     } catch (err) {
       console.error('Error al actualizar reserva:', err);
       this.navbar.alert.set({
@@ -1249,7 +1324,13 @@ this.navbar.cuposInfo.set(null);
         autoClose: false,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
       });
+    } finally {
+      this.isSubmitting.set(false);
     }
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 
   // ===================== Utilidades / files =====================
@@ -1318,15 +1399,10 @@ this.navbar.cuposInfo.set(null);
 
   viewComprobante(url: string | null) {
     if (!url) return;
-    // ensure absolute path
-    let href: string;
-    if (url.startsWith('http')) href = url;
-    else {
-      const apiBase = (environment.apiUrl || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
-      // make sure url begins with a slash
-      const pathPart = url.startsWith('/') ? url : `/${url}`;
-      href = `${apiBase}${pathPart}`;
-    }
+    const fileName = String(url).split('/').filter(Boolean).pop();
+    if (!fileName) return;
+    const apiBase = (environment.apiUrl || '').replace(/\/$/, '');
+    const href = `${apiBase}/reservas/comprobante/${encodeURIComponent(fileName)}`;
     // Open preview inside Dynamic Navbar
     this.navbar.openPreview(href, 'Vista previa del comprobante');
   }

@@ -5,6 +5,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
+import { apiEnvelopeInterceptor } from './interceptors/api-envelope.interceptor';
 import { IMAGE_CONFIG } from '@angular/common';
 
 export const appConfig: ApplicationConfig = {
@@ -14,7 +15,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     importProvidersFrom(DragDropModule),
     provideHttpClient(
-      withInterceptors([authInterceptor])
+      withInterceptors([authInterceptor, apiEnvelopeInterceptor])
     ),
     {
       provide: IMAGE_CONFIG,

@@ -1,4 +1,5 @@
 const dashboardService = require('../../services/Dashboard/dashboard.service');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 async function getDashboardStats(req, res) {
     try {
@@ -7,10 +8,10 @@ async function getDashboardStats(req, res) {
             endDate: req.query.endDate
         };
         const stats = await dashboardService.getDashboardStatsSvc(filters);
-        res.json(stats);
+        return sendSuccess(res, { data: stats, message: 'Dashboard obtenido correctamente' });
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
     }
 }
 
@@ -18,10 +19,10 @@ async function getIncomeHistory(req, res) {
     try {
         const year = req.query.year || new Date().getFullYear();
         const data = await dashboardService.getIncomeHistorySvc(year);
-        res.json(data);
+        return sendSuccess(res, { data, message: 'Historial de ingresos obtenido correctamente' });
     } catch (error) {
         console.error('Error fetching income history:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
     }
 }
 
@@ -32,10 +33,10 @@ async function getPassengerDistribution(req, res) {
             endDate: req.query.endDate
         };
         const data = await dashboardService.getPassengerDistributionSvc(filters);
-        res.json(data);
+        return sendSuccess(res, { data, message: 'Distribucion de pasajeros obtenida correctamente' });
     } catch (error) {
         console.error('Error fetching passenger distribution:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
     }
 }
 
@@ -46,10 +47,10 @@ async function getTourOccupancy(req, res) {
             endDate: req.query.endDate
         };
         const data = await dashboardService.getTourOccupancySvc(filters);
-        res.json(data);
+        return sendSuccess(res, { data, message: 'Ocupacion por tour obtenida correctamente' });
     } catch (error) {
         console.error('Error fetching tour occupancy:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
     }
 }
 

@@ -1,5 +1,6 @@
 const permisosService = require('../../services/Permisos/permisos.service');
 const { invalidarCacheUsuario } = require('../../middlewares/permissionsMiddleware');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 /**
  * Obtener permisos del usuario actual
@@ -9,26 +10,26 @@ async function obtenerMisPermisos(req, res) {
     const userId = req.user?.id;
     
     if (!userId) {
-      return res.status(401).json({ error: 'No autenticado' });
+      return sendError(res, { status: 401, message: 'No autenticado', errorCode: 'UNAUTHENTICATED' });
     }
 
     const permisos = await permisosService.obtenerPermisosPorUsuario(userId);
     
-    res.json({
-      permisos: permisos.map(p => ({
-        codigo: p.Codigo_Permiso,
-        accion: p.Accion,
-        modulo: p.Codigo_Modulo,
-        nombreModulo: p.Nombre_Modulo,
-        descripcion: p.Descripcion
-      }))
+    return sendSuccess(res, {
+      data: {
+        permisos: permisos.map(p => ({
+          codigo: p.Codigo_Permiso,
+          accion: p.Accion,
+          modulo: p.Codigo_Modulo,
+          nombreModulo: p.Nombre_Modulo,
+          descripcion: p.Descripcion
+        }))
+      },
+      message: 'Permisos obtenidos correctamente'
     });
   } catch (error) {
     console.error('Error obteniendo permisos:', error);
-    res.status(500).json({
-      error: 'Error al obtener permisos',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener permisos', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -40,27 +41,27 @@ async function obtenerMiMenu(req, res) {
     const userId = req.user?.id;
     
     if (!userId) {
-      return res.status(401).json({ error: 'No autenticado' });
+      return sendError(res, { status: 401, message: 'No autenticado', errorCode: 'UNAUTHENTICATED' });
     }
 
     const menu = await permisosService.obtenerMenuPorUsuario(userId);
     
-    res.json({
-      menu: menu.map(m => ({
-        id: m.Id_Modulo,
-        nombre: m.Nombre_Modulo,
-        codigo: m.Codigo_Modulo,
-        icono: m.Icono,
-        ruta: m.Ruta,
-        orden: m.Orden
-      }))
+    return sendSuccess(res, {
+      data: {
+        menu: menu.map(m => ({
+          id: m.Id_Modulo,
+          nombre: m.Nombre_Modulo,
+          codigo: m.Codigo_Modulo,
+          icono: m.Icono,
+          ruta: m.Ruta,
+          orden: m.Orden
+        }))
+      },
+      message: 'Menu obtenido correctamente'
     });
   } catch (error) {
     console.error('Error obteniendo menú:', error);
-    res.status(500).json({
-      error: 'Error al obtener menú',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener menu', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -70,13 +71,10 @@ async function obtenerMiMenu(req, res) {
 async function obtenerRoles(req, res) {
   try {
     const roles = await permisosService.obtenerRoles();
-    res.json({ roles });
+    return sendSuccess(res, { data: { roles }, message: 'Roles obtenidos correctamente' });
   } catch (error) {
     console.error('Error obteniendo roles:', error);
-    res.status(500).json({
-      error: 'Error al obtener roles',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener roles', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -86,13 +84,10 @@ async function obtenerRoles(req, res) {
 async function obtenerModulos(req, res) {
   try {
     const modulos = await permisosService.obtenerModulos();
-    res.json({ modulos });
+    return sendSuccess(res, { data: { modulos }, message: 'Modulos obtenidos correctamente' });
   } catch (error) {
     console.error('Error obteniendo módulos:', error);
-    res.status(500).json({
-      error: 'Error al obtener módulos',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener modulos', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -102,13 +97,10 @@ async function obtenerModulos(req, res) {
 async function obtenerPermisos(req, res) {
   try {
     const permisos = await permisosService.obtenerTodosPermisos();
-    res.json({ permisos });
+    return sendSuccess(res, { data: { permisos }, message: 'Permisos obtenidos correctamente' });
   } catch (error) {
     console.error('Error obteniendo permisos:', error);
-    res.status(500).json({
-      error: 'Error al obtener permisos',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener permisos', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -119,13 +111,10 @@ async function obtenerPermisosPorRol(req, res) {
   try {
     const idRol = req.params.idRol;
     const permisos = await permisosService.obtenerPermisosPorRol(idRol);
-    res.json({ permisos });
+    return sendSuccess(res, { data: { permisos }, message: 'Permisos del rol obtenidos correctamente' });
   } catch (error) {
     console.error('Error obteniendo permisos del rol:', error);
-    res.status(500).json({
-      error: 'Error al obtener permisos del rol',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al obtener permisos del rol', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -137,23 +126,15 @@ async function asignarPermiso(req, res) {
     const { idRol, idPermiso } = req.body;
     
     if (!idRol || !idPermiso) {
-      return res.status(400).json({
-        error: 'Datos incompletos',
-        mensaje: 'Se requieren idRol e idPermiso'
-      });
+      return sendError(res, { status: 400, message: 'Se requieren idRol e idPermiso', errorCode: 'MISSING_PARAMS' });
     }
 
     await permisosService.asignarPermisoARol(idRol, idPermiso);
     
-    res.json({
-      mensaje: 'Permiso asignado correctamente'
-    });
+    return sendSuccess(res, { data: null, message: 'Permiso asignado correctamente' });
   } catch (error) {
     console.error('Error asignando permiso:', error);
-    res.status(500).json({
-      error: 'Error al asignar permiso',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al asignar permiso', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -165,23 +146,15 @@ async function revocarPermiso(req, res) {
     const { idRol, idPermiso } = req.body;
     
     if (!idRol || !idPermiso) {
-      return res.status(400).json({
-        error: 'Datos incompletos',
-        mensaje: 'Se requieren idRol e idPermiso'
-      });
+      return sendError(res, { status: 400, message: 'Se requieren idRol e idPermiso', errorCode: 'MISSING_PARAMS' });
     }
 
     await permisosService.revocarPermisoDeRol(idRol, idPermiso);
     
-    res.json({
-      mensaje: 'Permiso revocado correctamente'
-    });
+    return sendSuccess(res, { data: null, message: 'Permiso revocado correctamente' });
   } catch (error) {
     console.error('Error revocando permiso:', error);
-    res.status(500).json({
-      error: 'Error al revocar permiso',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al revocar permiso', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -193,10 +166,7 @@ async function crearRol(req, res) {
     const { nombreRol, descripcion } = req.body;
     
     if (!nombreRol) {
-      return res.status(400).json({
-        error: 'Datos incompletos',
-        mensaje: 'Se requiere nombreRol'
-      });
+      return sendError(res, { status: 400, message: 'Se requiere nombreRol', errorCode: 'MISSING_PARAMS' });
     }
 
     const idRol = await permisosService.crearRol({
@@ -204,16 +174,10 @@ async function crearRol(req, res) {
       Descripcion: descripcion
     });
     
-    res.status(201).json({
-      mensaje: 'Rol creado correctamente',
-      idRol
-    });
+    return sendSuccess(res, { data: { idRol }, message: 'Rol creado correctamente', status: 201 });
   } catch (error) {
     console.error('Error creando rol:', error);
-    res.status(500).json({
-      error: 'Error al crear rol',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al crear rol', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -226,10 +190,7 @@ async function actualizarRol(req, res) {
     const { nombreRol, descripcion, activo } = req.body;
     
     if (!nombreRol) {
-      return res.status(400).json({
-        error: 'Datos incompletos',
-        mensaje: 'Se requiere nombreRol'
-      });
+      return sendError(res, { status: 400, message: 'Se requiere nombreRol', errorCode: 'MISSING_PARAMS' });
     }
 
     await permisosService.actualizarRol(idRol, {
@@ -238,15 +199,10 @@ async function actualizarRol(req, res) {
       Activo: activo !== undefined ? activo : 1
     });
     
-    res.json({
-      mensaje: 'Rol actualizado correctamente'
-    });
+    return sendSuccess(res, { data: null, message: 'Rol actualizado correctamente' });
   } catch (error) {
     console.error('Error actualizando rol:', error);
-    res.status(500).json({
-      error: 'Error al actualizar rol',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al actualizar rol', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -259,23 +215,15 @@ async function eliminarRol(req, res) {
     
     await permisosService.eliminarRol(idRol);
     
-    res.json({
-      mensaje: 'Rol eliminado correctamente'
-    });
+    return sendSuccess(res, { data: null, message: 'Rol eliminado correctamente' });
   } catch (error) {
     console.error('Error eliminando rol:', error);
     
     if (error.message.includes('usuarios asignados')) {
-      return res.status(400).json({
-        error: 'No se puede eliminar',
-        mensaje: error.message
-      });
+      return sendError(res, { status: 400, message: error.message, errorCode: 'ROLE_IN_USE' });
     }
-    
-    res.status(500).json({
-      error: 'Error al eliminar rol',
-      mensaje: error.message
-    });
+
+    return sendError(res, { status: 500, message: 'Error al eliminar rol', errorCode: 'INTERNAL_ERROR' });
   }
 }
 
@@ -290,15 +238,10 @@ async function invalidarCache(req, res) {
       invalidarCacheUsuario(userId);
     }
     
-    res.json({
-      mensaje: 'Cache invalidado correctamente'
-    });
+    return sendSuccess(res, { data: null, message: 'Cache invalidado correctamente' });
   } catch (error) {
     console.error('Error invalidando cache:', error);
-    res.status(500).json({
-      error: 'Error al invalidar cache',
-      mensaje: error.message
-    });
+    return sendError(res, { status: 500, message: 'Error al invalidar cache', errorCode: 'INTERNAL_ERROR' });
   }
 }
 

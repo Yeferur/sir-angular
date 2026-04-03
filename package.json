@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "backend": "cd backend && npm run dev",
-    "frontend": "cd frontend && ng serve --proxy-config proxy.conf.json"
+    "frontend": "cd frontend && npm run start"
   },
   "keywords": [],
   "author": "",

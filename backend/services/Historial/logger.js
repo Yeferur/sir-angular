@@ -1,5 +1,23 @@
 const db = require('../../database/db');
 
+async function ensureHistorialCambiosTable(conn) {
+  await conn.query(
+    `CREATE TABLE IF NOT EXISTS historial_cambios (
+      Id_Cambio BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      Tabla VARCHAR(100) NOT NULL,
+      Id_Registro VARCHAR(50) DEFAULT NULL,
+      Id_Usuario BIGINT UNSIGNED DEFAULT NULL,
+      Cambio_JSON JSON NOT NULL,
+      IP_Cliente VARCHAR(64) DEFAULT NULL,
+      Fecha_Registro DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (Id_Cambio),
+      KEY idx_historial_cambios_tabla (Tabla),
+      KEY idx_historial_cambios_registro (Id_Registro),
+      KEY idx_historial_cambios_usuario (Id_Usuario)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+}
+
 async function recordHistorial({ conexion = null, tabla, id_registro = null, accion, id_usuario = null, detalles = [] }) {
   // If a connection is provided, use it (inside transaction), else get a new one
   const useExternalConn = !!conexion;
@@ -78,13 +96,53 @@ async function logSistema({ mensaje, nivel = 'error', id_usuario = null, meta = 
   const msg = typeof mensaje === 'string' ? mensaje : JSON.stringify(mensaje);
   try {
     const safeUser = (id_usuario == null) ? 0 : id_usuario;
+    const modulo = meta ? JSON.stringify(meta).slice(0, 100) : null;
     await db.query(
-      'INSERT INTO logs_sistema (Nivel, Mensaje, Meta, Id_Usuario, Fecha_Registro) VALUES (?, ?, ?, ?, ?)',
-      [nivel, msg, meta ? JSON.stringify(meta) : '', safeUser, now]
+      'INSERT INTO logs_sistema (Nivel, Descripcion, Modulo, Id_Usuario, Fecha_Registro) VALUES (?, ?, ?, ?, ?)',
+      [String(nivel || 'INFO').toUpperCase(), msg, modulo, safeUser, now]
     );
   } catch (e) {
     console.error('Failed to write to logs_sistema:', e);
   }
 }
 
-module.exports = { recordHistorial, logSistema };
+async function recordHistorialCambioReserva({
+  conexion = null,
+  id_reserva,
+  id_usuario = null,
+  estado_anterior = null,
+  estado_nuevo = null,
+  ip_cliente = null,
+  metadata = {}
+}) {
+  const useExternalConn = !!conexion;
+  const conn = conexion || await db.getConnection();
+  try {
+    await ensureHistorialCambiosTable(conn);
+
+    const payload = {
+      estadoAnterior: estado_anterior,
+      estadoNuevo: estado_nuevo,
+      metadata: metadata || {}
+    };
+
+    const [result] = await conn.query(
+      `INSERT INTO historial_cambios
+      (Tabla, Id_Registro, Id_Usuario, Cambio_JSON, IP_Cliente, Fecha_Registro)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+      [
+        'reservas',
+        id_reserva ? String(id_reserva) : null,
+        id_usuario == null ? 0 : id_usuario,
+        JSON.stringify(payload),
+        ip_cliente || null,
+      ]
+    );
+
+    return result.insertId;
+  } finally {
+    if (!useExternalConn && conn) conn.release();
+  }
+}
+
+module.exports = { recordHistorial, logSistema, recordHistorialCambioReserva, ensureHistorialCambiosTable };

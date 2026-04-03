@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, effect, inject, signal } from '@angular/core';
 
 import { Reservas, Tour } from '../../../services/Reservas/reservas';
 import { Tours } from '../../../services/Tours/tours';
@@ -25,6 +25,17 @@ export class VerToursComponent implements OnInit {
     toursFiltrados = () => this.tours();
 
     ngOnInit(): void {
+        this.listar();
+
+        effect(() => {
+            const entity = this.navbar.needsRefresh();
+            if (entity === 'tours') {
+                this.listar();
+            }
+        });
+    }
+
+    listar() {
         this.loadTours();
     }
 

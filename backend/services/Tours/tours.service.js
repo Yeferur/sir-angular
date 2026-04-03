@@ -157,8 +157,8 @@ async function crearTour(data, userId = null) {
     // 1) Crear el tour
     const [result] = await conn.query(
       `INSERT INTO tours
-        (Nombre_Tour, Abreviacion, Comision_Hotel, Comision_Agencia, Comision_Freelance, Cupo_Base, Latitud, Longitud)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (Nombre_Tour, Abreviacion, Comision_Hotel, Comision_Agencia, Comision_Freelance, Cupo_Base, Latitud, Longitud, Activo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         Nombre_Tour,
         Abreviacion || null,
@@ -338,12 +338,12 @@ async function crearPlanTour(Id_Tour, Nombre_Plan) {
 }
 
 async function obtenerTours() {
-  const [rows] = await db.query('SELECT Id_Tour, Nombre_Tour, Abreviacion FROM tours ORDER BY Nombre_Tour');
+  const [rows] = await db.query('SELECT Id_Tour, Nombre_Tour, Abreviacion FROM tours WHERE Activo = 1 ORDER BY Nombre_Tour');
   return rows;
 }
 
 async function obtenerTourPorId(Id_Tour) {
-  const [rows] = await db.query('SELECT * FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]);
+  const [rows] = await db.query('SELECT * FROM tours WHERE Id_Tour = ? AND Activo = 1 LIMIT 1', [Id_Tour]);
   if (!rows.length) return null;
   const tour = rows[0];
 
@@ -571,40 +571,23 @@ async function eliminarTour(Id_Tour, userId = null) {
     await conn.beginTransaction();
 
     // fetch previous tour snapshot
-    const [prevRows] = await conn.query('SELECT Nombre_Tour, Abreviacion FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]);
+    const [prevRows] = await conn.query('SELECT Nombre_Tour, Abreviacion, Activo FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]);
     const prev = prevRows && prevRows[0] ? prevRows[0] : null;
 
-    const [reservas] = await conn.query(
-      `SELECT COUNT(*) as total FROM reservas r
-       JOIN horarios h ON h.Id_Horario = r.Id_Horario
-       WHERE h.Id_Tour = ?`,
-      [Id_Tour]
-    );
-
-    if (reservas[0].total > 0) {
+    if (!prev) {
       await conn.rollback();
-      throw new Error('No se puede eliminar el tour porque tiene reservas asociadas.');
+      throw new Error('Tour no encontrado.');
     }
 
-    // Limpieza disponibilidad
-    const [temps] = await conn.query('SELECT Id_Temporada FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
-    if (temps.length) {
-      const ids = temps.map(x => x.Id_Temporada);
-      await conn.query(`DELETE FROM tours_temporada_dias WHERE Id_Temporada IN (${ids.map(() => '?').join(',')})`, ids);
+    if (Number(prev.Activo) === 0) {
+      await conn.rollback();
+      throw new Error('El tour ya se encuentra inactivo.');
     }
-    await conn.query('DELETE FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
 
-    // Lo tuyo
-    await conn.query('DELETE FROM horarios WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM tour_precios WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM planes_tours WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM aforos WHERE Id_Tour = ?', [Id_Tour]);
-
-    const [result] = await conn.query('DELETE FROM tours WHERE Id_Tour = ?', [Id_Tour]);
+    const [result] = await conn.query('UPDATE tours SET Activo = 0 WHERE Id_Tour = ?', [Id_Tour]);
 
     await conn.commit();
-    try { await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'ELIMINAR', id_usuario: userId, detalles: [ { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: null } ] }); } catch (errRec) { console.error('Failed to write historial for eliminarTour:', errRec); }
+    try { await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'SOFT_DELETE', id_usuario: userId, detalles: [ { columna: 'Activo', anterior: 1, nuevo: 0 }, { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null } ] }); } catch (errRec) { console.error('Failed to write historial for eliminarTour:', errRec); }
     return { success: true, affectedRows: result.affectedRows };
   } catch (e) {
     await conn.rollback();
@@ -627,7 +610,7 @@ module.exports = {
 };
 
 async function obtenerDisponibilidadTour(Id_Tour) {
-  const [rowsTour] = await db.query('SELECT Id_Tour FROM tours WHERE  Id_Tour= ? LIMIT 1', [Id_Tour]);
+  const [rowsTour] = await db.query('SELECT Id_Tour FROM tours WHERE Id_Tour = ? AND Activo = 1 LIMIT 1', [Id_Tour]);
   if (!rowsTour.length) return null;
 
   // Modo

@@ -1,4 +1,4 @@
-import { Component, Signal, computed, signal, effect } from '@angular/core';
+import { Component, Signal, computed, signal } from '@angular/core';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -81,20 +81,11 @@ export class Usuarios {
   private performLogout(userId: string) {
     this.usuariosService.forzarCierreSesion(userId).subscribe({
       next: () => {
-        this.navbar.alert.set({
-          type: 'success',
-          title: 'Sesión Cerrada',
-          message: 'La sesión del usuario fue cerrada exitosamente.',
-          autoClose: true
-        });
+        this.navbar.successToast('Sesion cerrada', 'La sesión del usuario fue cerrada exitosamente.');
       },
       error: (err) => {
         console.error('❌ Error cerrando sesión:', err);
-        this.navbar.alert.set({
-          type: 'error',
-          title: 'Error',
-          message: 'Ocurrió un error cerrando la sesión.'
-        });
+        this.navbar.errorToast('Error', 'Ocurrió un error cerrando la sesión.');
       }
     });
   }
@@ -117,33 +108,22 @@ export class Usuarios {
   }
 
   private confirmEliminar(userId: string) {
-    // Show loading
-    this.navbar.alert.set({
-      title: 'Eliminando...',
-      message: 'Procesando eliminación.',
-      loading: true,
-      autoClose: false
-    });
+    const removed = this.usuariosService.removeUsuarioFromSignal(userId);
+    if (!removed.user) {
+      this.navbar.warningToast('Sin cambios', 'No se encontro el usuario seleccionado.');
+      return;
+    }
+
+    this.navbar.infoToast('Eliminando usuario', 'Actualizando listado...', 1800);
 
     this.usuariosService.eliminarUsuario(userId).subscribe({
       next: () => {
-        // Reload list from service to reflect changes
-        this.usuariosService.loadUsuariosYEstados();
-
-        this.navbar.alert.set({
-          type: 'success',
-          title: 'Eliminado',
-          message: 'Usuario eliminado correctamente.',
-          autoClose: true
-        });
+        this.navbar.successToast('Eliminado', 'Usuario eliminado correctamente.');
       },
       error: (err) => {
+        this.usuariosService.restoreUsuarioInSignal(removed.user!, removed.estado, removed.index);
         const msg = err?.error?.error || 'Error al eliminar usuario.';
-        this.navbar.alert.set({
-          type: 'error',
-          title: 'Error',
-          message: msg
-        });
+        this.navbar.errorToast('Error', msg);
       }
     });
   }

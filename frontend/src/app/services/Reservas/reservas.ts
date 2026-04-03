@@ -72,6 +72,19 @@ export interface ReservaDetalle {
   Pagos: Pago[];
 }
 
+export interface ReservaHistorialCambio {
+  Id_Cambio: number;
+  Id_Reserva: string;
+  Fecha_Registro: string;
+  Id_Usuario: number | null;
+  Usuario_Nombre: string;
+  IP_Cliente: string | null;
+  estadoAnterior: string | null;
+  estadoNuevo: string | null;
+  accion: string;
+  resumen: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class Reservas {
   apiUrl = environment.apiUrl; // ej: '/api'
@@ -143,15 +156,15 @@ export class Reservas {
       archivos.abonos.forEach((f, i) => { if (f) form.append(`abono_${i}`, f); });
     }
 
-    return this.http.post<{ success: boolean; Id_Reserva: string }>(
+    return this.http.post<{ Id_Reserva: string; auditId?: number }>(
       `${this.apiUrl}/reservas`,
       form
     );
   }
 
   // ♻️ Opción JSON si aún la usas en otros flujos
-  crearReservaJson(reserva: any): Observable<{ success: boolean; Id_Reserva: string }> {
-    return this.http.post<{ success: boolean; Id_Reserva: string }>(`${this.apiUrl}/reservas`, reserva);
+  crearReservaJson(reserva: any): Observable<{ Id_Reserva: string; auditId?: number }> {
+    return this.http.post<{ Id_Reserva: string; auditId?: number }>(`${this.apiUrl}/reservas`, reserva);
   }
 
   /** ===== Cupos ===== */
@@ -224,7 +237,7 @@ export class Reservas {
     Id_Reserva: number | string,
     data: { cabeceraReserva: Partial<CabeceraReserva>; pasajeros: Pasajero[]; pagos: any[] },
     archivos: { completo?: File | null; abonos?: (File | null)[] }
-  ): Observable<{ success: boolean }> {
+  ): Observable<{ Id_Reserva: string; auditId?: number }> {
     const form = new FormData();
     form.append('payload', JSON.stringify(data));
 
@@ -235,20 +248,29 @@ export class Reservas {
     }
 
     // Usamos PUT para actualización completa (cámbialo a PATCH si tu backend lo prefiere)
-    return this.http.put<{ success: boolean }>(
+    return this.http.put<{ Id_Reserva: string; auditId?: number }>(
       `${this.apiUrl}/reservas/${Id_Reserva}`,
       form
     );
   }
 
   /** Verificar DNI duplicado para una fecha específica */
-  verificarDniDuplicado(dni: string, fecha: string): Observable<{ exists: boolean; reserva?: any }> {
-    const params = new HttpParams()
+  verificarDniDuplicado(dni: string, fecha: string, excludeReservaId?: string): Observable<{ exists: boolean; reserva?: any }> {
+    let params = new HttpParams()
       .set('dni', dni)
       .set('fecha', fecha);
+    if (excludeReservaId) {
+      params = params.set('excludeReservaId', excludeReservaId);
+    }
+
     return this.http.get<{ exists: boolean; reserva?: any }>(
       `${this.apiUrl}/reservas/verificar-dni`,
       { params }
     );
+  }
+
+  getReservaHistorial(Id_Reserva: number | string, limit = 25): Observable<ReservaHistorialCambio[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<ReservaHistorialCambio[]>(`${this.apiUrl}/reservas/${Id_Reserva}/historial-cambios`, { params });
   }
 }

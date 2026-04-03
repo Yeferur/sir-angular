@@ -15,6 +15,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 })
 export class CrearPuntoComponent {
   isLoading = false;
+  isSubmitting = signal(false);
   successMsg = '';
   errorMsg = '';
 
@@ -41,7 +42,7 @@ export class CrearPuntoComponent {
   }
 
 onSubmitCrearPunto() {
-  if (this.isLoading) return;
+  if (this.isSubmitting()) return;
 
   this.successMsg = '';
   this.errorMsg = '';
@@ -63,49 +64,27 @@ onSubmitCrearPunto() {
       ? `Revisa los siguientes campos: ${fields.join(', ')}`
       : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.alert?.set?.({
-      type: 'error',
-      title: 'Campos inválidos',
-      message: msg,
-      autoClose: false,
-      buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }]
-    });
+    this.navbar.warningToast('Campos inválidos', msg);
     return;
   }
 
   // 2) duplicado antes de preguntar
   if (this.isDuplicate) {
-    this.navbar.alert?.set?.({
-      type: 'error',
-      title: 'Punto duplicado',
-      message: 'Ya existe un punto con esa dirección',
-      autoClose: false,
-      buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }]
-    });
+    this.navbar.warningToast('Punto duplicado', 'Ya existe un punto con esa dirección');
     return;
   }
 
-  // 3) confirmación SOLO si todo está OK
-  this.navbar.alert?.set?.({
-    type: 'info',
-    title: '¿Todo listo?',
-    message: '¿Deseas crear este punto de recogida?',
-    autoClose: false,
-    buttons: [
-      { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) },
-      { text: 'Crear', style: 'primary', onClick: () => { this.navbar.alert?.set?.(null); this.crearPuntoConfirmado(); } }
-    ]
-  });
+  this.crearPuntoConfirmado();
 }
 
-// Se llama SOLO desde el botón "Crear" del modal
 private crearPuntoConfirmado() {
-  if (this.isLoading) return;
+  if (this.isSubmitting()) return;
 
   // Seguridad extra: si algo cambió entre confirmación y click
   if (this.form.invalid || this.isDuplicate) return;
 
   this.isLoading = true;
+  this.isSubmitting.set(true);
 
   const payload: any = { ...this.form.value };
   payload.horarios = (this.tours() || []).map((t: any) => ({
@@ -115,19 +94,21 @@ private crearPuntoConfirmado() {
 
   this.puntos.crearPunto(payload).subscribe({
     next: () => {
-      this.navbar.alert?.set?.({ type: 'success', title: 'Punto creado', message: 'Punto creado correctamente', autoClose: true });
+      this.navbar.successToast('Punto creado', 'Punto creado correctamente');
 
       this.form.reset();
+      this.form.markAsPristine();
       this.isDuplicate = false;
       this.duplicatePoint = null;
-
-      setTimeout(() => this.router.navigate(['/Puntos/VerPuntos']), 900);
+      this.router.navigate(['/Puntos/VerPuntos']);
     },
     error: (err: any) => {
-    
-      this.navbar.alert?.set?.({ type: 'error', title: 'Error', message: 'Error al crear el punto', autoClose: false });
+      this.navbar.errorToast('Error', 'Error al crear el punto');
     },
-    complete: () => (this.isLoading = false)
+    complete: () => {
+      this.isLoading = false;
+      this.isSubmitting.set(false);
+    }
   });
 }
 
@@ -140,7 +121,6 @@ private crearPuntoConfirmado() {
       this.isDuplicate = false;
       this.duplicatePoint = null;
       ctrl?.setErrors(null);
-      this.navbar.alert?.set?.(null);
       return;
     }
 
@@ -157,30 +137,23 @@ private crearPuntoConfirmado() {
             this.isDuplicate = true;
             this.duplicatePoint = foundItem;
             ctrl?.setErrors({ duplicate: true });
-            this.navbar.alert?.set?.({
-              type: 'error',
-              title: 'Punto duplicado',
-              message: `${foundItem.Nombre_Punto || foundItem.NombrePunto || 'Punto'} — ${foundItem.Direccion || ''}`,
-              autoClose: false,
-              buttons: [
-                { text: 'Ver punto', style: 'primary', onClick: () => { this.navbar.alert?.set?.(null); this.router.navigate(['/Puntos/VerPuntos'], { queryParams: { q: foundItem.Direccion || '' } }); } },
-                { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }
-              ]
-            });
+            this.navbar.warningToast('Punto duplicado', `${foundItem.Nombre_Punto || foundItem.NombrePunto || 'Punto'} - ${foundItem.Direccion || ''}`);
           } else {
             this.isDuplicate = false;
             this.duplicatePoint = null;
             ctrl?.setErrors(null);
-            this.navbar.alert?.set?.(null);
           }
         },
         error: () => {
           this.isDuplicate = false;
           ctrl?.setErrors(null);
-          this.navbar.alert?.set?.(null);
         }
       });
     }, 450);
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 
   // Normaliza una dirección: quita acentos, puntuación, múltiples espacios y pasa a minúsculas

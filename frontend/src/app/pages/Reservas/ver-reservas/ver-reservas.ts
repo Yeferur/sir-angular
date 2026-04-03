@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
@@ -283,6 +283,19 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   ngOnInit(): void {
     this.loadInitialData();
+
+    effect(() => {
+      const entity = this.navbar.needsRefresh();
+      if (entity === 'reservas') {
+        this.listar();
+      }
+    });
+  }
+
+  listar() {
+    if (this.filtersApplied()) {
+      this.buscarReservas();
+    }
   }
 
   loadInitialData() {

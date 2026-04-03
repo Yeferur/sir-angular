@@ -1,5 +1,6 @@
 const { obtenerPuntos, obtenerPuntosQuery, obtenerHorario, obtenerHorariosPorPunto, obtenerPuntosPorDireccion, crearPunto, crearHorariosParaPunto, obtenerPuntoPorId, actualizarPunto, eliminarPunto } = require('../../services/Puntos/puntos.service');
 const ExcelJS = require('exceljs');
+const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 exports.exportarPuntosExcel = async (req, res) => {
   const q = req.query.q || '';
@@ -33,7 +34,7 @@ exports.exportarPuntosExcel = async (req, res) => {
     res.end();
   } catch (error) {
     console.error('Error al exportar puntos a Excel:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'EXPORT_FAILED' });
   }
 };
 
@@ -44,10 +45,10 @@ exports.getPuntos = async (req, res) => {
 
   try {
     const result = await obtenerPuntos({ page, limit, q });
-    res.json({ data: result.rows, total: result.total });
+    return sendSuccess(res, { data: { data: result.rows, total: result.total }, message: 'Puntos obtenidos correctamente' });
   } catch (error) {
     console.error('Error al obtener puntos:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -55,10 +56,10 @@ exports.getPuntosQuery = async (req, res) => {
   const query = req.query.query || "";
   try {
     const puntos = await obtenerPuntosQuery(query);
-    res.json(puntos);
+    return sendSuccess(res, { data: puntos, message: 'Puntos obtenidos correctamente' });
   } catch (error) {
     console.error('Error al obtener puntos:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -66,10 +67,10 @@ exports.getPuntosByDireccion = async (req, res) => {
   const direccion = req.query.direccion || '';
   try {
     const puntos = await obtenerPuntosPorDireccion(direccion);
-    res.json(puntos);
+    return sendSuccess(res, { data: puntos, message: 'Puntos obtenidos correctamente' });
   } catch (error) {
     console.error('Error al buscar punto por direccion:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -78,23 +79,23 @@ exports.getHorario = async (req, res) => {
   console.log(Id_Punto, Id_Tour);
   try {
     const horario = await obtenerHorario(Id_Punto, Id_Tour);
-    res.json(horario);
+    return sendSuccess(res, { data: horario, message: 'Horario obtenido correctamente' });
     console.log(horario);
   } catch (error) {
     console.error('Error al obtener horario:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
 exports.getHorariosPorPunto = async (req, res) => {
   const Id_Punto = req.query.Id_Punto;
-  if (!Id_Punto) return res.status(400).json({ error: 'Id_Punto es requerido' });
+  if (!Id_Punto) return sendError(res, { status: 400, message: 'Id_Punto es requerido', errorCode: 'MISSING_PARAMS' });
   try {
     const horarios = await obtenerHorariosPorPunto(Id_Punto);
-    res.json(horarios);
+    return sendSuccess(res, { data: horarios, message: 'Horarios obtenidos correctamente' });
   } catch (error) {
     console.error('Error al obtener horarios por punto:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -102,7 +103,7 @@ exports.createPunto = async (req, res) => {
   const { NombrePunto, Nombre_Punto, Sector, Direccion, Latitud, Longitud } = req.body || {};
   const nombre = NombrePunto || Nombre_Punto;
   if (!nombre || String(nombre).trim().length === 0) {
-    return res.status(400).json({ error: 'Nombre del punto es requerido' });
+    return sendError(res, { status: 400, message: 'Nombre del punto es requerido', errorCode: 'MISSING_PARAMS' });
   }
 
   const payload = {
@@ -128,10 +129,10 @@ exports.createPunto = async (req, res) => {
       }
     }
 
-    res.status(201).json({ message: 'Punto creado', insertId });
+    return sendSuccess(res, { data: { insertId }, message: 'Punto creado correctamente', status: 201 });
   } catch (error) {
     console.error('Error al crear punto:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -139,11 +140,11 @@ exports.getPuntoById = async (req, res) => {
   const id = req.params.id;
   try {
     const punto = await obtenerPuntoPorId(id);
-    if (!punto) return res.status(404).json({ error: 'Punto no encontrado' });
-    res.json(punto);
+    if (!punto) return sendError(res, { status: 404, message: 'Punto no encontrado', errorCode: 'NOT_FOUND' });
+    return sendSuccess(res, { data: punto, message: 'Punto obtenido correctamente' });
   } catch (err) {
     console.error('Error al obtener punto por id:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -153,10 +154,10 @@ exports.updatePunto = async (req, res) => {
     const userId = req.user?.id || null;
     const payload = req.body || {};
     await actualizarPunto(id, payload, userId);
-    res.json({ message: 'Punto actualizado' });
+    return sendSuccess(res, { data: null, message: 'Punto actualizado correctamente' });
   } catch (err) {
     console.error('Error al actualizar punto:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };
 
@@ -165,9 +166,9 @@ exports.deletePunto = async (req, res) => {
   try {
     const userId = req.user?.id || null;
     await eliminarPunto(id, userId);
-    res.json({ message: 'Punto eliminado' });
+    return sendSuccess(res, { data: null, message: 'Punto eliminado correctamente' });
   } catch (err) {
     console.error('Error al eliminar punto:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };

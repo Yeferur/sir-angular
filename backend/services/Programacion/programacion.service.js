@@ -12,9 +12,6 @@ const CONFIG = {
     GRAFO_PATH: 'grafo_antioquia.json',
 };
 
-const R_TIERRA = 6371;
-let grafoCache = null;
-
 // =================================================================
 // --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
 // =================================================================
@@ -22,31 +19,36 @@ async function obtenerReservas(fecha, idsTours) {
     // Normalizar a array si viene un solo ID
     const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
 
-    // Adaptado a la nueva estructura: pasajeros por reserva, puntos por pasajero
-    // Se agrupa por reserva y se cuenta el número de pasajeros
     const sql = `
-            SELECT r.Id_Reserva, h.Id_Tour, r.Fecha_Tour, r.Estado, r.Tipo_Reserva,
-                         COUNT(p.Id_Pasajero) AS NumeroPasajeros,
-                         MIN(p.Id_Punto) AS Id_Punto, -- Tomamos el primer punto de los pasajeros
-                         MIN(pt.Latitud) AS Latitud, MIN(pt.Longitud) AS Longitud, MIN(pt.Nombre_Punto) AS NombrePunto
-            FROM reservas r
-            LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
-            JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-            LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
-            WHERE r.Fecha_Tour = ? AND h.Id_Tour IN (?)
-                AND r.Estado IN ('Pendiente', 'Confirmada', 'PendienteDatos', 'Completada')
-                AND r.Tipo_Reserva = 'Grupal'
-            GROUP BY r.Id_Reserva
-        `;
-
+        SELECT
+            r.Id_Reserva,
+            h.Id_Tour,
+            r.Fecha_Tour,
+            r.Estado,
+            r.Tipo_Reserva,
+            COUNT(p.Id_Pasajero) AS NumeroPasajeros,
+            MIN(p.Id_Punto) AS Id_Punto,
+            MIN(pt.Nombre_Punto) AS NombrePunto,
+            MIN(pt.Latitud) AS Latitud,
+            MIN(pt.Longitud) AS Longitud
+        FROM reservas r
+        INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+        LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+        WHERE r.Fecha_Tour = ?
+          AND h.Id_Tour IN (?)
+          AND r.Estado NOT IN ('Cancelada', 'Rechazada')
+          AND r.Tipo_Reserva = 'Grupal'
+        GROUP BY r.Id_Reserva, h.Id_Tour, r.Fecha_Tour, r.Estado, r.Tipo_Reserva
+    `;
 
     try {
         const [rows] = await db.query(sql, [fecha, tours]);
-        return rows.map(r => ({
+        return (rows || []).map(r => ({
             ...r,
             NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
-            Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
-            Longitud: r.Longitud ? parseFloat(r.Longitud) : null
+            Latitud: r.Latitud !== null && r.Latitud !== undefined ? Number(r.Latitud) : null,
+            Longitud: r.Longitud !== null && r.Longitud !== undefined ? Number(r.Longitud) : null,
         }));
     } catch (error) {
         console.error("Error al obtener reservas:", error);
@@ -54,260 +56,100 @@ async function obtenerReservas(fecha, idsTours) {
     }
 }
 
-function haversine(lat1, lon1, lat2, lon2) {
-    const toRad = deg => deg * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return R_TIERRA * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function calcularDistancia(lat1, lon1, lat2, lon2) {
+    const tieneCoords = (v) => Number.isFinite(Number(v));
+    if (!tieneCoords(lat1) || !tieneCoords(lon1) || !tieneCoords(lat2) || !tieneCoords(lon2)) {
+        return Number.MAX_VALUE;
+    }
+
+    const toRad = (deg) => (Number(deg) * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(Number(lat2) - Number(lat1));
+    const dLon = toRad(Number(lon2) - Number(lon1));
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
-
-// =================================================================
-// --- NÚCLEO DE LA LÓGICA DE CLUSTERING ---
-// =================================================================
-
-/**
- * Agrupa las reservas en clusters geográficos, donde cada cluster representa la ruta de un bus.
- * @param {Array<Object>} reservas - Todas las reservas a planificar.
- * @returns {Array<Object>} Un array de clusters, cada uno con sus reservas y total de pasajeros.
- */
-// En la función crearClustersDeRutas, la corrección es esta:
-function dbscan(reservas, epsKm, minPts) {
-    const clusters = [];
-    const visited = new Set();
-    const assigned = new Map();
-
-    function regionQuery(p) {
-        const vecinos = [];
-        for (const q of reservas) {
-            if (haversine(p.Latitud, p.Longitud, q.Latitud, q.Longitud) <= epsKm) {
-                vecinos.push(q);
-            }
-        }
-        return vecinos;
-    }
-
-    function expandCluster(p, vecinos, cluster) {
-        cluster.push(p);
-        assigned.set(p, cluster);
-
-        for (let i = 0; i < vecinos.length; i++) {
-            const v = vecinos[i];
-            if (!visited.has(v)) {
-                visited.add(v);
-                const vecinosV = regionQuery(v);
-                if (vecinosV.length >= minPts) {
-                    vecinos.push(...vecinosV.filter(x => !vecinos.includes(x)));
-                }
-            }
-            if (!assigned.has(v)) {
-                cluster.push(v);
-                assigned.set(v, cluster);
-            }
-        }
-    }
-
-    for (const p of reservas) {
-        if (visited.has(p)) continue;
-        visited.add(p);
-
-        const vecinos = regionQuery(p);
-        if (vecinos.length < minPts) {
-            clusters.push([p]);
-            assigned.set(p, [p]);
-        } else {
-            const cluster = [];
-            expandCluster(p, vecinos, cluster);
-            clusters.push(cluster);
-        }
-    }
-
-    return clusters;
-}
-
-function crearClustersDeRutas(reservas) {
-    const zonas = dbscan(reservas, 1.5, 2);
-    const clustersFinales = [];
-
-    for (const zona of zonas) {
-        const pendientes = new Set(zona);
-
-        while (pendientes.size > 0) {
-            let seed = null;
-            let minDist = Infinity;
-
-            for (const r of pendientes) {
-                const d = haversine(CONFIG.PUNTO_BASE.lat, CONFIG.PUNTO_BASE.lon, r.Latitud, r.Longitud);
-                if (d < minDist) {
-                    minDist = d;
-                    seed = r;
-                }
-            }
-
-            if (!seed) break;
-
-            const cluster = {
-                reservas: [seed],
-                totalPasajeros: seed.NumeroPasajeros
-            };
-
-            pendientes.delete(seed);
-            let ultimo = seed;
-
-            let crecer = true;
-            while (crecer && pendientes.size > 0) {
-                let siguiente = null;
-                let mejorScore = Infinity;
-
-                for (const r of pendientes) {
-                    const nuevaCarga = cluster.totalPasajeros + r.NumeroPasajeros;
-                    const busDisponible = CONFIG.CAPACIDADES_BUSES.find(c => c >= nuevaCarga);
-                    if (!busDisponible) continue;
-
-                    const d = haversine(ultimo.Latitud, ultimo.Longitud, r.Latitud, r.Longitud);
-                    const desperdicio = busDisponible - nuevaCarga;
-                    const score = d + desperdicio * 0.05;
-
-                    if (score < mejorScore) {
-                        mejorScore = score;
-                        siguiente = r;
-                    }
-                }
-
-                if (siguiente) {
-                    cluster.reservas.push(siguiente);
-                    cluster.totalPasajeros += siguiente.NumeroPasajeros;
-                    pendientes.delete(siguiente);
-                    ultimo = siguiente;
-                } else {
-                    crecer = false;
-                }
-            }
-
-            clustersFinales.push(cluster);
-        }
-    }
-
-    return clustersFinales;
-}
-
-
-
-/**
- * Asigna el bus más pequeño y eficiente que pueda manejar la carga de pasajeros de un cluster.
- * @param {number} totalPasajeros - El número de pasajeros en el cluster.
- * @returns {number|null} La capacidad del bus ideal, o null si ninguno es suficientemente grande.
- */
-function asignarMejorBus(totalPasajeros) {
-    for (const capacidad of CONFIG.CAPACIDADES_BUSES) {
-        if (capacidad >= totalPasajeros) {
-            return capacidad;
-        }
-    }
-    // Esto solo ocurriría si un solo grupo de reserva excede la capacidad máxima,
-    // lo cual debería ser validado en la entrada de datos.
-    return null;
-}
-
-/**
- * Optimiza el orden de las paradas de un bus usando el algoritmo 2-opt para rutas más cortas.
- * @param {Array<Object>} paradas - Las paradas (reservas) asignadas a un bus.
- * @returns {Array<Object>} Las paradas en un orden de ruta optimizado.
- */
-function optimizarRuta2Opt(paradas) {
-    if (paradas.length < 3) return paradas;
-
-    let rutaActual = [CONFIG.PUNTO_BASE, ...paradas];
-    let mejora = true;
-
-    while (mejora) {
-        mejora = false;
-        for (let i = 1; i < rutaActual.length - 2; i++) {
-            for (let k = i + 1; k < rutaActual.length - 1; k++) {
-                const p1 = rutaActual[i - 1], p2 = rutaActual[i];
-                const p3 = rutaActual[k], p4 = rutaActual[k + 1];
-
-                const distOriginal = haversine(p1.Latitud, p1.Longitud, p2.Latitud, p2.Longitud) + haversine(p3.Latitud, p3.Longitud, p4.Latitud, p4.Longitud);
-                const distNueva = haversine(p1.Latitud, p1.Longitud, p3.Latitud, p3.Longitud) + haversine(p2.Latitud, p2.Longitud, p4.Latitud, p4.Longitud);
-
-                if (distNueva < distOriginal) {
-                    const segmentoInvertido = rutaActual.slice(i, k + 1).reverse();
-                    rutaActual = [...rutaActual.slice(0, i), ...segmentoInvertido, ...rutaActual.slice(k + 1)];
-                    mejora = true;
-                }
-            }
-        }
-    }
-    return rutaActual.slice(1); // Remover el punto base del inicio
-}
-
 
 async function generarPlanLogistico(fecha, idsTours) {
     try {
         const reservas = await obtenerReservas(fecha, idsTours);
-        if (reservas.length === 0) {
-            return { analisis: { fecha, idsTours, totalPasajeros: 0, totalReservas: 0 }, sugerencias: [], mensaje: "No hay pasajeros para planificar." };
-        }
+        const reservasPendientes = [...reservas];
+        if (reservasPendientes.length === 0) return [];
 
-        const totalPasajeros = reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
+        const buses = [];
+        let contadorBus = 1;
+        const CAPACIDAD_BUS = 38;
 
-        // 1. Agrupar todas las reservas en clusters geográficos
-        const clusters = crearClustersDeRutas(reservas);
-
-        // 2. Procesar cada cluster en paralelo para asignarle un bus y optimizar su ruta
-        const promesasDeBuses = clusters.map(async (cluster, index) => {
-            const capacidadBus = asignarMejorBus(cluster.totalPasajeros);
-            if (!capacidadBus) {
-                // Devolver un error si un cluster no puede ser atendido
-                return { error: `El cluster ${index + 1} con ${cluster.totalPasajeros} pasajeros excede la capacidad máxima de los buses.` };
+        while (reservasPendientes.length > 0) {
+            let idxSemilla = 0;
+            for (let i = 1; i < reservasPendientes.length; i++) {
+                const paxActual = Number(reservasPendientes[i].NumeroPasajeros || 0);
+                const paxSemilla = Number(reservasPendientes[idxSemilla].NumeroPasajeros || 0);
+                if (paxActual > paxSemilla) {
+                    idxSemilla = i;
+                }
             }
 
-            const rutaOptimizada = optimizarRuta2Opt(cluster.reservas);
-
-            let distanciaRuta = 0;
-            let puntoAnterior = { lat: CONFIG.PUNTO_BASE.lat, lon: CONFIG.PUNTO_BASE.lon };
-            for (const parada of rutaOptimizada) {
-                distanciaRuta += haversine(puntoAnterior.lat, puntoAnterior.lon, parada.Latitud, parada.Longitud);
-                puntoAnterior = { lat: parada.Latitud, lon: parada.Longitud };
-            }
-
-            return {
-                capacidad: capacidadBus,
-                ocupados: cluster.totalPasajeros,
-                porcentajeOcupacion: ((cluster.totalPasajeros / capacidadBus) * 100).toFixed(1) + '%',
-                reservas: rutaOptimizada,
-                distanciaKm: parseFloat(distanciaRuta.toFixed(2))
+            const [reservaSemilla] = reservasPendientes.splice(idxSemilla, 1);
+            const nuevoBus = {
+                id: `Bus ${contadorBus}`,
+                capacidad: CAPACIDAD_BUS,
+                ocupados: Number(reservaSemilla.NumeroPasajeros || 0),
+                reservas: [reservaSemilla],
+                guia: ''
             };
-        });
 
-        const busesListos = await Promise.all(promesasDeBuses);
+            let referencia = reservaSemilla;
 
-        // Manejar posibles errores de asignación
-        const busesConError = busesListos.filter(b => b.error);
-        if (busesConError.length > 0) {
-            const mensajeError = busesConError.map(b => b.error).join('; ');
-            throw new Error(mensajeError);
+            while (nuevoBus.ocupados < CAPACIDAD_BUS) {
+                const espacioRestante = CAPACIDAD_BUS - nuevoBus.ocupados;
+                let mejorIdx = -1;
+                let mejorDistancia = Number.MAX_VALUE;
+                let mejorPax = -1;
+
+                for (let i = 0; i < reservasPendientes.length; i++) {
+                    const candidata = reservasPendientes[i];
+                    const pax = Number(candidata.NumeroPasajeros || 0);
+                    if (pax > espacioRestante) continue;
+
+                    const distancia = calcularDistancia(
+                        referencia.Latitud,
+                        referencia.Longitud,
+                        candidata.Latitud,
+                        candidata.Longitud
+                    );
+
+                    if (
+                        distancia < mejorDistancia ||
+                        (distancia === mejorDistancia && pax > mejorPax)
+                    ) {
+                        mejorDistancia = distancia;
+                        mejorPax = pax;
+                        mejorIdx = i;
+                    }
+                }
+
+                if (mejorIdx === -1) break;
+
+                const [reservaSeleccionada] = reservasPendientes.splice(mejorIdx, 1);
+                nuevoBus.reservas.push(reservaSeleccionada);
+                nuevoBus.ocupados += Number(reservaSeleccionada.NumeroPasajeros || 0);
+                referencia = reservaSeleccionada;
+            }
+
+            buses.push(nuevoBus);
+            contadorBus += 1;
         }
 
-        // 3. Consolidar los resultados en la sugerencia final
-        const sugerenciaFinal = {
-            combinacion: busesListos.map(b => b.capacidad).sort((a, b) => a - b),
-            buses: busesListos,
-            totalBuses: busesListos.length,
-            distanciaTotalKm: parseFloat(busesListos.reduce((sum, b) => sum + b.distanciaKm, 0).toFixed(2))
-        };
-
-        sugerenciaFinal.buses.sort((a, b) => a.distanciaKm - b.distanciaKm);
-
-        return {
-            analisis: { fecha, idsTours, totalPasajeros, totalReservas: reservas.length },
-            sugerencias: [sugerenciaFinal], // Se genera una única solución optimizada
-            mensaje: `Se generó un plan logístico óptimo con ${sugerenciaFinal.totalBuses} buses.`
-        };
+        return buses;
 
     } catch (error) {
         console.error("Fallo crítico en la generación del plan logístico:", error);
-        return { error: true, sugerencias: [], mensaje: error.message || "Ocurrió un error inesperado al procesar la solicitud." };
+        throw new Error(error.message || "Ocurrió un error inesperado al procesar la solicitud.");
     }
 }
 
@@ -351,6 +193,7 @@ async function guardarListadoFinal({ fecha, idsTours, buses }) {
 
         const fechaCreacion = `${fecha} 00:00:00`;
         let reservasActualizadas = 0;
+        const updatesMasivos = [];
 
         for (let i = 0; i < buses.length; i++) {
             const bus = buses[i] || {};
@@ -375,13 +218,23 @@ async function guardarListadoFinal({ fecha, idsTours, buses }) {
                     const idReserva = reserva?.Id_Reserva;
                     if (!idReserva) continue;
 
-                    await conn.query(
-                        `UPDATE reservas SET Placa_Bus = ?, Orden_Ruta = ? WHERE Id_Reserva = ?`,
-                        [placa, r + 1, idReserva]
-                    );
+                    updatesMasivos.push([idReserva, placa, r + 1]);
                     reservasActualizadas += 1;
                 }
             }
+        }
+
+        if (updatesMasivos.length > 0) {
+            const valuesSql = updatesMasivos.map(() => '(?, ?, ?)').join(', ');
+            const params = updatesMasivos.flat();
+            await conn.query(
+                `INSERT INTO reservas (Id_Reserva, Placa_Bus, Orden_Ruta)
+                 VALUES ${valuesSql}
+                 ON DUPLICATE KEY UPDATE
+                    Placa_Bus = VALUES(Placa_Bus),
+                    Orden_Ruta = VALUES(Orden_Ruta)`,
+                params
+            );
         }
 
         await conn.commit();

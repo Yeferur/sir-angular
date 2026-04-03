@@ -13,7 +13,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectorRef, signal } from '@angular/core';
 import { Tours } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
@@ -85,6 +85,7 @@ type EditarTourFullPayload = {
 })
 export class EditarTourComponent implements OnInit {
   isLoading = false;
+  isSubmitting = signal(false);
   loadingData = true;
 
   tourId = 0;
@@ -311,22 +312,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       this.tourId = Number(params['id']) || 0;
 
       if (!this.tourId) {
-        this.navbar.alert?.set?.({
-          type: 'error',
-          title: 'Error',
-          message: 'ID de tour inválido',
-          autoClose: false,
-          buttons: [
-            {
-              text: 'Volver',
-              style: 'primary',
-              onClick: () => {
-                this.navbar.alert?.set?.(null);
-                this.router.navigate(['/Tours/VerTours']);
-              },
-            },
-          ],
-        });
+        this.navbar.errorToast('Error', 'ID de tour inválido');
+        this.router.navigate(['/Tours/VerTours']);
         return;
       }
 
@@ -863,22 +850,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       },
       error: (err) => {
         this.loadingData = false;
-        this.navbar.alert?.set?.({
-          type: 'error',
-          title: 'Error al cargar tour',
-          message: err?.error?.error || 'No se pudo cargar la información del tour',
-          autoClose: false,
-          buttons: [
-            {
-              text: 'Volver',
-              style: 'primary',
-              onClick: () => {
-                this.navbar.alert?.set?.(null);
-                this.router.navigate(['/Tours/VerTours']);
-              },
-            },
-          ],
-        });
+        this.navbar.errorToast('Error al cargar tour', err?.error?.error || 'No se pudo cargar la información del tour');
+        this.router.navigate(['/Tours/VerTours']);
       },
     });
   }
@@ -932,7 +905,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
    * SUBMIT
    * ========================================================= */
   onSubmitEditarTour(): void {
-    if (this.isLoading) return;
+    if (this.isSubmitting()) return;
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -959,33 +932,27 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   private editarTourConfirmado(): void {
-    if (this.isLoading || this.form.invalid) return;
+    if (this.isSubmitting() || this.form.invalid) return;
 
-    this.isLoading = true;
+    this.isSubmitting.set(true);
 
     const payload = this.buildUpdateTourPayload();
 
     this.tours.updateTour(this.tourId, payload as any).subscribe({
       next: () => {
-        this.navbar.alert?.set?.({
-          type: 'success',
-          title: 'Tour actualizado',
-          message: 'El tour ha sido actualizado exitosamente.',
-          autoClose: true,
-        });
-        setTimeout(() => this.router.navigate(['/Tours/VerTours']), 900);
+        this.navbar.successToast('Tour actualizado', 'El tour ha sido actualizado exitosamente.');
+        this.form.markAsPristine();
+        this.router.navigate(['/Tours/VerTours']);
       },
       error: (err) => {
         console.error('Error al actualizar tour:', err);
-        this.navbar.alert?.set?.({
-          type: 'error',
-          title: 'Error',
-          message: err?.error?.error || err?.error?.message || 'Error al actualizar el tour',
-          autoClose: false,
-          buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
-        });
+        this.navbar.errorToast('Error al actualizar tour', err?.error?.error || err?.error?.message || 'Error al actualizar el tour');
       },
-      complete: () => (this.isLoading = false),
+      complete: () => this.isSubmitting.set(false),
     });
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form?.dirty && !this.isSubmitting();
   }
 }

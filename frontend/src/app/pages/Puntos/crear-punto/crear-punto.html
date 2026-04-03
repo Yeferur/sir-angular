@@ -11,8 +11,8 @@
           </div>
 
           <div class="header-actions">
-            <button class="btn-primary" type="submit" [disabled]="isLoading">
-              {{ isLoading ? 'Guardando...' : 'Crear Punto' }}
+            <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
+              {{ isSubmitting() ? 'Guardando...' : 'Crear Punto' }}
             </button>
           </div>
         </div>
