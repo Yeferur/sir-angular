@@ -112,3 +112,4 @@ export class DynamicNavbarComponent implements OnInit {
   }
 
 }
+ 
