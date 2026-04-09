@@ -26,6 +26,9 @@ export type PrecioMap = Partial<Record<'ADULTO' | 'NINO' | 'INFANTE', number>>;
 export interface Punto {
   Id_Punto: number;
   NombrePunto: string;
+  ruta?: string | null;
+  Latitud?: number | string | null;
+  Longitud?: number | string | null;
 }
 
 /** ==== Tipos para Detalle de Reserva (edición) ==== */
@@ -272,5 +275,9 @@ export class Reservas {
   getReservaHistorial(Id_Reserva: number | string, limit = 25): Observable<ReservaHistorialCambio[]> {
     const params = new HttpParams().set('limit', String(limit));
     return this.http.get<ReservaHistorialCambio[]>(`${this.apiUrl}/reservas/${Id_Reserva}/historial-cambios`, { params });
+  }
+
+  eliminarComprobantePagoReserva(Id_Reserva: number | string, Id_Pago: number | string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/reservas/${Id_Reserva}/pagos/${Id_Pago}/comprobante`);
   }
 }

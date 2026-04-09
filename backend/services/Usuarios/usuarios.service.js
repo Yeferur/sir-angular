@@ -69,10 +69,22 @@ async function deleteUser(id) {
   return result;
 }
 
+/**
+ * Obtener solo el Avatar de un usuario
+ */
+async function getAvatarByUserId(userId) {
+  const [rows] = await db.query(
+    'SELECT Avatar FROM usuarios WHERE Id_Usuario = ?',
+    [userId]
+  );
+  return rows.length > 0 ? rows[0].Avatar : null;
+}
+
 module.exports = {
   getAllUsers,
   getActiveSessions,
   getUserById,
-  deleteUser
+  deleteUser,
+  getAvatarByUserId,
 };
 

@@ -907,14 +907,53 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   onSubmitEditarTour(): void {
     if (this.isSubmitting()) return;
 
+    this.form.updateValueAndValidity({ emitEvent: false });
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+
+      const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
+
+      let pricingInvalid = false;
+      try {
+        for (let p = 0; p < this.plans.length; p++) {
+          const plan = this.plans.at(p) as FormGroup;
+          if (plan.get('Nombre_Plan')?.invalid) { pricingInvalid = true; break; }
+          const currencies = plan.get('monedas') as FormArray;
+          for (let i = 0; i < currencies.length; i++) {
+            const cg = currencies.at(i) as FormGroup;
+            if (cg.get('ADULTO')?.invalid || cg.get('NINO')?.invalid || cg.get('INFANTE')?.invalid) { pricingInvalid = true; break; }
+          }
+          if (pricingInvalid) break;
+        }
+      } catch (_err) {
+        // noop
+      }
+
+      if (pricingInvalid && invalid.indexOf('planes') === -1) invalid.push('planes');
+
+      const friendly: Record<string, string> = {
+        Nombre_Tour: 'Nombre del Tour',
+        Abreviacion: 'Abreviacion',
+        Cupo_Base: 'Cupo Base',
+        Latitud: 'Latitud',
+        Longitud: 'Longitud',
+        Modo_Disponibilidad: 'Modo de disponibilidad',
+        planes: 'Planes y precios',
+        temporadas: 'Temporadas'
+      };
+
+      const fields = invalid.map((f) => friendly[f] || f);
+      const msg = fields.length
+        ? `Revisa los siguientes campos: ${fields.join(', ')}`
+        : 'Hay campos invalidos en el formulario.';
+
       this.navbar.alert?.set?.({
         type: 'error',
-        title: 'Campos inválidos',
-        message: 'Revisa los campos del formulario.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
+        title: 'Campos requeridos incompletos',
+        message: msg,
+        autoClose: true,
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert?.set?.(null) }],
       });
       return;
     }

@@ -574,20 +574,6 @@ this.navbar.alert.set({
       payloadGen.idTour = tour.Id_Tour;
     }
 
-    // Adaptamos generarPlanLogistico para aceptar payload objeto o (fecha, id)
-    // Pero el servicio `generarPlanLogistico` actual firma es (fecha, idTour).
-    // Necesitamos modificar esa llamada o sobrecargar.
-    // Como ProgramacionDashboardService.generarPlanLogistico espera (fecha, idTour),
-    // y ahora queremos pasar idsTours.
-    // OPCION: Pasar el array en el 2do argumento y confiar que el servicio lo mande.
-    // El servicio hace: `payload = { fecha, idTour }`. Si paso idTour = [1,5], payload={fecha, idTour: [1,5]}.
-    // El backend espera `idsTours` o `idTour`.
-
-    // Mejor solución rápida: Si es array, pasarlo como idTour en la función existente, 
-    // PERO el servicio frontend dice `generarPlanLogistico(fecha: string, idTour: number)`.
-    // TypeScript se quejará si paso array.
-    // Debemos modificar el servicio frontend si queremos tipado correcto, o castear a `any`.
-
     this.programacionService.generarPlanLogistico(this.fechaSeleccionada, ((tour as any).idsTours || tour.Id_Tour) as any).subscribe({
       next: (plan: any) => {
         const esFormatoNuevo = Array.isArray(plan);

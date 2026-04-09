@@ -93,6 +93,10 @@ export class VerPuntos implements OnInit {
     this.router.navigate(['/Puntos/NuevoPunto']);
   }
 
+  irAOrdenarPuntos() {
+    this.router.navigate(['/Puntos/OrdenarPuntos']);
+  }
+
   editarPunto(p: Punto) {
     const id = Number((p as any).Id_Punto || (p as any).IdPunto);
     if (!isNaN(id)) {

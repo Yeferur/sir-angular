@@ -1,0 +1,51 @@
+<div class="ordenar-page">
+  <div class="page-header">
+    <div>
+      <h1>Ordenar Puntos por Ruta</h1>
+      <p>Arrastra y suelta para reorganizar el orden visual de los puntos.</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field">
+      <label for="ruta">Ruta</label>
+      <select id="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="rutaSeleccionada = $event; onRutaChange()"
+        [disabled]="isLoadingRutas() || isLoadingPuntos() || isSaving()">
+        <option value="" disabled>Seleccionar ruta...</option>
+        @for (ruta of rutas(); track ruta) {
+        <option [value]="ruta">Ruta {{ ruta }}</option>
+        }
+      </select>
+    </div>
+
+    <button class="btn-save" type="button" (click)="guardarOrden()"
+      [disabled]="isSaving() || isLoadingPuntos() || !puntos().length || !hasPendingOrderChanges()">
+      {{ isSaving() ? 'Guardando...' : 'Guardar Orden' }}
+    </button>
+  </div>
+
+  @if (isLoadingPuntos()) {
+  <div class="empty-state">Cargando puntos...</div>
+  } @else if (!rutaSeleccionada) {
+  <div class="empty-state">Selecciona una ruta para cargar sus puntos.</div>
+  } @else if (!puntos().length) {
+  <div class="empty-state">No hay puntos registrados para esta ruta.</div>
+  } @else {
+  <div class="list-wrapper" cdkDropList [cdkDropListData]="puntos()" (cdkDropListDropped)="drop($event)">
+    @for (punto of puntos(); let i = $index; track trackByPuntoId($index, punto)) {
+    <div class="point-card" cdkDrag>
+      <div class="grip" cdkDragHandle aria-label="Mover punto">
+        <span class="dot"></span><span class="dot"></span>
+        <span class="dot"></span><span class="dot"></span>
+        <span class="dot"></span><span class="dot"></span>
+      </div>
+
+      <div class="point-meta">
+        <div class="point-title">{{ i + 1 }}. {{ nombrePunto(punto) }}</div>
+        <div class="point-subtitle">{{ punto.Sector || 'Sin sector' }} · {{ punto.Direccion || 'Sin dirección' }}</div>
+      </div>
+    </div>
+    }
+  </div>
+  }
+</div>

@@ -177,7 +177,7 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13.875 18.825A10.05 10.05 0 01112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
+                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
                                     </svg>
                                     }
                                 </button>
@@ -205,8 +205,7 @@
                         <label class="form-label">Rol <span class="required-star">*</span></label>
                         <div class="field-foot">
                             <select class="form-select" formControlName="Id_Rol" autocomplete="off"
-                                (change)="onRolChange()"
-                                [disabled]="catalogLoading()"
+                                (change)="onRolChange()" [disabled]="catalogLoading()"
                                 [ngClass]="form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid ? 'errorInput' : ''">
                                 <option value="" disabled>Seleccionar un rol.</option>
                                 @for (r of roles; track r.Id_Rol) {

@@ -1,11 +1,13 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { filter } from 'rxjs/operators';
 
 import { UserService } from '../services/userdata';
 import { DynamicIslandGlobalService } from '../services/DynamicNavbar/global';
 import { AuthService } from '../services/Login/login-service';
 import { PermisosService } from '../services/Permisos/permisos.service';
+import { UsuariosService } from '../services/Usuarios/usuarios';
 import { PermisoDirective } from '../shared/directives/permiso.directive';
 
 @Component({
@@ -20,6 +22,7 @@ export class layout implements OnInit {
   private userService = inject(UserService);
   private navbar = inject(DynamicIslandGlobalService);
   private permisosService = inject(PermisosService);
+  private usuariosService = inject(UsuariosService);
   private authService = inject(AuthService);
   private router = inject(Router);
 
@@ -30,6 +33,7 @@ export class layout implements OnInit {
 
   // data state
   user = signal<any>(null);
+  avatarUrl = signal<string | null>(null);
 
   // ✅ CLAVE: no renderizar el menú hasta tener permisos cargados
   ready = signal(false);
@@ -57,6 +61,14 @@ export class layout implements OnInit {
         this.ready.set(true); // deja renderizar layout (mostrar login o lo que aplique)
         return;
       }
+
+      // 3.1) Cargar avatar real del perfil (persistido en DB)
+      this.refreshAvatar();
+
+      // 3.2) Mantener avatar sincronizado al navegar entre rutas
+      this.router.events
+        .pipe(filter((event) => event instanceof NavigationEnd))
+        .subscribe(() => this.refreshAvatar());
 
       await this.permisosService.loadSessionData();
 
@@ -120,5 +132,31 @@ export class layout implements OnInit {
     this.navbar?.alert?.set(null);
     this.navbar?.cuposInfo?.set(null);
     this.navbar?.Id_Reserva?.set(null);
+  }
+
+  private refreshAvatar(): void {
+    this.usuariosService.getMiPerfil().subscribe({
+      next: (perfil: any) => {
+        this.avatarUrl.set(perfil?.Avatar || null);
+      },
+      error: () => {
+        this.avatarUrl.set(null);
+      }
+    });
+  }
+
+  getUserInitials(): string {
+    const u = this.user();
+    const first = String(u?.name || '').trim();
+    const last = String(u?.apellidos || '').trim();
+
+    if (first || last) {
+      return `${first.charAt(0)}${last.charAt(0)}`.trim().toUpperCase() || '?';
+    }
+
+    const email = String(u?.email || '').trim();
+    if (email) return email.charAt(0).toUpperCase();
+
+    return '?';
   }
 }

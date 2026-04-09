@@ -20,6 +20,11 @@ export interface Punto {
   _deleting?: boolean;
 }
 
+export interface OrdenPuntoItem {
+  id_punto: number;
+  posicion: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -44,6 +49,18 @@ export class puntosService {
   buscarPuntos(term: string): Observable<any[]> {
     const params = new HttpParams().set('query', term);
     return this.http.get<any[]>(`${this.baseUrl}/puntos/query`, { params });
+  }
+
+  getRutasPuntos(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/puntos/rutas`);
+  }
+
+  getPuntosPorRuta(ruta: string): Observable<Punto[]> {
+    return this.http.get<Punto[]>(`${this.baseUrl}/puntos/rutas/${encodeURIComponent(ruta)}`);
+  }
+
+  updateOrdenPuntosPorRuta(ruta: string, orden: OrdenPuntoItem[]): Observable<any> {
+    return this.http.put(`${this.baseUrl}/puntos/rutas/${encodeURIComponent(ruta)}/orden`, { orden });
   }
 
   buscarPuntosPorDireccion(direccion: string): Observable<any[]> {

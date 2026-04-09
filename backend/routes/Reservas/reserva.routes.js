@@ -35,5 +35,6 @@ router.get('/reservas/verificar-dni', authMiddleware, checkPermission('RESERVAS.
 
 // Comprobante protegido (sin acceso directo a /uploads)
 router.get('/reservas/comprobante/:nombreArchivo', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getComprobanteSeguro);
+router.delete('/reservas/:id/pagos/:idPago/comprobante', authMiddleware, checkPermission('RESERVAS.ACTUALIZAR'), reservasController.deleteComprobantePagoReserva);
 
 module.exports = router;

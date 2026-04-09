@@ -47,7 +47,8 @@ onSubmitCrearPunto() {
   this.successMsg = '';
   this.errorMsg = '';
 
-  // 1) validar form antes de preguntar
+  // ===== Validación del formulario ANTES de confirmar =====
+  this.form.updateValueAndValidity({ emitEvent: false });
   if (this.form.invalid) {
     this.form.markAllAsTouched();
 
@@ -64,7 +65,13 @@ onSubmitCrearPunto() {
       ? `Revisa los siguientes campos: ${fields.join(', ')}`
       : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.warningToast('Campos inválidos', msg);
+    this.navbar.alert.set({
+      type: 'error',
+      title: 'Campos requeridos incompletos',
+      message: msg,
+      autoClose: true,
+      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+    });
     return;
   }
 

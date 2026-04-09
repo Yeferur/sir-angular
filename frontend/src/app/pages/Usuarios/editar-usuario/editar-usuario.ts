@@ -307,14 +307,34 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
     submit() {
         this.errorMsg = '';
+        this.form.updateValueAndValidity({ emitEvent: false });
         this.form.markAllAsTouched();
 
         if (this.form.invalid) {
+            const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
+            const friendly: Record<string, string> = {
+                Id_Usuario: 'Cedula',
+                Nombres_Apellidos: 'Nombre completo',
+                Telefono_Usuario: 'Telefono',
+                Usuario: 'Usuario',
+                Correo: 'Correo',
+                Contrasena: 'Contrasena',
+                Confirmar: 'Confirmar contrasena',
+                Id_Rol: 'Rol',
+                Activo: 'Estado'
+            };
+
+            const fields = invalid.map((f) => friendly[f] || f);
+            const msg = fields.length
+                ? `Revisa los siguientes campos: ${fields.join(', ')}`
+                : 'Hay campos invalidos en el formulario.';
+
             this.global.alert?.set?.({
                 type: 'error',
-                title: 'Campos inválidos',
-                message: 'Por favor revisa los campos marcados en rojo.',
-                autoClose: true
+                title: 'Campos requeridos incompletos',
+                message: msg,
+                autoClose: true,
+                buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.global.alert?.set?.(null) }]
             });
             return;
         }

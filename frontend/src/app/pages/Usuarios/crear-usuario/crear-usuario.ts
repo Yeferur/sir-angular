@@ -247,6 +247,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   submit() {
     this.errorMsg = '';
+    this.form.updateValueAndValidity({ emitEvent: false });
     this.form.markAllAsTouched();
 
     if (this.form.invalid) {
@@ -269,10 +270,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
       this.global.alert?.set?.({
         type: 'error',
-        title: 'Campos inválidos',
+        title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.global.alert?.set?.(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.global.alert?.set?.(null) }]
       });
 
       this.cdr.markForCheck();

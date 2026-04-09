@@ -782,7 +782,7 @@ input[type=number] {
 
 
 /* ========================================
-   SIDEBAR FLOTANTE - RESUMEN INFERIOR
+   FLOATING SUMMARY - BASE ÚNICA
    ======================================== */
 
 .floating-summary {
@@ -790,38 +790,43 @@ input[type=number] {
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
-  background: var(--bg-secondary);
-  border: 1px solid var(--separator-color);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
   z-index: 900;
   pointer-events: auto;
-  transition: width 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    height 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    border-radius 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    top 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow: hidden;
+
+  background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.8));
+  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 8px 40px rgba(0, 0, 0, 0.25);
+
+  transition:
+    width 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    height 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    border-radius 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.35s ease,
+    background-color 0.3s ease;
 }
 
-/* Estado compacto (pastilla pequeña) */
 .floating-summary[data-state="compact"] {
-  width: 350px;
+  width: 300px;
   height: 50px;
-  border-radius: 22px;
-  bottom: 12px;
+  border-radius: 25px;
 }
 
-/* Estado expandido (card) */
 .floating-summary[data-state="expanded"] {
   width: clamp(320px, 95vw, 500px);
-  height: 430px;
-  border-radius: 24px;
-  bottom: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  height: 410px;
+  border-radius: 28px;
+
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 16px 40px rgba(0, 0, 0, 0.4);
 }
 
-/* ------ Vista compacta ------ */
 .summary-collapsed {
   display: flex;
   align-items: center;
@@ -873,39 +878,44 @@ input[type=number] {
   transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* ------ Vista expandida (contenido) ------ */
 .summary-expanded {
-  max-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
   opacity: 0;
-  transform: translateY(6px);
-  padding: 0 16px 0;
+  transform: translateY(10px);
   transition:
-    max-height 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 0.4s ease,
-    transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    padding 0.4s ease;
+    opacity 0.28s ease,
+    transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .summary-expanded-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 10px;
+  padding: 16px 20px 10px;
 }
 
-.close-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 1.1rem;
+.summary-content {
+  padding: 0 20px 12px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
 }
 
-/* NOTA: aquí NO redefinimos .form-label, .summary-totals,
-   .summary-item, .summary-value ni .summary-total
-   para que sigan usando tus estilos originales del sidebar */
+.summary-actions {
+  padding: 12px 20px 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  border-top: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.08));
+}
 
-/* Botón guardar en el dock */
+.summary-actions.two-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
 .btn-save-summary {
   width: 100%;
   border: none;
@@ -915,11 +925,8 @@ input[type=number] {
   font-size: 0.98rem;
   font-weight: 600;
   padding: 12px 14px;
-  margin: 4px 0 10px;
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    transform 0.15s ease;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 .btn-save-summary:hover {
@@ -930,29 +937,26 @@ input[type=number] {
   background-color: #3f9aff;
 }
 
-/* ------ Estados (lo que abre/cierra) ------ */
 .floating-summary[data-state="expanded"] .summary-collapsed {
   display: none;
 }
 
 .floating-summary[data-state="expanded"] .summary-expanded {
-  max-height: 500px;
   opacity: 1;
   transform: translateY(0);
-  padding-bottom: 12px;
 }
 
 .floating-summary[data-state="expanded"] .expand-icon {
   transform: rotate(180deg);
 }
 
-/* ------ Responsive ------ */
 @media (max-width: 768px) {
-  .floating-summary[data-state="compact"] {
+  .floating-summary[data-state="compact"],
+  .floating-summary[data-state="expanded"] {
     width: calc(100% - 20px);
   }
 
-  .floating-summary[data-state="expanded"] {
-    width: calc(100% - 20px);
+  .summary-actions.two-actions {
+    grid-template-columns: 1fr;
   }
 }

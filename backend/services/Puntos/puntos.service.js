@@ -134,6 +134,132 @@ async function reordenarPuntosRuta(rutaInput, idsOrdenados, userId = null) {
   }
 }
 
+async function obtenerRutasPuntos() {
+  const [rows] = await db.query(
+    `
+    SELECT DISTINCT ruta
+    FROM puntos
+    WHERE ruta IS NOT NULL AND TRIM(ruta) <> ''
+    ORDER BY ruta ASC
+    `
+  );
+  return rows.map((r) => r.ruta);
+}
+
+async function obtenerPuntosPorRuta(rutaInput) {
+  const ruta = normalizarRuta(rutaInput);
+  const [rows] = await db.query(
+    `
+    SELECT
+      Id_Punto,
+      Nombre_Punto AS NombrePunto,
+      ruta,
+      posicion,
+      Sector,
+      Direccion,
+      Latitud,
+      Longitud
+    FROM puntos
+    WHERE ruta = ?
+    ORDER BY posicion ASC, Id_Punto ASC
+    `,
+    [ruta]
+  );
+  return rows;
+}
+
+async function actualizarOrdenPuntosRuta(rutaInput, ordenItems, userId = null) {
+  const ruta = normalizarRuta(rutaInput);
+
+  if (!Array.isArray(ordenItems) || !ordenItems.length) {
+    throw new Error('ordenItems es requerido y debe ser un array no vacío.');
+  }
+
+  const parsedItems = ordenItems
+    .map((item) => {
+      const idRaw = item?.id_punto ?? item?.Id_Punto ?? item?.idPunto;
+      const posRaw = item?.posicion ?? item?.Posicion;
+      const id = Number(idRaw);
+      const posicion = Number(posRaw);
+      return { id, posicion };
+    })
+    .filter((x) => Number.isFinite(x.id) && x.id > 0 && Number.isFinite(x.posicion) && x.posicion > 0);
+
+  if (!parsedItems.length) {
+    throw new Error('El payload no contiene elementos válidos con id_punto y posicion.');
+  }
+
+  const ids = parsedItems.map((x) => x.id);
+  const uniqueIds = new Set(ids);
+  if (uniqueIds.size !== ids.length) {
+    throw new Error('Hay id_punto repetidos en el payload.');
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await lockRuta(conn, ruta);
+
+    const [rowsRuta] = await conn.query(
+      `SELECT Id_Punto FROM puntos WHERE ruta = ? ORDER BY posicion ASC, Id_Punto ASC`,
+      [ruta]
+    );
+    const idsRuta = rowsRuta.map((r) => Number(r.Id_Punto));
+    const idsRutaSet = new Set(idsRuta);
+
+    for (const id of ids) {
+      if (!idsRutaSet.has(id)) {
+        throw new Error(`El punto ${id} no pertenece a la ruta ${ruta}.`);
+      }
+    }
+
+    const sortedByPos = [...parsedItems].sort((a, b) => a.posicion - b.posicion);
+    const orderedIds = sortedByPos.map((x) => x.id);
+
+    const faltantes = idsRuta.filter((id) => !uniqueIds.has(id));
+    const finalOrder = orderedIds.concat(faltantes);
+
+    if (!finalOrder.length) {
+      throw new Error('No hay puntos para reordenar en la ruta seleccionada.');
+    }
+
+    const cases = finalOrder.map((id, idx) => `WHEN ${id} THEN ${idx + 1}`).join(' ');
+    const inList = finalOrder.join(',');
+
+    await conn.query(
+      `
+      UPDATE puntos
+      SET posicion = CASE Id_Punto ${cases} ELSE posicion END
+      WHERE ruta = ? AND Id_Punto IN (${inList})
+      `,
+      [ruta]
+    );
+
+    await compactarRuta(conn, ruta);
+    await conn.commit();
+
+    try {
+      await recordHistorial({
+        tabla: 'puntos',
+        id_registro: 0,
+        accion: 'REORDENAR_RUTA',
+        id_usuario: userId,
+        detalles: [{ columna: 'ruta', anterior: null, nuevo: ruta }]
+      });
+    } catch (err) {
+      console.error('Failed historial actualizarOrdenPuntosRuta:', err);
+    }
+
+    return { ok: true, ruta, total: finalOrder.length };
+  } catch (e) {
+    await conn.rollback();
+    try { await logSistema({ mensaje: `actualizarOrdenPuntosRuta error: ${e.message || e}`, meta: { ruta, ordenItems } }); } catch (_) {}
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
 /**
  * Devuelve puntos paginados (orden: ruta + posicion).
  */
@@ -570,6 +696,8 @@ async function eliminarPunto(Id_Punto, userId = null) {
 module.exports = {
   obtenerPuntos,
   obtenerPuntosQuery,
+  obtenerRutasPuntos,
+  obtenerPuntosPorRuta,
   obtenerHorario,
   obtenerHorariosPorPunto,
   obtenerPuntosPorDireccion,
@@ -578,5 +706,6 @@ module.exports = {
   obtenerPuntoPorId,
   actualizarPunto,
   eliminarPunto,
-  reordenarPuntosRuta
+  reordenarPuntosRuta,
+  actualizarOrdenPuntosRuta
 };

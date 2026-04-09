@@ -109,7 +109,8 @@
                 <ul class="autocomplete-list">
                   @for (result of puntoBusquedaResults(); track result.Id_Punto) {
                   <li (click)="seleccionarPunto(result, puntoInput)">
-                    {{ result.NombrePunto }}
+                    <span class="autocomplete-point-name">{{ result.NombrePunto }}</span>
+                    <span class="autocomplete-point-route">{{ result.ruta || 'PENDIENTE' }}</span>
                   </li>
                   }
                 </ul>
@@ -120,6 +121,10 @@
             <!-- Aviso cuando no hay punto seleccionado -->
             @if (form.get('Puntos')?.touched && puntosSeleccionados().length === 0) {
             <div class="errorMessage">Selecciona al menos un punto de encuentro.</div>
+            }
+
+            @if (tieneConflictoLogistico()) {
+            <div class="errorMessage">{{ mensajeInviabilidadLogistica() }}</div>
             }
           </div>
         </div>
@@ -159,14 +164,11 @@
           <label class="form-label">
             Teléfono <span class="required-star">*</span>
           </label>
-          <div class="phone-input-group">
-            <input type="text" class="form-input phone-prefix" formControlName="Indicativo" />
-            <input type="tel" class="form-input phone-number"
-              [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
-              formControlName="Telefono_Reportante" />
-          </div>
+          <input type="tel" class="form-input"
+            [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
+            formControlName="Telefono_Reportante" placeholder="+573001234567" />
           @if (form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid) {
-          <div class="errorMessage">Teléfono inválido (10 dígitos).</div>
+          <div class="errorMessage">{{ getPhoneError('Telefono_Reportante') }}</div>
           }
         </div>
 
@@ -238,12 +240,12 @@
         </div>
 
         @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {
-        <div class="form-group ">
+        <div class="form-group">
           <label class="form-label">Teléfono</label>
-          <div class="phone-input-group">
-            <input type="text" class="form-input phone-prefix" formControlName="Indicativo_Pasajero" />
-            <input type="text" class="form-input" formControlName="Telefono_Pasajero" />
-          </div>
+          <input type="tel" class="form-input" formControlName="Telefono_Pasajero" placeholder="+573001234567" />
+          @if (pasajero.get('Telefono_Pasajero')?.touched && pasajero.get('Telefono_Pasajero')?.invalid) {
+          <div class="errorMessage">Si se ingresa, debe iniciar con '+' y tener indicativo + exactamente 10 dígitos del número (ej: +573001234567).</div>
+          }
         </div>
         }
 
@@ -531,7 +533,7 @@
         </button>
       }
 
-      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()">
+      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting() || tieneConflictoLogistico()">
         {{ isSubmitting() ? 'Guardando...' : 'Guardar Reserva' }}
       </button>
     </div>

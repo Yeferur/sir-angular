@@ -25,10 +25,12 @@
 
         <div class="form-group">
           <label class="form-label">Teléfono del titular</label>
-          <div class="phone-input-group">
-            <input type="text" class="form-input phone-prefix" formControlName="IndicativoTitular" />
-            <input type="tel" class="form-input phone-number" formControlName="TelefonoTitular" />
-          </div>
+          <input type="tel" class="form-input"
+            [ngClass]="form.get('TelefonoTitular')?.touched && form.get('TelefonoTitular')?.invalid ? 'errorInput' : ''"
+            formControlName="TelefonoTitular" placeholder="+573001234567" />
+          @if (form.get('TelefonoTitular')?.touched && form.get('TelefonoTitular')?.invalid) {
+          <div class="errorMessage">{{ getPhoneError('TelefonoTitular') }}</div>
+          }
         </div>
 
         <div class="form-group">
@@ -154,15 +156,11 @@
           <label class="form-label">
             Teléfono Reserva <span class="required-star">*</span>
           </label>
-          <div class="phone-input-group">
-            <input type="text" class="form-input phone-prefix" formControlName="IndicativoReserva" />
-            <input type="tel" class="form-input phone-number"
-              [ngClass]="form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid ? 'errorInput' : ''"
-              formControlName="TelefonoReserva" />
-            <!-- <button type="button" class="btn-secondary" (click)="checkWhatsappForReserva()">Verificar WhatsApp</button> -->
-          </div>
+          <input type="tel" class="form-input"
+            [ngClass]="form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid ? 'errorInput' : ''"
+            formControlName="TelefonoReserva" placeholder="+573001234567" />
           @if (form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid) {
-          <div class="errorMessage">Teléfono de reserva es requerido.</div>
+          <div class="errorMessage">{{ getPhoneError('TelefonoReserva') }}</div>
           }
         </div>
       </div>
@@ -222,46 +220,50 @@
       </button>
     </div>
 
-    <div class="summary-totals">
-      <div class="summary-item">
-        <label class="form-label">Titular</label>
-        <span class="summary-value">{{ form.get('Titular')?.value || '—' }}</span>
-      </div>
+    <div class="summary-content">
+      <div class="summary-totals">
+        <div class="summary-item">
+          <label class="form-label">Titular</label>
+          <span class="summary-value">{{ form.get('Titular')?.value || '—' }}</span>
+        </div>
 
-      <div class="summary-item">
-        <label class="form-label">Rango de pasajeros</label>
-        <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
-      </div>
+        <div class="summary-item">
+          <label class="form-label">Rango de pasajeros</label>
+          <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
+        </div>
 
-      <div class="summary-item">
-        <label class="form-label">Hora Salida</label>
-        <span class="summary-value">
-          {{ form.get('Hora')?.value || '—' }}
-        </span>
-      </div>
+        <div class="summary-item">
+          <label class="form-label">Hora Salida</label>
+          <span class="summary-value">
+            {{ form.get('Hora')?.value || '—' }}
+          </span>
+        </div>
 
-      <div class="summary-item">
-        <label class="form-label">Punto de salida</label>
-        <span class="summary-value">{{ form.get('Salida')?.value || '—' }}</span>
-      </div>
+        <div class="summary-item">
+          <label class="form-label">Punto de salida</label>
+          <span class="summary-value">{{ form.get('Salida')?.value || '—' }}</span>
+        </div>
 
-      <div class="summary-item">
-        <label class="form-label">Punto de llegada</label>
-        <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
-      </div>
+        <div class="summary-item">
+          <label class="form-label">Punto de llegada</label>
+          <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
+        </div>
 
 
-      <div class="summary-item total-row">
-        <label class="form-label">Valor</label>
-        <span class="summary-value summary-total">
-          {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
-        </span>
+        <div class="summary-item total-row">
+          <label class="form-label">Valor</label>
+          <span class="summary-value summary-total">
+            {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
+          </span>
+        </div>
       </div>
     </div>
 
-    <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()">
-      {{ isSubmitting() ? 'Guardando...' : 'Guardar Transfer' }}
-    </button>
+    <div class="summary-actions">
+      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Guardando...' : 'Guardar Transfer' }}
+      </button>
+    </div>
   </div>
 </div>
 }

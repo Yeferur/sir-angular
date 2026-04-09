@@ -76,6 +76,8 @@ export class EditarPuntoComponent implements OnInit {
 onSubmitGuardarCambios() {
   if (this.isSubmitting()) return;
 
+  // ===== Validación del formulario ANTES de confirmar =====
+  this.form.updateValueAndValidity({ emitEvent: false });
 
   if (this.form.invalid) {
     this.form.markAllAsTouched();
@@ -90,7 +92,13 @@ onSubmitGuardarCambios() {
     const fields = invalid.map(f => friendly[f] || f);
     const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.warningToast('Campos inválidos', msg);
+    this.navbar.alert.set({
+      type: 'error',
+      title: 'Campos requeridos incompletos',
+      message: msg,
+      autoClose: true,
+      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+    });
     return;
   }
 

@@ -121,6 +121,21 @@ export class UsuariosService {
     return this.http.get(`${environment.apiUrl}/usuarios/${id}`);
   }
 
+  // Obtener perfil del usuario autenticado
+  getMiPerfil(): Observable<any> {
+    return this.http.get(`${environment.apiUrl}/perfil`);
+  }
+
+  // Actualizar perfil del usuario autenticado (campos seguros)
+  actualizarMiPerfil(payload: {
+    Nombres_Apellidos: string;
+    Telefono_Usuario?: string | null;
+    Correo: string;
+    Contrasena?: string;
+  }): Observable<any> {
+    return this.http.put(`${environment.apiUrl}/perfil`, payload);
+  }
+
   // Actualizar usuario
   actualizarUsuario(id: string, payload: any): Observable<any> {
     return this.http.put(`${environment.apiUrl}/usuarios/${id}`, payload);
@@ -167,6 +182,22 @@ export class UsuariosService {
       next.set(String(user.id_user), estado || 'inactiva');
       return next;
     });
+  }
+
+  // 🎥 Avatar methods
+
+  /**
+   * Upload profile photo (FormData with 'avatar' field)
+   */
+  uploadAvatar(formData: FormData): Observable<any> {
+    return this.http.post(`${environment.apiUrl}/perfil/foto`, formData);
+  }
+
+  /**
+   * Delete profile photo
+   */
+  deleteAvatar(): Observable<any> {
+    return this.http.delete(`${environment.apiUrl}/perfil/foto`);
   }
 
 }

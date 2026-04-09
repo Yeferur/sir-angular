@@ -344,7 +344,7 @@
       </div>
 
       <div class="actions-end">
-        <button class="btn-primary" type="submit" [disabled]="form.invalid || isSubmitting()">
+        <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
           {{ isSubmitting() ? 'Guardando...' : 'Crear Tour' }}
         </button>
       </div>

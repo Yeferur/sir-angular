@@ -3,6 +3,59 @@ const bcrypt = require('bcrypt');
 const db = require('../../database/db');
 const { recordHistorial } = require('../../services/Historial/logger');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const fs = require('fs');
+const path = require('path');
+
+const backendRoot = path.join(__dirname, '..', '..');
+
+function resolveAvatarAbsolutePath(avatarValue) {
+  if (!avatarValue || typeof avatarValue !== 'string') return null;
+
+  let raw = avatarValue.trim();
+  if (!raw) return null;
+
+  // Soporta URLs absolutas: http://host/uploads/...
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      raw = new URL(raw).pathname || raw;
+    } catch (_err) {
+      // mantener valor original si URL falla
+    }
+  }
+
+  // Normaliza separadores y elimina query/hash
+  raw = raw.split('?')[0].split('#')[0].replace(/\\/g, '/');
+
+  // Extraer ruta desde uploads si viene prefijada
+  const uploadsMarker = '/uploads/';
+  const uploadsIdx = raw.indexOf(uploadsMarker);
+  if (uploadsIdx >= 0) {
+    raw = `uploads/${raw.slice(uploadsIdx + uploadsMarker.length)}`;
+  }
+
+  // Quitar slash inicial
+  raw = raw.replace(/^\/+/, '');
+
+  // Candidato 1: ruta exacta relativa al backend
+  const exactCandidate = path.join(backendRoot, raw);
+  if (fs.existsSync(exactCandidate)) return exactCandidate;
+
+  // Candidato 2+: búsqueda por nombre de archivo en carpetas conocidas
+  const filename = path.basename(raw);
+  if (!filename) return null;
+
+  const candidates = [
+    path.join(backendRoot, 'uploads', 'fotos_perfil', filename),
+    path.join(backendRoot, 'uploads', 'usuarios', filename),
+    path.join(backendRoot, 'uploads', filename),
+  ];
+
+  for (const filePath of candidates) {
+    if (fs.existsSync(filePath)) return filePath;
+  }
+
+  return null;
+}
 
 exports.obtenerUsuariosYSesiones = async (req, res) => {
   try {
@@ -46,6 +99,182 @@ exports.obtenerUsuario = async (req, res) => {
       message: 'Error obteniendo usuario',
       errorCode: 'INTERNAL_ERROR',
     });
+  }
+};
+
+exports.obtenerMiPerfil = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return sendError(res, {
+        status: 401,
+        message: 'Usuario no autenticado',
+        errorCode: 'UNAUTHENTICATED',
+      });
+    }
+
+    const [rows] = await db.query(
+      'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Avatar FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!rows.length) {
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    return sendSuccess(res, {
+      data: rows[0],
+      message: 'Perfil obtenido correctamente',
+    });
+  } catch (err) {
+    console.error('obtenerMiPerfil error:', err);
+    return sendError(res, {
+      status: 500,
+      message: 'Error obteniendo perfil',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  }
+};
+
+exports.actualizarMiPerfil = async (req, res) => {
+  let conn;
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return sendError(res, {
+        status: 401,
+        message: 'Usuario no autenticado',
+        errorCode: 'UNAUTHENTICATED',
+      });
+    }
+
+    const forbiddenKeys = ['Id_Usuario', 'Id_Rol', 'permisos', 'Activo', 'Usuario'];
+    const attemptedForbidden = forbiddenKeys.filter((k) => Object.prototype.hasOwnProperty.call(req.body || {}, k));
+    if (attemptedForbidden.length > 0) {
+      return sendError(res, {
+        status: 403,
+        message: 'No tienes permisos para modificar campos privilegiados',
+        errorCode: 'FORBIDDEN',
+        details: { fields: attemptedForbidden },
+      });
+    }
+
+    const {
+      Nombres_Apellidos,
+      Telefono_Usuario,
+      Correo,
+      Contrasena,
+    } = req.body || {};
+
+    if (!Nombres_Apellidos || !Correo) {
+      return sendError(res, {
+        status: 400,
+        message: 'Nombre y correo son obligatorios',
+        errorCode: 'MISSING_PARAMS',
+      });
+    }
+
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [currentRows] = await conn.query(
+      'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Correo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!currentRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    const current = currentRows[0];
+
+    const [exists] = await conn.query(
+      'SELECT COUNT(*) as total FROM usuarios WHERE Correo = ? AND Id_Usuario != ?',
+      [Correo, userId]
+    );
+
+    if (exists[0].total > 0) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 409,
+        message: 'El correo ya esta en uso',
+        errorCode: 'DUPLICATE_USER',
+      });
+    }
+
+    let hash = null;
+    if (Contrasena && String(Contrasena).trim().length > 0) {
+      hash = await bcrypt.hash(String(Contrasena), 8);
+    }
+
+    let updateQuery = 'UPDATE usuarios SET Nombres_Apellidos = ?, Telefono_Usuario = ?, Correo = ?';
+    const params = [
+      String(Nombres_Apellidos).trim(),
+      Telefono_Usuario ? String(Telefono_Usuario).trim() : null,
+      String(Correo).trim(),
+    ];
+
+    if (hash) {
+      updateQuery += ', Contrasena = ?';
+      params.push(hash);
+    }
+
+    updateQuery += ' WHERE Id_Usuario = ?';
+    params.push(userId);
+
+    await conn.query(updateQuery, params);
+
+    const detalles = [
+      { columna: 'Nombres_Apellidos', anterior: current.Nombres_Apellidos, nuevo: String(Nombres_Apellidos).trim() },
+      { columna: 'Telefono_Usuario', anterior: current.Telefono_Usuario, nuevo: Telefono_Usuario ? String(Telefono_Usuario).trim() : null },
+      { columna: 'Correo', anterior: current.Correo, nuevo: String(Correo).trim() },
+    ];
+
+    if (hash) {
+      detalles.push({ columna: 'Contrasena', anterior: '***', nuevo: 'ACTUALIZADA' });
+    }
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'usuarios',
+      id_registro: userId,
+      accion: 'ACTUALIZAR_PERFIL',
+      id_usuario: userId,
+      detalles,
+    });
+
+    await conn.commit();
+
+    const [updatedRows] = await db.query(
+      'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Avatar FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [userId]
+    );
+
+    return sendSuccess(res, {
+      data: updatedRows[0] || null,
+      message: 'Perfil actualizado correctamente',
+    });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error('actualizarMiPerfil error:', err);
+    return sendError(res, {
+      status: 500,
+      message: 'Error actualizando perfil',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -365,6 +594,200 @@ exports.crearUsuario = async (req, res) => {
     return sendError(res, {
       status: 500,
       message: 'Error creando usuario',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+/**
+ * POST /api/perfil/foto
+ * Subir foto de perfil del usuario autenticado
+ * Body: FormData con file (en campo 'avatar')
+ * IDOR Prevention: Id_Usuario extraído del token SOLAMENTE
+ */
+exports.subirFotoPerfil = async (req, res) => {
+  let conn;
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return sendError(res, {
+        status: 401,
+        message: 'Usuario no autenticado',
+        errorCode: 'UNAUTHENTICATED',
+      });
+    }
+
+    if (!req.file) {
+      return sendError(res, {
+        status: 400,
+        message: 'No se envió archivo',
+        errorCode: 'MISSING_FILE',
+      });
+    }
+
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // Obtener foto actual
+    const [currentRows] = await conn.query(
+      'SELECT Avatar FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!currentRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    const currentAvatar = currentRows[0].Avatar;
+
+    // URL de la foto nueva basada en la ruta REAL donde multer la guardó
+    const relativeFilePath = path.relative(backendRoot, req.file.path).replace(/\\/g, '/');
+    const newAvatarUrl = `/${relativeFilePath}`;
+
+    // Actualizar BD
+    await conn.query(
+      'UPDATE usuarios SET Avatar = ? WHERE Id_Usuario = ?',
+      [newAvatarUrl, userId]
+    );
+
+    // Log en historial
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'usuarios',
+      id_registro: userId,
+      accion: 'ACTUALIZAR_AVATAR',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Avatar', anterior: currentAvatar || 'NINGUNA', nuevo: newAvatarUrl },
+      ],
+    });
+
+    await conn.commit();
+
+    // Eliminar archivo anterior DESPUÉS de commitear (para no bloquear transacción)
+    if (currentAvatar) {
+      try {
+        const oldFilePath = resolveAvatarAbsolutePath(currentAvatar);
+        if (oldFilePath && fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      } catch (err) {
+        console.warn('No se pudo eliminar archivo anterior:', err.message);
+      }
+    }
+
+    return sendSuccess(res, {
+      data: { Avatar: newAvatarUrl },
+      message: 'Foto de perfil subida correctamente',
+    });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error('subirFotoPerfil error:', err);
+    return sendError(res, {
+      status: 500,
+      message: 'Error subiendo foto de perfil',
+      errorCode: 'INTERNAL_ERROR',
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+/**
+ * DELETE /api/perfil/foto
+ * Eliminar foto de perfil del usuario autenticado
+ * IDOR Prevention: Id_Usuario extraído del token SOLAMENTE
+ */
+exports.eliminarFotoPerfil = async (req, res) => {
+  let conn;
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return sendError(res, {
+        status: 401,
+        message: 'Usuario no autenticado',
+        errorCode: 'UNAUTHENTICATED',
+      });
+    }
+
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // Obtener foto actual
+    const [currentRows] = await conn.query(
+      'SELECT Avatar FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!currentRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 404,
+        message: 'Usuario no encontrado',
+        errorCode: 'USER_NOT_FOUND',
+      });
+    }
+
+    const currentAvatar = currentRows[0].Avatar;
+
+    if (!currentAvatar) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 400,
+        message: 'El usuario no tiene foto de perfil asignada',
+        errorCode: 'NO_AVATAR',
+      });
+    }
+
+    // Actualizar BD
+    await conn.query(
+      'UPDATE usuarios SET Avatar = NULL WHERE Id_Usuario = ?',
+      [userId]
+    );
+
+    // Log en historial
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'usuarios',
+      id_registro: userId,
+      accion: 'ELIMINAR_AVATAR',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Avatar', anterior: currentAvatar, nuevo: 'ELIMINADA' },
+      ],
+    });
+
+    await conn.commit();
+
+    // Eliminar archivo físico DESPUÉS de commitear
+    try {
+      const filePath = resolveAvatarAbsolutePath(currentAvatar);
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.warn('No se pudo eliminar archivo:', err.message);
+    }
+
+    return sendSuccess(res, {
+      data: { Avatar: null },
+      message: 'Foto de perfil eliminada',
+    });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error('eliminarFotoPerfil error:', err);
+    return sendError(res, {
+      status: 500,
+      message: 'Error eliminando foto de perfil',
       errorCode: 'INTERNAL_ERROR',
     });
   } finally {

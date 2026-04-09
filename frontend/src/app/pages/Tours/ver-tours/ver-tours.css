@@ -79,7 +79,7 @@
     opacity: 0;
     transform: translateY(12px), ;
     animation: cardFadeInUp 0.5s ease-out forwards;
-    animation-delay: calc(var(--animation-order, 0) * 80ms);
+    animation-delay: 0ms;
 }
 
 .tour-card:hover {

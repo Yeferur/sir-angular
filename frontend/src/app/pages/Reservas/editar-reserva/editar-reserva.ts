@@ -29,6 +29,7 @@ import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/
 export class EditarReservaComponent implements OnInit {
 showDuplicate: boolean = false;
   openSummary = false;
+  private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
@@ -90,6 +91,90 @@ showDuplicate: boolean = false;
   // Puntos de encuentro (chips + búsqueda)
   puntosSeleccionados = signal<Punto[]>([]);
   puntoBusquedaResults = signal<Punto[]>([]);
+  private conflictoRutasNotificado = signal<boolean>(false);
+  rutasLogisticasSeleccionadas = computed(() => {
+    const rutas = new Set(
+      this.puntosSeleccionados()
+        .map((p) => this.normalizarRutaLogistica((p as any)?.ruta))
+        .filter((r) => r !== '' && r !== '0' && r !== 'PENDIENTE')
+    );
+    return Array.from(rutas);
+  });
+  distanciaMaximaPuntosLogisticosKm = computed(() => {
+    const puntos = this.puntosSeleccionados().filter((p) => {
+      const ruta = this.normalizarRutaLogistica((p as any)?.ruta);
+      return this.tieneCoordenadasLogisticas(p) && ruta !== '' && ruta !== '0' && ruta !== 'PENDIENTE';
+    });
+    let max = 0;
+
+    for (let i = 0; i < puntos.length; i++) {
+      const p1 = puntos[i];
+      const ruta1 = this.normalizarRutaLogistica((p1 as any)?.ruta);
+      const lat1 = Number((p1 as any)?.Latitud);
+      const lon1 = Number((p1 as any)?.Longitud);
+
+      for (let j = i + 1; j < puntos.length; j++) {
+        const p2 = puntos[j];
+        const ruta2 = this.normalizarRutaLogistica((p2 as any)?.ruta);
+        if (!ruta1 || !ruta2 || ruta1 === ruta2) continue;
+        const lat2 = Number((p2 as any)?.Latitud);
+        const lon2 = Number((p2 as any)?.Longitud);
+        const distancia = this.distanciaHaversineKm(lat1, lon1, lat2, lon2);
+        if (distancia > max) max = distancia;
+      }
+    }
+
+    return max;
+  });
+  tieneConflictoRutasLogisticas = computed(() => this.rutasLogisticasSeleccionadas().length > 1);
+  tieneConflictoDistanciaLogistica = computed(() => this.distanciaMaximaPuntosLogisticosKm() > 6);
+  tieneConflictoLogistico = computed(() => this.tieneConflictoRutasLogisticas() || this.tieneConflictoDistanciaLogistica());
+  mensajeInviabilidadLogistica = computed(() => {
+    const mensajes: string[] = [];
+    if (this.tieneConflictoRutasLogisticas()) {
+      mensajes.push('Los puntos seleccionados pertenecen a rutas distintas.');
+    }
+    if (this.tieneConflictoDistanciaLogistica()) {
+      mensajes.push(`La distancia máxima entre puntos de rutas distintas supera 6 km (${this.distanciaMaximaPuntosLogisticosKm().toFixed(1)} km).`);
+    }
+    return mensajes.join(' ');
+  });
+
+  private normalizarRutaLogistica(ruta: unknown): string {
+    return String(ruta ?? '').trim().toUpperCase();
+  }
+
+  private tieneCoordenadasLogisticas(punto: Punto): boolean {
+    const lat = Number((punto as any)?.Latitud);
+    const lon = Number((punto as any)?.Longitud);
+    return Number.isFinite(lat) && Number.isFinite(lon);
+  }
+
+  private distanciaHaversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const radiusKm = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return radiusKm * c;
+  }
+
+  private evaluarConflictoRutasEnTiempoReal(): void {
+    const hayConflicto = this.tieneConflictoLogistico();
+    if (hayConflicto && !this.conflictoRutasNotificado()) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Inviabilidad logística detectada',
+        message: this.mensajeInviabilidadLogistica() || 'Los puntos seleccionados no cumplen la validación logística.',
+        autoClose: true,
+      });
+    }
+    this.conflictoRutasNotificado.set(hayConflicto);
+  }
 
   historialActividad = signal<ReservaHistorialCambio[]>([]);
   historialLoading = signal<boolean>(false);
@@ -257,8 +342,7 @@ showDuplicate: boolean = false;
       // Responsable
       Id_Canal: [1, Validators.required],
       Nombre_Reportante: ['', Validators.required],
-      Indicativo: ['+57'],
-      Telefono_Reportante: ['', [Validators.required, Validators.pattern(/^\d{10}$/)]],
+      Telefono_Reportante: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
 
       // Tipo
@@ -381,7 +465,6 @@ showDuplicate: boolean = false;
         Id_Moneda: data?.Cabecera?.Id_Moneda ?? data?.Id_Moneda ?? 1,
         Id_Canal: data?.Cabecera?.Id_Canal ?? data?.Id_Canal ?? 1,
         Nombre_Reportante: data?.Cabecera?.Nombre_Reportante ?? data?.Reportante?.Nombre ?? '',
-        Indicativo: data?.Cabecera?.Indicativo ?? data?.Indicativo ?? '+57',
         Telefono_Reportante: data?.Cabecera?.Telefono_Reportante ?? data?.Reportante?.Telefono ?? '',
         Observaciones: data?.Cabecera?.Observaciones ?? data?.Observaciones ?? '',
         Tipo_Reserva: data?.Cabecera?.Tipo_Reserva ?? data?.Tipo_Reserva ?? 'Grupal',
@@ -421,7 +504,7 @@ showDuplicate: boolean = false;
           Tipo_Pasajero: [p.Tipo_Pasajero ?? p.TipoPasajero ?? 'ADULTO', Validators.required],
           Nombre_Pasajero: [p.Nombre_Pasajero ?? p.NombrePasajero ?? ''],
           DNI: [p.DNI ?? p.IdPas ?? ''],
-          Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? ''],
+          Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? '', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
           Id_Punto: [p.Id_Punto ?? puntoId ?? null],
           Confirmacion: [p.Confirmacion ?? false],
           PrecioRef: [p.Precio_Tour ?? p.PrecioRef ?? 0],
@@ -447,8 +530,10 @@ showDuplicate: boolean = false;
       if (tipoPagoForm === 'Completo') {
         const pagoCompleto = pagosDb.find((p: any) => p.Tipo === 'Pago Completo');
         if (pagoCompleto) {
-          this.form.get('ComprobantePago')?.setValue(null); // No se puede rehidratar el archivo
-          this.form.get('ComprobantePago')?.patchValue({ SoporteUrl: pagoCompleto.Ruta_Comprobante || pagoCompleto.SoporteUrl || null });
+          this.form.get('ComprobantePago')?.setValue({
+            Id_Pago: pagoCompleto.Id_Pago || null,
+            SoporteUrl: pagoCompleto.Ruta_Comprobante || pagoCompleto.SoporteUrl || null,
+          });
         }
       }
 
@@ -548,6 +633,7 @@ showDuplicate: boolean = false;
     this.puntoBusquedaResults.set([]);
     const principal = this.puntosSeleccionados()[0];
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
+    this.evaluarConflictoRutasEnTiempoReal();
     await this.fijarHorarioAutomatico();
     this.verificarCuposDisponibles();
   }
@@ -561,6 +647,7 @@ showDuplicate: boolean = false;
     } else {
       await this.fijarHorarioAutomatico();
     }
+    this.evaluarConflictoRutasEnTiempoReal();
     this.verificarCuposDisponibles();
   }
 
@@ -681,8 +768,7 @@ showDuplicate: boolean = false;
       Tipo_Pasajero: [tipo, Validators.required],
       Nombre_Pasajero: [''],
       DNI: [''],
-      Indicativo_Pasajero: ['+57'],
-      Telefono_Pasajero: [''],
+      Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
       PrecioRef: [0],
@@ -758,8 +844,7 @@ showDuplicate: boolean = false;
           Tipo_Pasajero: [tipo, Validators.required],
           Nombre_Pasajero: [''],
           DNI: [''],
-          Indicativo_Pasajero: ['+57'],
-          Telefono_Pasajero: [''],
+          Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
           Id_Punto: [this.form.get('Id_Punto')?.value ?? null],
           Confirmacion: [false],
           PrecioRef: [0],
@@ -1168,11 +1253,49 @@ this.navbar.cuposInfo.set(null);
   async onSubmit(): Promise<void> {
     if (this.isSubmitting()) return;
     this.isSubmitting.set(true);
-    // Validación
+
+    // ===== Validación del formulario ANTES de confirmar =====
     this.form.updateValueAndValidity({ emitEvent: false });
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.navbar.alert.set({ type: 'warning', title: 'Formulario incompleto', message: 'Revisa los campos obligatorios antes de guardar.', autoClose: true });
+
+      const invalid = Object.keys(this.form.controls).filter(k => this.form.get(k)?.invalid);
+      const friendly: Record<string, string> = {
+        SelectTour: 'Tour',
+        Fecha_Tour: 'Fecha del Tour',
+        Id_Horario: 'Horario',
+        Id_Moneda: 'Moneda',
+        Id_Canal: 'Canal',
+        Nombre_Reportante: 'Nombre del Reportante',
+        Telefono_Reportante: 'Teléfono del Reportante (indicativo + 10 dígitos, ej: +573001234567)',
+        Tipo_Reserva: 'Tipo de Reserva',
+        Id_Punto: 'Punto de Encuentro'
+      };
+
+      const fields = invalid.map(f => friendly[f] || f);
+      const msg = fields.length
+        ? `Revisa los siguientes campos: ${fields.join(', ')}`
+        : 'Hay campos invalidos en el formulario.';
+
+      this.navbar.alert.set({
+        type: 'error',
+        title: 'Campos requeridos incompletos',
+        message: msg,
+        autoClose: true,
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+      });
+      this.isSubmitting.set(false);
+      return;
+    }
+
+    if (this.tieneConflictoLogistico()) {
+      this.navbar.alert.set({
+        type: 'error',
+        title: 'Inviabilidad logística',
+        message: this.mensajeInviabilidadLogistica() || 'Corrige los puntos de encuentro antes de guardar.',
+        autoClose: false,
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+      });
       this.isSubmitting.set(false);
       return;
     }
@@ -1393,18 +1516,33 @@ this.navbar.cuposInfo.set(null);
     return { ok: okNombres && okDni && hayTelefonoPasajero, okNombres, okDni, hayTelefonoPasajero, faltanNombre, faltanDni };
   }
 
+  getPhoneError(controlName: string): string {
+    const ctrl = this.form?.get(controlName);
+    if (!ctrl) return 'Teléfono inválido.';
+    if (ctrl.hasError('required')) return 'El teléfono es obligatorio.';
+    if (ctrl.hasError('pattern')) {
+      return "Debe iniciar con '+' y tener indicativo + exactamente 10 dígitos del número (ej: +573001234567).";
+    }
+    return 'Teléfono inválido.';
+  }
+
   // ===================== Comprobante preview / actions =====================
   previewVisible = signal(false);
   previewUrl = signal<SafeResourceUrl | null>(null);
 
   viewComprobante(url: string | null) {
     if (!url) return;
-    const fileName = String(url).split('/').filter(Boolean).pop();
-    if (!fileName) return;
-    const apiBase = (environment.apiUrl || '').replace(/\/$/, '');
-    const href = `${apiBase}/reservas/comprobante/${encodeURIComponent(fileName)}`;
-    // Open preview inside Dynamic Navbar
-    this.navbar.openPreview(href, 'Vista previa del comprobante');
+    const href = this.resolveComprobanteUrl(url);
+    if (!href) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Comprobante inválido',
+        message: 'No se pudo resolver la URL del comprobante.',
+        autoClose: true,
+      });
+      return;
+    }
+    window.open(href, '_blank', 'noopener,noreferrer');
   }
 
   closePreview() {
@@ -1418,10 +1556,79 @@ this.navbar.cuposInfo.set(null);
   }
 
   deleteComprobante() {
-    // Clear the comprobante on the form; caller should save to persist change
+    const currentValue: any = this.form.get('ComprobantePago')?.value;
+    const idPago = Number(currentValue?.Id_Pago);
+    const idReserva = this.reservaId();
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar comprobante',
+      message: 'Esta acción eliminará el comprobante actual de manera permanente. ¿Deseas continuar?',
+      autoClose: false,
+      buttons: [
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+        {
+          text: 'Eliminar',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+
+            if (idReserva && Number.isFinite(idPago) && idPago > 0) {
+              this.reservasSvc.eliminarComprobantePagoReserva(idReserva, idPago).subscribe({
+                next: () => {
+                  this.clearComprobanteLocalState();
+                  this.navbar.alert.set({
+                    type: 'success',
+                    title: 'Comprobante eliminado',
+                    message: 'El comprobante se eliminó correctamente del servidor.',
+                    autoClose: true,
+                  });
+                },
+                error: () => {
+                  this.navbar.alert.set({
+                    type: 'error',
+                    title: 'Error al eliminar',
+                    message: 'No se pudo eliminar el comprobante en el servidor.',
+                    autoClose: true,
+                  });
+                },
+              });
+              return;
+            }
+
+            this.clearComprobanteLocalState();
+            this.navbar.alert.set({
+              type: 'info',
+              title: 'Comprobante eliminado',
+              message: 'El comprobante fue removido del formulario. Guarda para persistir.',
+              autoClose: true,
+            });
+          },
+        },
+      ],
+    });
+  }
+
+  private clearComprobanteLocalState(): void {
     this.form.get('ComprobantePago')?.setValue(null);
     this.form.get('ComprobantePago')?.markAsDirty();
-    this.navbar.alert.set({ type: 'info', title: 'Comprobante eliminado', message: 'El comprobante fue removido del formulario. Guarda para persistir.', autoClose: true });
+    this.form.get('ComprobantePago')?.updateValueAndValidity({ emitEvent: false });
+    const input = document.getElementById('ComprobantePago') as HTMLInputElement | null;
+    if (input) input.value = '';
+  }
+
+  private resolveComprobanteUrl(url: string): string | null {
+    const raw = String(url || '').trim();
+    if (!raw) return null;
+
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith('/uploads/')) return raw;
+    if (raw.startsWith('uploads/')) return `/${raw}`;
+
+    const apiBase = (environment.apiUrl || '').replace(/\/$/, '');
+    const fileName = raw.split('/').filter(Boolean).pop();
+    if (!fileName) return null;
+    return `${apiBase}/reservas/comprobante/${encodeURIComponent(fileName)}`;
   }
 
   private resolverEstadoYMotivo(

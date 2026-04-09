@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -65,6 +66,11 @@ export const routes: Routes = [
     canDeactivate: [unsavedChangesGuard],
     title: 'SIR · Editar Punto',
   },
+  {
+    path: 'Puntos/OrdenarPuntos',
+    loadComponent: () => import('./pages/Puntos/ordenar-puntos/ordenar-puntos').then((m) => m.OrdenarPuntosComponent),
+    title: 'SIR · Ordenar Puntos',
+  },
 
   {
     path: 'Programacion/Listado',
@@ -105,6 +111,13 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/Usuarios/editar-usuario/editar-usuario').then((m) => m.EditarUsuarioComponent),
     canDeactivate: [unsavedChangesGuard],
     title: 'SIR · Editar Usuario',
+  },
+  {
+    path: 'Perfil/Editar',
+    loadComponent: () => import('./pages/Perfil/editar-perfil/editar-perfil').then((m) => m.EditarPerfilComponent),
+    canActivate: [authGuard],
+    canDeactivate: [unsavedChangesGuard],
+    title: 'SIR · Editar Perfil',
   },
 
   {

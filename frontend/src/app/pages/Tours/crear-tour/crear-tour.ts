@@ -781,10 +781,10 @@ const disponibilidad = this.buildDisponibilidadPayload();
 
       this.navbar.alert?.set?.({
         type: 'error',
-        title: 'Campos inválidos',
+        title: 'Campos requeridos incompletos',
         message: msg,
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
+        autoClose: true,
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert?.set?.(null) }],
       });
       return;
     }

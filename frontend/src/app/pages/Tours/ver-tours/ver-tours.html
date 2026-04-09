@@ -1,5 +1,4 @@
-@if (!isLoading()) {
-  <div class="page-container">
+<div class="page-container">
 
     <div class="page-header">
       <div>
@@ -14,9 +13,20 @@
       </div>
     </div>
 
+    @if (isLoading()) {
+      <div class="dashboard-grid">
+        <div class="tour-card">
+          <div class="card-top">
+            <div class="title-row">
+              <h2 class="tour-name">Cargando tours...</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+    } @else {
     <div class="dashboard-grid">
-      @for (tour of toursFiltrados(); track tour.Id_Tour; let i = $index) {
-        <div class="tour-card" [style.--animation-order]="i">
+      @for (tour of toursFiltrados(); track $index; let i = $index) {
+        <div class="tour-card">
 
           <div class="card-top">
             <div class="title-row">
@@ -63,6 +73,6 @@
         </div>
       }
     </div>
+    }
 
-  </div>
-}
+</div>

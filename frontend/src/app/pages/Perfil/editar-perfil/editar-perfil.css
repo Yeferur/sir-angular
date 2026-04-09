@@ -1,0 +1,370 @@
+:host {
+  display: block;
+}
+
+.booking-dashboard {
+  gap: 30px;
+  max-width: 1400px;
+  margin: auto;
+  padding-top: 20px;
+  margin-bottom: 50px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.card {
+  background-color: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 15px var(--shadow-color);
+}
+
+.card-header {
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.card-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-control {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .form-control {
+  padding-right: 40px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.toggle-password:hover {
+  color: var(--text-primary);
+}
+
+.toggle-password svg {
+  width: 20px;
+  height: 20px;
+}
+
+.errorInput {
+  border-color: var(--error-color) !important;
+}
+
+.errorMessage {
+  color: var(--error-color);
+  font-size: var(--small-font-size);
+  margin-top: 4px;
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.required-star {
+  color: var(--accent-blue);
+}
+
+.actions-end {
+  margin-top: 20px;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 14px;
+  background-color: var(--accent-blue);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.15s ease, opacity 0.2s;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 🎥 Avatar Styles */
+
+.avatar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.avatar-container {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--accent-blue), #3A00FF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--separator-color);
+  transition: border-color 0.3s, transform 0.3s;
+}
+
+.avatar-wrapper:hover {
+  border-color: var(--accent-blue);
+  transform: scale(1.02);
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  /* <-- AÑADE ESTA LÍNEA */
+}
+
+.avatar-image.preview {
+  /* Distinguir visualmente la previsualización */
+  border: 2px solid var(--accent-blue);
+  border-radius: 50%;
+  /* <-- AÑADE ESTA LÍNEA TAMBIÉN */
+  animation: fadeInPreview 0.3s ease-out;
+}
+
+@keyframes fadeInPreview {
+  from {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--accent-blue), #3A00FF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.avatar-initials {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.avatar-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  color: var(--accent-blue);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-avatar {
+  position: relative;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.btn-avatar input[type="file"] {
+  display: none;
+}
+
+.btn-avatar.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn-change {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-change:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-delete {
+  background-color: transparent;
+  color: var(--error-color);
+  border: 1.5px solid var(--error-color);
+}
+
+.btn-delete:hover:not(:disabled) {
+  background-color: rgba(var(--error-rgb, 220, 53, 69), 0.1);
+  border-color: var(--error-color);
+  transform: translateY(-2px);
+}
+
+.btn-avatar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .card {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .avatar-wrapper {
+    width: 100px;
+    height: 100px;
+    border-width: 2px;
+  }
+
+  .avatar-initials {
+    font-size: 1.5rem;
+  }
+
+  .btn-avatar {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    min-width: 100px;
+  }
+
+  .avatar-actions {
+    gap: 8px;
+  }
+}

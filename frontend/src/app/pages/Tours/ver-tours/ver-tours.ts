@@ -21,18 +21,19 @@ export class VerToursComponent implements OnInit {
     tours = signal<Tour[]>([]);
     isLoading = signal(true);
 
+    private refreshToursEffect = effect(() => {
+        const entity = this.navbar.needsRefresh();
+        if (entity === 'tours') {
+            this.listar();
+            this.navbar.needsRefresh.set('');
+        }
+    });
+
     // filtro simple - por ahora devuelve todos, expón como función para template
     toursFiltrados = () => this.tours();
 
     ngOnInit(): void {
         this.listar();
-
-        effect(() => {
-            const entity = this.navbar.needsRefresh();
-            if (entity === 'tours') {
-                this.listar();
-            }
-        });
     }
 
     listar() {
@@ -40,13 +41,16 @@ export class VerToursComponent implements OnInit {
     }
 
     loadTours() {
+        this.isLoading.set(true);
         this.navbar.alert.set({
             title: 'Cargando tours...',
             loading: true,
             autoClose: false
         });
         this.reservasService.getTours().subscribe({
-            next: (data) => this.tours.set(data || []),
+            next: (data) => {
+                queueMicrotask(() => this.tours.set(data || []));
+            },
             error: (err) => {
                 this.navbar.alert.set({
                     type: 'error',
@@ -55,7 +59,12 @@ export class VerToursComponent implements OnInit {
                     autoClose: true,
                 });
             },
-            complete: () => { this.isLoading.set(false); this.navbar.alert.set(null); }
+            complete: () => {
+                queueMicrotask(() => {
+                    this.isLoading.set(false);
+                    this.navbar.alert.set(null);
+                });
+            }
         });
     }
 

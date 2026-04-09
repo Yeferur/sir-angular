@@ -407,10 +407,28 @@ input[type=number] {
   padding: 10px 12px;
   cursor: pointer;
   border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .autocomplete-list li:hover {
   background-color: var(--bg-tertiary);
+}
+
+.autocomplete-point-name {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.autocomplete-point-route {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: .82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* =========================================================
@@ -1169,14 +1187,15 @@ input[type=number] {
 .floating-summary .summary-content {
   padding: 0 20px 12px;
   flex: 1 1 auto;
-
-  overflow: hidden; /* NUNCA SCROLL */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Mantener segmented EN FILA dentro del resumen */
 .floating-summary .segmented-control {
   flex-direction: row !important;
   gap: 0 !important;
+  margin-bottom: 16px;
   padding: 3px !important;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--separator-color);
@@ -1196,15 +1215,13 @@ input[type=number] {
   border-top: 1px solid var(--separator-color);
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .floating-summary .summary-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin: 0;
+  margin-bottom: 12px;
 }
 
 .floating-summary .summary-item .form-label {
@@ -1215,8 +1232,9 @@ input[type=number] {
 
 .floating-summary .summary-value {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
+  text-align: right;
 }
 
 .floating-summary .summary-item.total-row {

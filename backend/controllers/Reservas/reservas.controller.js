@@ -22,6 +22,7 @@ const {
   verificarDniDuplicado,
   obtenerHistorialCambiosReserva,
   resolverComprobanteSeguroPorNombre,
+  eliminarComprobantePagoReserva,
 } = require('../../services/Reservas/reservas.service');
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -162,6 +163,15 @@ exports.getComprobanteSeguro = asyncHandler(async (req, res) => {
     return sendError(res, { status: 404, message: 'Comprobante no encontrado', errorCode: 'FILE_NOT_FOUND' });
   }
   return res.sendFile(resolved.absolutePath);
+});
+
+exports.deleteComprobantePagoReserva = asyncHandler(async (req, res) => {
+  const { id, idPago } = req.params;
+  const userId = req.user?.id || null;
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
+
+  const data = await eliminarComprobantePagoReserva(id, idPago, userId, clientIp);
+  return sendSuccess(res, { data, message: 'Comprobante eliminado correctamente' });
 });
 
 

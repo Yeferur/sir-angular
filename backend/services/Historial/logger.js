@@ -1,5 +1,27 @@
 const db = require('../../database/db');
 
+let historialIdRegistroSchemaPromise = null;
+
+function normalizeOptionalUserId(idUsuario) {
+  if (idUsuario === null || idUsuario === undefined) return null;
+
+  if (typeof idUsuario === 'number') {
+    return Number.isInteger(idUsuario) && idUsuario > 0 ? idUsuario : null;
+  }
+
+  if (typeof idUsuario === 'bigint') {
+    return idUsuario > 0n ? idUsuario.toString() : null;
+  }
+
+  if (typeof idUsuario === 'string') {
+    const trimmed = idUsuario.trim();
+    if (!/^\d+$/.test(trimmed)) return null;
+    return trimmed === '0' ? null : trimmed;
+  }
+
+  return null;
+}
+
 async function ensureHistorialCambiosTable(conn) {
   await conn.query(
     `CREATE TABLE IF NOT EXISTS historial_cambios (
@@ -18,14 +40,42 @@ async function ensureHistorialCambiosTable(conn) {
   );
 }
 
+async function ensureHistorialIdRegistroTextColumn() {
+  if (!historialIdRegistroSchemaPromise) {
+    historialIdRegistroSchemaPromise = (async () => {
+      const [rows] = await db.query(
+        `SELECT DATA_TYPE
+           FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'historial'
+            AND COLUMN_NAME = 'Id_Registro'
+          LIMIT 1`
+      );
+
+      const dataType = String(rows?.[0]?.DATA_TYPE || '').toLowerCase();
+      if (dataType !== 'varchar' && dataType !== 'text' && dataType !== 'mediumtext' && dataType !== 'longtext') {
+        await db.query('ALTER TABLE historial MODIFY COLUMN Id_Registro VARCHAR(50) NULL');
+      }
+    })().catch((error) => {
+      historialIdRegistroSchemaPromise = null;
+      throw error;
+    });
+  }
+
+  return historialIdRegistroSchemaPromise;
+}
+
 async function recordHistorial({ conexion = null, tabla, id_registro = null, accion, id_usuario = null, detalles = [] }) {
   // If a connection is provided, use it (inside transaction), else get a new one
   const useExternalConn = !!conexion;
   const conn = conexion || await db.getConnection();
 
   try {
-    // Normalizar usuario
-    const safeUser = (id_usuario == null) ? 0 : id_usuario;
+    await ensureHistorialIdRegistroTextColumn();
+
+    // En tablas con FK a usuarios, usar NULL cuando no exista usuario válido
+    const safeUser = normalizeOptionalUserId(id_usuario);
+    const safeRegistro = (id_registro == null || id_registro === '') ? null : String(id_registro);
 
     // Resolver acción concreta si viniera como 'CREAR_O_ACTUALIZAR'
     let finalAccion = accion;
@@ -68,7 +118,7 @@ async function recordHistorial({ conexion = null, tabla, id_registro = null, acc
 
     const [res] = await conn.query(
       'INSERT INTO historial (Tabla, Id_Registro, Accion, Id_Usuario) VALUES (?, ?, ?, ?)',
-      [tabla, id_registro ?? 0, finalAccion, safeUser]
+      [tabla, safeRegistro, finalAccion, safeUser]
     );
 
     const Id_Historial = res.insertId;
@@ -95,7 +145,7 @@ async function logSistema({ mensaje, nivel = 'error', id_usuario = null, meta = 
   const now = new Date();
   const msg = typeof mensaje === 'string' ? mensaje : JSON.stringify(mensaje);
   try {
-    const safeUser = (id_usuario == null) ? 0 : id_usuario;
+    const safeUser = normalizeOptionalUserId(id_usuario);
     const modulo = meta ? JSON.stringify(meta).slice(0, 100) : null;
     await db.query(
       'INSERT INTO logs_sistema (Nivel, Descripcion, Modulo, Id_Usuario, Fecha_Registro) VALUES (?, ?, ?, ?, ?)',
@@ -133,7 +183,7 @@ async function recordHistorialCambioReserva({
       [
         'reservas',
         id_reserva ? String(id_reserva) : null,
-        id_usuario == null ? 0 : id_usuario,
+        normalizeOptionalUserId(id_usuario),
         JSON.stringify(payload),
         ip_cliente || null,
       ]

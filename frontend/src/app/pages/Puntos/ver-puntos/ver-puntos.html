@@ -20,6 +20,7 @@
     </div>
 
     <div class="header-right header-actions" style="display: flex; gap: 10px;">
+      <button class="btn-secondary" type="button" (click)="irAOrdenarPuntos()">Ordenar Puntos</button>
       <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
         {{ descargandoExcel ? 'Exportando...' : 'Exportar Excel' }}
       </button>

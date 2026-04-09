@@ -1,4 +1,4 @@
-const { obtenerPuntos, obtenerPuntosQuery, obtenerHorario, obtenerHorariosPorPunto, obtenerPuntosPorDireccion, crearPunto, crearHorariosParaPunto, obtenerPuntoPorId, actualizarPunto, eliminarPunto } = require('../../services/Puntos/puntos.service');
+const { obtenerPuntos, obtenerPuntosQuery, obtenerRutasPuntos, obtenerPuntosPorRuta, obtenerHorario, obtenerHorariosPorPunto, obtenerPuntosPorDireccion, crearPunto, crearHorariosParaPunto, obtenerPuntoPorId, actualizarPunto, eliminarPunto, actualizarOrdenPuntosRuta } = require('../../services/Puntos/puntos.service');
 const ExcelJS = require('exceljs');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
@@ -60,6 +60,61 @@ exports.getPuntosQuery = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener puntos:', error);
     return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.getRutasPuntos = async (req, res) => {
+  try {
+    const rutas = await obtenerRutasPuntos();
+    return sendSuccess(res, { data: rutas, message: 'Rutas obtenidas correctamente' });
+  } catch (error) {
+    console.error('Error al obtener rutas de puntos:', error);
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.getPuntosByRuta = async (req, res) => {
+  const ruta = req.params.ruta || req.query.ruta;
+  if (!ruta || !String(ruta).trim()) {
+    return sendError(res, { status: 400, message: 'Ruta es requerida', errorCode: 'MISSING_PARAMS' });
+  }
+
+  try {
+    const puntos = await obtenerPuntosPorRuta(ruta);
+    return sendSuccess(res, { data: puntos, message: 'Puntos por ruta obtenidos correctamente' });
+  } catch (error) {
+    console.error('Error al obtener puntos por ruta:', error);
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.updateOrdenPuntosByRuta = async (req, res) => {
+  const ruta = req.params.ruta;
+  const orden = req.body?.orden;
+
+  if (!ruta || !String(ruta).trim()) {
+    return sendError(res, { status: 400, message: 'Ruta es requerida', errorCode: 'MISSING_PARAMS' });
+  }
+
+  if (!Array.isArray(orden) || !orden.length) {
+    return sendError(res, {
+      status: 400,
+      message: 'Debes enviar un array "orden" con elementos { id_punto, posicion }.',
+      errorCode: 'BAD_REQUEST'
+    });
+  }
+
+  try {
+    const userId = req.user?.id || null;
+    const result = await actualizarOrdenPuntosRuta(ruta, orden, userId);
+    return sendSuccess(res, { data: result, message: 'Orden de puntos actualizado correctamente' });
+  } catch (error) {
+    console.error('Error al actualizar orden de puntos:', error);
+    return sendError(res, {
+      status: 400,
+      message: error?.message || 'No fue posible actualizar el orden de puntos.',
+      errorCode: 'BAD_REQUEST'
+    });
   }
 };
 

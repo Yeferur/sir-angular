@@ -411,13 +411,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             autoCloseTime: 3000
           });
         } else {
-          this.navbar.alert.set({
-            type: 'success',
-            title: 'Reservas encontradas',
-            message: `Se encontraron ${data.length} reservas.`,
-            autoClose: true,
-            autoCloseTime: 3000,
-          });
+          this.navbar.successToast('Reservas encontradas', `Se encontraron ${data.length} reservas.`);
         }
       },
       error: (error) => {

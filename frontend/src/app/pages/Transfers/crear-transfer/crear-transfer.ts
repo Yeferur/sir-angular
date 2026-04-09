@@ -15,6 +15,7 @@ import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-in
 })
 export class CrearTransferComponent implements OnInit {
   form!: FormGroup;
+  private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
   openSummary = false;
   isLoading = signal<boolean>(true);
@@ -196,8 +197,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   ngOnInit(): void {
     this.form = this.fb.group({
       Titular: ['', Validators.required],
-      IndicativoTitular: [''],
-      TelefonoTitular: [''],
+      TelefonoTitular: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
       Rango: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Moneda: ['COP'],
       TipoServicio: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
@@ -209,8 +209,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Reporta: ['', Validators.required],
       Vuelo: [''],
       Valor: [0],
-      IndicativoReserva: [''],
-      TelefonoReserva: ['', Validators.required],
+      TelefonoReserva: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: ['']
     });
 
@@ -343,6 +342,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       const invalid = Object.keys(this.form.controls).filter(k => this.form.get(k)?.invalid);
       const friendly: Record<string, string> = {
         Titular: 'Titular',
+        TelefonoTitular: 'Teléfono del titular (ej: +573001234567)',
         Rango: 'Rango de pasajeros',
         TipoServicio: 'Tipo de servicio',
         Salida: 'Punto de salida',
@@ -351,13 +351,19 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
         Reporta: 'Nombre del reportante',
-        TelefonoReserva: 'Teléfono de reserva'
+        TelefonoReserva: 'Teléfono de reserva (ej: +573001234567)'
       };
 
       const fields = invalid.map(f => friendly[f] || f);
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-      this.navbar.warningToast('Campos inválidos', msg);
+      this.navbar.alert.set({
+        type: 'error',
+        title: 'Campos requeridos incompletos',
+        message: msg,
+        autoClose: true,
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+      });
       return;
     }
 
@@ -402,7 +408,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     const transferData = {
       Id_Transfer: `TR-${Math.floor(10000 + Math.random() * 90000)}`,
       Titular: this.form.value.Titular,
-      Tel_Contacto: `${this.form.value.IndicativoTitular || ''}${this.form.value.TelefonoTitular || ''}`,
+      Tel_Contacto: this.form.value.TelefonoTitular || '',
       Id_Rango: this.form.value.Rango,
       RangoDescripcion: this.selectedRangoDescripcion,
       Servicio: this.form.value.TipoServicio,
@@ -413,7 +419,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       HoraRecogida: this.form.value.Hora,
       Vuelo: this.form.value.Vuelo,
       TipoVuelo: this.form.value.TipoVuelo,
-      TelefonoTransfer: `${this.form.value.IndicativoReserva || ''}${this.form.value.TelefonoReserva || ''}`,
+      TelefonoTransfer: this.form.value.TelefonoReserva || '',
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
       Observaciones: [this.form.value.Observaciones, `EstadoMotivo: ${estadoInfo.motivo}`].filter(Boolean).join('\n'),
@@ -445,5 +451,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   hasUnsavedChanges(): boolean {
     return this.form?.dirty && !this.isSubmitting();
+  }
+
+  getPhoneError(controlName: string): string {
+    const ctrl = this.form?.get(controlName);
+    if (!ctrl) return 'Teléfono inválido.';
+    if (ctrl.hasError('required')) return 'El teléfono es obligatorio.';
+    if (ctrl.hasError('pattern')) {
+      return "Debe iniciar con '+' y tener indicativo + exactamente 10 dígitos del número (ej: +573001234567).";
+    }
+    return 'Teléfono inválido.';
   }
 }

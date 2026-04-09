@@ -8,6 +8,29 @@ const http = require('http');
 
 const app = express();
 
+// ✅ Expose uploads folder as static (for profile photos, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Compatibilidad: avatares antiguos pudieron quedar en /uploads o /uploads/usuarios.
+app.get('/uploads/fotos_perfil/:filename', (req, res, next) => {
+  const safeName = path.basename(req.params.filename || '');
+  if (!safeName) return next();
+
+  const candidates = [
+    path.join(__dirname, 'uploads', 'fotos_perfil', safeName),
+    path.join(__dirname, 'uploads', 'usuarios', safeName),
+    path.join(__dirname, 'uploads', safeName),
+  ];
+
+  for (const filePath of candidates) {
+    if (require('fs').existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  }
+
+  return next();
+});
+
 const loginRoutes = require('./routes/Login/login.routes');
 const inicioRoutes = require('./routes/inicio.routes');
 const reservasRoutes = require('./routes/Reservas/reserva.routes');

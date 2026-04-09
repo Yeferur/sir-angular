@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
 const { recordHistorial, logSistema } = require('../Historial/logger');
+const fsp = fs.promises;
 
 /* ===========================
  * HELPERS
@@ -69,6 +70,41 @@ function normalizarRutaComprobanteExistente(input, idReserva) {
   if (!COMPROBANTE_FILE_RE.test(fileName)) return '';
 
   return `${expectedPrefix}${fileName}`;
+}
+
+function normalizarRutaComprobanteSalida(input) {
+  const value = String(input || '').trim().replace(/\\/g, '/');
+  if (!value || value === 'N/A') return null;
+  if (!value.startsWith('uploads/reservas/')) return null;
+  const fileName = path.basename(value);
+  if (!COMPROBANTE_FILE_RE.test(fileName)) return null;
+  return value;
+}
+
+function rutaComprobanteAbsolutaSegura(relativePath) {
+  const normalized = normalizarRutaComprobanteSalida(relativePath);
+  if (!normalized) return null;
+
+  const uploadsRoot = path.resolve(__dirname, '../../uploads');
+  const absolutePath = path.resolve(__dirname, '../../', normalized);
+  if (!(absolutePath === uploadsRoot || absolutePath.startsWith(`${uploadsRoot}${path.sep}`))) {
+    return null;
+  }
+
+  return absolutePath;
+}
+
+async function eliminarArchivoComprobanteFisico(relativePath) {
+  const absolutePath = rutaComprobanteAbsolutaSegura(relativePath);
+  if (!absolutePath) return false;
+
+  try {
+    await fsp.unlink(absolutePath);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
 }
 
 async function resolverComprobanteSeguroPorNombre(nombreArchivo) {
@@ -163,29 +199,38 @@ async function validarPuntosRecogidaLogistica(pasajeros, dbConnection) {
 
   const puntos = rows || [];
 
-  const rutasNoNulas = new Set(
-    puntos
-      .map((r) => (r?.ruta == null ? '' : String(r.ruta).trim()))
-      .filter((r) => r !== '')
-  );
+  const normalizarRuta = (ruta) => {
+    const value = String(ruta ?? '').trim().toUpperCase();
+    if (!value || value === 'PENDIENTE' || value === '0') return '';
+    return value;
+  };
 
-  if (rutasNoNulas.size > 1) {
-    throw new Error('Inviabilidad Logística: Todos los pasajeros de una misma reserva deben pertenecer a la misma ruta de recogida.');
-  }
+  const puntosValidos = puntos.filter((r) => {
+    const ruta = normalizarRuta(r?.ruta);
+    const lat = Number(r?.Latitud);
+    const lon = Number(r?.Longitud);
+    return ruta !== '' && Number.isFinite(lat) && Number.isFinite(lon);
+  });
 
-  for (let i = 0; i < puntos.length; i++) {
-    const lat1 = Number(puntos[i]?.Latitud);
-    const lon1 = Number(puntos[i]?.Longitud);
+  for (let i = 0; i < puntosValidos.length; i++) {
+    const puntoA = puntosValidos[i];
+    const rutaA = normalizarRuta(puntoA?.ruta);
+    const lat1 = Number(puntoA?.Latitud);
+    const lon1 = Number(puntoA?.Longitud);
     if (!Number.isFinite(lat1) || !Number.isFinite(lon1)) continue;
 
-    for (let j = i + 1; j < puntos.length; j++) {
-      const lat2 = Number(puntos[j]?.Latitud);
-      const lon2 = Number(puntos[j]?.Longitud);
+    for (let j = i + 1; j < puntosValidos.length; j++) {
+      const puntoB = puntosValidos[j];
+      const rutaB = normalizarRuta(puntoB?.ruta);
+      if (!rutaA || !rutaB || rutaA === rutaB) continue;
+
+      const lat2 = Number(puntoB?.Latitud);
+      const lon2 = Number(puntoB?.Longitud);
       if (!Number.isFinite(lat2) || !Number.isFinite(lon2)) continue;
 
       const distancia = distanciaHaversineKm(lat1, lon1, lat2, lon2);
       if (distancia > 6) {
-        throw new Error('Inviabilidad Logística: Los puntos de encuentro están demasiado separados (> 6km). Por favor, divida la reserva.');
+        throw new Error('Inviabilidad Logística: Los puntos de encuentro de rutas distintas están demasiado separados (> 6km). Por favor, divida la reserva.');
       }
     }
   }
@@ -1013,6 +1058,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
  * =========================== */
 async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap = {}, userId = null, clientIp = null) {
   let conn;
+  let rutasPendientesEliminar = [];
   try {
     validarReglasPasajerosPorTour(payload);
 
@@ -1130,12 +1176,33 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
     const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(Id_Reserva));
     fs.mkdirSync(baseDir, { recursive: true });
 
-    if (pagosArray.length > 0 || payload.pagos !== undefined) {
+    if (payload.pagos !== undefined) {
+      const [pagosActualesRows] = await conn.query(
+        `SELECT Id_Pago, Ruta_Comprobante
+           FROM pagos_reservas
+          WHERE Id_Reserva = ?
+          FOR UPDATE`,
+        [Id_Reserva]
+      );
+
+      const rutasActuales = new Set(
+        (pagosActualesRows || [])
+          .map((row) => normalizarRutaComprobanteSalida(row.Ruta_Comprobante))
+          .filter(Boolean)
+      );
+
+      const rutasConservar = new Set(
+        pagosArray
+          .map((pago) => normalizarRutaComprobanteExistente(pago?.Ruta_Comprobante || pago?.SoporteUrl, Id_Reserva))
+          .map((ruta) => normalizarRutaComprobanteSalida(ruta))
+          .filter(Boolean)
+      );
+
+      rutasPendientesEliminar = Array.from(rutasActuales).filter((ruta) => !rutasConservar.has(ruta));
+
+      await conn.query('DELETE FROM pagos_reservas WHERE Id_Reserva = ?', [Id_Reserva]);
+
       let abonoIdx = 0;
-      const pagosDirectoCompleto = pagosArray.filter(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo');
-      if (pagosDirectoCompleto.length === 1 && pagosArray.length === 1) {
-        await conn.query('DELETE FROM pagos_reservas WHERE Id_Reserva = ?', [Id_Reserva]);
-      }
       for (const pago of pagosArray) {
         const tipo = (pago.Tipo === 'Pago Directo' || pago.Tipo === 'Pago Completo' || pago.Tipo === 'Abono') ? pago.Tipo : 'Abono';
         let rutaComprobante = 'N/A';
@@ -1174,6 +1241,10 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
 
     await conn.commit();
 
+    if (rutasPendientesEliminar.length > 0) {
+      await Promise.all(rutasPendientesEliminar.map((ruta) => eliminarArchivoComprobanteFisico(ruta)));
+    }
+
     if (payload?.cabeceraReserva?.Fecha_Tour) {
       websocketManager.broadcastReservaEvento({
         type: 'reservaActualizada',
@@ -1187,6 +1258,76 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
   } catch (error) {
     if (conn) await conn.rollback();
     try { await logSistema({ mensaje: `actualizarReserva error: ${error.message || error}`, meta: { Id_Reserva, payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+async function eliminarComprobantePagoReserva(Id_Reserva, Id_Pago, userId = null, clientIp = null) {
+  let conn;
+  let rutaEliminar = null;
+
+  try {
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT Id_Pago, Ruta_Comprobante
+         FROM pagos_reservas
+        WHERE Id_Reserva = ?
+          AND Id_Pago = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [Id_Reserva, Id_Pago]
+    );
+
+    if (!rows?.length) {
+      const err = new Error('Pago no encontrado para la reserva indicada.');
+      err.status = 404;
+      err.errorCode = 'PAGO_NOT_FOUND';
+      throw err;
+    }
+
+    const pago = rows[0];
+    rutaEliminar = normalizarRutaComprobanteSalida(pago.Ruta_Comprobante);
+
+    await conn.query(
+      `UPDATE pagos_reservas
+          SET Ruta_Comprobante = 'N/A'
+        WHERE Id_Reserva = ?
+          AND Id_Pago = ?`,
+      [Id_Reserva, Id_Pago]
+    );
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'reservas',
+      id_registro: Id_Reserva,
+      accion: 'ACTUALIZAR',
+      id_usuario: userId,
+      detalles: [
+        {
+          columna: 'Ruta_Comprobante',
+          anterior: pago.Ruta_Comprobante || null,
+          nuevo: 'N/A',
+        },
+      ],
+    });
+
+    await conn.commit();
+
+    if (rutaEliminar) {
+      await eliminarArchivoComprobanteFisico(rutaEliminar);
+    }
+
+    return {
+      Id_Reserva: String(Id_Reserva),
+      Id_Pago: Number(Id_Pago),
+      comprobanteEliminado: true,
+    };
+  } catch (error) {
+    if (conn) await conn.rollback();
     throw error;
   } finally {
     if (conn) conn.release();
@@ -1345,6 +1486,7 @@ module.exports = {
   obtenerComisiones,
   getPuntoByIdSvc,
   resolverComprobanteSeguroPorNombre,
+  eliminarComprobantePagoReserva,
   // verificación
   verificarDniDuplicado,
   obtenerHistorialCambiosReserva,

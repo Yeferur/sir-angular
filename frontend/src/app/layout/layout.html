@@ -4,7 +4,11 @@
 
 <div class="top-bar">
   <div class="avatar-placeholder">
-    <i class="bx bx-user"></i>
+    @if (avatarUrl()) {
+      <img [src]="avatarUrl()" alt="Avatar" class="avatar-image" />
+    } @else {
+      <span class="avatar-initials">{{ getUserInitials() }}</span>
+    }
   </div>
   <button class="menu-button" [class.active]="isSidebarOpen()" (click)="toggleSidebar()">
     <i class="bx" [class.bx-menu]="!isSidebarOpen()" [class.bx-x]="isSidebarOpen()"></i>
@@ -15,7 +19,11 @@
 <div class="sidebar" [class.open]="isSidebarOpen()" (mouseleave)="closeAllSubmenus()">
   <div class="user-section">
     <div class="avatar-placeholder-large">
-      <i class="bx bx-user"></i>
+      @if (avatarUrl()) {
+        <img [src]="avatarUrl()" alt="Avatar" class="avatar-image" />
+      } @else {
+        <span class="avatar-initials">{{ getUserInitials() }}</span>
+      }
     </div>
     <div class="user-info">
       <h4>{{ user()?.name }} {{ user()?.apellidos }}</h4>
@@ -103,10 +111,10 @@
       <a (click)="toggleMenu(6)" class="link"><i class="bx bx-cog"></i><span>Configuración</span><i
           class="bx bx-chevron-down"></i></a>
       <div class="submenu">
-        <a routerLink="/" (click)="clickPage()">Perfil</a>
+        <a routerLink="/Perfil/Editar" (click)="clickPage()">Perfil</a>
         <a *appPermiso="'USUARIOS.LEER'" routerLink="/Usuarios" (click)="clickPage()">Administrar Usuarios</a>
         <a *appPermiso="'USUARIOS.CREAR'" routerLink="/Usuarios/NuevoUsuario" (click)="clickPage()">Crear Usuarios</a>
-        <a routerLink="/" (click)="clickPage()">Ayuda</a>
+        <a routerLink="/Ayuda" (click)="clickPage()">Ayuda</a>
         <a (click)="toggleTheme()">
           Tema: {{ isDarkMode ? 'Oscuro' : 'Claro' }}
         </a>
