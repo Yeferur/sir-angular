@@ -1271,7 +1271,7 @@ export class CrearReservaComponent implements OnInit {
           autoClose: false,
           buttons: [
             { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.Id_Reserva.set(res.Id_Reserva); } },
+            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(res.Id_Reserva); } },
           ],
         });
 

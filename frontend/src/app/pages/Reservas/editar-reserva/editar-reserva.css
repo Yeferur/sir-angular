@@ -1006,7 +1006,16 @@ input[type=number] {
   background: rgba(255, 255, 255, 0.03);
   padding: 10px 12px;
   border-radius: 12px;
-  gap: 10px;
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.pago-completo .file-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .status-pill {
@@ -1040,18 +1049,58 @@ input[type=number] {
   opacity: .85;
 }
 
+.pago-completo .btn-link,
+.pago-completo .btn-subtle,
+.pago-completo .btn-danger {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.pago-completo .btn-link {
+  background: rgba(43, 109, 255, 0.12);
+  color: #9fc0ff;
+  border-color: rgba(43, 109, 255, 0.25);
+}
+
+.pago-completo .btn-link:hover {
+  background: rgba(43, 109, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.pago-completo .btn-subtle {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.pago-completo .btn-subtle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
 .pago-completo .btn-danger {
   background: rgba(255, 87, 87, 0.10);
   border: 1px solid rgba(255, 87, 87, 0.20);
   color: #ffb7b7;
-  padding: 6px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 700;
 }
 
 .pago-completo .btn-danger:hover {
   background: rgba(255, 87, 87, 0.16);
+  transform: translateY(-1px);
+}
+
+.pago-completo .btn-link:active,
+.pago-completo .btn-subtle:active,
+.pago-completo .btn-danger:active {
+  transform: translateY(0);
 }
 
 @media (min-width: 900px) {
@@ -1062,6 +1111,24 @@ input[type=number] {
 
   .payments-right {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .pago-completo .file-chip {
+    align-items: flex-start;
+  }
+
+  .pago-completo .file-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .pago-completo .btn-link,
+  .pago-completo .btn-subtle,
+  .pago-completo .btn-danger {
+    flex: 1 1 auto;
+    text-align: center;
   }
 }
 

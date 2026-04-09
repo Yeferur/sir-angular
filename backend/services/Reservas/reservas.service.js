@@ -1070,9 +1070,16 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
     await conn.beginTransaction();
 
     const [currentReservaRows] = await conn.query(
-      `SELECT Id_Reserva, Id_Tour, Fecha_Tour, Tipo_Reserva, Estado
-         FROM reservas
-        WHERE Id_Reserva = ?
+      `SELECT
+          r.Id_Reserva,
+          r.Fecha_Tour,
+          r.Tipo_Reserva,
+          r.Estado,
+          r.Id_Horario,
+          h.Id_Tour AS Id_Tour_Actual
+         FROM reservas r
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        WHERE r.Id_Reserva = ?
         LIMIT 1
         FOR UPDATE`,
       [Id_Reserva]
@@ -1089,9 +1096,16 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
     const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
     const pagosArray = Array.isArray(payload?.pagos) ? payload.pagos : [];
 
-    const idTourFinal = Number(r.Id_Tour || currentReserva.Id_Tour);
+    const idTourFinal = Number(r.Id_Tour || currentReserva.Id_Tour_Actual || 0);
     const fechaTourFinal = normalizarFechaYMD(r.Fecha_Tour || currentReserva.Fecha_Tour);
     const tipoReservaFinal = String(r.Tipo_Reserva || currentReserva.Tipo_Reserva || 'Grupal');
+
+    if (!idTourFinal || !Number.isFinite(idTourFinal)) {
+      const err = new Error('No fue posible determinar el tour de la reserva para validar cupos.');
+      err.status = 400;
+      err.errorCode = 'ID_TOUR_REQUIRED';
+      throw err;
+    }
 
     // Primera operación transaccional: bloqueo y verificación de disponibilidad.
     if (tipoReservaFinal.toLowerCase() === 'grupal') {
@@ -1135,8 +1149,6 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       if (r.Telefono_Reportante !== undefined) setIf('Telefono_Reportante', r.Telefono_Reportante);
       if (r.Nombre_Reportante !== undefined) setIf('Nombre_Reportante', r.Nombre_Reportante);
       if (r.Observaciones !== undefined) setIf('Observaciones', r.Observaciones);
-      if (r.Id_Tour !== undefined) setIf('Id_Tour', r.Id_Tour);
-      
       // Estado calculado desde el backend
       setIf('Estado', estadoCalculado);
 
@@ -1237,7 +1249,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       }
     }
 
-    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva, accion: 'ACTUALIZAR', id_usuario: userId, detalles: [ { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado }, { columna: 'Id_Tour', anterior: currentReserva.Id_Tour, nuevo: idTourFinal }, { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal } ] });
+    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva, accion: 'ACTUALIZAR', id_usuario: userId, detalles: [ { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado }, { columna: 'Id_Tour', anterior: currentReserva.Id_Tour_Actual, nuevo: idTourFinal }, { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal } ] });
 
     await conn.commit();
 
@@ -1249,7 +1261,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       websocketManager.broadcastReservaEvento({
         type: 'reservaActualizada',
         Fecha_Tour: payload.cabeceraReserva.Fecha_Tour,
-        Id_Tour: payload.cabeceraReserva.Id_Tour,
+        Id_Tour: idTourFinal,
         Id_Reserva,
       });
     }

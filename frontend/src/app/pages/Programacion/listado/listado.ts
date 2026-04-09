@@ -363,6 +363,11 @@ this.navbar.alert.set({
     const order = this.activeStops.map(s => s.NombrePunto);
     this.stopOrderByBus.set(this.activeBusIndex, order);
 
+    if (this.navbar.puntos()) {
+      const reservasReordenadas = this.activeStops.flatMap(stop => stop.reservas);
+      this.navbar.puntos.set(reservasReordenadas);
+    }
+
     this.cdr.markForCheck();
   }
 
@@ -418,6 +423,10 @@ this.navbar.alert.set({
       }
 
       this.rebuildActiveStops();
+      if (this.activeBus && this.navbar.puntos()) {
+        const reservasActualizadas = this.activeStops.flatMap(stop => stop.reservas);
+        this.navbar.puntos.set(reservasActualizadas);
+      }
       this.cdr.markForCheck();
       return;
     }
@@ -466,11 +475,18 @@ this.navbar.alert.set({
     }
 
     this.rebuildActiveStops();
+    if (this.activeBus && this.navbar.puntos()) {
+      const reservasActualizadas = this.activeStops.flatMap(stop => stop.reservas);
+      this.navbar.puntos.set(reservasActualizadas);
+    }
     this.cdr.markForCheck();
   }
 
-  verMapa(bus: any): void {
-    this.navbar.puntos.set(bus.reservas);
+  verMapa(bus: any, busIndex?: number): void {
+    const reservas = Array.isArray(bus?.reservas) ? bus.reservas : [];
+    const order = typeof busIndex === 'number' ? this.stopOrderByBus.get(busIndex) : undefined;
+    const reservasOrdenadas = this.groupStops(reservas, order).flatMap(stop => stop.reservas);
+    this.navbar.puntos.set(reservasOrdenadas);
   }
 
   guardarListadoFinal(): void {
@@ -491,9 +507,14 @@ this.navbar.alert.set({
       return;
     }
 
+    const busesOrdenados = this.planSeleccionado.buses.map((bus, idx) => ({
+      ...bus,
+      reservas: this.ordenarReservasPorParadas(bus.reservas || [], idx)
+    }));
+
     const payload: any = {
       fecha: this.fechaSeleccionada,
-      buses: this.planSeleccionado.buses
+      buses: busesOrdenados
     };
 
     if ((this.tourSeleccionado as any).idsTours) {
@@ -736,6 +757,24 @@ this.navbar.alert.set({
     if (!m) return undefined;
     const idx = Number(m[1]);
     return this.planSeleccionado?.buses[idx];
+  }
+
+  private ordenarReservasPorParadas(reservas: Reserva[], busIndex: number): Reserva[] {
+    const order = this.stopOrderByBus.get(busIndex);
+    if (!order?.length) return [...reservas];
+
+    const rank = new Map(order.map((nombre, i) => [nombre, i]));
+    return [...reservas]
+      .map((r, idx) => ({ r, idx }))
+      .sort((a, b) => {
+        const ra = rank.get(a.r?.NombrePunto || '');
+        const rb = rank.get(b.r?.NombrePunto || '');
+        const oa = ra !== undefined ? ra : Number.MAX_SAFE_INTEGER;
+        const ob = rb !== undefined ? rb : Number.MAX_SAFE_INTEGER;
+        if (oa !== ob) return oa - ob;
+        return a.idx - b.idx;
+      })
+      .map((x) => x.r);
   }
 
   private rebuildActiveStops(): void {

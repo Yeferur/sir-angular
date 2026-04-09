@@ -475,6 +475,9 @@ showDuplicate: boolean = false;
         ComprobantePago: null, // no se puede rehidratar un File
       }, { emitEvent: false });
 
+      const listaPax = data?.Pasajeros ?? data?.Detalle?.Pasajeros ?? [];
+      const puntoPrincipalCabecera = this.parsePuntoId(data?.Cabecera?.Id_Punto ?? data?.Id_Punto ?? null);
+
 
 
       // Planes y preciosRef para poder calcular totales/sidebar
@@ -485,27 +488,32 @@ showDuplicate: boolean = false;
         await this.onPlanMonedaChange(true); // solo cargar preciosRef
       }
 
-      // Puntos seleccionados (chip principal)
-      const puntoId = this.form.get('Id_Punto')?.value;
-      console.log('Punto principal ID:', puntoId);
-      if (puntoId) {
-        const principal = await firstValueFrom(this.reservasSvc.getPuntoById(puntoId));
-        if (principal) this.puntosSeleccionados.set([principal]);
-      }
+      // Puntos seleccionados: usar hasta 3 únicos desde pasajeros + principal de cabecera
+      const idsPuntosReserva = this.extraerIdsPuntosReserva(puntoPrincipalCabecera, listaPax);
+      await this.hidratarPuntosSeleccionados(idsPuntosReserva);
+
+      const principalCargado = this.puntosSeleccionados()[0] ?? null;
+      this.form.get('Id_Punto')?.setValue(principalCargado?.Id_Punto ?? null, { emitEvent: false });
+      this.evaluarConflictoRutasEnTiempoReal();
 
       // Horario auto
       await this.fijarHorarioAutomatico();
 
       // Pasajeros: reconstruir EXACTO desde DB y marcar precios como dirty
       this.pasajeros.clear();
-      const listaPax = data?.Pasajeros ?? data?.Detalle?.Pasajeros ?? [];
+      const puntoPrincipalForm = this.parsePuntoId(this.form.get('Id_Punto')?.value);
+      const idsPuntosActivos = new Set(this.puntosSeleccionados().map((p) => Number(p.Id_Punto)));
       for (const p of listaPax) {
+        const puntoPasajero = this.parsePuntoId(p.Id_Punto);
+        const puntoPasajeroValido = puntoPasajero && idsPuntosActivos.has(puntoPasajero)
+          ? puntoPasajero
+          : null;
         const fg = this.fb.group({
           Tipo_Pasajero: [p.Tipo_Pasajero ?? p.TipoPasajero ?? 'ADULTO', Validators.required],
           Nombre_Pasajero: [p.Nombre_Pasajero ?? p.NombrePasajero ?? ''],
           DNI: [p.DNI ?? p.IdPas ?? ''],
           Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? '', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
-          Id_Punto: [p.Id_Punto ?? puntoId ?? null],
+          Id_Punto: [puntoPasajeroValido ?? puntoPrincipalForm ?? null],
           Confirmacion: [p.Confirmacion ?? false],
           PrecioRef: [p.Precio_Tour ?? p.PrecioRef ?? 0],
           Precio_Pasajero: [p.Precio_Pasajero ?? 0, [Validators.min(0)]],
@@ -576,6 +584,52 @@ showDuplicate: boolean = false;
     if (pagos.some(p => p.Tipo === 'Pago Completo')) return 'Completo';
     if (pagos.some(p => p.Tipo === 'Abono')) return 'Abono';
     return 'Directo';
+  }
+
+  private parsePuntoId(raw: any): number | null {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  private extraerIdsPuntosReserva(puntoPrincipal: number | null, pasajeros: any[]): number[] {
+    const ids: number[] = [];
+    const vistos = new Set<number>();
+
+    const pushUnique = (idRaw: any) => {
+      const id = this.parsePuntoId(idRaw);
+      if (!id || vistos.has(id)) return;
+      vistos.add(id);
+      ids.push(id);
+    };
+
+    // Mantiene el principal primero para conservar la semántica actual del formulario.
+    pushUnique(puntoPrincipal);
+    for (const p of pasajeros || []) pushUnique(p?.Id_Punto);
+
+    return ids.slice(0, 3);
+  }
+
+  private async hidratarPuntosSeleccionados(ids: number[]): Promise<void> {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      this.puntosSeleccionados.set([]);
+      return;
+    }
+
+    const puntos = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          return await firstValueFrom(this.reservasSvc.getPuntoById(id));
+        } catch {
+          return {
+            Id_Punto: id,
+            NombrePunto: `Punto ${id} (no disponible)`,
+            ruta: null,
+          } as Punto;
+        }
+      })
+    );
+
+    this.puntosSeleccionados.set((puntos || []).filter(Boolean).slice(0, 3));
   }
 
   private async cargarHistorialActividad(id: string): Promise<void> {
