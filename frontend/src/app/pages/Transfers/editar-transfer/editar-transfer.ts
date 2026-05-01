@@ -21,9 +21,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
+  showDuplicate = true;
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  private isNavigatingToDuplicate = false;
 
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
@@ -35,6 +37,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   // Archivos de comprobantes
   pagoPagadoFile: File | null = null;
   pagoPagadoFileName: string | null = null;
+  private pagoCompletoSoporteUrlParaReemplazo: string | null = null;
   abonoFiles: Map<number, File> = new Map();
   abonoFileNames: Map<number, string> = new Map();
 
@@ -175,12 +178,19 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     return this.form.get('Abonos') as FormArray;
   }
 
+  private crearAbonoGroup(data?: any): FormGroup {
+    return this.fb.group({
+      Id_Pago: [data?.Id_Pago || null],
+      Monto: [data?.Monto ?? '', [Validators.required, Validators.min(0.01)]],
+      Observaciones: [data?.Observaciones || ''],
+      Fecha_Pago: [data?.Fecha_Pago || ''],
+      Comprobante: [null],
+      SoporteUrl: [data?.Pago_Comprobante || data?.SoporteUrl || null]
+    });
+  }
+
   addAbono(): void {
-    this.abonos.push(this.fb.group({
-      Monto: ['', [Validators.required, Validators.min(0.01)]],
-      Observaciones: [''],
-      Fecha_Pago: ['']
-    }));
+    this.abonos.push(this.crearAbonoGroup());
   }
 
   removeAbono(index: number): void {
@@ -210,6 +220,14 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     return Array.from({ length: this.abonos.length }, (_, i) => i);
   }
 
+  get abonosValidos(): boolean {
+    return this.getTotalAbonado() <= Number(this.form.get('Valor')?.value || 0);
+  }
+
+  recalcularTotales(): void {
+    this.form.get('Valor')?.updateValueAndValidity({ emitEvent: false });
+  }
+
   private validateFile(file: File | null): { valid: boolean; error?: string } {
     if (!file) return { valid: false, error: 'No se seleccionó archivo' };
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -233,9 +251,17 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         target.value = '';
         return;
       }
+      const currentValue = this.form.get('ComprobantePago')?.value;
+      this.pagoCompletoSoporteUrlParaReemplazo = currentValue?.SoporteUrl || this.pagoCompletoSoporteUrlParaReemplazo;
       this.pagoPagadoFile = files[0];
       this.pagoPagadoFileName = files[0].name;
+      this.form.get('ComprobantePago')?.setValue(files[0]);
+      this.form.get('ComprobantePago')?.markAsDirty();
     }
+  }
+
+  onFileSelected(event: Event): void {
+    this.onPagoCompletoFileSelected(event);
   }
 
   onAbonoFileSelected(event: Event, index: number): void {
@@ -250,25 +276,90 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       }
       this.abonoFiles.set(index, files[0]);
       this.abonoFileNames.set(index, files[0].name);
+      const abonoControl = this.abonos.at(index) as FormGroup;
+      abonoControl.get('Comprobante')?.setValue(files[0]);
+      abonoControl.markAsDirty();
     }
   }
 
   clearPagoCompletoFile(): void {
     this.pagoPagadoFile = null;
     this.pagoPagadoFileName = null;
+    this.pagoCompletoSoporteUrlParaReemplazo = null;
+    this.form.get('ComprobantePago')?.setValue(null);
+    this.form.get('ComprobantePago')?.markAsDirty();
     const input = document.getElementById('file-pago-completo') as HTMLInputElement;
     if (input) input.value = '';
+    const newInput = document.getElementById('ComprobantePagoReemplazar') as HTMLInputElement;
+    if (newInput) newInput.value = '';
+  }
+
+  deleteComprobante(): void {
+    this.clearPagoCompletoFile();
   }
 
   clearAbonoFile(index: number): void {
     this.abonoFiles.delete(index);
     this.abonoFileNames.delete(index);
+    const abonoControl = this.abonos.at(index) as FormGroup;
+    abonoControl.get('Comprobante')?.setValue(null);
+    abonoControl.get('SoporteUrl')?.setValue(null);
+    abonoControl.markAsDirty();
     const input = document.getElementById(`file-abono-${index}`) as HTMLInputElement;
     if (input) input.value = '';
+    const newInput = document.getElementById(`ComprobanteAbono${index}`) as HTMLInputElement;
+    if (newInput) newInput.value = '';
   }
 
   getAbonoFileName(index: number): string | null {
-    return this.abonoFileNames.get(index) || null;
+    const file = this.abonos.at(index)?.get('Comprobante')?.value;
+    return file?.name || this.abonoFileNames.get(index) || null;
+  }
+
+  eliminarComprobanteAbono(index: number): void {
+    this.clearAbonoFile(index);
+  }
+
+  viewComprobante(url: string | null): void {
+    if (!url) return;
+    const filename = String(url).split('/').filter(Boolean).pop();
+    if (!filename) {
+      this.navbar.warningToast('Comprobante inválido', 'No se pudo resolver el comprobante.');
+      return;
+    }
+
+    this.transferSvc.descargarComprobante(filename).subscribe({
+      next: (blob) => {
+        const href = URL.createObjectURL(blob);
+        window.open(href, '_blank');
+        setTimeout(() => URL.revokeObjectURL(href), 30000);
+      },
+      error: () => this.navbar.errorToast('Error', 'No se pudo abrir el comprobante.')
+    });
+  }
+
+  private getTransferIdFromRoute(): string | null {
+    const routeId =
+      this.route.snapshot.paramMap.get('id') ||
+      this.route.snapshot.paramMap.get('Id_Transfer') ||
+      this.route.snapshot.queryParamMap.get('id') ||
+      this.route.snapshot.queryParamMap.get('Id_Transfer') ||
+      this.navbar.Id_Transfer();
+
+    const normalizedId = String(routeId ?? '').trim();
+    return normalizedId || null;
+  }
+
+  private unwrapListResponse(response: any): any[] {
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.data)) return response.data;
+    return [];
+  }
+
+  private unwrapTransferDetalle(response: any): any | null {
+    if (response?.data?.transfer) return response.data;
+    if (response?.transfer) return response;
+    return null;
   }
 
   ngOnInit(): void {
@@ -290,7 +381,9 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       TelefonoReserva: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
       TipoPago: ['PagaEnPunto'],
-      Abonos: this.fb.array([])
+      Abonos: this.fb.array([]),
+      ComprobantePago: [null],
+      PagoObservaciones: ['']
     });
 
     // Cargar catálogos y datos del transfer
@@ -386,10 +479,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   private loadCatalogosAndTransferData(): void {
     this.isLoading.set(true);
 
-    const transferId = this.route.snapshot.paramMap.get('id');
+    const transferId = this.getTransferIdFromRoute();
     if (!transferId) {
       this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
       this.router.navigate(['/Transfers/VerTransfers']);
+      this.isLoading.set(false);
       return;
     }
 
@@ -400,17 +494,18 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       transfer: this.transferSvc.getTransfer(transferId).pipe(catchError(() => of(null)))
     }).subscribe({
       next: ({ servicios, rangos, monedas, transfer }) => {
-        this.resultsServicioTransfer = Array.isArray(servicios) ? servicios : [];
-        this.resultsRangos = Array.isArray(rangos) ? rangos : [];
-        this.resultsMonedas = Array.isArray(monedas) ? monedas : [];
+        this.resultsServicioTransfer = this.unwrapListResponse(servicios);
+        this.resultsRangos = this.unwrapListResponse(rangos);
+        this.resultsMonedas = this.unwrapListResponse(monedas);
 
-        if (!transfer || !transfer.data?.transfer) {
+        const detalle = this.unwrapTransferDetalle(transfer);
+        if (!detalle) {
           this.navbar.errorToast('Error', 'Transfer no encontrado.');
           this.router.navigate(['/Transfers/VerTransfers']);
           return;
         }
 
-        this.fillFormWithTransferData(transfer.data);
+        this.fillFormWithTransferData(detalle);
       },
       error: () => {
         this.navbar.errorToast('Error', 'No se pudieron cargar los catálogos.');
@@ -448,21 +543,25 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     }, { emitEvent: false });
 
     // Determinar tipo de pago
-    if (pagos.length === 0) {
+    if (pagos.length === 0 || (pagos.length === 1 && pagos[0].Metodo === 'Paga en punto')) {
       this.form.patchValue({ TipoPago: 'PagaEnPunto' }, { emitEvent: false });
     } else if (pagos.length === 1 && pagos[0].Metodo === 'Completo') {
       this.form.patchValue({ TipoPago: 'Completo' }, { emitEvent: false });
+      this.form.get('PagoObservaciones')?.setValue(pagos[0].Observaciones || '');
+      this.form.get('ComprobantePago')?.setValue(pagos[0].Pago_Comprobante
+        ? { Id_Pago: pagos[0].Id_Pago, SoporteUrl: pagos[0].Pago_Comprobante }
+        : null
+      );
     } else {
       this.form.patchValue({ TipoPago: 'Abonos' }, { emitEvent: false });
       // Llenar abonos
       const abonosArray = this.form.get('Abonos') as FormArray;
       abonosArray.clear();
       pagos.forEach((pago: any) => {
-        if (pago.Metodo === 'Abono' || pago.Metodo === 'Paga en punto') {
-          abonosArray.push(this.fb.group({
-            Monto: [Number(pago.Monto || 0)],
-            Observaciones: [pago.Observaciones || ''],
-            Fecha_Pago: [pago.Fecha_Pago || '']
+        if (pago.Metodo === 'Abono') {
+          abonosArray.push(this.crearAbonoGroup({
+            ...pago,
+            Monto: Number(pago.Monto || 0)
           }));
         }
       });
@@ -523,10 +622,26 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.processSubmit();
   }
 
+  duplicarTransfer(): void {
+    const transferId = this.getTransferIdFromRoute();
+    if (!transferId) {
+      this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
+      return;
+    }
+
+    this.openSummary = false;
+    this.isNavigatingToDuplicate = true;
+    this.form.markAsPristine();
+
+    this.router.navigate(['/Transfers/NuevoTransfer'], {
+      queryParams: { duplicar: transferId }
+    });
+  }
+
   private processSubmit(): void {
     this.isSubmitting.set(true);
 
-    const transferId = this.route.snapshot.paramMap.get('id');
+    const transferId = this.getTransferIdFromRoute();
     if (!transferId) {
       this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
       this.isSubmitting.set(false);
@@ -540,6 +655,22 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         return;
       }
     }
+
+    const tipoPago = this.form.value.TipoPago;
+    const comprobantePagoValue = this.form.get('ComprobantePago')?.value;
+    const pagoCompletoRutaActual = comprobantePagoValue instanceof File
+      ? this.pagoCompletoSoporteUrlParaReemplazo
+      : comprobantePagoValue?.SoporteUrl || null;
+    const abonosPayload = tipoPago === 'Abonos'
+      ? this.abonos.controls
+          .map((control) => ({
+            Monto: Number(control.get('Monto')?.value || 0),
+            Observaciones: control.get('Observaciones')?.value || null,
+            Fecha_Pago: control.get('Fecha_Pago')?.value || null,
+            Pago_Comprobante: control.get('SoporteUrl')?.value || null
+          }))
+          .filter((abono) => abono.Monto > 0)
+      : [];
 
     const transferData = {
       Titular: this.form.value.Titular,
@@ -559,19 +690,24 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
       Observaciones: this.form.value.Observaciones,
-      Estado: 'Confirmada',
       Pago: {
-        Tipo: this.form.value.TipoPago,
-        Abonos: this.form.value.TipoPago === 'Abonos' ? this.form.value.Abonos : []
+        Tipo: tipoPago,
+        Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
+        Pago_Comprobante: tipoPago === 'Completo' ? pagoCompletoRutaActual : null,
+        Abonos: abonosPayload
       }
     };
 
     this.transferSvc.actualizarTransfer(transferId, transferData).subscribe({
       next: (data) => {
-        this.navbar.successToast('Transfer actualizado', 'Transfer actualizado correctamente.');
-        this.form.markAsPristine();
-        this.isSubmitting.set(false);
-        this.router.navigate(['/Transfers/VerTransfers']);
+        const idTransfer = data?.data?.Id_Transfer || transferId;
+        const pagos = data?.data?.pagos || [];
+        if (idTransfer && this.hasComprobantesToUpload()) {
+          this.uploadComprobantesTransfer(idTransfer, pagos);
+          return;
+        }
+
+        this.finishSubmitSuccess('Transfer actualizado correctamente.');
       },
       error: (err) => {
         console.error('Error:', err);
@@ -581,13 +717,62 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     });
   }
 
+  private uploadComprobantesTransfer(idTransfer: number | string, pagos: any[]): void {
+    const uploads: Promise<void>[] = [];
+    const pagoCompletoFile = this.form.get('ComprobantePago')?.value;
+
+    if (pagoCompletoFile instanceof File && pagos.length > 0) {
+      uploads.push(new Promise((resolve, reject) => {
+        this.transferSvc.subirComprobantePago(idTransfer, pagos[0].Id_Pago, pagoCompletoFile).subscribe({
+          next: () => resolve(),
+          error: (err) => reject(err)
+        });
+      }));
+    }
+
+    const abonosConMonto = this.abonos.controls.filter(control => Number(control.get('Monto')?.value || 0) > 0);
+    abonosConMonto.forEach((control, index) => {
+      const file = control.get('Comprobante')?.value;
+      if (file instanceof File && pagos[index]) {
+        uploads.push(new Promise((resolve, reject) => {
+          this.transferSvc.subirComprobantePago(idTransfer, pagos[index].Id_Pago, file).subscribe({
+            next: () => resolve(),
+            error: (err) => reject(err)
+          });
+        }));
+      }
+    });
+
+    Promise.all(uploads)
+      .then(() => this.finishSubmitSuccess('Transfer y comprobantes actualizados correctamente.'))
+      .catch(() => {
+        this.navbar.warningToast('Advertencia', 'Transfer actualizado pero hubo problemas al guardar algunos comprobantes.');
+        this.form.markAsPristine();
+        this.isSubmitting.set(false);
+        this.router.navigate(['/Transfers/VerTransfers']);
+      });
+  }
+
+  private hasComprobantesToUpload(): boolean {
+    const pagoCompletoFile = this.form.get('ComprobantePago')?.value;
+    if (pagoCompletoFile instanceof File) return true;
+    return this.abonos.controls.some(control => control.get('Comprobante')?.value instanceof File);
+  }
+
+  private finishSubmitSuccess(message: string): void {
+    this.navbar.successToast('Transfer actualizado', message);
+    this.form.markAsPristine();
+    this.isSubmitting.set(false);
+    this.router.navigate(['/Transfers/VerTransfers']);
+  }
+
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     if (this.navbar?.alert) this.navbar.alert.set(null);
   }
 
   hasUnsavedChanges(): boolean {
-    return this.form?.dirty && !this.isSubmitting();
+    return this.form?.dirty && !this.isSubmitting() && !this.isNavigatingToDuplicate;
   }
 
   getPhoneError(controlName: string): string {

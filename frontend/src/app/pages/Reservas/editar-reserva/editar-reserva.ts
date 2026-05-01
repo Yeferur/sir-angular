@@ -373,6 +373,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
       // Comprobante (pago completo)
       ComprobantePago: [null],
+      PagoObservaciones: [''],
     });
     this.wsService.messages$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -584,6 +585,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       if (tipoPagoForm === 'Completo') {
         const pagoCompleto = pagosDb.find((p: any) => p.Tipo === 'Pago Completo');
         if (pagoCompleto) {
+          this.form.get('PagoObservaciones')?.setValue(pagoCompleto.Observaciones || '');
           this.form.get('ComprobantePago')?.setValue({
             Id_Pago: pagoCompleto.Id_Pago || null,
             SoporteUrl: pagoCompleto.Ruta_Comprobante || pagoCompleto.SoporteUrl || null,
@@ -599,7 +601,9 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
             Id_Pago: [abono.Id_Pago || null],
             Monto: [abono.Monto || 0],
             Comprobante: [null], // No se puede rehidratar el archivo
-            SoporteUrl: [abono.Ruta_Comprobante || abono.SoporteUrl || null]
+            SoporteUrl: [abono.Ruta_Comprobante || abono.SoporteUrl || null],
+            Fecha_Pago: [abono.Fecha || abono.Fecha_Pago || ''],
+            Observaciones: [abono.Observaciones || '']
           });
           this.abonos.push(fg);
         }
@@ -706,6 +710,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Monto: [0],
       Comprobante: [null], // File
       SoporteUrl: [null],
+      Fecha_Pago: [''],
+      Observaciones: [''],
     });
   }
   agregarAbono() { this.abonos.push(this.crearAbonoGroup()); }
@@ -1550,6 +1556,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       } else if (forma === 'Completo') {
         const cmpVal = this.form.get('ComprobantePago')?.value;
         const pagoCompleto: any = { Monto: totalNeto, Tipo: 'Pago Completo' };
+        pagoCompleto.Observaciones = this.form.get('PagoObservaciones')?.value || null;
 
         if (cmpVal instanceof File) {
           pagoCompleto.fileField = 'comprobante_pago';
@@ -1565,14 +1572,21 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         this.abonos.controls.forEach((g, i) => {
           const monto = Number(g.get('Monto')?.value || 0);
           const cmpVal = g.get('Comprobante')?.value;
+          const soporteUrl = g.get('SoporteUrl')?.value;
           if (monto > 0) {
-            const pagoAbono: any = { Monto: monto, Tipo: 'Abono' };
+            const pagoAbono: any = {
+              Monto: monto,
+              Tipo: 'Abono',
+              Fecha: g.get('Fecha_Pago')?.value || null,
+              Fecha_Pago: g.get('Fecha_Pago')?.value || null,
+              Observaciones: g.get('Observaciones')?.value || null
+            };
             if (cmpVal instanceof File) {
               pagoAbono.fileField = `abono_${i}`;
               archivos.abonos!.push(cmpVal);
               tieneComprobanteOUrl = true;
-            } else if (cmpVal?.SoporteUrl) {
-              pagoAbono.SoporteUrl = cmpVal.SoporteUrl;
+            } else if (cmpVal?.SoporteUrl || soporteUrl) {
+              pagoAbono.SoporteUrl = cmpVal?.SoporteUrl || soporteUrl;
               archivos.abonos!.push(null);
               tieneComprobanteOUrl = true;
             } else {

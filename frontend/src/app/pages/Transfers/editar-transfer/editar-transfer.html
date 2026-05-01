@@ -276,10 +276,10 @@
       </div>
     </div>
 
-    <!-- VALOR -->
+    <!-- PAGOS -->
     <div class="card">
       <div class="card-header">
-        <h2>Valor</h2>
+        <h2>Pagos</h2>
       </div>
 
       <div class="form-grid">
@@ -296,62 +296,156 @@
           </select>
         </div>
       </div>
-    </div>
 
-    <!-- PAGO -->
-    <div class="card">
-      <div class="card-header">
-        <h2>Pago</h2>
-      </div>
-
-      <div class="form-grid">
+      <div class="payments-grid">
         <div class="form-group full-width">
           <label class="form-label">Tipo de pago</label>
-          <select formControlName="TipoPago" class="form-select">
+          <select formControlName="TipoPago" class="form-select" (change)="recalcularTotales()">
             <option value="PagaEnPunto">Paga en el punto</option>
             <option value="Completo">Ya pagó</option>
             <option value="Abonos">Abonos</option>
           </select>
+          <small class="hint">Selecciona cómo se registrará el pago de este transfer.</small>
         </div>
 
-        @if (form.get('TipoPago')?.value === 'Abonos') {
-        <div class="form-group full-width">
-          <h3>Abonos</h3>
-          <div formArrayName="Abonos" class="abonos-list">
-            <div *ngFor="let abono of abonos.controls; let i = index" [formGroupName]="i" class="abono-item">
-              <div class="abono-fields">
-                <input type="number"
-                       formControlName="Monto"
-                       placeholder="Monto"
-                       class="form-input" />
-                <input type="text"
-                       formControlName="Observaciones"
-                       placeholder="Observaciones (opcional)"
-                       class="form-input" />
-                <input type="date"
-                       formControlName="Fecha_Pago"
-                       class="form-input" />
-                <button type="button"
-                        (click)="removeAbono(i)"
-                        class="btn-remove">
-                  ✕
-                </button>
-              </div>
-
-              <div class="abono-errors">
-                <div class="errorMessage" *ngIf="abono.get('Monto')?.touched && abono.get('Monto')?.invalid">
-                  Monto debe ser mayor a 0.
-                </div>
-              </div>
+        <div class="form-group full-width payments-right">
+        @if (form.get('TipoPago')?.value === 'Completo') {
+        <div class="payments-panel pago-completo">
+          <div class="payments-panel-head">
+            <div class="payments-title">
+              <h3>Comprobante de Pago</h3>
+              <span class="payments-sub">Sube o reemplaza el soporte del pago completo (máx. 5MB).</span>
             </div>
           </div>
-          <button type="button"
-                  (click)="addAbono()"
-                  class="btn-secondary">
-            + Agregar Abono
-          </button>
+
+          <div class="payment-file-row">
+            <div class="payment-file-status">
+              @if (form.get('ComprobantePago')?.value; as f) {
+                @if (f?.SoporteUrl) {
+                  <span class="payment-chip saved">Guardado</span>
+                  <span class="file-name">Comprobante guardado</span>
+                } @else {
+                  <span class="payment-chip loaded">Cargado</span>
+                  <span class="file-name">{{ f?.name }}</span>
+                }
+              } @else {
+                <span class="file-name text-muted">Sin archivo</span>
+              }
+            </div>
+
+            <div class="payment-actions">
+              <input type="file" id="ComprobantePagoReemplazar" accept=".pdf,.jpg,.jpeg,.png"
+                (change)="onFileSelected($event)" style="display:none" />
+
+              @if (!form.get('ComprobantePago')?.value) {
+                <label class="btn-payment-action primary" for="ComprobantePagoReemplazar">Subir comprobante</label>
+              } @else {
+                @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
+                  <button type="button" class="btn-payment-action secondary"
+                    (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
+                }
+                <label class="btn-payment-action secondary" for="ComprobantePagoReemplazar">Reemplazar</label>
+                <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
+              }
+            </div>
+          </div>
+
+          <div class="payment-notes">
+            <label class="form-label">Observaciones del pago</label>
+            <textarea formControlName="PagoObservaciones" class="form-input" rows="2"
+              placeholder="Método, referencia o nota del pago"></textarea>
+          </div>
         </div>
         }
+
+        @if (form.get('TipoPago')?.value === 'Abonos') {
+        <div class="payments-panel" formArrayName="Abonos">
+          <div class="payments-panel-head">
+            <div class="payments-title">
+              <h3>Abonos</h3>
+              <span class="payments-sub">
+                Moneda: <strong>{{ form.get('Moneda')?.value || 'COP' }}</strong> · {{ abonos.length }} registrado(s)
+              </span>
+            </div>
+
+            <button type="button" (click)="addAbono()" class="btn-add-abono">
+              + Agregar Abono
+            </button>
+          </div>
+
+          <div class="abonos-grid">
+            @for (abono of abonos.controls; let i = $index; track i) {
+            <div class="payment-file-row transfer-abono-row" [formGroupName]="i">
+              <div class="abono-index">
+                <span class="abono-number">Abono {{ i + 1 }}</span>
+              </div>
+
+              <div class="abono-monto">
+                <input type="number" formControlName="Monto" placeholder="0" class="form-input"
+                  (change)="recalcularTotales()" />
+              </div>
+
+              <div class="abono-extra">
+                <input type="date" formControlName="Fecha_Pago" class="form-input" />
+              </div>
+
+              <div class="abono-extra">
+                <input type="text" formControlName="Observaciones" placeholder="Observaciones" class="form-input" />
+              </div>
+
+              <div class="payment-file-status">
+                @if (abonos.controls[i].get('Comprobante')?.value) {
+                  <span class="payment-chip loaded">Cargado</span>
+                  <span class="file-name">{{ getAbonoFileName(i) }}</span>
+                } @else if (abonos.controls[i].get('SoporteUrl')?.value) {
+                  <span class="payment-chip saved">Guardado</span>
+                  <span class="file-name">Comprobante guardado</span>
+                } @else {
+                  <span class="file-name text-muted">Sin archivo</span>
+                }
+              </div>
+
+              <div class="payment-actions">
+                <input type="file" [id]="'ComprobanteAbono' + i" accept=".pdf,.jpg,.jpeg,.png"
+                  (change)="onAbonoFileSelected($event, i)" style="display:none" />
+
+                @if (!abonos.controls[i].get('Comprobante')?.value && !abonos.controls[i].get('SoporteUrl')?.value) {
+                  <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+                } @else {
+                  @if (abonos.controls[i].get('SoporteUrl')?.value && !abonos.controls[i].get('Comprobante')?.value) {
+                    <button type="button" class="btn-payment-action secondary"
+                      (click)="viewComprobante(abonos.controls[i].get('SoporteUrl')?.value)">Ver</button>
+                  }
+                  <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
+                  <button type="button" class="btn-payment-action danger" (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+                }
+
+                @if (abonos.length > 1) {
+                  <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
+                    (click)="removeAbono(i)">✕</button>
+                }
+              </div>
+            </div>
+            }
+          </div>
+
+          @if (!abonosValidos) {
+          <div class="errorMessage">Los abonos no pueden superar el valor del transfer.</div>
+          }
+
+          <div class="payments-foot">
+            <span class="hint">Registra cada abono con su comprobante para auditoría.</span>
+          </div>
+        </div>
+        }
+
+        @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
+        <div class="payments-panel payments-panel-muted">
+          <h3>Pago en el punto</h3>
+          <p class="hint">No se requiere comprobante. El cobro queda pendiente para registrarse por fuera del sistema.</p>
+        </div>
+        }
+        </div>
       </div>
     </div>
 
@@ -441,7 +535,13 @@
       </div>
     </div>
 
-    <div class="summary-actions">
+    <div class="summary-actions" [class.two-actions]="showDuplicate">
+      @if (showDuplicate) {
+        <button type="button" class="btn-duplicate" (click)="duplicarTransfer()">
+          Duplicar Transfer
+        </button>
+      }
+
       <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
         {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
       </button>

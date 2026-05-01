@@ -268,14 +268,14 @@
             (click)="verTransfer(t.Id_Transfer)"
             (keydown.enter)="verTransfer(t.Id_Transfer)"
             (keydown.space)="$event.preventDefault(); verTransfer(t.Id_Transfer)"
-            [attr.aria-label]="'Ver transfer ' + t.Id_Transfer + ' — ' + (t.Nombre_Servicio || t.Nombre_Titular)">
+            [attr.aria-label]="'Ver transfer ' + (t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0'))) + ' — ' + (t.Nombre_Servicio || t.Nombre_Titular)">
 
             <span class="status-pill" [ngClass]="'status-' + (t.Estado ? (t.Estado | lowercase) : '')">
               {{ t.Estado }}
             </span>
 
             <div class="item-main-info">
-              <span class="item-id">#{{ t.Id_Transfer }}</span>
+              <span class="item-id">#{{ t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0')) }}</span>
               <span class="item-tour">{{ t.Nombre_Servicio || t.Nombre_Titular }}</span>
               <span class="item-meta">
                 {{ t.Fecha_Transfer | date:'d MMM yyyy':'':'es-CO' }}

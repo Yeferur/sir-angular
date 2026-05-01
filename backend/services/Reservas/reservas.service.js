@@ -162,6 +162,75 @@ function normalizarFechaYMD(fecha) {
   return String(fecha).slice(0, 10);
 }
 
+function hoyBogotaYMD() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+function fechaEsPasadaBogota(fecha) {
+  const ymd = normalizarFechaYMD(fecha);
+  return !!ymd && ymd < hoyBogotaYMD();
+}
+
+function tieneTexto(value) {
+  return String(value ?? '').trim().length > 0;
+}
+
+function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null }) {
+  if (estadoActual === 'Cancelada' || estadoActual === 'Completada') {
+    return estadoActual;
+  }
+
+  const pasajerosArray = Array.isArray(pasajeros) ? pasajeros : [];
+  const pagosArray = Array.isArray(pagos) ? pagos : [];
+
+  const datosOk = pasajerosArray.length > 0
+    && pasajerosArray.every((p) => tieneTexto(p?.Nombre_Pasajero) && tieneTexto(p?.DNI))
+    && pasajerosArray.some((p) => tieneTexto(p?.Telefono_Pasajero));
+
+  const totalVenta = pasajerosArray.reduce((sum, p) => sum + Number(p?.Precio_Pasajero || 0), 0);
+  const totalAbonado = pagosArray.reduce((sum, pago) => sum + Number(pago?.Monto || 0), 0);
+  const tienePagoCompletoOPunto = pagosArray.some((pago) =>
+    pago?.Tipo === 'Pago Directo' || pago?.Tipo === 'Pago Completo'
+  );
+  const pagoOk = tienePagoCompletoOPunto || (totalVenta > 0 && totalAbonado >= totalVenta);
+
+  let estado = 'Pendiente';
+  if (datosOk && pagoOk) estado = 'Confirmada';
+  else if (!datosOk && pagoOk) estado = 'Pendiente de datos';
+  else if (datosOk && !pagoOk) estado = 'Pendiente de pago';
+
+  if (fechaEsPasadaBogota(fechaTour)) {
+    return estado === 'Confirmada' ? 'Completada' : 'Cancelada';
+  }
+
+  return estado;
+}
+
+async function actualizarEstadosReservasVencidas(conexion = db) {
+  await conexion.query(`
+    UPDATE reservas
+       SET Estado = CASE
+         WHEN Estado IN ('Activo', 'Confirmado') AND Fecha_Tour < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00')) THEN 'Completada'
+         WHEN Estado IN ('Activo', 'Confirmado') THEN 'Confirmada'
+         WHEN Estado = 'Completado' THEN 'Completada'
+         WHEN Estado = 'Cancelado' THEN 'Cancelada'
+         WHEN Estado = 'Confirmada' THEN 'Completada'
+         WHEN Estado IN ('Pendiente', 'Pendiente de datos', 'Pendiente de pago') THEN 'Cancelada'
+         ELSE Estado
+       END
+     WHERE Estado IN ('Activo', 'Confirmado', 'Completado', 'Cancelado')
+        OR (
+          Fecha_Tour < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00'))
+          AND Estado IN ('Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
+        )
+  `);
+}
+
 function distanciaHaversineKm(lat1, lon1, lat2, lon2) {
   const toRad = (deg) => (Number(deg) * Math.PI) / 180;
   const R = 6371;
@@ -384,6 +453,8 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
  * LISTADOS / LECTURA
  * =========================== */
 async function filtrarReservas(q) {
+  await actualizarEstadosReservasVencidas();
+
   const params = (typeof q === 'object' && q !== null) ? q : { q: String(q || '') };
 
   const {
@@ -493,6 +564,8 @@ async function filtrarReservas(q) {
 
 
 async function obtenerReserva(Id_Reserva) {
+  await actualizarEstadosReservasVencidas();
+
   const [cabRows] = await db.query(
     `
     SELECT 
@@ -799,15 +872,12 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
       });
     }
 
-    // --- CÁLCULO DE ESTADO DE RESERVA EN SERVER (SEGURO) ---
     const pagosArray = Array.isArray(payload.pagos) ? payload.pagos : [];
-    const totalAbonado = pagosArray.reduce((sum, pag) => sum + Number(pag.Monto || 0), 0);
-    const totalVenta = pasajerosArray.reduce((sum, px) => sum + Number(px.Precio_Pasajero || 0), 0);
-    
-    let estadoCalculado = 'Pendiente';
-    if (pagosArray.some(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo') || (totalAbonado > 0 && totalAbonado >= totalVenta)) {
-      estadoCalculado = 'Confirmada';
-    }
+    const estadoCalculado = resolverEstadoReserva({
+      fechaTour: r.Fecha_Tour,
+      pasajeros: pasajerosArray,
+      pagos: pagosArray,
+    });
 
     const idReserva = await generarIdReservaUnico(r.Id_Tour);
 
@@ -957,6 +1027,8 @@ async function obtenerComisiones(Id_Tour, Id_Canal) {
  * DETALLE PARA EDICIÓN
  * =========================== */
 async function obtenerReservaDetalle(Id_Reserva) {
+  await actualizarEstadosReservasVencidas();
+
   // Cabecera (sin r.Id_Moneda). Se deriva una moneda sugerida desde tour_precios.
   const [cabRows] = await db.query(
     `
@@ -1144,14 +1216,12 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
 
     const estadoAnterior = currentReserva.Estado || null;
 
-    // --- CÁLCULO DE ESTADO DE RESERVA EN SERVER ---
-    const totalAbonado = pagosArray.reduce((sum, pag) => sum + Number(pag.Monto || 0), 0);
-    const totalVenta = pasajerosArray.reduce((sum, px) => sum + Number(px.Precio_Pasajero || 0), 0);
-    
-    let estadoCalculado = 'Pendiente';
-    if (pagosArray.some(p => p.Tipo === 'Pago Directo' || p.Tipo === 'Pago Completo') || (totalAbonado > 0 && totalAbonado >= totalVenta)) {
-      estadoCalculado = 'Confirmada';
-    }
+    const estadoCalculado = resolverEstadoReserva({
+      fechaTour: fechaTourFinal,
+      pasajeros: pasajerosArray,
+      pagos: pagosArray,
+      estadoActual: estadoAnterior,
+    });
 
     // 1) Update cabecera
     if (payload?.cabeceraReserva) {
@@ -1288,6 +1358,49 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
   } catch (error) {
     if (conn) await conn.rollback();
     try { await logSistema({ mensaje: `actualizarReserva error: ${error.message || error}`, meta: { Id_Reserva, payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
+  let conn;
+  try {
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      'SELECT Estado FROM reservas WHERE Id_Reserva = ? LIMIT 1 FOR UPDATE',
+      [Id_Reserva]
+    );
+
+    if (!rows?.length) {
+      const err = new Error('Reserva no encontrada');
+      err.status = 404;
+      err.errorCode = 'RESERVA_NOT_FOUND';
+      throw err;
+    }
+
+    const estadoAnterior = rows[0].Estado || null;
+    await conn.query('UPDATE reservas SET Estado = ? WHERE Id_Reserva = ?', ['Cancelada', Id_Reserva]);
+
+    if (estadoAnterior !== 'Cancelada') {
+      await recordHistorial({
+        conexion: conn,
+        tabla: 'reservas',
+        id_registro: Id_Reserva,
+        accion: 'CANCELAR',
+        id_usuario: userId,
+        detalles: [{ columna: 'Estado', anterior: estadoAnterior, nuevo: 'Cancelada' }]
+      });
+    }
+
+    await conn.commit();
+    return { Id_Reserva, Estado: 'Cancelada' };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    try { await logSistema({ mensaje: `cancelarReserva error: ${error.message || error}`, meta: { Id_Reserva, userId, clientIp } }); } catch (_) {}
     throw error;
   } finally {
     if (conn) conn.release();
@@ -1511,6 +1624,7 @@ module.exports = {
   // create/update
   crearReservaConPasajerosYPagos,
   actualizarReservaConPasajerosYPagos,
+  cancelarReservaSvc,
   // detail + aux
   obtenerReservaDetalle,
   obtenerComisiones,

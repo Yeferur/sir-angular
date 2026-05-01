@@ -4,10 +4,11 @@ import {
   Output,
   EventEmitter,
   OnInit,
+  OnChanges,
   SimpleChanges,
   ChangeDetectorRef
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TransferService } from '../../services/Transfers/transfers';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
@@ -18,6 +19,7 @@ import { logoBase64 } from '../../../../public/assets/img/logoBase64';
 
 interface Transfer {
   Id_Transfer?: number | string;
+  Codigo_Transfer?: string;
   Nombre_Titular?: string;
   DNI?: string;
   Telefono_Titular?: string;
@@ -55,11 +57,11 @@ interface TransferDetalle {
 @Component({
   selector: 'app-transfer-dynamic',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './transfer.html',
   styleUrls: ['./transfer.css']
 })
-export class TransferDynamicComponent implements OnInit {
+export class TransferDynamicComponent implements OnInit, OnChanges {
   @Input() Id_Transfer!: string | number;
   @Output() onClose = new EventEmitter<void>();
 
@@ -72,7 +74,6 @@ export class TransferDynamicComponent implements OnInit {
   constructor(
     private api: TransferService,
     private cdr: ChangeDetectorRef,
-    private router: Router,
     private navbar: DynamicIslandGlobalService
   ) {}
 
@@ -114,8 +115,51 @@ export class TransferDynamicComponent implements OnInit {
     return this.data?.transfer || { Id_Transfer: null };
   }
 
+  get transferCodigo(): string {
+    const codigo = this.transfer.Codigo_Transfer?.toString().trim();
+    if (codigo) return codigo;
+
+    const id = this.transfer.Id_Transfer || this.Id_Transfer;
+    const numeric = String(id || '').replace(/\D/g, '');
+    return numeric ? `TRS${numeric.padStart(5, '0')}` : 'TRS';
+  }
+
   get pagos(): Pago[] {
     return this.data?.pagos || [];
+  }
+
+  get puedeCancelar(): boolean {
+    const estado = (this.transfer.Estado || '').toLowerCase();
+    return !!this.transfer.Id_Transfer && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
+
+  cancelarTransfer(): void {
+    const id = this.transfer.Id_Transfer || this.Id_Transfer;
+    if (!id) return;
+    const confirmed = window.confirm(`Cancelar el transfer #${this.transferCodigo}? La información se conservará para consulta futura.`);
+    if (!confirmed) return;
+
+    this.api.cancelarTransfer(id).subscribe({
+      next: () => {
+        this.navbar.alert.set({
+          type: 'success',
+          title: 'Transfer cancelado',
+          message: `El transfer #${this.transferCodigo} quedó en estado Cancelado.`,
+          autoClose: true,
+          autoCloseTime: 3000
+        });
+        this.loadTransferData(id);
+      },
+      error: (err) => {
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'No se pudo cancelar',
+          message: err?.error?.message || err?.message || 'Intenta nuevamente.',
+          autoClose: true,
+          autoCloseTime: 4000
+        });
+      }
+    });
   }
 
   get valorTotal(): number {
@@ -146,7 +190,7 @@ export class TransferDynamicComponent implements OnInit {
 
     doc.addImage(logoBase64, 'PNG', 10, 10, 40, 15);
     doc.setFontSize(18); doc.setTextColor(40, 40, 40);
-    doc.text(`Transfer #TRC${t.Id_Transfer}`, 60, 20);
+    doc.text(`Transfer #${this.transferCodigo}`, 60, 20);
     doc.setFontSize(12); doc.setTextColor(90);
     doc.text(`Estado: ${t.Estado || 'Pendiente'}`, 60, 28);
     doc.line(10, 35, 200, 35);
@@ -267,7 +311,7 @@ export class TransferDynamicComponent implements OnInit {
       const doc = this.buildTransferPdfDoc();
       const pdfArrayBuffer = doc.output('arraybuffer') as ArrayBuffer;
       const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-      this.downloadBlob(pdfBlob, `Transfer_TRC${t.Id_Transfer}.pdf`);
+      this.downloadBlob(pdfBlob, `Transfer_${this.transferCodigo}.pdf`);
 
       this.navbar.alert.set({
         title: 'PDF descargado',
@@ -279,28 +323,6 @@ export class TransferDynamicComponent implements OnInit {
       console.error(e);
       this.navbar.errorToast('Error', 'No se pudo generar el PDF.');
     }
-  }
-
-  editarTransfer(): void {
-    const id = this.transfer?.Id_Transfer;
-    if (!id) return;
-
-    this.navbar.Id_Transfer.set(null);
-    try { this.onClose.emit(); } catch {}
-
-    this.router.navigate(['/Transfers/EditarTransfer', id]);
-  }
-
-  duplicarTransfer(): void {
-    const id = this.transfer?.Id_Transfer;
-    if (!id) return;
-
-    this.navbar.Id_Transfer.set(null);
-    try { this.onClose.emit(); } catch {}
-
-    this.router.navigate(['/Transfers/NuevoTransfer'], {
-      queryParams: { duplicar: id }
-    });
   }
 
   close(): void {

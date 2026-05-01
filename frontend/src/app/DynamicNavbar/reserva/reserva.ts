@@ -5,6 +5,7 @@ import {
   Output,
   EventEmitter,
   OnInit,
+  OnChanges,
   ChangeDetectorRef,
   SimpleChanges
 } from '@angular/core';
@@ -62,7 +63,7 @@ interface Reserva {
   templateUrl: './reserva.html',
   styleUrls: ['./reserva.css'],
 })
-export class ReservasDynamicComponent implements OnInit {
+export class ReservasDynamicComponent implements OnInit, OnChanges {
   @Input() Id_Reserva!: string;
   @Output() onClose = new EventEmitter<void>();
 
@@ -94,6 +95,11 @@ export class ReservasDynamicComponent implements OnInit {
     if (this.Id_Reserva) this.loadReservaData(this.Id_Reserva);
   }
 
+  get puedeCancelar(): boolean {
+    const estado = (this.reserva?.Estado || '').toLowerCase();
+    return !!this.reserva?.Id_Reserva && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
+
   editarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id) return;
@@ -102,6 +108,35 @@ export class ReservasDynamicComponent implements OnInit {
     try { this.navbar.closePanel(); } catch {}
     try { this.onClose.emit(); } catch {}
     this.router.navigate([`/Reservas/EditarReserva`, this.reserva.Id_Reserva]);
+  }
+
+  cancelarReserva() {
+    const id = this.reserva?.Id_Reserva;
+    if (!id) return;
+    const confirmed = window.confirm(`Cancelar la reserva #${id}? La información se conservará para consulta futura.`);
+    if (!confirmed) return;
+
+    this.api.cancelarReserva(id).subscribe({
+      next: () => {
+        this.navbar.alert.set({
+          type: 'success',
+          title: 'Reserva cancelada',
+          message: `La reserva #${id} quedó en estado Cancelada.`,
+          autoClose: true,
+          autoCloseTime: 3000
+        });
+        this.loadReservaData(id);
+      },
+      error: (err) => {
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'No se pudo cancelar',
+          message: err?.error?.message || err?.message || 'Intenta nuevamente.',
+          autoClose: true,
+          autoCloseTime: 4000
+        });
+      }
+    });
   }
 
   get tipoClases() {

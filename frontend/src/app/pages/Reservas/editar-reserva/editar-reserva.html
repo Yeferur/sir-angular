@@ -570,7 +570,7 @@
 
         <div class="abonos-grid">
           @for (group of abonos.controls; let i = $index; track i) {
-          <div class="payment-file-row" [formGroupName]="i">
+          <div class="payment-file-row transfer-abono-row" [formGroupName]="i">
 
             <div class="abono-index">
               <span class="abono-number">Abono {{ i + 1 }}</span>
@@ -579,6 +579,14 @@
             <div class="abono-monto">
               <input type="number" class="form-input" formControlName="Monto" (change)="recalcularTotales()"
                 placeholder="0" />
+            </div>
+
+            <div class="abono-extra">
+              <input type="date" class="form-input" formControlName="Fecha_Pago" />
+            </div>
+
+            <div class="abono-extra">
+              <input type="text" class="form-input" formControlName="Observaciones" placeholder="Observaciones" />
             </div>
 
             <div class="payment-file-status">
@@ -674,6 +682,12 @@
         @if (form.get('ComprobantePago')?.touched) {
         <div class="errorMessage pc-error">El comprobante debe ser menor a 5 MB.</div>
         }
+
+        <div class="payment-notes">
+          <label class="form-label">Observaciones del pago</label>
+          <textarea formControlName="PagoObservaciones" class="form-input" rows="2"
+            placeholder="Método, referencia o nota del pago"></textarea>
+        </div>
 
       </div>
       }

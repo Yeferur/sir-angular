@@ -281,4 +281,8 @@ export class Reservas {
   eliminarComprobantePagoReserva(Id_Reserva: number | string, Id_Pago: number | string): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/reservas/${Id_Reserva}/pagos/${Id_Pago}/comprobante`);
   }
+
+  cancelarReserva(Id_Reserva: number | string): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/reservas/${Id_Reserva}/cancelar`, {});
+  }
 }

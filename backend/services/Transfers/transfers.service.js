@@ -3,6 +3,164 @@ const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 
+const COMPROBANTE_TRANSFER_FILE_RE = /^[a-zA-Z0-9._-]+$/;
+
+function normalizarRutaComprobanteTransferSalida(input, idTransfer = null) {
+  const value = String(input || '').trim().replace(/\\/g, '/');
+  if (!value || value === 'N/A') return null;
+
+  const relative = value.startsWith('uploads/transfers/')
+    ? value.slice('uploads/'.length)
+    : value;
+
+  const expectedPrefix = idTransfer
+    ? `transfers/${String(idTransfer)}/`
+    : 'transfers/';
+
+  if (!relative.startsWith(expectedPrefix)) return null;
+
+  const fileName = path.basename(relative);
+  if (!COMPROBANTE_TRANSFER_FILE_RE.test(fileName)) return null;
+
+  return relative;
+}
+
+function rutaComprobanteTransferAbsolutaSegura(relativePath) {
+  const normalized = normalizarRutaComprobanteTransferSalida(relativePath);
+  if (!normalized) return null;
+
+  const uploadsRoot = path.resolve(__dirname, '../../uploads');
+  const absolutePath = path.resolve(uploadsRoot, normalized);
+  if (!(absolutePath === uploadsRoot || absolutePath.startsWith(`${uploadsRoot}${path.sep}`))) {
+    return null;
+  }
+
+  return absolutePath;
+}
+
+async function eliminarArchivoComprobanteTransferFisico(relativePath) {
+  const absolutePath = rutaComprobanteTransferAbsolutaSegura(relativePath);
+  if (!absolutePath) return false;
+
+  try {
+    await fs.promises.unlink(absolutePath);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+function normalizarFechaTransferYMD(fecha) {
+  if (!fecha) return '';
+  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
+  return String(fecha).slice(0, 10);
+}
+
+function hoyBogotaYMD() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+function fechaTransferEsPasadaBogota(fecha) {
+  const ymd = normalizarFechaTransferYMD(fecha);
+  return !!ymd && ymd < hoyBogotaYMD();
+}
+
+function tieneTexto(value) {
+  return String(value ?? '').trim().length > 0;
+}
+
+function resolverEstadoTransfer(payload = {}, estadoActual = null) {
+  if (estadoActual === 'Cancelado' || estadoActual === 'Completado') {
+    return estadoActual;
+  }
+
+  const valorServicio = Number(payload.ValorServicio || payload.Valor || 0);
+  const pago = payload.Pago || {};
+  const abonos = Array.isArray(pago.Abonos) ? pago.Abonos : [];
+  const totalAbonado = abonos.reduce((sum, abono) => sum + Number(abono?.Monto || 0), 0);
+  const pagoOk = pago.Tipo === 'Completo'
+    || pago.Tipo === 'PagaEnPunto'
+    || (valorServicio > 0 && totalAbonado >= valorServicio);
+
+  const vueloParcial = tieneTexto(payload.Vuelo) || tieneTexto(payload.TipoVuelo);
+  const datosOk = [
+    payload.Titular,
+    payload.DNI,
+    payload.Tel_Contacto,
+    payload.Id_Rango || payload.Rango,
+    payload.Servicio,
+    payload.Salida,
+    payload.Llegada,
+    payload.FechaTransfer,
+    payload.HoraRecogida,
+    payload.NombreReporta,
+    payload.TelefonoTransfer,
+    payload.ValorServicio || payload.Valor,
+  ].every(tieneTexto) && (!vueloParcial || (tieneTexto(payload.Vuelo) && tieneTexto(payload.TipoVuelo)));
+
+  let estado = 'Pendiente';
+  if (datosOk && pagoOk) estado = 'Confirmado';
+  else if (!datosOk && pagoOk) estado = 'Pendiente de datos';
+  else if (datosOk && !pagoOk) estado = 'Pendiente de pago';
+
+  if (fechaTransferEsPasadaBogota(payload.FechaTransfer)) {
+    return estado === 'Confirmado' ? 'Completado' : 'Cancelado';
+  }
+
+  return estado;
+}
+
+async function actualizarEstadosTransfersVencidos(conexion = db) {
+  await conexion.query(`
+    UPDATE transfers
+       SET Estado = CASE
+         WHEN Estado IN ('Activo', 'Confirmada') AND Fecha_Transfer < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00')) THEN 'Completado'
+         WHEN Estado IN ('Activo', 'Confirmada') THEN 'Confirmado'
+         WHEN Estado = 'Completada' THEN 'Completado'
+         WHEN Estado = 'Cancelada' THEN 'Cancelado'
+         WHEN Estado = 'Confirmado' THEN 'Completado'
+         WHEN Estado IN ('Pendiente', 'Pendiente de datos', 'Pendiente de pago') THEN 'Cancelado'
+         ELSE Estado
+       END
+     WHERE Estado IN ('Activo', 'Confirmada', 'Completada', 'Cancelada')
+        OR (
+          Fecha_Transfer < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00'))
+          AND Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
+        )
+  `);
+}
+
+function formatoCodigoTransfer(idTransfer) {
+  const numeric = String(idTransfer || '').replace(/\D/g, '');
+  return numeric ? `TRS${numeric.padStart(5, '0')}` : null;
+}
+
+function normalizarIdTransferInput(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^TRS/i, '')
+    .replace(/^TRC/i, '')
+    .replace(/^TR-?/i, '');
+}
+
+async function generarIdTransferUnico(conn) {
+  for (let intento = 0; intento < 10; intento += 1) {
+    const idTransfer = Math.floor(10000 + Math.random() * 90000);
+    const [rows] = await conn.query('SELECT 1 FROM transfers WHERE Id_Transfer = ? LIMIT 1', [idTransfer]);
+    if (!rows.length) return idTransfer;
+  }
+
+  const err = new Error('No se pudo generar un código único para el transfer.');
+  err.status = 500;
+  throw err;
+}
+
 async function getServiciosTransferSvc() {
   const [rows] = await db.query('SELECT Id_Servicio, Nombre_Servicio FROM servicios_transfer');
   return rows.map(r => ({ id: r.Id_Servicio, Servicio: r.Nombre_Servicio }));
@@ -25,7 +183,14 @@ async function crearTransferSvc(payload) {
       idMoneda = monedas?.[0]?.Id_Moneda || null;
     }
 
+    const estadoCalculado = resolverEstadoTransfer({
+      ...payload,
+      Id_Moneda: idMoneda,
+    });
+    const idTransfer = await generarIdTransferUnico(conn);
+
     const sql = `INSERT INTO transfers (
+      Id_Transfer,
       Nombre_Titular,
       DNI,
       Telefono_Titular,
@@ -43,9 +208,10 @@ async function crearTransferSvc(payload) {
       TipoVuelo,
       Estado,
       Observaciones
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
     const params = [
+      idTransfer,
       payload.Titular || null,
       payload.DNI || null,
       payload.Tel_Contacto || null,
@@ -61,12 +227,11 @@ async function crearTransferSvc(payload) {
       idMoneda,
       payload.Vuelo || null,
       payload.TipoVuelo || null,
-      payload.Estado || null,
+      estadoCalculado,
       payload.Observaciones || null
     ];
 
-    const [result] = await conn.query(sql, params);
-    const idTransfer = result.insertId;
+    await conn.query(sql, params);
 
     // Array para guardar los pagos creados (devolver Ids)
     const pagosCreados = [];
@@ -82,7 +247,7 @@ async function crearTransferSvc(payload) {
           `INSERT INTO pagos_transfers
            (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [idTransfer, valorServicio, 'Completo', ahora, 'Pagado', 'Pago completo registrado al crear transfer', null]
+          [idTransfer, valorServicio, 'Completo', ahora, 'Pagado', payload.Pago.Observaciones || 'Pago completo registrado al crear transfer', null]
         );
         pagosCreados.push({
           Id_Pago: pagRes.insertId,
@@ -126,7 +291,7 @@ async function crearTransferSvc(payload) {
     // Commit transacción
     await conn.commit();
 
-    return { success: true, Id_Transfer: idTransfer, pagos: pagosCreados, message: 'Transfer creado correctamente.' };
+    return { success: true, Id_Transfer: idTransfer, Codigo_Transfer: formatoCodigoTransfer(idTransfer), pagos: pagosCreados, message: 'Transfer creado correctamente.' };
   } catch (error) {
     // Rollback en caso de error
     await conn.rollback();
@@ -141,6 +306,8 @@ async function crearTransferSvc(payload) {
 // exports consolidated at end of file
 
 async function filtrarTransfersSvc(q) {
+  await actualizarEstadosTransfersVencidos();
+
   const {
     Fecha_Transfer,
     Id_Servicio,
@@ -171,7 +338,8 @@ async function filtrarTransfersSvc(q) {
       conds.push(`tr.Estado = ${db.escape(Estado)}`);
     }
   }
-  if (Id_Transfer) conds.push(`tr.Id_Transfer = ${db.escape(Id_Transfer)}`);
+  const idTransferFiltro = normalizarIdTransferInput(Id_Transfer);
+  if (idTransferFiltro) conds.push(`tr.Id_Transfer = ${db.escape(idTransferFiltro)}`);
   if (Nombre_Titular) conds.push(`tr.Nombre_Titular LIKE ${db.escape('%' + Nombre_Titular + '%')}`);
   if (Telefono_Titular) conds.push(`tr.Telefono_Titular LIKE ${db.escape('%' + Telefono_Titular + '%')}`);
   if (DNI) conds.push(`tr.DNI LIKE ${db.escape('%' + DNI + '%')}`);
@@ -183,6 +351,7 @@ async function filtrarTransfersSvc(q) {
   const sql = `
     SELECT
       tr.Id_Transfer,
+      CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
       tr.Fecha_Transfer,
       tr.Hora_Recogida,
       tr.Estado,
@@ -221,10 +390,13 @@ async function getPreciosPorRangoSvc(Id_Rango) {
 }
 
 async function getDetalleTransferSvc(Id_Transfer) {
+  await actualizarEstadosTransfersVencidos();
+
   // Obtener detalles completos del transfer
   const [transferData] = await db.query(`
     SELECT
       tr.*,
+      CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
       s.Nombre_Servicio,
       rg.Descripcion AS RangoDescripcion,
       rg.Minimo,
@@ -269,11 +441,14 @@ async function getDetalleTransferSvc(Id_Transfer) {
 
 async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = null, clientIp = null) {
   let conn;
+  let rutaAnterior = null;
+  let rutaNueva = null;
   try {
     // Validar que el pago existe y pertenece al transfer
     conn = await db.getConnection();
+    await conn.beginTransaction();
     const [pagos] = await conn.query(
-      'SELECT Id_Pago FROM pagos_transfers WHERE Id_Pago = ? AND Id_Transfer = ? LIMIT 1',
+      'SELECT Id_Pago, Pago_Comprobante FROM pagos_transfers WHERE Id_Pago = ? AND Id_Transfer = ? LIMIT 1 FOR UPDATE',
       [Id_Pago, Id_Transfer]
     );
 
@@ -282,6 +457,7 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
       err.status = 404;
       throw err;
     }
+    rutaAnterior = normalizarRutaComprobanteTransferSalida(pagos[0].Pago_Comprobante, Id_Transfer);
 
     // Crear carpeta de uploads si no existe
     const baseDir = path.join(__dirname, '../../uploads', 'transfers', String(Id_Transfer));
@@ -297,6 +473,7 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
 
     // Generar ruta relativa segura
     const rutaComprobante = `transfers/${Id_Transfer}/${fileName}`;
+    rutaNueva = rutaComprobante;
 
     // Actualizar la base de datos con la ruta
     await conn.query(
@@ -304,7 +481,15 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
       [rutaComprobante, Id_Pago]
     );
 
+    await conn.commit();
     conn.release();
+    conn = null;
+
+    if (rutaAnterior && rutaAnterior !== rutaNueva) {
+      await eliminarArchivoComprobanteTransferFisico(rutaAnterior).catch((error) => {
+        console.warn('No se pudo eliminar el comprobante anterior del transfer:', error?.message || error);
+      });
+    }
 
     return {
       Id_Pago,
@@ -312,7 +497,13 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
       message: 'Comprobante guardado correctamente'
     };
   } catch (error) {
-    if (conn) conn.release();
+    if (conn) {
+      await conn.rollback();
+      conn.release();
+    }
+    if (rutaNueva) {
+      await eliminarArchivoComprobanteTransferFisico(rutaNueva).catch(() => false);
+    }
     throw error;
   }
 }
@@ -327,10 +518,26 @@ function getExtensionForMime(file) {
 
 async function actualizarTransferSvc(Id_Transfer, payload) {
   const conn = await db.getConnection();
+  let rutasPendientesEliminar = [];
 
   try {
     // Iniciar transacción
     await conn.beginTransaction();
+
+    const [transferActualRows] = await conn.query(
+      `SELECT Estado
+         FROM transfers
+        WHERE Id_Transfer = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [Id_Transfer]
+    );
+
+    if (!transferActualRows?.length) {
+      const err = new Error('Transfer no encontrado');
+      err.status = 404;
+      throw err;
+    }
 
     // Resolver Id_Moneda desde tabla monedas si viene Codigo
     let idMoneda = payload.Id_Moneda || null;
@@ -341,6 +548,11 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       );
       idMoneda = monedas?.[0]?.Id_Moneda || null;
     }
+
+    const estadoCalculado = resolverEstadoTransfer({
+      ...payload,
+      Id_Moneda: idMoneda,
+    }, transferActualRows[0].Estado || null);
 
     const sql = `UPDATE transfers SET
       Nombre_Titular = ?,
@@ -358,6 +570,7 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       Id_Moneda = ?,
       Vuelo = ?,
       TipoVuelo = ?,
+      Estado = ?,
       Observaciones = ?
     WHERE Id_Transfer = ?`;
 
@@ -377,11 +590,38 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       idMoneda,
       payload.Vuelo || null,
       payload.TipoVuelo || null,
+      estadoCalculado,
       payload.Observaciones || null,
       Id_Transfer
     ];
 
     await conn.query(sql, params);
+
+    const [pagosActualesRows] = await conn.query(
+      `SELECT Pago_Comprobante
+         FROM pagos_transfers
+        WHERE Id_Transfer = ?
+        FOR UPDATE`,
+      [Id_Transfer]
+    );
+
+    const rutasActuales = new Set(
+      (pagosActualesRows || [])
+        .map((row) => normalizarRutaComprobanteTransferSalida(row.Pago_Comprobante, Id_Transfer))
+        .filter(Boolean)
+    );
+
+    const rutasConservar = new Set();
+    const rutaPagoCompleto = normalizarRutaComprobanteTransferSalida(payload?.Pago?.Pago_Comprobante, Id_Transfer);
+    if (rutaPagoCompleto) rutasConservar.add(rutaPagoCompleto);
+    if (Array.isArray(payload?.Pago?.Abonos)) {
+      for (const abono of payload.Pago.Abonos) {
+        const rutaAbono = normalizarRutaComprobanteTransferSalida(abono?.Pago_Comprobante, Id_Transfer);
+        if (rutaAbono) rutasConservar.add(rutaAbono);
+      }
+    }
+
+    rutasPendientesEliminar = Array.from(rutasActuales).filter((ruta) => !rutasConservar.has(ruta));
 
     // Eliminar pagos existentes
     await conn.query('DELETE FROM pagos_transfers WHERE Id_Transfer = ?', [Id_Transfer]);
@@ -393,16 +633,18 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       const ahora = new Date();
 
       if (payload.Pago.Tipo === 'Completo') {
+        const pagoComprobante = payload.Pago.Pago_Comprobante || null;
         const [pagRes] = await conn.query(
           `INSERT INTO pagos_transfers
            (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [Id_Transfer, valorServicio, 'Completo', ahora, 'Pagado', 'Pago completo registrado al actualizar transfer', null]
+          [Id_Transfer, valorServicio, 'Completo', ahora, 'Pagado', payload.Pago.Observaciones || 'Pago completo registrado al actualizar transfer', pagoComprobante]
         );
         pagosCreados.push({
           Id_Pago: pagRes.insertId,
           Monto: valorServicio,
-          Metodo: 'Completo'
+          Metodo: 'Completo',
+          Pago_Comprobante: pagoComprobante
         });
       } else if (payload.Pago.Tipo === 'PagaEnPunto') {
         const [pagRes] = await conn.query(
@@ -420,16 +662,18 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
         for (const abono of payload.Pago.Abonos) {
           if (abono.Monto && Number(abono.Monto) > 0) {
             const fechaPago = abono.Fecha_Pago ? new Date(abono.Fecha_Pago) : ahora;
+            const pagoComprobante = abono.Pago_Comprobante || null;
             const [pagRes] = await conn.query(
               `INSERT INTO pagos_transfers
                (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [Id_Transfer, Number(abono.Monto), 'Abono', fechaPago, 'Pagado', abono.Observaciones || null, null]
+              [Id_Transfer, Number(abono.Monto), 'Abono', fechaPago, 'Pagado', abono.Observaciones || null, pagoComprobante]
             );
             pagosCreados.push({
               Id_Pago: pagRes.insertId,
               Monto: Number(abono.Monto),
-              Metodo: 'Abono'
+              Metodo: 'Abono',
+              Pago_Comprobante: pagoComprobante
             });
           }
         }
@@ -439,7 +683,18 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
     // Commit transacción
     await conn.commit();
 
-    return { success: true, Id_Transfer, pagos: pagosCreados, message: 'Transfer actualizado correctamente.' };
+    if (rutasPendientesEliminar.length > 0) {
+      await Promise.all(
+        rutasPendientesEliminar.map((ruta) =>
+          eliminarArchivoComprobanteTransferFisico(ruta).catch((error) => {
+            console.warn('No se pudo eliminar un comprobante anterior del transfer:', error?.message || error);
+            return false;
+          })
+        )
+      );
+    }
+
+    return { success: true, Id_Transfer, Codigo_Transfer: formatoCodigoTransfer(Id_Transfer), pagos: pagosCreados, message: 'Transfer actualizado correctamente.' };
   } catch (error) {
     // Rollback en caso de error
     await conn.rollback();
@@ -450,15 +705,43 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
   }
 }
 
+async function cancelarTransferSvc(Id_Transfer) {
+  const [result] = await db.query(
+    'UPDATE transfers SET Estado = ? WHERE Id_Transfer = ?',
+    ['Cancelado', Id_Transfer]
+  );
+
+  if (!result.affectedRows) {
+    const err = new Error('Transfer no encontrado');
+    err.status = 404;
+    throw err;
+  }
+
+  return { Id_Transfer, Codigo_Transfer: formatoCodigoTransfer(Id_Transfer), Estado: 'Cancelado' };
+}
+
 async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   // Validar que nombreArchivo no intente path traversal
   if (nombreArchivo.includes('..') || nombreArchivo.includes('/') || nombreArchivo.includes('\\')) {
     return null;
   }
 
-  // Buscar el archivo en la carpeta uploads/transfers
+  // Buscar el archivo en la carpeta uploads/transfers o en sus subcarpetas por transfer
   const uploadsDir = path.join(__dirname, '../../uploads', 'transfers');
-  const resolvedPath = path.resolve(uploadsDir, nombreArchivo);
+  const directPath = path.resolve(uploadsDir, nombreArchivo);
+  let resolvedPath = directPath;
+
+  if (!fs.existsSync(resolvedPath)) {
+    const transferDirs = fs.existsSync(uploadsDir)
+      ? fs.readdirSync(uploadsDir, { withFileTypes: true }).filter(entry => entry.isDirectory())
+      : [];
+
+    const match = transferDirs
+      .map(entry => path.resolve(uploadsDir, entry.name, nombreArchivo))
+      .find(candidate => candidate.startsWith(uploadsDir) && fs.existsSync(candidate));
+
+    if (match) resolvedPath = match;
+  }
 
   // Verificar que está dentro de uploadsDir
   if (!resolvedPath.startsWith(uploadsDir)) {
@@ -476,4 +759,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre };
+module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre };

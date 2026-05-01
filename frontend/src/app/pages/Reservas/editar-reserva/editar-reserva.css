@@ -494,6 +494,12 @@ input[type=number] {
   flex-wrap: wrap;
 }
 
+.transfer-abono-row {
+  display: grid;
+  grid-template-columns: minmax(80px, .6fr) minmax(110px, .8fr) minmax(130px, .8fr) minmax(160px, 1fr) minmax(180px, 1fr) auto;
+  align-items: center;
+}
+
 .abono-index {
   flex-shrink: 0;
   width: 70px;
@@ -517,6 +523,17 @@ input[type=number] {
   padding: 6px 10px;
   font-size: 0.95rem;
   font-weight: 500;
+  height: 34px;
+}
+
+.abono-extra {
+  flex: 0 1 150px;
+  min-width: 140px;
+}
+
+.abono-extra .form-input {
+  padding: 6px 10px;
+  font-size: 0.9rem;
   height: 34px;
 }
 
@@ -568,6 +585,15 @@ input[type=number] {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.payment-notes {
+  margin-top: 14px;
+}
+
+.payment-notes .form-input {
+  min-height: 76px;
+  resize: vertical;
 }
 
 .btn-payment-action {
@@ -1016,6 +1042,16 @@ input[type=number] {
     gap: 8px;
   }
 
+  .transfer-abono-row,
+  .payment-file-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .payment-actions {
+    justify-content: flex-start;
+  }
+
   .abono-index {
     padding-right: 0;
   }
@@ -1025,7 +1061,6 @@ input[type=number] {
   }
 
   .pago-completo .pc-grid {
-    grid-template-columns: 1fr;
     gap: 10px;
     align-items: stretch;
   }

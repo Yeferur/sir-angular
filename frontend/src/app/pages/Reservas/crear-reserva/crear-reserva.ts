@@ -367,6 +367,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
       // comprobante de pago (dinámico)
       ComprobantePago: [null],
+      PagoObservaciones: [''],
     });
     this.wsService.messages$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -426,6 +427,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     return this.fb.group({
       Monto: [0],
       Comprobante: [null], // File
+      Fecha_Pago: [''],
+      Observaciones: [''],
     });
   }
   agregarAbono() { this.abonos.push(this.crearAbonoGroup()); }
@@ -1279,14 +1282,27 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         pagos.push({ Monto: totalNeto, Tipo: 'Pago Directo' });
       } else if (forma === 'Completo') {
         const file: File | null = this.form.get('ComprobantePago')?.value || null;
-        pagos.push({ Monto: totalNeto, Tipo: 'Pago Completo', fileField: 'comprobante_pago' });
+        pagos.push({
+          Monto: totalNeto,
+          Tipo: 'Pago Completo',
+          fileField: 'comprobante_pago',
+          Observaciones: this.form.get('PagoObservaciones')?.value || null
+        } as any);
         archivos.completo = file;
         comprobanteCompletoFile = file;
       } else if (forma === 'Abono') {
         this.abonos.controls.forEach((g, i) => {
           const monto = Number(g.get('Monto')?.value || 0);
           const f: File | null = g.get('Comprobante')?.value || null;
-          if (monto > 0) pagos.push({ Monto: monto, Tipo: 'Abono', fileField: `abono_${i}` });
+          if (monto > 0) {
+            pagos.push({
+              Monto: monto,
+              Tipo: 'Abono',
+              fileField: `abono_${i}`,
+              Fecha_Pago: g.get('Fecha_Pago')?.value || null,
+              Observaciones: g.get('Observaciones')?.value || null
+            } as any);
+          }
           archivos.abonos!.push(f);
         });
       }
@@ -1499,6 +1515,16 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       message: `Se ha cargado el archivo: ${file.name}`,
       autoClose: true,
     });
+  }
+
+  eliminarComprobanteAbono(index: number): void {
+    const abonoControl = this.abonos.at(index) as FormGroup;
+    abonoControl.get('Comprobante')?.setValue(null);
+    abonoControl.markAsDirty();
+    abonoControl.updateValueAndValidity({ emitEvent: false });
+
+    const input = document.getElementById(`ComprobanteAbono${index}`) as HTMLInputElement | null;
+    if (input) input.value = '';
   }
 
   // ===================== Comprobante preview / actions =====================

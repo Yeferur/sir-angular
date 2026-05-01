@@ -76,7 +76,7 @@
   white-space: nowrap;
 }
 
-.status-activo, .status-confirmada {
+.status-activo, .status-confirmado, .status-confirmada {
   background: rgba(52, 199, 89, 0.15);
   color: var(--accent-green);
 }
@@ -94,6 +94,11 @@
 .status-pagado {
   background: rgba(52, 199, 89, 0.15);
   color: var(--accent-green);
+}
+
+.status-completado, .status-completada {
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent-blue);
 }
 
 .metrics-row {
@@ -177,6 +182,59 @@
   border: 1px solid var(--separator-color);
   padding: 6px;
   border-radius: 14px;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--accent-red);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 55%, var(--separator-color));
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover,
+.btn-danger:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--text-secondary);
+  transform: translateY(-1px);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 
 .btn-close {
@@ -556,7 +614,20 @@
   }
 
   .header-actions {
-    width: auto;
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    padding: 4px;
+    gap: 6px;
+    background: transparent;
+    border: none;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    padding: 8px 12px;
+    font-size: 0.8rem;
   }
 
   .metrics-row {

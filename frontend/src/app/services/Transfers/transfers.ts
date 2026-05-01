@@ -19,6 +19,10 @@ export class TransferService {
   actualizarTransfer(id: string | number, payload: any): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/Transfer/${id}`, payload);
   }
+
+  cancelarTransfer(id: string | number): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/Transfer/${id}/Cancelar`, {});
+  }
   
   getRangos(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/Rangos`);

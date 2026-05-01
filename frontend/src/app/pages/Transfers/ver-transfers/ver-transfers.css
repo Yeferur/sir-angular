@@ -516,6 +516,7 @@
   letter-spacing: .02em;
 }
 
+.status-pill.status-confirmado,
 .status-pill.status-confirmada,
 .status-pill.status-activo,
 .status-pill.status-activa     { background: rgba(52,199,89,.13); color: var(--accent-green); }

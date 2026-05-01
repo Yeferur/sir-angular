@@ -88,6 +88,10 @@
   background: rgba(255, 159, 10, 0.15);
   color: var(--accent-yellow);
 }
+.status-completada, .status-completado {
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent-blue);
+}
 
 .metrics-row {
   display: flex;
@@ -196,6 +200,18 @@
   transition: filter 0.2s ease, transform 0.2s ease;
 }
 
+.btn-danger {
+  background: transparent;
+  color: var(--accent-red);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 55%, var(--separator-color));
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
 .btn-close {
   width: 36px;
   height: 36px;
@@ -214,6 +230,7 @@
 }
 
 .btn-secondary:hover,
+.btn-danger:hover,
 .btn-close:hover {
   background-color: var(--bg-secondary);
   border-color: var(--text-secondary);
@@ -278,6 +295,22 @@
 .info-value {
   font-weight: 600;
   text-align: right;
+  color: var(--text-primary);
+}
+
+/* === SECCIÓN DE OBSERVACIONES === */
+.observations-section {
+  opacity: 0;
+  animation: itemsIn 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation-delay: 0.25s;
+  margin-bottom: 40px;
+}
+
+.observations-text {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.95rem;
   color: var(--text-primary);
 }
 
@@ -414,7 +447,7 @@
     border: none;
   }
   
-  .btn-primary, .btn-secondary {
+  .btn-primary, .btn-secondary, .btn-danger {
     padding: 8px 12px;
     font-size: 0.8rem;
   }

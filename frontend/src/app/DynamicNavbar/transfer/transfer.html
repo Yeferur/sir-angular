@@ -17,7 +17,7 @@
       <!-- Encabezado Sticky -->
       <div class="view-header-top">
         <div class="header-main">
-          <h1 class="transfer-id">#TRC{{ transfer.Id_Transfer }}</h1>
+          <h1 class="transfer-id">#{{ transferCodigo }}</h1>
           <span class="status-tag"
                 [ngClass]="'status-' + (transfer.Estado || 'pendiente')!.toLowerCase()">
             {{ transfer.Estado || 'Pendiente' }}
@@ -25,8 +25,14 @@
         </div>
          <div class="header-actions">
           <button class="btn-secondary" (click)="descargarTransfer();">Descargar</button>
-          <button class="btn-secondary" (click)="duplicarTransfer();">Duplicar</button>
-          <button class="btn-primary" (click)="editarTransfer();">Editar</button>
+          @if (puedeCancelar) {
+            <button class="btn-danger" (click)="cancelarTransfer()">Cancelar</button>
+          }
+          <a
+            class="btn-primary"
+            [routerLink]="['/Transfers/EditarTransfer', transfer.Id_Transfer || Id_Transfer]">
+            Editar
+          </a>
           <button class="btn-close" (click)="close()">✕</button>
         </div>
       </div>
@@ -34,11 +40,7 @@
       <!-- Resumen Superior con Métricas -->
       <div class="view-header">
         <div class="metrics-row">
-          <div class="metric-cell">
-            <span class="metric-value">{{ transfer.Nombre_Titular || '—' }}</span>
-            <span class="metric-label">Titular</span>
-          </div>
-          <div class="metric-divider"></div>
+
           <div class="metric-cell">
             <span class="metric-value">
               {{ transfer.MonedaCodigo || 'COP' }} {{ valorTotal | number:'1.0-0' }}
@@ -146,35 +148,6 @@
             <div class="info-row">
               <span class="info-label">DNI</span>
               <span class="info-value">{{ transfer.DNI || '—' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Pago -->
-        <div class="card detail-card">
-          <div class="card-header"><h2>Pago</h2></div>
-          <div class="card-body">
-            <div class="info-row">
-              <span class="info-label">Valor Total</span>
-              <span class="info-value amount-highlight">
-                {{ transfer.MonedaCodigo || 'COP' }} {{ valorTotal | number:'1.2-2' }}
-              </span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Total Pagado</span>
-              <span class="info-value" [ngClass]="{'amount-paid': totalPagado > 0}">
-                {{ transfer.MonedaCodigo || 'COP' }} {{ totalPagado | number:'1.2-2' }}
-              </span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Saldo Pendiente</span>
-              <span class="info-value" [ngClass]="{'amount-pending': saldoPendiente > 0}">
-                {{ transfer.MonedaCodigo || 'COP' }} {{ saldoPendiente | number:'1.2-2' }}
-              </span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Moneda</span>
-              <span class="info-value">{{ transfer.MonedaCodigo || '—' }}</span>
             </div>
           </div>
         </div>

@@ -19,6 +19,9 @@
         </div>
         <div class="header-actions">
           <button class="btn-secondary" (click)="descargarArchivoReserva()">Descargar</button>
+          @if (puedeCancelar) {
+            <button class="btn-danger" (click)="cancelarReserva()">Cancelar</button>
+          }
           <button class="btn-primary" (click)="editarReserva()">Editar</button>
           <button class="btn-close" (click)="onClose.emit()">✕</button>
         </div>
@@ -102,13 +105,6 @@
                 <span class="info-value">{{ reserva.IdiomaReserva }}</span>
               </div>
             }
-
-            @if (reserva.Observaciones) {
-              <div class="info-row">
-                <span class="info-label">Observaciones</span>
-                <span class="info-value">{{ reserva.Observaciones }}</span>
-              </div>
-            }
           </div>
         </div>
 
@@ -131,6 +127,19 @@
           </div>
         </div>
       </div>
+
+      @if (reserva.Observaciones) {
+        <div class="observations-section">
+          <div class="card detail-card">
+            <div class="card-header"><h2>Observaciones</h2></div>
+            <div class="card-body">
+              <div class="observations-text">
+                {{ reserva.Observaciones }}
+              </div>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Pasajeros -->
       <div class="passengers-section">

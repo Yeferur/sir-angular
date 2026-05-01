@@ -16,7 +16,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
   styleUrls: ['./ver-reservas.css']
 })
 export class VerReservasComponent implements OnInit {
-  readonly estadoOptions = ['Activo', 'Pendiente', 'Completado', 'Cancelado'];
+  readonly estadoOptions = ['Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completada', 'Cancelada'];
   mainInputFocused = signal(false);
 private settingFromAutocomplete = false;
 

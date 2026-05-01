@@ -553,7 +553,7 @@
 
           <div class="abonos-grid">
             @for (group of abonos.controls; let i = $index; track i) {
-            <div class="abono-row" [formGroupName]="i">
+            <div class="payment-file-row transfer-abono-row" [formGroupName]="i">
 
               <!-- Índice/Número -->
               <div class="abono-index">
@@ -566,27 +566,39 @@
                   placeholder="0" />
               </div>
 
-              <!-- Comprobante -->
-              <div class="abono-col file-col">
-                <div class="file-upload-wrapper">
-                  <input type="file" [id]="'ComprobanteAbono' + i" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
-                    (change)="onAbonoFileSelected($event, i)" style="display:none" />
-
-                  <label class="btn-upload" [for]="'ComprobanteAbono' + i">Subir</label>
-
-                  @if (abonos.controls[i].get('Comprobante')?.value; as f) {
-                  <span class="file-info">{{ f?.name }} ({{ (f?.size / 1024) | number:'1.0-0' }} KB)</span>
-                  } @else {
-                  <span class="file-info placeholder">Sin archivo</span>
-                  }
-                </div>
+              <div class="abono-col fecha-col">
+                <input type="date" class="form-input" formControlName="Fecha_Pago" />
               </div>
 
-              <!-- Delete -->
-              @if (abonos.length > 1) {
-              <button type="button" class="btn-icon-delete" aria-label="Eliminar abono"
-                (click)="eliminarAbono(i)">✕</button>
-              }
+              <div class="abono-col observacion-col">
+                <input type="text" class="form-input" formControlName="Observaciones" placeholder="Observaciones" />
+              </div>
+
+              <div class="payment-file-status">
+                @if (abonos.controls[i].get('Comprobante')?.value) {
+                  <span class="payment-chip loaded">Cargado</span>
+                  <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
+                } @else {
+                  <span class="file-name text-muted">Sin archivo</span>
+                }
+              </div>
+
+              <div class="payment-actions">
+                <input type="file" [id]="'ComprobanteAbono' + i" accept=".pdf,.jpg,.jpeg,.png"
+                  (change)="onAbonoFileSelected($event, i)" style="display:none" />
+
+                @if (!abonos.controls[i].get('Comprobante')?.value) {
+                  <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+                } @else {
+                  <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
+                  <button type="button" class="btn-payment-action danger" (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+                }
+
+                @if (abonos.length > 1) {
+                  <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
+                    (click)="eliminarAbono(i)">✕</button>
+                }
+              </div>
 
             </div>
             }
@@ -614,45 +626,50 @@
           </div>
 
           <div class="pc-grid">
-
-            <!-- Botón de carga -->
-            <div class="uploader">
-              <input type="file" id="ComprobantePago" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
-                (change)="onFileSelected($event)" style="display:none" />
-              <label class="btn-upload" for="ComprobantePago">Subir comprobante</label>
-            </div>
-
-            <!-- Chip archivo -->
-            <div class="file-chip">
-
+            <div class="payment-file-row">
+              <div class="payment-file-status">
               @if (form.get('ComprobantePago')?.value; as f) {
 
               @if (f?.SoporteUrl) {
-              <span class="status-pill ok">Guardado</span>
-              <span class="name">Comprobante guardado</span>
+              <span class="payment-chip saved">Guardado</span>
+              <span class="file-name">Comprobante guardado</span>
+              } @else {
+              <span class="payment-chip loaded">Cargado</span>
+              <span class="file-name">{{ f?.name }}</span>
+              }
 
-              <div class="file-actions">
-                <button type="button" class="btn-link" (click)="viewComprobante(f.SoporteUrl)">Ver</button>
-                <button type="button" class="btn-subtle" (click)="triggerComprobanteUpload()">Actualizar</button>
-                <button type="button" class="btn-danger" (click)="deleteComprobante()">Eliminar</button>
+              } @else {
+              <span class="file-name text-muted">Sin archivo</span>
+              }
               </div>
-              } @else {
-              <span class="status-pill pending">Listo para subir</span>
-              <span class="name">{{ f?.name }}</span>
-              <span class="size">— {{ (f?.size / 1024) | number:'1.0-0' }} KB</span>
-              }
 
-              } @else {
-              <span class="status-pill neutral">Sin archivo</span>
-              <span class="name">Aún no has subido el comprobante</span>
-              }
+              <div class="payment-actions">
+                <input type="file" id="ComprobantePago" accept=".pdf,.jpg,.jpeg,.png"
+                  (change)="onFileSelected($event)" style="display:none" />
 
+                @if (!form.get('ComprobantePago')?.value) {
+                  <label class="btn-payment-action primary" for="ComprobantePago">Subir comprobante</label>
+                } @else {
+                  @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
+                    <button type="button" class="btn-payment-action secondary"
+                      (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
+                  }
+                  <label class="btn-payment-action secondary" for="ComprobantePago">Reemplazar</label>
+                  <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
+                }
+              </div>
             </div>
 
             <!-- Error -->
             @if (form.get('ComprobantePago')?.touched) {
             <div class="errorMessage pc-error">El comprobante debe ser menor a 5 MB.</div>
             }
+
+            <div class="payment-notes">
+              <label class="form-label">Observaciones del pago</label>
+              <textarea formControlName="PagoObservaciones" class="form-input" rows="2"
+                placeholder="Método, referencia o nota del pago"></textarea>
+            </div>
 
           </div>
 

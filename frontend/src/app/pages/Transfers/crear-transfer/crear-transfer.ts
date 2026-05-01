@@ -30,6 +30,8 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  isDuplicateMode = false;
+  duplicarFromId: string | null = null;
 
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
@@ -216,12 +218,17 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     return this.form.get('Abonos') as FormArray;
   }
 
-  addAbono(): void {
-    this.abonos.push(this.fb.group({
+  private crearAbonoGroup(): FormGroup {
+    return this.fb.group({
       Monto: ['', [Validators.required, Validators.min(0.01)]],
       Observaciones: [''],
-      Fecha_Pago: ['']
-    }));
+      Fecha_Pago: [''],
+      Comprobante: [null]
+    });
+  }
+
+  addAbono(): void {
+    this.abonos.push(this.crearAbonoGroup());
   }
 
   removeAbono(index: number): void {
@@ -249,6 +256,14 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   getAbonosIndices(): number[] {
     return Array.from({ length: this.abonos.length }, (_, i) => i);
+  }
+
+  get abonosValidos(): boolean {
+    return this.getTotalAbonado() <= Number(this.form.get('Valor')?.value || 0);
+  }
+
+  recalcularTotales(): void {
+    this.form.get('Valor')?.updateValueAndValidity({ emitEvent: false });
   }
 
   // MÉTODOS PARA ARCHIVOS/COMPROBANTES
@@ -281,7 +296,13 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       }
       this.pagoPagadoFile = files[0];
       this.pagoPagadoFileName = files[0].name;
+      this.form.get('ComprobantePago')?.setValue(files[0]);
+      this.form.get('ComprobantePago')?.markAsDirty();
     }
+  }
+
+  onFileSelected(event: Event): void {
+    this.onPagoCompletoFileSelected(event);
   }
 
   onAbonoFileSelected(event: Event, index: number): void {
@@ -296,25 +317,42 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       }
       this.abonoFiles.set(index, files[0]);
       this.abonoFileNames.set(index, files[0].name);
+      const abonoControl = this.abonos.at(index) as FormGroup;
+      abonoControl.get('Comprobante')?.setValue(files[0]);
+      abonoControl.markAsDirty();
     }
   }
 
   clearPagoCompletoFile(): void {
     this.pagoPagadoFile = null;
     this.pagoPagadoFileName = null;
+    this.form.get('ComprobantePago')?.setValue(null);
+    this.form.get('ComprobantePago')?.markAsDirty();
     const input = document.getElementById('file-pago-completo') as HTMLInputElement;
     if (input) input.value = '';
+    const newInput = document.getElementById('ComprobantePago') as HTMLInputElement;
+    if (newInput) newInput.value = '';
+  }
+
+  deleteComprobante(): void {
+    this.clearPagoCompletoFile();
   }
 
   clearAbonoFile(index: number): void {
     this.abonoFiles.delete(index);
     this.abonoFileNames.delete(index);
+    const abonoControl = this.abonos.at(index) as FormGroup;
+    abonoControl.get('Comprobante')?.setValue(null);
+    abonoControl.markAsDirty();
     const input = document.getElementById(`file-abono-${index}`) as HTMLInputElement;
     if (input) input.value = '';
+    const newInput = document.getElementById(`ComprobanteAbono${index}`) as HTMLInputElement;
+    if (newInput) newInput.value = '';
   }
 
   getAbonoFileName(index: number): string | null {
-    return this.abonoFileNames.get(index) || null;
+    const file = this.abonos.at(index)?.get('Comprobante')?.value;
+    return file?.name || this.abonoFileNames.get(index) || null;
   }
 
   ngOnInit(): void {
@@ -336,7 +374,9 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       TelefonoReserva: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
       TipoPago: ['PagaEnPunto'],
-      Abonos: this.fb.array([])
+      Abonos: this.fb.array([]),
+      ComprobantePago: [null],
+      PagoObservaciones: ['']
     });
 
     this.loadCatalogos();
@@ -440,6 +480,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.isLoading.set(true);
 
     const duplicarId = this.route.snapshot.queryParamMap.get('duplicar');
+    this.isDuplicateMode = Boolean(duplicarId);
+    this.duplicarFromId = duplicarId;
 
     const requests: any = {
       servicios: this.transferSvc.getServicios().pipe(catchError(() => of([] as any[]))),
@@ -483,7 +525,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   private fillFormWithDuplicateData(data: any): void {
     const transfer = data.transfer || data;
-    const pagos = data.pagos || [];
 
     // Llenar formulario con datos del transfer
     this.form.patchValue({
@@ -502,9 +543,16 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Vuelo: transfer.Vuelo || '',
       Valor: Number(transfer.Valor || 0),
       TelefonoReserva: transfer.Telefono_Reportante || '',
-      Observaciones: `Duplicado desde Transfer #TRC${transfer.Id_Transfer}`,
-      TipoPago: 'PagaEnPunto'  // Siempre comienzar con PagaEnPunto
+      Observaciones: `Duplicado desde Transfer #${transfer.Codigo_Transfer || `TRS${String(transfer.Id_Transfer || '').padStart(5, '0')}`}`,
+      TipoPago: 'PagaEnPunto'
     }, { emitEvent: false });
+
+    this.abonos.clear();
+    this.form.get('ComprobantePago')?.setValue(null);
+    this.pagoPagadoFile = null;
+    this.pagoPagadoFileName = null;
+    this.abonoFiles.clear();
+    this.abonoFileNames.clear();
 
     // Actualizar descripciones
     const rangoId = this.form.get('Rango')?.value;
@@ -579,7 +627,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       }
 
       if (vals.Valor && Number(vals.Valor) > 0) {
-        return { estado: 'Confirmada', subestado: null, motivo: 'Valor registrado.' };
+        return { estado: 'Confirmado', subestado: null, motivo: 'Valor registrado.' };
       }
 
       return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Sin valor registrado.' };
@@ -595,6 +643,17 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         return;
       }
     }
+
+    const tipoPago = this.form.value.TipoPago;
+    const abonosPayload = tipoPago === 'Abonos'
+      ? this.abonos.controls
+          .map((control) => ({
+            Monto: Number(control.get('Monto')?.value || 0),
+            Observaciones: control.get('Observaciones')?.value || null,
+            Fecha_Pago: control.get('Fecha_Pago')?.value || null
+          }))
+          .filter((abono) => abono.Monto > 0)
+      : [];
 
     const transferData = {
       Titular: this.form.value.Titular,
@@ -613,11 +672,12 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
-      Observaciones: [this.form.value.Observaciones, `EstadoMotivo: ${estadoInfo.motivo}`].filter(Boolean).join('\n'),
+      Observaciones: this.form.value.Observaciones || null,
       Estado: estadoInfo.estado,
       Pago: {
-        Tipo: this.form.value.TipoPago,
-        Abonos: this.form.value.TipoPago === 'Abonos' ? this.form.value.Abonos : []
+        Tipo: tipoPago,
+        Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
+        Abonos: abonosPayload
       }
     };
 
@@ -627,13 +687,14 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         const pagos = data?.data?.pagos || [];
 
         // Si hay archivos de comprobantes, subirlos
-        if (idTransfer && (this.pagoPagadoFile || this.abonoFiles.size > 0)) {
+        if (idTransfer && this.hasComprobantesToUpload()) {
           this.uploadComprobantesTransfer(idTransfer, pagos);
         } else {
           // Sin comprobantes, mostrar éxito
           this.navbar.successToast('Transfer creado', data?.message || 'Transfer creado correctamente.');
           this.resetForm();
           this.isSubmitting.set(false);
+          this.router.navigate(['/Transfers/VerTransfers']);
         }
       },
       error: () => {
@@ -648,11 +709,12 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     const uploads: Promise<void>[] = [];
 
     // Pago completo
-    if (this.pagoPagadoFile && pagos.length > 0) {
+    const pagoCompletoFile = this.form.get('ComprobantePago')?.value;
+    if (pagoCompletoFile instanceof File && pagos.length > 0) {
       const idPago = pagos[0].Id_Pago;
       uploads.push(
         new Promise((resolve, reject) => {
-          this.transferSvc.subirComprobantePago(idTransfer, idPago, this.pagoPagadoFile!).subscribe({
+          this.transferSvc.subirComprobantePago(idTransfer, idPago, pagoCompletoFile).subscribe({
             next: () => resolve(),
             error: (err) => {
               console.error('Error subiendo pago completo:', err);
@@ -664,11 +726,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     }
 
     // Abonos
-    this.abonoFiles.forEach((file, abonoIndex) => {
-      // Buscar el pago correspondiente (saltando el primero si es pago completo)
-      const pagoIndex = this.form.get('TipoPago')?.value === 'Completo' ? abonoIndex + 1 : abonoIndex;
-      if (pagos[pagoIndex]) {
-        const idPago = pagos[pagoIndex].Id_Pago;
+    const abonosConMonto = this.abonos.controls.filter(control => Number(control.get('Monto')?.value || 0) > 0);
+    abonosConMonto.forEach((control, abonoIndex) => {
+      const file = control.get('Comprobante')?.value;
+      if (file instanceof File && pagos[abonoIndex]) {
+        const idPago = pagos[abonoIndex].Id_Pago;
         uploads.push(
           new Promise((resolve, reject) => {
             this.transferSvc.subirComprobantePago(idTransfer, idPago, file).subscribe({
@@ -699,14 +761,25 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       });
   }
 
+  private hasComprobantesToUpload(): boolean {
+    const pagoCompletoFile = this.form.get('ComprobantePago')?.value;
+    if (pagoCompletoFile instanceof File) return true;
+    return this.abonos.controls.some(control => control.get('Comprobante')?.value instanceof File);
+  }
+
   private resetForm(): void {
+    this.abonos.clear();
     this.form.reset({
       TipoServicio: 'Seleccionar',
       Rango: 'Seleccionar',
       Moneda: 'COP',
-      Valor: 0
+      Valor: 0,
+      TipoPago: 'PagaEnPunto',
+      ComprobantePago: null,
+      PagoObservaciones: ''
     });
     this.form.markAsPristine();
+    this.form.get('ComprobantePago')?.setValue(null);
     this.pagoPagadoFile = null;
     this.pagoPagadoFileName = null;
     this.abonoFiles.clear();

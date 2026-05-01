@@ -7,6 +7,7 @@ const {
   getServiciosTransferSvc,
   crearTransferSvc,
   actualizarTransferSvc,
+  cancelarTransferSvc,
   getDetalleTransferSvc,
   subirComprobanteTransferSvc,
   resolverComprobanteSeguroTransferPorNombre
@@ -119,6 +120,23 @@ exports.updateTransfer = async (req, res) => {
   } catch (e) {
     console.error(e);
     return sendError(res, { status: 500, message: 'Error al actualizar transfer', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.cancelTransfer = async (req, res) => {
+  try {
+    const { Id_Transfer } = req.params;
+    if (!Id_Transfer) return sendError(res, { status: 400, message: 'Falta Id_Transfer', errorCode: 'MISSING_PARAMS' });
+
+    const result = await cancelarTransferSvc(Id_Transfer);
+    return sendSuccess(res, { data: result, message: 'Transfer cancelado correctamente' });
+  } catch (e) {
+    const status = e?.status || 500;
+    return sendError(res, {
+      status,
+      message: status === 404 ? 'Transfer no encontrado' : 'Error al cancelar transfer',
+      errorCode: status === 404 ? 'TRANSFER_NOT_FOUND' : 'INTERNAL_ERROR'
+    });
   }
 };
 
