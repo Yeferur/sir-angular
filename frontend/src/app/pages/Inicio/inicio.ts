@@ -6,12 +6,12 @@ import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { InicioService, Tour, Transfer } from '../../services/inicio';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 import { PermisosService } from '../../services/Permisos/permisos.service';
-import { AlertasCupoComponent } from './alertas-cupo/alertas-cupo';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, PermisoDirective, FlatpickrInputDirective, AlertasCupoComponent],
+  imports: [CommonModule, PermisoDirective, FlatpickrInputDirective],
   templateUrl: './inicio.html',
   styleUrls: ['./inicio.css'],
 })
@@ -25,9 +25,9 @@ export class Inicio implements OnInit {
   editando: { [key: number]: boolean } = {};
   nuevoCupo: { [key: number]: string } = {};
   mostrarDetallesCombinada = false;
-  isLoading = false;
+  isLoading = true;
+  isUpdatingDate = false;
 
-  // permiso para editar aforo
   canEditarAforo = signal(false);
 
   fecha: string = new Date().toISOString().split('T')[0];
@@ -37,12 +37,12 @@ export class Inicio implements OnInit {
 
   combinedTour: Tour | null = null;
   combinedDetails: Tour[] = [];
+  skeletonCards = [0, 1, 2, 3];
 
-  // evita recargas duplicadas
   private loading = false;
 
   constructor() {
-    // ✅ Aforo en tiempo real: actualiza estado local (NO HTTP)
+    // Aforo en tiempo real: actualiza estado local sin disparar HTTP.
     effect(() => {
       const aforo = this.inicioService.aforoActualizado();
       if (!aforo) return;
@@ -50,26 +50,21 @@ export class Inicio implements OnInit {
       const id = Number(aforo.Id_Tour);
       const nuevo = Number(aforo.NuevoCupo);
 
-      // actualiza tours
       const t = this.tours.find(x => x.Id_Tour === id);
       if (t) t.cupos = nuevo;
 
-      // actualiza combinado (si es el 5)
       if (this.combinedTour && id === 5) {
         this.combinedTour.cupos = nuevo;
       }
 
-      // si estaba editando ese tour, refresca input
       if (this.editando[id]) {
         this.nuevoCupo[id] = String(nuevo);
       }
 
-      // zoneless friendly
       this.cdr.markForCheck();
     }, { injector: this.injector });
 
-    // ✅ Reservas en tiempo real: aquí sí conviene recargar (porque afectan contadores)
-    // Pero hazlo "deferred" para evitar NG0100 si llega durante render.
+    // Reservas en tiempo real: recarga datos para recalcular contadores.
     effect(() => {
       const reserva = this.inicioService.reservaActualizada();
       if (!reserva) return;
@@ -101,7 +96,7 @@ export class Inicio implements OnInit {
     altInputClass: 'form-input flatpickr-input flatpickr-alt',
 
     onReady: (_sel, _str, inst: any) => {
-      // ✅ SSR guard ANTES DE TODO
+      // SSR guard
       if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
       const cal: HTMLElement = inst?.calendarContainer;
@@ -109,34 +104,27 @@ export class Inicio implements OnInit {
 
       cal.classList.add('sir-flatpickr');
 
-      // util: clamp día al máximo del mes
       const clampDay = (y: number, m: number, d: number) => {
         const last = new Date(y, m + 1, 0).getDate(); // último día del mes
         return Math.min(Math.max(d, 1), last);
       };
 
-      // --- Inyectar select en el header estable (flatpickr-month) ---
       let yearDiv: HTMLDivElement | null = null;
       let yearSelect: HTMLSelectElement | null = null;
 
       const ensureYearSelect = () => {
-        // contenedor header
         const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
         if (!monthWrap) return null;
 
-        // elimina el input numérico (cuando exista)
         const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
         if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
 
-        // preferimos insertar dentro del pill .flatpickr-current-month
         const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
         const container = curMonth ?? monthWrap;
 
-        // evita duplicados
         yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
         if (yearSelect) return yearSelect;
 
-        // elimina cualquier wrapper previo para mantener DOM limpio
         const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
         if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
 
@@ -190,35 +178,28 @@ export class Inicio implements OnInit {
 
         const newDate = new Date(y, m, day);
 
-        // siempre mueve la vista
         if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
 
-        // solo setea si ya había selección
         if (inst.selectedDates?.length) {
           inst.setDate(newDate, true); // true => triggerChange para reactive forms
         }
       };
 
-      // init
       buildYears(inst.currentYear ?? new Date().getFullYear());
       syncSelectValue();
 
-      // listeners
       const sel0 = ensureYearSelect();
       sel0?.addEventListener('change', onChange);
 
-      // hook sin pisar otros callbacks
       const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
         const prev = inst.config[key];
         const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
         inst.config[key] = [...arr, fn];
       };
 
-      // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
       wrap('onMonthChange', () => syncSelectValue());
       wrap('onYearChange', () => syncSelectValue());
 
-      // cleanup
       const prevOnDestroy = inst.config.onDestroy;
       const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
       inst.config.onDestroy = [
@@ -236,8 +217,22 @@ export class Inicio implements OnInit {
   loadData() {
     if (this.loading) return;
     this.loading = true;
+    const isInitialLoad = this.tours.length === 0 && !this.combinedTour;
 
-    this.inicioService.getDatosInicio(this.fecha).subscribe({
+    if (isInitialLoad) {
+      this.isLoading = true;
+    } else {
+      this.isUpdatingDate = true;
+    }
+
+    this.inicioService.getDatosInicio(this.fecha).pipe(
+      finalize(() => {
+        this.loading = false;
+        this.isLoading = false;
+        this.isUpdatingDate = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: (data) => {
         this.tours = data.tours;
         this.transfers = data.transfers;
@@ -260,14 +255,10 @@ export class Inicio implements OnInit {
           this.combinedDetails = [];
         }
 
-        // ✅ NO detectChanges() en zoneless
         this.cdr.markForCheck();
       },
       error: () => {
         this.cdr.markForCheck();
-      },
-      complete: () => {
-        this.loading = false;
       }
     });
   }
@@ -279,6 +270,10 @@ export class Inicio implements OnInit {
     if (usage < 60) return 'blue';
     if (usage < 90) return 'yellow';
     return 'red';
+  }
+
+  getCupoInputId(tourId: number): string {
+    return `cupo-${tourId}`;
   }
 
   trackByTourId(index: number, tour: any): number {
@@ -307,7 +302,6 @@ export class Inicio implements OnInit {
   }
 
   guardarAforo(tour: Tour) {
-    // seguridad: verificar permiso antes de intentar guardar
     if (!this.canEditarAforo()) {
       this.global.alert.set({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.', autoClose: true });
       return;
@@ -341,7 +335,6 @@ export class Inicio implements OnInit {
             this.global.alert.set({
               title: 'Guardando aforo...',
               message: 'Por favor espera un momento.',
-              loading: true,
               autoClose: false
             });
 
@@ -366,8 +359,7 @@ export class Inicio implements OnInit {
                   autoCloseTime: 3000,
                 });
 
-                // ✅ No es obligatorio recargar aquí; el WS lo actualizará.
-                // Si quieres recargar para asegurar consistencia de pasajeros/privados:
+                // El WS también actualiza estado, pero se recarga para asegurar consistencia.
                 queueMicrotask(() => this.loadData());
 
                 this.cdr.markForCheck();

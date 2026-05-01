@@ -4,8 +4,13 @@
     max-width: 1600px;
     margin: 0 auto;
     min-height: 100vh;
-    color: #fff;
-    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    animation: fadeIn 0.5s ease;
+}
+
+.dashboard-loading {
+    min-height: 70vh;
 }
 
 /* Header */
@@ -26,7 +31,7 @@
 
 .dashboard-header p {
     margin: 0.5rem 0 0;
-    color: #a3a3a3;
+    color: var(--text-secondary);
     font-size: 0.95rem;
 }
 
@@ -43,24 +48,24 @@
 
 .input-group label {
     font-size: 0.75rem;
-    color: #a3a3a3;
+    color: var(--text-secondary);
     margin-bottom: 0.25rem;
 }
 
 .input-group input {
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--separator-color);
     border-radius: 8px;
     padding: 0.5rem 1rem;
-    color: #fff;
-    font-family: inherit;
+    color: var(--text-primary);
+    font-family: var(--font-family);
     outline: none;
     transition: all 0.2s;
 }
 
 .input-group input:focus {
-    border-color: #ffd700;
-    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.1);
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 15%, transparent);
 }
 
 /* KPI Grid */
@@ -72,8 +77,8 @@
 }
 
 .kpi-card {
-    background: #161618;
-    border: 1px solid #2a2a2a;
+    background: var(--bg-secondary);
+    border: 1px solid var(--separator-color);
     border-radius: 16px;
     padding: 1.5rem;
     display: flex;
@@ -140,7 +145,7 @@
     margin: 0;
     font-size: 0.85rem;
     font-weight: 500;
-    color: #a3a3a3;
+    color: var(--text-secondary);
 }
 
 .kpi-info .value {
@@ -148,12 +153,12 @@
     font-size: 1.75rem;
     font-weight: 700;
     margin: 0.25rem 0;
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .kpi-info .subtext {
     font-size: 0.75rem;
-    color: #666;
+    color: var(--text-tertiary);
 }
 
 /* Charts Grid */
@@ -164,8 +169,8 @@
 }
 
 .chart-card {
-    background: #161618;
-    border: 1px solid #2a2a2a;
+    background: var(--bg-secondary);
+    border: 1px solid var(--separator-color);
     border-radius: 16px;
     padding: 1.5rem;
     min-height: 400px;
@@ -183,12 +188,12 @@
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .card-subtitle {
     font-size: 0.85rem;
-    color: #666;
+    color: var(--text-tertiary);
 }
 
 .donut-container {

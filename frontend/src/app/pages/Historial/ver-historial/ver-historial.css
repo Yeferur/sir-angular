@@ -6,7 +6,7 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
-  animation: fadeInScale 0.5s ease-out;
+  animation: fadeIn 0.5s ease;
 }
 
 .page-header {
@@ -120,14 +120,15 @@
 }
 
 .filter-token {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  background: rgba(43, 109, 255, 0.1);
-  border: 1px solid rgba(43, 109, 255, 0.2);
-  border-radius: 20px;
-  font-size: 0.85rem;
+  padding: 3px 10px;
+  background: rgba(10, 132, 255, 0.12);
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--accent-blue);
   animation: fadeInScale 0.2s ease-out;
 }
@@ -182,8 +183,8 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(0.9);
-  transform: scale(1.02);
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -197,13 +198,14 @@
 }
 
 .btn-info {
-  background-color: var(--accent-green);
-  color: #fff;
+  background: rgba(48, 209, 88, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(48, 209, 88, 0.3);
 }
 
 .btn-info:hover:not(:disabled) {
-  filter: brightness(0.9);
-  transform: scale(1.02);
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .btn-primary:disabled,
@@ -346,10 +348,9 @@
   padding: 14px 12px;
   text-align: left;
   font-weight: 600;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
 }
 
 .historial-table tbody tr {
@@ -378,36 +379,37 @@
 }
 
 .user-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  background: rgba(43, 109, 255, 0.1);
+  display: inline-flex;
+  padding: 3px 9px;
+  background: rgba(10, 132, 255, 0.12);
   color: var(--accent-blue);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .accion-badge {
-  display: inline-block;
-  padding: 5px 12px;
-  color: #fff;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  display: inline-flex;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .accion-badge.crear {
-  background: rgba(46, 204, 113, 0.8);
+  background: rgba(48, 209, 88, 0.15);
+  color: var(--accent-green);
 }
 
 .accion-badge.actualizar {
-  background: rgba(52, 152, 219, 0.8);
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent-blue);
 }
 
 .accion-badge.eliminar {
-  background: rgba(231, 76, 60, 0.8);
+  background: rgba(255, 69, 58, 0.15);
+  color: var(--accent-red);
 }
 
 .tabla-cell code {

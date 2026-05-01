@@ -43,7 +43,6 @@
   text-decoration: none;
   font-weight: 600;
   transition: filter 0.2s, transform 0.15s;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .btn-primary-create:hover {
@@ -67,36 +66,35 @@
   align-items: center;
   gap: 16px;
   border: 1px solid var(--separator-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s;
 }
 
 .kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
 .kpi-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
 }
 
 .users-icon {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent-blue);
 }
 
 .active-icon {
-  background: linear-gradient(135deg, #2af598 0%, #009efd 100%);
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--accent-green);
 }
 
 .kpi-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .kpi-content {
@@ -183,33 +181,30 @@
   border-color: color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color));
 }
 
-/* Status dots */
-.item-status {
-  display: flex;
+/* Status pills — reemplazan los dots con glow */
+.status-pill {
+  display: inline-flex;
   align-items: center;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin: 0;
-  box-shadow: 0 0 8px currentColor;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .status-activa {
+  background: rgba(52, 199, 89, 0.15);
   color: var(--accent-green);
-  background-color: var(--accent-green);
 }
 
 .status-inactiva {
+  background: rgba(255, 159, 10, 0.15);
   color: var(--accent-yellow);
-  background-color: var(--accent-yellow);
 }
 
 .status-cerrada {
+  background: rgba(255, 59, 48, 0.18);
   color: var(--accent-red);
-  background-color: var(--accent-red);
 }
 
 /* Info blocks */
@@ -233,9 +228,7 @@
 
 /* Secondary info */
 .username-badge {
-  background-color: var(--bg-tertiary);
-  /* fallback */
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-tertiary);
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 0.85rem;

@@ -13,7 +13,9 @@
       <div class="formGroup">
         <label class="formLabel">Tour:</label>
         <select [(ngModel)]="tourSeleccionado" class="formInput">
-          <option *ngFor="let t of tours" [value]="t.Id_Tour">{{ t.NombreTour }}</option>
+          @for (t of tours; track t.Id_Tour) {
+            <option [value]="t.Id_Tour">{{ t.NombreTour }}</option>
+          }
         </select>
       </div>
     
@@ -21,56 +23,72 @@
     </div>
     
     <!-- ✅ COMBINACIONES SUGERIDAS -->
-    <div *ngIf="mostrarCombinaciones && combinacionesSugeridas.length" class="combinaciones-grid">
+    @if (mostrarCombinaciones && combinacionesSugeridas.length) {
+    <div class="combinaciones-grid">
       <h3>Selecciona una combinación</h3>
     
       <div class="tablero">
-        <div *ngFor="let combi of combinacionesSugeridas; let i = index; trackBy: trackByCombinacion"
+        @for (combi of combinacionesSugeridas; track combi.combinacion.join('-'); let i = $index) {
+        <div
           class="columna" (click)="seleccionarCombinacion(i)">
           <header>
             <h4>Combinación {{ i + 1 }}</h4>
             <span>{{ combi.buses.length }} buses</span>
           </header>
           <ul>
-            <li *ngFor="let bus of combi.buses">
+            @for (bus of combi.buses; track bus.placa ?? $index) {
+            <li>
               Capacidad: {{ bus.capacidad }} – {{ bus.reservas.length }} reservas
             </li>
+            }
           </ul>
         </div>
+        }
       </div>
     </div>
+    }
     
     <!-- 🔄 VOLVER A VER OTRAS COMBINACIONES -->
-    <button *ngIf="mostrarBotonVerOtras" (click)="verOtrasCombinaciones()">← Ver otras combinaciones</button>
+    @if (mostrarBotonVerOtras) {
+    <button (click)="verOtrasCombinaciones()">← Ver otras combinaciones</button>
+    }
     
     <!-- ✍️ FORMULARIO DE PLACA Y GUÍA PARA COMBINACIÓN -->
-    <div *ngIf="mostrarFormularioBuses && combinacionSeleccionada">
+    @if (mostrarFormularioBuses && combinacionSeleccionada) {
+    <div>
       <h3>Completa los datos de los buses</h3>
       <form (ngSubmit)="guardarCambios()">
         <div class="formRow">
-          <div *ngFor="let bus of combinacionSeleccionada.buses; let i = index" class="bus-datos formGroup">
+          @for (bus of combinacionSeleccionada.buses; track bus.id ?? $index; let i = $index) {
+          <div class="bus-datos formGroup">
             <label class="formLabel">Placa del bus {{ i + 1 }}:</label>
             <input [(ngModel)]="bus.placa" name="placa-{{ i }}" class="formInput" required />
       
             <label class="formLabel">Guía:</label>
             <input [(ngModel)]="bus.guia" name="guia-{{ i }}" class="formInput" required />
           </div>
+          }
         </div>
         <button type="submit">Confirmar combinación</button>
       </form>
     </div>
+    }
     
     <!-- 🛠 OPCIÓN MANUAL -->
-    <div *ngIf="mostrarCombinaciones && combinacionesSugeridas.length" class="manual-entry">
+    @if (mostrarCombinaciones && combinacionesSugeridas.length) {
+    <div class="manual-entry">
       <button (click)="activarModoManual()">Ingresar combinación manual</button>
     </div>
+    }
     
     <!-- 🧾 FORMULARIO MANUAL -->
-    <div *ngIf="modoManual">
+    @if (modoManual) {
+    <div>
       <h3>Crear combinación manual</h3>
       <form (ngSubmit)="enviarCombinacionManual()">
         <div class="formRow">
-          <div *ngFor="let bus of busesManual; let i = index" class="bus-datos formGroup">
+          @for (bus of busesManual; track bus.placa ?? $index; let i = $index) {
+          <div class="bus-datos formGroup">
             <h4>Bus {{ i + 1 }}</h4>
             <label class="formLabel">Placa:</label>
             <input [(ngModel)]="bus.placa" name="placaManual-{{ i }}" class="formInput" required />
@@ -81,19 +99,23 @@
             <label class="formLabel">Guía:</label>
             <input [(ngModel)]="bus.guia" name="guiaManual-{{ i }}" class="formInput" required />
           </div>
+          }
         </div>
     
         <button type="button" (click)="agregarBusManual()">+ Agregar otro bus</button>
         <button type="submit">Generar listados</button>
       </form>
     </div>
+    }
     
     <!-- 🔁 BOTÓN PARA VOLVER A EDITAR -->
-    <button *ngIf="listado.buses?.length" class="btn-toggle" (click)="toggleEdit()">
+    @if (listado.buses?.length) {
+    <button class="btn-toggle" (click)="toggleEdit()">
       {{ editMode ? 'Salir de edición' : 'Editar listados' }}
     </button>
+    }
     <!-- =================== MODO EDICIÓN =================== -->
-    <ng-container *ngIf="editMode; else lectura">
+    @if (editMode) {
       <div class="tablero" cdkDropListGroup>
     
         <!-- 🔴 SIN ASIGNAR -->
@@ -106,18 +128,21 @@
           </header>
     
           <ul>
-            <li *ngFor="let r of listado.sinAsignar; trackBy: trackByReservaSinAsignar" cdkDrag [cdkDragData]="r">
+            @for (r of listado.sinAsignar; track r.Id_Reserva) {
+            <li cdkDrag [cdkDragData]="r">
               <div class="reserva-info">
                 <div class="reserva-id"><strong>#{{ r.Id_Reserva }}</strong></div>
                 <div class="reserva-punto">{{ r.NombrePunto }}</div>
                 <div class="reserva-pax">{{ r.NumeroPasajeros }} pax</div>
               </div>
             </li>
+            }
           </ul>
         </div>
     
         <!-- 🚌 BUSES -->
-        <div *ngFor="let bus of listado.buses; let i = index; trackBy: trackByBus" class="columna"
+        @for (bus of listado.buses; track bus.id ?? $index; let i = $index) {
+        <div class="columna"
           [id]="'bus-' + i" cdkDropList [cdkDropListData]="bus.reservas"
           [cdkDropListConnectedTo]="busIds" (cdkDropListDropped)="dropReserva($event, i)">
     
@@ -133,31 +158,34 @@
           </header>
     
           <ul>
-            <li *ngFor="let r of bus.reservas; trackBy: trackByReserva" cdkDrag [cdkDragData]="r">
+            @for (r of bus.reservas; track r.Id_Reserva) {
+            <li cdkDrag [cdkDragData]="r">
               <div class="reserva-info">
                 <div class="reserva-id"><strong>#{{ r.Id_Reserva }}</strong></div>
                 <div class="reserva-punto">{{ r.NombrePunto }}</div>
                 <div class="reserva-pax">{{ r.NumeroPasajeros }} pax</div>
               </div>
             </li>
+            }
           </ul>
     
           <button class="btn-ver-ruta" (click)="verMapa(bus)">Ver ruta</button>
         </div>
+        }
       </div>
     
       <button class="btn-save" (click)="guardarCambios()">Guardar cambios</button>
-    </ng-container>
+    } @else {
     
     <!-- =================== MODO LECTURA =================== -->
-    <ng-template #lectura>
-      <div *ngIf="listado">
+      @if (listado) {
         <h2>Listado del {{ listado.fecha }} (Tour: {{ listado.tour }})</h2>
         <p>Total de pasajeros: {{ listado.totalPasajeros }}</p>
         <p>Combinación usada: {{ listado.combinacionUsada.join(', ') }}</p>
     
         <div class="tablero lectura">
-          <div *ngFor="let bus of listado.buses; let i = index; trackBy: trackByBus" class="columna">
+          @for (bus of listado.buses; track bus.id ?? $index; let i = $index) {
+          <div class="columna">
             <header>
               <h3>Bus {{ i + 1 }}</h3>
               <span [class.warning]="bus.ocupados / bus.capacidad > 0.9" [class.full]="bus.ocupados >= bus.capacidad">
@@ -170,39 +198,48 @@
             </header>
     
             <ul>
-              <li *ngFor="let r of bus.reservas; trackBy: trackByReserva">
+              @for (r of bus.reservas; track r.Id_Reserva) {
+              <li>
                 <div class="reserva-info">
                   <div class="reserva-id"><strong>#{{ r.Id_Reserva }}</strong></div>
                   <div class="reserva-punto">{{ r.NombrePunto }}</div>
                   <div class="reserva-pax">{{ r.NumeroPasajeros }} pax</div>
                 </div>
               </li>
+              }
             </ul>
     
             <button class="btn-ver-ruta" (click)="verMapa(bus)">Ver ruta</button>
           </div>
+          }
     
-          <div *ngIf="listado.sinAsignar.length" class="columna">
+          @if (listado.sinAsignar.length) {
+          <div class="columna">
             <header>
               <h3>Sin asignar</h3>
               <span>{{ listado.sinAsignar.length }} reservas</span>
             </header>
     
             <ul>
-              <li *ngFor="let r of listado.sinAsignar; trackBy: trackByReservaSinAsignar">
+              @for (r of listado.sinAsignar; track r.Id_Reserva) {
+              <li>
                 <div class="reserva-info">
                   <div class="reserva-id"><strong>#{{ r.Id_Reserva }}</strong></div>
                   <div class="reserva-punto">{{ r.NombrePunto }}</div>
                   <div class="reserva-pax">{{ r.NumeroPasajeros }} pax</div>
                 </div>
               </li>
+              }
             </ul>
           </div>
+          }
         </div>
-      </div>
-    </ng-template>
+      }
+    }
     
-    <div *ngIf="error" class="error">{{ error }}</div>
+    @if (error) {
+    <div class="error">{{ error }}</div>
+    }
     
  </div>
 </div>

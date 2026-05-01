@@ -1,5 +1,4 @@
 <div class="dashboard-container">
-
   <!-- Header & Filters -->
   <header class="dashboard-header animate-fade-in">
     <div>
@@ -17,6 +16,13 @@
       </div>
     </div>
   </header>
+
+  @if (isLoading) {
+    <div class="loading-state dashboard-loading">
+      <div class="spinner"></div>
+      <p>Cargando información...</p>
+    </div>
+  } @else {
 
   <!-- KPI Cards -->
   <section class="kpi-grid animate-fade-in-up">
@@ -136,5 +142,7 @@
     </div>
 
   </section>
+
+  }
 
 </div>

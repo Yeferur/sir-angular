@@ -73,6 +73,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   public occupancyChartOptions: Partial<ChartOptions> | any;
 
   // FLAGS / CACHE
+  isLoading = true;
   private viewReady = false;
   private lastResponse: any = null;
 
@@ -262,12 +263,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       endDate: this.endDate || undefined
     };
 
-    this.navbar.alert.set({
-      title: 'Cargando',
-      message: 'Actualizando Dashboard...',
-      loading: true,
-      autoClose: false
-    });
+    this.isLoading = true;
+    this.cdr.detectChanges();
+
+    this.navbar.alert.set(null);
 
     forkJoin({
       stats: this.dashboardService.getStats(filters),
@@ -277,7 +276,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     })
       .pipe(
         finalize(() => {
-          this.navbar.alert.set(null);
+          this.isLoading = false;
+          const current = this.navbar.alert();
+          if (current?.loading) this.navbar.alert.set(null);
+          this.cdr.detectChanges();
         })
       )
       .subscribe({
@@ -295,14 +297,18 @@ export class DashboardComponent implements OnInit, AfterViewInit {
             this.applyChartData(res);
             this.forceChartsReflow();
           }
+
+          this.cdr.detectChanges();
         },
         error: (err) => {
           console.error('Dashboard Error:', err);
           this.navbar.alert.set({
             title: 'Error',
             message: 'No se pudo cargar la información del Dashboard',
-            type: 'error'
+            type: 'error',
+            autoClose: true,
           });
+          this.cdr.detectChanges();
         }
       });
   }

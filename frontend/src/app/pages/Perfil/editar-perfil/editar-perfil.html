@@ -7,8 +7,9 @@
   </div>
 
   @if (isLoading()) {
-  <div class="card">
-    <p class="hint">Cargando perfil...</p>
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <p>Cargando información...</p>
   </div>
   } @else {
   <form [formGroup]="form" (ngSubmit)="guardar()" autocomplete="off" novalidate>

@@ -7,67 +7,52 @@
       </div>
 
       <div class="header-actions">
-        <button class="btn-primary" (click)="crearTour()">
-          <i class="ri-add-line"></i> Nuevo Tour
-        </button>
+        <button class="btn-primary" (click)="crearTour()">+ Nuevo Tour</button>
       </div>
     </div>
 
     @if (isLoading()) {
-      <div class="dashboard-grid">
-        <div class="tour-card">
-          <div class="card-top">
-            <div class="title-row">
-              <h2 class="tour-name">Cargando tours...</h2>
-            </div>
-          </div>
-        </div>
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando información...</p>
       </div>
     } @else {
     <div class="dashboard-grid">
-      @for (tour of toursFiltrados(); track $index; let i = $index) {
+      @for (tour of toursFiltrados(); track $index) {
         <div class="tour-card">
 
-          <div class="card-top">
-            <div class="title-row">
-              <h2 class="tour-name" title="{{ tour.Nombre_Tour }}">{{ tour.Nombre_Tour }}</h2>
-              @if (tour.Abreviacion) {
-                <span class="pill">{{ tour.Abreviacion }}</span>
-              }
-            </div>
-
-            <div class="meta">
-              <div class="meta-item">
-                <span class="meta-label">Cupo Base</span>
-                <span class="meta-value">{{ showNumber(tour.Cupo_Base) }}</span>
-              </div>
-            </div>
+          <div class="card-header">
+            <h2 class="tour-name" [title]="tour.Nombre_Tour">{{ tour.Nombre_Tour }}</h2>
+            @if (tour.Abreviacion) {
+              <span class="pill">{{ tour.Abreviacion }}</span>
+            }
           </div>
 
-          <div class="divider"></div>
-
-          <div class="commissions">
-            <div class="kpi">
-              <span class="kpi-label">Hotel</span>
-              <span class="kpi-value">{{ showNumber(tour.Comision_Hotel) }}</span>
+          <div class="metrics-row">
+            <div class="metric-cell">
+              <span class="metric-value">{{ showNumber(tour.Cupo_Base) }}</span>
+              <span class="metric-label">cupo base</span>
             </div>
-            <div class="kpi">
-              <span class="kpi-label">Agencia</span>
-              <span class="kpi-value">{{ showNumber(tour.Comision_Agencia) }}</span>
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ showNumber(tour.Comision_Hotel) }}</span>
+              <span class="metric-label">hotel</span>
             </div>
-            <div class="kpi">
-              <span class="kpi-label">Freelance</span>
-              <span class="kpi-value">{{ showNumber(tour.Comision_Freelance) }}</span>
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ showNumber(tour.Comision_Agencia) }}</span>
+              <span class="metric-label">agencia</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ showNumber(tour.Comision_Freelance) }}</span>
+              <span class="metric-label">freelance</span>
             </div>
           </div>
 
           <div class="card-footer">
-            <button class="btn-secondary" (click)="editarTour(tour)">
-              Editar
-            </button>
-            <button class="btn-danger" (click)="eliminarTour(tour)">
-              Eliminar
-            </button>
+            <button class="btn-secondary" (click)="editarTour(tour)">Editar</button>
+            <button class="btn-danger" (click)="eliminarTour(tour)">Eliminar</button>
           </div>
 
         </div>

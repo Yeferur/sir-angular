@@ -1,5 +1,11 @@
 <div class="booking-dashboard">
   <div class="main-content">
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando información...</p>
+      </div>
+    } @else {
     <form [formGroup]="form" (ngSubmit)="onSubmitGuardarCambios()">
       <div class="card">
         <div class="card-header header-row">
@@ -75,5 +81,6 @@
         </div>
       </div>
     </form>
+    }
   </div>
 </div>

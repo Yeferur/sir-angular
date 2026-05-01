@@ -1,169 +1,386 @@
+@if (isLoading()) {
+  <div class="page-container sk-ver-reservas">
+    <div class="page-header">
+      <div class="header-top">
+        <div class="header-text">
+          <div class="sk-line sk-vr-title"></div>
+          <div class="sk-line sk-vr-subtitle"></div>
+        </div>
+        <div class="header-actions">
+          <div class="sk-field sk-vr-btn"></div>
+        </div>
+      </div>
+
+      <div class="search-row">
+        <div class="search-container">
+          <div class="sk-field sk-vr-search"></div>
+        </div>
+        <div class="sk-field sk-vr-icon-btn"></div>
+        <div class="sk-field sk-vr-btn"></div>
+      </div>
+
+      <div class="active-filters">
+        <div class="sk-field sk-vr-chip"></div>
+        <div class="sk-field sk-vr-chip"></div>
+        <div class="sk-field sk-vr-chip"></div>
+      </div>
+    </div>
+
+    <div class="results-area">
+      <div class="results-list">
+        <div class="sk-result-item">
+          <div class="sk-field sk-vr-status"></div>
+          <div class="sk-vr-item-info">
+            <div class="sk-line sk-vr-item-id"></div>
+            <div class="sk-line sk-vr-item-tour"></div>
+            <div class="sk-line sk-vr-item-meta"></div>
+          </div>
+          <div class="sk-line sk-vr-arrow"></div>
+        </div>
+
+        <div class="sk-result-item">
+          <div class="sk-field sk-vr-status"></div>
+          <div class="sk-vr-item-info">
+            <div class="sk-line sk-vr-item-id"></div>
+            <div class="sk-line sk-vr-item-tour"></div>
+            <div class="sk-line sk-vr-item-meta"></div>
+          </div>
+          <div class="sk-line sk-vr-arrow"></div>
+        </div>
+
+        <div class="sk-result-item">
+          <div class="sk-field sk-vr-status"></div>
+          <div class="sk-vr-item-info">
+            <div class="sk-line sk-vr-item-id"></div>
+            <div class="sk-line sk-vr-item-tour"></div>
+            <div class="sk-line sk-vr-item-meta"></div>
+          </div>
+          <div class="sk-line sk-vr-arrow"></div>
+        </div>
+
+        <div class="sk-result-item sk-result-item--last">
+          <div class="sk-field sk-vr-status"></div>
+          <div class="sk-vr-item-info">
+            <div class="sk-line sk-vr-item-id"></div>
+            <div class="sk-line sk-vr-item-tour"></div>
+            <div class="sk-line sk-vr-item-meta"></div>
+          </div>
+          <div class="sk-line sk-vr-arrow"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+} @else {
 <div class="page-container">
-  <!-- ENCABEZADO Y BARRA DE BÚSQUEDA -->
+
+  <!-- HEADER -->
   <div class="page-header">
-    <h1>Ver Reservas</h1>
-    <div class="search-container">
-      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M10 18a7.952 7.952 0 0 0 4.897-1.688l4.396 4.396 1.414-1.414-4.396-4.396A7.952 7.952 0 0 0 18 10c0-4.411-3.589-8-8-8s-8 3.589-8 8 3.589 8 8 8zm0-14c3.309 0 6 2.691 6 6s-2.691 6-6 6-6-2.691-6-6 2.691-6 6-6z"></path>
-      </svg>
-      <input
-        type="text"
-        class="search-input"
-        placeholder="Buscar por ID, nombre, DNI, punto..."
-        [value]="filters().NombreApellido"
-        (input)="onMainSearchInput($any($event.target).value)"
-        (keyup.enter)="buscarReservas()"
-        autocomplete="off"
-        (focus)="onMainInputFocus()"
-        (blur)="onMainInputBlur()"
+    <div class="header-top">
+      <div class="header-text">
+        <h1>Ver Reservas</h1>
+        <p class="subtitle">Busca por ID, nombre, DNI o punto de encuentro.</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" (click)="crearReserva()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Crear Reserva
+        </button>
+      </div>
+    </div>
+
+    <!-- SEARCH ROW -->
+    <div class="search-row">
+      <div class="search-container">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Buscar por ID, nombre, DNI, punto..."
+          [value]="filters().NombreApellido"
+          (input)="onMainSearchInput($any($event.target).value)"
+          (keyup.enter)="buscarReservas()"
+          autocomplete="off"
+          (focus)="onMainInputFocus()"
+          (blur)="onMainInputBlur()"
         />
         @if (puntoAutocompleteVisible()) {
           <div class="autocomplete-dropdown">
             @for (p of puntoSugerencias(); track p) {
               <div class="autocomplete-item" (mousedown)="seleccionarPuntoAutocomplete(p)">
-                <span>{{ p.NombrePunto }}</span>
+                {{ p.NombrePunto }}
               </div>
             }
           </div>
         }
       </div>
-    </div>
 
-    <!-- BARRA DE HERRAMIENTAS DE FILTROS -->
-    <div class="filters-toolbar">
-      <div class="filter-actions">
-        <button class="btn-filter" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3a1 1 0 0 0-1 1v2.586a1 1 0 0 0 .293.707l6 6a1 1 0 0 1 .293.707V19a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4.707a1 1 0 0 1 .293-.707l6-6A1 1 0 0 0 22 6.586V4a1 1 0 0 0-1-1zm-1 3.414-6 6a3 3 0 0 0-.879 2.121V19h-2v-4.464a3 3 0 0 0-.879-2.121l-6-6V5h16v1.414z"></path></svg>
-          <span>Filtros</span>
-        </button>
+      <button class="btn-filter" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())"
+        [class.btn-filter--active]="advancedFiltersVisible()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        Filtros
+        @if (activeFilterCount() > 0) {
+          <span class="filter-count">{{ activeFilterCount() }}</span>
+        }
+      </button>
 
-        <!-- Tokens de filtros activos -->
-        <div class="active-filters">
-          @if (filters().FechaReserva) {
-            <div class="filter-token">
-              <span>Fecha: {{ filters().FechaReserva | date:'shortDate' }}</span>
-              <button class="remove-token-btn" (click)="updateFilter('FechaReserva', '')">✕</button>
-            </div>
-          }
-          @if (filters().FechaRegistro) {
-            <div class="filter-token">
-              <span>Registro: {{ filters().FechaRegistro | date:'shortDate' }}</span>
-              <button class="remove-token-btn" (click)="updateFilter('FechaRegistro', '')">✕</button>
-            </div>
-          }
-          @if (filters().Estado?.length > 0) {
-            <div class="filter-token">
-              <span>Estado: {{ filters().Estado.join(', ') }}</span>
-              <button class="remove-token-btn" (click)="updateFilter('Estado', [])">✕</button>
-            </div>
-          }
-          @if (filters().tour?.length > 0) {
-            <div class="filter-token">
-              <span>Tour: {{ getSelectedToursText() }}</span>
-              <button class="remove-token-btn" (click)="updateFilter('tour', [])">✕</button>
-            </div>
-          }
-        </div>
-      </div>
-
-      <button class="btn-primary" (click)="buscarReservas()">
-        @if (!isLoadingReservas()) { <span>Buscar</span> }
-        @if (isLoadingReservas())  { <span>Buscando...</span> }
+      <button class="btn-primary" (click)="buscarReservas()" [disabled]="isSearching()">
+        @if (isSearching()) {
+          <span class="btn-spinner"></span>
+          Buscando...
+        } @else {
+          Buscar
+        }
       </button>
     </div>
 
-    <!-- PANEL DE FILTROS AVANZADOS (desplegable) -->
-    @if (advancedFiltersVisible()) {
-      <div class="advanced-filters-panel">
-        <div class="form-grid">
-          <!-- Fecha del Tour -->
-          <div class="form-group">
-            <label class="form-label">Fecha del tour</label>
-            <input
-              type="text"
-              class="form-input"
-              appFlatpickrInput
-              [fpOptions]="fpOptionsFecha"
-              [value]="filters().FechaReserva"
-              (change)="updateFilter('FechaReserva', $any($event.target).value)"
-              />
+    <!-- ACTIVE FILTER TOKENS -->
+    @if (filters().FechaReserva || filters().FechaRegistro || filters().Estado?.length > 0 || filters().tour?.length > 0 || filters().CategoriaReserva?.length > 0) {
+      <div class="active-filters">
+        @if (filters().FechaReserva) {
+          <div class="filter-token">
+            Fecha tour: {{ filters().FechaReserva | date:'d MMM yyyy':'':'es-CO' }}
+            <button class="remove-token-btn" (click)="clearFechaReserva()">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().FechaRegistro) {
+          <div class="filter-token">
+            Registro: {{ filters().FechaRegistro | date:'d MMM yyyy':'':'es-CO' }}
+            <button class="remove-token-btn" (click)="clearFechaRegistro()">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().Estado?.length > 0) {
+          <div class="filter-token">
+            Estado: {{ filters().Estado.join(', ') }}
+            <button class="remove-token-btn" (click)="updateFilter('Estado', [])">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().tour?.length > 0) {
+          <div class="filter-token">
+            Tour: {{ getSelectedToursText() }}
+            <button class="remove-token-btn" (click)="updateFilter('tour', [])">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().CategoriaReserva?.length > 0) {
+          <div class="filter-token">
+            Categoría: {{ getSelectedCategoriasText() }}
+            <button class="remove-token-btn" (click)="updateFilter('CategoriaReserva', [])">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- ADVANCED FILTERS PANEL -->
+  @if (advancedFiltersVisible()) {
+    <div class="advanced-filters-panel">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Fecha del tour</label>
+          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+            [value]="filters().FechaReserva" placeholder="Selecciona una fecha"
+            (change)="updateFilter('FechaReserva', $any($event.target).value)"
+            #fechaReservaFp="fp" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de registro</label>
+          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+            [value]="filters().FechaRegistro" placeholder="Selecciona una fecha"
+            (change)="updateFilter('FechaRegistro', $any($event.target).value)"
+            #fechaRegistroFp="fp" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <div class="multi-filter">
+            <button
+              type="button"
+              class="multi-filter-trigger"
+              [class.active]="dropdownOpenEstado()"
+              [class.multi-filter-trigger-active]="filters().Estado.length > 0"
+              (click)="toggleDropdown('estado')"
+              [attr.aria-expanded]="dropdownOpenEstado()"
+            >
+              <span>{{ getMultiFilterLabel('Estado') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (dropdownOpenEstado()) {
+              <div class="multi-filter-menu">
+                @for (e of estadoOptions; track e) {
+                  <button type="button" class="multi-filter-option" (click)="toggleSelection(e, 'Estado')">
+                    <span class="multi-filter-checkbox" [class.checked]="isSelected('Estado', e)">
+                      @if (isSelected('Estado', e)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ e }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('Estado')">
+                  Limpiar selección
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tour</label>
+          <div class="multi-filter">
+            <button
+              type="button"
+              class="multi-filter-trigger"
+              [class.active]="dropdownOpenTour()"
+              [class.multi-filter-trigger-active]="filters().tour.length > 0"
+              (click)="toggleDropdown('tour')"
+              [attr.aria-expanded]="dropdownOpenTour()"
+            >
+              <span>{{ getMultiFilterLabel('tour') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (dropdownOpenTour()) {
+              <div class="multi-filter-menu">
+                @for (t of resultsTours(); track t.Id_Tour) {
+                  <button type="button" class="multi-filter-option" (click)="toggleSelection(t.Id_Tour, 'tour')">
+                    <span class="multi-filter-checkbox" [class.checked]="isSelected('tour', t.Id_Tour)">
+                      @if (isSelected('tour', t.Id_Tour)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ t.Nombre_Tour }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('tour')">
+                  Limpiar selección
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoría / Canal</label>
+          <div class="multi-filter">
+            <button
+              type="button"
+              class="multi-filter-trigger"
+              [class.active]="dropdownOpenCategoria()"
+              [class.multi-filter-trigger-active]="filters().CategoriaReserva.length > 0"
+              (click)="toggleDropdown('categoria')"
+              [attr.aria-expanded]="dropdownOpenCategoria()"
+            >
+              <span>{{ getMultiFilterLabel('CategoriaReserva') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (dropdownOpenCategoria()) {
+              <div class="multi-filter-menu">
+                @for (c of resultsCategoria(); track c.Id_Canal) {
+                  <button type="button" class="multi-filter-option" (click)="toggleSelection(c.Id_Canal, 'CategoriaReserva')">
+                    <span class="multi-filter-checkbox" [class.checked]="isSelected('CategoriaReserva', c.Id_Canal)">
+                      @if (isSelected('CategoriaReserva', c.Id_Canal)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ c.Nombre_Canal }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('CategoriaReserva')">
+                  Limpiar selección
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- RESULTS -->
+  <div class="results-area">
+    @if (isSearching()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Buscando resultados...</p>
+      </div>
+    } @else if (reservas().length > 0) {
+      <div class="results-list">
+        @for (r of reservas(); track r.Id_Reserva) {
+          <div class="result-item"
+            role="button"
+            tabindex="0"
+            (click)="verReserva(r.Id_Reserva)"
+            (keydown.enter)="verReserva(r.Id_Reserva)"
+            (keydown.space)="$event.preventDefault(); verReserva(r.Id_Reserva)"
+            [attr.aria-label]="'Ver reserva ' + r.Id_Reserva + ' — ' + r.Nombre_Tour">
+
+            <span class="status-pill" [ngClass]="'status-' + (r.Estado ? (r.Estado | lowercase) : '')">
+              {{ r.Estado }}
+            </span>
+
+            <div class="item-main-info">
+              <span class="item-id">#{{ r.Id_Reserva }}</span>
+              <span class="item-tour">{{ r.Nombre_Tour }}</span>
+              <span class="item-meta">
+                {{ r.Fecha_Tour | date:'d MMM yyyy':'':'es-CO' }}
+                <span class="sep">·</span>
+                {{ r.Pasajeros }} pax
+              </span>
             </div>
 
-            <!-- Fecha de Registro -->
-            <div class="form-group">
-              <label class="form-label">Fecha de registro</label>
-              <input
-                type="text"
-                class="form-input"
-                appFlatpickrInput
-                [fpOptions]="fpOptionsFecha"
-                [value]="filters().FechaRegistro"
-                (change)="updateFilter('FechaRegistro', $any($event.target).value)"
-                />
-              </div>
-
-              <!-- Estado -->
-              <div class="form-group">
-                <label class="form-label">Estado</label>
-                <select class="form-select" (change)="toggleSelection($any($event.target).value, 'Estado')">
-                  <option value="">Todos</option>
-                  @for (e of ['Activo', 'Pendiente', 'Completado', 'Cancelado']; track e) {
-                    <option [value]="e">{{ e }}</option>
-                  }
-                </select>
-              </div>
-
-              <!-- Tour -->
-              <div class="form-group">
-                <label class="form-label">Tour</label>
-                <select class="form-select" (change)="toggleSelection($any($event.target).value, 'tour')">
-                  <option value="">Todos</option>
-                  @for (t of resultsTours(); track t.Id_Tour) {
-                    <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-                  }
-                </select>
-              </div>
+            <div class="item-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
             </div>
           </div>
         }
-
-        <!-- ÁREA DE RESULTADOS -->
-        <div class="results-area">
-          @if (!isLoadingReservas() && reservas().length > 0) {
-            <div class="results-list">
-              @for (r of reservas(); track r.Id_Reserva) {
-                <div class="result-item" (click)="verReserva(r.Id_Reserva)">
-                  <div class="status-dot" [ngClass]="'status-' + (r.Estado ? (r.Estado | lowercase) : '')"></div>
-
-                  <div class="item-main-info">
-                    <span class="item-title">{{ r.Id_Reserva }} - {{ r.Nombre_Tour }}</span>
-                    <span class="item-subtitle">{{ r.Fecha_Tour | date:'yyyy-MM-dd' }}</span>
-                  </div>
-
-                  <div class="item-secondary-info">
-                    <span>{{ r.Pasajeros }} Pasajeros</span>
-                  </div>
-
-                  <div class="item-action">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M10.707 17.707 16.414 12l-5.707-5.707-1.414 1.414L13.586 12l-4.293 4.293z"></path>
-                    </svg>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-
-          @if (!isLoadingReservas() && reservas().length === 0) {
-            <div class="empty-state">
-              <p>No se encontraron reservas con los filtros actuales.</p>
-            </div>
-          }
-
-          @if (isLoadingReservas()) {
-            <div class="loading-state">
-              <p>Cargando reservas...</p>
-            </div>
-          }
-        </div>
       </div>
+    } @else if (hasSearched()) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
+          </svg>
+        </div>
+        <h3>Sin resultados</h3>
+        <p>No se encontraron reservas con los filtros aplicados.</p>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <h3>Listo para buscar</h3>
+        <p>Selecciona tus filtros y presiona "Buscar" para ver las reservas.</p>
+      </div>
+    }
+  </div>
+
+</div>
+}

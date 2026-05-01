@@ -24,25 +24,32 @@ export class ComisionesComponent implements OnInit {
     // Data
     tours: any[] = [];
     comisiones: any[] = [];
-    loading: boolean = false;
+    isPageLoading: boolean = false;
+    isSearching: boolean = false;
+    hasSearched: boolean = false;
 
     ngOnInit() {
         this.cargarTours();
-        this.buscar();
     }
 
     cargarTours() {
+        this.isPageLoading = true;
         this.toursService.getTours().subscribe({
             next: (data: any[]) => {
                 this.tours = data;
                 this.cdr.detectChanges();
             },
-            error: (err: any) => console.error('Error cargando tours', err)
+            error: (err: any) => console.error('Error cargando tours', err),
+            complete: () => {
+                this.isPageLoading = false;
+                this.cdr.detectChanges();
+            }
         });
     }
 
     buscar() {
-        this.loading = true;
+        this.hasSearched = true;
+        this.isSearching = true;
         const filtros = {
             Fecha: this.fecha,
             Id_Tour: this.idTour
@@ -51,12 +58,15 @@ export class ComisionesComponent implements OnInit {
         this.comisionesService.listarComisiones(filtros).subscribe({
             next: (data: any[]) => {
                 this.comisiones = data;
-                this.loading = false;
                 this.cdr.detectChanges();
             },
             error: (err: any) => {
                 console.error('Error buscando comisiones', err);
-                this.loading = false;
+                this.comisiones = [];
+                this.cdr.detectChanges();
+            },
+            complete: () => {
+                this.isSearching = false;
                 this.cdr.detectChanges();
             }
         });

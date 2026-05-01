@@ -8,6 +8,12 @@
         </div>
     </div>
 
+    @if (isLoading() || catalogLoading()) {
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Cargando información...</p>
+        </div>
+    } @else {
     <form [formGroup]="form" (ngSubmit)="submit()" autocomplete="off" novalidate>
         <input class="autofill-trap" type="text" name="fake-user" autocomplete="username" tabindex="-1"
             aria-hidden="true" />
@@ -263,4 +269,5 @@
 
         </div>
     </form>
+    }
 </div>

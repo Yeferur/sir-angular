@@ -37,6 +37,24 @@ interface Pasajero {
 
 type ResponsableVM = { nombre: string; telefono: string; CanalReserva: string };
 
+interface Reserva {
+  Id_Reserva: string;
+  Estado?: string;
+  NumeroPasajeros?: number;
+  TotalNeto?: number;
+  Pendiente?: number;
+  TourReserva?: string;
+  PuntoEncuentro?: string;
+  FechaReserva?: string | null;
+  HoraSalida?: string;
+  IdiomaReserva?: string;
+  Observaciones?: string;
+  Reportante?: { Nombre?: string; Telefono?: string };
+  CanalReserva?: string;
+  Pasajeros?: Pasajero[];
+  Pagos?: any[];
+}
+
 @Component({
   selector: 'app-reserva',
   standalone: true,
@@ -50,7 +68,7 @@ export class ReservasDynamicComponent implements OnInit {
 
   isLoading = false;
 
-  reserva: any = null;
+  reserva: Reserva | null = null;
   responsable: ResponsableVM = { nombre: '—', telefono: '—', CanalReserva: '—' };
 
   pasajeros = {
@@ -102,10 +120,15 @@ export class ReservasDynamicComponent implements OnInit {
           Pagos: data?.pagos || [],
         };
 
+    const totalNeto = base.TotalNeto != null ? Number(base.TotalNeto) : undefined;
+    const pendiente = base.Pendiente != null ? Number(base.Pendiente) : undefined;
+
     const r = {
       Id_Reserva: base.Id_Reserva,
       Estado: base.Estado ?? 'Pendiente',
       NumeroPasajeros: (base.Pasajeros || []).length,
+      TotalNeto: totalNeto,
+      Pendiente: pendiente,
       TourReserva: base.TourReserva ?? base.Nombre_Tour ?? '—',
       PuntoEncuentro: base.PuntoEncuentro ?? base.Nombre_Punto ?? '—',
       FechaReserva: base.FechaReserva ?? base.Fecha_Tour ?? null,
@@ -143,7 +166,7 @@ export class ReservasDynamicComponent implements OnInit {
         this.pasajeros.infantes = infantes;
         this.responsable = responsable;
         this.isLoading = false;
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error al cargar la reserva:', err);
@@ -295,7 +318,7 @@ export class ReservasDynamicComponent implements OnInit {
 
     try {
       this.isLoading = true;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
 
       const doc = this.buildReservaPdfDoc();
 
@@ -337,7 +360,7 @@ export class ReservasDynamicComponent implements OnInit {
       });
     } finally {
       this.isLoading = false;
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     }
   }
 

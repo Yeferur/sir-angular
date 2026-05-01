@@ -1,134 +1,149 @@
 <div class="page-container">
-    <div class="header-top">
-        <div>
-            <h1>Confirmación de Viaje</h1>
-        </div>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-text">
+      <h1>Confirmación de Viaje</h1>
+      <p class="subtitle">Marca los pasajeros que efectivamente viajaron.</p>
     </div>
 
-    <div class="filters-container">
-        <div class="filter-group">
-            <label class="label">Fecha del Tour</label>
-            <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-                [(ngModel)]="filters.Fecha" (change)="onFechaChange($event)" />
-        </div>
+    <!-- FILTERS -->
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="form-label">Fecha del Tour</label>
+        <input
+          id="fecha"
+          class="form-input"
+          type="text"
+          appFlatpickrInput
+          [fpOptions]="fpOptionsFecha"
+          [(ngModel)]="filters.Fecha"
+          (change)="onFechaChange($event)"
+          placeholder="Seleccionar fecha..."
+        />
+      </div>
 
-        <div class="filter-group">
-            <label class="label">Tour</label>
-            <select [(ngModel)]="filters.Id_Tour" class="form-select">
-                <option value="" selected disabled>Seleccionar Tour</option>
-                @for (t of toursList; track t.Id_Tour) {
-                <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-                }
-            </select>
-        </div>
+      <div class="filter-group">
+        <label class="form-label">Tour</label>
+        <select [(ngModel)]="filters.Id_Tour" class="form-select">
+          <option value="" selected disabled>Seleccionar tour...</option>
+          @for (t of toursList; track t.Id_Tour) {
+            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+          }
+        </select>
+      </div>
 
-        <button (click)="search()" [disabled]="isLoading" class="btn-search">
-            @if (isLoading) {
-            <div class="spinner"></div>
+      <button (click)="search()" [disabled]="isLoading" class="btn-primary btn-search">
+        @if (isLoading) {
+          <span class="btn-spinner"></span>
+          Buscando...
+        } @else {
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Buscar Pasajeros
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card">
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando pasajeros...</p>
+      </div>
+    } @else if (pasajeros.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3>Sin pasajeros</h3>
+        <p>Selecciona una fecha y un tour, luego presiona "Buscar".</p>
+      </div>
+    } @else {
+      <!-- META ROW -->
+      <div class="table-meta">
+        <div class="meta-info">
+          <span class="count-badge">{{ pasajeros.length }}</span>
+          <span class="meta-text">pasajeros encontrados</span>
+        </div>
+        <label class="toggle-all-label">
+          <span class="toggle-all-text">Marcar todos</span>
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="allChecked" (change)="toggleAll($event)" class="toggle-checkbox sr-only">
+            <div class="toggle-bg"><div class="toggle-dot"></div></div>
+          </label>
+        </label>
+      </div>
+
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead class="thead">
+            <tr>
+              <th class="th">Reserva</th>
+              <th class="th">Pasajero</th>
+              <th class="th">Documento</th>
+              <th class="th">Contacto</th>
+              <th class="th">Punto de Encuentro</th>
+              <th class="th th-center">¿Viajó?</th>
+            </tr>
+          </thead>
+          <tbody class="tbody">
+            @for (p of pasajeros; track p.Id_Pasajero; let i = $index) {
+              <tr [class.reservation-separator]="i > 0 && p.Id_Reserva !== pasajeros[i-1].Id_Reserva">
+                <td class="td">
+                  <span class="reserva-id">#{{ p.Id_Reserva }}</span>
+                  <div class="reporter-name">{{ p.Nombre_Reportante }}</div>
+                </td>
+                <td class="td">
+                  <div class="passenger-name">{{ p.Nombre_Pasajero }}</div>
+                  <span class="badge" [ngClass]="{
+                    'badge-adulto':  p.Tipo_Pasajero === 'ADULTO',
+                    'badge-nino':    p.Tipo_Pasajero === 'NINO',
+                    'badge-infante': p.Tipo_Pasajero === 'INFANTE'
+                  }">{{ p.Tipo_Pasajero }}</span>
+                </td>
+                <td class="td td-mono">{{ p.DNI || '—' }}</td>
+                <td class="td">
+                  <div>{{ p.Telefono_Pasajero || '—' }}</div>
+                  @if (!p.Telefono_Pasajero && p.Telefono_Reportante) {
+                    <div class="contact-sub">Rep: {{ p.Telefono_Reportante }}</div>
+                  }
+                </td>
+                <td class="td">{{ p.PuntoEncuentro || '—' }}</td>
+                <td class="td td-center">
+                  <label class="toggle-switch">
+                    <input type="checkbox" [(ngModel)]="p.Confirmacion" (change)="checkAllStatus()" class="toggle-checkbox sr-only">
+                    <div class="toggle-bg"><div class="toggle-dot"></div></div>
+                  </label>
+                </td>
+              </tr>
             }
-            @if (!isLoading) {
-            <span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </span>
-            <span>Buscar Pasajeros</span>
-            }
-        </button>
-    </div>
-
-    <div class="table-container">
-        <div class="table-scroll">
-            <table class="data-table">
-                <thead class="thead">
-                    <tr>
-                        <th class="th">Reserva</th>
-                        <th class="th">Pasajero</th>
-                        <th class="th">Documento</th>
-                        <th class="th">Contacto</th>
-                        <th class="th">Punto Encuentro</th>
-                        <th class="th th-center" style="width: 100px;">
-                            <label class="header-checkbox-container">
-                                <span class="header-checkbox-label">¿Viajó?</span>
-                                <input type="checkbox" [checked]="allChecked" (change)="toggleAll($event)"
-                                    class="toggle-checkbox sr-only">
-                                <div class="toggle-bg">
-                                    <div class="toggle-dot"></div>
-                                </div>
-                            </label>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="tbody">
-                    @if (pasajeros.length === 0 && !isLoading) {
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            Usa los filtros y presiona "Buscar" para ver los pasajeros.
-                        </td>
-                    </tr>
-                    }
-
-                    @for (p of pasajeros; track p.Id_Pasajero; let i = $index) {
-                    <tr [class.reservation-separator]="i > 0 && p.Id_Reserva !== pasajeros[i-1].Id_Reserva">
-                        <td class="td">
-                            <div class="td-reserva">{{ p.Id_Reserva }}</div>
-                            <div class="reporter-name">{{ p.Nombre_Reportante }}</div>
-                        </td>
-                        <td class="td">
-                            <div class="passenger-name">{{ p.Nombre_Pasajero }}</div>
-                            <span class="badge" [ngClass]="{
-                                'badge-adulto': p.Tipo_Pasajero === 'ADULTO',
-                                'badge-nino': p.Tipo_Pasajero === 'NINO',
-                                'badge-infante': p.Tipo_Pasajero === 'INFANTE'
-                            }">
-                                {{ p.Tipo_Pasajero }}
-                            </span>
-                        </td>
-                        <td class="td">{{ p.DNI || '-' }}</td>
-                        <td class="td">
-                            <div class="contact-info">{{ p.Telefono_Pasajero || '-' }}</div>
-                            @if (!p.Telefono_Pasajero && p.Telefono_Reportante) {
-                            <div class="contact-sub">
-                                (Rep: {{ p.Telefono_Reportante }})
-                            </div>
-                            }
-                        </td>
-                        <td class="td">{{ p.PuntoEncuentro || '-' }}</td>
-                        <td class="td td-center">
-                            <label class="toggle-switch">
-                                <input type="checkbox" [(ngModel)]="p.Confirmacion" (change)="checkAllStatus()"
-                                    class="toggle-checkbox sr-only">
-                                <div class="toggle-bg">
-                                    <div class="toggle-dot"></div>
-                                </div>
-                            </label>
-                        </td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
 
 </div>
 
+<!-- FLOATING SAVE -->
 @if (pasajeros.length > 0) {
-<button (click)="save()" [disabled]="isLoading || isSubmitting" class="floating-save-btn">
-    @if (isLoading) {
-    <span class="spinner"></span>
+  <button (click)="save()" [disabled]="isLoading || isSubmitting" class="floating-save-btn">
+    @if (isSubmitting) {
+      <span class="btn-spinner"></span>
+      Guardando...
+    } @else {
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Guardar Confirmación
     }
-    @if (!isLoading) {
-    <span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-        </svg>
-    </span>
-    }
-    <span>Guardar Confirmación</span>
-</button>
+  </button>
 }

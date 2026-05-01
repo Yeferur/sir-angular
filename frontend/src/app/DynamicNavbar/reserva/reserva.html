@@ -8,10 +8,10 @@
     </div>
   } @else if (reserva) {
     <div class="reserva-view">
-      <!-- Encabezado -->
-      <div class="view-header">
+      <!-- Encabezado Sticky -->
+      <div class="view-header-top">
         <div class="header-main">
-          <h1 class="reserva-id">Reserva #{{ reserva.Id_Reserva }}</h1>
+          <h1 class="reserva-id">#{{ reserva.Id_Reserva }}</h1>
           <span class="status-tag"
                 [ngClass]="'status-' + (reserva.Estado || 'pendiente')!.toLowerCase()">
             {{ reserva.Estado }}
@@ -19,15 +19,62 @@
         </div>
         <div class="header-actions">
           <button class="btn-secondary" (click)="descargarArchivoReserva()">Descargar</button>
-          <button class="btn-secondary" (click)="editarReserva()">Editar</button>
+          <button class="btn-primary" (click)="editarReserva()">Editar</button>
           <button class="btn-close" (click)="onClose.emit()">✕</button>
         </div>
+      </div>
+
+      <div class="view-header">
+        <div class="metrics-row">
+          <div class="metric-cell">
+            <span class="metric-value">{{ reserva.NumeroPasajeros || 0 }}</span>
+            <span class="metric-label">Pasajeros</span>
+          </div>
+
+          @if (reserva.TotalNeto != null) {
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-value">
+                {{ reserva.TotalNeto | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+              </span>
+              <span class="metric-label">Total</span>
+            </div>
+          }
+
+          @if (reserva.Pendiente != null) {
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-value">
+                {{ reserva.Pendiente | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+              </span>
+              <span class="metric-label">Pendiente</span>
+            </div>
+          }
+        </div>
+
+        @if (reserva.TotalNeto != null && reserva.Pendiente != null) {
+          @let total = reserva.TotalNeto;
+          @let pendiente = reserva.Pendiente;
+          @let pagadoPct = total > 0 ? ((total - pendiente) / total) * 100 : 0;
+          <div class="payment-progress">
+            <div class="progress-track">
+              <div class="progress-fill"
+                [class.green]="pagadoPct >= 100"
+                [class.blue]="pagadoPct >= 50 && pagadoPct < 100"
+                [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
+                [class.red]="pagadoPct === 0"
+                [style.width.%]="pagadoPct">
+              </div>
+            </div>
+            <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
+          </div>
+        }
       </div>
 
       <!-- Detalles -->
       <div class="details-grid">
         <!-- Detalles del Tour -->
-        <div class="card">
+        <div class="card detail-card">
           <div class="card-header"><h2>Detalles del Tour</h2></div>
           <div class="card-body">
             <div class="info-row">
@@ -66,7 +113,7 @@
         </div>
 
         <!-- Responsable -->
-        <div class="card">
+        <div class="card detail-card">
           <div class="card-header"><h2>Responsable</h2></div>
           <div class="card-body">
             <div class="info-row">
@@ -87,39 +134,50 @@
 
       <!-- Pasajeros -->
       <div class="passengers-section">
-        <h2>Pasajeros ({{ reserva.NumeroPasajeros || 0 }})</h2>
+        <div class="passengers-title-row">
+          <h2>Pasajeros ({{ reserva.NumeroPasajeros || 0 }})</h2>
+        </div>
 
         <div class="passengers-grid" [ngClass]="tipoClases">
           <!-- Adultos -->
           @for (p of pasajeros.adultos; track p.id ?? p.NombrePasajero; let i = $index) {
-            <div class="passenger-card">
+            <div class="passenger-card passenger-card-adulto">
+              <div class="passenger-card-header">
+                <span class="passenger-pill adulto">Adulto</span>
+                <span class="passenger-price">
+                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                </span>
+              </div>
               <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
               <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
-              <span class="passenger-price">
-                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-              </span>
             </div>
           }
 
           <!-- Niños -->
           @for (p of pasajeros.ninos; track p.id ?? p.NombrePasajero; let i = $index) {
-            <div class="passenger-card">
-              <span class="passenger-name">{{ p.NombrePasajero || '—' }} (Niño)</span>
+            <div class="passenger-card passenger-card-nino">
+              <div class="passenger-card-header">
+                <span class="passenger-pill nino">Niño</span>
+                <span class="passenger-price">
+                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                </span>
+              </div>
+              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
               <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
-              <span class="passenger-price">
-                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-              </span>
             </div>
           }
 
           <!-- Infantes -->
           @for (p of pasajeros.infantes; track p.id ?? p.NombrePasajero; let i = $index) {
-            <div class="passenger-card">
-              <span class="passenger-name">{{ p.NombrePasajero || '—' }} (Infante)</span>
+            <div class="passenger-card passenger-card-infante">
+              <div class="passenger-card-header">
+                <span class="passenger-pill infante">Infante</span>
+                <span class="passenger-price">
+                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                </span>
+              </div>
+              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
               <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
-              <span class="passenger-price">
-                {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-              </span>
             </div>
           }
         </div>

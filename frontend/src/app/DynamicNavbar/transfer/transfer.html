@@ -1,0 +1,250 @@
+<div class="page-container">
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando transfer...</p>
+    </div>
+  } @else if (isError) {
+    <div class="error-view">
+      <div class="error-content">
+        <h1>Transfer</h1>
+        <p class="error-message">{{ errorMessage }}</p>
+        <button class="btn-close" (click)="close()">Cerrar</button>
+      </div>
+    </div>
+  } @else if (data) {
+    <div class="transfer-view">
+      <!-- Encabezado Sticky -->
+      <div class="view-header-top">
+        <div class="header-main">
+          <h1 class="transfer-id">#TRC{{ transfer.Id_Transfer }}</h1>
+          <span class="status-tag"
+                [ngClass]="'status-' + (transfer.Estado || 'pendiente')!.toLowerCase()">
+            {{ transfer.Estado || 'Pendiente' }}
+          </span>
+        </div>
+         <div class="header-actions">
+          <button class="btn-secondary" (click)="descargarTransfer();">Descargar</button>
+          <button class="btn-secondary" (click)="duplicarTransfer();">Duplicar</button>
+          <button class="btn-primary" (click)="editarTransfer();">Editar</button>
+          <button class="btn-close" (click)="close()">✕</button>
+        </div>
+      </div>
+
+      <!-- Resumen Superior con Métricas -->
+      <div class="view-header">
+        <div class="metrics-row">
+          <div class="metric-cell">
+            <span class="metric-value">{{ transfer.Nombre_Titular || '—' }}</span>
+            <span class="metric-label">Titular</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-cell">
+            <span class="metric-value">
+              {{ transfer.MonedaCodigo || 'COP' }} {{ valorTotal | number:'1.0-0' }}
+            </span>
+            <span class="metric-label">Total</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-cell">
+            <span class="metric-value">
+              {{ transfer.MonedaCodigo || 'COP' }} {{ totalPagado | number:'1.0-0' }}
+            </span>
+            <span class="metric-label">Pagado</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-cell">
+            <span class="metric-value">
+              {{ transfer.MonedaCodigo || 'COP' }} {{ saldoPendiente | number:'1.0-0' }}
+            </span>
+            <span class="metric-label">Pendiente</span>
+          </div>
+        </div>
+
+        @if (valorTotal > 0) {
+          @let pagadoPct = totalPagado > 0 ? (totalPagado / valorTotal) * 100 : 0;
+          <div class="payment-progress">
+            <div class="progress-track">
+              <div class="progress-fill"
+                [class.green]="pagadoPct >= 100"
+                [class.blue]="pagadoPct >= 50 && pagadoPct < 100"
+                [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
+                [class.red]="pagadoPct === 0"
+                [style.width.%]="pagadoPct">
+              </div>
+            </div>
+            <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
+          </div>
+        }
+      </div>
+
+      <!-- Detalles en Cards -->
+      <div class="details-grid">
+        <!-- Detalles del Servicio -->
+        <div class="card detail-card">
+          <div class="card-header"><h2>Detalles del Servicio</h2></div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="info-label">Servicio</span>
+              <span class="info-value">{{ transfer.Nombre_Servicio || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Rango</span>
+              <span class="info-value">{{ transfer.RangoDescripcion || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Punto de Salida</span>
+              <span class="info-value">{{ transfer.Punto_Salida || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Punto de Llegada</span>
+              <span class="info-value">{{ transfer.Punto_Destino || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Fecha</span>
+              <span class="info-value">{{ transfer.Fecha_Transfer || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Hora de Recogida</span>
+              <span class="info-value">{{ transfer.Hora_Recogida || '—' }}</span>
+            </div>
+            @if (transfer.Vuelo) {
+              <div class="info-row">
+                <span class="info-label">Vuelo</span>
+                <span class="info-value">{{ transfer.Vuelo }}</span>
+              </div>
+            }
+            @if (transfer.TipoVuelo) {
+              <div class="info-row">
+                <span class="info-label">Tipo de Vuelo</span>
+                <span class="info-value">{{ transfer.TipoVuelo }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Responsable -->
+        <div class="card detail-card">
+          <div class="card-header"><h2>Responsable</h2></div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="info-label">Reportante</span>
+              <span class="info-value">{{ transfer.Nombre_Reportante || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Teléfono</span>
+              <span class="info-value">{{ transfer.Telefono_Reportante || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Titular</span>
+              <span class="info-value">{{ transfer.Nombre_Titular || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Teléfono Titular</span>
+              <span class="info-value">{{ transfer.Telefono_Titular || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">DNI</span>
+              <span class="info-value">{{ transfer.DNI || '—' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pago -->
+        <div class="card detail-card">
+          <div class="card-header"><h2>Pago</h2></div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="info-label">Valor Total</span>
+              <span class="info-value amount-highlight">
+                {{ transfer.MonedaCodigo || 'COP' }} {{ valorTotal | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Total Pagado</span>
+              <span class="info-value" [ngClass]="{'amount-paid': totalPagado > 0}">
+                {{ transfer.MonedaCodigo || 'COP' }} {{ totalPagado | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Saldo Pendiente</span>
+              <span class="info-value" [ngClass]="{'amount-pending': saldoPendiente > 0}">
+                {{ transfer.MonedaCodigo || 'COP' }} {{ saldoPendiente | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Moneda</span>
+              <span class="info-value">{{ transfer.MonedaCodigo || '—' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagos Registrados -->
+      @if (pagos.length > 0) {
+        <div class="payments-section">
+          <div class="payments-title-row">
+            <h2>Pagos Registrados ({{ pagos.length }})</h2>
+          </div>
+          <div class="payments-grid">
+            @for (pago of pagos; track pago.Id_Pago ?? $index) {
+              <div class="payment-card">
+                <div class="payment-card-header">
+                  <span class="payment-method">{{ pago.Metodo }}</span>
+                  <span class="payment-status"
+                        [ngClass]="'status-' + (pago.Estado?.toLowerCase() || 'pendiente')">
+                    {{ pago.Estado }}
+                  </span>
+                </div>
+                <div class="payment-card-body">
+                  <div class="payment-amount">
+                    {{ transfer.MonedaCodigo || 'COP' }} {{ pago.Monto | number:'1.2-2' }}
+                  </div>
+                  <div class="payment-detail">
+                    <span class="payment-label">Fecha:</span>
+                    <span class="payment-value">{{ pago.Fecha_Pago || '—' }}</span>
+                  </div>
+                  @if (pago.Observaciones) {
+                    <div class="payment-detail">
+                      <span class="payment-label">Observaciones:</span>
+                      <span class="payment-value">{{ pago.Observaciones }}</span>
+                    </div>
+                  }
+                  @if (tieneComprobante(pago)) {
+                    <div class="payment-comprobante">
+                      <span class="comprobante-text">✓ Comprobante cargado</span>
+                      <button type="button"
+                              (click)="descargarComprobante(pago.Pago_Comprobante)"
+                              class="btn-comprobante"
+                              aria-label="Descargar comprobante">
+                        ⬇ Descargar
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="payment-comprobante empty">
+                      <span class="comprobante-empty">Sin comprobante</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Observaciones -->
+      @if (transfer.Observaciones) {
+        <div class="observations-section">
+          <div class="card detail-card">
+            <div class="card-header"><h2>Observaciones</h2></div>
+            <div class="card-body">
+              <div class="observations-text">
+                {{ transfer.Observaciones }}
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

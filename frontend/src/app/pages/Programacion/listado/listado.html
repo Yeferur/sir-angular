@@ -11,16 +11,19 @@
   </div>
 
   <!-- SPINNER -->
-  @if (cargando) {
+  @if (isPageLoading) {
   <div class="loading-state">
     <div class="spinner"></div>
-    <p>Cargando...</p>
+    <p>Cargando información...</p>
   </div>
   }
 
   <!-- DASHBOARD -->
-  @if (!cargando && modoVista === 'dashboard') {
-  <section class="dashboard-section">
+  @if (!isPageLoading && modoVista === 'dashboard') {
+  <section class="dashboard-section"
+    [style.opacity]="isUpdatingDate ? '0.5' : '1'"
+    [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'"
+    style="transition: opacity 0.3s ease;">
     @if (toursDelDia.length === 0) {
     <div class="empty-state">
       <h3>No hay tours para la fecha seleccionada.</h3>
@@ -31,14 +34,21 @@
     @if (toursDelDia.length > 0) {
     <div class="capacity-dashboard">
       @for (tour of toursDelDia; track tour.Id_Tour) {
-      <div class="capacity-card" (click)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+      <div class="capacity-card"
+        role="button"
+        tabindex="0"
+        (click)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        (keydown.enter)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        (keydown.space)="$event.preventDefault(); tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        [attr.aria-label]="'Generar plan para ' + tour.NombreTour"
+        [attr.aria-disabled]="!tour.totalPasajeros || tour.totalPasajeros === 0 ? 'true' : null"
         [class.generated]="tour.estado === 'Generado'"
         [class.disabled]="!tour.totalPasajeros || tour.totalPasajeros === 0">
 
         <div class="card-content">
           <div class="stats-container">
             <div class="card-header">
-              <h2 class="tour-name">{{ tour.NombreTour }}</h2>
+              <h2 class="tour-name" [title]="tour.NombreTour">{{ tour.NombreTour }}</h2>
               @if (tour.totalPasajeros && tour.totalPasajeros > 0) {
               <span class="badge" [ngClass]="(tour.estado || 'Pendiente') | lowercase">
                 {{ tour.estado === 'Generado' ? 'Generado' : 'Pendiente' }}
@@ -49,20 +59,65 @@
             </div>
 
             @if (!tour.totalPasajeros || tour.totalPasajeros === 0) {
-            <p class="stat-main">Sin reservas</p>
-            <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
+            <div class="metrics-row">
+              <div class="metric-cell">
+                <span class="metric-value">0</span>
+                <span class="metric-label">pasajeros</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
+                <span class="metric-label">reservas</span>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill blue" style="width: 0%"></div>
+            </div>
+
             } @else if (tour.estado === 'Generado') {
-            <p class="stat-main">
-              {{ tour.totalPasajeros || 0 }}
-              <span class="stat-label">Pasajeros</span>
-            </p>
-            <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
+            <div class="metrics-row">
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalPasajeros || 0 }}</span>
+                <span class="metric-label">pasajeros</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
+                <span class="metric-label">reservas</span>
+              </div>
+              @if (tour.totalBuses) {
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalBuses }}</span>
+                <span class="metric-label">buses</span>
+              </div>
+              }
+            </div>
+            <div class="progress-track">
+              @let pct = tour.ocupacionPromedio || 0;
+              <div class="progress-fill"
+                [class.green]="pct < 70"
+                [class.yellow]="pct >= 70 && pct < 90"
+                [class.red]="pct >= 90"
+                [style.width.%]="pct">
+              </div>
+            </div>
+
             } @else {
-            <p class="stat-main">
-              {{ tour.totalPasajeros || 0 }}
-              <span class="stat-label">Pasajeros</span>
-            </p>
-            <p class="stat-secondary">{{ tour.totalReservas || 0 }} reservas</p>
+            <div class="metrics-row">
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalPasajeros || 0 }}</span>
+                <span class="metric-label">pasajeros</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
+                <span class="metric-label">reservas</span>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill blue" style="width: 0%"></div>
+            </div>
             }
           </div>
         </div>
@@ -110,7 +165,7 @@
   }
 
   <!-- EDITOR MASTER–DETAIL -->
-  @if (!cargando && modoVista === 'editor' && planSeleccionado) {
+  @if (!isPageLoading && modoVista === 'editor' && planSeleccionado) {
   <section class="editor-section">
 
     <div class="editor-header">
@@ -157,6 +212,7 @@
             }
 
             @for (bus of planSeleccionado.buses; track $index; let i = $index) {
+            @let pct = bus.capacidad ? (bus.ocupados / bus.capacidad) * 100 : 0;
             <div class="bus-item" [class.active]="i === activeBusIndex" (click)="selectBus(i)" cdkDropList
               [id]="'busdrop-' + i" [cdkDropListData]="bus.reservas" [cdkDropListConnectedTo]="connectedDropLists"
               (cdkDropListDropped)="dropReserva($event)">
@@ -164,9 +220,15 @@
                 <div class="bus-item-title">
                   <span class="dot ok"></span>
                   <span class="bus-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
+                  <span class="bus-occ-pill"
+                    [class.ok]="pct < 70"
+                    [class.warn]="pct >= 70 && pct < 90"
+                    [class.danger]="pct >= 90">
+                    {{ pct | number:'1.0-0' }}%
+                  </span>
                 </div>
                 <div class="bus-item-right">
-                  {{ bus.ocupados }} / {{ bus.capacidad }} pax
+                  {{ bus.ocupados }} / {{ bus.capacidad }}
                 </div>
               </div>
 
@@ -178,13 +240,16 @@
               <div class="bus-item-bottom">
                 <span>{{ bus.reservas.length }} reservas</span>
                 <div class="bus-actions">
-                  <button class="btn-secondary" (click)="verMapa(bus, i)">Ver mapa</button>
+                  <button class="btn-secondary" (click)="verMapa(bus)">Ver mapa</button>
                   <button class="btn-primary" (click)="descargarListadoBus(i)">Descargar</button>
                 </div>
               </div>
 
               <div class="bus-progress">
-                <span [style.width.%]="bus.capacidad ? (bus.ocupados / bus.capacidad) * 100 : 0"></span>
+                <span [class.ok]="pct < 70"
+                      [class.warn]="pct >= 70 && pct < 90"
+                      [class.danger]="pct >= 90"
+                      [style.width.%]="pct"></span>
               </div>
             </div>
             }

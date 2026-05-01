@@ -25,7 +25,10 @@
   </div>
 
   @if (isLoadingPuntos()) {
-  <div class="empty-state">Cargando puntos...</div>
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <p>Cargando información...</p>
+  </div>
   } @else if (!rutaSeleccionada) {
   <div class="empty-state">Selecciona una ruta para cargar sus puntos.</div>
   } @else if (!puntos().length) {

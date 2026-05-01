@@ -86,7 +86,7 @@
 //     this.global.alert.set({
 //       title: 'Cargando...',
 //       message: 'Cargando combinaciones sugeridas...',
-//       loading: true
+//       estado de carga local
 //     });
 //     this.service.obtenerListado(this.fechaSeleccionada, Number(this.tourSeleccionado)).subscribe({
 //       next: res => {

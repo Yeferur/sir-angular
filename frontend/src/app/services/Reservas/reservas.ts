@@ -27,6 +27,7 @@ export interface Punto {
   Id_Punto: number;
   NombrePunto: string;
   ruta?: string | null;
+  Ruta?: string | null;
   Latitud?: number | string | null;
   Longitud?: number | string | null;
 }

@@ -65,51 +65,125 @@
 }
 
 .capacity-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px var(--shadow-color);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   border-color: var(--accent-blue);
 }
 
 .capacity-card .card-content {
-  padding: 24px;
+  padding: 20px;
   flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .tour-name {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
 }
 
-.badge {
-  padding: .25rem .75rem;
-  border-radius: 20px;
-  font-size: .75rem;
+/* Métricas en fila — patrón unificado */
+.metrics-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--separator-color);
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.metric-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.metric-value {
+  font-size: 1.4rem;
   font-weight: 700;
-  text-transform: uppercase;
+  color: var(--text-primary);
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+
+.metric-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.metric-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--separator-color);
+  flex-shrink: 0;
+}
+
+/* Barra de progreso */
+.progress-track {
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.progress-fill.green  { background: var(--accent-green); }
+.progress-fill.yellow { background: var(--accent-yellow); }
+.progress-fill.red    { background: var(--accent-red); }
+.progress-fill.blue   { background: var(--accent-blue); }
+
+/* =========================================================
+   BADGES DE ESTADO (Translucent Pills)
+   ========================================================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  /* Eliminamos el text-transform: uppercase para que se vea más limpio */
 }
 
 .badge.pendiente {
-  background-color: var(--accent-yellow);
-  color: #000;
+  background-color: rgba(241, 196, 15, 0.12); /* Amarillo translúcido */
+  color: var(--accent-yellow, #f1c40f);
+  border: 1px solid rgba(241, 196, 15, 0.25);
 }
 
 .badge.generado {
-  background-color: var(--accent-green);
-  color: #fff;
+  background-color: rgba(46, 204, 113, 0.12); /* Verde translúcido */
+  color: var(--accent-green, #2ecc71);
+  border: 1px solid rgba(46, 204, 113, 0.25);
 }
 
 .badge.disabled {
-  background-color: var(--bg-tertiary);
+  background-color: rgba(255, 255, 255, 0.03);
   color: var(--text-tertiary);
+  border: 1px solid var(--separator-color);
 }
 
 .capacity-card.disabled {
@@ -125,38 +199,20 @@
 
 .stats-container {
   flex-grow: 1;
-}
-
-.stat-main {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-.stat-main .stat-label {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-left: 5px;
-}
-
-.stat-secondary {
-  font-size: .95rem;
-  color: var(--text-secondary);
-  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .card-footer {
-  padding: 16px 24px;
+  padding: 12px 20px;
   border-top: 1px solid var(--separator-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: var(--text-secondary);
-  font-size: .85rem;
-  transition: color .3s;
+  font-size: 0.8rem;
+  transition: color 0.2s;
 }
 
 .capacity-card:hover .card-footer {
@@ -360,6 +416,19 @@
   white-space: nowrap;
 }
 
+.bus-occ-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bus-occ-pill.ok     { background: rgba(52, 199, 89, 0.15);  color: var(--accent-green); }
+.bus-occ-pill.warn   { background: rgba(255, 159, 10, 0.15); color: var(--accent-yellow); }
+.bus-occ-pill.danger { background: rgba(255, 59, 48, 0.18);  color: var(--accent-red); }
+
 .bus-item-bottom {
   margin-top: 10px;
   display: flex;
@@ -394,22 +463,29 @@
 
 .bus-progress {
   margin-top: 10px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .06);
+  height: 4px;
+  border-radius: 99px;
+  background: var(--bg-tertiary);
   overflow: hidden;
 }
 
-.bus-progress>span {
+.bus-progress > span {
   display: block;
   height: 100%;
-  background: var(--accent-blue);
+  border-radius: 99px;
   width: 0%;
+  transition: width 0.6s cubic-bezier(0.23, 1, 0.32, 1), background-color 0.3s ease;
 }
+
+/* Color semántico según ocupación — se aplica via [style] en el template */
+.bus-progress > span.ok     { background: var(--accent-green); }
+.bus-progress > span.warn   { background: var(--accent-yellow); }
+.bus-progress > span.danger { background: var(--accent-red); }
 
 .bus-item.newbus {
   border-style: dashed;
-  background: linear-gradient(135deg, rgba(10, 132, 255, 0.08), rgba(52, 199, 89, 0.08));
+  background: var(--bg-tertiary);
+  opacity: 0.7;
 }
 
 .bus-item.newbus.hidden {

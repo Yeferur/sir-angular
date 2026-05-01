@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
@@ -14,13 +15,23 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 })
 export class VerTransfersComponent implements OnInit {
   private navbar = inject(DynamicIslandGlobalService);
+  private router = inject(Router);
   private transferService = inject(TransferService);
+
+  readonly estadoOptions = ['Activo', 'Pendiente', 'Completado', 'Cancelado'];
 
   resultsServicios = signal<any[]>([]);
   transfers = signal<any[]>([]);
-  isLoading = signal(false);
-  isLoadingTransfers = signal(false);
+  isPageLoading = signal(false);
+  isSearching = signal(false);
+  hasSearched = signal(false);
   advancedFiltersVisible = signal(false);
+
+  dropdownOpenEstado = signal(false);
+  dropdownOpenServicio = signal(false);
+
+  @ViewChild('fechaTransferFp') fechaTransferFp?: FlatpickrInputDirective;
+  @ViewChild('fechaRegistroFp') fechaRegistroFp?: FlatpickrInputDirective;
 
   filters = signal({
     Fecha_Transfer: '',
@@ -180,9 +191,16 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 };
 
   loadInitialData() {
-    this.isLoading.set(true);
-    this.transferService.getServicios().subscribe({ next: (s) => this.resultsServicios.set(s || []), error: () => {} });
-    this.isLoading.set(false);
+    this.isPageLoading.set(true);
+    this.transferService.getServicios().subscribe({
+      next: (s) => this.resultsServicios.set(s || []),
+      error: () => this.resultsServicios.set([]),
+      complete: () => this.isPageLoading.set(false)
+    });
+  }
+
+  crearTransfer() {
+    this.router.navigate(['/Transfers/NuevoTransfer']);
   }
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
@@ -190,30 +208,99 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   onMainSearchInput(val: string) {
-    // actualiza filtro de nombre/titular
-    this.updateFilter('Nombre_Titular', val || '');
-    // si parece un DNI largo
-    if (/^\d{6,}$/.test(val)) {
-      this.updateFilter('DNI', val);
-    } else if (/^TR-?\d+/i.test(val)) {
-      this.updateFilter('Id_Transfer', val);
-    } else {
-      this.updateFilter('DNI', '');
-      this.updateFilter('Id_Transfer', '');
+    const v = (val || '').trim();
+    this.updateFilter('Nombre_Titular', v);
+
+    // Reset specific filters first
+    this.updateFilter('DNI', '');
+    this.updateFilter('Id_Transfer', '');
+    this.updateFilter('Telefono_Titular', '');
+
+    if (/^\d{6,}$/.test(v)) {
+      // 6+ digits → DNI
+      this.updateFilter('DNI', v);
+    } else if (/^TR-?\d+/i.test(v)) {
+      // TR-123 or TR123 → Id_Transfer (extract number)
+      const idNum = v.replace(/^TR-?/i, '');
+      this.updateFilter('Id_Transfer', idNum);
+    } else if (/^\+?\d[\d\s\-]{6,}$/.test(v)) {
+      // Phone-like pattern → Telefono_Titular
+      this.updateFilter('Telefono_Titular', v);
     }
   }
 
+  // --- Dropdown management ---
+
+  toggleDropdown(name: 'estado' | 'servicio') {
+    this.dropdownOpenEstado.set(name === 'estado' ? !this.dropdownOpenEstado() : false);
+    this.dropdownOpenServicio.set(name === 'servicio' ? !this.dropdownOpenServicio() : false);
+  }
+
+  isSelected(filterKey: 'Estado' | 'Id_Servicio', value: any): boolean {
+    const selectedValues = this.filters()[filterKey] as any[];
+    if (!selectedValues?.length) return false;
+    return selectedValues.includes(value);
+  }
+
+  clearMultiFilter(filterKey: 'Estado' | 'Id_Servicio'): void {
+    this.updateFilter(filterKey, []);
+    if (filterKey === 'Estado') this.dropdownOpenEstado.set(false);
+    if (filterKey === 'Id_Servicio') this.dropdownOpenServicio.set(false);
+  }
+
+  getMultiFilterLabel(filterKey: 'Estado' | 'Id_Servicio'): string {
+    const selectedCount = (this.filters()[filterKey] as any[])?.length || 0;
+    if (selectedCount === 0) return 'Todos';
+    if (selectedCount === 1) return '1 seleccionado';
+    return `${selectedCount} seleccionados`;
+  }
+
   toggleSelection(value: any, filterKey: 'Id_Servicio' | 'Estado' | 'Id_Rango') {
+    if (value === '' || value === null || value === undefined) {
+      this.updateFilter(filterKey as any, []);
+      return;
+    }
     const current = this.filters()[filterKey] as any[];
     const updated = current?.includes ? (current.includes(value) ? current.filter(v => v !== value) : [...current, value]) : [value];
     this.updateFilter(filterKey as any, updated);
+  }
+
+  activeFilterCount(): number {
+    const f = this.filters();
+    let count = 0;
+    if (f.Fecha_Transfer) count++;
+    if (f.Fecha_Registro) count++;
+    if (f.Estado?.length) count++;
+    if (f.Id_Servicio?.length) count++;
+    return count;
+  }
+
+  getSelectedServiciosText(): string {
+    const ids = this.filters().Id_Servicio;
+    if (!ids?.length) return '';
+    return ids
+      .map(id => {
+        const s = this.resultsServicios().find(srv => (srv.Id_Servicio ?? srv.id) == id);
+        return s ? s.Servicio : id;
+      })
+      .join(', ');
+  }
+
+  clearFechaTransfer(): void {
+    this.updateFilter('Fecha_Transfer', '');
+    this.fechaTransferFp?.instance?.clear();
+  }
+
+  clearFechaRegistro(): void {
+    this.updateFilter('Fecha_Registro', '');
+    this.fechaRegistroFp?.instance?.clear();
   }
 
   private buildApiFilters() {
     const f = this.filters();
     const api: any = {};
     if (f.Fecha_Transfer) api.Fecha_Transfer = f.Fecha_Transfer;
-    if (f.Fecha_Registro) api.Fecha_Registro = f.Fecha_Registro;
+    // Fecha_Registro: not supported by backend query
     if (f.Id_Servicio?.length) api.Id_Servicio = f.Id_Servicio;
     if (f.Id_Rango) api.Id_Rango = f.Id_Rango;
     if (f.Estado?.length) api.Estado = f.Estado;
@@ -223,7 +310,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     if (f.DNI?.trim()) api.DNI = f.DNI.trim();
     if (f.Punto_Salida?.trim()) api.Punto_Salida = f.Punto_Salida.trim();
     if (f.Punto_Destino?.trim()) api.Punto_Destino = f.Punto_Destino.trim();
-    if (f.Empty) api.Empty = true;
     return api;
   }
 
@@ -234,15 +320,22 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       this.transfers.set([]);
       return;
     }
-    this.isLoadingTransfers.set(true);
+    this.hasSearched.set(true);
+    this.isSearching.set(true);
+    this.advancedFiltersVisible.set(false);
+    this.dropdownOpenEstado.set(false);
+    this.dropdownOpenServicio.set(false);
     this.transferService.getTransfers(filtros).subscribe({
       next: (data) => { this.transfers.set(data || []); },
       error: (err) => { this.navbar.alert.set({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
-      complete: () => { this.isLoadingTransfers.set(false); }
+      complete: () => { this.isSearching.set(false); }
     });
   }
 
   verTransfer(Id_Transfer: string) {
+    console.log('🔵 [VerTransfers] Abriendo transfer:', Id_Transfer);
+    console.log('🔵 [VerTransfers] navbar.Id_Transfer antes:', this.navbar.Id_Transfer());
     this.navbar.Id_Transfer?.set ? this.navbar.Id_Transfer.set(Id_Transfer) : null;
+    console.log('🔵 [VerTransfers] navbar.Id_Transfer después:', this.navbar.Id_Transfer());
   }
 }

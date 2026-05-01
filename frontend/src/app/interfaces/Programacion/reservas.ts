@@ -78,6 +78,8 @@ export interface TourProgramacion {
   planGenerado: PlanLogistico | null;
   totalPasajeros?: number;
   totalReservas?: number;
+  totalBuses?: number;
+  ocupacionPromedio?: number;
   reservasSinAsignar?: Reserva[];
 }
 

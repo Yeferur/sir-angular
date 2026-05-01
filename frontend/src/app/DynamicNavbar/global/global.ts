@@ -2,22 +2,19 @@ import { Component, computed, inject, ChangeDetectorRef, OnInit, OnDestroy } fro
 
 import { RouterLink } from '@angular/router';
 
-// Importa los nuevos componentes de contenido
 import { AlertContentComponent } from '../Alertas/alertas';
 import { CuposWidgetComponent } from '../cupos/cupos';
-// Importa tu servicio global
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 import { LoginContentComponent } from '../login/login';
-// Importa otros componentes que necesites mostrar, como Login, Mapa, etc.
-// import { Login } from '../login/login'; 
 import { Mapa } from '../mapa/mapa';
 import { ReservasDynamicComponent } from '../reserva/reserva';
+import { TransferDynamicComponent } from '../transfer/transfer';
 import { Combinaciones } from '../combinaciones/combinaciones';
 import { PreviewComponent } from '../preview/preview';
 import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 
 @Component({
-  selector: 'app-dynamic-navbar', // Renombrado para mayor claridad
+  selector: 'app-dynamic-navbar',
   standalone: true,
   imports: [
     RouterLink,
@@ -25,6 +22,7 @@ import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
     CuposWidgetComponent,
     LoginContentComponent,
     ReservasDynamicComponent,
+    TransferDynamicComponent,
     Mapa,
     Combinaciones,
     PreviewComponent,
@@ -36,15 +34,14 @@ import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 export class DynamicNavbarComponent implements OnInit {
   private global = inject(DynamicIslandGlobalService);
 
-  // Exponer panel para el template
   panel = this.global.panel;
 
-  // Signals del servicio
   mode = this.global.mode;
   alert = this.global.alert;
   cuposInfo = this.global.cuposInfo;
   toasts = this.global.toasts;
   reserva = this.global.Id_Reserva;
+  transfer = this.global.Id_Transfer;
   mapa = this.global.puntos;
   sugerencias = this.global.sugerencias
   preview = this.global.previewUrl;
@@ -52,23 +49,22 @@ export class DynamicNavbarComponent implements OnInit {
 
   isDarkMode = true;
 
-  // El signal computado ahora maneja el estado 'login'
   islandState = computed(() => {
-    // preview has priority when set
     if (this.global.previewUrl()) return 'preview';
     if (this.global.panel()) return 'panel';
-    if (this.mode() === 'login') return 'full-screen'; // El login usa el estado full-screen
+    if (this.mode() === 'login') return 'full-screen';
     if (this.alert()?.loading) return 'loading';
     if (this.alert()) return 'alert';
     if (this.cuposInfo()) return 'cupos';
     if (this.reserva()) return 'reserva';
-    if (this.mapa()) return 'mapa';
+    if (this.transfer()) return 'transfer';
+  
+    if (Array.isArray(this.mapa()) && this.mapa().length > 0) return 'mapa';
     if (this.sugerencias()) return 'sugerencias';
     return 'compact';
   });
 
   ngOnInit(): void {
-    // Lógica para detectar el tema (sin cambios)
     const theme = document.documentElement.getAttribute('data-theme');
     this.isDarkMode = theme !== 'light';
     const observer = new MutationObserver(() => {
@@ -90,8 +86,16 @@ export class DynamicNavbarComponent implements OnInit {
     this.global.dismissToast(id);
   }
 
+  toastsList() {
+    return this.toasts();
+  }
+
   clearReserva() {
     this.global.Id_Reserva.set(null);
+  }
+
+  clearTransfer() {
+    this.global.Id_Transfer.set(null);
   }
 
   clearPuntos() {
@@ -102,7 +106,6 @@ export class DynamicNavbarComponent implements OnInit {
     this.global.sugerencias.set(null);
   }
 
-
   seleccionarSugerenciaDesdeNavbar(sugerencia: any) {
     this.global.confirmarSugerenciaDesdeNavbar(sugerencia);
   }
@@ -110,6 +113,4 @@ export class DynamicNavbarComponent implements OnInit {
   generarManual(manual: any) {
     this.global.generarCombincionManual(manual);
   }
-
 }
- 

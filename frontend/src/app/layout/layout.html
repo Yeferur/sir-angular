@@ -33,16 +33,13 @@
 
   <div class="menu">
     <!-- Inicio -->
-    <a *appPermiso="'INICIO.LEER'" routerLink="/" (click)="clickPage()"><i
-        class="bx bxs-dashboard"></i><span>Inicio</span></a>
+    <a *appPermiso="'INICIO.LEER'" routerLink="/" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact:true}" (click)="clickPage()"><i class="bx bxs-dashboard"></i><span>Inicio</span></a>
 
     <!-- Informes -->
-    <a *appPermiso="'INFORMES.LEER'" routerLink="/Dashboard" (click)="clickPage()"><i
-        class="bx bx-line-chart"></i><span>Dashboard</span></a>
+    <a *appPermiso="'INFORMES.LEER'" routerLink="/Dashboard" routerLinkActive="active-link" (click)="clickPage()"><i class="bx bx-line-chart"></i><span>Dashboard</span></a>
 
     <!-- Historial -->
-    <a *appPermiso="'HISTORIAL.LEER'" routerLink="/Historial" (click)="clickPage()"><i
-        class="bx bx-history"></i><span>Historial</span></a>
+    <a *appPermiso="'HISTORIAL.LEER'" routerLink="/Historial" routerLinkActive="active-link" (click)="clickPage()"><i class="bx bx-history"></i><span>Historial</span></a>
 
     <!-- Reservas -->
     <div *appPermiso="'RESERVAS.LEER'" class="menu-item" [class.active]="activeMenu() === 1">
@@ -86,25 +83,13 @@
         <a *appPermiso="'PUNTOS.LEER'" routerLink="/Puntos/VerPuntos" (click)="clickPage()">Ver Puntos</a>
       </div>
     </div>
-    <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" (click)="clickPage()"><i
-        class="bx bx-list-check"></i><span>listados de buses</span></a>
-    <!-- Programación -->
-    <!-- <div *appPermiso="'PROGRAMACION.LEER'" class="menu-item" [class.active]="activeMenu() === 5">
-      <a (click)="toggleMenu(5)" class="link"><i class="bx bx-list-check"></i><span>Programación</span><i
-          class="bx bx-chevron-down"></i></a>
-      <div class="submenu">
-        <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" (click)="clickPage()">Generar listados</a>
-        <a *appPermiso="'PROGRAMACION.CREAR'" routerLink="/Transfer/NuevoTransfer" (click)="clickPage()">Ver listados</a>
-      </div>
-    </div> -->
+    <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado" routerLinkActive="active-link" (click)="clickPage()"><i class="bx bx-list-check"></i><span>Listados de buses</span></a>
 
     <!-- Comisiones -->
-    <a *appPermiso="'COMISIONES.LEER'" routerLink="/Comisiones" (click)="clickPage()"><i
-        class="bx bx-money"></i><span>Comisiones</span></a>
+    <a *appPermiso="'COMISIONES.LEER'" routerLink="/Comisiones" routerLinkActive="active-link" (click)="clickPage()"><i class="bx bx-money"></i><span>Comisiones</span></a>
 
     <!-- Seguros -->
-    <a *appPermiso="'SEGUROS.LEER'" routerLink="/Seguros" (click)="clickPage()"><i
-        class="bx bx-shield-plus"></i><span>Seguros</span></a>
+    <a *appPermiso="'SEGUROS.LEER'" routerLink="/Seguros" routerLinkActive="active-link" (click)="clickPage()"><i class="bx bx-shield-plus"></i><span>Seguros</span></a>
 
     <!-- Configuración -->
     <div class="menu-item" [class.active]="activeMenu() === 6">

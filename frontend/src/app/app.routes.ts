@@ -6,6 +6,7 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    data: { preload: true },
     title: 'SIR · Inicio',
   },
   {
@@ -23,17 +24,20 @@ export const routes: Routes = [
     path: 'Reservas/NuevaReserva',
     loadComponent: () => import('./pages/Reservas/crear-reserva/crear-reserva').then((m) => m.CrearReservaComponent),
     canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
     title: 'SIR · Nueva Reserva',
   },
   {
     path: 'Reservas/VerReservas',
     loadComponent: () => import('./pages/Reservas/ver-reservas/ver-reservas').then((m) => m.VerReservasComponent),
+    data: { preload: true },
     title: 'SIR · Ver Reservas',
   },
   {
     path: 'Reservas/EditarReserva/:id',
     loadComponent: () => import('./pages/Reservas/editar-reserva/editar-reserva').then((m) => m.EditarReservaComponent),
     canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
     title: 'SIR · Editar Reserva',
   },
 
@@ -41,11 +45,20 @@ export const routes: Routes = [
     path: 'Transfers/NuevoTransfer',
     loadComponent: () => import('./pages/Transfers/crear-transfer/crear-transfer').then((m) => m.CrearTransferComponent),
     canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
     title: 'SIR · Nuevo Transfer',
+  },
+  {
+    path: 'Transfers/EditarTransfer/:id',
+    loadComponent: () => import('./pages/Transfers/editar-transfer/editar-transfer').then((m) => m.EditarTransferComponent),
+    canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
+    title: 'SIR · Editar Transfer',
   },
   {
     path: 'Transfers/VerTransfers',
     loadComponent: () => import('./pages/Transfers/ver-transfers/ver-transfers').then((m) => m.VerTransfersComponent),
+    data: { preload: true },
     title: 'SIR · Ver Transfers',
   },
 
@@ -75,6 +88,7 @@ export const routes: Routes = [
   {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    data: { preload: true },
     title: 'SIR · Programación',
   },
 
@@ -124,25 +138,23 @@ export const routes: Routes = [
     path: 'Tours/NuevoTour',
     loadComponent: () => import('./pages/Tours/crear-tour/crear-tour').then((m) => m.CrearTourComponent),
     canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
     title: 'SIR · Nuevo Tour',
   },
   {
     path: 'Tours/VerTours',
     loadComponent: () => import('./pages/Tours/ver-tours/ver-tours').then((m) => m.VerToursComponent),
+    data: { preload: true },
     title: 'SIR · Ver Tours',
   },
   {
     path: 'Tours/Editar/:id',
     loadComponent: () => import('./pages/Tours/editar-tour/editar-tour').then((m) => m.EditarTourComponent),
     canDeactivate: [unsavedChangesGuard],
+    data: { preload: true },
     title: 'SIR · Editar Tour',
   },
-  {
-    path: 'Tours/Precios/:id',
-    loadComponent: () => import('./pages/Tours/precios/precios').then((m) => m.PreciosTourComponent),
-    canDeactivate: [unsavedChangesGuard],
-    title: 'SIR · Precios del Tour',
-  },
+  
 
   { path: '**', redirectTo: '' },
 ];

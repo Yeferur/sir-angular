@@ -17,29 +17,25 @@
         <div class="kpi-icon users-icon">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <path d="M16 13v-2H7V8l-5 4 5 4v-3z"></path>
-            <path
-              d="M20 3h-9c-1.103 0-2 .897-2 2v4h2V5h9v14h-9v-4H9v4c0 1.103.897 2 2 2h9c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2z">
-            </path>
+            <path d="M20 3h-9c-1.103 0-2 .897-2 2v4h2V5h9v14h-9v-4H9v4c0 1.103.897 2 2 2h9c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2z"></path>
           </svg>
         </div>
         <div class="kpi-content">
           <span class="kpi-value">{{ totalUsers() }}</span>
-          <span class="kpi-label">Usuarios Totales</span>
+          <span class="kpi-label">Usuarios totales</span>
         </div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-icon active-icon">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z">
-            </path>
+            <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path>
             <path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path>
           </svg>
         </div>
         <div class="kpi-content">
           <span class="kpi-value">{{ activeSessions() }}</span>
-          <span class="kpi-label">Sesiones Activas</span>
+          <span class="kpi-label">Sesiones activas</span>
         </div>
       </div>
     </div>
@@ -66,13 +62,14 @@
     <div class="results-list">
       @for (user of filteredUsuarios(); track user.id_user) {
       <div class="result-item">
-        <div class="item-status">
-          <div class="status-dot" [ngClass]="{
-                      'status-activa': estados().get(user.id_user.toString()) === 'activa',
-                      'status-inactiva': estados().get(user.id_user.toString()) === 'inactiva',
-                      'status-cerrada': estados().get(user.id_user.toString()) === 'cerrada'
-                    }" [title]="estados().get(user.id_user.toString())"></div>
-        </div>
+        <span class="status-pill" [ngClass]="{
+                    'status-activa': estados().get(user.id_user.toString()) === 'activa',
+                    'status-inactiva': estados().get(user.id_user.toString()) === 'inactiva',
+                    'status-cerrada': estados().get(user.id_user.toString()) === 'cerrada'
+                  }">
+          {{ estados().get(user.id_user.toString()) === 'activa' ? 'Activa' :
+             estados().get(user.id_user.toString()) === 'inactiva' ? 'Sin sesión' : 'Cerrada' }}
+        </span>
 
         <div class="item-main-info">
           <span class="item-title">{{ user.name }} {{ user.apellidos }}</span>

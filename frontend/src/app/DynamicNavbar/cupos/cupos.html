@@ -1,19 +1,36 @@
 @if (cuposInfoSignal()) {
   <div class="widget-container" [ngClass]="colorClass()">
-    <div class="gauge-container">
-      <div class="gauge" [style.--progress]="ocupacionPorcentaje()">
-        <span class="gauge-percentage">{{ ocupacionPorcentaje() | number:'1.0-0' }}%</span>
+
+    <!-- NOMBRE + BADGE -->
+    <div class="widget-header">
+      <h3 class="tour-name" [title]="cuposInfoSignal().nombreTour">
+        {{ cuposInfoSignal().nombreTour }}
+      </h3>
+      <span class="status-badge">{{ ocupacionPorcentaje() | number:'1.0-0' }}% lleno</span>
+    </div>
+
+    <!-- MÉTRICAS EN FILA -->
+    <div class="metrics-row">
+      <div class="metric-cell">
+        <span class="metric-value">{{ cuposInfoSignal().cuposDisponibles }}</span>
+        <span class="metric-label">disponibles</span>
+      </div>
+      <div class="metric-divider"></div>
+      <div class="metric-cell">
+        <span class="metric-value">{{ cuposInfoSignal().ocupados }}</span>
+        <span class="metric-label">ocupados</span>
+      </div>
+      <div class="metric-divider"></div>
+      <div class="metric-cell">
+        <span class="metric-value">{{ cuposInfoSignal().cupoTotal }}</span>
+        <span class="metric-label">capacidad</span>
       </div>
     </div>
-    <div class="stats-container">
-      <h3 class="tour-name">{{ cuposInfoSignal().nombreTour }}</h3>
-      <p class="stat-main">
-        {{ cuposInfoSignal().cuposDisponibles }}
-        <span class="stat-label">Disponibles</span>
-      </p>
-      <p class="stat-secondary">
-        {{ cuposInfoSignal().ocupados }} de {{ cuposInfoSignal().cupoTotal }} ocupados
-      </p>
+
+    <!-- BARRA DE PROGRESO -->
+    <div class="progress-track">
+      <div class="progress-fill" [style.width.%]="ocupacionPorcentaje()"></div>
     </div>
+
   </div>
 }

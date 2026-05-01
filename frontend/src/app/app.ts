@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, Router, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { layout } from './layout/layout';
 import { DynamicNavbarComponent } from './DynamicNavbar/global/global';
 import { DynamicIslandGlobalService } from './services/DynamicNavbar/global';
@@ -27,10 +27,35 @@ export class App implements OnInit, OnDestroy {
     public auth: AuthService,
     private ws: WebSocketService,
     private permisosService: PermisosService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {}
 
   ngOnInit() {
+    this.router.events
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event: RouterEvent) => {
+        if (event instanceof NavigationStart) {
+          
+          this.navbar.alert.set({
+            type: 'info',
+            loading: true,
+            title: 'Cargando datos...'
+          });
+          this.cdr.markForCheck();
+        } else if (
+          event instanceof NavigationEnd ||
+          event instanceof NavigationCancel ||
+          event instanceof NavigationError
+        ) {
+          const currentAlert = this.navbar.alert();
+          if (currentAlert?.loading) {
+            this.navbar.alert.set(null);
+            this.cdr.markForCheck();
+          }
+        }
+      });
+
     this.permisosService.cargarPermisosDesdeLocalStorage();
 
     this.ws.messages$

@@ -15,6 +15,10 @@ export class TransferService {
   crearTransfer(payload: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/Transfer/NuevoTransfer`, payload);
   }
+
+  actualizarTransfer(id: string | number, payload: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/Transfer/${id}`, payload);
+  }
   
   getRangos(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/Rangos`);
@@ -34,9 +38,22 @@ export class TransferService {
     const url = `${this.apiUrl}/Transfer/Buscar` + (httpParams.toString() ? `?${httpParams.toString()}` : '');
     return this.http.get<any[]>(url);
   }
-  
+
+  getTransfer(Id_Transfer: string | number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/Transfer/${Id_Transfer}`);
+  }
+
   getMonedas(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl.replace('/api','')}/api/monedas`);
   }
-}
 
+  subirComprobantePago(Id_Transfer: number | string, Id_Pago: number | string, file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<any>(`${this.apiUrl}/Transfer/${Id_Transfer}/Pagos/${Id_Pago}/Comprobante`, formData);
+  }
+
+  descargarComprobante(nombreArchivo: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/Transfer/Comprobante/${nombreArchivo}`, { responseType: 'blob' });
+  }
+}

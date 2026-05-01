@@ -1,5 +1,177 @@
-<div *ngIf="!isLoading()">
+@if(isLoading()){
+<div class="skeleton-page booking-dashboard">
 
+  <div class="page-header">
+    <div>
+      <div class="sk-line sk-title"></div>
+      <div class="sk-line sk-subtitle"></div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="top-section-grid">
+      <div class="card sk-card">
+        <div class="card-header">
+          <div class="sk-line sk-heading"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group full-width">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field sk-field-tall"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card sk-card">
+        <div class="card-header">
+          <div class="sk-line sk-heading"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="form-group full-width">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field sk-field-tall"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group full-width">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-textarea"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card sk-card">
+    <div class="card-header">
+      <div class="sk-line sk-heading"></div>
+      <div class="sk-passengers-counter">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-sm"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-sm"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-sm"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sk-passenger-row">
+      <div class="sk-passenger-header">
+        <div class="sk-line sk-passenger-pill"></div>
+        <div class="sk-line sk-passenger-name"></div>
+      </div>
+      <div class="form-grid sk-passenger-body">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+      </div>
+    </div>
+    <div class="add-buttons-container">
+      <div class="sk-field sk-btn-add"></div>
+      <div class="sk-field sk-btn-add"></div>
+      <div class="sk-field sk-btn-add"></div>
+    </div>
+  </div>
+
+  <div class="card sk-card">
+    <div class="card-header">
+      <div class="sk-line sk-heading"></div>
+    </div>
+    <div class="payments-grid">
+      <div class="form-group">
+        <div class="sk-line sk-label"></div>
+        <div class="sk-field"></div>
+      </div>
+      <div class="form-group full-width">
+        <div class="sk-line sk-label"></div>
+        <div class="sk-prices-grid">
+          <div class="sk-price-col">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+            <div class="sk-field"></div>
+          </div>
+          <div class="sk-price-col">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+            <div class="sk-field"></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="sk-line sk-label"></div>
+        <div class="sk-field"></div>
+      </div>
+      <div class="form-group full-width">
+        <div class="sk-field sk-field-panel"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="floating-summary" data-state="compact" style="pointer-events:none">
+  <div class="summary-collapsed">
+    <div class="summary-left">
+      <div class="sk-field sk-summary-badge"></div>
+      <div class="sk-line sk-summary-meta"></div>
+    </div>
+  </div>
+</div>
+}
+@else {
 <div class="booking-dashboard" [formGroup]="form">
   <div class="page-header">
     <div>
@@ -26,7 +198,7 @@
             <select class="form-select"
               [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
               formControlName="SelectTour"
-              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar(); autollenarPrecios();">
+              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar();">
               <option value="" disabled>Seleccionar un tour...</option>
 
               @for (tour of tours(); track tour.Id_Tour) {
@@ -76,15 +248,7 @@
             </select>
           </div>
 
-          <!-- Moneda -->
-          <div class="form-group">
-            <label class="form-label">Moneda</label>
-            <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
-              @for (m of monedas(); track m.Id_Moneda) {
-              <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
-              }
-            </select>
-          </div>
+
 
           <!-- Puntos -->
           <div class="form-group full-width">
@@ -166,7 +330,7 @@
         <!-- Canal -->
         <div class="form-group">
           <label class="form-label">Canal / Categoría</label>
-          <select class="form-select" formControlName="Id_Canal" (change)="recalcularComisionesPorCanal()">
+          <select class="form-select" formControlName="Id_Canal" (change)="recalcularComisionesPorCanal(); autollenarPrecios()">
             @for (canal of canales(); track canal.Id_Canal) {
             <option [value]="canal.Id_Canal">
               {{ canal.Nombre_Canal }}
@@ -205,14 +369,14 @@
         <label class="form-label">Adultos</label>
         <input type="number" min="0" class="form-input" [value]="adultosInputValue()"
           (input)="setCantidadPasajeros('ADULTO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
-          (change)="verificarCuposDisponibles(); autollenarPrecios(); CuposDisponiblesNavbar()" />
+          (change)="verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
       </div>
 
       <div class="form-group">
         <label class="form-label">Niños</label>
         <input type="number" min="0" class="form-input" [value]="ninosInputValue()"
           (input)="setCantidadPasajeros('NINO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
-          (change)="verificarCuposDisponibles(); autollenarPrecios(); CuposDisponiblesNavbar()" />
+          (change)="verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
 
         @if (isRioClaroTour()) {
         <small class="hint">En Río Claro, los niños deben tener 5 o más años.</small>
@@ -265,17 +429,7 @@
       </div>
       }
 
-      <div class="form-group">
-        <label class="form-label">Precio</label>
-        <input type="number" class="form-input" formControlName="Precio_Pasajero" readonly />
-      </div>
 
-      @if (pasajero.get('Comision')?.value > 0) {
-      <div class="form-group">
-        <label class="form-label">Comisión</label>
-        <input type="number" class="form-input" formControlName="Comision" readonly />
-      </div>
-      }
 
       @if (puntosSeleccionados().length > 1) {
       <div class="form-group">
@@ -306,10 +460,79 @@
 <!-- PAGOS -->
 <div class="card">
   <div class="card-header">
-    <h2>Detalles de Pago</h2>
+    <h2>Precios, comisiones y pago</h2>
   </div>
 
   <div class="payments-grid">
+    <!-- Moneda (movido desde arriba) -->
+    <div class="form-group">
+      <label class="form-label">Moneda</label>
+      <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
+        @for (m of monedas(); track m.Id_Moneda) {
+        <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Precios y Comisiones Globales -->
+    <div class="form-group full-width payments-prices">
+      <label class="form-label">Precios y Comisiones por Pasajero</label>
+
+      <div class="passenger-prices-grid">
+        <!-- ADULTO -->
+        <div class="price-col">
+          <label class="form-label subtle">Adulto</label>
+          <div class="price-group" [class.disabled]="adultosInputValue() === 0">
+            <div class="price-field">
+              <label class="form-label tiny">Precio</label>
+              <input type="number" class="form-input" formControlName="PrecioAdulto"
+                [disabled]="adultosInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('ADULTO')" />
+            </div>
+            <div class="price-field">
+              <label class="form-label tiny">Comisión</label>
+              <input type="number" class="form-input" formControlName="ComisionAdulto"
+                [disabled]="adultosInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('ADULTO')" />
+            </div>
+          </div>
+        </div>
+
+        <!-- NINO -->
+        <div class="price-col">
+          <label class="form-label subtle">Niño</label>
+          <div class="price-group" [class.disabled]="ninosInputValue() === 0">
+            <div class="price-field">
+              <label class="form-label tiny">Precio</label>
+              <input type="number" class="form-input" formControlName="PrecioNino"
+                [disabled]="ninosInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('NINO')" />
+            </div>
+            <div class="price-field">
+              <label class="form-label tiny">Comisión</label>
+              <input type="number" class="form-input" formControlName="ComisionNino"
+                [disabled]="ninosInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('NINO')" />
+            </div>
+          </div>
+        </div>
+
+        <!-- INFANTE -->
+        @if (tourRules.allowsPassengerType(Number(form.get('SelectTour')?.value), 'INFANTE')) {
+        <div class="price-col">
+          <label class="form-label subtle">Infante</label>
+          <div class="price-group" [class.disabled]="infantesInputValue() === 0">
+            <div class="price-field">
+              <label class="form-label tiny">Precio</label>
+              <input type="number" class="form-input" formControlName="PrecioInfante"
+                [disabled]="infantesInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('INFANTE')" />
+            </div>
+            <div class="price-field">
+              <label class="form-label tiny">Comisión</label>
+              <input type="number" class="form-input" formControlName="ComisionInfante"
+                [disabled]="infantesInputValue() === 0" (input)="actualizarPreciosComisionesPorTipo('INFANTE')" />
+            </div>
+          </div>
+        </div>
+        }
+      </div>
+    </div>
 
     <!-- Col A: forma de pago -->
     <div class="form-group">
@@ -347,43 +570,44 @@
 
         <div class="abonos-grid">
           @for (group of abonos.controls; let i = $index; track i) {
-          <div class="abono-row" [formGroupName]="i">
+          <div class="payment-file-row" [formGroupName]="i">
 
-            <!-- Monto -->
-            <div class="abono-col monto-col">
-              <label class="form-label subtle">Monto</label>
+            <div class="abono-index">
+              <span class="abono-number">Abono {{ i + 1 }}</span>
+            </div>
+
+            <div class="abono-monto">
               <input type="number" class="form-input" formControlName="Monto" (change)="recalcularTotales()"
                 placeholder="0" />
             </div>
 
-            <!-- Archivo -->
-            <div class="abono-col file-col">
-              <label class="form-label subtle">Comprobante</label>
-
-              <div class="file-upload-wrapper">
-                <input type="file" [id]="'ComprobanteAbono' + i" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
-                  (change)="onAbonoFileSelected($event, i)" style="display:none" />
-
-                <label class="btn-upload" [for]="'ComprobanteAbono' + i">
-                  Subir archivo
-                </label>
-
-                @if (abonos.controls[i].get('Comprobante')?.value; as f) {
-                <div class="file-name">
-                  {{ f?.name }} — {{ (f?.size / 1024) | number:'1.0-0' }} KB
-                </div>
-                } @else {
-                <div class="file-placeholder">PDF / JPG / PNG</div>
-                }
-              </div>
+            <div class="payment-file-status">
+              @if (abonos.controls[i].get('Comprobante')?.value) {
+                <span class="payment-chip loaded">Cargado</span>
+                <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
+              } @else if (abonos.controls[i].get('SoporteUrl')?.value) {
+                <span class="payment-chip saved">Guardado</span>
+                <span class="file-name">Comprobante guardado</span>
+              } @else {
+                <span class="file-name text-muted">Sin archivo</span>
+              }
             </div>
 
-            <!-- Delete -->
-            <div class="delete-buttons-container">
+            <div class="payment-actions">
+              <input type="file" [id]="'ComprobanteAbono' + i" accept=".pdf,.jpg,.jpeg,.png" (change)="onAbonoFileSelected($event, i)" style="display:none" />
+
+              @if (!abonos.controls[i].get('Comprobante')?.value && !abonos.controls[i].get('SoporteUrl')?.value) {
+                <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+              } @else {
+                @if (abonos.controls[i].get('SoporteUrl')?.value && !abonos.controls[i].get('Comprobante')?.value) {
+                  <button type="button" class="btn-payment-action secondary" (click)="viewComprobante(abonos.controls[i].get('SoporteUrl')?.value)">Ver</button>
+                }
+                <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
+                <button type="button" class="btn-payment-action danger" (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+              }
+
               @if (abonos.length > 1) {
-              <button type="button" class="btn-icon-delete" aria-label="Eliminar abono" (click)="eliminarAbono(i)">
-                ✕
-              </button>
+                <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono" (click)="eliminarAbono(i)">✕</button>
               }
             </div>
 
@@ -416,50 +640,40 @@
           </div>
         </div>
 
-        <div class="pc-grid">
-
-          <!-- Botón de carga -->
-          <div class="uploader">
-            <input type="file" id="ComprobantePago" class="file-input" accept=".pdf,.jpg,.jpeg,.png"
-              (change)="onFileSelected($event)" style="display:none" />
-            <label class="btn-upload" for="ComprobantePago">
-              Subir comprobante
-            </label>
-          </div>
-
-          <!-- Chip archivo -->
-          <div class="file-chip">
-
+        <div class="payment-file-row">
+          <div class="payment-file-status">
             @if (form.get('ComprobantePago')?.value; as f) {
-
-            @if (f?.SoporteUrl) {
-            <span class="status-pill ok">Guardado</span>
-            <span class="name">Comprobante guardado</span>
-
-            <div class="file-actions">
-              <button type="button" class="btn-link" (click)="viewComprobante(f.SoporteUrl)">Ver</button>
-              <button type="button" class="btn-subtle" (click)="triggerComprobanteUpload()">Actualizar</button>
-              <button type="button" class="btn-danger" (click)="deleteComprobante()">Eliminar</button>
-            </div>
+              @if (f?.SoporteUrl) {
+                <span class="payment-chip saved">Guardado</span>
+                <span class="file-name">Comprobante guardado</span>
+              } @else {
+                <span class="payment-chip loaded">Cargado</span>
+                <span class="file-name">{{ f?.name }}</span>
+              }
             } @else {
-            <span class="status-pill pending">Listo para subir</span>
-            <span class="name">{{ f?.name }}</span>
-            <span class="size">— {{ (f?.size / 1024) | number:'1.0-0' }} KB</span>
+              <span class="file-name text-muted">Sin archivo</span>
             }
-
-            } @else {
-            <span class="status-pill neutral">Sin archivo</span>
-            <span class="name">Aún no has subido el comprobante</span>
-            }
-
           </div>
 
-          <!-- Error -->
-          @if (form.get('ComprobantePago')?.touched) {
-          <div class="errorMessage pc-error">El comprobante debe ser menor a 5 MB.</div>
-          }
+          <div class="payment-actions">
+            <input type="file" id="ComprobantePagoReemplazar" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelected($event)" style="display:none" />
 
+            @if (!form.get('ComprobantePago')?.value) {
+              <label class="btn-payment-action primary" for="ComprobantePagoReemplazar">Subir comprobante</label>
+            } @else {
+              @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
+                <button type="button" class="btn-payment-action secondary" (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
+              }
+              <label class="btn-payment-action secondary" for="ComprobantePagoReemplazar">Reemplazar</label>
+              <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
+            }
+          </div>
         </div>
+
+        <!-- Error -->
+        @if (form.get('ComprobantePago')?.touched) {
+        <div class="errorMessage pc-error">El comprobante debe ser menor a 5 MB.</div>
+        }
 
       </div>
       }
@@ -524,7 +738,7 @@
       <span class="badge">{{ form.get('Tipo_Reserva')?.value || 'Grupal' }}</span>
       <span class="meta">
         {{ pasajerosConAsiento() || 0 }} pax ·
-        {{ pendientePorPagar() | number:'1.0-0' }} {{ monedaCodigo() }}
+        {{ totalNeto() | number:'1.0-0' }} {{ monedaCodigo() }}
       </span>
     </div>
 
@@ -609,3 +823,4 @@
 
 
 </div>
+}

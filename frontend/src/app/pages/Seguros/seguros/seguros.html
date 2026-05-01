@@ -1,74 +1,111 @@
 <div class="page-container">
 
-    <div class="header-top">
-        <div>
-            <h1>Seguros</h1>
-        </div>
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="header-text">
+      <h1>Seguros</h1>
+      <p class="subtitle">Listado de pasajeros con seguro de viaje por fecha y tour.</p>
     </div>
 
-    <div class="filters-container">
-        <div class="filter-group">
-            <label class="label">Fecha del Tour</label>
-            <input type="date" [(ngModel)]="fecha" class="input-control">
-        </div>
+    <!-- FILTERS -->
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="form-label">Fecha del Tour</label>
+        <input type="date" [(ngModel)]="fecha" class="form-input" />
+      </div>
 
-        <div class="filter-group">
-            <label class="label">Tour</label>
-            <select [(ngModel)]="idTour" class="input-control">
-                <option value="">Todos los Tours</option>
-                @for (t of tours; track t.Id_Tour) {
-                <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-                }
-            </select>
-        </div>
+      <div class="filter-group">
+        <label class="form-label">Tour</label>
+        <select [(ngModel)]="idTour" class="form-select">
+          <option value="">Todos los tours</option>
+          @for (t of tours; track t.Id_Tour) {
+            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+          }
+        </select>
+      </div>
 
-        <button (click)="buscar()" [disabled]="loading" class="btn-search">
-            @if (loading) {
-            <span class="spinner-sm"></span>
+      <button (click)="buscar()" [disabled]="isPageLoading || isSearching" class="btn-primary">
+        @if (isSearching) {
+          <span class="btn-spinner"></span>
+          Buscando...
+        } @else {
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Buscar
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- TABLE CARD -->
+  <div class="card">
+    @if (isPageLoading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando información...</p>
+      </div>
+    } @else if (seguros.length > 0) {
+      <div class="table-meta">
+        <div class="meta-info">
+          <span class="count-badge">{{ seguros.length }}</span>
+          <span class="meta-text">pasajeros con seguro</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead class="thead">
+            <tr>
+              <th class="th">Fecha de Viaje</th>
+              <th class="th">Tour</th>
+              <th class="th">Pasajero</th>
+              <th class="th">DNI / Pasaporte</th>
+            </tr>
+          </thead>
+          <tbody class="tbody">
+            @for (item of seguros; track item.Id_Reserva + '-' + item.IdPas) {
+              <tr>
+                <td class="td td-mono">{{ item.Fecha_Tour | date:'dd/MM/yyyy' }}</td>
+                <td class="td">{{ item.Nombre_Tour }}</td>
+                <td class="td">
+                  <span class="passenger-name">{{ item.Nombre_Pasajero }}</span>
+                </td>
+                <td class="td td-mono">{{ item.IdPas || '—' }}</td>
+              </tr>
             }
-            @if (!loading) {
-            <span>Buscar</span>
-            }
-        </button>
-    </div>
-
-    <div class="table-container">
-        <div class="table-scroll">
-            <table class="data-table">
-                <thead class="thead">
-                    <tr>
-                        <th class="th">Fecha de viaje</th>
-                        <th class="th">Tour</th>
-                        <th class="th">Nombre del Pasajero</th>
-                        <th class="th">DNI/Pasaporte</th>
-                    </tr>
-                </thead>
-                <tbody class="tbody">
-                    @for (item of seguros; track item.Id_Reserva + '-' + item.IdPas) {
-                    <tr>
-                        <td class="td">{{ item.Fecha_Tour | date:'dd/MM/yyyy' }}</td>
-                        <td class="td">{{ item.Nombre_Tour }}</td>
-                        <td class="td">
-                            <span class="passenger-name">{{ item.Nombre_Pasajero }}</span>
-                        </td>
-                        <td class="td">{{ item.IdPas }}</td>
-                    </tr>
-                    }
-                    @if (seguros.length === 0 && !loading) {
-                    <tr>
-                        <td colspan="4" class="empty-state">No se encontraron registros</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
+          </tbody>
+        </table>
+      </div>
+    } @else if (hasSearched) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
+          </svg>
         </div>
-    </div>
+        <h3>Sin resultados</h3>
+        <p>No se encontraron registros con los filtros aplicados.</p>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <h3>Listo para buscar</h3>
+        <p>Selecciona una fecha y un tour, luego presiona "Buscar".</p>
+      </div>
+    }
+  </div>
 
 </div>
 
-<!-- Floating Excel Button -->
 @if (seguros.length > 0) {
-<button class="floating-save-btn" (click)="descargarExcel()">
+  <button class="floating-save-btn" (click)="descargarExcel()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
     Descargar Excel
-</button>
+  </button>
 }

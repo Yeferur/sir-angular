@@ -1,11 +1,21 @@
-import { Component, OnInit, signal, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef } from '@angular/core';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
-import { firstValueFrom } from 'rxjs';
-import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { Router, ActivatedRoute } from '@angular/router';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
+
+type CrearTransferLoadResult = {
+  servicios: any[];
+  rangos: any[];
+  monedas: any[];
+  transfer?: any | null;
+};
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
@@ -13,7 +23,7 @@ import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-in
   templateUrl: './crear-transfer.html',
   styleUrls: ['./crear-transfer.css']
 })
-export class CrearTransferComponent implements OnInit {
+export class CrearTransferComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
@@ -22,12 +32,17 @@ export class CrearTransferComponent implements OnInit {
   isSubmitting = signal<boolean>(false);
 
   resultsServicioTransfer: any[] = [];
-  servicioLoading = true;
   resultsRangos: any[] = [];
   resultsMonedas: any[] = [];
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
   showFlightFields = false;
+
+  // Archivos de comprobantes
+  pagoPagadoFile: File | null = null;
+  pagoPagadoFileName: string | null = null;
+  abonoFiles: Map<number, File> = new Map();
+  abonoFileNames: Map<number, string> = new Map();
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
@@ -175,6 +190,9 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     private navbar: DynamicIslandGlobalService,
     private transferSvc: TransferService,
     private cdr: ChangeDetectorRef,
+    private router: Router,
+    private route: ActivatedRoute,
+    private destroyRef: DestroyRef
   ) { }
 
   private notSeleccionarValidator(): ValidatorFn {
@@ -190,13 +208,119 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   public getNombreServicio(): string {
     const id = this.form?.get('TipoServicio')?.value;
-    const servicio = this.resultsServicioTransfer.find(s => String(s.id) === String(id));
+    const servicio = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(id));
     return servicio ? servicio.Servicio : '—';
+  }
+
+  get abonos(): FormArray {
+    return this.form.get('Abonos') as FormArray;
+  }
+
+  addAbono(): void {
+    this.abonos.push(this.fb.group({
+      Monto: ['', [Validators.required, Validators.min(0.01)]],
+      Observaciones: [''],
+      Fecha_Pago: ['']
+    }));
+  }
+
+  removeAbono(index: number): void {
+    this.abonos.removeAt(index);
+  }
+
+  getTotalAbonado(): number {
+    if (this.form.get('TipoPago')?.value !== 'Abonos') return 0;
+    return this.abonos.controls.reduce((sum, control) => {
+      const monto = Number(control.get('Monto')?.value || 0);
+      return sum + monto;
+    }, 0);
+  }
+
+  getPendiente(): number {
+    const valor = Number(this.form.get('Valor')?.value || 0);
+    const tipoPago = this.form.get('TipoPago')?.value;
+
+    if (tipoPago === 'Completo') return 0;
+    if (tipoPago === 'Abonos') {
+      return Math.max(0, valor - this.getTotalAbonado());
+    }
+    return valor;
+  }
+
+  getAbonosIndices(): number[] {
+    return Array.from({ length: this.abonos.length }, (_, i) => i);
+  }
+
+  // MÉTODOS PARA ARCHIVOS/COMPROBANTES
+  private validateFile(file: File | null): { valid: boolean; error?: string } {
+    if (!file) return { valid: false, error: 'No se seleccionó archivo' };
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedTypes.includes(file.type)) {
+      return { valid: false, error: 'Tipo no permitido. Solo JPG, PNG o PDF.' };
+    }
+
+    if (file.size > maxSize) {
+      return { valid: false, error: 'Archivo muy grande. Máximo 5MB.' };
+    }
+
+    return { valid: true };
+  }
+
+  onPagoCompletoFileSelected(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files[0]) {
+      const validation = this.validateFile(files[0]);
+      if (!validation.valid) {
+        this.navbar.errorToast('Archivo inválido', validation.error || 'Error al validar archivo');
+        target.value = '';
+        return;
+      }
+      this.pagoPagadoFile = files[0];
+      this.pagoPagadoFileName = files[0].name;
+    }
+  }
+
+  onAbonoFileSelected(event: Event, index: number): void {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files[0]) {
+      const validation = this.validateFile(files[0]);
+      if (!validation.valid) {
+        this.navbar.errorToast('Archivo inválido', validation.error || 'Error al validar archivo');
+        target.value = '';
+        return;
+      }
+      this.abonoFiles.set(index, files[0]);
+      this.abonoFileNames.set(index, files[0].name);
+    }
+  }
+
+  clearPagoCompletoFile(): void {
+    this.pagoPagadoFile = null;
+    this.pagoPagadoFileName = null;
+    const input = document.getElementById('file-pago-completo') as HTMLInputElement;
+    if (input) input.value = '';
+  }
+
+  clearAbonoFile(index: number): void {
+    this.abonoFiles.delete(index);
+    this.abonoFileNames.delete(index);
+    const input = document.getElementById(`file-abono-${index}`) as HTMLInputElement;
+    if (input) input.value = '';
+  }
+
+  getAbonoFileName(index: number): string | null {
+    return this.abonoFileNames.get(index) || null;
   }
 
   ngOnInit(): void {
     this.form = this.fb.group({
       Titular: ['', Validators.required],
+      DNI: [''],
       TelefonoTitular: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
       Rango: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Moneda: ['COP'],
@@ -210,126 +334,193 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Vuelo: [''],
       Valor: [0],
       TelefonoReserva: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
-      Observaciones: ['']
+      Observaciones: [''],
+      TipoPago: ['PagaEnPunto'],
+      Abonos: this.fb.array([])
     });
 
-    this.loadServicios();
-    this.loadRangos();
-    this.loadMonedas();
+    this.loadCatalogos();
+
     // escuchar cambio de rango para obtener precio inmediato
-    this.form.get('Rango')?.valueChanges.subscribe((rangoId) => {
-      if (!rangoId || rangoId === 'Seleccionar') {
-        this.selectedRangoDescripcion = null;
-        this.precioSeleccionado = null;
-        this.form.get('Valor')?.setValue(0);
-        return;
-      }
-      const r = this.resultsRangos.find(rr => String(rr.id) === String(rangoId));
-      this.selectedRangoDescripcion = r ? r.Descripcion : null;
-      // pedir precios por rango
-      this.transferSvc.getPreciosPorRango(rangoId).subscribe({
-        next: (rows) => {
-          // buscar precio según moneda seleccionada
-          const monedaSel = this.form.get('Moneda')?.value || 'COP';
-          const precioMoneda = rows.find((p: any) => p.MonedaCodigo === monedaSel);
-          const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-          this.precioSeleccionado = precio;
-          this.form.get('Valor')?.setValue(precio ?? 0);
-          // evitar ExpressionChangedAfterItHasBeenCheckedError
-          try { this.cdr.detectChanges(); } catch { /* noop */ }
-        },
-        error: () => {
+    this.form.get('Rango')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((rangoId) => {
+        if (!rangoId || rangoId === 'Seleccionar') {
+          this.selectedRangoDescripcion = null;
           this.precioSeleccionado = null;
           this.form.get('Valor')?.setValue(0);
+          return;
+        }
+        const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
+        this.selectedRangoDescripcion = r ? r.Descripcion : null;
+        // pedir precios por rango
+        const rId = String(rangoId);
+        this.transferSvc.getPreciosPorRango(rId as any).subscribe({
+          next: (rows) => {
+            // buscar precio según moneda seleccionada
+            const monedaSel = this.form.get('Moneda')?.value || 'COP';
+            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === monedaSel);
+            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
+            this.precioSeleccionado = precio;
+            this.form.get('Valor')?.setValue(precio ?? 0);
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.precioSeleccionado = null;
+            this.form.get('Valor')?.setValue(0);
+          }
+        });
+      });
+    // reacción a cambio de moneda: si hay rango seleccionado, reconsultar precios
+    this.form.get('Moneda')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((mon) => {
+        const rangoId = this.form.get('Rango')?.value;
+        if (!rangoId || rangoId === 'Seleccionar') return;
+        this.transferSvc.getPreciosPorRango(rangoId).subscribe({
+          next: (rows) => {
+            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === mon);
+            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
+            this.precioSeleccionado = precio;
+            this.form.get('Valor')?.setValue(precio ?? 0);
+            this.cdr.markForCheck();
+          }, error: () => { /* ignore */ }
+        });
+      });
+    // detectar cuando el tipo de servicio cambia para activar campos de vuelo
+    this.form.get('TipoServicio')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((serviceId) => {
+        const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
+        // sólo activar si es 'Hotel -> Aeropuerto' (no al revés)
+        const isHotelToAirport = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
+        this.showFlightFields = Boolean(isHotelToAirport);
+
+        const tipoVueloCtrl = this.form.get('TipoVuelo');
+        const vueloCtrl = this.form.get('Vuelo');
+        if (this.showFlightFields) {
+          tipoVueloCtrl?.setValidators([Validators.required]);
+          vueloCtrl?.setValidators([Validators.required]);
+        } else {
+          tipoVueloCtrl?.clearValidators();
+          vueloCtrl?.clearValidators();
+        }
+        tipoVueloCtrl?.updateValueAndValidity({ emitEvent: false });
+        vueloCtrl?.updateValueAndValidity({ emitEvent: false });
+
+        if (!this.showFlightFields) {
+          vueloCtrl?.setValue('');
+          tipoVueloCtrl?.setValue('');
         }
       });
-    });
-    // reacción a cambio de moneda: si hay rango seleccionado, reconsultar precios
-    this.form.get('Moneda')?.valueChanges.subscribe((mon) => {
-      const rangoId = this.form.get('Rango')?.value;
-      if (!rangoId || rangoId === 'Seleccionar') return;
-      this.transferSvc.getPreciosPorRango(rangoId).subscribe({
-        next: (rows) => {
-          const precioMoneda = rows.find((p: any) => p.MonedaCodigo === mon);
-          const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-          this.precioSeleccionado = precio;
-          this.form.get('Valor')?.setValue(precio ?? 0);
-          try { this.cdr.detectChanges(); } catch { }
-        }, error: () => { /* ignore */ }
-      });
-    });
-    // detectar cuando el tipo de servicio cambia para activar campos de vuelo
-    this.form.get('TipoServicio')?.valueChanges.subscribe((serviceId) => {
-      const nombre = this.resultsServicioTransfer.find(s => String(s.id) === String(serviceId))?.Servicio || '';
-      // sólo activar si es 'Hotel -> Aeropuerto' (no al revés)
-      const isHotelToAirport = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
-      this.showFlightFields = Boolean(isHotelToAirport);
-
-      const tipoVueloCtrl = this.form.get('TipoVuelo');
-      const vueloCtrl = this.form.get('Vuelo');
-      if (this.showFlightFields) {
-        tipoVueloCtrl?.setValidators([Validators.required]);
-        vueloCtrl?.setValidators([Validators.required]);
-      } else {
-        tipoVueloCtrl?.clearValidators();
-        vueloCtrl?.clearValidators();
-      }
-      tipoVueloCtrl?.updateValueAndValidity({ emitEvent: false });
-      vueloCtrl?.updateValueAndValidity({ emitEvent: false });
-
-      if (!this.showFlightFields) {
-        vueloCtrl?.setValue('');
-        tipoVueloCtrl?.setValue('');
-      }
-    });
 
     // cuando cambie el tipo de vuelo y el servicio sea hotel->aeropuerto, advertir al usuario
-    this.form.get('TipoVuelo')?.valueChanges.subscribe((tipo) => {
-      if (!this.showFlightFields) return;
-      const msg = tipo === 'Internacional'
-        ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
-        : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
-      this.navbar.infoToast('Anticipación recomendada', msg, 2500);
-    });
+    this.form.get('TipoVuelo')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((tipo) => {
+        if (!this.showFlightFields) return;
+        const msg = tipo === 'Internacional'
+          ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
+          : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
+        this.navbar.alert.set({
+          type: 'info',
+          title: 'Recomendación',
+          message: msg,
+          autoClose: true,
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        });
+      });
   }
 
   checkWhatsappForReserva(): void {
     // WhatsApp verification removed — no operation.
   }
 
-  private loadRangos(): void {
-    this.transferSvc.getRangos().subscribe({
-      next: (data) => { this.resultsRangos = Array.isArray(data) ? data : []; },
-      error: () => { /* ignore silently for now */ }
-    });
-  }
+  private loadCatalogos(): void {
+    this.isLoading.set(true);
 
-  private loadMonedas(): void {
-    this.transferSvc.getMonedas().subscribe({
-      next: (data) => {
-        this.resultsMonedas = Array.isArray(data) ? data : [];
+    const duplicarId = this.route.snapshot.queryParamMap.get('duplicar');
+
+    const requests: any = {
+      servicios: this.transferSvc.getServicios().pipe(catchError(() => of([] as any[]))),
+      rangos: this.transferSvc.getRangos().pipe(catchError(() => of([] as any[]))),
+      monedas: this.transferSvc.getMonedas().pipe(catchError(() => of([] as any[])))
+    };
+
+    if (duplicarId) {
+      requests.transfer = this.transferSvc.getTransfer(duplicarId).pipe(catchError(() => of(null)));
+    }
+
+    forkJoin<CrearTransferLoadResult>(requests).subscribe({
+      next: (result: CrearTransferLoadResult) => {
+        this.resultsServicioTransfer = Array.isArray(result.servicios) ? result.servicios : [];
+        this.resultsRangos = Array.isArray(result.rangos) ? result.rangos : [];
+        this.resultsMonedas = Array.isArray(result.monedas) ? result.monedas : [];
+
         // set default moneda if existe COP
         const hasCOP = this.resultsMonedas.find((m: any) => m.Codigo === 'COP');
         const defaultMon = hasCOP ? 'COP' : (this.resultsMonedas[0]?.Codigo || 'COP');
         this.form.get('Moneda')?.setValue(defaultMon);
+
+        if (result.servicios.length === 0) {
+          this.navbar.errorToast('Error', 'No se pudieron cargar los servicios de transfer.');
+        }
+
+        // Si viene duplicar, llenar el formulario con los datos del transfer original
+        if (duplicarId && result.transfer && result.transfer.data) {
+          this.fillFormWithDuplicateData(result.transfer.data);
+        }
       },
-      error: () => { /* ignore */ }
+      error: () => {
+        this.navbar.errorToast('Error', 'No se pudieron cargar los catálogos necesarios.');
+      },
+      complete: () => {
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+      }
     });
   }
 
-  // removed recommended pickup/time validation: only show advisory alerts for TipoVuelo
+  private fillFormWithDuplicateData(data: any): void {
+    const transfer = data.transfer || data;
+    const pagos = data.pagos || [];
 
-  private loadServicios(): void {
-    this.servicioLoading = true;
-    this.isLoading.set(true);
+    // Llenar formulario con datos del transfer
+    this.form.patchValue({
+      Titular: transfer.Nombre_Titular || '',
+      DNI: transfer.DNI || '',
+      TelefonoTitular: transfer.Telefono_Titular || '',
+      Rango: transfer.Id_Rango || 'Seleccionar',
+      Moneda: transfer.MonedaCodigo || 'COP',
+      TipoServicio: transfer.Id_Servicio || 'Seleccionar',
+      Salida: transfer.Punto_Salida || '',
+      Llegada: transfer.Punto_Destino || '',
+      Fecha: transfer.Fecha_Transfer || '',
+      Hora: transfer.Hora_Recogida || '',
+      TipoVuelo: transfer.TipoVuelo || '',
+      Reporta: transfer.Nombre_Reportante || '',
+      Vuelo: transfer.Vuelo || '',
+      Valor: Number(transfer.Valor || 0),
+      TelefonoReserva: transfer.Telefono_Reportante || '',
+      Observaciones: `Duplicado desde Transfer #TRC${transfer.Id_Transfer}`,
+      TipoPago: 'PagaEnPunto'  // Siempre comienzar con PagaEnPunto
+    }, { emitEvent: false });
 
-    this.transferSvc.getServicios().subscribe({
-      next: (data) => { this.resultsServicioTransfer = Array.isArray(data) ? data : []; },
-      error: () => {
-        this.navbar.errorToast('Error', 'No se pudieron cargar los servicios de transfer.');
-      },
-      complete: () => { this.servicioLoading = false; this.isLoading.set(false); }
-    });
+    // Actualizar descripciones
+    const rangoId = this.form.get('Rango')?.value;
+    if (rangoId && rangoId !== 'Seleccionar') {
+      const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
+      this.selectedRangoDescripcion = r ? r.Descripcion : null;
+    }
+
+    // Detectar si necesita campos de vuelo
+    const serviceId = this.form.get('TipoServicio')?.value;
+    if (serviceId && serviceId !== 'Seleccionar') {
+      const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
+      this.showFlightFields = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
+    }
+
+    this.form.markAsPristine();
   }
 
   async onSubmit(): Promise<void> {
@@ -406,8 +597,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     }
 
     const transferData = {
-      Id_Transfer: `TR-${Math.floor(10000 + Math.random() * 90000)}`,
       Titular: this.form.value.Titular,
+      DNI: this.form.value.DNI || '',
       Tel_Contacto: this.form.value.TelefonoTitular || '',
       Id_Rango: this.form.value.Rango,
       RangoDescripcion: this.selectedRangoDescripcion,
@@ -424,29 +615,108 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Moneda: this.form.value.Moneda,
       Observaciones: [this.form.value.Observaciones, `EstadoMotivo: ${estadoInfo.motivo}`].filter(Boolean).join('\n'),
       Estado: estadoInfo.estado,
+      Pago: {
+        Tipo: this.form.value.TipoPago,
+        Abonos: this.form.value.TipoPago === 'Abonos' ? this.form.value.Abonos : []
+      }
     };
 
     this.transferSvc.crearTransfer(transferData).subscribe({
       next: (data) => {
-        this.navbar.successToast('Transfer creado', data?.message || 'Transfer creado correctamente.');
+        const idTransfer = data?.data?.Id_Transfer;
+        const pagos = data?.data?.pagos || [];
 
-        this.form.reset({
-          TipoServicio: 'Seleccionar',
-          Rango: 'Seleccionar',
-          Moneda: 'COP',
-          Valor: 0
-        });
-        this.form.markAsPristine();
-
-        this.toggleSummary(false);
+        // Si hay archivos de comprobantes, subirlos
+        if (idTransfer && (this.pagoPagadoFile || this.abonoFiles.size > 0)) {
+          this.uploadComprobantesTransfer(idTransfer, pagos);
+        } else {
+          // Sin comprobantes, mostrar éxito
+          this.navbar.successToast('Transfer creado', data?.message || 'Transfer creado correctamente.');
+          this.resetForm();
+          this.isSubmitting.set(false);
+        }
       },
       error: () => {
         this.navbar.errorToast('Error', 'Hubo un error al crear el transfer.');
-      },
-      complete: () => {
         this.isSubmitting.set(false);
       }
     });
+  }
+
+  private uploadComprobantesTransfer(idTransfer: number, pagos: any[]): void {
+    // Mapear archivos a pagos
+    const uploads: Promise<void>[] = [];
+
+    // Pago completo
+    if (this.pagoPagadoFile && pagos.length > 0) {
+      const idPago = pagos[0].Id_Pago;
+      uploads.push(
+        new Promise((resolve, reject) => {
+          this.transferSvc.subirComprobantePago(idTransfer, idPago, this.pagoPagadoFile!).subscribe({
+            next: () => resolve(),
+            error: (err) => {
+              console.error('Error subiendo pago completo:', err);
+              reject(err);
+            }
+          });
+        })
+      );
+    }
+
+    // Abonos
+    this.abonoFiles.forEach((file, abonoIndex) => {
+      // Buscar el pago correspondiente (saltando el primero si es pago completo)
+      const pagoIndex = this.form.get('TipoPago')?.value === 'Completo' ? abonoIndex + 1 : abonoIndex;
+      if (pagos[pagoIndex]) {
+        const idPago = pagos[pagoIndex].Id_Pago;
+        uploads.push(
+          new Promise((resolve, reject) => {
+            this.transferSvc.subirComprobantePago(idTransfer, idPago, file).subscribe({
+              next: () => resolve(),
+              error: (err) => {
+                console.error(`Error subiendo abono ${abonoIndex}:`, err);
+                reject(err);
+              }
+            });
+          })
+        );
+      }
+    });
+
+    // Ejecutar todas las subidas en paralelo
+    Promise.all(uploads)
+      .then(() => {
+        this.navbar.successToast('Transfer creado', 'Transfer y comprobantes guardados correctamente.');
+        this.resetForm();
+        this.isSubmitting.set(false);
+        this.router.navigate(['/Transfers/VerTransfers']);
+      })
+      .catch(() => {
+        this.navbar.warningToast('Advertencia', 'Transfer creado pero hubo problemas al guardar algunos comprobantes.');
+        this.resetForm();
+        this.isSubmitting.set(false);
+        this.router.navigate(['/Transfers/VerTransfers']);
+      });
+  }
+
+  private resetForm(): void {
+    this.form.reset({
+      TipoServicio: 'Seleccionar',
+      Rango: 'Seleccionar',
+      Moneda: 'COP',
+      Valor: 0
+    });
+    this.form.markAsPristine();
+    this.pagoPagadoFile = null;
+    this.pagoPagadoFileName = null;
+    this.abonoFiles.clear();
+    this.abonoFileNames.clear();
+    this.toggleSummary(false);
+  }
+
+  ngOnDestroy(): void {
+    if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
+    if (this.navbar?.alert) this.navbar.alert.set(null);
   }
 
   hasUnsavedChanges(): boolean {

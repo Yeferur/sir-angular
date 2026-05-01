@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -26,8 +26,9 @@ import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/
   templateUrl: './editar-reserva.html',
   styleUrls: ['./editar-reserva.css'],
 })
-export class EditarReservaComponent implements OnInit {
-showDuplicate: boolean = false;
+export class EditarReservaComponent implements OnInit, OnDestroy {
+  Number = Number;
+  showDuplicate: boolean = true;
   openSummary = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
@@ -45,13 +46,17 @@ showDuplicate: boolean = false;
   private sanitizer = inject(DomSanitizer);
   private injector = inject(Injector);
   private destroyRef = inject(DestroyRef);
-  private tourRules = inject(TourRulesService);
+  public tourRules = inject(TourRulesService);
 
   // Estado
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
   reservaId = signal<string | null>(null);
   form!: FormGroup;
+
+  comprobantesAEliminar: number[] = [];
+  comprobantesAReemplazar: number[] = [];
+  private ultimoTotalConocido: number = 0;
 
   // Catálogos
   tours = signal<Tour[]>([]);
@@ -356,6 +361,13 @@ showDuplicate: boolean = false;
       Abonos: this.fb.array([]),
       ComisionInternacional: [0],
 
+      PrecioAdulto: [0, [Validators.min(0)]],
+      PrecioNino: [0, [Validators.min(0)]],
+      PrecioInfante: [0, [Validators.min(0)]],
+      ComisionAdulto: [0],
+      ComisionNino: [0],
+      ComisionInfante: [0],
+
       // Punto principal
       Id_Punto: [null, Validators.required],
 
@@ -370,7 +382,7 @@ showDuplicate: boolean = false;
         if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
           this.CuposDisponiblesNavbar();
         }
-    });
+      });
     try {
       // 1) catálogos en paralelo
       const [tours, canales, monedas] = await Promise.all([
@@ -422,6 +434,16 @@ showDuplicate: boolean = false;
             this.cargarHistorialActividad(newId),
           ]).then(() => this.cdr.markForCheck());
         }
+      });
+
+    // Escuchar cambios en FormaPago para conversión manual
+    this.form.get('FormaPago')?.valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      distinctUntilChanged()
+    ).subscribe(nuevaForma => {
+      if (nuevaForma === 'Abono') {
+        this.verificarConversionCompletoAAbono(this.ultimoTotalConocido, true);
+      }
     });
 
     // React to Id_Reserva changes from the Dynamic Navbar: if user clicks "Editar" there,
@@ -525,6 +547,30 @@ showDuplicate: boolean = false;
         this.pasajeros.push(fg);
       }
 
+      // Hidratar controles globales con el primer pasajero existente de cada tipo
+      const primerosPorTipo = new Map<string, any>();
+      for (const ctrl of this.pasajeros.controls) {
+        const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+        if (!primerosPorTipo.has(tipo)) primerosPorTipo.set(tipo, ctrl);
+      }
+
+      const adulto = primerosPorTipo.get('ADULTO');
+      const nino = primerosPorTipo.get('NINO');
+      const infante = primerosPorTipo.get('INFANTE');
+
+      if (adulto) {
+        this.form.get('PrecioAdulto')?.setValue(adulto.get('Precio_Pasajero')?.value ?? 0, { emitEvent: false });
+        this.form.get('ComisionAdulto')?.setValue(adulto.get('Comision')?.value ?? 0, { emitEvent: false });
+      }
+      if (nino) {
+        this.form.get('PrecioNino')?.setValue(nino.get('Precio_Pasajero')?.value ?? 0, { emitEvent: false });
+        this.form.get('ComisionNino')?.setValue(nino.get('Comision')?.value ?? 0, { emitEvent: false });
+      }
+      if (infante) {
+        this.form.get('PrecioInfante')?.setValue(infante.get('Precio_Pasajero')?.value ?? 0, { emitEvent: false });
+        this.form.get('ComisionInfante')?.setValue(infante.get('Comision')?.value ?? 0, { emitEvent: false });
+      }
+
       // Pagos: hidratar tipo de pago y comprobantes
       this.abonos.clear();
       const pagosDb = data?.Pagos ?? [];
@@ -550,6 +596,7 @@ showDuplicate: boolean = false;
         const abonosDb = pagosDb.filter((p: any) => p.Tipo === 'Abono');
         for (const abono of abonosDb) {
           const fg = this.fb.group({
+            Id_Pago: [abono.Id_Pago || null],
             Monto: [abono.Monto || 0],
             Comprobante: [null], // No se puede rehidratar el archivo
             SoporteUrl: [abono.Ruta_Comprobante || abono.SoporteUrl || null]
@@ -564,6 +611,9 @@ showDuplicate: boolean = false;
       await this.verificarCuposDisponibles();
       this.CuposDisponiblesNavbar();
       await this.recalcularComisionesPorCanal();
+
+      this.ultimoTotalConocido = this.totalNeto() + Number(this.form.get('ComisionInternacional')?.value || 0);
+
       this.cdr.markForCheck();
     } catch (e) {
       console.error(e);
@@ -591,15 +641,16 @@ showDuplicate: boolean = false;
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  private extraerIdsPuntosReserva(puntoPrincipal: number | null, pasajeros: any[]): number[] {
-    const ids: number[] = [];
+  private extraerIdsPuntosReserva(puntoPrincipal: number | null, pasajeros: Array<any>): number[] {
     const vistos = new Set<number>();
+    const ids: number[] = [];
 
     const pushUnique = (idRaw: any) => {
       const id = this.parsePuntoId(idRaw);
-      if (!id || vistos.has(id)) return;
-      vistos.add(id);
-      ids.push(id);
+      if (id !== null && !vistos.has(id)) {
+        vistos.add(id);
+        ids.push(id);
+      }
     };
 
     // Mantiene el principal primero para conservar la semántica actual del formulario.
@@ -651,12 +702,28 @@ showDuplicate: boolean = false;
   // ===================== Abonos helpers =====================
   private crearAbonoGroup(): FormGroup {
     return this.fb.group({
+      Id_Pago: [null],
       Monto: [0],
       Comprobante: [null], // File
+      SoporteUrl: [null],
     });
   }
   agregarAbono() { this.abonos.push(this.crearAbonoGroup()); }
-  eliminarAbono(i: number) { this.abonos.removeAt(i); }
+  eliminarAbono(i: number) {
+    const fg = this.abonos.at(i);
+    const idPago = fg.get('Id_Pago')?.value;
+    if (idPago) this.comprobantesAEliminar.push(idPago);
+    this.abonos.removeAt(i);
+  }
+  eliminarComprobanteAbono(i: number) {
+    const fg = this.abonos.at(i);
+    const idPago = fg.get('Id_Pago')?.value;
+    if (idPago && fg.get('SoporteUrl')?.value) {
+      this.comprobantesAEliminar.push(idPago);
+    }
+    fg.get('Comprobante')?.setValue(null);
+    fg.get('SoporteUrl')?.setValue(null);
+  }
   totalAbonos(): number {
     return this.abonos.controls.reduce((acc, g: any) =>
       acc + Number(g.get('Monto')?.value || 0), 0);
@@ -667,8 +734,11 @@ showDuplicate: boolean = false;
   }
 
   // ===================== Puntos: búsqueda / selección =====================
+  puntoBusquedaTerm = signal<string>('');
+
   async onPuntoSearch(ev: Event) {
     const term = (ev.target as HTMLInputElement)?.value?.trim() || '';
+    this.puntoBusquedaTerm.set(term);
     if (term.length < 2) { this.puntoBusquedaResults.set([]); return; }
     try {
       const results = await firstValueFrom(this.reservasSvc.buscarPuntos(term));
@@ -677,6 +747,14 @@ showDuplicate: boolean = false;
       this.puntoBusquedaResults.set([]);
       this.navbar.alert.set({ type: 'error', title: 'Error buscando puntos', message: 'No fue posible obtener los puntos de encuentro.', autoClose: true });
     }
+  }
+
+  resaltarCoincidencia(texto: string): string {
+    const term = this.puntoBusquedaTerm().trim();
+    if (!term) return texto;
+    const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${safeTerm})`, 'gi');
+    return texto.replace(regex, '<strong class="text-highlight">$1</strong>');
   }
   async seleccionarPunto(p: Punto, input: HTMLInputElement) {
     if (!p) return;
@@ -806,6 +884,29 @@ showDuplicate: boolean = false;
   private countByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
     return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
   }
+  private precioControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
+    switch (tipo) {
+      case 'ADULTO': return 'PrecioAdulto';
+      case 'NINO': return 'PrecioNino';
+      case 'INFANTE': return 'PrecioInfante';
+    }
+  }
+
+  private comisionControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
+    switch (tipo) {
+      case 'ADULTO': return 'ComisionAdulto';
+      case 'NINO': return 'ComisionNino';
+      case 'INFANTE': return 'ComisionInfante';
+    }
+  }
+
+  private precioGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+    return Number(this.form.get(this.precioControlPorTipo(tipo))?.value || 0);
+  }
+
+  private comisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+    return Number(this.form.get(this.comisionControlPorTipo(tipo))?.value || 0);
+  }
   private removeInfantes(): void {
     for (let i = this.pasajeros.length - 1; i >= 0; i--) {
       if (this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value === 'INFANTE') this.pasajeros.removeAt(i);
@@ -813,11 +914,31 @@ showDuplicate: boolean = false;
     this.recalcularTotales();
   }
 
-  agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
+  actualizarPreciosComisionesPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
+    const precio = this.precioGlobalPorTipo(tipo);
+    const comision = this.comisionGlobalPorTipo(tipo);
+
+    for (const ctrl of this.pasajeros.controls) {
+      if (ctrl.get('Tipo_Pasajero')?.value === tipo) {
+        ctrl.get('Precio_Pasajero')?.setValue(precio, { emitEvent: false });
+        ctrl.get('Comision')?.setValue(comision, { emitEvent: false });
+        ctrl.get('Precio_Pasajero')?.markAsDirty();
+        ctrl.get('Comision')?.markAsDirty();
+      }
+    }
+
+    this.recalcularTotales();
+    this.cdr.markForCheck();
+  }
+
+  agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE', omitirCalculos = false) {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
     if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
 
     const principalPunto = this.form.get('Id_Punto')?.value ?? null;
+    const precioInicial = this.precioGlobalPorTipo(tipo);
+    const comisionInicial = this.comisionGlobalPorTipo(tipo);
+
     const fg = this.fb.group({
       Tipo_Pasajero: [tipo, Validators.required],
       Nombre_Pasajero: [''],
@@ -825,9 +946,9 @@ showDuplicate: boolean = false;
       Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
-      PrecioRef: [0],
-      Precio_Pasajero: [0, [Validators.min(0)]],
-      Comision: [0],
+      PrecioRef: [this.preciosRef()[tipo] ?? 0],
+      Precio_Pasajero: [precioInicial, [Validators.min(0)]],
+      Comision: [comisionInicial],
     });
 
     // Validación DNI en tiempo real
@@ -868,9 +989,9 @@ showDuplicate: boolean = false;
     this.pasajeros.push(fg);
     this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
 
-    // Solo para NUEVOS: autollenar referencia inicial
-    this.autollenarPrecios();
-    this.recalcularTotales();
+    if (!omitirCalculos) {
+      this.recalcularTotales();
+    }
   }
 
   eliminarPasajero(i: number) {
@@ -888,70 +1009,20 @@ showDuplicate: boolean = false;
   setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any) {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
     if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
-    
+
     const n = Math.max(0, Number(val || 0));
     const cur = this.countByTipo(tipo);
 
     if (n > cur) {
-      for (let i = 0; i < (n - cur); i++) {
-        const fg = this.fb.group({
-          Tipo_Pasajero: [tipo, Validators.required],
-          Nombre_Pasajero: [''],
-          DNI: [''],
-          Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
-          Id_Punto: [this.form.get('Id_Punto')?.value ?? null],
-          Confirmacion: [false],
-          PrecioRef: [0],
-          Precio_Pasajero: [0, [Validators.min(0)]],
-          Comision: [0],
-        });
-
-        // Validación DNI
-        fg.get('DNI')?.valueChanges.pipe(
-          debounceTime(800),
-          distinctUntilChanged(),
-          takeUntilDestroyed(this.destroyRef),
-          switchMap((dniVal: string) => {
-            if (!dniVal || dniVal.length < 5) return of(null);
-            const fecha = this.form.get('Fecha_Tour')?.value;
-            if (!fecha) return of(null);
-            return (this.reservasSvc as any).verificarDniDuplicado(dniVal, fecha, this.reservaId() || undefined).pipe(
-              catchError(() => of(null))
-            );
-          })
-        ).subscribe((res: any) => {
-          if (res?.exists) {
-            const reservaId = res?.reserva?.Id_Reserva ?? '?';
-            fg.get('DNI')?.setErrors({ duplicadoEnBd: true });
-            this.navbar.alert.set({
-              type: 'warning',
-              title: 'Documento Duplicado',
-              message: `El documento ${fg.get('DNI')?.value} ya se encuentra reservado en otro tour para esta misma fecha (Reserva #${reservaId}).`,
-              autoClose: false,
-              buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
-            });
-          } else {
-            const errs = fg.get('DNI')?.errors;
-            if (errs) {
-              delete errs['duplicadoEnBd'];
-              if (Object.keys(errs).length === 0) fg.get('DNI')?.setErrors(null);
-              else fg.get('DNI')?.setErrors(errs);
-            }
-          }
-        });
-
-        this.pasajeros.push(fg);
-      }
-      this.autollenarPrecios();
-      this.recalcularTotales();
+      for (let i = 0; i < (n - cur); i++) this.agregarPasajero(tipo, true);
     } else if (n < cur) {
       for (let i = cur - 1; i >= n; i--) {
         const idx = this.pasajeros.controls.findIndex(c => c.get('Tipo_Pasajero')?.value === tipo);
         if (idx >= 0) this.pasajeros.removeAt(idx);
       }
-      this.recalcularTotales();
     }
 
+    this.recalcularTotales();
     if (tipo === 'NINO') this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
   }
 
@@ -971,14 +1042,24 @@ showDuplicate: boolean = false;
     try {
       const comisiones = await firstValueFrom(this.reservasSvc.getComisiones(idTour, idCanal));
       const ref = this.preciosRef();
+
+      this.form.patchValue({
+        PrecioAdulto: Number(ref.ADULTO || 0),
+        PrecioNino: Number(ref.NINO || 0),
+        PrecioInfante: Number(ref.INFANTE || 0),
+        ComisionAdulto: Number(comisiones.ADULTO || 0),
+        ComisionNino: Number(comisiones.NINO || 0),
+        ComisionInfante: 0,
+      }, { emitEvent: false });
+
       for (const ctrl of this.pasajeros.controls) {
         const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
-        const precioTour = ref[tipo] ?? 0;
-        ctrl.get('PrecioRef')?.setValue(precioTour, { emitEvent: false });
-        if (!ctrl.get('Precio_Pasajero')?.dirty) ctrl.get('Precio_Pasajero')?.setValue(precioTour, { emitEvent: false });
-        const com = tipo === 'INFANTE' ? 0 : (comisiones[tipo] || 0);
-        ctrl.get('Comision')?.setValue(com, { emitEvent: false });
+
+        ctrl.get('PrecioRef')?.setValue(Number(ref[tipo] || 0), { emitEvent: false });
+        ctrl.get('Precio_Pasajero')?.setValue(this.precioGlobalPorTipo(tipo), { emitEvent: false });
+        ctrl.get('Comision')?.setValue(this.comisionGlobalPorTipo(tipo), { emitEvent: false });
       }
+
     } catch {
       for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
     }
@@ -1032,7 +1113,56 @@ showDuplicate: boolean = false;
     if (forma === 'Completo') return 0;
     return total;
   }
-  recalcularTotales() { /* getters ya recalculan */ }
+  recalcularTotales() {
+    const nuevoTotal = this.totalNeto() + Number(this.form.get('ComisionInternacional')?.value || 0);
+
+    if (this.ultimoTotalConocido > 0 && nuevoTotal !== this.ultimoTotalConocido) {
+      this.verificarConversionCompletoAAbono(this.ultimoTotalConocido, false);
+    }
+
+    this.ultimoTotalConocido = nuevoTotal;
+  }
+
+  private verificarConversionCompletoAAbono(montoOriginal: number, manual: boolean = false) {
+    const comprobantePago = this.form.get('ComprobantePago')?.value;
+
+    if (comprobantePago) {
+      if (!manual && this.form.get('FormaPago')?.value !== 'Abono') {
+        this.form.get('FormaPago')?.setValue('Abono', { emitEvent: false });
+      }
+
+      const fg = this.crearAbonoGroup();
+      fg.get('Monto')?.setValue(montoOriginal);
+
+      if (comprobantePago instanceof File) {
+        fg.get('Comprobante')?.setValue(comprobantePago);
+      } else {
+        fg.get('Id_Pago')?.setValue(comprobantePago.Id_Pago);
+        fg.get('SoporteUrl')?.setValue(comprobantePago.SoporteUrl);
+      }
+
+      this.abonos.push(fg);
+
+      this.form.get('ComprobantePago')?.setValue(null, { emitEvent: false });
+
+      if (!manual) {
+        this.navbar.alert.set({
+          type: 'info',
+          title: 'Cambio a Abonos',
+          message: 'El total ha cambiado. El pago completo se convirtió en abono. Puedes agregar más abonos o ajustar.',
+          autoClose: true
+        });
+      } else {
+        this.navbar.alert.set({
+          type: 'success',
+          title: 'Conversión exitosa',
+          message: 'El comprobante anterior ha sido movido a tu primer abono.',
+          autoClose: true
+        });
+      }
+      this.cdr.markForCheck();
+    }
+  }
 
   // ===================== Cupos =====================
   async verificarCuposDisponibles(): Promise<void> {
@@ -1213,7 +1343,7 @@ showDuplicate: boolean = false;
       let comisionesGlobal = {};
       try {
         comisionesGlobal = await firstValueFrom(this.reservasSvc.getComisiones(targetTourId, idCanal)) || {};
-      } catch {}
+      } catch { }
 
       pax.forEach((p: any) => {
         const precioReal = (preciosNuevos as any)[p.Tipo_Pasajero] ?? 0;
@@ -1299,7 +1429,7 @@ showDuplicate: boolean = false;
   private abrirReservaEnNavbar(idReserva: string) {
 
     this.navbar.alert.set(null);
-this.navbar.cuposInfo.set(null);
+    this.navbar.cuposInfo.set(null);
     this.navbar.Id_Reserva.set(idReserva);
 
   }
@@ -1354,6 +1484,25 @@ this.navbar.cuposInfo.set(null);
       return;
     }
 
+    // ===== Verificar duplicados por DNI =====
+    const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
+    if (dupCtrl) {
+      const dupErr = dupCtrl.get('DNI')?.errors?.['duplicadoEnBd'];
+      const reserva = dupErr?.reserva;
+      const dniVal = dupCtrl.get('DNI')?.value;
+      this.navbar.alert.set({
+        type: 'error',
+        title: 'Pasajero duplicado',
+        message: `No es posible actualizar la reserva: el DNI ${dniVal} ya aparece en otra reserva para esta misma fecha (Reserva #${reserva?.Id_Reserva}).`,
+        autoClose: false,
+        buttons: [
+          { text: 'Corregir DNI', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+        ]
+      });
+      this.isSubmitting.set(false);
+      return;
+    }
+
     const tourNombre = this.tours().find(t => t.Id_Tour === Number(this.form.get('SelectTour')?.value))?.Nombre_Tour ?? '—';
     const fecha = this.form.get('Fecha_Tour')?.value ?? '—';
     const ad = this.countByTipo('ADULTO');
@@ -1401,7 +1550,7 @@ this.navbar.cuposInfo.set(null);
       } else if (forma === 'Completo') {
         const cmpVal = this.form.get('ComprobantePago')?.value;
         const pagoCompleto: any = { Monto: totalNeto, Tipo: 'Pago Completo' };
-        
+
         if (cmpVal instanceof File) {
           pagoCompleto.fileField = 'comprobante_pago';
           archivos.completo = cmpVal;
@@ -1528,6 +1677,12 @@ this.navbar.cuposInfo.set(null);
       this.navbar.alert.set({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
       ctrl.setValue(null); input.value = ''; return;
     }
+
+    const currentVal: any = ctrl.value;
+    if (currentVal && !currentVal.name && currentVal.Id_Pago) {
+      this.comprobantesAReemplazar.push(currentVal.Id_Pago);
+    }
+
     ctrl.setValue(file);
     ctrl.markAsDirty();
     ctrl.updateValueAndValidity({ emitEvent: false });
@@ -1548,6 +1703,14 @@ this.navbar.cuposInfo.set(null);
       this.navbar.alert.set({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
       abonoControl.get('Comprobante')?.setValue(null); input.value = ''; return;
     }
+
+    const idPago = abonoControl.get('Id_Pago')?.value;
+    const url = abonoControl.get('SoporteUrl')?.value;
+    if (idPago && url) {
+      this.comprobantesAReemplazar.push(idPago);
+      abonoControl.get('SoporteUrl')?.setValue(null);
+    }
+
     abonoControl.get('Comprobante')?.setValue(file);
     abonoControl.markAsDirty();
     abonoControl.updateValueAndValidity({ emitEvent: false });
@@ -1612,12 +1775,11 @@ this.navbar.cuposInfo.set(null);
   deleteComprobante() {
     const currentValue: any = this.form.get('ComprobantePago')?.value;
     const idPago = Number(currentValue?.Id_Pago);
-    const idReserva = this.reservaId();
 
     this.navbar.alert.set({
       type: 'warning',
       title: 'Eliminar comprobante',
-      message: 'Esta acción eliminará el comprobante actual de manera permanente. ¿Deseas continuar?',
+      message: 'Esta acción eliminará el comprobante actual. ¿Deseas continuar?',
       autoClose: false,
       buttons: [
         { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
@@ -1627,34 +1789,15 @@ this.navbar.cuposInfo.set(null);
           onClick: () => {
             this.navbar.alert.set(null);
 
-            if (idReserva && Number.isFinite(idPago) && idPago > 0) {
-              this.reservasSvc.eliminarComprobantePagoReserva(idReserva, idPago).subscribe({
-                next: () => {
-                  this.clearComprobanteLocalState();
-                  this.navbar.alert.set({
-                    type: 'success',
-                    title: 'Comprobante eliminado',
-                    message: 'El comprobante se eliminó correctamente del servidor.',
-                    autoClose: true,
-                  });
-                },
-                error: () => {
-                  this.navbar.alert.set({
-                    type: 'error',
-                    title: 'Error al eliminar',
-                    message: 'No se pudo eliminar el comprobante en el servidor.',
-                    autoClose: true,
-                  });
-                },
-              });
-              return;
+            if (Number.isFinite(idPago) && idPago > 0) {
+              this.comprobantesAEliminar.push(idPago);
             }
 
             this.clearComprobanteLocalState();
             this.navbar.alert.set({
               type: 'info',
               title: 'Comprobante eliminado',
-              message: 'El comprobante fue removido del formulario. Guarda para persistir.',
+              message: 'El comprobante fue removido del formulario. Guarda para persistir los cambios.',
               autoClose: true,
             });
           },
@@ -1685,6 +1828,11 @@ this.navbar.cuposInfo.set(null);
     return `${apiBase}/reservas/comprobante/${encodeURIComponent(fileName)}`;
   }
 
+  ngOnDestroy(): void {
+    if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
+    if (this.navbar?.alert) this.navbar.alert.set(null);
+  }
+
   private resolverEstadoYMotivo(
     pasajeros: Array<any>,
     formaPago: 'Directo' | 'Completo' | 'Abono',
@@ -1707,3 +1855,4 @@ this.navbar.cuposInfo.set(null);
     return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
   }
 }
+

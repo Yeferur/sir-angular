@@ -5,20 +5,19 @@
 /*========== VARIABLES CSS ==========*/
 :root {
   /* DARK THEME (por defecto) */
-  --primary-bg: #1b1b1b;
-  --secondary-bg: #141414;
-  --hover-bg: #5ec6e9;
-  --card-bg: rgba(27, 27, 27, 0.9);
-  --border-color: rgba(255, 255, 255, 0.1);
-  --input-bg: rgb(42, 42, 42);
+  --primary-bg: #1b1b1b; /* DEPRECATED – usar --bg-primary */
+  --secondary-bg: #141414; /* DEPRECATED – usar --bg-secondary */
+  --hover-bg: #5ec6e9; /* DEPRECATED – usar --accent-blue */
+  --card-bg: rgba(27, 27, 27, 0.9); /* DEPRECATED – usar --bg-secondary */
+  --border-color: rgba(255, 255, 255, 0.1); /* DEPRECATED – usar --separator-color */
+  --input-bg: rgb(42, 42, 42); /* DEPRECATED – usar --bg-tertiary */
 
-  --text-color: #eaeaea;
-  --font-color: #e0e0e0;
-  --font-color-hover: #ff6666;
-  --accent: #5ec6e9;
-  --label-color: #b0b0b0;
+  --text-color: #eaeaea; /* DEPRECATED – usar --text-primary */
+  --font-color: #e0e0e0; /* DEPRECATED */
+  --font-color-hover: #ff6666; /* DEPRECATED */
+  --accent: #5ec6e9; /* DEPRECATED – usar --accent-blue */
+  --label-color: #b0b0b0; /* DEPRECATED – usar --text-secondary */
 
-  --text-secondary: rgba(255, 255, 255, 0.85);
   --button-bg: #2e3032;
   --button-text: #ffffff;
   --button-hover-bg: #3b3e40;
@@ -76,6 +75,24 @@
 
   --separator-color: #38383a;
   --shadow-color: rgba(0, 0, 0, 0.2);
+
+  /* Escala de Radios */
+  --radius-sm: 8px;     /* Botones pequeños, tags */
+  --radius-md: 12px;    /* Inputs, botones principales, tarjetas pequeñas */
+  --radius-lg: 16px;    /* Tarjetas medianas, modales */
+  --radius-xl: 20px;    /* Tarjetas principales (cards de layout) */
+  --radius-pill: 999px; /* Badges, pastillas */
+
+  /* Escala de Z-Index */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 500;
+  --z-navbar: 900;
+  --z-sidebar: 1000;
+  --z-toast: 1200;
+  --z-modal: 1500;
+  --z-loading: 2000;
+  --z-datepicker: 8000;
 }
 
 /* MODO CLARO */
@@ -171,6 +188,53 @@ body {
   padding: 20px 20px 20px 120px;
   padding-top: 70px;
   overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.loading-state .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--bg-tertiary);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+.loading-state p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 
@@ -295,7 +359,7 @@ textarea.form-input {
   color: #ff6b6b;
   padding: 1rem;
   border: 1px solid #ff6b6b;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   text-align: center;
   margin-top: 1rem;
 }
@@ -315,7 +379,7 @@ textarea.form-input {
       rgba(75, 68, 188, 0.9));
   color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 12px 20px;
   font-size: 16px;
   cursor: pointer;
@@ -348,7 +412,7 @@ textarea.form-input {
 .dropdownButton {
   background-color: var(--dropdown-bg);
   border: 1px solid var(--dropdown-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px;
   color: var(--dropdown-text);
   font-size: 14px;
@@ -367,7 +431,7 @@ textarea.form-input {
   position: absolute;
   background-color: var(--dropdown-bg);
   border: 1px solid var(--dropdown-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px;
   z-index: 10;
   max-height: 200px;
@@ -426,7 +490,7 @@ textarea.form-input {
   color: var(--toggle-text);
   background-color: var(--toggle-bg);
   border: 1px solid var(--dropdown-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -451,7 +515,7 @@ textarea.form-input {
   margin-top: 30px;
   padding: 24px;
   background-color: #1b1b1b;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.6);
   color: #ffffff;
 }
@@ -492,6 +556,57 @@ textarea.form-input {
   margin-top: 16px;
 }
 
+/* ============================================================
+   ESTADOS GLOBALES: VACÍO Y CARGA
+   ============================================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  border: 2px dashed var(--separator-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  margin: 20px 0;
+}
+
+.empty-state h3 {
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.empty-state p {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--separator-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Listas */
 .lista {
   list-style: none;
@@ -504,7 +619,7 @@ textarea.form-input {
   background: #333;
   padding: 12px;
   margin-bottom: 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
   cursor: grab;
   transition: transform 0.2s, background 0.3s;
@@ -538,7 +653,7 @@ textarea.form-input {
   flex-direction: column;
   background: #1b1b1b;
   /* Fondo acorde al diseño */
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
   border: 1px solid #282828;
 }
@@ -551,7 +666,7 @@ textarea.form-input {
   flex-direction: column;
   background: #1b1b1b;
   /* Mismo fondo que el de los puntos */
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
   border: 1px solid #282828;
   height: 100%;
@@ -624,17 +739,16 @@ input[type=number] {
 input.form-input.flatpickr-input,
 input.form-input.flatpickr-input[readonly],
 .flatpickr-input[readonly] {
-  width: 100%;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--separator-color);
-  border-radius: 10px;
-  padding: 12px 14px;
+    background-color: var(--bg-tertiary);
+  border: 1.5px solid var(--separator-color);
+  border-radius: 12px;
+  padding: 10px 13px;
   font-size: 1rem;
   font-family: var(--font-family);
-  color: var(--text-primary);
+  width: 100%;
   box-sizing: border-box;
-  cursor: pointer;
-  transition: border-color .2s ease, background-color .2s ease;
+  color: var(--text-primary);
+  transition: border-color .2s, background-color .2s;
 }
 
 input.form-input.flatpickr-input:focus {
@@ -660,7 +774,7 @@ input.form-input.flatpickr-input:disabled {
 .sir-flatpickr.flatpickr-calendar {
   background: var(--bg-secondary) !important;
   border: 1px solid var(--separator-color) !important;
-  border-radius: 16px !important;
+  border-radius: var(--radius-lg) !important;
   box-shadow: 0 18px 55px var(--shadow-color) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -670,7 +784,7 @@ input.form-input.flatpickr-input:disabled {
   width: min(360px, calc(100vw - 24px)) !important;
   max-width: 360px !important;
   overflow: hidden !important;
-  z-index: 8000 !important;
+  z-index: var(--z-datepicker) !important;
 }
 
 .sir-flatpickr.flatpickr-calendar:before,
@@ -825,7 +939,7 @@ input.form-input.flatpickr-input:disabled {
   max-width: 38px;
   height: 38px;
   line-height: 38px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: .9rem;
   font-weight: 650;
   color: var(--text-primary) !important;
@@ -885,7 +999,7 @@ input.form-input.flatpickr-input:disabled {
   border: 1px solid var(--separator-color) !important;
   color: var(--text-primary) !important;
   padding: 6px 8px !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 .sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months option,
@@ -998,7 +1112,7 @@ input.form-input.flatpickr-input:disabled {
   white-space: nowrap !important;
   background: rgba(255, 255, 255, .04);
   border: 1px solid rgba(255, 255, 255, .06);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   font-size: 1.05rem;
   font-weight: 700;

@@ -1,36 +1,32 @@
-<!-- 
-  ========================================
-  PLANTILLA DE DYNAMIC NAVBAR ACTUALIZADA
-  ========================================
-  Añadido el ng-container para mostrar el componente
-  de login cuando el modo sea 'login'.
--->
 <div class="navbar-container" [attr.data-state]="islandState()">
-    <!-- Barras laterales (sin cambios) -->
     <div class="sidebar-widget left">
         <a routerLink="/Reservas/VerReservas" class="quick-button">Ver Reservas</a>
         <a routerLink="/Reservas/NuevaReserva" class="quick-button">Crear Reserva</a>
     </div>
 
-    <!-- La Dynamic Island Central -->
-    <div class="dynamic-island">
+    <div class="dynamic-island"
+         [attr.role]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'dialog' : null"
+         [attr.aria-modal]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'true' : null"
+         [attr.aria-label]="islandState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'sugerencias' ? 'Sugerencias' : islandState() === 'panel' ? 'Panel' : null">
         <div class="island-content">
-            <!-- Estado Compacto (Logo) -->
             @if (islandState() === 'compact') {
             <div class="activity-content">
                 <img [src]="isDarkMode ? 'assets/img/LogoMaxitoursPNG.webp' : 'assets/img/LogoMaxitours-Light.webp'"
-                    alt="Logo" class="logo">
+                    alt="Logo Maxitours" 
+                    width="91" 
+                    height="34" 
+                    fetchpriority="high"
+                    decoding="async"
+                    class="logo">
             </div>
             }
 
-            <!-- Contenido de Login -->
             @if (islandState() === 'full-screen' && mode() === 'login') {
             <div class="activity-content">
                 <app-login> </app-login>
             </div>
             }
 
-            <!-- Contenido de Alerta -->
             @if (islandState() === 'alert' || (islandState() === 'loading' && alert())) {
             <div class="activity-content">
                 <app-alert-content [type]="alert()?.type || 'info'" [title]="alert()?.title || ''"
@@ -41,7 +37,6 @@
             </div>
             }
 
-            <!-- Contenido de Cupos -->
             @if (islandState() === 'cupos' && cuposInfo()) {
             <div class="activity-content">
                 <app-cupos-widget [cuposInfo]="cuposInfo()"></app-cupos-widget>
@@ -53,14 +48,18 @@
             </div>
             }
 
+            @if (islandState() === 'transfer' && transfer()) {
+            <div class="activity-content">
+                <app-transfer-dynamic [Id_Transfer]="transfer()" (onClose)="clearTransfer()" />
+            </div>
+            }
+
             @if (islandState() === 'mapa' && mapa()) {
             <div class="activity-content">
                 <app-mapa [puntos]="mapa()" (onClose)="clearPuntos()" />
             </div>
             }
-            <!-- Otros contenidos como Reserva, Mapa, etc. -->
 
-            <!-- Contenido de Combinaciones -->
             @if (islandState() === 'sugerencias' && sugerencias()) {
             <div class="activity-content">
                 <app-combinaciones [tour]="sugerencias()?.tour" [sugerencias]="sugerencias()?.sugerencias"
@@ -70,14 +69,12 @@
             </div>
             }
 
-            <!-- Contenido de Preview (comprobante u otros recursos) -->
             @if (islandState() === 'preview' && preview()) {
             <div class="activity-content">
                 <app-preview [rawUrl]="preview()" [title]="previewTitle()"></app-preview>
             </div>
             }
 
-            <!-- Contenido de Paneles personalizados (ej: duplicar reserva) -->
             @if (panel() && panel().open) {
             <div class="activity-content">
                 @if (panel().id === 'duplicar') {
@@ -90,11 +87,10 @@
     </div>
 
     <div class="sidebar-widget right">
-        <!-- Otros accesos rápidos -->
     </div>
 
     <div class="toast-viewport" aria-live="polite" aria-atomic="true">
-        @for (toast of toasts(); track toast.id) {
+        @for (toast of toastsList(); track toast.id) {
         <div class="toast-item" [attr.data-type]="toast.type">
             <div class="toast-body">
                 <strong class="toast-title">{{ toast.title }}</strong>
@@ -102,7 +98,7 @@
                 <p class="toast-message">{{ toast.message }}</p>
                 }
             </div>
-            <button type="button" class="toast-close" (click)="dismissToast(toast.id)" aria-label="Cerrar notificacion">
+            <button type="button" class="toast-close" (click)="dismissToast(toast.id)" aria-label="Cerrar notificación">
                 ×
             </button>
         </div>

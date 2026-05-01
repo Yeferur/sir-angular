@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
 
@@ -13,7 +13,7 @@ import { PermisoDirective } from '../shared/directives/permiso.directive';
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, PermisoDirective, CommonModule],
+  imports: [RouterLink, RouterLinkActive, PermisoDirective, CommonModule],
   styleUrl: './layout.css',
   templateUrl: './layout.html',
 })
@@ -68,7 +68,10 @@ export class layout implements OnInit {
       // 3.2) Mantener avatar sincronizado al navegar entre rutas
       this.router.events
         .pipe(filter((event) => event instanceof NavigationEnd))
-        .subscribe(() => this.refreshAvatar());
+        .subscribe(() => {
+          this.refreshAvatar();
+          this.resetNavbarStates(); // Limpieza automática en CADA navegación
+        });
 
       await this.permisosService.loadSessionData();
 
@@ -128,11 +131,19 @@ export class layout implements OnInit {
   // -----------------------
   // Helpers
   // -----------------------
-  private resetNavbarStates() {
+private resetNavbarStates() {
+  const currentAlert = this.navbar?.alert?.();
+
+  if (!currentAlert?.loading) {
     this.navbar?.alert?.set(null);
-    this.navbar?.cuposInfo?.set(null);
-    this.navbar?.Id_Reserva?.set(null);
   }
+
+  this.navbar?.cuposInfo?.set(null);
+  this.navbar?.Id_Reserva?.set(null);
+
+  if (this.navbar?.Id_Transfer) this.navbar.Id_Transfer.set(null);
+  if (this.navbar?.puntos) this.navbar.puntos.set(null);
+}
 
   private refreshAvatar(): void {
     this.usuariosService.getMiPerfil().subscribe({

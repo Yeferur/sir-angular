@@ -1,4 +1,5 @@
 import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { finalize } from 'rxjs';
 
 import { Reservas, Tour } from '../../../services/Reservas/reservas';
 import { Tours } from '../../../services/Tours/tours';
@@ -42,12 +43,11 @@ export class VerToursComponent implements OnInit {
 
     loadTours() {
         this.isLoading.set(true);
-        this.navbar.alert.set({
-            title: 'Cargando tours...',
-            loading: true,
-            autoClose: false
-        });
-        this.reservasService.getTours().subscribe({
+        this.reservasService.getTours().pipe(
+            finalize(() => {
+                this.isLoading.set(false);
+            })
+        ).subscribe({
             next: (data) => {
                 queueMicrotask(() => this.tours.set(data || []));
             },
@@ -61,7 +61,6 @@ export class VerToursComponent implements OnInit {
             },
             complete: () => {
                 queueMicrotask(() => {
-                    this.isLoading.set(false);
                     this.navbar.alert.set(null);
                 });
             }

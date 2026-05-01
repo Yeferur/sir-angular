@@ -507,6 +507,22 @@ async function obtenerReserva(Id_Reserva) {
       r.Nombre_Reportante,
       r.Placa_Bus,
       r.Orden_Ruta,
+      COALESCE((
+        SELECT SUM(COALESCE(px.Precio_Pasajero, 0))
+        FROM pasajeros px
+        WHERE px.Id_Reserva = r.Id_Reserva
+      ), 0) AS TotalNeto,
+      (
+        COALESCE((
+          SELECT SUM(COALESCE(px.Precio_Pasajero, 0))
+          FROM pasajeros px
+          WHERE px.Id_Reserva = r.Id_Reserva
+        ), 0) - COALESCE((
+          SELECT SUM(pr.Monto)
+          FROM pagos_reservas pr
+          WHERE pr.Id_Reserva = r.Id_Reserva
+        ), 0)
+      ) AS Pendiente,
       t.Nombre_Tour,
       c.Nombre_Canal,
       h.Hora_Salida,
@@ -590,6 +606,8 @@ async function obtenerReserva(Id_Reserva) {
     Id_Reserva: cab.Id_Reserva,
     Estado: cab.Estado || 'Pendiente',
     NumeroPasajeros: Pasajeros.length,
+    TotalNeto: Number(cab.TotalNeto || 0),
+    Pendiente: Number(cab.Pendiente || 0),
     TourReserva: cab.Nombre_Tour || '',
     PuntoEncuentro: cab.PuntoEncuentro || '',
     FechaReserva: cab.Fecha_Tour,

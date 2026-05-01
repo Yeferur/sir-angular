@@ -1,5 +1,112 @@
-@if (!isLoading()) {
+@if (isLoading()) {
+<div class="skeleton-page booking-dashboard">
+
+  <div class="page-header">
+    <div>
+      <div class="sk-line sk-title"></div>
+      <div class="sk-line sk-subtitle"></div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- Card: Nuevo Transfer skeleton -->
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group full-width">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-textarea"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card: Responsable skeleton -->
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card: Valor skeleton -->
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- Floating summary skeleton -->
+<div class="floating-summary" data-state="compact" style="pointer-events:none">
+  <div class="summary-collapsed">
+    <div class="summary-left">
+      <div class="sk-field sk-summary-badge"></div>
+      <div class="sk-line sk-summary-meta"></div>
+    </div>
+  </div>
+</div>
+} @else {
 <div class="booking-dashboard" [formGroup]="form">
+  <div class="page-header">
+    <div>
+      <h1>Nuevo Transfer</h1>
+      <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
+    </div>
+  </div>
   <div class="main-content">
 
     <!-- DETALLES DEL SERVICIO -->
@@ -34,14 +141,19 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label">DNI / Pasaporte</label>
+          <input type="text" formControlName="DNI" class="form-input" />
+        </div>
+
+        <div class="form-group">
           <label class="form-label">
             Rango de pasajeros <span class="required-star">*</span>
           </label>
           <select formControlName="Rango" class="form-select"
             [ngClass]="form.get('Rango')?.touched && form.get('Rango')?.invalid ? 'errorInput' : ''">
             <option value="Seleccionar" disabled>SELECCIONAR</option>
-            @for (rango of resultsRangos; track rango.id) {
-            <option [value]="rango.id">{{ rango.Descripcion }} ({{ rango.Minimo }}-{{ rango.Maximo }} pax)</option>
+            @for (rango of resultsRangos; track rango.Id_Rango ?? rango.id) {
+            <option [value]="rango.Id_Rango ?? rango.id">{{ rango.Descripcion }} ({{ rango.Minimo }}-{{ rango.Maximo }} pax)</option>
             }
           </select>
           @if (form.get('Rango')?.touched && form.get('Rango')?.invalid) {
@@ -56,8 +168,8 @@
           <select formControlName="TipoServicio" class="form-select"
             [ngClass]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'errorInput' : ''">
             <option value="Seleccionar" disabled>SELECCIONAR</option>
-            @for (servicio of resultsServicioTransfer; track servicio.id) {
-            <option [value]="servicio.id">{{ servicio.Servicio }}</option>
+            @for (servicio of resultsServicioTransfer; track servicio.Id_Servicio ?? servicio.id) {
+            <option [value]="servicio.Id_Servicio ?? servicio.id">{{ servicio.Servicio }}</option>
             }
           </select>
           @if (form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid) {
@@ -66,7 +178,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Punto de salida</label>
+          <label class="form-label">Punto de salida <span class="required-star">*</span></label>
           <input type="text" formControlName="Salida" class="form-input"
             [ngClass]="form.get('Salida')?.touched && form.get('Salida')?.invalid ? 'errorInput' : ''" />
           @if (form.get('Salida')?.touched && form.get('Salida')?.invalid) {
@@ -75,7 +187,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Punto de llegada</label>
+          <label class="form-label">Punto de llegada <span class="required-star">*</span></label>
           <input type="text" formControlName="Llegada" class="form-input"
             [ngClass]="form.get('Llegada')?.touched && form.get('Llegada')?.invalid ? 'errorInput' : ''" />
           @if (form.get('Llegada')?.touched && form.get('Llegada')?.invalid) {
@@ -95,7 +207,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Tipo de vuelo</label>
+          <label class="form-label">Tipo de vuelo <span class="required-star">*</span></label>
           <select formControlName="TipoVuelo" class="form-select"
             [ngClass]="form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid ? 'errorInput' : ''">
             <option value="" selected disabled>Seleccionar</option>
@@ -126,11 +238,11 @@
           <input type="text" formControlName="Hora" class="form-input" />
         </div>
 
-      </div>
+        <div class="form-group full-width">
+          <label class="form-label">Observaciones</label>
+          <textarea formControlName="Observaciones" class="form-input" rows="3"></textarea>
+        </div>
 
-      <div class="form-group full-width">
-        <label class="form-label">Observaciones</label>
-        <textarea formControlName="Observaciones" class="form-input" rows="3"></textarea>
       </div>
     </div>
 
@@ -185,6 +297,117 @@
             }
           </select>
         </div>
+      </div>
+    </div>
+
+    <!-- PAGO -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Pago</h2>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label class="form-label">Tipo de pago</label>
+          <select formControlName="TipoPago" class="form-select">
+            <option value="PagaEnPunto">Paga en el punto</option>
+            <option value="Completo">Ya pagó</option>
+            <option value="Abonos">Abonos</option>
+          </select>
+        </div>
+
+        @if (form.get('TipoPago')?.value === 'Completo') {
+        <div class="form-group full-width">
+          <label class="form-label">Comprobante de pago</label>
+          <div class="file-upload-group">
+            <div class="file-input-wrapper">
+              <input type="file"
+                     id="file-pago-completo"
+                     (change)="onPagoCompletoFileSelected($event)"
+                     accept=".jpg,.jpeg,.png,.pdf"
+                     class="file-input" />
+              <label for="file-pago-completo" class="file-label">
+                📎 Seleccionar archivo
+              </label>
+            </div>
+            @if (pagoPagadoFileName) {
+            <div class="file-selected">
+              <span class="file-name">✓ {{ pagoPagadoFileName }}</span>
+              <button type="button"
+                      (click)="clearPagoCompletoFile()"
+                      class="btn-remove-file">✕</button>
+            </div>
+            } @else {
+            <div class="file-info">Sin archivo seleccionado</div>
+            }
+          </div>
+        </div>
+        }
+
+        @if (form.get('TipoPago')?.value === 'Abonos') {
+        <div class="form-group full-width">
+          <h3>Abonos</h3>
+          <div formArrayName="Abonos" class="abonos-list">
+            <div *ngFor="let abono of abonos.controls; let i = index" [formGroupName]="i" class="abono-item">
+              <div class="abono-fields">
+                <input type="number"
+                       formControlName="Monto"
+                       placeholder="Monto"
+                       class="form-input" />
+                <input type="text"
+                       formControlName="Observaciones"
+                       placeholder="Observaciones (opcional)"
+                       class="form-input" />
+                <input type="date"
+                       formControlName="Fecha_Pago"
+                       class="form-input" />
+                <button type="button"
+                        (click)="removeAbono(i)"
+                        class="btn-remove">
+                  ✕
+                </button>
+              </div>
+
+              <!-- Comprobante para abono -->
+              <div class="abono-file-upload">
+                <div class="file-upload-group">
+                  <div class="file-input-wrapper">
+                    <input type="file"
+                           [id]="'file-abono-' + i"
+                           (change)="onAbonoFileSelected($event, i)"
+                           accept=".jpg,.jpeg,.png,.pdf"
+                           class="file-input" />
+                    <label [for]="'file-abono-' + i" class="file-label">
+                      📎 Comprobante
+                    </label>
+                  </div>
+                  @if (getAbonoFileName(i)) {
+                  <div class="file-selected">
+                    <span class="file-name">✓ {{ getAbonoFileName(i) }}</span>
+                    <button type="button"
+                            (click)="clearAbonoFile(i)"
+                            class="btn-remove-file">✕</button>
+                  </div>
+                  } @else {
+                  <div class="file-info">Sin archivo</div>
+                  }
+                </div>
+              </div>
+
+              <div class="abono-errors">
+                <div class="errorMessage" *ngIf="abono.get('Monto')?.touched && abono.get('Monto')?.invalid">
+                  Monto debe ser mayor a 0.
+                </div>
+              </div>
+            </div>
+          </div>
+          <button type="button"
+                  (click)="addAbono()"
+                  class="btn-secondary">
+            + Agregar Abono
+          </button>
+        </div>
+        }
       </div>
     </div>
 
@@ -249,6 +472,21 @@
           <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
         </div>
 
+        <div class="summary-item">
+          <label class="form-label">Tipo de Pago</label>
+          <span class="summary-value">{{ form.get('TipoPago')?.value || '—' }}</span>
+        </div>
+
+        @if (form.get('TipoPago')?.value === 'Abonos') {
+        <div class="summary-item">
+          <label class="form-label">Total Abonado</label>
+          <span class="summary-value">{{ getTotalAbonado() | number:'1.2-2' }}</span>
+        </div>
+        <div class="summary-item">
+          <label class="form-label">Pendiente</label>
+          <span class="summary-value">{{ getPendiente() | number:'1.2-2' }}</span>
+        </div>
+        }
 
         <div class="summary-item total-row">
           <label class="form-label">Valor</label>

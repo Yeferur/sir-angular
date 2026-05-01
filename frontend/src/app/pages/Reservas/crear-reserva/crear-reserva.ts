@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, inject, signal, computed, ViewChild, NgZone, DestroyRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, ViewChild, NgZone, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
@@ -22,7 +22,7 @@ import { TourRulesService } from '../../../services/Reservas/tour-rules.service'
   templateUrl: './crear-reserva.html',
   styleUrls: ['./crear-reserva.css'],
 })
-export class CrearReservaComponent implements OnInit {
+export class CrearReservaComponent implements OnInit, OnDestroy {
   openSummary = false;
   showDuplicate = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
@@ -40,11 +40,14 @@ export class CrearReservaComponent implements OnInit {
   private navbar = inject(DynamicIslandGlobalService);
   private zone = inject(NgZone);
   private destroyRef = inject(DestroyRef);
-  private tourRules = inject(TourRulesService);
+  tourRules = inject(TourRulesService);
 
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
   form!: FormGroup;
+
+  // Exponemos Number al template para usarlo en @if
+  Number = Number;
 
   // catálogos
   tours = signal<Tour[]>([]);
@@ -136,6 +139,10 @@ export class CrearReservaComponent implements OnInit {
     }
     return mensajes.join(' ');
   });
+
+  tieneConflictoLogisticoActual(): boolean {
+    return this.tieneConflictoLogistico();
+  }
 
   private normalizarRutaLogistica(ruta: unknown): string {
     return String(ruta ?? '').trim().toUpperCase();
@@ -347,6 +354,14 @@ export class CrearReservaComponent implements OnInit {
       Abonos: this.fb.array([]),            // ahora será de grupos {Monto, Comprobante}
       ComisionInternacional: [0],
 
+      // precios y comisiones globales por tipo de pasajero
+      PrecioAdulto: [0, [Validators.min(0)]],
+      PrecioNino: [0, [Validators.min(0)]],
+      PrecioInfante: [0, [Validators.min(0)]],
+      ComisionAdulto: [0],
+      ComisionNino: [0],
+      ComisionInfante: [0],
+
       // punto principal
       Id_Punto: [null, Validators.required],
 
@@ -356,32 +371,27 @@ export class CrearReservaComponent implements OnInit {
     this.wsService.messages$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((msg: any) => {
-      this.zone.run(() => {
-        const fecha = this.form.get('Fecha_Tour')?.value;
-        const tour = this.form.get('SelectTour')?.value;
+        this.zone.run(() => {
+          const fecha = this.form.get('Fecha_Tour')?.value;
+          const tour = this.form.get('SelectTour')?.value;
 
-        // Reservas que afectan cupos del tour/fecha actual
-        if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
-          this.CuposDisponiblesNavbar();
-          this.verificarCuposDisponibles();
-        }
-
-        // Cambios de aforo del tour actual (si el evento trae fecha, intenta matchear)
-        if (msg?.type === 'aforoActualizado' && msg?.Id_Tour == tour) {
-          if (!msg?.Fecha || msg.Fecha === fecha) {
+          // Reservas que afectan cupos del tour/fecha actual
+          if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
             this.CuposDisponiblesNavbar();
             this.verificarCuposDisponibles();
           }
-        }
+
+          // Cambios de aforo del tour actual (si el evento trae fecha, intenta matchear)
+          if (msg?.type === 'aforoActualizado' && msg?.Id_Tour == tour) {
+            if (!msg?.Fecha || msg.Fecha === fecha) {
+              this.CuposDisponiblesNavbar();
+              this.verificarCuposDisponibles();
+            }
+          }
+        });
       });
-    });
     try {
       this.isLoading.set(true);
-      this.navbar.alert.set({
-        title: 'Cargando datos...',
-        loading: true,
-        autoClose: false,
-      });
       const [tours, canales, monedas] = await Promise.all([
         firstValueFrom(this.reservasSvc.getTours()),
         firstValueFrom(this.reservasSvc.getCanales()),
@@ -402,7 +412,6 @@ export class CrearReservaComponent implements OnInit {
         ],
       });
     } finally {
-      this.navbar.alert.set(null);
       this.isLoading.set(false);
       this.cdr.markForCheck();
     }
@@ -545,7 +554,6 @@ export class CrearReservaComponent implements OnInit {
       this.recalcularComisionesPorCanal();
       await this.fijarHorarioAutomatico();
       await this.onPlanMonedaChange(true);
-      this.autollenarPrecios();
       this.recalcularTotales();
 
       // ===== Obtener disponibilidad y configurar datepicker =====
@@ -588,21 +596,21 @@ export class CrearReservaComponent implements OnInit {
         this.navbar.alert.set({
           type: 'info',
           title: 'Política de Niños e Infantes',
-          message: 'En Hacienda Nápoles, los niños ≥5 van como ADULTOS y los infantes >1 año como NIÑOS.',
+          message: 'En Hacienda Nápoles, los niños mayores de 5 años van como ADULTOS y los infantes mayores de 1 año como NIÑOS.',
           autoClose: true,
         });
       } else if (infantes > 0) {
         this.navbar.alert.set({
           type: 'info',
           title: 'Política de Infantes',
-          message: 'En Hacienda Nápoles, los infantes >1 año deben ser NIÑOS.',
+          message: 'En Hacienda Nápoles, los infantes mayores de 1 año deben ser NIÑOS.',
           autoClose: true,
         });
       } else if (ninos > 0) {
         this.navbar.alert.set({
           type: 'info',
           title: 'Política de Niños',
-          message: 'En Hacienda Nápoles, niños ≥5 años deben ir como ADULTOS.',
+          message: 'En Hacienda Nápoles, niños mayores de 5 años deben ir como ADULTOS.',
           autoClose: true,
         });
       }
@@ -653,11 +661,33 @@ export class CrearReservaComponent implements OnInit {
   private countByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
     return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
   }
+  private precioControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
+    switch (tipo) {
+      case 'ADULTO': return 'PrecioAdulto';
+      case 'NINO': return 'PrecioNino';
+      case 'INFANTE': return 'PrecioInfante';
+    }
+  }
+
+  private comisionControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
+    switch (tipo) {
+      case 'ADULTO': return 'ComisionAdulto';
+      case 'NINO': return 'ComisionNino';
+      case 'INFANTE': return 'ComisionInfante';
+    }
+  }
+
+  private precioGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+    return Number(this.form.get(this.precioControlPorTipo(tipo))?.value || 0);
+  }
+
+  private comisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+    return Number(this.form.get(this.comisionControlPorTipo(tipo))?.value || 0);
+  }
   private removeInfantes(): void {
     for (let i = this.pasajeros.length - 1; i >= 0; i--) {
       if (this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value === 'INFANTE') this.pasajeros.removeAt(i);
     }
-    this.autollenarPrecios();
     this.recalcularTotales();
   }
 
@@ -665,7 +695,12 @@ export class CrearReservaComponent implements OnInit {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
     if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
 
-    const principalPunto = this.form.get('Id_Punto')?.value ?? null;
+    // Usar el primer punto seleccionado (punto principal)
+    const principalPunto = this.puntosSeleccionados()[0]?.Id_Punto ?? null;
+
+    // Obtener precio y comisión del control global correspondiente
+    const precioInicial = this.precioGlobalPorTipo(tipo);
+    const comisionInicial = this.comisionGlobalPorTipo(tipo);
 
     const fg = this.fb.group({
       Tipo_Pasajero: [tipo, Validators.required],
@@ -675,8 +710,8 @@ export class CrearReservaComponent implements OnInit {
       Id_Punto: [principalPunto],
       Confirmacion: [false],
       PrecioRef: [0],
-      Precio_Pasajero: [0, [Validators.min(0)]],
-      Comision: [0],
+      Precio_Pasajero: [precioInicial, [Validators.min(0)]],
+      Comision: [comisionInicial],
     });
 
     fg.get('DNI')?.valueChanges
@@ -686,9 +721,9 @@ export class CrearReservaComponent implements OnInit {
         switchMap((dni: string) => {
           if (!dni || dni.trim().length < 3) {
             const ctrl = fg.get('DNI');
-            if (ctrl?.errors?.['duplicated']) {
+            if (ctrl?.errors?.['duplicadoEnBd']) {
               const errs = { ...ctrl.errors };
-              delete errs['duplicated'];
+              delete errs['duplicadoEnBd'];
               ctrl.setErrors(Object.keys(errs).length ? errs : null);
             }
             return of(null);
@@ -707,7 +742,7 @@ export class CrearReservaComponent implements OnInit {
         if (resultado.exists && resultado.reserva) {
           if (ctrl) {
             const existing = ctrl.errors ? { ...ctrl.errors } : {};
-            existing['duplicated'] = { reserva: resultado.reserva };
+            existing['duplicadoEnBd'] = { reserva: resultado.reserva };
             ctrl.setErrors(existing);
           }
           const reserva = resultado.reserva;
@@ -725,14 +760,12 @@ export class CrearReservaComponent implements OnInit {
     this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
 
     if (!omitirCalculos) {
-      this.autollenarPrecios();
       this.recalcularTotales();
     }
   }
 
   eliminarPasajero(i: number) {
     this.pasajeros.removeAt(i);
-    this.autollenarPrecios();
     this.recalcularTotales();
   }
 
@@ -756,8 +789,7 @@ export class CrearReservaComponent implements OnInit {
         if (idx >= 0) this.pasajeros.removeAt(idx);
       }
     }
-    
-    this.autollenarPrecios();
+
     this.recalcularTotales();
   }
 
@@ -784,6 +816,15 @@ export class CrearReservaComponent implements OnInit {
       // preciosRef(): { ADULTO: number, NINO: number, INFANTE: number }
       const ref = this.preciosRef();
 
+      this.form.patchValue({
+        PrecioAdulto: Number(ref.ADULTO || 0),
+        PrecioNino: Number(ref.NINO || 0),
+        PrecioInfante: Number(ref.INFANTE || 0),
+        ComisionAdulto: Number(comisiones.ADULTO || 0),
+        ComisionNino: Number(comisiones.NINO || 0),
+        ComisionInfante: 0,
+      }, { emitEvent: false });
+
       for (const ctrl of this.pasajeros.controls) {
         const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
 
@@ -791,19 +832,16 @@ export class CrearReservaComponent implements OnInit {
         const precioTour = ref[tipo] ?? 0;
         ctrl.get('PrecioRef')?.setValue(precioTour, { emitEvent: false });
 
-        // Inicializa Precio_Pasajero SOLO si el usuario no lo tocó
-        if (!ctrl.get('Precio_Pasajero')?.dirty) {
-          // Infante sin costo
-          const inicial = precioTour;
-          ctrl.get('Precio_Pasajero')?.setValue(inicial, { emitEvent: false });
-        }
-
-        // Comisión por pasajero (0 para infantes)
-        const com = tipo === 'INFANTE' ? 0 : (comisiones[tipo] || 0);
-        ctrl.get('Comision')?.setValue(com, { emitEvent: false });
+        ctrl.get('Precio_Pasajero')?.setValue(this.precioGlobalPorTipo(tipo), { emitEvent: false });
+        ctrl.get('Comision')?.setValue(this.comisionGlobalPorTipo(tipo), { emitEvent: false });
       }
     } catch {
       // Si falla, setear comisiones a 0
+      this.form.patchValue({
+        ComisionAdulto: 0,
+        ComisionNino: 0,
+        ComisionInfante: 0,
+      }, { emitEvent: false });
       for (const ctrl of this.pasajeros.controls) {
         ctrl.get('Comision')?.setValue(0, { emitEvent: false });
       }
@@ -953,6 +991,27 @@ export class CrearReservaComponent implements OnInit {
     } catch {
       for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
     }
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Actualiza los precios y comisiones de todos los pasajeros de un tipo específico
+   * basándose en los controles globales (PrecioAdulto, ComisionAdulto, etc.)
+   */
+  actualizarPreciosComisionesPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): void {
+    const precio = this.precioGlobalPorTipo(tipo);
+    const comision = this.comisionGlobalPorTipo(tipo);
+
+    for (const ctrl of this.pasajeros.controls) {
+      if (ctrl.get('Tipo_Pasajero')?.value === tipo) {
+        ctrl.get('Precio_Pasajero')?.setValue(precio, { emitEvent: false });
+        ctrl.get('Comision')?.setValue(comision, { emitEvent: false });
+        ctrl.get('Precio_Pasajero')?.markAsDirty();
+        ctrl.get('Comision')?.markAsDirty();
+      }
+    }
+
+    this.recalcularTotales();
     this.cdr.markForCheck();
   }
 
@@ -1140,9 +1199,9 @@ export class CrearReservaComponent implements OnInit {
     }
 
     // ===== Verificar duplicados por DNI =====
-    const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicated']);
+    const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
     if (dupCtrl) {
-      const dupErr = dupCtrl.get('DNI')?.errors?.['duplicated'];
+      const dupErr = dupCtrl.get('DNI')?.errors?.['duplicadoEnBd'];
       const reserva = dupErr?.reserva;
       const dniVal = dupCtrl.get('DNI')?.value;
       this.navbar.alert.set({
@@ -1322,6 +1381,11 @@ export class CrearReservaComponent implements OnInit {
       return "Debe iniciar con '+' y tener indicativo + exactamente 10 dígitos del número (ej: +573001234567).";
     }
     return 'Teléfono inválido.';
+  }
+
+  ngOnDestroy(): void {
+    if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
+    if (this.navbar?.alert) this.navbar.alert.set(null);
   }
 
 

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\" \"c:/Users/USUARIO/OneDrive/Documentos/Sir-Angular/frontend/src/app/pages/Dashboard/dashboard.css\")",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}

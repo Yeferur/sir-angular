@@ -1,6 +1,6 @@
 /*
   ========================================
-  ESTILOS DE DYNAMIC NAVBAR (PREMIUM ANIMATIONS)
+  ESTILOS DE DYNAMIC NAVBAR (ANIMACIONES)
   ========================================
 */
 :host {
@@ -11,7 +11,7 @@
   z-index: 900;
   display: flex;
   justify-content: center;
-  pointer-events: none; /* Eventos pasan a través del contenedor */
+  pointer-events: none;
 }
 
 .navbar-container {
@@ -38,12 +38,10 @@
   pointer-events: all;
   overflow: hidden;
 
-  /* OPTIMIZACIÓN DE RENDIMIENTO */
   will-change: width, height, border-radius, transform, top;
   transform: translateZ(0); 
   backface-visibility: hidden;
 
-  /* FÍSICA "SNAPPY" (iOS STYLE) */
   transition: 
     width 0.5s cubic-bezier(0.23, 1, 0.32, 1),
     height 0.5s cubic-bezier(0.23, 1, 0.32, 1),
@@ -66,7 +64,6 @@
   justify-content: center;
   align-items: center;
   
-  /* ANIMACIÓN DE ENTRADA (POP) */
   animation: islandContentEnter 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
   opacity: 0;
   transform: scale(0.95);
@@ -86,7 +83,6 @@
   }
 }
 
-/* Alert overlay styles */
 .alert-overlay {
   position: absolute;
   inset: 0;
@@ -102,7 +98,6 @@
 
 /* === ESTADOS DE LA ISLA === */
 
-/* Compacto */
 .navbar-container[data-state="compact"] .dynamic-island {
   width: 180px;
   height: 50px;
@@ -110,15 +105,13 @@
   top: 0;
 }
 
-/* Cupos */
 .navbar-container[data-state="cupos"] .dynamic-island {
   width: clamp(320px, 95vw, 350px);
-  height: 100px;
+  height: 120px;
   border-radius: 30px;
   top: 0;
 }
 
-/* Alerta */
 .navbar-container[data-state="alert"] .dynamic-island {
   width: clamp(320px, 95vw, 500px);
   height: 350px;
@@ -127,7 +120,6 @@
   top: 0;
 }
 
-/* Loading */
 .navbar-container[data-state="loading"] .dynamic-island {
   width: clamp(320px, 95vw, 400px);
   height: 180px;
@@ -136,18 +128,38 @@
   top: 0;
 }
 
-/* Reserva */
 .navbar-container[data-state="reserva"] .dynamic-island {
-  width: clamp(320px, 95vw, 1100px);
+  width: clamp(320px, 95vw, 1000px);
   height: min(95vh, 1000px);
   border-radius: 28px;
   padding: 20px;
   top: 0;
 }
 
-/* Mapa */
+.navbar-container[data-state="transfer"] .dynamic-island {
+  width: clamp(320px, 95vw, 1000px);
+  height: min(95vh, 1000px);
+  border-radius: 28px;
+  padding: 20px;
+  top: 0;
+}
+
+.navbar-container[data-state="transfer"] .island-content {
+  height: 100%;
+}
+
+.navbar-container[data-state="transfer"] .activity-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
 .navbar-container[data-state="mapa"] .dynamic-island {
-  width: clamp(320px, 95vw, 1400px);
+  width: clamp(320px, 95vw, 1000px);
   height: min(95vh, 1000px);
   border-radius: 28px;
   top: 0;
@@ -155,7 +167,6 @@
   flex-direction: column;
 }
 
-/* Full Screen (Login) */
 .navbar-container[data-state="full-screen"] .dynamic-island {
   width: 100vw;
   height: 100vh;
@@ -165,7 +176,6 @@
   border: none;
 }
 
-/* Sugerencias */
 .navbar-container[data-state="sugerencias"] .dynamic-island {
   width: clamp(320px, 95vw, 600px);
   height: min(95vh, 1000px);
@@ -174,7 +184,6 @@
   top: 0;
 }
 
-/* Preview */
 .navbar-container[data-state="preview"] .dynamic-island {
   width: clamp(360px, 90vw, 1100px);
   height: min(85vh, 900px);
@@ -185,7 +194,6 @@
   flex-direction: column;
 }
 
-/* Panel */
 .navbar-container[data-state="panel"] .dynamic-island {
   width: clamp(320px, 95vw, 500px);
   height: 550px;
@@ -327,7 +335,8 @@
 }
 
 .logo {
-  height: 70%;
+  height: 34px;
+  width: auto;
   object-fit: contain;
 }
 

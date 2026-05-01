@@ -1,8 +1,9 @@
-import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
-import { firstValueFrom } from 'rxjs';
+import { finalize, forkJoin, firstValueFrom } from 'rxjs';
 // Importa tus servicios
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
@@ -15,6 +16,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
   styleUrls: ['./ver-reservas.css']
 })
 export class VerReservasComponent implements OnInit {
+  readonly estadoOptions = ['Activo', 'Pendiente', 'Completado', 'Cancelado'];
   mainInputFocused = signal(false);
 private settingFromAutocomplete = false;
 
@@ -114,14 +116,28 @@ seleccionarPuntoAutocomplete(p: any) {
       .join(', ');
   }
 
+  getSelectedCategoriasText(): string {
+    const ids = this.filters().CategoriaReserva;
+    if (!ids?.length) return '';
+    return ids
+      .map(id => {
+        const c = this.resultsCategoria().find(canal => canal.Id_Canal == id);
+        return c ? c.Nombre_Canal : id;
+      })
+      .join(', ');
+  }
+
   private navbar = inject(DynamicIslandGlobalService);
+  private router = inject(Router);
   private reservasService = inject(Reservas);
+  private cdr = inject(ChangeDetectorRef);
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
   reservas = signal<any[]>([]);
   isLoading = signal(true);
-  isLoadingReservas = signal(false);
+  isSearching = signal(false);
+  hasSearched = signal(false);
   filtersApplied = signal(false);
 
   advancedFiltersVisible = signal(false);
@@ -129,6 +145,9 @@ seleccionarPuntoAutocomplete(p: any) {
   dropdownOpenCategoria = signal(false);
   dropdownOpenTour = signal(false);
   dropdownOpenEstado = signal(false);
+
+  @ViewChild('fechaReservaFp') fechaReservaFp?: FlatpickrInputDirective;
+  @ViewChild('fechaRegistroFp') fechaRegistroFp?: FlatpickrInputDirective;
 
   filters = signal({
     FechaReserva: '',
@@ -141,6 +160,13 @@ seleccionarPuntoAutocomplete(p: any) {
     Punto: '',
     Estado: [] as string[],
     Empty: false,
+  });
+
+  private readonly refreshEffect = effect(() => {
+    const entity = this.navbar.needsRefresh();
+    if (entity === 'reservas') {
+      this.listar();
+    }
   });
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
@@ -283,13 +309,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   ngOnInit(): void {
     this.loadInitialData();
-
-    effect(() => {
-      const entity = this.navbar.needsRefresh();
-      if (entity === 'reservas') {
-        this.listar();
-      }
-    });
   }
 
   listar() {
@@ -298,33 +317,115 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     }
   }
 
+  crearReserva() {
+    this.router.navigate(['/Reservas/NuevaReserva']);
+  }
+
+  clearFechaReserva(): void {
+    this.updateFilter('FechaReserva', '');
+    this.fechaReservaFp?.instance?.clear();
+    this.cdr.markForCheck();
+  }
+
+  clearFechaRegistro(): void {
+    this.updateFilter('FechaRegistro', '');
+    this.fechaRegistroFp?.instance?.clear();
+    this.cdr.markForCheck();
+  }
+
   loadInitialData() {
     this.isLoading.set(true);
-    try {
-      this.reservasService.getTours().subscribe({
-        next: (tours) => this.resultsTours.set(tours),
-        error: (error) => console.error('Error al cargar tours:', error)
-      });
-      this.reservasService.getCanales().subscribe({
-        next: (categorias) => this.resultsCategoria.set(categorias),
-        error: (error) => console.error('Error al cargar categorías:', error)
-      });
-    } catch (error) {
-    } finally {
-      this.isLoading.set(false);
-    }
+    forkJoin({
+      tours: this.reservasService.getTours(),
+      categorias: this.reservasService.getCanales(),
+    }).pipe(
+      finalize(() => {
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: ({ tours, categorias }) => {
+        this.resultsTours.set(tours || []);
+        this.resultsCategoria.set(categorias || []);
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        console.error('Error al cargar catálogos:', error);
+        this.resultsTours.set([]);
+        this.resultsCategoria.set([]);
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update((prev) => ({ ...prev, [key]: value }));
   }
 
+  toggleDropdown(name: 'tour' | 'categoria' | 'estado') {
+    this.dropdownOpenTour.set(name === 'tour' ? !this.dropdownOpenTour() : false);
+    this.dropdownOpenCategoria.set(name === 'categoria' ? !this.dropdownOpenCategoria() : false);
+    this.dropdownOpenEstado.set(name === 'estado' ? !this.dropdownOpenEstado() : false);
+  }
+
+  isSelected(filterKey: 'CategoriaReserva' | 'tour' | 'Estado', value: any): boolean {
+    const selectedValues = this.filters()[filterKey] as any[];
+    if (!selectedValues?.length) return false;
+
+    if (filterKey === 'CategoriaReserva' || filterKey === 'tour') {
+      return selectedValues.includes(typeof value === 'string' ? Number(value) : value);
+    }
+
+    return selectedValues.includes(String(value));
+  }
+
+  clearMultiFilter(filterKey: 'CategoriaReserva' | 'tour' | 'Estado'): void {
+    this.updateFilter(filterKey, []);
+  }
+
+  getMultiFilterLabel(filterKey: 'CategoriaReserva' | 'tour' | 'Estado'): string {
+    const selectedCount = (this.filters()[filterKey] as any[])?.length || 0;
+    if (selectedCount === 0) return 'Todos';
+    if (selectedCount === 1) return '1 seleccionado';
+    return `${selectedCount} seleccionados`;
+  }
+
   toggleSelection(value: any, filterKey: 'CategoriaReserva' | 'tour' | 'Estado') {
+    // Si value es "", limpiar completamente el filtro (equivalente a seleccionar "Todos")
+    if (value === '') {
+      this.updateFilter(filterKey, []);
+      return;
+    }
+
+    // Validar que value no sea null o undefined
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    // Convertir a number para CategoriaReserva y tour, mantener string para Estado
+    let normalizedValue = value;
+    if ((filterKey === 'CategoriaReserva' || filterKey === 'tour') && typeof value === 'string') {
+      normalizedValue = Number(value);
+    }
+
     const current = this.filters()[filterKey] as any[];
-    const updated = current.includes(value)
-      ? current.filter((v) => v !== value)
-      : [...current, value];
+    const updated = current.includes(normalizedValue)
+      ? current.filter((v) => v !== normalizedValue)
+      : [...current, normalizedValue];
     this.updateFilter(filterKey, updated);
+  }
+
+  activeFilterCount(): number {
+    const f = this.filters();
+    let count = 0;
+
+    if (f.FechaReserva) count++;
+    if (f.FechaRegistro) count++;
+    if (f.CategoriaReserva?.length) count++;
+    if (f.tour?.length) count++;
+    if (f.Estado?.length) count++;
+
+    return count;
   }
 
   private buildApiFilters() {
@@ -385,7 +486,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     }
     // Si no hay ningún filtro relevante, no buscar
     if (Object.keys(filtros).length === 0 ||
-      (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour)) {
+      (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal)) {
       this.navbar.alert.set({
         type: 'info',
         title: 'Sin filtros',
@@ -396,12 +497,20 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       this.reservas.set([]);
       return;
     }
-    this.isLoadingReservas.set(true);
+    this.hasSearched.set(true);
+    this.isSearching.set(true);
     this.filtersApplied.set(true);
     this.advancedFiltersVisible.set(false); // Oculta el panel de filtros al buscar
-    this.reservasService.getReservas(filtros).subscribe({
+    this.cdr.markForCheck();
+    this.reservasService.getReservas(filtros).pipe(
+      finalize(() => {
+        this.isSearching.set(false);
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: (data) => {
         this.reservas.set(data);
+        this.cdr.markForCheck();
         if (data.length === 0) {
           this.navbar.alert.set({
             type: 'info',
@@ -422,11 +531,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           autoClose: false
         });
         this.reservas.set([]);
-      },
-      complete: () => {
-        this.isLoadingReservas.set(false);
-        const current = this.navbar.alert();
-        if (current?.loading) this.navbar.alert.set(null);
+        this.cdr.markForCheck();
       }
     });
   }

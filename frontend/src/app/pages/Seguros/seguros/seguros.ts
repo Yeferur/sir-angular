@@ -24,25 +24,32 @@ export class SegurosComponent implements OnInit {
     // Data
     tours: any[] = [];
     seguros: any[] = [];
-    loading: boolean = false;
+    isPageLoading: boolean = false;
+    isSearching: boolean = false;
+    hasSearched: boolean = false;
 
     ngOnInit() {
         this.cargarTours();
-        this.buscar();
     }
 
     cargarTours() {
+        this.isPageLoading = true;
         this.toursService.getTours().subscribe({
             next: (data: any[]) => {
                 this.tours = data;
                 this.cdr.detectChanges();
             },
-            error: (err: any) => console.error('Error cargando tours', err)
+            error: (err: any) => console.error('Error cargando tours', err),
+            complete: () => {
+                this.isPageLoading = false;
+                this.cdr.detectChanges();
+            }
         });
     }
 
     buscar() {
-        this.loading = true;
+        this.hasSearched = true;
+        this.isSearching = true;
         const filtros = {
             Fecha: this.fecha,
             Id_Tour: this.idTour
@@ -51,12 +58,15 @@ export class SegurosComponent implements OnInit {
         this.segurosService.listarSeguros(filtros).subscribe({
             next: (data: any[]) => {
                 this.seguros = data;
-                this.loading = false;
                 this.cdr.detectChanges();
             },
             error: (err: any) => {
                 console.error('Error buscando seguros', err);
-                this.loading = false;
+                this.seguros = [];
+                this.cdr.detectChanges();
+            },
+            complete: () => {
+                this.isSearching = false;
                 this.cdr.detectChanges();
             }
         });

@@ -1,232 +1,390 @@
 :host { display: block; }
 
 /* =========================================================
-   LAYOUT (igual al resto)
+   LAYOUT
    ========================================================= */
-.booking-dashboard{
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 30px;
-  max-width: 1400px;
-  margin: 40px auto 60px;
-  animation: fadeIn .5s ease;
+.booking-dashboard {
+  max-width: 1300px;
+  margin: 36px auto 64px;
+  padding: 0 24px;
+  animation: fadeIn .45s cubic-bezier(.22, 1, .36, 1);
 }
 
-.main-content{
+.main-content {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 24px;
 }
 
-/* ✅ CLAVE: tus .card están dentro de un <form>, no en .main-content */
-.main-content > form{
+.main-content > form {
   display: flex;
   flex-direction: column;
-  gap: 30px;          /* <-- esto evita que queden pegadas */
+  gap: 24px;
   margin: 0;
 }
 
 /* =========================================================
-   CARD BASE (igual)
+   PAGE HEADER
    ========================================================= */
-.card{
-  background-color: var(--bg-secondary);
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 4px 15px var(--shadow-color);
-  transition: background-color .3s ease;
-}
-
-.card-header{
-  padding-bottom: 16px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--separator-color);
-}
-
-/* Header con botón (primer card) */
-.card-header.header-row{
+.page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
+  padding-bottom: 8px;
 }
 
-.header-title h2{
-  font-size: 1.5rem;
-  font-weight: 600;
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
   margin: 0;
   color: var(--text-primary);
+  letter-spacing: -0.035em;
+  line-height: 1.1;
 }
 
-.muted{
+.page-subtitle {
+  font-size: .875rem;
   color: var(--text-secondary);
-  margin: 6px 0 0 0;
-  font-size: .92rem;
+  margin: 5px 0 0;
 }
 
-.header-actions{
+.page-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   TWO-COLUMN GRID
+   ========================================================= */
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* =========================================================
+   CARD
+   ========================================================= */
+.card {
+  background-color: var(--bg-secondary);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.07);
+  border: 1.5px solid var(--separator-color);
+  transition: background-color .3s ease;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1.5px solid var(--separator-color);
+}
+
+.card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-icon--blue {
+  background-color: rgba(10, 132, 255, .12);
+  color: var(--accent-blue);
+}
+
+.card-icon--purple {
+  background-color: rgba(175, 82, 222, .12);
+  color: #af52de;
+}
+
+.header-title h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.muted {
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+  font-size: .84rem;
+  line-height: 1.4;
 }
 
 /* =========================================================
    FORM
    ========================================================= */
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-label{
-  font-size: .9rem;
-  font-weight: 500;
+.form-label {
+  font-size: .78rem;
+  font-weight: 700;
   color: var(--text-secondary);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.required-star{
+.label-icon {
+  opacity: .6;
+}
+
+.required-star {
   color: var(--accent-blue);
-  font-weight: 800;
-  margin-left: 4px;
+  font-weight: 900;
+  margin-left: 2px;
 }
 
 .form-input,
-.form-select{
+.form-select {
   background-color: var(--bg-tertiary);
-  border: 1px solid var(--separator-color);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 1rem;
+  border: 1.5px solid var(--separator-color);
+  border-radius: 12px;
+  padding: 10px 13px;
+  font-size: .95rem;
   font-family: var(--font-family);
   width: 100%;
   box-sizing: border-box;
   color: var(--text-primary);
-  transition: border-color .2s, background-color .2s;
+  transition: border-color .18s, background-color .18s, box-shadow .18s;
   outline: none;
 }
 
 .form-input:focus,
-.form-select:focus{
+.form-select:focus {
   border-color: var(--accent-blue);
   background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
+}
+
+.form-input::placeholder { color: var(--text-tertiary); opacity: .5; }
+
+/* Coords row */
+.coords-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Coords hint */
+.coords-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: .78rem;
+  color: var(--text-tertiary);
+  padding: 10px 13px;
+  background-color: var(--bg-tertiary);
+  border-radius: 10px;
+  border: 1.5px solid var(--separator-color);
+  line-height: 1.45;
+}
+
+.coords-hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: .7;
+}
+
+/* Error state */
+.errorInput {
+  border-color: var(--accent-red) !important;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, .1) !important;
+}
+
+.errorMessage {
+  font-size: .78rem;
+  color: var(--accent-red);
+  font-weight: 600;
+  margin-top: 1px;
 }
 
 /* Quitar spinners number */
 input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button{
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type=number]{
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-/* Divider */
-.divider{
-  height: 1px;
-  width: 100%;
-  background: var(--separator-color);
-  opacity: .9;
-  border-radius: 999px;
-}
-
-
-/* error input border when control is invalid */
-
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* =========================================================
-   BUTTON (en header)
+   BUTTONS
    ========================================================= */
-.btn-primary{
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background-color: var(--accent-blue);
   color: #fff;
-  padding: 12px 18px;
+  padding: 10px 18px;
   border-radius: 12px;
   border: none;
   font-weight: 700;
+  font-size: .9rem;
+  font-family: var(--font-family);
   cursor: pointer;
-  transition: filter .2s, transform .15s;
+  transition: filter .18s, transform .12s, box-shadow .18s;
   white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(10, 132, 255, .28);
 }
-.btn-primary:hover{ filter: brightness(1.05); transform: translateY(-1px); }
-.btn-primary:disabled{
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(10, 132, 255, .36);
+}
+
+.btn-primary:disabled {
   background: var(--separator-color);
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--separator-color);
+  font-weight: 600;
+  font-size: .9rem;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: border-color .18s, color .18s, background-color .18s;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
 }
 
 /* =========================================================
-   HORARIOS POR TOUR
+   TOUR GRID
    ========================================================= */
-.card-body{ padding-top: 4px; }
-
-.tour-grid{
+.tour-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
-.tour-row{
+.tour-row {
   display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 14px;
+  grid-template-columns: 1fr 140px;
+  gap: 12px;
   align-items: center;
-
-  padding: 16px;
+  padding: 11px 14px;
   border-radius: 12px;
-  border: 1px solid var(--separator-color);
+  border: 1.5px solid var(--separator-color);
   background-color: var(--bg-tertiary);
-  transition: border-color .2s, background-color .2s;
+  transition: border-color .18s, box-shadow .18s;
 }
 
-.tour-name{
+.tour-row:hover {
+  border-color: color-mix(in oklab, var(--accent-blue) 30%, var(--separator-color));
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+
+.tour-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
+  opacity: .5;
+  flex-shrink: 0;
+}
+
+.tour-name {
   color: var(--text-primary);
-  font-weight: 650;
-  font-size: .98rem;
-  line-height: 1.2;
+  font-weight: 600;
+  font-size: .88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tour-input .form-input{
-  width: 100%;
-  background-color: var(--bg-secondary);
+.time-input {
+  text-align: center;
+  font-size: .88rem;
+  padding: 8px 10px;
+  letter-spacing: .02em;
 }
 
 /* =========================================================
-   ANIM / RESPONSIVE
+   ANIMATIONS
    ========================================================= */
-@keyframes fadeIn{
-  from{ opacity: 0; transform: scale(.98); }
-  to{ opacity: 1; transform: scale(1); }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 900px){
-  .form-grid{ grid-template-columns: 1fr; }
-
-  .card-header.header-row{
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .header-actions{ width: 100%; }
-  .btn-primary{ width: 100%; }
-
-  .tour-row{ grid-template-columns: 1fr; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@media (max-width: 720px){
-  .card{ padding: 18px; }
-  .form-grid{ gap: 12px; }
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 980px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .page-header-actions { width: 100%; }
+  .btn-primary,
+  .btn-secondary { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 580px) {
+  .booking-dashboard { padding: 0 16px; }
+  .card { padding: 18px 16px; }
+  .coords-row { grid-template-columns: 1fr; }
+  .tour-row { grid-template-columns: 1fr; gap: 8px; }
+  .time-input { text-align: left; }
 }

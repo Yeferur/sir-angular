@@ -8,7 +8,7 @@ import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
-import { forkJoin, switchMap, of } from 'rxjs';
+import { forkJoin, switchMap, of, finalize } from 'rxjs';
 
 type ViewStop = {
   key: string;
@@ -32,7 +32,8 @@ export class Listado implements OnInit {
 
   fechaSeleccionada: string = new Date().toISOString().split('T')[0];
   toursDelDia: TourProgramacion[] = [];
-  cargando = false;
+  isPageLoading = true;
+  isUpdatingDate = false;
   modoVista: 'dashboard' | 'editor' = 'dashboard';
 
   tourSeleccionado: TourProgramacion | null = null;
@@ -79,12 +80,13 @@ export class Listado implements OnInit {
   };
 
   cargarToursDelDia(): void {
-this.navbar.alert.set({
-  title: 'Cargando',
-  message: 'Cargando tours del día',
-  loading: true,
-  autoClose: false
-})
+    const isInitialLoad = this.toursDelDia.length === 0;
+
+    if (isInitialLoad) {
+      this.isPageLoading = true;
+    } else {
+      this.isUpdatingDate = true;
+    }
 
     // Obtener tours
     this.programacionService.getTours().pipe(
@@ -120,6 +122,11 @@ this.navbar.alert.set({
           datosDelDia: this.inicioService.getDatosInicio(this.fechaSeleccionada),
           listados: tours.length > 0 ? forkJoin(listadoObservables) : of({})
         });
+      }),
+      finalize(() => {
+        this.isPageLoading = false;
+        this.isUpdatingDate = false;
+        this.cdr.markForCheck();
       })
     ).subscribe({
       next: (result: any) => {
@@ -229,30 +236,18 @@ this.navbar.alert.set({
           return resultado;
         });
 
-        this.navbar.alert.set(null);
-
         this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error al cargar tours del día', err);
         this.toursDelDia = [];
-        this.navbar.alert.set({
-          title: 'Error',
-          message: 'Error al cargar tours del día',
-          type: 'error'
-        });
         this.cdr.markForCheck();
       }
     });
   }
 
   generarPlan(tour: TourProgramacion): void {
-    this.navbar.alert.set({
-      title: 'Consultando listados...',
-      message: 'Por favor espera un momento.',
-      loading: true,
-      autoClose: false
-    });
+    this.isPageLoading = true;
 
     this.tourSeleccionado = tour;
 
@@ -270,10 +265,10 @@ this.navbar.alert.set({
     this.programacionService.obtenerListadoFinal(payload).subscribe({
       next: (data) => {
         if (data?.exists) {
-          this.navbar.alert.set(null);
           const sugerencia = this.construirSugerenciaDesdeListado(data);
           this.aplicarPlan(tour, sugerencia, data.reservasSinAsignar || []);
           this.mostrarAlertaReservasSinAsignar(tour, data.reservasSinAsignar || []);
+          this.isPageLoading = false;
           return;
         }
 
@@ -281,6 +276,7 @@ this.navbar.alert.set({
       },
       error: (err) => {
         console.error('Error al consultar listados', err);
+        this.isPageLoading = false;
         this.generarPlanDesdeCero(tour);
       }
     });
@@ -523,15 +519,15 @@ this.navbar.alert.set({
       payload.idTour = this.tourSeleccionado.Id_Tour;
     }
 
-    this.cargando = true;
+    this.isPageLoading = true;
     this.programacionService.guardarListadoFinal(payload).subscribe({
       next: () => {
-        this.cargando = false;
+        this.isPageLoading = false;
         this.navbar.alert.set({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
         this.volverAlDashboard();
       },
       error: (err) => {
-        this.cargando = false;
+        this.isPageLoading = false;
         console.error('Error al guardar', err);
         this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.', autoClose: true, autoCloseTime: 4000 });
       }
@@ -581,12 +577,7 @@ this.navbar.alert.set({
   }
 
   private generarPlanDesdeCero(tour: TourProgramacion): void {
-    this.navbar.alert.set({
-      title: 'Generando plan...',
-      message: 'Por favor espera un momento.',
-      loading: true,
-      autoClose: false
-    });
+    this.isPageLoading = true;
 
     const payloadGen: any = { fecha: this.fechaSeleccionada };
     if ((tour as any).idsTours) {
@@ -618,7 +609,6 @@ this.navbar.alert.set({
           tour.totalPasajeros = totalPasajeros;
           tour.totalReservas = totalReservas;
 
-          this.navbar.alert.set(null);
           this.reservasSinAsignar = [];
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
           this.modoVista = 'editor';
@@ -628,7 +618,6 @@ this.navbar.alert.set({
           tour.totalPasajeros = plan?.analisis?.totalPasajeros || 0;
           tour.totalReservas = plan?.analisis?.totalReservas || 0;
 
-          this.navbar.alert.set(null);
           this.reservasSinAsignar = [];
           this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
           this.modoVista = 'editor';
@@ -638,11 +627,12 @@ this.navbar.alert.set({
         this.stopOrderByBus.clear();
         this.rebuildActiveStops();
 
+        this.isPageLoading = false;
         this.cdr.markForCheck();
       },
       error: (err) => {
         console.error(`Error al generar plan para ${tour.NombreTour}`, err);
-        this.cargando = false;
+        this.isPageLoading = false;
       }
     });
   }
