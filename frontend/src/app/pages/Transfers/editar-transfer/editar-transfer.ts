@@ -25,6 +25,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  isDuplicateMode = false;
   private isNavigatingToDuplicate = false;
 
   resultsServicioTransfer: any[] = [];
@@ -487,6 +488,10 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const duplicarParam = this.route.snapshot.queryParamMap.get('duplicar');
+    this.isDuplicateMode = !!duplicarParam;
+    this.showDuplicate = !this.isDuplicateMode;
+
     forkJoin({
       servicios: this.transferSvc.getServicios().pipe(catchError(() => of([]))),
       rangos: this.transferSvc.getRangos().pipe(catchError(() => of([]))),
@@ -581,6 +586,10 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       this.showFlightFields = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
     }
 
+    if (this.isDuplicateMode) {
+      this.applyDuplicateTransferState(transfer);
+    }
+
     this.form.markAsPristine();
   }
 
@@ -623,18 +632,24 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   }
 
   duplicarTransfer(): void {
-    const transferId = this.getTransferIdFromRoute();
-    if (!transferId) {
+    if (!this.getTransferIdFromRoute()) {
       this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
       return;
     }
 
     this.openSummary = false;
-    this.isNavigatingToDuplicate = true;
+    this.isDuplicateMode = true;
+    this.showDuplicate = false;
+    this.isNavigatingToDuplicate = false;
     this.form.markAsPristine();
-
-    this.router.navigate(['/Transfers/NuevoTransfer'], {
-      queryParams: { duplicar: transferId }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { duplicar: 'true' },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    }).then(() => {
+      this.applyDuplicateTransferState();
+      this.form.markAsDirty();
     });
   }
 
@@ -672,6 +687,20 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
           .filter((abono) => abono.Monto > 0)
       : [];
 
+    const isDuplicate = this.isDuplicateMode;
+    const pagoFinal: any = isDuplicate
+      ? {
+          Tipo: 'PagaEnPunto',
+          Observaciones: null,
+          Abonos: []
+        }
+      : {
+          Tipo: tipoPago,
+          Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
+          Pago_Comprobante: tipoPago === 'Completo' ? pagoCompletoRutaActual : null,
+          Abonos: abonosPayload
+        };
+
     const transferData = {
       Titular: this.form.value.Titular,
       DNI: this.form.value.DNI || '',
@@ -689,21 +718,28 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
-      Observaciones: this.form.value.Observaciones,
-      Pago: {
-        Tipo: tipoPago,
-        Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
-        Pago_Comprobante: tipoPago === 'Completo' ? pagoCompletoRutaActual : null,
-        Abonos: abonosPayload
-      }
+      Observaciones: isDuplicate ? this.buildDuplicatedTransferObservaciones(this.form.value.Observaciones) : this.form.value.Observaciones,
+      Estado: isDuplicate ? 'Pendiente' : null,
+      ModoDuplicado: isDuplicate,
+      Pago: pagoFinal
     };
 
-    this.transferSvc.actualizarTransfer(transferId, transferData).subscribe({
+    const request$ = isDuplicate
+      ? this.transferSvc.crearTransfer(transferData)
+      : this.transferSvc.actualizarTransfer(transferId, transferData);
+
+    request$.subscribe({
       next: (data) => {
         const idTransfer = data?.data?.Id_Transfer || transferId;
         const pagos = data?.data?.pagos || [];
-        if (idTransfer && this.hasComprobantesToUpload()) {
+
+        if (!isDuplicate && idTransfer && this.hasComprobantesToUpload()) {
           this.uploadComprobantesTransfer(idTransfer, pagos);
+          return;
+        }
+
+        if (isDuplicate) {
+          this.finishDuplicateSuccess(idTransfer, data?.data?.Codigo_Transfer || null);
           return;
         }
 
@@ -711,7 +747,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error:', err);
-        this.navbar.errorToast('Error', 'Hubo un error al actualizar el transfer.');
+        this.navbar.errorToast('Error', isDuplicate ? 'Hubo un error al duplicar el transfer.' : 'Hubo un error al actualizar el transfer.');
         this.isSubmitting.set(false);
       }
     });
@@ -764,6 +800,55 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.form.markAsPristine();
     this.isSubmitting.set(false);
     this.router.navigate(['/Transfers/VerTransfers']);
+  }
+
+  private finishDuplicateSuccess(idTransfer: number | string, codigoTransfer: string | null): void {
+    this.navbar.successToast('Transfer duplicado', 'Transfer duplicado correctamente.');
+    this.form.markAsPristine();
+    this.isSubmitting.set(false);
+
+    const targetId = String(idTransfer || '').trim();
+    if (targetId) {
+      this.router.navigate(['/Transfers/EditarTransfer', targetId], {
+        queryParams: codigoTransfer ? { codigo: codigoTransfer } : {}
+      });
+      return;
+    }
+
+    this.router.navigate(['/Transfers/VerTransfers']);
+  }
+
+  private applyDuplicateTransferState(transfer?: any): void {
+    this.form.patchValue({
+      TipoPago: 'PagaEnPunto',
+      Observaciones: this.buildDuplicatedTransferObservaciones(transfer?.Observaciones)
+    }, { emitEvent: false });
+
+    this.abonos.clear();
+    this.form.get('ComprobantePago')?.setValue(null);
+    this.pagoPagadoFile = null;
+    this.pagoPagadoFileName = null;
+    this.pagoCompletoSoporteUrlParaReemplazo = null;
+    this.abonoFiles.clear();
+    this.abonoFileNames.clear();
+  }
+
+  private buildDuplicatedTransferObservaciones(baseObservaciones?: string | null): string {
+    const currentObs = String(baseObservaciones ?? this.form.get('Observaciones')?.value ?? '').trim();
+    const codigoTransfer = this.getTransferCodeFromCurrentContext();
+    const duplicateNote = `Duplicado desde Transfer #${codigoTransfer}.`;
+    const cleaned = currentObs
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && line !== duplicateNote)
+      .join('\n');
+
+    return [cleaned, duplicateNote].filter(Boolean).join('\n');
+  }
+
+  private getTransferCodeFromCurrentContext(): string {
+    const transferId = this.getTransferIdFromRoute();
+    return `TRS${String(transferId || '').padStart(5, '0')}`;
   }
 
   ngOnDestroy(): void {

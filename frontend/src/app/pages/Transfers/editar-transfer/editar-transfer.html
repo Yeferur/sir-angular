@@ -107,6 +107,11 @@
       <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     </div>
   </div>
+  @if (isDuplicateMode) {
+    <div class="duplicate-banner" role="status" aria-live="polite">
+      Estás creando un nuevo transfer basado en otro existente. Los pagos, abonos y comprobantes no se copian. Debes registrar nuevamente la forma de pago correspondiente.
+    </div>
+  }
   <div class="main-content">
 
     <!-- DETALLES DEL SERVICIO -->

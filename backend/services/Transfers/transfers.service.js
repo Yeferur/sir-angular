@@ -80,6 +80,10 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
     return estadoActual;
   }
 
+  if (payload.ModoDuplicado) {
+    return 'Pendiente';
+  }
+
   const valorServicio = Number(payload.ValorServicio || payload.Valor || 0);
   const pago = payload.Pago || {};
   const abonos = Array.isArray(pago.Abonos) ? pago.Abonos : [];

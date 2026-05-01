@@ -71,8 +71,10 @@ type DisponibilidadPayload = {
   imports: [CommonModule, ReactiveFormsModule, FlatpickrInputDirective],
 })
 export class CrearTourComponent implements OnInit {
-  isLoading = false;
+  isLoading = signal<boolean>(true);
   isSubmitting = signal(false);
+  private toursLoaded = false;
+  private currenciesLoaded = false;
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
@@ -293,7 +295,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   private loadExistingTours(): void {
     this.tours.getTours().subscribe({
       next: (t) => (this.toursExistentes = t || []),
-      error: () => (this.toursExistentes = []),
+      error: () => {
+        this.toursExistentes = [];
+        this.markInitialLoadStep('tours');
+      },
+      complete: () => this.markInitialLoadStep('tours'),
     });
   }
 
@@ -311,8 +317,19 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         // fallback mínimo
         this.monedas = [{ Id_Moneda: 1, Codigo: 'COP', Nombre_Moneda: 'Peso colombiano' }];
         this.initBasePlan();
+        this.markInitialLoadStep('currencies');
       },
+      complete: () => this.markInitialLoadStep('currencies'),
     });
+  }
+
+  private markInitialLoadStep(step: 'tours' | 'currencies'): void {
+    if (step === 'tours') this.toursLoaded = true;
+    if (step === 'currencies') this.currenciesLoaded = true;
+
+    if (this.toursLoaded && this.currenciesLoaded) {
+      this.isLoading.set(false);
+    }
   }
 
   private initBasePlan(): void {
@@ -740,7 +757,7 @@ const disponibilidad = this.buildDisponibilidadPayload();
   /* ---------------------------
    * Submit
    * --------------------------- */
-  submitCreateTour(): void {
+  async submitCreateTour(): Promise<void> {
     if (this.isSubmitting()) return;
 
     if (this.form.invalid) {
@@ -804,22 +821,69 @@ const disponibilidad = this.buildDisponibilidadPayload();
       return;
     }
 
-    this.navbar.alert?.set?.({
-      type: 'info',
-      title: '¿Crear tour?',
-      message: 'Se creará el tour con sus planes y precios (0 si no aplica).',
-      autoClose: false,
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) },
-        {
-          text: 'Crear',
-          style: 'primary',
-          onClick: () => {
-            this.navbar.alert?.set?.(null);
-            this.confirmCreateTour();
+    const confirmed = await this.requestCreateTourConfirmation();
+    if (!confirmed) return;
+
+    this.confirmCreateTour();
+  }
+
+  private buildCreateTourConfirmationMessage(): string {
+    const nombreTour = String(this.form.get('Nombre_Tour')?.value || '').trim();
+    const abreviacion = String(this.form.get('Abreviacion')?.value || '').trim();
+    const cupoBase = Number(this.form.get('Cupo_Base')?.value || 0);
+    const cantidadPlanes = this.plans.length;
+    const modoDisponibilidad = this.form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'
+      ? 'Solo por temporadas'
+      : 'Todo el año';
+    const origenId = this.form.get('Id_Tour_Origen')?.value;
+    const nombreOrigen = origenId
+      ? this.toursExistentes.find((tour) => String(tour.Id_Tour) === String(origenId))?.Nombre_Tour
+      : null;
+
+    const partes = [
+      `Vas a crear el tour ${nombreTour || '—'}.`,
+      `Abreviación: ${abreviacion || '—'}.`,
+      `Cupo base: ${cupoBase}.`,
+      `Planes: ${cantidadPlanes}.`,
+      `Disponibilidad: ${modoDisponibilidad}.`,
+    ];
+
+    if (origenId) {
+      partes.push(`Copiará horarios desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
+    } else {
+      partes.push('Los horarios quedarán pendientes/configurables.');
+    }
+
+    partes.push('¿Deseas continuar?');
+    return partes.join('\n');
+  }
+
+  private requestCreateTourConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.navbar.alert?.set?.({
+        type: 'info',
+        title: '¿Todo listo?',
+        message: this.buildCreateTourConfirmationMessage(),
+        autoClose: false,
+        buttons: [
+          {
+            text: 'Cancelar',
+            style: 'secondary',
+            onClick: () => {
+              this.navbar.alert?.set?.(null);
+              resolve(false);
+            },
           },
-        },
-      ],
+          {
+            text: 'Crear',
+            style: 'primary',
+            onClick: () => {
+              this.navbar.alert?.set?.(null);
+              resolve(true);
+            },
+          },
+        ],
+      });
     });
   }
 

@@ -36,6 +36,18 @@
   font-size: .95rem;
 }
 
+.duplicate-banner {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 132, 255, 0.24);
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.12), rgba(10, 132, 255, 0.08));
+  color: var(--text-primary);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
 .main-content {
   display: flex;
   flex-direction: column;

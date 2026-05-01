@@ -1378,15 +1378,17 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         Idioma_Reserva: this.form.get('Idioma_Reserva')?.value,
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
         Nombre_Reportante: this.form.get('Nombre_Reportante')?.value,
-        Observaciones: overrides.Observaciones ?? this.form.get('Observaciones')?.value,
+        Observaciones: this.buildDuplicatedObservaciones(overrides.Observaciones),
         Id_Tour: targetTourId,
         Id_Punto: Id_Punto,
+        Estado: 'Pendiente',
       };
 
       const payload: any = {
         cabeceraReserva: cab,
         pasajeros: pax,
-        pagos: [{ Monto: totalNeto, Tipo: 'Pago Directo' }]
+        pagos: [],
+        esDuplicado: true,
       };
 
       const res = await firstValueFrom(this.reservasSvc.crearReserva(payload, { abonos: [] }));
@@ -1438,6 +1440,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.navbar.cuposInfo.set(null);
     this.navbar.Id_Reserva.set(idReserva);
 
+  }
+
+  private buildDuplicatedObservaciones(observacionExtra?: string | null): string {
+    const originalObs = String(this.form.get('Observaciones')?.value || '').trim();
+    const extraObs = String(observacionExtra || '').trim();
+    const duplicateNote = `Duplicado desde Reserva #${this.reservaId() || 'N/A'}.`;
+    return [originalObs, extraObs, duplicateNote].filter(Boolean).join('\n');
   }
 
   async onSubmit(): Promise<void> {

@@ -480,18 +480,20 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.isLoading.set(true);
 
     const duplicarId = this.route.snapshot.queryParamMap.get('duplicar');
-    this.isDuplicateMode = Boolean(duplicarId);
-    this.duplicarFromId = duplicarId;
+    if (duplicarId) {
+      this.router.navigate(['/Transfers/EditarTransfer', duplicarId], {
+        queryParams: { duplicar: 'true' },
+        replaceUrl: true
+      });
+      this.isLoading.set(false);
+      return;
+    }
 
     const requests: any = {
       servicios: this.transferSvc.getServicios().pipe(catchError(() => of([] as any[]))),
       rangos: this.transferSvc.getRangos().pipe(catchError(() => of([] as any[]))),
       monedas: this.transferSvc.getMonedas().pipe(catchError(() => of([] as any[])))
     };
-
-    if (duplicarId) {
-      requests.transfer = this.transferSvc.getTransfer(duplicarId).pipe(catchError(() => of(null)));
-    }
 
     forkJoin<CrearTransferLoadResult>(requests).subscribe({
       next: (result: CrearTransferLoadResult) => {
@@ -508,10 +510,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           this.navbar.errorToast('Error', 'No se pudieron cargar los servicios de transfer.');
         }
 
-        // Si viene duplicar, llenar el formulario con los datos del transfer original
-        if (duplicarId && result.transfer && result.transfer.data) {
-          this.fillFormWithDuplicateData(result.transfer.data);
-        }
       },
       error: () => {
         this.navbar.errorToast('Error', 'No se pudieron cargar los catálogos necesarios.');
@@ -606,7 +604,67 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       return;
     }
 
+    const confirmed = await this.requestCreateTransferConfirmation();
+    if (!confirmed) return;
+
     this.processSubmit();
+  }
+
+  private buildCreateTransferConfirmationMessage(): string {
+    const titular = String(this.form.get('Titular')?.value || '').trim();
+    const fecha = String(this.form.get('Fecha')?.value || '').trim();
+    const servicioNombre = this.getNombreServicio();
+    const salida = String(this.form.get('Salida')?.value || '').trim();
+    const llegada = String(this.form.get('Llegada')?.value || '').trim();
+    const moneda = String(this.form.get('Moneda')?.value || 'COP').trim();
+    const valor = Number(this.form.get('Valor')?.value || 0);
+    const tipoPago = String(this.form.get('TipoPago')?.value || '').trim();
+
+    const partes = [
+      `Vas a crear el transfer para ${titular || '—'} el ${fecha || '—'}.`,
+      `Servicio: ${servicioNombre}.`,
+      `Ruta: ${salida || '—'} → ${llegada || '—'}.`,
+      `Valor: ${moneda} ${valor.toLocaleString('es-CO')}.`,
+      `Tipo de pago: ${tipoPago || '—'}.`,
+    ];
+
+    if (this.showFlightFields) {
+      const vuelo = String(this.form.get('Vuelo')?.value || '').trim();
+      const tipoVuelo = String(this.form.get('TipoVuelo')?.value || '').trim();
+      partes.push(`Vuelo: ${vuelo || '—'} (${tipoVuelo || '—'}).`);
+    }
+
+    partes.push('¿Deseas continuar?');
+    return partes.join('\n');
+  }
+
+  private requestCreateTransferConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.navbar.alert.set({
+        type: 'info',
+        title: '¿Todo listo?',
+        message: this.buildCreateTransferConfirmationMessage(),
+        autoClose: false,
+        buttons: [
+          {
+            text: 'Cancelar',
+            style: 'secondary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              resolve(false);
+            }
+          },
+          {
+            text: 'Crear',
+            style: 'primary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              resolve(true);
+            }
+          }
+        ]
+      });
+    });
   }
 
   private processSubmit(): void {
