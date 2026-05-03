@@ -96,7 +96,7 @@ export const routes: Routes = [
     path: 'Reservas/Confirmacion',
     loadComponent: () => import('./pages/Confirmacion/confirmacion/confirmacion').then((m) => m.ConfirmacionComponent),
     canDeactivate: [unsavedChangesGuard],
-    title: 'SIR · Confirmación de Viaje',
+    title: 'SIR · Control de Viaje',
   },
   {
     path: 'Comisiones',
@@ -132,6 +132,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
     title: 'SIR · Editar Perfil',
+  },
+  {
+    path: 'Ayuda',
+    loadComponent: () => import('./pages/ayuda/ayuda').then((m) => m.AyudaComponent),
+    canActivate: [authGuard],
+    title: 'SIR · Ayuda',
   },
 
   {

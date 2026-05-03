@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
@@ -11,10 +11,10 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
   templateUrl: './editar-punto.html',
   styleUrls: ['../crear-punto/crear-punto.css'],
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, CommonModule]
+  imports: [ReactiveFormsModule, FormsModule, CommonModule, RouterLink]
 })
 export class EditarPuntoComponent implements OnInit {
-  isLoading = false;
+  isLoading = signal(true);
   isSubmitting = signal(false);
   successMsg = '';
   errorMsg = '';
@@ -26,6 +26,8 @@ export class EditarPuntoComponent implements OnInit {
   duplicatePoint: any = null;
   private addrTimer: any = null;
   puntoId: number | null = null;
+  private toursLoaded = false;
+  private puntoLoaded = false;
 
   constructor(private fb: FormBuilder, private puntos: puntosService, private route: ActivatedRoute, private router: Router, private reservasSvc: Reservas, private navbar: DynamicIslandGlobalService) {
     this.form = this.fb.group({
@@ -35,20 +37,40 @@ export class EditarPuntoComponent implements OnInit {
       Latitud: [null, [Validators.required, Validators.min(-90), Validators.max(90)]],
       Longitud: [null, [Validators.required, Validators.min(-180), Validators.max(180)]]
     });
-
-    this.reservasSvc.getTours().subscribe({ next: t => this.tours.set(t || []), error: () => this.tours.set([]) });
   }
 
   ngOnInit(): void {
+    this.loadTours();
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       this.puntoId = Number(idParam);
       this.loadPunto(this.puntoId);
+    } else {
+      this.navbar.errorToast('Error', 'ID de punto inválido');
+      this.puntoLoaded = true;
+      this.markInitialLoadDone();
     }
   }
 
+  private loadTours(): void {
+    this.isLoading.set(true);
+    this.reservasSvc.getTours().subscribe({
+      next: t => this.tours.set(t || []),
+      error: () => {
+        this.tours.set([]);
+        this.toursLoaded = true;
+        this.navbar.errorToast('Error', 'No se pudieron cargar los tours.');
+        this.markInitialLoadDone();
+      },
+      complete: () => {
+        this.toursLoaded = true;
+        this.markInitialLoadDone();
+      }
+    });
+  }
+
   private loadPunto(id: number) {
-    this.isLoading = true;
+    this.isLoading.set(true);
     this.puntos.getPunto(id).subscribe({
       next: (p: Punto) => {
         this.form.patchValue({
@@ -64,16 +86,28 @@ export class EditarPuntoComponent implements OnInit {
             if (h?.Id_Tour != null) this.horariosMap[h.Id_Tour] = h.HoraSalida || h.Hora_Salida || '';
           }
         }
-        console.log('Punto cargado para edición:', p);
+        this.puntoLoaded = true;
+        this.markInitialLoadDone();
       },
       error: () => {
         this.navbar.errorToast('Error', 'No se pudo cargar el punto');
+        this.puntoLoaded = true;
+        this.markInitialLoadDone();
       },
-      complete: () => (this.isLoading = false)
+      complete: () => {
+        this.puntoLoaded = true;
+        this.markInitialLoadDone();
+      }
     });
   }
 
-onSubmitGuardarCambios() {
+  private markInitialLoadDone(): void {
+    if (this.toursLoaded && this.puntoLoaded) {
+      this.isLoading.set(false);
+    }
+  }
+
+async onSubmitGuardarCambios() {
   if (this.isSubmitting()) return;
 
   // ===== Validación del formulario ANTES de confirmar =====
@@ -104,6 +138,9 @@ onSubmitGuardarCambios() {
 
   if (!this.puntoId) return;
 
+  const confirmed = await this.requestUpdatePointConfirmation();
+  if (!confirmed) return;
+
   this.guardarCambiosConfirmado();
 }
 
@@ -112,7 +149,6 @@ private guardarCambiosConfirmado() {
   if (!this.puntoId) return;
   if (this.form.invalid) return; // seguridad extra
 
-  this.isLoading = true;
   this.isSubmitting.set(true);
 
   const payload: any = { ...this.form.value };
@@ -120,7 +156,6 @@ private guardarCambiosConfirmado() {
     Id_Tour: t.Id_Tour,
     Hora_Salida: (this.horariosMap[t.Id_Tour] || '').trim() || 'Pendiente'
   }));
-console.log('Payload para actualizar punto:', payload);
   this.puntos.updatePunto(this.puntoId, payload).subscribe({
     next: () => {
       this.successMsg = 'Punto actualizado correctamente';
@@ -133,9 +168,52 @@ console.log('Payload para actualizar punto:', payload);
       this.navbar.errorToast('Error', this.errorMsg);
     },
     complete: () => {
-      this.isLoading = false;
       this.isSubmitting.set(false);
     }
+  });
+}
+
+private buildUpdatePointConfirmationMessage(): string {
+  const nombrePunto = String(this.form.get('NombrePunto')?.value || '').trim() || 'el punto de encuentro';
+  const sector = String(this.form.get('Sector')?.value || '').trim() || '—';
+  const direccion = String(this.form.get('Direccion')?.value || '').trim() || '—';
+  const cantidadTours = this.tours().length;
+
+  return [
+    `Vas a guardar los cambios del punto de encuentro ${nombrePunto}.`,
+    `Sector: ${sector}.`,
+    `Dirección: ${direccion}.`,
+    `Se mantendrán horarios para ${cantidadTours} tours.`,
+    '¿Deseas continuar?'
+  ].join(' ');
+}
+
+private requestUpdatePointConfirmation(): Promise<boolean> {
+  return new Promise((resolve) => {
+    this.navbar.alert?.set?.({
+      type: 'info',
+      title: '¿Todo listo?',
+      message: this.buildUpdatePointConfirmationMessage(),
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => {
+            this.navbar.alert?.set?.(null);
+            resolve(false);
+          }
+        },
+        {
+          text: 'Guardar cambios',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert?.set?.(null);
+            resolve(true);
+          }
+        }
+      ]
+    });
   });
 }
 

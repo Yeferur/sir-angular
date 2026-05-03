@@ -1,59 +1,90 @@
-<div class="booking-dashboard">
-  <div class="page-header">
-    <div>
-      <h1>Editar Perfil</h1>
-      <p class="subtitle">Actualiza tu informacion personal y credenciales de acceso.</p>
+@if (isLoading()) {
+<div class="booking-dashboard skeleton-page" aria-busy="true" aria-live="polite">
+  <div class="page-header card sk-card">
+    <div class="page-header-copy">
+      <div class="sk-line sk-title"></div>
+      <div class="sk-line sk-subtitle"></div>
     </div>
   </div>
 
-  @if (isLoading()) {
-  <div class="loading-state">
-    <div class="spinner"></div>
-    <p>Cargando información...</p>
+  <div class="main-content">
+    <div class="card skeleton-card avatar-card">
+      <div class="avatar-shell skeleton-avatar-shell">
+        <div class="sk-avatar"></div>
+      </div>
+      <div class="avatar-actions skeleton-actions">
+        <div class="sk-button"></div>
+        <div class="sk-button sk-button-secondary"></div>
+      </div>
+    </div>
+
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-card-title"></div>
+      </div>
+      <div class="form-grid sk-grid">
+        @for (field of skeletonAccountFields; track field) {
+        <div class="form-group">
+          <div class="sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        }
+        <div class="form-group full-width">
+          <div class="sk-label"></div>
+          <div class="sk-field sk-wide"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-card-title"></div>
+      </div>
+      <div class="form-grid sk-grid">
+        @for (field of skeletonSecurityFields; track field) {
+        <div class="form-group">
+          <div class="sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        }
+      </div>
+      <div class="actions-end">
+        <div class="sk-button sk-button-primary"></div>
+      </div>
+    </div>
   </div>
-  } @else {
+</div>
+} @else {
+<div class="booking-dashboard">
+  <div class="page-header">
+    <div class="page-header-copy">
+      <h1>Editar Perfil</h1>
+      <p class="subtitle">Actualiza tu información personal y credenciales de acceso.</p>
+    </div>
+  </div>
+
   <form [formGroup]="form" (ngSubmit)="guardar()" autocomplete="off" novalidate>
     <div class="main-content">
-      <!-- 🎥 Avatar Card - Previsualización instantánea -->
       <div class="card avatar-card">
         <div class="avatar-container">
           <div class="avatar-wrapper">
-            <!-- Prioridad: Preview (base64 local) > Avatar actual (servidor) > Placeholder (iniciales) -->
             @if (avatarPreview()) {
-              <!-- 🎯 PREVISUALIZACIÓN INSTANTÁNEA (base64 del archivo seleccionado) -->
-              <img 
-                class="avatar-image preview" 
-                [src]="avatarPreview()" 
-                alt="Vista previa de foto"
-              />
+            <img class="avatar-image preview" [src]="avatarPreview()" alt="Vista previa de foto" />
             } @else if (avatarActual()) {
-              <!-- Foto del servidor después de upload exitoso -->
-              <img 
-                class="avatar-image" 
-                [src]="avatarActual()" 
-                alt="Foto de perfil"
-              />
+            <img class="avatar-image" [src]="avatarActual()" alt="Foto de perfil" />
             } @else {
-              <!-- Fallback: Iniciales del usuario -->
-              <div class="avatar-placeholder">
-                <span class="avatar-initials">{{ getInitials() }}</span>
-              </div>
+            <div class="avatar-placeholder">
+              <span class="avatar-initials">{{ getInitials() }}</span>
+            </div>
+            }
+
+            @if (isUploadingAvatar()) {
+            <div class="avatar-loading-state">Subiendo...</div>
             }
           </div>
-
-          <!-- Spinner de carga mientras se sube -->
-          @if (isUploadingAvatar()) {
-            <div class="avatar-loading">
-              <svg class="spinner" viewBox="0 0 50 50">
-                <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="2"></circle>
-              </svg>
-            </div>
-          }
         </div>
 
-        <!-- Botones de acción -->
         <div class="avatar-actions">
-          <!-- Botón: Cambiar Foto (abre input file invisible) -->
           <label class="btn-avatar btn-change" [class.loading]="isUploadingAvatar()">
             <input
               type="file"
@@ -63,30 +94,25 @@
               [disabled]="isUploadingAvatar()"
               aria-label="Seleccionar foto de perfil"
             />
-            @if (isUploadingAvatar()) {
-              <span>Subiendo...</span>
-            } @else {
-              <span>Cambiar Foto</span>
-            }
+            <span>{{ isUploadingAvatar() ? 'Subiendo...' : 'Cambiar foto' }}</span>
           </label>
 
-          <!-- Botón: Eliminar (solo si hay foto) -->
           @if (avatarActual() && !isUploadingAvatar()) {
-            <button
-              type="button"
-              class="btn-avatar btn-delete"
-              (click)="eliminarAvatar()"
-              [disabled]="isDeletingAvatar()"
-              aria-label="Eliminar foto de perfil"
-            >
-              @if (isDeletingAvatar()) {
-                <span>Eliminando...</span>
-              } @else {
-                <span>Eliminar</span>
-              }
-            </button>
+          <button
+            type="button"
+            class="btn-avatar btn-delete"
+            (click)="eliminarAvatar()"
+            [disabled]="isDeletingAvatar()"
+            aria-label="Eliminar foto de perfil"
+          >
+            <span>{{ isDeletingAvatar() ? 'Eliminando...' : 'Eliminar' }}</span>
+          </button>
           }
         </div>
+
+        @if (avatarPreview()) {
+        <p class="avatar-note">La nueva foto se guardará al guardar los cambios.</p>
+        }
       </div>
 
       <div class="card">
@@ -96,7 +122,7 @@
 
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">Cedula</label>
+            <label class="form-label">Cédula</label>
             <input class="form-control" formControlName="Id_Usuario" readonly />
           </div>
 
@@ -118,7 +144,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Telefono <span class="required-star">*</span></label>
+            <label class="form-label">Teléfono <span class="required-star">*</span></label>
             <input
               class="form-control"
               formControlName="Telefono_Usuario"
@@ -151,7 +177,7 @@
 
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">Nueva contrasena (opcional)</label>
+            <label class="form-label">Nueva contraseña (opcional)</label>
             <div class="password-wrapper">
               <input
                 class="form-control"
@@ -160,23 +186,13 @@
                 autocomplete="new-password"
                 [ngClass]="c('Contrasena').touched && c('Contrasena').invalid ? 'errorInput' : ''"
               />
-              <button type="button" class="toggle-password" (click)="showPassword.set(!showPassword())"
-                aria-label="Mostrar u ocultar contraseña">
-                @if (!showPassword()) {
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
-                </svg>
-                }
+              <button
+                type="button"
+                class="toggle-password"
+                (click)="showPassword.set(!showPassword())"
+                [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Ver contraseña'"
+              >
+                {{ showPassword() ? 'Ocultar' : 'Ver' }}
               </button>
             </div>
             @if (c('Contrasena').touched && c('Contrasena').invalid) {
@@ -185,7 +201,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Confirmar contrasena</label>
+            <label class="form-label">Confirmar contraseña</label>
             <div class="password-wrapper">
               <input
                 class="form-control"
@@ -194,38 +210,28 @@
                 autocomplete="new-password"
                 [ngClass]="form.touched && form.errors?.['passwordMismatch'] ? 'errorInput' : ''"
               />
-              <button type="button" class="toggle-password" (click)="showConfirm.set(!showConfirm())"
-                aria-label="Mostrar u ocultar confirmación">
-                @if (!showConfirm()) {
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
-                </svg>
-                }
+              <button
+                type="button"
+                class="toggle-password"
+                (click)="showConfirm.set(!showConfirm())"
+                [attr.aria-label]="showConfirm() ? 'Ocultar confirmación' : 'Ver confirmación'"
+              >
+                {{ showConfirm() ? 'Ocultar' : 'Ver' }}
               </button>
             </div>
             @if (form.touched && form.errors?.['passwordMismatch']) {
-            <div class="errorMessage">Las contrasenas no coinciden.</div>
+            <div class="errorMessage">Las contraseñas no coinciden.</div>
             }
           </div>
         </div>
 
         <div class="actions-end">
-          <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
+          <button class="btn-primary" type="submit" [disabled]="isSubmitting() || isUploadingAvatar() || isDeletingAvatar()">
             {{ isSubmitting() ? 'Guardando...' : 'Guardar cambios' }}
           </button>
         </div>
       </div>
     </div>
   </form>
-  }
 </div>
+}

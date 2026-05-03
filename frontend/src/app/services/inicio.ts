@@ -22,6 +22,24 @@ export interface Transfer {
   id: number;
   Servicio: string;
   totalTransfers: number;
+  tipo?: string;
+  Tipo_Transfer?: string;
+  nombre?: string;
+  Nombre?: string;
+  cantidad?: number;
+  total?: number;
+  Total?: number;
+  Fecha_Transfer?: string;
+  FechaTransfer?: string;
+  Fecha?: string;
+  Estado?: string;
+}
+
+export interface TransfersSummary {
+  total: number;
+  hotelAeropuerto: number;
+  aeropuertoHotel: number;
+  otros: number;
 }
 
 @Injectable({
@@ -36,6 +54,7 @@ export class InicioService {
   // Signal para cambios en tiempo real
   aforoActualizado = signal<any>(null);
   reservaActualizada = signal<any>(null);
+  // TODO: Integrar evento WebSocket de transfers para refrescar Inicio cuando se cree, edite o elimine un transfer de la fecha visible.
 
   constructor() {
     this.setupWebSocketListeners();
@@ -56,7 +75,7 @@ export class InicioService {
     });
   }
 
-  getDatosInicio(fecha: string): Observable<{ tours: Tour[]; transfers: Transfer[] }> {
+  getDatosInicio(fecha: string): Observable<{ tours: Tour[]; transfers: Transfer[] | TransfersSummary }> {
     const url = `${this.baseUrl}/tours-data`;
     // Evitar devoluciones en caché del navegador cuando la URL es idéntica
     const params = { fecha, t: Date.now().toString() };

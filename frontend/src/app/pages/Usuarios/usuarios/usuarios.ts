@@ -1,4 +1,4 @@
-import { Component, Signal, computed, signal } from '@angular/core';
+import { Component, OnInit, Signal, computed, signal } from '@angular/core';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -12,9 +12,12 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
   templateUrl: './usuarios.html',
   styleUrl: './usuarios.css'
 })
-export class Usuarios {
+export class Usuarios implements OnInit {
   usuarios!: Signal<Usuario[]>;
   estados!: Signal<Map<string, string>>;
+
+  isLoading = signal<boolean>(true);
+  skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
 
   // Search signal
   searchQuery = signal('');
@@ -49,6 +52,12 @@ export class Usuarios {
   constructor(private usuariosService: UsuariosService, private navbar: DynamicIslandGlobalService) {
     this.usuarios = this.usuariosService.getUsuariosSignal();
     this.estados = this.usuariosService.getEstadosSignal();
+  }
+
+  ngOnInit(): void {
+    queueMicrotask(() => {
+      this.isLoading.set(false);
+    });
   }
 
   onSearchInput(val: string) {

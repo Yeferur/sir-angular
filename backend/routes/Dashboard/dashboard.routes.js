@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../../controllers/Dashboard/dashboard.controller');
 const { authMiddleware } = require('../../middlewares/authMiddleware');
-const { checkPermission } = require('../../middlewares/permissionsMiddleware');
+const { checkAnyPermission } = require('../../middlewares/permissionsMiddleware');
 
-router.get('/stats', authMiddleware, checkPermission('DASHBOARD.LEER'), dashboardController.getDashboardStats);
-router.get('/income-history', authMiddleware, checkPermission('DASHBOARD.LEER'), dashboardController.getIncomeHistory);
-router.get('/passengers-distribution', authMiddleware, checkPermission('DASHBOARD.LEER'), dashboardController.getPassengerDistribution);
-router.get('/tour-occupancy', authMiddleware, checkPermission('DASHBOARD.LEER'), dashboardController.getTourOccupancy);
+const dashboardReadPermission = checkAnyPermission(['INFORMES.LEER', 'DASHBOARD.LEER']);
+
+router.get('/stats', authMiddleware, dashboardReadPermission, dashboardController.getDashboardStats);
+router.get('/income-history', authMiddleware, dashboardReadPermission, dashboardController.getIncomeHistory);
+router.get('/passengers-distribution', authMiddleware, dashboardReadPermission, dashboardController.getPassengerDistribution);
+router.get('/tour-occupancy', authMiddleware, dashboardReadPermission, dashboardController.getTourOccupancy);
 
 module.exports = router;

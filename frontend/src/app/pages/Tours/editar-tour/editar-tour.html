@@ -1,330 +1,493 @@
-<!-- editar-tour.html (NUEVO) -->
-<div class="booking-dashboard">
+@if (isLoading()) {
+<div class="booking-dashboard skeleton-page">
+
   <div class="page-header">
-    <div>
-      <h1>Editar Tour</h1>
-      <p class="subtitle">
-        Los campos marcados con <span class="required-star">*</span> son obligatorios.
-      </p>
+    <div class="page-header-text">
+      <div class="sk-line sk-title"></div>
+      <div class="sk-line sk-subtitle"></div>
+    </div>
+    <div class="page-header-actions">
+      <div class="sk-button"></div>
     </div>
   </div>
 
-  @if (loadingData || isLoading) {
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Cargando información...</p>
+  <div class="main-content">
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group full-width">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group full-width">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field sk-field-textarea"></div>
+        </div>
+      </div>
     </div>
-  } @else {
-    <form [formGroup]="form" (ngSubmit)="onSubmitEditarTour()">
-      <div class="main-content">
-        <div class="card">
-          <div class="card-header header-row">
-            <div class="header-title">
-              <h2>Información del tour</h2>
-            </div>
+
+    <div class="card sk-card">
+      <div class="card-header header-row">
+        <div>
+          <div class="sk-line sk-heading"></div>
+          <div class="sk-line sk-subtitle sk-subtitle-small"></div>
+        </div>
+        <div class="sk-button sk-button-small"></div>
+      </div>
+      <div class="sk-plan-card">
+        <div class="sk-line sk-label"></div>
+        <div class="sk-field"></div>
+        <div class="sk-chip-row">
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+        </div>
+        <div class="sk-currency-grid">
+          <div class="sk-currency">
+            <div class="sk-line sk-label"></div>
+            <div class="sk-field"></div>
+            <div class="sk-field"></div>
+            <div class="sk-field"></div>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <div class="form-grid">
-            <div class="form-group full-width">
-              <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
-              <input formControlName="Nombre_Tour" type="text" class="form-input" maxlength="255" placeholder="Ej: Guatapé" [ngClass]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid ? 'errorInput' : ''" />
-              @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
-                <div class="errorMessage">Ingresa un nombre válido.</div>
-              }
-            </div>
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+      </div>
+      <div class="sk-segmented">
+        <div class="sk-chip sk-chip-wide"></div>
+        <div class="sk-chip sk-chip-wide"></div>
+      </div>
+      <div class="sk-chip-row sk-chip-row-wrap">
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+        <div class="sk-chip"></div>
+      </div>
+      <div class="sk-season-card">
+        <div class="sk-line sk-label"></div>
+        <div class="sk-field"></div>
+        <div class="sk-field"></div>
+        <div class="sk-chip-row sk-chip-row-wrap">
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+          <div class="sk-chip"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+} @else {
+<div class="booking-dashboard">
 
-            <div class="form-group">
-              <label class="form-label">Abreviación <span class="required-star">*</span></label>
-              <input formControlName="Abreviacion" type="text" class="form-input" maxlength="50" placeholder="Ej: TG" [ngClass]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid ? 'errorInput' : ''" />
-              @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
-                <div class="errorMessage">La abreviación es obligatoria.</div>
-              }
-            </div>
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1>Editar Tour</h1>
+      <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn-submit" type="submit" form="tourForm" [disabled]="isSubmitting()">
+        @if (isSubmitting()) {
+        <span class="btn-spinner"></span>
+        Guardando...
+        } @else {
+        Guardar Cambios
+        }
+      </button>
+    </div>
+  </div>
 
-            <div class="form-group">
-              <label class="form-label">Cupo Base <span class="required-star">*</span></label>
-              <input formControlName="Cupo_Base" type="number" class="form-input" min="0" placeholder="0" [ngClass]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid ? 'errorInput' : ''" />
-              @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
-                <div class="errorMessage">El cupo base es obligatorio.</div>
-              }
-            </div>
+  <form id="tourForm" [formGroup]="form" (ngSubmit)="onSubmitEditarTour()">
+    <div class="main-content">
 
-            <div class="form-group full-width">
-              <label class="form-label">Copiar Horarios de Tour Existente (Opcional)</label>
-              <select formControlName="Id_Tour_Origen" class="form-input">
-                <option [ngValue]="null">Pendiente</option>
-                @for (tour of toursExistentes; track tour.Id_Tour) {
-                  <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-                }
-              </select>
-              <small class="form-hint">
-                Si seleccionas un tour, se copiarán sus horarios. Si no, todos los horarios quedarán en “Pendiente”.
-              </small>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Comisión Hotel</label>
-              <input formControlName="Comision_Hotel" type="number" class="form-input" min="0" placeholder="0" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Comisión Agencia</label>
-              <input formControlName="Comision_Agencia" type="number" class="form-input" min="0" placeholder="0" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Comisión Freelance</label>
-              <input formControlName="Comision_Freelance" type="number" class="form-input" min="0" placeholder="0" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Latitud <span class="required-star">*</span></label>
-              <input formControlName="Latitud" type="number" class="form-input" step="any" placeholder="6.24..." [ngClass]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid ? 'errorInput' : ''" />
-              @if (form.get('Latitud')?.touched && form.get('Latitud')?.invalid) {
-                <div class="errorMessage">Latitud inválida.</div>
-              }
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Longitud <span class="required-star">*</span></label>
-              <input formControlName="Longitud" type="number" class="form-input" step="any" placeholder="-75.57..." [ngClass]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid ? 'errorInput' : ''" />
-              @if (form.get('Longitud')?.touched && form.get('Longitud')?.invalid) {
-                <div class="errorMessage">Longitud inválida.</div>
-              }
-            </div>
+      <!-- =============================================
+           CARD 1: INFORMACIÓN BÁSICA
+           ============================================= -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Información del Tour</h2>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header header-row">
-            <div class="header-title">
-              <h2>Planes y precios</h2>
-            </div>
-            <div class="header-actions">
-              <button type="button" class="btn-secondary" (click)="addNewPlan()">+ Agregar plan</button>
-            </div>
+        <div class="form-grid">
+
+          <div class="form-group full-width">
+            <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
+            <input formControlName="Nombre_Tour" type="text" class="form-input" maxlength="255"
+              placeholder="Ej: Guatapé"
+              [class.errorInput]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid" />
+            @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
+            <div class="errorMessage">Ingresa un nombre válido.</div>
+            }
           </div>
 
-          <div formArrayName="planes" class="planes-list">
-            @for (planCtrl of plans.controls; track (planCtrl.get('Id_Plan')?.value ?? $index); let i = $index) {
-              <div class="card plan-card" [formGroupName]="i">
-                <div class="plan-row">
-                  @if (i !== 0) {
-                    <div class="btn-header">
-                      <button type="button" class="btn-icon-delete" (click)="deletePlan(i)">✕</button>
-                    </div>
-                  }
+          <div class="form-group">
+            <label class="form-label">Abreviación <span class="required-star">*</span></label>
+            <input formControlName="Abreviacion" type="text" class="form-input" maxlength="50" placeholder="Ej: TG"
+              [class.errorInput]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid" />
+            @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
+            <div class="errorMessage">La abreviación es obligatoria.</div>
+            }
+          </div>
 
-                  <div class="plan-main">
-                    <label class="form-label">Nombre del plan <span class="required-star">*</span></label>
-                    <input type="text" formControlName="Nombre_Plan" class="form-input" placeholder="Ej: Plan básico / Premium" [ngClass]="planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid ? 'errorInput' : ''" />
-                    @if (planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid) {
-                      <div class="errorMessage">El nombre del plan es obligatorio.</div>
-                    }
-                    @if (i === 0) {
-                      <small class="form-hint">Este plan es el principal del tour.</small>
+          <div class="form-group">
+            <label class="form-label">Cupo Base <span class="required-star">*</span></label>
+            <input formControlName="Cupo_Base" type="number" class="form-input" min="0" placeholder="0"
+              [class.errorInput]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid" />
+            @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
+            <div class="errorMessage">El cupo base es obligatorio.</div>
+            }
+          </div>
+
+          <div class="form-group full-width">
+            <label class="form-label">Copiar Horarios de Tour Existente <span
+                class="label-optional">(Opcional)</span></label>
+            <select formControlName="Id_Tour_Origen" class="form-select">
+              <option [ngValue]="null">Sin copiar — todos en Pendiente</option>
+              @for (tour of toursExistentes; track tour.Id_Tour) {
+              <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+              }
+            </select>
+            <p class="form-hint">Si seleccionas un tour, se copiarán sus horarios de punto de encuentro.</p>
+          </div>
+
+          <!-- COORDS -->
+          <div class="form-group">
+            <label class="form-label">Latitud <span class="required-star">*</span></label>
+            <input formControlName="Latitud" type="number" class="form-input" step="any" placeholder="6.244747"
+              [class.errorInput]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Longitud <span class="required-star">*</span></label>
+            <input formControlName="Longitud" type="number" class="form-input" step="any" placeholder="-75.574756"
+              [class.errorInput]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid" />
+          </div>
+
+          <!-- DIVIDER -->
+          <div class="form-group full-width">
+            <div class="divider"></div>
+          </div>
+
+          <!-- COMISIONES -->
+          <div class="form-group">
+            <label class="form-label">Comisión Hotel <span class="label-optional">(%)</span></label>
+            <input formControlName="Comision_Hotel" type="number" class="form-input" min="0" placeholder="0" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Comisión Agencia <span class="label-optional">(%)</span></label>
+            <input formControlName="Comision_Agencia" type="number" class="form-input" min="0" placeholder="0" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Comisión Freelance <span class="label-optional">(%)</span></label>
+            <input formControlName="Comision_Freelance" type="number" class="form-input" min="0" placeholder="0" />
+          </div>
+
+        </div>
+      </div>
+
+      <!-- =============================================
+           CARD 2: PLANES Y PRECIOS
+           ============================================= -->
+      <div class="card">
+        <div class="card-header header-row">
+          <div class="card-header-left">
+            <div>
+              <h2>Planes y Precios</h2>
+              <p class="card-subtitle">Configura precios por plan y moneda.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-secondary" (click)="addNewPlan()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Agregar plan
+          </button>
+        </div>
+
+        <div formArrayName="planes" class="planes-list">
+          @for (planCtrl of plans.controls; track (planCtrl.get('Id_Plan')?.value ?? $index); let i = $index) {
+          <div class="plan-card" [formGroupName]="i">
+
+            <!-- Plan header -->
+            <div class="plan-header">
+              <div class="plan-name-group">
+                <label class="form-label">
+                  Nombre del plan <span class="required-star">*</span>
+                  @if (i === 0) { <span class="label-badge">Principal</span> }
+                </label>
+                <input type="text" formControlName="Nombre_Plan" class="form-input"
+                  placeholder="Ej: Plan básico / Premium"
+                  [class.errorInput]="planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid" />
+                @if (planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid) {
+                <div class="errorMessage">El nombre del plan es obligatorio.</div>
+                }
+              </div>
+              @if (i !== 0) {
+              <button type="button" class="btn-icon-delete" (click)="deletePlan(i)" title="Eliminar plan">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+              }
+            </div>
+
+            <!-- Passenger type toggles -->
+            <div class="plan-controls">
+              <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowNino')?.value"
+                (click)="planCtrl.get('AllowNino')?.setValue(!planCtrl.get('AllowNino')?.value); togglePassengerType(i, 'NINO')">
+                <span class="perm-codigo">Niños</span>
+                <span class="perm-desc">Permite pasajeros tipo Niño</span>
+              </button>
+              <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowInfante')?.value"
+                (click)="planCtrl.get('AllowInfante')?.setValue(!planCtrl.get('AllowInfante')?.value); togglePassengerType(i, 'INFANTE')">
+                <span class="perm-codigo">Infantes</span>
+                <span class="perm-desc">Permite pasajeros tipo Infante</span>
+              </button>
+            </div>
+
+            <!-- Monedas -->
+            <div formArrayName="monedas" class="plan-monedas">
+              @for (monCtrl of getPlanCurrencies(i).controls; track (monCtrl.get('Id_Moneda')?.value ?? $index); let mi = $index) {
+              <div class="moneda-card" [formGroupName]="mi">
+                <div class="moneda-title">
+                  {{ monCtrl.get('Nombre_Moneda')?.value }}
+                  <span class="moneda-code">{{ monCtrl.get('Codigo')?.value }}</span>
+                </div>
+                <div class="moneda-grid">
+
+                  <div class="form-group">
+                    <label class="form-label">
+                      Adulto @if (isAdultRequired(i, mi)) { <span class="required-star">*</span> }
+                    </label>
+                    <input type="number" class="form-input" formControlName="ADULTO" min="0" placeholder="0"
+                      [class.errorInput]="monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid" />
+                    @if (monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid) {
+                    <div class="errorMessage">{{ getAdultErrorMessage(i, mi) }}</div>
                     }
                   </div>
-                </div>
 
-                <div class="plan-controls">
-                  <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowNino')?.value" (click)="planCtrl.get('AllowNino')?.setValue(!planCtrl.get('AllowNino')?.value); togglePassengerType(i, 'NINO')">
-                    <span class="perm-codigo">Permite Niño</span>
-                  </button>
+                  <div class="form-group">
+                    <label class="form-label">Niño</label>
+                    <input type="number" class="form-input" formControlName="NINO" min="0" placeholder="0"
+                      [class.errorInput]="monCtrl.get('NINO')?.touched && monCtrl.get('NINO')?.invalid" />
+                    @if (planCtrl.get('AllowNino')?.value && monCtrl.get('NINO')?.touched &&
+                    monCtrl.get('NINO')?.invalid) {
+                    <div class="errorMessage">{{ getChildErrorMessage(i, mi) }}</div>
+                    }
+                  </div>
 
-                  <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowInfante')?.value" (click)="planCtrl.get('AllowInfante')?.setValue(!planCtrl.get('AllowInfante')?.value); togglePassengerType(i, 'INFANTE')">
-                    <span class="perm-codigo">Permite Infante</span>
-                  </button>
-                </div>
+                  <div class="form-group">
+                    <label class="form-label">Infante</label>
+                    <input type="number" class="form-input" formControlName="INFANTE" min="0" placeholder="0"
+                      [class.errorInput]="monCtrl.get('INFANTE')?.touched && monCtrl.get('INFANTE')?.invalid" />
+                    @if (planCtrl.get('AllowInfante')?.value && monCtrl.get('INFANTE')?.touched &&
+                    monCtrl.get('INFANTE')?.invalid) {
+                    <div class="errorMessage">{{ getInfantErrorMessage(i, mi) }}</div>
+                    }
+                  </div>
 
-                <div formArrayName="monedas" class="plan-monedas">
-                  @for (monCtrl of getPlanCurrencies(i).controls; track (monCtrl.get('Id_Moneda')?.value ?? $index); let mi = $index) {
-                    <div class="card moneda-card" [formGroupName]="mi">
-                      <div class="moneda-row">
-                        <div class="form-label">
-                          {{ monCtrl.get('Nombre_Moneda')?.value }} ({{ monCtrl.get('Codigo')?.value }})
-                        </div>
-                      </div>
-
-                      <div class="moneda-grid">
-                        <div>
-                          <label class="form-label">
-                            Adulto
-                            @if (mi === 0 || (i === 0 && monCtrl.get('Codigo')?.value === 'COP')) {
-                              <span class="required-star">*</span>
-                            }
-                          </label>
-                          <input type="number" class="form-input" formControlName="ADULTO" min="0" placeholder="0" [ngClass]="monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid ? 'errorInput' : ''" />
-                          @if (monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid) {
-                            <div class="errorMessage">Ingresa un precio válido.</div>
-                          }
-                        </div>
-
-                        <div>
-                          <label class="form-label">Niño</label>
-                          <input type="number" class="form-input" formControlName="NINO" min="0" placeholder="0" [ngClass]="monCtrl.get('NINO')?.touched && monCtrl.get('NINO')?.invalid ? 'errorInput' : ''" />
-                          @if (planCtrl.get('AllowNino')?.value && monCtrl.get('NINO')?.touched && monCtrl.get('NINO')?.invalid) {
-                            <div class="errorMessage">Ingresa un precio válido.</div>
-                          }
-                        </div>
-
-                        <div>
-                          <label class="form-label">Infante</label>
-                          <input type="number" class="form-input" formControlName="INFANTE" min="0" placeholder="0" [ngClass]="monCtrl.get('INFANTE')?.touched && monCtrl.get('INFANTE')?.invalid ? 'errorInput' : ''" />
-                          @if (planCtrl.get('AllowInfante')?.value && monCtrl.get('INFANTE')?.touched && monCtrl.get('INFANTE')?.invalid) {
-                            <div class="errorMessage">Ingresa un precio válido.</div>
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  }
                 </div>
               </div>
+              }
+            </div>
+
+          </div>
+          }
+        </div>
+      </div>
+
+      <!-- =============================================
+           CARD 3: DISPONIBILIDAD Y TEMPORADAS
+           ============================================= -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Disponibilidad y Temporadas</h2>
+            <p class="card-subtitle">Define cuándo opera el tour.</p>
+          </div>
+        </div>
+
+        <!-- MODO DISPONIBILIDAD -->
+        <div class="form-group">
+          <label class="form-label">Modo de disponibilidad</label>
+          <div class="segmented-control">
+            <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'TODO_EL_ANO'"
+              (click)="form.get('Modo_Disponibilidad')?.setValue('TODO_EL_ANO')">
+              Todo el año
+            </button>
+            <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'"
+              (click)="form.get('Modo_Disponibilidad')?.setValue('SOLO_TEMPORADAS')">
+              Solo por temporadas
+            </button>
+          </div>
+        </div>
+
+        <!-- DÍAS BASE -->
+        @if (!isSoloTemporadas()) {
+        <div class="section-divider">
+          <div class="section-header-row">
+            <span class="form-label">Días de operación</span>
+            <button type="button" class="btn-secondary btn-sm" (click)="toggleAllBaseDaysToggle()">
+              {{ areAllBaseDaysSelected() ? 'Ninguno' : 'Todos' }}
+            </button>
+          </div>
+          <div [formGroup]="diasBaseFG" class="days-row">
+            @for (d of diasSemana; track d.key) {
+            <label class="day-chip">
+              <input type="checkbox" [formControlName]="d.key" />
+              <span>{{ d.label }}</span>
+            </label>
             }
           </div>
         </div>
+        }
 
-        <div class="card card--spaced">
-          <div class="card-header header-row">
-            <div class="header-title">
-              <h2>Disponibilidad y temporadas</h2>
-            </div>
+        <!-- TEMPORADAS -->
+        <div class="section-divider">
+          <div class="section-header-row">
+            <span class="form-label">Temporadas</span>
+            <button type="button" class="btn-secondary btn-sm" (click)="addTemporada()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Agregar temporada
+            </button>
           </div>
 
-          <div class="form-grid">
-            <div class="form-group full-width">
-              <label class="form-label">Modo de disponibilidad</label>
-
-              <div class="segmented-wrapper">
-                <div class="segmented-control">
-                  <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'TODO_EL_ANO'" (click)="form.get('Modo_Disponibilidad')?.setValue('TODO_EL_ANO')">
-                    Disponible todo el año
-                  </button>
-
-                  <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'" (click)="form.get('Modo_Disponibilidad')?.setValue('SOLO_TEMPORADAS')">
-                    Disponible solo por temporadas
-                  </button>
-                </div>
-              </div>
-            </div>
+          @if (temporadasFA.touched && temporadasFA.invalid && temporadasFA.errors?.['requiereTemporada']) {
+          <div class="errorMessage" style="margin-bottom: 12px;">
+            Debes agregar al menos una temporada en el modo "Solo por temporadas".
           </div>
+          }
 
-          @if (!isSoloTemporadas()) {
-            <div class="section-divider">
-              <div class="section-header-row">
-                <div>
-                  <div class="form-label">Días de operación</div>
+          <div formArrayName="temporadas" class="temporadas-list">
+            @for (tempCtrl of temporadasFA.controls; track $index; let ti = $index) {
+            <div class="temporada-card" [formGroupName]="ti">
+
+              <!-- Temporada header -->
+              <div class="plan-header">
+                <div class="plan-name-group" style="flex:1">
+                  <label class="form-label">Nombre de temporada <span class="required-star">*</span></label>
+                  <input type="text" class="form-input" formControlName="Nombre_Temporada"
+                    placeholder="Ej: Diciembre (alta)"
+                    [class.errorInput]="tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid" />
+                  @if (tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid) {
+                  <div class="errorMessage">Nombre obligatorio.</div>
+                  }
                 </div>
+                <button type="button" class="btn-icon-delete" (click)="deleteTemporada(ti)" title="Eliminar temporada">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
 
-                <div class="button-row header-actions">
-                  <button type="button" class="btn-secondary btn-toggle" (click)="toggleAllBaseDaysToggle()">{{ areAllBaseDaysSelected() ? 'Ninguno' : 'Todos' }}</button>
+              <!-- Fechas -->
+              <div class="temp-grid">
+                <div class="form-group">
+                  <label class="form-label">Fecha inicio <span class="required-star">*</span></label>
+                  <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+                    formControlName="Fecha_Inicio"
+                    [class.errorInput]="tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid" />
+                  @if (tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid) {
+                  <div class="errorMessage">Obligatoria.</div>
+                  }
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Fecha fin <span class="required-star">*</span></label>
+                  <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
+                    formControlName="Fecha_Fin"
+                    [class.errorInput]="tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid" />
+                  @if (tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid) {
+                  <div class="errorMessage">Obligatoria.</div>
+                  }
                 </div>
               </div>
 
-              <div [formGroup]="diasBaseFG" class="days-row">
-                @for (d of diasSemana; track d.key) {
+              @if (tempCtrl.touched && tempCtrl.errors?.['rangoInvalido']) {
+              <div class="errorMessage" style="margin-top: 8px;">
+                La fecha fin no puede ser menor que la fecha inicio.
+              </div>
+              }
+
+              <!-- Días de la temporada -->
+              <div class="section-divider" style="margin-top: 16px; padding-top: 16px;">
+                <div class="section-header-row">
+                  <span class="form-label">Días de operación <span class="required-star">*</span></span>
+                  <button type="button" class="btn-secondary btn-sm" (click)="toggleAllSeasonDaysToggle(ti)">
+                    {{ areAllSeasonDaysSelected(ti) ? 'Ninguno' : 'Todos' }}
+                  </button>
+                </div>
+                <div formGroupName="dias" class="days-row">
+                  @for (d of diasSemana; track d.key) {
                   <label class="day-chip">
                     <input type="checkbox" [formControlName]="d.key" />
                     <span>{{ d.label }}</span>
                   </label>
+                  }
+                </div>
+                @if (tempCtrl.touched && tempCtrl.errors?.['sinDias']) {
+                <div class="errorMessage" style="margin-top: 8px;">
+                  Selecciona al menos un día para esta temporada.
+                </div>
                 }
               </div>
+
             </div>
-          }
-
-          <div class="section-divider">
-            <div class="section-header-row">
-              <div>
-                <div class="strong-title">Temporadas</div>
-              </div>
-
-              <div class="header-actions">
-                <button type="button" class="btn-secondary" (click)="addTemporada()">+ Agregar temporada</button>
-              </div>
-            </div>
-
-            @if (temporadasFA.touched && temporadasFA.invalid && temporadasFA.errors?.['requiereTemporada']) {
-              <div class="errorMessage mt-10">
-                Debes agregar al menos una temporada en el modo “Solo por temporadas”.
-              </div>
             }
-
-            <div formArrayName="temporadas" class="temporadas-list">
-              @for (tempCtrl of temporadasFA.controls; track $index; let ti = $index) {
-                <div class="card temporada-card" [formGroupName]="ti">
-                  <div class="plan-row">
-                    <div class="btn-header">
-                      <button type="button" class="btn-icon-delete" (click)="deleteTemporada(ti)">✕</button>
-                    </div>
-
-                    <div class="plan-main">
-                      <label class="form-label">Nombre de temporada <span class="required-star">*</span></label>
-                      <input type="text" class="form-input" formControlName="Nombre_Temporada" placeholder="Ej: Diciembre (alta)" [ngClass]="tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid ? 'errorInput' : ''" />
-                      @if (tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid) {
-                        <div class="errorMessage">Nombre obligatorio.</div>
-                      }
-                    </div>
-                  </div>
-
-                  <div class="temp-grid">
-                    <div>
-                      <label class="form-label">Fecha inicio <span class="required-star">*</span></label>
-                      <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha" formControlName="Fecha_Inicio" [ngClass]="tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid ? 'errorInput' : ''" />
-                      @if (tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid) {
-                        <div class="errorMessage">Obligatoria.</div>
-                      }
-                    </div>
-
-                    <div>
-                      <label class="form-label">Fecha fin <span class="required-star">*</span></label>
-                      <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha" formControlName="Fecha_Fin" [ngClass]="tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid ? 'errorInput' : ''" />
-                      @if (tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid) {
-                        <div class="errorMessage">Obligatoria.</div>
-                      }
-                    </div>
-                  </div>
-
-                  @if (tempCtrl.touched && tempCtrl.errors?.['rangoInvalido']) {
-                    <div class="errorMessage mt-10">
-                      La fecha fin no puede ser menor que la fecha inicio.
-                    </div>
-                  }
-
-                  <div class="mt-14">
-                    <div class="section-header-row">
-                      <div class="form-label">Días de operación de la temporada <span class="required-star">*</span></div>
-                      <div class="button-row header-actions">
-                        <button type="button" class="btn-secondary btn-toggle" (click)="toggleAllSeasonDaysToggle(ti)">{{ areAllSeasonDaysSelected(ti) ? 'Ninguno' : 'Todos' }}</button>
-                      </div>
-                    </div>
-
-                    <div formGroupName="dias" class="days-row">
-                      @for (d of diasSemana; track d.key) {
-                        <label class="day-chip">
-                          <input type="checkbox" [formControlName]="d.key" />
-                          <span>{{ d.label }}</span>
-                        </label>
-                      }
-                    </div>
-
-                    @if (tempCtrl.touched && tempCtrl.errors?.['sinDias']) {
-                      <div class="errorMessage mt-10">
-                        Selecciona al menos un día para esta temporada.
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
           </div>
         </div>
 
-        <div class="actions-end">
-          <button class="btn-primary" type="submit" [disabled]="isSubmitting() || loadingData">
-            {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
-          </button>
-        </div>
       </div>
-    </form>
-  }
+    </div>
+  </form>
 </div>
+}

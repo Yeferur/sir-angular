@@ -1,7 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, finalize } from 'rxjs';
+import { forkJoin, finalize, catchError, of } from 'rxjs';
+import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
+import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 
 import { DashboardService } from '../../services/dashboard.service';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
@@ -43,11 +45,11 @@ export type ChartOptions = {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, NgApexchartsModule, FormsModule],
+  imports: [CommonModule, NgApexchartsModule, FormsModule, FlatpickrInputDirective],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private dashboardService = inject(DashboardService);
   private navbar = inject(DynamicIslandGlobalService);
   private cdr = inject(ChangeDetectorRef);
@@ -66,6 +68,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   @ViewChild('chartIncome') chartIncome?: ChartComponent;
   @ViewChild('chartPassengers') chartPassengers?: ChartComponent;
   @ViewChild('chartOccupancy') chartOccupancy?: ChartComponent;
+  @ViewChild('startDateFp') startDateFp?: FlatpickrInputDirective;
+  @ViewChild('endDateFp') endDateFp?: FlatpickrInputDirective;
 
   // OPTIONS
   public incomeChartOptions: Partial<ChartOptions> | any;
@@ -73,23 +77,163 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   public occupancyChartOptions: Partial<ChartOptions> | any;
 
   // FLAGS / CACHE
+  isInitialLoading = true;
+  isRefreshing = false;
   isLoading = true;
+  hasIncomeData = false;
+  hasPassengerData = false;
+  hasOccupancyData = false;
   private viewReady = false;
   private lastResponse: any = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private dashboardRequestId = 0;
+
+  fpOptionsFecha: Partial<FlatpickrOptions> = {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+    disableMobile: true,
+    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
+    altInputClass: 'form-input flatpickr-input flatpickr-alt',
+
+    onReady: (_sel, _str, inst: any) => {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+      const cal: HTMLElement = inst?.calendarContainer;
+      if (!cal) return;
+
+      cal.classList.add('sir-flatpickr');
+
+      const clampDay = (y: number, m: number, d: number) => {
+        const last = new Date(y, m + 1, 0).getDate();
+        return Math.min(Math.max(d, 1), last);
+      };
+
+      let yearSelect: HTMLSelectElement | null = null;
+
+      const ensureYearSelect = () => {
+        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
+        if (!monthWrap) return null;
+
+        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
+        if (numWrap) {
+          try { numWrap.remove(); } catch { /* ignore */ }
+        }
+
+        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
+        const container = curMonth ?? monthWrap;
+
+        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
+        if (yearSelect) return yearSelect;
+
+        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
+        if (oldDiv) {
+          try { oldDiv.remove(); } catch { /* ignore */ }
+        }
+
+        yearSelect = document.createElement('select');
+        yearSelect.className = 'sir-year-select';
+        yearSelect.setAttribute('aria-label', 'Seleccionar año');
+
+        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
+        return yearSelect;
+      };
+
+      const buildYears = (centerYear: number) => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const start = centerYear - 20;
+        const end = centerYear + 20;
+
+        sel.innerHTML = '';
+        for (let y = end; y >= start; y--) {
+          const opt = document.createElement('option');
+          opt.value = String(y);
+          opt.textContent = String(y);
+          sel.appendChild(opt);
+        }
+        sel.value = String(centerYear);
+      };
+
+      const syncSelectValue = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const y = inst.currentYear ?? new Date().getFullYear();
+        const exists = !!sel.querySelector(`option[value="${y}"]`);
+        if (!exists) buildYears(y);
+        sel.value = String(y);
+      };
+
+      const getSafeDay = () => {
+        const d: Date | undefined = inst.selectedDates?.[0];
+        return d ? d.getDate() : 1;
+      };
+
+      const onChange = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const y = Number(sel.value);
+        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
+        const day = clampDay(y, m, getSafeDay());
+
+        const newDate = new Date(y, m, day);
+
+        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
+
+        if (inst.selectedDates?.length) {
+          inst.setDate(newDate, true);
+        }
+      };
+
+      buildYears(inst.currentYear ?? new Date().getFullYear());
+      syncSelectValue();
+
+      const sel0 = ensureYearSelect();
+      sel0?.addEventListener('change', onChange);
+
+      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
+        const prev = inst.config[key];
+        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
+        inst.config[key] = [...arr, fn];
+      };
+
+      wrap('onMonthChange', () => syncSelectValue());
+      wrap('onYearChange', () => syncSelectValue());
+
+      const prevOnDestroy = inst.config.onDestroy;
+      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
+      inst.config.onDestroy = [
+        ...destroyArr,
+        () => sel0?.removeEventListener('change', onChange)
+      ];
+    }
+  };
 
   ngOnInit() {
+    const tomorrow = this.getTomorrowDateValue();
+    this.startDate = tomorrow;
+    this.endDate = tomorrow;
     this.initCharts();
-    this.loadData();
+    this.loadData(true);
   }
 
   ngAfterViewInit() {
     this.viewReady = true;
+    this.syncDatePickers();
 
     // Si la data llegó antes del view, la aplicamos acá
     if (this.lastResponse) {
       this.applyChartData(this.lastResponse);
       this.forceChartsReflow();
     }
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
   }
 
   private initCharts() {
@@ -202,43 +346,80 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     };
   }
 
+  private toDateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getTomorrowDateValue(): string {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return this.toDateInputValue(tomorrow);
+  }
+
+  private syncDatePickers(): void {
+    this.startDateFp?.instance?.setDate(this.startDate, false);
+    this.endDateFp?.instance?.setDate(this.endDate, false);
+  }
+
   private applyChartData(res: any) {
     // Income
-    if (res.income) {
-      const series = [{ name: 'Ingresos', data: res.income }];
+    const incomeData = Array.isArray(res?.income) ? res.income.map((v: any) => Number(v) || 0) : [];
+    this.hasIncomeData = incomeData.some((value: number) => value > 0);
+    const incomeSeries = [{ name: 'Ingresos', data: incomeData.length ? incomeData : [0] }];
+    this.incomeChartOptions = {
+      ...this.incomeChartOptions,
+      series: incomeSeries
+    };
 
-      if (this.chartIncome) this.chartIncome.updateSeries(series, true);
-      else this.incomeChartOptions = { ...this.incomeChartOptions, series };
+    if (this.chartIncome) {
+      this.chartIncome.updateOptions({ series: incomeSeries }, true, true);
+      this.chartIncome.updateSeries(incomeSeries, true);
     }
 
     // Passengers
-    if (res.passengers) {
-      const labels = res.passengers.map((d: any) => d.estado);
-      const series = res.passengers.map((d: any) => Number(d.cantidad));
+    const passengerData = Array.isArray(res?.passengers) ? res.passengers : [];
+    const labels = passengerData.map((d: any) => d.estado);
+    const passengerSeries = passengerData.map((d: any) => Number(d.cantidad) || 0);
+    const passengerTotal = passengerSeries.reduce((acc: number, curr: number) => acc + curr, 0);
+    this.hasPassengerData = passengerTotal > 0;
+    this.passengerChartOptions = {
+      ...this.passengerChartOptions,
+      labels,
+      series: this.hasPassengerData ? passengerSeries : []
+    };
 
-      if (this.chartPassengers) {
-        this.chartPassengers.updateOptions({ labels }, true, true);
-        this.chartPassengers.updateSeries(series, true);
-      } else {
-        this.passengerChartOptions = { ...this.passengerChartOptions, labels, series };
-      }
+    if (this.chartPassengers) {
+      this.chartPassengers.updateOptions({ labels, series: this.hasPassengerData ? passengerSeries : [] }, true, true);
+      this.chartPassengers.updateSeries(this.hasPassengerData ? passengerSeries : [], true);
     }
 
     // Occupancy
-    if (res.occupancy) {
-      const categories = res.occupancy.map((d: any) => d.Nombre_Tour);
-      const series = [{ name: 'Pasajeros', data: res.occupancy.map((d: any) => Number(d.pasajeros)) }];
+    const occupancyData = Array.isArray(res?.occupancy) ? res.occupancy : [];
+    const categories = occupancyData.map((d: any) => d.Nombre_Tour);
+    const occupancySeriesData = occupancyData.map((d: any) => Number(d.pasajeros) || 0);
+    this.hasOccupancyData = occupancySeriesData.some((value: number) => value > 0);
+    const occupancySeries = [{ name: 'Pasajeros', data: this.hasOccupancyData ? occupancySeriesData : [0] }];
+    this.occupancyChartOptions = {
+      ...this.occupancyChartOptions,
+      xaxis: {
+        ...this.occupancyChartOptions.xaxis,
+        categories: this.hasOccupancyData ? categories : []
+      },
+      series: occupancySeries
+    };
 
-      if (this.chartOccupancy) {
-        this.chartOccupancy.updateOptions({ xaxis: { categories } }, true, true);
-        this.chartOccupancy.updateSeries(series, true);
-      } else {
-        this.occupancyChartOptions = {
-          ...this.occupancyChartOptions,
-          xaxis: { ...this.occupancyChartOptions.xaxis, categories },
-          series
-        };
-      }
+    if (this.chartOccupancy) {
+      this.chartOccupancy.updateOptions({
+        xaxis: {
+          ...this.occupancyChartOptions.xaxis,
+          categories: this.hasOccupancyData ? categories : []
+        },
+        series: occupancySeries
+      }, true, true);
+      this.chartOccupancy.updateSeries(occupancySeries, true);
     }
 
     this.cdr.detectChanges();
@@ -257,25 +438,59 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 180);
   }
 
-  loadData() {
+  loadData(initial = false) {
+    const requestId = ++this.dashboardRequestId;
     const filters = {
       startDate: this.startDate || undefined,
       endDate: this.endDate || undefined
     };
+    let hasPartialError = false;
 
-    this.isLoading = true;
+    if (initial) {
+      this.isInitialLoading = true;
+      this.isLoading = true;
+    } else {
+      this.isRefreshing = true;
+    }
     this.cdr.detectChanges();
 
     this.navbar.alert.set(null);
 
     forkJoin({
-      stats: this.dashboardService.getStats(filters),
-      income: this.dashboardService.getIncomeHistory(new Date().getFullYear()),
-      passengers: this.dashboardService.getPassengerDistribution(filters),
-      occupancy: this.dashboardService.getTourOccupancy(filters)
+      stats: this.dashboardService.getStats(filters).pipe(
+        catchError((err) => {
+          console.error('Dashboard stats error:', err);
+          hasPartialError = true;
+          return of(null);
+        })
+      ),
+      income: this.dashboardService.getIncomeHistory(new Date().getFullYear()).pipe(
+        catchError((err) => {
+          console.error('Dashboard income error:', err);
+          hasPartialError = true;
+          return of([]);
+        })
+      ),
+      passengers: this.dashboardService.getPassengerDistribution(filters).pipe(
+        catchError((err) => {
+          console.error('Dashboard passengers error:', err);
+          hasPartialError = true;
+          return of([]);
+        })
+      ),
+      occupancy: this.dashboardService.getTourOccupancy(filters).pipe(
+        catchError((err) => {
+          console.error('Dashboard occupancy error:', err);
+          hasPartialError = true;
+          return of([]);
+        })
+      )
     })
       .pipe(
         finalize(() => {
+          if (requestId !== this.dashboardRequestId) return;
+          this.isInitialLoading = false;
+          this.isRefreshing = false;
           this.isLoading = false;
           const current = this.navbar.alert();
           if (current?.loading) this.navbar.alert.set(null);
@@ -284,28 +499,49 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       )
       .subscribe({
         next: (res) => {
+          if (requestId !== this.dashboardRequestId) return;
           this.lastResponse = res;
 
-          if (res.stats) {
-            this.totalReservas = res.stats.totalReservas || 0;
-            this.totalPasajeros = res.stats.totalPasajeros || 0;
-            this.totalIngresos = res.stats.totalIngresos || 0;
-            this.totalTransfers = res.stats.totalTransfers || 0;
-          }
+          this.totalReservas = Number(res?.stats?.totalReservas || 0);
+          this.totalPasajeros = Number(res?.stats?.totalPasajeros || 0);
+          this.totalIngresos = Number(res?.stats?.totalIngresos || 0);
+          this.totalTransfers = Number(res?.stats?.totalTransfers || 0);
 
           if (this.viewReady) {
-            this.applyChartData(res);
+            this.applyChartData({
+              income: Array.isArray(res?.income) ? res.income : [],
+              passengers: Array.isArray(res?.passengers) ? res.passengers : [],
+              occupancy: Array.isArray(res?.occupancy) ? res.occupancy : []
+            });
             this.forceChartsReflow();
+          }
+
+          if (hasPartialError) {
+            this.navbar.alert.set({
+              title: 'Dashboard parcialmente cargado',
+              message: 'Algunas métricas no pudieron cargarse.',
+              type: 'warning',
+              autoClose: true
+            });
           }
 
           this.cdr.detectChanges();
         },
         error: (err) => {
+          if (requestId !== this.dashboardRequestId) return;
           console.error('Dashboard Error:', err);
+          this.totalReservas = 0;
+          this.totalPasajeros = 0;
+          this.totalIngresos = 0;
+          this.totalTransfers = 0;
+          this.hasIncomeData = false;
+          this.hasPassengerData = false;
+          this.hasOccupancyData = false;
+          this.applyChartData({ income: [], passengers: [], occupancy: [] });
           this.navbar.alert.set({
-            title: 'Error',
-            message: 'No se pudo cargar la información del Dashboard',
-            type: 'error',
+            title: 'Dashboard parcialmente cargado',
+            message: 'Algunas métricas no pudieron cargarse.',
+            type: 'warning',
             autoClose: true,
           });
           this.cdr.detectChanges();
@@ -313,7 +549,90 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       });
   }
 
-  applyFilters() {
-    this.loadData();
+  onDateRangeChange(field: 'startDate' | 'endDate', value: string): void {
+    if (!value) return;
+
+    this[field] = value;
+
+    if (this.startDate && this.endDate && this.startDate > this.endDate) {
+      if (field === 'startDate') {
+        this.endDate = this.startDate;
+      } else {
+        this.startDate = this.endDate;
+      }
+    }
+
+    this.syncDatePickers();
+    this.scheduleRefresh();
+  }
+
+  private scheduleRefresh(): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+
+    this.refreshTimer = setTimeout(() => {
+      this.loadData(false);
+    }, 180);
+  }
+
+  setTomorrowRange() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    const tomorrow = this.getTomorrowDateValue();
+    this.startDate = tomorrow;
+    this.endDate = tomorrow;
+    this.syncDatePickers();
+    this.loadData(false);
+  }
+
+  setTodayRange() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    const today = this.toDateInputValue(new Date());
+    this.startDate = today;
+    this.endDate = today;
+    this.syncDatePickers();
+    this.loadData(false);
+  }
+
+  get activeRangeLabel(): string {
+    if (!this.startDate || !this.endDate) return 'Sin rango definido';
+    if (this.startDate === this.endDate) return `Operación: ${this.startDate}`;
+    return `Rango: ${this.startDate} — ${this.endDate}`;
+  }
+
+  isTodayRange(): boolean {
+    const today = this.toDateInputValue(new Date());
+    return this.startDate === today && this.endDate === today;
+  }
+
+  isTomorrowRange(): boolean {
+    const tomorrow = this.getTomorrowDateValue();
+    return this.startDate === tomorrow && this.endDate === tomorrow;
+  }
+
+  hasAnyActivity(): boolean {
+    return this.totalReservas > 0 || this.totalPasajeros > 0 || this.totalIngresos > 0 || this.totalTransfers > 0;
+  }
+
+  getOperationVolumeLabel(): string {
+    if (this.totalPasajeros >= 100) return 'Alto';
+    if (this.totalPasajeros >= 30) return 'Medio';
+    if (this.totalPasajeros > 0) return 'Bajo';
+    return 'Sin operación';
+  }
+
+  getOperationVolumeClass(): string {
+    if (this.totalPasajeros >= 100) return 'high';
+    if (this.totalPasajeros >= 30) return 'medium';
+    if (this.totalPasajeros > 0) return 'low';
+    return 'none';
+  }
+
+  get averagePassengersPerBooking(): number | null {
+    if (!this.totalReservas) return null;
+    return this.totalPasajeros / this.totalReservas;
+  }
+
+  get averageIncomePerBooking(): number | null {
+    if (!this.totalReservas) return null;
+    return this.totalIngresos / this.totalReservas;
   }
 }

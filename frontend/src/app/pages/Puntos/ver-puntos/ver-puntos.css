@@ -6,7 +6,7 @@
 .page-container {
   margin: 36px auto 72px;
   padding: 0 24px;
-  max-width: 1100px;
+  max-width: 1350px;
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
@@ -91,12 +91,6 @@
 .search:focus-within {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
-}
-
-.search-icon {
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-  opacity: .7;
 }
 
 .search input {
@@ -245,6 +239,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-weight: 800;
 }
 
 .punto-meta { min-width: 0; }
@@ -445,6 +440,86 @@
 }
 
 /* =========================================================
+   SKELETON
+   ========================================================= */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-shape {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 45%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 800px 100%;
+  animation: sk-shimmer 1.6s ease-in-out infinite;
+}
+
+.sk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sk-title {
+  width: 260px;
+  height: 18px;
+  border-radius: 8px;
+}
+
+.sk-address {
+  width: 340px;
+  height: 13px;
+  border-radius: 8px;
+}
+
+.sk-chip {
+  width: 110px;
+  height: 24px;
+  border-radius: 999px;
+}
+
+.sk-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sk-schedule-chip {
+  width: 130px;
+  height: 28px;
+  border-radius: 999px;
+}
+
+.sk-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sk-button {
+  width: 84px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+@keyframes sk-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* =========================================================
    PAGINATION
    ========================================================= */
 .pagination {
@@ -507,6 +582,9 @@
   .punto-tags     { grid-column: 1; grid-row: 2; }
   .card-schedules { grid-column: 1; grid-row: 3; }
   .card-actions   { grid-column: 1; grid-row: 4; justify-content: flex-end; }
+
+  .sk-title { width: 220px; }
+  .sk-address { width: 280px; }
 }
 
 @media (max-width: 640px) {
@@ -514,6 +592,9 @@
   .header-actions { width: 100%; flex-wrap: wrap; }
   .btn-primary, .btn-secondary, .btn-icon-only { flex: 1; justify-content: center; }
   .booking-dashboard { padding: 0 16px; }
+
+  .sk-address { width: 220px; }
+  .sk-schedule-chip { width: 110px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

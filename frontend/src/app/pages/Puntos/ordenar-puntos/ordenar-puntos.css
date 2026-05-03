@@ -3,32 +3,124 @@
 }
 
 .ordenar-page {
-  max-width: 980px;
-  margin: 24px auto 48px;
-  padding: 0 16px;
-  animation: fadeIn 0.5s ease;
+  max-width: 1200px;
+  margin: 28px auto 64px;
+  padding: 0 24px;
+  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
-.page-header h1 {
-  margin: 0;
-  font-size: 2rem;
-  color: var(--text-primary);
-}
-
-.page-header p {
-  margin: 8px 0 0;
-  color: var(--text-secondary);
-}
-
-.toolbar {
-  margin-top: 18px;
+/* =========================================================
+   HEADER
+   ========================================================= */
+.page-header {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
 }
 
+.page-header-text h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: .875rem;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+.toolbar-card,
+.list-card,
+.empty-state-card,
+.skeleton-card {
+  background-color: var(--bg-secondary);
+  border: 1.5px solid var(--separator-color);
+  border-radius: 20px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.07);
+}
+
+.toolbar-card {
+  padding: 20px;
+}
+
+.toolbar-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+}
+
+.route-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, auto));
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1.5px solid var(--separator-color);
+  background: var(--bg-tertiary);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.summary-label {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.summary-value {
+  font-size: .92rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--separator-color);
+  background: rgba(255,255,255,.03);
+  color: var(--text-secondary);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.status-chip--dirty {
+  background: rgba(10, 132, 255, .1);
+  border-color: rgba(10, 132, 255, .22);
+  color: var(--accent-blue);
+}
+
+/* =========================================================
+   FORM
+   ========================================================= */
 .field {
   display: flex;
   flex-direction: column;
@@ -39,33 +131,48 @@
 .field label {
   color: var(--text-secondary);
   font-weight: 700;
+  font-size: .78rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .field select {
-  height: 42px;
+  height: 44px;
   border-radius: 12px;
-  border: 1px solid var(--separator-color);
-  background: var(--bg-secondary);
+  border: 1.5px solid var(--separator-color);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   padding: 0 12px;
   outline: none;
+  font-family: var(--font-family);
+  font-size: .94rem;
 }
 
 .field select:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.12);
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+.btn-save,
+.btn-secondary {
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  padding: 0 18px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: .9rem;
+  font-family: var(--font-family);
+  transition: transform .18s ease, filter .18s ease, background-color .18s ease;
 }
 
 .btn-save {
-  height: 42px;
-  border: none;
-  border-radius: 12px;
   background: var(--accent-blue);
   color: #fff;
-  font-weight: 800;
-  padding: 0 18px;
-  cursor: pointer;
-  transition: transform 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 2px 10px rgba(10, 132, 255, .28);
 }
 
 .btn-save:hover:not(:disabled) {
@@ -74,57 +181,101 @@
 }
 
 .btn-save:disabled {
-  opacity: 0.6;
+  opacity: .55;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
-.empty-state {
-  margin-top: 18px;
-  border: 1px dashed var(--separator-color);
-  border-radius: 14px;
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1.5px solid var(--separator-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
   background: var(--bg-secondary);
-  color: var(--text-secondary);
+}
+
+/* =========================================================
+   LIST
+   ========================================================= */
+.list-card {
+  margin-top: 18px;
   padding: 18px;
 }
 
+.list-header {
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1.5px solid var(--separator-color);
+}
+
+.list-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.list-header p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: .84rem;
+}
+
 .list-wrapper {
-  margin-top: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .point-card {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
-  background: color-mix(in oklab, var(--bg-secondary) 86%, #000 14%);
-  border: 1px solid var(--separator-color);
-  border-radius: 14px;
-  padding: 12px 14px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--separator-color);
+  border-radius: 16px;
+  padding: 14px 16px;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 
 .point-card:hover {
-  border-color: color-mix(in oklab, var(--accent-blue) 35%, var(--separator-color));
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent-blue) 30%, var(--separator-color));
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
 }
 
-.grip {
-  width: 20px;
-  min-width: 20px;
-  display: grid;
-  grid-template-columns: repeat(2, 6px);
-  grid-template-rows: repeat(3, 6px);
-  gap: 3px;
-  cursor: grab;
-  opacity: 0.85;
+.position-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1.5px solid var(--separator-color);
+  background: var(--bg-tertiary);
 }
 
-.grip .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--text-secondary) 70%, #fff 30%);
+.position-number {
+  color: var(--text-primary);
+  font-weight: 800;
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.position-label {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: .64rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-weight: 700;
 }
 
 .point-meta {
@@ -134,6 +285,7 @@
 .point-title {
   color: var(--text-primary);
   font-weight: 800;
+  font-size: .98rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,15 +294,168 @@
 .point-subtitle {
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: .86rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.drag-handle {
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid var(--separator-color);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  letter-spacing: -0.12em;
+  user-select: none;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.drag-handle:hover {
+  border-color: color-mix(in oklab, var(--accent-blue) 30%, var(--separator-color));
+  color: var(--accent-blue);
+}
+
+/* =========================================================
+   EMPTY STATES
+   ========================================================= */
+.empty-state-card {
+  margin-top: 18px;
+  padding: 18px 20px;
+  color: var(--text-secondary);
+  font-size: .92rem;
+}
+
+/* =========================================================
+   SKELETON
+   ========================================================= */
+.skeleton-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.skeleton-card {
+  padding: 20px;
+  pointer-events: none;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.skeleton-shape {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 45%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 800px 100%;
+  animation: sk-shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.sk-title {
+  width: 260px;
+  height: 22px;
+}
+
+.sk-subtitle {
+  width: 360px;
+  height: 14px;
+  margin-top: 10px;
+}
+
+.controls-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) repeat(2, minmax(120px, .7fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.control-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-label {
+  width: 72px;
+  height: 11px;
+}
+
+.sk-field {
+  height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid var(--separator-color);
+}
+
+.sk-button {
+  width: 140px;
+  height: 44px;
+  border-radius: 12px;
+  margin-top: 18px;
+}
+
+.skeleton-point-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.sk-position {
+  width: 44px;
+  height: 46px;
+  border-radius: 12px;
+}
+
+.sk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sk-name {
+  width: 260px;
+  height: 15px;
+}
+
+.sk-meta {
+  width: 360px;
+  height: 12px;
+}
+
+.sk-handle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+@keyframes sk-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* =========================================================
+   DRAG STATES
+   ========================================================= */
 .cdk-drag-preview {
   box-sizing: border-box;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid color-mix(in oklab, var(--accent-blue) 45%, var(--separator-color));
   background: color-mix(in oklab, var(--bg-secondary) 78%, var(--accent-blue) 22%);
   box-shadow: 0 16px 28px rgba(var(--shadow-color), 0.35);
@@ -169,16 +474,64 @@
   transition: transform 220ms cubic-bezier(0, 0, 0.2, 1);
 }
 
-@media (max-width: 768px) {
-  .toolbar {
-    align-items: stretch;
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 900px) {
+  .toolbar-grid {
+    grid-template-columns: 1fr;
   }
 
-  .field {
-    min-width: 100%;
+  .route-summary {
+    grid-template-columns: 1fr;
   }
 
-  .btn-save {
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ordenar-page {
+    padding: 0 16px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-header-actions {
     width: 100%;
   }
+
+  .btn-save,
+  .btn-secondary {
+    width: 100%;
+  }
+
+  .point-card,
+  .skeleton-point-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .drag-handle {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ordenar-page,
+  .point-card,
+  .skeleton-shape {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Utility used for buttons already present in other pages */
+.btn-save:disabled {
+  opacity: .55;
 }

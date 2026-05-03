@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, OnInit, inject, effect, Injector, signal 
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
 import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
-import { InicioService, Tour, Transfer } from '../../services/inicio';
+import { InicioService, Tour, Transfer, TransfersSummary } from '../../services/inicio';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { finalize } from 'rxjs';
@@ -30,14 +30,24 @@ export class Inicio implements OnInit {
 
   canEditarAforo = signal(false);
 
-  fecha: string = new Date().toISOString().split('T')[0];
+  fecha: string = (() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  })();
 
   tours: Tour[] = [];
   transfers: Transfer[] = [];
+  transfersSummary: TransfersSummary = {
+    total: 0,
+    hotelAeropuerto: 0,
+    aeropuertoHotel: 0,
+    otros: 0
+  };
 
   combinedTour: Tour | null = null;
   combinedDetails: Tour[] = [];
-  skeletonCards = [0, 1, 2, 3];
+  skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
 
   private loading = false;
 
@@ -73,6 +83,8 @@ export class Inicio implements OnInit {
         queueMicrotask(() => this.loadData());
       }
     }, { injector: this.injector });
+
+    // TODO: Integrar evento WebSocket de transfers para refrescar Inicio cuando se cree, edite o elimine un transfer de la fecha visible.
   }
 
   ngOnInit(): void {
@@ -235,7 +247,8 @@ export class Inicio implements OnInit {
     ).subscribe({
       next: (data) => {
         this.tours = data.tours;
-        this.transfers = data.transfers;
+        this.transfers = Array.isArray(data.transfers) ? data.transfers : [];
+        this.transfersSummary = this.normalizeTransfers(data.transfers);
 
         const tour1 = data.tours.find((t) => t.Id_Tour === 1);
         const tour5 = data.tours.find((t) => t.Id_Tour === 5);
@@ -261,6 +274,50 @@ export class Inicio implements OnInit {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  private normalizeTransfers(raw: any): TransfersSummary {
+    if (!raw) {
+      return { total: 0, hotelAeropuerto: 0, aeropuertoHotel: 0, otros: 0 };
+    }
+
+    if (!Array.isArray(raw)) {
+      const hotelAeropuerto = Number(raw.hotelAeropuerto || raw.hotel_aeropuerto || 0);
+      const aeropuertoHotel = Number(raw.aeropuertoHotel || raw.aeropuerto_hotel || 0);
+      const otros = Number(raw.otros || raw.otro || 0);
+      const total = Number(raw.total || raw.totalTransfers || hotelAeropuerto + aeropuertoHotel + otros || 0);
+
+      return {
+        total,
+        hotelAeropuerto,
+        aeropuertoHotel,
+        otros,
+      };
+    }
+
+    let hotelAeropuerto = 0;
+    let aeropuertoHotel = 0;
+    let otros = 0;
+
+    for (const item of raw) {
+      const label = String(item.tipo || item.Tipo_Transfer || item.Servicio || item.nombre || item.Nombre || '').toLowerCase();
+      const cantidad = Number(item.cantidad || item.totalTransfers || item.total || item.Total || 0);
+
+      if (label.includes('hotel') && label.includes('aeropuerto') && label.indexOf('hotel') < label.indexOf('aeropuerto')) {
+        hotelAeropuerto += cantidad;
+      } else if (label.includes('aeropuerto') && label.includes('hotel') && label.indexOf('aeropuerto') < label.indexOf('hotel')) {
+        aeropuertoHotel += cantidad;
+      } else {
+        otros += cantidad;
+      }
+    }
+
+    return {
+      total: hotelAeropuerto + aeropuertoHotel + otros,
+      hotelAeropuerto,
+      aeropuertoHotel,
+      otros,
+    };
   }
 
   getCardColor(pasajeros: number, cupos: number): string {

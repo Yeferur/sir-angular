@@ -84,9 +84,11 @@ type EditarTourFullPayload = {
   imports: [CommonModule, ReactiveFormsModule, FlatpickrInputDirective],
 })
 export class EditarTourComponent implements OnInit {
-  isLoading = false;
+  isLoading = signal<boolean>(true);
   isSubmitting = signal(false);
-  loadingData = true;
+  private toursLoaded = false;
+  private currenciesLoaded = false;
+  private tourLoaded = false;
 
   tourId = 0;
 
@@ -345,7 +347,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   private loadExistingTours(): void {
     this.tours.getTours().subscribe({
       next: (t) => (this.toursExistentes = t || []),
-      error: () => (this.toursExistentes = []),
+      error: () => {
+        this.toursExistentes = [];
+        this.markInitialLoadStep('tours');
+      },
+      complete: () => this.markInitialLoadStep('tours'),
     });
   }
 
@@ -364,8 +370,20 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.monedas = [{ Id_Moneda: 1, Codigo: 'COP', Nombre_Moneda: 'Peso colombiano' }];
         this.initBasePlan();
         done?.();
+        this.markInitialLoadStep('currencies');
       },
+      complete: () => this.markInitialLoadStep('currencies'),
     });
+  }
+
+  private markInitialLoadStep(step: 'tours' | 'currencies' | 'tour'): void {
+    if (step === 'tours') this.toursLoaded = true;
+    if (step === 'currencies') this.currenciesLoaded = true;
+    if (step === 'tour') this.tourLoaded = true;
+
+    if (this.toursLoaded && this.currenciesLoaded && this.tourLoaded) {
+      this.isLoading.set(false);
+    }
   }
 
   /* =========================================================
@@ -513,6 +531,39 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     } catch {
       // ignore
     }
+  }
+
+  /* ---------------------------
+   * Helpers UI (HTML)
+   * --------------------------- */
+  isBaseCop(planIndex: number, currencyIndex: number): boolean {
+    return planIndex === 0 && this.getCurrencyCode(planIndex, currencyIndex) === 'COP';
+  }
+
+  isAdultRequired(planIndex: number, currencyIndex: number): boolean {
+    return this.isBaseCop(planIndex, currencyIndex) || currencyIndex === 0;
+  }
+
+  private getCurrencyCode(planIndex: number, currencyIndex: number): string {
+    const cg = this.getPlanCurrencies(planIndex).at(currencyIndex) as FormGroup;
+    return String(cg.get('Codigo')?.value || '');
+  }
+
+  getAdultErrorMessage(planIndex: number, currencyIndex: number): string {
+    if (this.isBaseCop(planIndex, currencyIndex)) {
+      return 'Ingresa un precio válido.';
+    }
+    return 'Ingresa un precio válido para Adulto.';
+  }
+
+  getChildErrorMessage(planIndex: number, currencyIndex: number): string {
+    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    return 'Ingresa un precio válido para Niño.';
+  }
+
+  getInfantErrorMessage(planIndex: number, currencyIndex: number): string {
+    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    return 'Ingresa un precio válido para Infante.';
   }
 
   /* =========================================================
@@ -700,8 +751,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
    * CARGAR TOUR + MAPEO PLANES
    * ========================================================= */
   cargarTour(): void {
-    this.loadingData = true;
-
     this.tours.getTourById(this.tourId).subscribe({
       next: (tour: any) => {
         try {
@@ -834,7 +883,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             // ocultar UI simple si hay planes
             this.form.get('Tiene_Plan')?.setValue(false, { emitEvent: false });
 
-            this.loadingData = false;
+            this.markInitialLoadStep('tour');
             this.adjustControlsAfterPopulate();
             try { this.cd.detectChanges(); } catch {}
 
@@ -842,14 +891,14 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           }
 
           // si no hay planes, deja base vacío
-          this.loadingData = false;
+          this.markInitialLoadStep('tour');
         } catch (e) {
           console.error('Error mapping tour:', e);
-          this.loadingData = false;
+          this.markInitialLoadStep('tour');
         }
       },
       error: (err) => {
-        this.loadingData = false;
+        this.markInitialLoadStep('tour');
         this.navbar.errorToast('Error al cargar tour', err?.error?.error || 'No se pudo cargar la información del tour');
         this.router.navigate(['/Tours/VerTours']);
       },
@@ -904,7 +953,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   /* =========================================================
    * SUBMIT
    * ========================================================= */
-  onSubmitEditarTour(): void {
+  async onSubmitEditarTour(): Promise<void> {
     if (this.isSubmitting()) return;
 
     this.form.updateValueAndValidity({ emitEvent: false });
@@ -958,15 +1007,69 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       return;
     }
 
-    this.navbar.alert?.set?.({
-      type: 'info',
-      title: '¿Actualizar tour?',
-      message: '¿Deseas guardar los cambios realizados?',
-      autoClose: false,
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) },
-        { text: 'Guardar', style: 'primary', onClick: () => { this.navbar.alert?.set?.(null); this.editarTourConfirmado(); } },
-      ],
+    const confirmed = await this.requestUpdateTourConfirmation();
+    if (!confirmed) return;
+
+    this.editarTourConfirmado();
+  }
+
+  private buildUpdateTourConfirmationMessage(): string {
+    const nombreTour = String(this.form.get('Nombre_Tour')?.value || '').trim();
+    const abreviacion = String(this.form.get('Abreviacion')?.value || '').trim();
+    const cupoBase = Number(this.form.get('Cupo_Base')?.value || 0);
+    const cantidadPlanes = this.plans.length;
+    const modoDisponibilidad = this.form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'
+      ? 'Solo por temporadas'
+      : 'Todo el año';
+    const origenId = this.form.get('Id_Tour_Origen')?.value;
+    const nombreOrigen = origenId
+      ? this.toursExistentes.find((tour) => String(tour.Id_Tour) === String(origenId))?.Nombre_Tour
+      : null;
+
+    const partes = [
+      `Vas a guardar los cambios del tour ${nombreTour || '—'}.`,
+      `Abreviación: ${abreviacion || '—'}.`,
+      `Cupo base: ${cupoBase}.`,
+      `Planes: ${cantidadPlanes}.`,
+      `Disponibilidad: ${modoDisponibilidad}.`,
+    ];
+
+    if (origenId) {
+      partes.push(`Copiará horarios desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
+    } else {
+      partes.push('Los horarios quedarán pendientes/configurables.');
+    }
+
+    partes.push('¿Deseas continuar?');
+    return partes.join('\n');
+  }
+
+  private requestUpdateTourConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.navbar.alert?.set?.({
+        type: 'info',
+        title: '¿Todo listo?',
+        message: this.buildUpdateTourConfirmationMessage(),
+        autoClose: false,
+        buttons: [
+          {
+            text: 'Cancelar',
+            style: 'secondary',
+            onClick: () => {
+              this.navbar.alert?.set?.(null);
+              resolve(false);
+            }
+          },
+          {
+            text: 'Guardar',
+            style: 'primary',
+            onClick: () => {
+              this.navbar.alert?.set?.(null);
+              resolve(true);
+            }
+          }
+        ]
+      });
     });
   }
 

@@ -72,6 +72,31 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     return m?.Codigo || 'COP';
   });
 
+  private getDefaultCanalId(): number {
+    const canales = this.canales();
+
+    const hotel = canales.find((c: any) =>
+      String(c.Nombre_Canal || c.Nombre || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .includes('HOTEL')
+    );
+
+    return Number(hotel?.Id_Canal || 1);
+  }
+
+  private ensureDefaultCanal(): number {
+    const ctrl = this.form.get('Id_Canal');
+    const current = Number(ctrl?.value || 0);
+
+    if (current) return current;
+
+    const defaultCanalId = this.getDefaultCanalId();
+    ctrl?.setValue(defaultCanalId, { emitEvent: false });
+    return defaultCanalId;
+  }
+
   isRioClaroTour(): boolean {
     const idTour = Number(this.form?.get('SelectTour')?.value || 0);
     if (!idTour) return false;
@@ -400,6 +425,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       ]);
       this.tours.set(tours || []);
       this.canales.set(canales || []);
+      this.ensureDefaultCanal();
       this.monedas.set(monedas || []);
     } catch {
       this.navbar.alert.set({
@@ -538,25 +564,28 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   // ====== Cambios de Tour / Plan / Moneda ======
   async onTourChange() {
     const idTour = Number(this.form.get('SelectTour')?.value);
-    this.form.patchValue({ Id_Plan: null, Id_Horario: null });
+    this.form.patchValue({ Id_Plan: null, Id_Horario: null }, { emitEvent: false });
     this.horarioSeleccionado.set(null);
     this.preciosRef.set({});
     if (!idTour) return;
 
     try {
+      this.ensureDefaultCanal();
+
       const planes = await firstValueFrom(this.reservasSvc.getPlanesByTour(idTour));
       this.planes.set(planes || []);
       if (this.planes().length === 1) {
-        this.form.get('Id_Plan')?.setValue(this.planes()[0].Id_Plan);
+        this.form.get('Id_Plan')?.setValue(this.planes()[0].Id_Plan, { emitEvent: false });
       }
 
       if (!this.form.get('Id_Moneda')?.value) {
         this.form.get('Id_Moneda')?.setValue(1, { emitEvent: false });
       }
 
-      this.recalcularComisionesPorCanal();
       await this.fijarHorarioAutomatico();
-      await this.onPlanMonedaChange(true);
+      await this.onPlanMonedaChange(false);
+      await this.recalcularComisionesPorCanal();
+      await this.autollenarPrecios();
       this.recalcularTotales();
 
       // ===== Obtener disponibilidad y configurar datepicker =====
@@ -582,6 +611,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       }
 
       this.tourRules.resetSession();
+      this.cdr.markForCheck();
     } catch {
       this.navbar.alert.set({
         type: 'error',
@@ -629,7 +659,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     try {
       const precios = await firstValueFrom(this.reservasSvc.getPrecios({ Id_Tour, Id_Plan, Id_Moneda }));
       this.preciosRef.set(precios || {});
-      if (!soloCargar) this.autollenarPrecios();
+      if (!soloCargar) await this.autollenarPrecios();
       this.recalcularTotales();
     } catch {
       this.navbar.alert.set({
@@ -712,7 +742,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
-      PrecioRef: [0],
+      PrecioRef: [this.preciosRef()[tipo] ?? 0],
       Precio_Pasajero: [precioInicial, [Validators.min(0)]],
       Comision: [comisionInicial],
     });
@@ -798,7 +828,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   async autollenarPrecios() {
     const idTour = Number(this.form.get('SelectTour')?.value);
-    const idCanal = Number(this.form.get('Id_Canal')?.value);
+    const idCanal = this.ensureDefaultCanal();
 
     // Si faltan referencias, limpiar comisiones y mantener precios actuales
     if (!idTour || !idCanal) {
@@ -979,7 +1009,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   async recalcularComisionesPorCanal() {
     const idTour = Number(this.form.get('SelectTour')?.value);
-    const idCanal = Number(this.form.get('Id_Canal')?.value);
+    const idCanal = this.ensureDefaultCanal();
     if (!idTour || !idCanal) {
       for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
       this.cdr.markForCheck(); return;

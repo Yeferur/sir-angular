@@ -1,54 +1,149 @@
 <div class="ordenar-page">
   <div class="page-header">
-    <div>
+    <div class="page-header-text">
       <h1>Ordenar Puntos por Ruta</h1>
-      <p>Arrastra y suelta para reorganizar el orden visual de los puntos.</p>
+      <p class="subtitle">Arrastra y suelta los puntos para definir el orden visual de cada ruta.</p>
+    </div>
+
+    <div class="page-header-actions">
+      <button class="btn-save" type="button" (click)="guardarOrden()"
+        [disabled]="isSaving() || !hasPendingOrderChanges() || isLoadingPuntos()">
+        {{ isSaving() ? 'Guardando...' : 'Guardar Orden' }}
+      </button>
     </div>
   </div>
 
-  <div class="toolbar">
-    <div class="field">
-      <label for="ruta">Ruta</label>
-      <select id="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="rutaSeleccionada = $event; onRutaChange()"
-        [disabled]="isLoadingRutas() || isLoadingPuntos() || isSaving()">
-        <option value="" disabled>Seleccionar ruta...</option>
-        @for (ruta of rutas(); track ruta) {
-        <option [value]="ruta">Ruta {{ ruta }}</option>
-        }
-      </select>
+  @if (isLoadingRutas()) {
+    <div class="skeleton-section">
+      <div class="card skeleton-card">
+        <div class="sk-line sk-title skeleton-shape"></div>
+        <div class="sk-line sk-subtitle skeleton-shape"></div>
+
+        <div class="controls-grid">
+          <div class="control-block">
+            <div class="sk-line sk-label skeleton-shape"></div>
+            <div class="sk-field skeleton-shape"></div>
+          </div>
+          <div class="control-block">
+            <div class="sk-line sk-label skeleton-shape"></div>
+            <div class="sk-field skeleton-shape"></div>
+          </div>
+          <div class="control-block">
+            <div class="sk-line sk-label skeleton-shape"></div>
+            <div class="sk-field skeleton-shape"></div>
+          </div>
+        </div>
+        <div class="sk-button skeleton-shape"></div>
+      </div>
+
+      <div class="card skeleton-card">
+        <div class="sk-line sk-title skeleton-shape"></div>
+        <div class="sk-line sk-subtitle skeleton-shape"></div>
+        <div class="skeleton-list">
+          @for (slot of skeletonRows; track slot) {
+            <div class="point-card skeleton-point-row" [style.--i]="slot">
+              <div class="sk-position skeleton-shape"></div>
+              <div class="sk-main">
+                <div class="sk-line skeleton-shape sk-name"></div>
+                <div class="sk-line skeleton-shape sk-meta"></div>
+              </div>
+              <div class="sk-handle skeleton-shape"></div>
+            </div>
+          }
+        </div>
+      </div>
     </div>
-
-    <button class="btn-save" type="button" (click)="guardarOrden()"
-      [disabled]="isSaving() || isLoadingPuntos() || !puntos().length || !hasPendingOrderChanges()">
-      {{ isSaving() ? 'Guardando...' : 'Guardar Orden' }}
-    </button>
-  </div>
-
-  @if (isLoadingPuntos()) {
-  <div class="loading-state">
-    <div class="spinner"></div>
-    <p>Cargando información...</p>
-  </div>
-  } @else if (!rutaSeleccionada) {
-  <div class="empty-state">Selecciona una ruta para cargar sus puntos.</div>
-  } @else if (!puntos().length) {
-  <div class="empty-state">No hay puntos registrados para esta ruta.</div>
   } @else {
-  <div class="list-wrapper" cdkDropList [cdkDropListData]="puntos()" (cdkDropListDropped)="drop($event)">
-    @for (punto of puntos(); let i = $index; track trackByPuntoId($index, punto)) {
-    <div class="point-card" cdkDrag>
-      <div class="grip" cdkDragHandle aria-label="Mover punto">
-        <span class="dot"></span><span class="dot"></span>
-        <span class="dot"></span><span class="dot"></span>
-        <span class="dot"></span><span class="dot"></span>
-      </div>
+    <div class="toolbar-card">
+      <div class="toolbar-grid">
+        <div class="field">
+          <label for="ruta">Ruta</label>
+          <select id="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="onRutaChangeRequest($event)"
+            [disabled]="isLoadingPuntos() || isSaving() || !rutas().length">
+            <option value="" disabled>Seleccionar ruta...</option>
+            @for (ruta of rutas(); track ruta) {
+            <option [value]="ruta">Ruta {{ ruta }}</option>
+            }
+          </select>
+        </div>
 
-      <div class="point-meta">
-        <div class="point-title">{{ i + 1 }}. {{ nombrePunto(punto) }}</div>
-        <div class="point-subtitle">{{ punto.Sector || 'Sin sector' }} · {{ punto.Direccion || 'Sin dirección' }}</div>
+        <div class="route-summary">
+          <div class="summary-item">
+            <span class="summary-label">Puntos</span>
+            <span class="summary-value">{{ puntos().length || 0 }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Estado</span>
+            @if (hasPendingOrderChanges()) {
+              <span class="status-chip status-chip--dirty">Hay cambios sin guardar</span>
+            } @else {
+              <span class="status-chip">Sin cambios pendientes</span>
+            }
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Ruta actual</span>
+            <span class="summary-value">{{ rutaSeleccionada || '—' }}</span>
+          </div>
+        </div>
       </div>
     </div>
+
+    @if (rutas().length === 0) {
+      <div class="empty-state-card">
+        No hay rutas disponibles para ordenar.
+      </div>
+    } @else if (isLoadingPuntos()) {
+      <div class="card skeleton-card list-card">
+        <div class="sk-line sk-title skeleton-shape"></div>
+        <div class="sk-line sk-subtitle skeleton-shape"></div>
+        <div class="skeleton-list">
+          @for (slot of skeletonRows; track slot) {
+            <div class="point-card skeleton-point-row" [style.--i]="slot">
+              <div class="sk-position skeleton-shape"></div>
+              <div class="sk-main">
+                <div class="sk-line skeleton-shape sk-name"></div>
+                <div class="sk-line skeleton-shape sk-meta"></div>
+              </div>
+              <div class="sk-handle skeleton-shape"></div>
+            </div>
+          }
+        </div>
+      </div>
+    } @else if (!rutaSeleccionada) {
+      <div class="empty-state-card">
+        Selecciona una ruta para cargar sus puntos.
+      </div>
+    } @else if (!puntos().length) {
+      <div class="empty-state-card">
+        No hay puntos registrados para esta ruta.
+      </div>
+    } @else {
+      <div class="list-card">
+        <div class="list-header">
+          <div>
+            <h2>Puntos de la Ruta {{ rutaSeleccionada }}</h2>
+            <p>Arrastra para ajustar el orden visual. Los cambios se guardan al confirmar.</p>
+          </div>
+        </div>
+
+        <div class="list-wrapper" cdkDropList [cdkDropListData]="puntos()" (cdkDropListDropped)="drop($event)">
+          @for (punto of puntos(); let i = $index; track trackByPuntoId($index, punto)) {
+          <div class="point-card" cdkDrag>
+            <div class="position-block">
+              <span class="position-number">{{ formatPosition(i + 1) }}</span>
+              <span class="position-label">Pos</span>
+            </div>
+
+            <div class="point-meta">
+              <div class="point-title">{{ nombrePunto(punto) }}</div>
+              <div class="point-subtitle">{{ punto.Sector || 'Sin sector' }} · {{ punto.Direccion || 'Sin dirección' }}</div>
+            </div>
+
+            <button type="button" class="drag-handle" cdkDragHandle aria-label="Mover punto">⋮⋮</button>
+          </div>
+          }
+        </div>
+      </div>
     }
-  </div>
   }
 </div>

@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h1>Tours</h1>
-        <p class="subtitle">Gestiona cupos, comisiones y programación.</p>
       </div>
 
       <div class="header-actions">
@@ -12,10 +11,31 @@
     </div>
 
     @if (isLoading()) {
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Cargando información...</p>
-      </div>
+      <section class="dashboard-grid is-loading" aria-live="polite" aria-busy="true">
+        @for (slot of skeletonCards; track slot) {
+          <article class="tour-card skeleton-card" [style.--animation-order]="slot">
+            <div class="skeleton-shape skeleton-title"></div>
+            <div class="skeleton-shape skeleton-pill"></div>
+            <div class="skeleton-metrics">
+              <div class="skeleton-metric"></div>
+              <div class="skeleton-metric"></div>
+              <div class="skeleton-metric"></div>
+              <div class="skeleton-metric"></div>
+            </div>
+            <div class="skeleton-actions">
+              <div class="skeleton-shape skeleton-button"></div>
+              <div class="skeleton-shape skeleton-button skeleton-button-danger"></div>
+            </div>
+          </article>
+        }
+      </section>
+    } @else if (toursFiltrados().length === 0) {
+      <section class="empty-state" aria-live="polite">
+        <div class="empty-state-icon">✦</div>
+        <h2>No hay tours registrados</h2>
+        <p>Crea tu primer tour para empezar a configurar cupos, comisiones y programación.</p>
+        <button class="btn-primary" type="button" (click)="crearTour()">+ Nuevo Tour</button>
+      </section>
     } @else {
     <div class="dashboard-grid">
       @for (tour of toursFiltrados(); track $index) {

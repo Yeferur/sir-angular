@@ -1,273 +1,295 @@
 <div class="booking-dashboard">
-    <div class="page-header">
-        <div>
-            <h1>Editar Usuario</h1>
-            <p class="subtitle">
-                Modifique los datos del usuario. La cédula no se puede cambiar.
-            </p>
-        </div>
+  @if (isLoading()) {
+    <div class="page-header skeleton-header">
+      <div class="page-header-text">
+        <div class="skeleton-shape sk-title"></div>
+        <div class="skeleton-shape sk-subtitle"></div>
+      </div>
+      <div class="page-header-actions">
+        <div class="skeleton-shape sk-button"></div>
+      </div>
     </div>
 
-    @if (isLoading() || catalogLoading()) {
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Cargando información...</p>
+    <div class="main-content">
+      <div class="top-cards-grid">
+        @for (card of [0, 1]; track card) {
+          <div class="card skeleton-card">
+            <div class="card-heading">
+              <div>
+                <div class="skeleton-shape sk-card-title"></div>
+                <div class="skeleton-shape sk-card-subtitle"></div>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              @for (field of (card === 0 ? [0, 1, 2, 3] : [0, 1, 2, 3]); track field) {
+                <div class="form-group">
+                  <div class="skeleton-shape sk-label"></div>
+                  <div class="skeleton-shape sk-input"></div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="card skeleton-card permissions-card">
+        <div class="card-heading">
+          <div>
+            <div class="skeleton-shape sk-card-title"></div>
+            <div class="skeleton-shape sk-card-subtitle"></div>
+          </div>
         </div>
-    } @else {
-    <form [formGroup]="form" (ngSubmit)="submit()" autocomplete="off" novalidate>
-        <input class="autofill-trap" type="text" name="fake-user" autocomplete="username" tabindex="-1"
-            aria-hidden="true" />
-        <input class="autofill-trap" type="password" name="fake-pass" autocomplete="current-password" tabindex="-1"
-            aria-hidden="true" />
 
-        <div class="main-content">
+        <div class="form-grid">
+          <div class="form-group">
+            <div class="skeleton-shape sk-label"></div>
+            <div class="skeleton-shape sk-input"></div>
+          </div>
+          <div class="form-group full-width">
+            <div class="permissions-head">
+              <div class="skeleton-shape sk-label"></div>
+              <div class="skeleton-shape sk-button sk-count"></div>
+            </div>
+            <div class="skeleton-permissions">
+              @for (row of skeletonPermissionRows; track row) {
+                <div class="skeleton-shape sk-permission"></div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <form id="usuarioForm" [formGroup]="form" (ngSubmit)="submit()" autocomplete="off" novalidate>
+      <input class="autofill-trap" type="text" name="fake-user" autocomplete="username" tabindex="-1" aria-hidden="true" />
+      <input class="autofill-trap" type="password" name="fake-pass" autocomplete="current-password" tabindex="-1" aria-hidden="true" />
 
-            <!-- CARD 1: IDENTIDAD -->
-            <div class="card">
-                <div class="card-header">
-                    <h2>Identidad</h2>
-                </div>
+      <div class="page-header">
+        <div class="page-header-text">
+          <h1>Editar Usuario</h1>
+          <p class="subtitle">Modifica los datos del usuario. La cédula no se puede cambiar.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn-submit" type="submit" form="usuarioForm" [disabled]="isSubmitting()">
+            @if (isSubmitting()) {
+              <span class="btn-spinner"></span>
+              Guardando...
+            } @else {
+              Guardar Cambios
+            }
+          </button>
+        </div>
+      </div>
 
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">Cédula (No editable)</label>
-                        <div class="field-foot">
-                            <input class="form-input disabled" formControlName="Id_Usuario" readonly />
-                        </div>
-                    </div>
-
-                    <div class="form-group ">
-                        <label class="form-label">Nombre completo <span class="required-star">*</span></label>
-                        <div class="field-foot">
-                            <input class="form-input" formControlName="Nombres_Apellidos" autocomplete="off"
-                                [ngClass]="form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid ? 'errorInput' : ''" />
-                            @if (form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid) {
-                            <div class="errorMessage">{{ msg('Nombres_Apellidos') }}</div>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Teléfono <span class="required-star">*</span></label>
-                        <div class="field-foot">
-                            <input class="form-input" formControlName="Telefono_Usuario" inputmode="numeric"
-                                autocomplete="off"
-                                [ngClass]="form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid ? 'errorInput' : ''" />
-                            @if (form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid) {
-                            <div class="errorMessage">{{ msg('Telefono_Usuario') }}</div>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Estado</label>
-                        <div class="field-foot">
-                            <select class="form-select" formControlName="Activo">
-                                <option [ngValue]="1">Activo</option>
-                                <option [ngValue]="0">Inactivo</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+      <div class="main-content">
+        <div class="top-cards-grid">
+          <div class="card">
+            <div class="card-heading">
+              <div>
+                <h2>Identidad</h2>
+                <p class="card-subtitle">Datos personales del usuario.</p>
+              </div>
             </div>
 
-            <!-- CARD 2: ACCESO -->
-            <div class="card">
-                <div class="card-header">
-                    <h2>Acceso</h2>
-                </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Cédula <span class="required-star">*</span></label>
+                <input class="form-input disabled" formControlName="Id_Usuario" readonly
+                  [class.errorInput]="form.get('Id_Usuario')?.touched && form.get('Id_Usuario')?.invalid" />
+                @if (form.get('Id_Usuario')?.touched && form.get('Id_Usuario')?.invalid) {
+                  <div class="errorMessage">{{ msg('Id_Usuario') }}</div>
+                }
+              </div>
 
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">Usuario <span class="required-star">*</span></label>
-                        <div class="field-foot">
-                            <input class="form-input" formControlName="Usuario" autocomplete="off" autocapitalize="off"
-                                spellcheck="false"
-                                [ngClass]="form.get('Usuario')?.touched && form.get('Usuario')?.invalid ? 'errorInput' : ''" />
-                            @if (form.get('Usuario')?.touched && form.get('Usuario')?.invalid) {
-                            <div class="errorMessage">{{ msg('Usuario') }}</div>
-                            }
-                        </div>
-                    </div>
+              <div class="form-group">
+                <label class="form-label">Nombre completo <span class="required-star">*</span></label>
+                <input class="form-input" formControlName="Nombres_Apellidos" autocomplete="off"
+                  [class.errorInput]="form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid" />
+                @if (form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid) {
+                  <div class="errorMessage">{{ msg('Nombres_Apellidos') }}</div>
+                }
+              </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Correo <span class="required-star">*</span></label>
-                        <div class="field-foot">
-                            <input class="form-input" formControlName="Correo" autocomplete="off" autocapitalize="off"
-                                spellcheck="false"
-                                [ngClass]="form.get('Correo')?.touched && form.get('Correo')?.invalid ? 'errorInput' : ''" />
-                            @if (form.get('Correo')?.touched && form.get('Correo')?.invalid) {
-                            <div class="errorMessage">{{ msg('Correo') }}</div>
-                            }
-                        </div>
-                    </div>
+              <div class="form-group">
+                <label class="form-label">Teléfono <span class="required-star">*</span></label>
+                <input class="form-input" formControlName="Telefono_Usuario" inputmode="numeric" autocomplete="off"
+                  [class.errorInput]="form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid" />
+                @if (form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid) {
+                  <div class="errorMessage">{{ msg('Telefono_Usuario') }}</div>
+                }
+              </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Nueva Contraseña (Opcional)</label>
+              <div class="form-group">
+                <label class="form-label">Estado</label>
+                <select class="form-select" formControlName="Activo">
+                  <option [ngValue]="1">Activo</option>
+                  <option [ngValue]="0">Inactivo</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-                        <div class="field-foot">
-                            <div class="password-wrapper" #pwdWrap (focusin)="openPasswordStrength()"
-                                (focusout)="closePasswordStrengthIfOutside($event, pwdWrap)">
-                                <input class="form-input" [type]="showPassword ? 'text' : 'password'"
-                                    formControlName="Contrasena" autocomplete="new-password"
-                                    placeholder="Solo si desea cambiarla"
-                                    [ngClass]="form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid ? 'errorInput' : ''" />
-
-                                <button type="button" class="toggle-password" (click)="showPassword = !showPassword"
-                                    aria-label="Mostrar u ocultar contraseña">
-                                    @if (!showPassword) {
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    } @else {
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
-                                    </svg>
-                                    }
-                                </button>
-
-                                @if (passwordStrengthOpen && form.get('Contrasena')?.value) {
-                                <div class="password-strength-popover">
-                                    <div class="strength-top">
-                                        <span class="strength-label">Seguridad: <strong>{{ passwordStrength.label
-                                                }}</strong></span>
-                                        <span class="strength-score">{{ passwordStrength.score }}/6</span>
-                                    </div>
-
-                                    <div class="strength-bars" [attr.data-level]="passwordStrength.label">
-                                        <span class="bar" [class.on]="passwordStrength.score >= 1"></span>
-                                        <span class="bar" [class.on]="passwordStrength.score >= 2"></span>
-                                        <span class="bar" [class.on]="passwordStrength.score >= 3"></span>
-                                        <span class="bar" [class.on]="passwordStrength.score >= 4"></span>
-                                        <span class="bar" [class.on]="passwordStrength.score >= 5"></span>
-                                        <span class="bar" [class.on]="passwordStrength.score >= 6"></span>
-                                    </div>
-
-                                    <ul class="strength-checks">
-                                        <li [class.ok]="passwordStrength.checks.length8">Mínimo 8 caracteres</li>
-                                        <li [class.ok]="passwordStrength.checks.upper">Una mayúscula</li>
-                                        <li [class.ok]="passwordStrength.checks.lower">Una minúscula</li>
-                                        <li [class.ok]="passwordStrength.checks.digit">Un número</li>
-                                        <li [class.ok]="passwordStrength.checks.symbol">Un símbolo</li>
-                                        <li [class.ok]="passwordStrength.checks.length12">Recomendado: 12+ caracteres
-                                        </li>
-                                    </ul>
-                                </div>
-                                }
-                            </div>
-
-                            @if (form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid) {
-                            <div class="errorMessage">{{ msg('Contrasena') }}</div>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Confirmar Contraseña</label>
-                        <div class="field-foot">
-                            <div class="password-wrapper">
-                                <input class="form-input" [type]="showConfirm ? 'text' : 'password'"
-                                    formControlName="Confirmar" autocomplete="new-password"
-                                    [ngClass]="(form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) || (form.touched && form.errors?.['passwordMismatch']) ? 'errorInput' : ''" />
-                                <button type="button" class="toggle-password" (click)="showConfirm = !showConfirm"
-                                    aria-label="Mostrar u ocultar confirmación">
-                                    @if (!showConfirm) {
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    } @else {
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13.875 18.825A10.05 10.05 0 01112 19c-4.478 0-8.27-2.944-9.544-7a10.05 10.05 0 012.184-3.272m1.768-1.768A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.308 5.066M15 12a3 3 0 00-3-3m0 0a3 3 0 013 3m-3-3v.01M3 3l18 18" />
-                                    </svg>
-                                    }
-                                </button>
-                            </div>
-
-                            @if (form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) {
-                            <div class="errorMessage">{{ msg('Confirmar') }}</div>
-                            }
-                            @if (form.touched && form.errors?.['passwordMismatch']) {
-                            <div class="errorMessage">Las contraseñas no coinciden.</div>
-                            }
-                        </div>
-                    </div>
-                </div>
+          <div class="card">
+            <div class="card-heading">
+              <div>
+                <h2>Acceso</h2>
+                <p class="card-subtitle">Credenciales de inicio de sesión.</p>
+              </div>
             </div>
 
-            <!-- CARD 3: ROL + PERMISOS -->
-            <div class="card">
-                <div class="card-header">
-                    <h2>Rol y permisos</h2>
-                </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Usuario <span class="required-star">*</span></label>
+                <input class="form-input" formControlName="Usuario" autocomplete="off" autocapitalize="off" spellcheck="false"
+                  [class.errorInput]="form.get('Usuario')?.touched && form.get('Usuario')?.invalid" />
+                @if (form.get('Usuario')?.touched && form.get('Usuario')?.invalid) {
+                  <div class="errorMessage">{{ msg('Usuario') }}</div>
+                }
+              </div>
 
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">Rol <span class="required-star">*</span></label>
-                        <div class="field-foot">
-                            <select class="form-select" formControlName="Id_Rol" autocomplete="off"
-                                (change)="onRolChange()"
-                                [disabled]="catalogLoading()"
-                                [ngClass]="form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid ? 'errorInput' : ''">
-                                <option value="" disabled>Seleccionar un rol.</option>
-                                @for (r of roles; track r.Id_Rol) {
-                                <option [value]="r.Id_Rol">{{ r.Nombre_Rol }}</option>
-                                }
-                            </select>
-                            @if (catalogLoading()) {
-                            <div class="hint">Cargando roles...</div>
-                            }
+              <div class="form-group">
+                <label class="form-label">Correo <span class="required-star">*</span></label>
+                <input class="form-input" formControlName="Correo" autocomplete="off" autocapitalize="off" spellcheck="false"
+                  [class.errorInput]="form.get('Correo')?.touched && form.get('Correo')?.invalid" />
+                @if (form.get('Correo')?.touched && form.get('Correo')?.invalid) {
+                  <div class="errorMessage">{{ msg('Correo') }}</div>
+                }
+              </div>
 
-                            @if (form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid) {
-                            <div class="errorMessage">Selecciona un rol.</div>
-                            }
-                        </div>
+              <div class="form-group">
+                <label class="form-label">Nueva contraseña</label>
+                <div class="password-wrapper" #pwdWrap
+                  (focusin)="openPasswordStrength()"
+                  (focusout)="closePasswordStrengthIfOutside($event, pwdWrap)">
+                  <input class="form-input" [type]="showPassword ? 'text' : 'password'" formControlName="Contrasena"
+                    autocomplete="new-password" placeholder="Solo si deseas cambiarla"
+                    [class.errorInput]="form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid" />
+                  <button type="button" class="toggle-password" (click)="showPassword = !showPassword" aria-label="Mostrar u ocultar contraseña">
+                    @if (!showPassword) {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    } @else {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      </svg>
+                    }
+                  </button>
+
+                  @if (passwordStrengthOpen && form.get('Contrasena')?.value) {
+                    <div class="password-strength-popover">
+                      <div class="strength-top">
+                        <span class="strength-label">Seguridad: <strong>{{ passwordStrength.label }}</strong></span>
+                        <span class="strength-score">{{ passwordStrength.score }}/6</span>
+                      </div>
+                      <div class="strength-bars" [attr.data-level]="passwordStrength.label">
+                        <span class="bar" [class.on]="passwordStrength.score >= 1"></span>
+                        <span class="bar" [class.on]="passwordStrength.score >= 2"></span>
+                        <span class="bar" [class.on]="passwordStrength.score >= 3"></span>
+                        <span class="bar" [class.on]="passwordStrength.score >= 4"></span>
+                        <span class="bar" [class.on]="passwordStrength.score >= 5"></span>
+                        <span class="bar" [class.on]="passwordStrength.score >= 6"></span>
+                      </div>
+                      <ul class="strength-checks">
+                        <li [class.ok]="passwordStrength.checks.length8">Mínimo 8 caracteres</li>
+                        <li [class.ok]="passwordStrength.checks.upper">Una mayúscula</li>
+                        <li [class.ok]="passwordStrength.checks.lower">Una minúscula</li>
+                        <li [class.ok]="passwordStrength.checks.digit">Un número</li>
+                        <li [class.ok]="passwordStrength.checks.symbol">Un símbolo</li>
+                        <li [class.ok]="passwordStrength.checks.length12">Recomendado: 12+ caracteres</li>
+                      </ul>
                     </div>
-
-                    <div class="form-group full-width">
-                        <div class="permissions-head">
-                            <h4 style="margin:0">Permisos asignables</h4>
-                            <div class="permissions-meta">Seleccionados: {{ selectedPermisos.length }}</div>
-                        </div>
-
-                        @if (catalogLoading()) {
-                        <div class="hint">Cargando permisos...</div>
-                        } @else if (permisos.length === 0) {
-                        <div class="hint">No hay permisos disponibles</div>
-                        } @else {
-                        <div class="permisos-grid">
-                            @for (p of permisos; track p.Id_Permiso) {
-                            <button type="button" class="perm-btn" (click)="togglePermiso(p.Id_Permiso)"
-                                [class.active]="selectedPermisos.includes(p.Id_Permiso)">
-                                <span class="perm-codigo">{{ p.Descripcion }}</span>
-
-                            </button>
-                            }
-                        </div>
-                        }
-                    </div>
+                  }
                 </div>
+                @if (form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid) {
+                  <div class="errorMessage">{{ msg('Contrasena') }}</div>
+                }
+              </div>
 
-                <div class="actions-end">
-                    <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
-                        {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
+              <div class="form-group">
+                <label class="form-label">Confirmar contraseña</label>
+                <div class="password-wrapper">
+                  <input class="form-input" [type]="showConfirm ? 'text' : 'password'" formControlName="Confirmar" autocomplete="new-password"
+                    [class.errorInput]="(form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) || (form.touched && form.errors?.['passwordMismatch'])" />
+                  <button type="button" class="toggle-password" (click)="showConfirm = !showConfirm" aria-label="Mostrar u ocultar confirmación">
+                    @if (!showConfirm) {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    } @else {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      </svg>
+                    }
+                  </button>
+                </div>
+                @if (form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) {
+                  <div class="errorMessage">{{ msg('Confirmar') }}</div>
+                }
+                @if (form.touched && form.errors?.['passwordMismatch']) {
+                  <div class="errorMessage">Las contraseñas no coinciden.</div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card permissions-card">
+          <div class="card-heading">
+            <div>
+              <h2>Rol y Permisos</h2>
+              <p class="card-subtitle">Define qué puede hacer este usuario en el sistema.</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Rol <span class="required-star">*</span></label>
+              <select class="form-select" formControlName="Id_Rol" autocomplete="off"
+                (change)="onRolChange()" [disabled]="catalogLoading()"
+                [class.errorInput]="form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid">
+                <option value="" disabled>Seleccionar un rol...</option>
+                @for (r of roles; track r.Id_Rol) {
+                  <option [value]="r.Id_Rol">{{ r.Nombre_Rol }}</option>
+                }
+              </select>
+              @if (form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid) {
+                <div class="errorMessage">Selecciona un rol.</div>
+              }
+            </div>
+
+            <div class="form-group full-width">
+              <div class="permissions-head">
+                <span class="form-label">Permisos asignables</span>
+                @if (permisos.length > 0) {
+                  <span class="permissions-meta">
+                    <span class="count-badge">{{ selectedPermisos.length }}</span> seleccionados
+                  </span>
+                }
+              </div>
+
+              @if (catalogLoading()) {
+                <p class="form-hint">Cargando permisos...</p>
+              } @else if (permisos.length === 0) {
+                <p class="form-hint">No hay permisos disponibles para este rol.</p>
+              } @else {
+                <div class="permissions-grid">
+                  @for (p of permisos; track p.Id_Permiso) {
+                    <button type="button" class="permission-option"
+                      (click)="togglePermiso(+p.Id_Permiso)"
+                      [class.active]="selectedPermisos.includes(+p.Id_Permiso)">
+                      <span class="permission-label">{{ p.Descripcion }}</span>
                     </button>
-                
+                  }
                 </div>
+              }
             </div>
-
+          </div>
         </div>
+      </div>
     </form>
-    }
+  }
 </div>

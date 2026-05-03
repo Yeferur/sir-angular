@@ -41,6 +41,7 @@ export class VerPuntos implements OnInit {
   searchTerm = '';
   page = 1;
   limit = 10;
+  skeletonRows = [0, 1, 2, 3, 4, 5, 6];
 
   // streams
   private search$ = new Subject<string>();

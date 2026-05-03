@@ -4,7 +4,8 @@
 
   <div class="field">
     <label>Tour</label>
-    <select [(ngModel)]="Id_Tour">
+    <select [(ngModel)]="Id_Tour" (ngModelChange)="onTourChange($event)">
+      <option [ngValue]="null" disabled selected>Seleccione un tour</option>
       @for (t of tours; track t) {
         <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
       }
@@ -13,7 +14,15 @@
 
   <div class="field">
     <label>Fecha</label>
-    <input type="text" appFlatpickrInput [(ngModel)]="Fecha_Tour" [fpOptions]="{ dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', disableMobile: true, altInputClass: 'form-input flatpickr-input flatpickr-alt' }" />
+    <input
+      type="text"
+      class="form-input"
+      #fechaFp="fp"
+      appFlatpickrInput
+      [(ngModel)]="Fecha_Tour"
+      [fpOptions]="fpOptionsFecha"
+      placeholder="Seleccione una fecha"
+    />
   </div>
 
   <div class="field">
@@ -21,8 +30,12 @@
     <textarea class="form-input" rows="4" [(ngModel)]="Observaciones" placeholder="Anota aquí comentarios u observaciones para la nueva reserva..."></textarea>
   </div>
 
+  @if (errorMsg()) {
+    <div class="error-message">{{ errorMsg() }}</div>
+  }
+
   <div class="actions">
-    <button (click)="confirmar()" class="btn-primary">Confirmar</button>
-    <button (click)="cancelar()" class="btn-secondary">Cancelar</button>
+    <button type="button" (click)="confirmar()" class="btn-primary" [disabled]="isSubmitting() || !isValid()">Confirmar</button>
+    <button type="button" (click)="cancelar()" class="btn-secondary" [disabled]="isSubmitting()">Cancelar</button>
   </div>
 </div>

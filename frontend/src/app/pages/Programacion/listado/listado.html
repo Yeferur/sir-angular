@@ -1,42 +1,183 @@
 <div class="page-container">
-
-  <!-- ENCABEZADO -->
   <div class="page-header">
-    <h1>Programación</h1>
-    <div class="form-group">
-      <label for="fecha" class="form-label">Fecha de Operación:</label>
-      <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-        [(ngModel)]="fechaSeleccionada" (change)="cargarToursDelDia()" />
+    <div class="page-header-text">
+      <h1>Programación</h1>
+      <p>Gestiona la programación, generación y revisión de listados por fecha.</p>
+    </div>
+
+    <div class="page-header-actions">
+      <div class="form-group">
+        <label for="fecha" class="form-label">Fecha de Operación</label>
+        <input
+          id="fecha"
+          class="form-input"
+          type="text"
+          appFlatpickrInput
+          [fpOptions]="fpOptionsFecha"
+          [(ngModel)]="fechaSeleccionada"
+          (change)="cargarToursDelDia()"
+        />
+      </div>
     </div>
   </div>
 
-  <!-- SPINNER -->
-  @if (isPageLoading) {
-  <div class="loading-state">
-    <div class="spinner"></div>
-    <p>Cargando información...</p>
-  </div>
+  @if (isPageLoading && !tourSeleccionado) {
+  <section class="dashboard-section skeleton-dashboard" aria-live="polite" aria-busy="true">
+    <div class="capacity-dashboard is-loading">
+      @for (slot of skeletonCards; track slot) {
+      <div class="capacity-card skeleton-card" [style.--i]="slot">
+        <div class="card-content">
+          <div class="stats-container skeleton-stats">
+            <div class="card-header skeleton-card-header">
+              <div class="skeleton-shape sk-line sk-title"></div>
+              <div class="skeleton-shape sk-pill"></div>
+            </div>
+
+            <div class="metrics-row skeleton-metrics">
+              <div class="metric-cell">
+                <div class="skeleton-shape sk-line sk-metric"></div>
+                <div class="skeleton-shape sk-line sk-label"></div>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <div class="skeleton-shape sk-line sk-metric"></div>
+                <div class="skeleton-shape sk-line sk-label"></div>
+              </div>
+            </div>
+
+            <div class="skeleton-shape sk-progress"></div>
+          </div>
+        </div>
+
+        <div class="card-footer skeleton-footer">
+          <div class="skeleton-shape sk-line sk-footer-line"></div>
+          <div class="skeleton-shape sk-button"></div>
+        </div>
+      </div>
+      }
+    </div>
+  </section>
   }
 
-  <!-- DASHBOARD -->
+  @if (isPageLoading && tourSeleccionado) {
+  <section class="editor-section editor-skeleton" aria-live="polite" aria-busy="true">
+    <div class="editor-header skeleton-card">
+      <div class="editor-title skeleton-title-wrap">
+        <div class="skeleton-shape sk-line sk-title"></div>
+        <div class="skeleton-shape sk-line sk-subtitle"></div>
+      </div>
+      <div class="editor-actions skeleton-actions">
+        <div class="skeleton-shape sk-button"></div>
+        <div class="skeleton-shape sk-button"></div>
+        <div class="skeleton-shape sk-button"></div>
+      </div>
+    </div>
+
+    <div class="md-layout skeleton-layout">
+      <aside class="md-sidebar">
+        <div class="sidebar-card skeleton-card sk-sidebar">
+          <div class="skeleton-shape sk-line sk-title"></div>
+          <div class="skeleton-shape sk-line sk-subtitle"></div>
+          <div class="bus-list skeleton-bus-list">
+            @for (slot of skeletonCards; track slot) {
+            <div class="bus-item skeleton-bus">
+              <div class="bus-item-top">
+                <div class="bus-item-title">
+                  <span class="skeleton-shape sk-pill"></span>
+                  <span class="skeleton-shape sk-line sk-bus"></span>
+                </div>
+                <span class="skeleton-shape sk-line sk-status"></span>
+              </div>
+              <div class="bus-item-mid">
+                <span class="skeleton-shape sk-field"></span>
+                <span class="skeleton-shape sk-field"></span>
+              </div>
+              <div class="bus-item-bottom">
+                <span class="skeleton-shape sk-line sk-footer-line"></span>
+                <span class="skeleton-shape sk-button"></span>
+              </div>
+              <div class="bus-progress">
+                <span class="skeleton-shape sk-progress"></span>
+              </div>
+            </div>
+            }
+          </div>
+        </div>
+      </aside>
+
+      <main class="md-main">
+        <section class="main-card skeleton-card sk-main">
+          <div class="main-card-header">
+            <div class="main-card-title">
+              <div class="skeleton-shape sk-line sk-title"></div>
+              <div class="skeleton-shape sk-line sk-subtitle"></div>
+            </div>
+          </div>
+
+          <div class="route-list skeleton-route-list">
+            @for (slot of skeletonCards; track slot) {
+            <div class="route-item skeleton-route">
+              <div class="route-left">
+                <span class="skeleton-shape sk-position"></span>
+                <div class="route-info">
+                  <div class="skeleton-shape sk-line sk-route-name"></div>
+                  <div class="skeleton-shape sk-line sk-route-meta"></div>
+                </div>
+              </div>
+              <span class="skeleton-shape sk-pill"></span>
+            </div>
+            }
+          </div>
+        </section>
+
+        <section class="main-card skeleton-card sk-main">
+          <div class="main-card-header">
+            <div class="main-card-title">
+              <div class="skeleton-shape sk-line sk-title"></div>
+              <div class="skeleton-shape sk-line sk-subtitle"></div>
+            </div>
+          </div>
+
+          <div class="stops-grid skeleton-stops-grid">
+            @for (slot of [0, 1, 2, 3, 4, 5]; track slot) {
+            <div class="stop-card skeleton-stop">
+              <div class="stop-header">
+                <div class="stop-left">
+                  <span class="skeleton-shape sk-position"></span>
+                  <div class="stop-title">
+                    <span class="skeleton-shape sk-line sk-stop-name"></span>
+                    <span class="skeleton-shape sk-line sk-stop-meta"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="stop-body">
+                <div class="skeleton-shape sk-line sk-stop-line"></div>
+                <div class="skeleton-shape sk-line sk-stop-line short"></div>
+                <div class="skeleton-shape sk-line sk-stop-line"></div>
+              </div>
+            </div>
+            }
+          </div>
+        </section>
+      </main>
+    </div>
+  </section>
+  }
+
   @if (!isPageLoading && modoVista === 'dashboard') {
-  <section class="dashboard-section"
-    [style.opacity]="isUpdatingDate ? '0.5' : '1'"
-    [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'"
-    style="transition: opacity 0.3s ease;">
+  <section class="dashboard-section" [style.opacity]="isUpdatingDate ? '0.5' : '1'"
+    [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'" style="transition: opacity 0.3s ease;">
     @if (toursDelDia.length === 0) {
     <div class="empty-state">
-      <h3>No hay tours para la fecha seleccionada.</h3>
-      <p>Elige otra fecha para ver la programación.</p>
+      <h3>No hay programación para esta fecha</h3>
+      <p>Elige otra fecha o revisa que existan reservas y tours configurados.</p>
     </div>
     }
 
     @if (toursDelDia.length > 0) {
     <div class="capacity-dashboard">
       @for (tour of toursDelDia; track tour.Id_Tour) {
-      <div class="capacity-card"
-        role="button"
-        tabindex="0"
+      <div class="capacity-card" role="button" tabindex="0"
         (click)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
         (keydown.enter)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
         (keydown.space)="$event.preventDefault(); tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
@@ -95,11 +236,8 @@
             </div>
             <div class="progress-track">
               @let pct = tour.ocupacionPromedio || 0;
-              <div class="progress-fill"
-                [class.green]="pct < 70"
-                [class.yellow]="pct >= 70 && pct < 90"
-                [class.red]="pct >= 90"
-                [style.width.%]="pct">
+              <div class="progress-fill" [class.green]="pct < 70" [class.yellow]="pct >= 70 && pct < 90"
+                [class.red]="pct >= 90" [style.width.%]="pct">
               </div>
             </div>
 
@@ -124,12 +262,10 @@
 
         <div class="card-footer">
           @if (tour.totalPasajeros && tour.totalPasajeros > 0) {
-          <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Clic para generar el plan
-            logístico' }}</span>
+          <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Clic para generar el plan logístico' }}</span>
           } @else {
           <span>Sin pasajeros</span>
           }
-          <span class="arrow-icon">→</span>
         </div>
       </div>
       }
@@ -164,10 +300,8 @@
   }
   }
 
-  <!-- EDITOR MASTER–DETAIL -->
   @if (!isPageLoading && modoVista === 'editor' && planSeleccionado) {
   <section class="editor-section">
-
     <div class="editor-header">
       <div class="editor-title">
         <h3>Editor de Listado</h3>
@@ -181,17 +315,9 @@
     </div>
 
     <div class="md-layout" cdkDropListGroup>
-
-      <!-- LEFT: BUS LIST (drop targets) -->
       <aside class="md-sidebar">
         <div class="sidebar-card">
-
-
           <div class="bus-list">
-
-
-
-            <!-- Unassigned Bus Drop -->
             @if (reservasSinAsignar.length > 0) {
             <div class="bus-item unassigned-bus" [class.active]="activeBusIndex === -1" (click)="selectBus(-1)"
               cdkDropList id="unassigned-bus" [cdkDropListData]="reservasSinAsignar"
@@ -220,9 +346,7 @@
                 <div class="bus-item-title">
                   <span class="dot ok"></span>
                   <span class="bus-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
-                  <span class="bus-occ-pill"
-                    [class.ok]="pct < 70"
-                    [class.warn]="pct >= 70 && pct < 90"
+                  <span class="bus-occ-pill" [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90"
                     [class.danger]="pct >= 90">
                     {{ pct | number:'1.0-0' }}%
                   </span>
@@ -246,15 +370,12 @@
               </div>
 
               <div class="bus-progress">
-                <span [class.ok]="pct < 70"
-                      [class.warn]="pct >= 70 && pct < 90"
-                      [class.danger]="pct >= 90"
-                      [style.width.%]="pct"></span>
+                <span [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90" [class.danger]="pct >= 90"
+                  [style.width.%]="pct"></span>
               </div>
             </div>
             }
 
-            <!-- Nuevo bus drop -->
             <div class="bus-item newbus" [class.hidden]="!isDragging" cdkDropList id="new-bus"
               [cdkDropListData]="newBusDropData" [cdkDropListConnectedTo]="connectedDropLists"
               (cdkDropListDropped)="dropReserva($event)">
@@ -269,15 +390,11 @@
                 <span>Suelta aquí para crear otro bus</span>
               </div>
             </div>
-
           </div>
         </div>
       </aside>
 
-      <!-- RIGHT: ROUTE + STOPS -->
       <main class="md-main">
-
-        <!-- Route card -->
         @if (activeBusIndex !== -1) {
         <section class="main-card">
           <div class="main-card-header">
@@ -287,7 +404,6 @@
             </div>
           </div>
 
-          <!-- Stops order (draggable) -->
           <div class="route-list" cdkDropList id="route-order" [cdkDropListData]="activeStops" cdkDropListLockAxis="y"
             (cdkDropListDropped)="dropStop($event)">
             @for (stop of activeStops; track stop.key; let p = $index) {
@@ -306,7 +422,6 @@
         </section>
         }
 
-        <!-- Stops + reservas (solo para ver; reservas se mueven entre buses desde la izquierda) -->
         <section class="main-card">
           <div class="main-card-header">
             <div class="main-card-title">
@@ -319,7 +434,6 @@
             </div>
           </div>
 
-          <!-- Active bus reservations: un solo droplist fuente -->
           <div class="stops-grid" cdkDropList id="active-bus" [cdkDropListData]="activeBus?.reservas"
             [cdkDropListConnectedTo]="connectedDropLists" [cdkDropListSortingDisabled]="true"
             (cdkDropListDropped)="dropReserva($event)">
@@ -341,7 +455,6 @@
                 }
 
                 @for (reserva of stop.reservas; track reserva.Id_Reserva) {
-                <!-- OJO: los drags están dentro del dropList "active-bus" (fuente) -->
                 <div class="reserva-card" cdkDrag (cdkDragStarted)="onDragStarted()" (cdkDragEnded)="onDragEnded()">
                   <div class="reserva-details">
                     <span>#{{ reserva.Id_Reserva }}</span>
@@ -353,12 +466,9 @@
             </div>
             }
           </div>
-
         </section>
       </main>
-
     </div>
   </section>
   }
-
 </div>

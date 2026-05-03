@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
@@ -9,6 +9,20 @@ import { AuthService } from '../services/Login/login-service';
 import { PermisosService } from '../services/Permisos/permisos.service';
 import { UsuariosService } from '../services/Usuarios/usuarios';
 import { PermisoDirective } from '../shared/directives/permiso.directive';
+
+/**
+ * Mapa que asocia cada índice de submenú con el prefijo de ruta padre.
+ * Se usa para:
+ *   1) Marcar el padre como "has-active-child" cuando una ruta hija está activa.
+ *   2) Abrir automáticamente el submenú correspondiente al navegar a una ruta hija.
+ */
+const SUBMENU_ROUTES: Record<number, string> = {
+  1: '/Reservas',
+  2: '/Transfers',
+  3: '/Tours',
+  4: '/Puntos',
+  6: '/Configuracion', // Configuración no tiene un prefijo único, ver isSubmenuActive
+};
 
 @Component({
   selector: 'app-sidebar',
@@ -31,6 +45,9 @@ export class layout implements OnInit {
   activeMenu = signal<number | null>(null);
   isDarkMode = false;
 
+  // Ruta actual reactiva (para resaltar el padre del submenú activo)
+  currentUrl = signal<string>(this.router.url);
+
   // data state
   user = signal<any>(null);
   avatarUrl = signal<string | null>(null);
@@ -44,7 +61,7 @@ export class layout implements OnInit {
   // -----------------------
   async ngOnInit() {
     try {
-      // 1) usuario desde sesión (localStorage o donde lo guardes)
+      // 1) usuario desde sesión
       this.user.set(this.authService.getUser());
 
       // 2) tema guardado
@@ -54,57 +71,114 @@ export class layout implements OnInit {
         document.documentElement.setAttribute('data-theme', savedTheme);
       }
 
-      // 3) ✅ cargar permisos antes de mostrar el menú
-      //    (si no hay token/usuario, no intentes cargar)
+      // 3) cargar permisos antes de mostrar el menú
       const token = this.authService.getToken?.() || null;
       if (!token) {
-        this.ready.set(true); // deja renderizar layout (mostrar login o lo que aplique)
+        this.ready.set(true);
         return;
       }
 
-      // 3.1) Cargar avatar real del perfil (persistido en DB)
+      // 3.1) Cargar avatar real del perfil
       this.refreshAvatar();
 
-      // 3.2) Mantener avatar sincronizado al navegar entre rutas
+      // 3.2) Suscripción a NavigationEnd
       this.router.events
         .pipe(filter((event) => event instanceof NavigationEnd))
-        .subscribe(() => {
+        .subscribe((event) => {
+          const navEnd = event as NavigationEnd;
+          this.currentUrl.set(navEnd.urlAfterRedirects || navEnd.url);
+
           this.refreshAvatar();
-          this.resetNavbarStates(); // Limpieza automática en CADA navegación
+          this.resetNavbarStates();
+
+          // ✅ Auto-abrir submenú según la ruta actual
+          this.syncActiveSubmenu();
         });
 
       await this.permisosService.loadSessionData();
 
-      // 4) listo para renderizar el sidebar
+      // 3.3) Sincronizar al cargar (por si la app entró directo a una ruta hija)
+      this.syncActiveSubmenu();
+
+      // 4) listo
       this.ready.set(true);
     } catch (e: any) {
       console.error('Layout init error:', e);
       this.loadingError.set('No se pudieron cargar permisos');
-      // para que no se quede negro, renderiza igual
       this.ready.set(true);
     }
+  }
+
+  // -----------------------
+  // Submenu logic
+  // -----------------------
+
+  /**
+   * Devuelve true si el submenú con índice dado contiene la ruta activa.
+   * Se usa desde la plantilla para aplicar la clase `has-active-child` al padre.
+   */
+  isSubmenuActive(index: number): boolean {
+    const url = this.currentUrl();
+    const prefix = SUBMENU_ROUTES[index];
+    if (!prefix) return false;
+
+    // Caso especial: el menú "Configuración" agrupa rutas dispersas
+    if (index === 6) {
+      return (
+        url.startsWith('/Perfil') ||
+        url.startsWith('/Usuarios') ||
+        url.startsWith('/Ayuda')
+      );
+    }
+
+    return url.startsWith(prefix);
+  }
+
+  /**
+   * Abre automáticamente el submenú cuyo padre coincide con la ruta actual.
+   * En desktop colapsado el CSS lo mantiene cerrado visualmente, pero el
+   * estado lógico queda correcto para cuando el usuario haga hover.
+   */
+  private syncActiveSubmenu(): void {
+    for (const idxStr of Object.keys(SUBMENU_ROUTES)) {
+      const idx = Number(idxStr);
+      if (this.isSubmenuActive(idx)) {
+        this.activeMenu.set(idx);
+        return;
+      }
+    }
+    // Si la ruta actual no pertenece a ningún submenú, no abrimos nada.
+    // (No cerramos manualmente — respeta la preferencia del usuario)
   }
 
   // -----------------------
   // UI Actions
   // -----------------------
   toggleSidebar() {
-    this.isSidebarOpen.update(v => !v);
+    this.isSidebarOpen.update((v) => !v);
     this.resetNavbarStates();
   }
 
   toggleMenu(index: number) {
-    this.activeMenu.update(current => (current === index ? null : index));
+    this.activeMenu.update((current) => (current === index ? null : index));
   }
 
   closeAllSubmenus() {
+    // Solo cierra si la ruta actual NO pertenece a un submenú abierto.
+    // Así, si el usuario está dentro de "Reservas/...", el submenú se mantiene
+    // abierto al sacar el mouse (mejor UX).
+    const current = this.activeMenu();
+    if (current !== null && this.isSubmenuActive(current)) {
+      return;
+    }
     this.activeMenu.set(null);
   }
 
   clickPage() {
     this.resetNavbarStates();
     this.isSidebarOpen.set(false);
-    this.activeMenu.set(null);
+    // No cerramos activeMenu aquí — la sincronización por NavigationEnd
+    // se encargará de dejar abierto el submenú correcto.
   }
 
   toggleTheme() {
@@ -117,9 +191,8 @@ export class layout implements OnInit {
   async handleLogout() {
     try {
       this.userService.clearUser();
-      this.authService.logout(); // asumo que te redirige o limpia token
+      this.authService.logout();
     } finally {
-      // por si acaso
       this.ready.set(false);
       this.user.set(null);
       this.activeMenu.set(null);
@@ -131,19 +204,19 @@ export class layout implements OnInit {
   // -----------------------
   // Helpers
   // -----------------------
-private resetNavbarStates() {
-  const currentAlert = this.navbar?.alert?.();
+  private resetNavbarStates() {
+    const currentAlert = this.navbar?.alert?.();
 
-  if (!currentAlert?.loading) {
-    this.navbar?.alert?.set(null);
+    if (!currentAlert?.loading) {
+      this.navbar?.alert?.set(null);
+    }
+
+    this.navbar?.cuposInfo?.set(null);
+    this.navbar?.Id_Reserva?.set(null);
+
+    if (this.navbar?.Id_Transfer) this.navbar.Id_Transfer.set(null);
+    if (this.navbar?.puntos) this.navbar.puntos.set(null);
   }
-
-  this.navbar?.cuposInfo?.set(null);
-  this.navbar?.Id_Reserva?.set(null);
-
-  if (this.navbar?.Id_Transfer) this.navbar.Id_Transfer.set(null);
-  if (this.navbar?.puntos) this.navbar.puntos.set(null);
-}
 
   private refreshAvatar(): void {
     this.usuariosService.getMiPerfil().subscribe({
@@ -152,7 +225,7 @@ private resetNavbarStates() {
       },
       error: () => {
         this.avatarUrl.set(null);
-      }
+      },
     });
   }
 

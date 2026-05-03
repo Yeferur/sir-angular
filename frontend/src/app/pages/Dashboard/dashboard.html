@@ -1,148 +1,356 @@
-<div class="dashboard-container">
-  <!-- Header & Filters -->
-  <header class="dashboard-header animate-fade-in">
+@if (isInitialLoading) {
+<div class="skeleton-page dashboard-page">
+  <div class="page-header">
     <div>
-      <h1>Panel de Control</h1>
+      <div class="sk-line sk-title"></div>
+      <div class="sk-line sk-subtitle"></div>
+    </div>
+    <div class="sk-line sk-range-chip"></div>
+  </div>
+
+  <div class="main-content">
+    <div class="card sk-card">
+      <div class="sk-toolbar-grid">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="sk-toolbar-actions">
+          <div class="sk-field sk-btn-quick"></div>
+          <div class="sk-field sk-btn-quick"></div>
+        </div>
+      </div>
     </div>
 
-    <div class="filters">
-      <div class="input-group">
-        <label>Desde</label>
-        <input type="date" [(ngModel)]="startDate" (change)="applyFilters()">
+    <div class="kpi-grid">
+      @for (_ of [1,2,3,4]; track $index) {
+      <div class="card sk-card sk-kpi">
+        <div class="sk-icon-box"></div>
+        <div class="sk-kpi-info">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-line sk-kpi-value"></div>
+          <div class="sk-line sk-kpi-sub"></div>
+        </div>
       </div>
-      <div class="input-group">
-        <label>Hasta</label>
-        <input type="date" [(ngModel)]="endDate" (change)="applyFilters()">
+      }
+    </div>
+
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+        <div class="sk-line sk-subtitle"></div>
       </div>
+      <div class="summary-grid">
+        @for (_ of [1,2,3,4]; track $index) {
+        <div class="sk-summary-item">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-line sk-summary-value"></div>
+        </div>
+        }
+      </div>
+    </div>
+
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+        <div class="sk-line sk-subtitle"></div>
+      </div>
+      <div class="sk-field sk-chart-wide"></div>
+    </div>
+
+    <div class="charts-grid">
+      @for (_ of [1,2]; track $index) {
+      <div class="card sk-card">
+        <div class="card-header">
+          <div class="sk-line sk-heading"></div>
+          <div class="sk-line sk-subtitle"></div>
+        </div>
+        <div class="sk-field sk-chart"></div>
+      </div>
+      }
+    </div>
+
+    <div class="card sk-card">
+      <div class="card-header">
+        <div class="sk-line sk-heading"></div>
+        <div class="sk-line sk-subtitle"></div>
+      </div>
+      <div class="admin-preview-grid">
+        @for (_ of [1,2,3,4]; track $index) {
+        <div class="sk-admin-item">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-line sk-kpi-sub"></div>
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+} @else {
+<div class="dashboard-page">
+  <header class="page-header">
+    <div>
+      <h1>Panel de Control</h1>
+      <p class="subtitle">Centro operativo de SIR para reservas, pasajeros, ingresos, transfers y actividad diaria.</p>
+    </div>
+
+    <div class="range-chip">
+      @if (startDate && endDate && startDate === endDate) {
+      Operación: {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
+      } @else {
+      Rango: {{ startDate | date:'d MMM yyyy':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
+      }
     </div>
   </header>
 
-  @if (isLoading) {
-    <div class="loading-state dashboard-loading">
-      <div class="spinner"></div>
-      <p>Cargando información...</p>
+  <div class="main-content">
+    <section class="card dashboard-toolbar">
+      <div class="form-grid toolbar-grid">
+        <div class="form-group">
+          <label class="form-label">Desde</label>
+          <input
+            type="text"
+            class="form-input"
+            appFlatpickrInput
+            #startDateFp="fp"
+            [fpOptions]="fpOptionsFecha"
+            [value]="startDate"
+            (change)="onDateRangeChange('startDate', $any($event.target).value)" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hasta</label>
+          <input
+            type="text"
+            class="form-input"
+            appFlatpickrInput
+            #endDateFp="fp"
+            [fpOptions]="fpOptionsFecha"
+            [value]="endDate"
+            (change)="onDateRangeChange('endDate', $any($event.target).value)" />
+        </div>
+        <div class="form-group toolbar-actions">
+          <label class="form-label">Acciones</label>
+          <div class="quick-actions">
+            <button class="btn-add" [class.active]="isTodayRange()" (click)="setTodayRange()" [disabled]="isRefreshing">Hoy</button>
+            <button class="btn-add" [class.active]="isTomorrowRange()" (click)="setTomorrowRange()"
+              [disabled]="isRefreshing">Mañana</button>
+          </div>
+        </div>
+      </div>
+      <p class="toolbar-note">Los datos se actualizan automáticamente al cambiar las fechas.</p>
+    </section>
+
+    <div class="dashboard-content" [class.dashboard-refreshing]="isRefreshing">
+      @if (isRefreshing) {
+      <div class="refresh-indicator">
+        <span class="refresh-pulse"></span>
+        Actualizando datos…
+      </div>
+      }
+
+      <section class="kpi-grid">
+        <div class="card kpi-card income">
+          <div class="icon-box"><i class="bx bx-dollar-circle"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Ingresos Totales</span>
+            <span class="kpi-value">{{ totalIngresos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
+            <span class="kpi-sub">Ingresos registrados en el rango</span>
+          </div>
+        </div>
+
+        <div class="card kpi-card bookings">
+          <div class="icon-box"><i class="bx bx-calendar-check"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Reservas Activas</span>
+            <span class="kpi-value">{{ totalReservas }}</span>
+            <span class="kpi-sub">Reservas no canceladas</span>
+          </div>
+        </div>
+
+        <div class="card kpi-card passengers">
+          <div class="icon-box"><i class="bx bx-user-voice"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Pasajeros</span>
+            <span class="kpi-value">{{ totalPasajeros }}</span>
+            <span class="kpi-sub">Pasajeros del rango seleccionado</span>
+          </div>
+        </div>
+
+        <div class="card kpi-card transfers">
+          <div class="icon-box"><i class="bx bx-car"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Transfers</span>
+            <span class="kpi-value">{{ totalTransfers }}</span>
+            <span class="kpi-sub">Transfers registrados</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card operational-summary-card">
+        <div class="card-header">
+          <h2>Resumen operativo</h2>
+          <span class="card-subtitle">Indicadores rápidos del rango seleccionado.</span>
+        </div>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="form-label">Pasajeros por reserva</span>
+            <strong class="summary-value">{{ averagePassengersPerBooking === null ? '—' : (averagePassengersPerBooking |
+              number:'1.1-2') }}</strong>
+          </div>
+          <div class="summary-item">
+            <span class="form-label">Ingreso promedio por reserva</span>
+            <strong class="summary-value">{{ averageIncomePerBooking === null ? '—' : (averageIncomePerBooking |
+              currency:'COP':'symbol-narrow':'1.0-0') }}</strong>
+          </div>
+          <div class="summary-item">
+            <span class="form-label">Estado del rango</span>
+            <strong class="summary-value">{{ hasAnyActivity() ? 'Con actividad' : 'Sin actividad' }}</strong>
+          </div>
+          <div class="summary-item">
+            <span class="form-label">Fecha operativa</span>
+            <strong class="summary-value">
+              @if (startDate === endDate) {
+              {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
+              } @else {
+              {{ startDate | date:'d MMM yyyy':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
+              }
+            </strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card quick-read-card">
+        <div class="card-header">
+          <h2>Lectura rápida</h2>
+          <span class="card-subtitle">Interpretación automática del rango seleccionado.</span>
+        </div>
+        <div class="quick-read-grid">
+          <div class="quick-read-item">
+            <span class="form-label">Estado general</span>
+            <strong>{{ hasAnyActivity() ? 'Con actividad' : 'Sin actividad' }}</strong>
+          </div>
+          <div class="quick-read-item">
+            <span class="form-label">Volumen</span>
+            <strong class="volume-pill" [ngClass]="getOperationVolumeClass()">{{ getOperationVolumeLabel() }}</strong>
+          </div>
+          <div class="quick-read-item">
+            <span class="form-label">Dependencia de reservas</span>
+            <strong>{{ averagePassengersPerBooking === null ? '—' : (averagePassengersPerBooking | number:'1.1-2') }} pax/reserva</strong>
+          </div>
+          <div class="quick-read-item">
+            <span class="form-label">Servicios</span>
+            <strong>{{ totalTransfers }} transfers registrados</strong>
+          </div>
+        </div>
+      </section>
+
+      @if (!hasAnyActivity()) {
+      <section class="card no-activity-card">
+        <strong>No hay actividad para este rango</strong>
+        <span>Puedes cambiar la fecha o revisar la operación de mañana.</span>
+      </section>
+      }
+
+      <section class="card chart-card wide">
+        <div class="card-header">
+          <h2>Tendencia de Ingresos</h2>
+          <span class="card-subtitle">Evolución del ingreso en el periodo consultado.</span>
+        </div>
+        <div class="chart-body">
+          @if (hasIncomeData) {
+          <apx-chart #chartIncome [series]="incomeChartOptions.series" [chart]="incomeChartOptions.chart"
+            [xaxis]="incomeChartOptions.xaxis" [stroke]="incomeChartOptions.stroke"
+            [tooltip]="incomeChartOptions.tooltip" [dataLabels]="incomeChartOptions.dataLabels"
+            [fill]="incomeChartOptions.fill" [colors]="incomeChartOptions.colors" [grid]="incomeChartOptions.grid"
+            [yaxis]="incomeChartOptions.yaxis">
+          </apx-chart>
+          } @else {
+          <div class="chart-empty">
+            <h4>Sin ingresos registrados</h4>
+            <p>No hay ingresos para el rango seleccionado.</p>
+          </div>
+          }
+        </div>
+      </section>
+
+      <section class="charts-grid">
+        <div class="card chart-card">
+          <div class="card-header">
+            <h2>Top Destinos</h2>
+            <span class="card-subtitle">Pasajeros por tour en el rango seleccionado.</span>
+          </div>
+          <div class="chart-body">
+            @if (hasOccupancyData) {
+            <apx-chart #chartOccupancy [series]="occupancyChartOptions.series" [chart]="occupancyChartOptions.chart"
+              [plotOptions]="occupancyChartOptions.plotOptions" [xaxis]="occupancyChartOptions.xaxis"
+              [colors]="occupancyChartOptions.colors" [dataLabels]="occupancyChartOptions.dataLabels"
+              [grid]="occupancyChartOptions.grid" [yaxis]="occupancyChartOptions.yaxis"
+              [tooltip]="occupancyChartOptions.tooltip">
+            </apx-chart>
+            } @else {
+            <div class="chart-empty">
+              <h4>Sin pasajeros por tour</h4>
+              <p>No hay reservas activas para comparar destinos.</p>
+            </div>
+            }
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-header">
+            <h2>Estado Pasajeros</h2>
+            <span class="card-subtitle">Distribución de pasajeros por estado operativo.</span>
+          </div>
+          <div class="chart-body donut-container">
+            @if (hasPassengerData) {
+            <apx-chart #chartPassengers [series]="passengerChartOptions.series" [chart]="passengerChartOptions.chart"
+              [labels]="passengerChartOptions.labels" [colors]="passengerChartOptions.colors"
+              [legend]="passengerChartOptions.legend" [plotOptions]="passengerChartOptions.plotOptions"
+              [dataLabels]="passengerChartOptions.dataLabels" [tooltip]="passengerChartOptions.tooltip">
+            </apx-chart>
+            } @else {
+            <div class="chart-empty">
+              <h4>Sin distribución disponible</h4>
+              <p>No hay pasajeros registrados para este rango.</p>
+            </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="card admin-preview-card">
+        <div class="card-header">
+          <h2>Gestión operativa</h2>
+          <span class="card-subtitle">Accesos administrativos que se integrarán progresivamente.</span>
+        </div>
+        <div class="admin-preview-grid">
+          <div class="admin-preview-item">
+            <strong>Monedas</strong>
+            <span>Crear, editar y eliminar monedas.</span>
+            <em>Próximamente</em>
+          </div>
+          <div class="admin-preview-item">
+            <strong>Canales</strong>
+            <span>Administrar canales de venta.</span>
+            <em>Próximamente</em>
+          </div>
+          <div class="admin-preview-item">
+            <strong>Rangos de transfer</strong>
+            <span>Configurar rangos y precios.</span>
+            <em>Próximamente</em>
+          </div>
+          <div class="admin-preview-item">
+            <strong>Catálogos</strong>
+            <span>Centralizar datos operativos.</span>
+            <em>Próximamente</em>
+          </div>
+        </div>
+      </section>
     </div>
-  } @else {
-
-  <!-- KPI Cards -->
-  <section class="kpi-grid animate-fade-in-up">
-
-    <div class="kpi-card income">
-      <div class="icon-box">
-        <i class="bx bx-dollar-circle"></i>
-      </div>
-      <div class="kpi-info">
-        <h3>Ingresos Totales</h3>
-        <span class="value">{{ totalIngresos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
-        <span class="subtext">Reservas + Tours</span>
-      </div>
-    </div>
-
-    <div class="kpi-card bookings">
-      <div class="icon-box">
-        <i class="bx bx-calendar-check"></i>
-      </div>
-      <div class="kpi-info">
-        <h3>Reservas Activas</h3>
-        <span class="value">{{ totalReservas }}</span>
-        <span class="subtext">No canceladas</span>
-      </div>
-    </div>
-
-    <div class="kpi-card passengers">
-      <div class="icon-box">
-        <i class="bx bx-user-voice"></i>
-      </div>
-      <div class="kpi-info">
-        <h3>Pasajeros</h3>
-        <span class="value">{{ totalPasajeros }}</span>
-        <span class="subtext">Confirmados y pendientes</span>
-      </div>
-    </div>
-
-    <div class="kpi-card transfers">
-      <div class="icon-box">
-        <i class="bx bx-car"></i>
-      </div>
-      <div class="kpi-info">
-        <h3>Transfers</h3>
-        <span class="value">{{ totalTransfers }}</span>
-        <span class="subtext">Servicios realizados</span>
-      </div>
-    </div>
-
-  </section>
-
-  <!-- Charts Layout -->
-  <section class="charts-grid animate-fade-in-up delay-1">
-
-    <!-- Main Income Chart -->
-    <div class="chart-card wide">
-      <div class="card-header">
-        <h3>Tendencia de Ingresos</h3>
-        <span class="card-subtitle">Comportamiento anual</span>
-      </div>
-
-      <apx-chart
-        #chartIncome
-        [series]="incomeChartOptions.series"
-        [chart]="incomeChartOptions.chart"
-        [xaxis]="incomeChartOptions.xaxis"
-        [stroke]="incomeChartOptions.stroke"
-        [tooltip]="incomeChartOptions.tooltip"
-        [dataLabels]="incomeChartOptions.dataLabels"
-        [fill]="incomeChartOptions.fill"
-        [colors]="incomeChartOptions.colors"
-        [grid]="incomeChartOptions.grid"
-        [yaxis]="incomeChartOptions.yaxis">
-      </apx-chart>
-    </div>
-
-    <!-- Tour Occupancy -->
-    <div class="chart-card">
-      <div class="card-header">
-        <h3>Top Destinos</h3>
-        <span class="card-subtitle">Pasajeros por Tour</span>
-      </div>
-
-      <apx-chart
-        #chartOccupancy
-        [series]="occupancyChartOptions.series"
-        [chart]="occupancyChartOptions.chart"
-        [plotOptions]="occupancyChartOptions.plotOptions"
-        [xaxis]="occupancyChartOptions.xaxis"
-        [colors]="occupancyChartOptions.colors"
-        [dataLabels]="occupancyChartOptions.dataLabels"
-        [grid]="occupancyChartOptions.grid"
-        [yaxis]="occupancyChartOptions.yaxis"
-        [tooltip]="occupancyChartOptions.tooltip">
-      </apx-chart>
-    </div>
-
-    <!-- Passenger Status -->
-    <div class="chart-card">
-      <div class="card-header">
-        <h3>Estado Pasajeros</h3>
-        <span class="card-subtitle">Distribución por estatus</span>
-      </div>
-
-      <div class="donut-container">
-        <apx-chart
-          #chartPassengers
-          [series]="passengerChartOptions.series"
-          [chart]="passengerChartOptions.chart"
-          [labels]="passengerChartOptions.labels"
-          [colors]="passengerChartOptions.colors"
-          [legend]="passengerChartOptions.legend"
-          [plotOptions]="passengerChartOptions.plotOptions"
-          [dataLabels]="passengerChartOptions.dataLabels"
-          [tooltip]="passengerChartOptions.tooltip">
-        </apx-chart>
-      </div>
-    </div>
-
-  </section>
-
-  }
-
+  </div>
 </div>
+}

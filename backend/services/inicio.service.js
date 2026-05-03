@@ -53,17 +53,20 @@ async function obtenerDatosInicio(fecha) {
     FROM tours t
   `;
 
-  // TRANSFERS: total por servicio en la fecha
+  // TRANSFERS: total por servicio en la fecha, excluyendo estados anulados/cancelados
   const transferQuery = `
     SELECT 
       st.Id_Servicio AS id,
       st.Nombre_Servicio AS Servicio,
-      COALESCE(SUM(CASE WHEN tr.Id_Servicio = st.Id_Servicio THEN 1 ELSE 0 END), 0) AS totalTransfers
+      COALESCE(SUM(CASE WHEN tr.Id_Transfer IS NOT NULL THEN 1 ELSE 0 END), 0) AS totalTransfers
     FROM servicios_transfer st
     LEFT JOIN transfers tr
       ON tr.Id_Servicio = st.Id_Servicio
      AND tr.Fecha_Transfer = ?
-     AND UPPER(tr.Estado) IN ('PENDIENTE','ACTIVO','COMPLETADO')
+     AND (
+       tr.Estado IS NULL
+       OR UPPER(TRIM(tr.Estado)) NOT IN ('CANCELADO','CANCELADA','ANULADO','ANULADA','ELIMINADO','ELIMINADA')
+     )
     GROUP BY st.Id_Servicio, st.Nombre_Servicio
     ORDER BY st.Id_Servicio
   `;
@@ -107,6 +110,10 @@ async function obtenerDatosInicio(fecha) {
     }
 
     const [transfers] = await db.query(transferQuery, [fecha]);
+    for (const transfer of transfers) {
+      transfer.totalTransfers = Number(transfer.totalTransfers) || 0;
+    }
+
     const [privadosRaw] = await db.query(privadosQuery, [fecha]);
 
     // map privados por tour

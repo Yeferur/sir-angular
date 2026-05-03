@@ -20,6 +20,8 @@ export class VerHistorialComponent implements OnInit {
   // Datos del historial
   historialList = signal<Historial[]>([]);
   isLoading = signal(false);
+  isInitialLoading = signal(true);
+  isTableRefreshing = signal(false);
   totalRecords = signal(0);
 
   // Paginación
@@ -38,6 +40,8 @@ export class VerHistorialComponent implements OnInit {
   });
 
   advancedFiltersVisible = signal(false);
+  skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  skeletonFilters = [0, 1, 2, 3, 4];
 
   // Opciones para dropdowns
   tiposAccion = signal<string[]>([
@@ -200,10 +204,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 };
 
   ngOnInit() {
-    this.cargarHistorial();
+    this.cargarHistorial(true);
   }
 
-  cargarHistorial() {
+  cargarHistorial(initial = false) {
+    if (initial) {
+      this.isInitialLoading.set(true);
+    } else {
+      this.isTableRefreshing.set(true);
+    }
     this.isLoading.set(true);
 
     const filtersData: HistorialFilters = {
@@ -222,6 +231,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.historialList.set(response.data || []);
         this.totalRecords.set(response.total || 0);
         this.totalPages.set(Math.ceil(this.totalRecords() / this.pageSize()));
+        this.isInitialLoading.set(false);
+        this.isTableRefreshing.set(false);
         this.isLoading.set(false);
       },
       error: (error) => {
@@ -231,6 +242,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           title: 'Error',
           message: 'No se pudo cargar el historial'
         });
+        this.isInitialLoading.set(false);
+        this.isTableRefreshing.set(false);
         this.isLoading.set(false);
       }
     });
@@ -245,7 +258,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   buscar() {
     this.currentPage.set(1);
-    this.cargarHistorial();
+    this.cargarHistorial(false);
   }
 
   limpiarFiltros() {
@@ -258,13 +271,13 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       searchText: ''
     });
     this.currentPage.set(1);
-    this.cargarHistorial();
+    this.cargarHistorial(false);
   }
 
   goToPage(page: number) {
     if (page >= 1 && page <= this.totalPages()) {
       this.currentPage.set(page);
-      this.cargarHistorial();
+      this.cargarHistorial(false);
     }
   }
 
@@ -331,4 +344,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     };
     return labels[accion] || accion;
   }
+
+  getAccionClass(accion: string): string {
+    return (accion || '').toLowerCase();
+  }
+
+  // TODO: Revisar en una pasada posterior la lógica completa del historial y los logs del sistema
+  // para validar el registro correcto de creación, actualización y eliminación con detalle.
 }

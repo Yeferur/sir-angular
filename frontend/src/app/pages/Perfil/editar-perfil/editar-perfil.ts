@@ -23,18 +23,20 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 export class EditarPerfilComponent implements OnInit {
   form: FormGroup;
 
-  isLoading = signal(false);
+  isLoading = signal(true);
   isSubmitting = signal(false);
   perfilActual = signal<any | null>(null);
   showPassword = signal(false);
   showConfirm = signal(false);
 
-  // 🎥 Avatar signals
   avatarActual = signal<string | null>(null);
   avatarPreview = signal<string | null>(null);
   selectedAvatarFile: File | null = null;
   isUploadingAvatar = signal(false);
   isDeletingAvatar = signal(false);
+
+  readonly skeletonAccountFields = [0, 1, 2, 3];
+  readonly skeletonSecurityFields = [0, 1];
 
   private readonly PHONE_REGEX = /^[0-9]{7,15}$/;
 
@@ -72,11 +74,11 @@ export class EditarPerfilComponent implements OnInit {
     if (!ctrl.errors) return '';
 
     if (ctrl.errors['required']) return 'Este campo es obligatorio.';
-    if (ctrl.errors['email']) return 'Correo invalido.';
-    if (ctrl.errors['minlength']) return `Minimo ${ctrl.errors['minlength'].requiredLength} caracteres.`;
-    if (ctrl.errors['maxlength']) return `Maximo ${ctrl.errors['maxlength'].requiredLength} caracteres.`;
-    if (ctrl.errors['pattern'] && name === 'Telefono_Usuario') return 'Telefono invalido (7 a 15 digitos).';
-    return 'Valor invalido.';
+    if (ctrl.errors['email']) return 'Correo inválido.';
+    if (ctrl.errors['minlength']) return `Mínimo ${ctrl.errors['minlength'].requiredLength} caracteres.`;
+    if (ctrl.errors['maxlength']) return `Máximo ${ctrl.errors['maxlength'].requiredLength} caracteres.`;
+    if (ctrl.errors['pattern'] && name === 'Telefono_Usuario') return 'Teléfono inválido (7 a 15 dígitos).';
+    return 'Valor inválido.';
   }
 
   cargarPerfil(): void {
@@ -86,6 +88,9 @@ export class EditarPerfilComponent implements OnInit {
       next: (perfil: any) => {
         this.perfilActual.set(perfil || null);
         this.avatarActual.set(perfil?.Avatar || null);
+        this.avatarPreview.set(null);
+        this.selectedAvatarFile = null;
+
         this.form.patchValue({
           Id_Usuario: perfil?.Id_Usuario || '',
           Usuario: perfil?.Usuario || '',
@@ -97,10 +102,12 @@ export class EditarPerfilComponent implements OnInit {
         });
         this.form.markAsPristine();
         this.isLoading.set(false);
+        this.cdr.markForCheck();
       },
       error: (err: any) => {
         this.isLoading.set(false);
         this.navbar.errorToast('Error', err?.error?.message || 'No se pudo cargar tu perfil.');
+        this.cdr.markForCheck();
       },
     });
   }
@@ -110,31 +117,30 @@ export class EditarPerfilComponent implements OnInit {
       return;
     }
 
-    // ===== Validación del formulario ANTES de confirmar =====
     this.form.updateValueAndValidity({ emitEvent: false });
     if (this.form.invalid) {
       this.form.markAllAsTouched();
 
-      const invalid = Object.keys(this.form.controls).filter(k => this.form.get(k)?.invalid);
+      const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
       const friendly: Record<string, string> = {
         Nombres_Apellidos: 'Nombre completo',
-        Telefono_Usuario: 'Telefono',
+        Telefono_Usuario: 'Teléfono',
         Correo: 'Correo',
-        Contrasena: 'Contrasena',
-        ConfirmarContrasena: 'Confirmar contrasena'
+        Contrasena: 'Contraseña',
+        ConfirmarContrasena: 'Confirmar contraseña',
       };
 
-      const fields = invalid.map(f => friendly[f] || f);
+      const fields = invalid.map((f) => friendly[f] || f);
       const msg = fields.length
         ? `Revisa los siguientes campos: ${fields.join(', ')}`
-        : 'Hay campos invalidos en el formulario.';
+        : 'Hay campos inválidos en el formulario.';
 
       this.navbar.alert.set({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }],
       });
       return;
     }
@@ -148,6 +154,42 @@ export class EditarPerfilComponent implements OnInit {
 
     if (values.Contrasena) {
       payload.Contrasena = String(values.Contrasena);
+    }
+
+    const confirmationParts = ['Vas a actualizar tu información de perfil. ¿Deseas continuar?'];
+    if (values.Contrasena) {
+      confirmationParts.push('También se actualizará tu contraseña.');
+    }
+    if (this.selectedAvatarFile) {
+      confirmationParts.push('También se actualizará tu foto de perfil.');
+    }
+
+    this.navbar.alert.set({
+      type: 'info',
+      title: '¿Guardar cambios?',
+      message: confirmationParts.join(' '),
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null),
+        },
+        {
+          text: 'Guardar cambios',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.ejecutarGuardado(payload);
+          },
+        },
+      ],
+    });
+  }
+
+  private ejecutarGuardado(payload: any): void {
+    if (this.isSubmitting()) {
+      return;
     }
 
     this.isSubmitting.set(true);
@@ -166,32 +208,33 @@ export class EditarPerfilComponent implements OnInit {
         this.form.markAsPristine();
 
         if (this.selectedAvatarFile) {
-          this.subirAvatar(this.selectedAvatarFile, () => {
-            this.isSubmitting.set(false);
-            this.navbar.successToast('Perfil actualizado', 'Tus datos y tu foto se guardaron correctamente.');
-          }, () => {
-            this.isSubmitting.set(false);
-          });
+          this.subirAvatar(
+            this.selectedAvatarFile,
+            () => {
+              this.isSubmitting.set(false);
+              this.navbar.successToast('Perfil actualizado', 'Tus datos y tu foto se guardaron correctamente.');
+              this.cdr.markForCheck();
+            },
+            () => {
+              this.isSubmitting.set(false);
+              this.cdr.markForCheck();
+            }
+          );
           return;
         }
 
         this.isSubmitting.set(false);
         this.navbar.successToast('Perfil actualizado', 'Tus datos se guardaron correctamente.');
+        this.cdr.markForCheck();
       },
       error: (err: any) => {
         this.isSubmitting.set(false);
         this.navbar.errorToast('Error', err?.error?.message || 'No se pudo actualizar tu perfil.');
+        this.cdr.markForCheck();
       },
     });
   }
 
-  // 🎥 AVATAR METHODS
-
-  /**
-   * Handle file selection and preview
-  * - Lee archivo en base64 para preview local
-  * - Guarda el archivo para subirlo al presionar "Guardar cambios"
-   */
   onAvatarSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -200,15 +243,13 @@ export class EditarPerfilComponent implements OnInit {
       return;
     }
 
-    // Validar tipo de archivo
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
-      this.navbar.errorToast('Tipo invalido', 'Solo se aceptan imágenes JPEG, PNG, WEBP o GIF');
+      this.navbar.errorToast('Tipo inválido', 'Solo se aceptan imágenes JPEG, PNG, WEBP o GIF');
       input.value = '';
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       this.navbar.errorToast('Archivo muy grande', 'El archivo no puede ser mayor a 5MB');
@@ -216,11 +257,9 @@ export class EditarPerfilComponent implements OnInit {
       return;
     }
 
-    // Guardar archivo para upload posterior al guardar perfil
     this.selectedAvatarFile = file;
 
     const reader = new FileReader();
-
     reader.onload = (loadEvent) => {
       this.ngZone.run(() => {
         const previewBase64 = loadEvent.target?.result as string;
@@ -232,12 +271,6 @@ export class EditarPerfilComponent implements OnInit {
     reader.readAsDataURL(file);
   }
 
-  /**
-   * Upload avatar to server
-   * - FormData con archivo
-   * - Mantiene preview mientras se sube
-   * - Actualiza avatarActual cuando llega respuesta
-   */
   subirAvatar(file: File, onSuccess?: () => void, onError?: () => void): void {
     if (this.isUploadingAvatar()) {
       return;
@@ -279,7 +312,6 @@ export class EditarPerfilComponent implements OnInit {
         this.navbar.errorToast('Error en carga', err?.error?.message || 'No se pudo subir la foto');
         onError?.();
 
-        // Reset input file
         const input = document.querySelector('input[type="file"][name="avatarInput"]') as HTMLInputElement;
         if (input) {
           input.value = '';
@@ -288,10 +320,6 @@ export class EditarPerfilComponent implements OnInit {
     });
   }
 
-  /**
-   * Delete avatar from server
-   * Muestra alerta de confirmación personalizada antes de eliminar
-   */
   eliminarAvatar(): void {
     if (this.isDeletingAvatar() || !this.avatarActual()) {
       return;
@@ -307,19 +335,18 @@ export class EditarPerfilComponent implements OnInit {
           text: 'Eliminar',
           style: 'primary',
           onClick: () => {
-            // Cerrar alerta y ejecutar eliminación
             this.navbar.alert.set(null);
             this.ejecutarEliminacionAvatar();
-          }
+          },
         },
         {
           text: 'Cancelar',
           style: 'secondary',
           onClick: () => {
             this.navbar.alert.set(null);
-          }
-        }
-      ]
+          },
+        },
+      ],
     });
   }
 
@@ -333,22 +360,22 @@ export class EditarPerfilComponent implements OnInit {
         this.avatarPreview.set(null);
         this.selectedAvatarFile = null;
         this.navbar.successToast('Foto eliminada', 'Tu foto de perfil fue eliminada.');
+        this.cdr.markForCheck();
       },
       error: (err: any) => {
         this.isDeletingAvatar.set(false);
         this.navbar.errorToast('Error', err?.error?.message || 'No se pudo eliminar la foto');
+        this.cdr.markForCheck();
       },
     });
   }
 
-  /**
-   * Get initials from full name
-   */
   getInitials(): string {
     const perfil = this.perfilActual();
     if (!perfil?.Nombres_Apellidos) {
       return '?';
     }
+
     const parts = String(perfil.Nombres_Apellidos).trim().split(' ');
     return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
   }

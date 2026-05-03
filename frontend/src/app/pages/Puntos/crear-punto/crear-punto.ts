@@ -1,8 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { puntosService, Punto } from '../../../services/Puntos/puntos';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { puntosService } from '../../../services/Puntos/puntos';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 
@@ -11,15 +11,15 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
   templateUrl: './crear-punto.html',
   styleUrls: ['./crear-punto.css'],
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, CommonModule]
+  imports: [ReactiveFormsModule, FormsModule, CommonModule, RouterLink]
 })
-export class CrearPuntoComponent {
-  isLoading = false;
-  isSubmitting = signal(false);
+export class CrearPuntoComponent implements OnInit {
+  isLoading = signal<boolean>(true);
+  isSubmitting = signal<boolean>(false);
   successMsg = '';
   errorMsg = '';
 
-  form;
+  form!: FormGroup;
   tours = signal<any[]>([]);
   horariosMap: Record<number | string, string> = {};
   newHorario: { Id_Tour: number | string; Hora_Salida: string } = { Id_Tour: '', Hora_Salida: '' };
@@ -36,12 +36,28 @@ export class CrearPuntoComponent {
       Latitud: [null, [Validators.required, Validators.min(-90), Validators.max(90)]],
       Longitud: [null, [Validators.required, Validators.min(-180), Validators.max(180)]]
     });
-    // cargar tours para seleccionar en horarios (usa Reservas service para incluir auth)
-    this.reservasSvc.getTours().subscribe({ next: t => this.tours.set(t || []), error: () => this.tours.set([]) });
-    
   }
 
-onSubmitCrearPunto() {
+  ngOnInit(): void {
+    this.loadTours();
+  }
+
+  private loadTours(): void {
+    this.isLoading.set(true);
+
+    // Carga inicial de tours para configurar horarios por tour.
+    this.reservasSvc.getTours().subscribe({
+      next: t => this.tours.set(t || []),
+      error: () => {
+        this.tours.set([]);
+        this.navbar.errorToast('Error', 'No se pudieron cargar los tours.');
+        this.isLoading.set(false);
+      },
+      complete: () => this.isLoading.set(false)
+    });
+  }
+
+async onSubmitCrearPunto() {
   if (this.isSubmitting()) return;
 
   this.successMsg = '';
@@ -81,6 +97,9 @@ onSubmitCrearPunto() {
     return;
   }
 
+  const confirmed = await this.requestCreatePointConfirmation();
+  if (!confirmed) return;
+
   this.crearPuntoConfirmado();
 }
 
@@ -90,7 +109,6 @@ private crearPuntoConfirmado() {
   // Seguridad extra: si algo cambió entre confirmación y click
   if (this.form.invalid || this.isDuplicate) return;
 
-  this.isLoading = true;
   this.isSubmitting.set(true);
 
   const payload: any = { ...this.form.value };
@@ -113,9 +131,52 @@ private crearPuntoConfirmado() {
       this.navbar.errorToast('Error', 'Error al crear el punto');
     },
     complete: () => {
-      this.isLoading = false;
       this.isSubmitting.set(false);
     }
+  });
+}
+
+private buildCreatePointConfirmationMessage(): string {
+  const nombrePunto = String(this.form.get('NombrePunto')?.value || '').trim() || 'el punto de encuentro';
+  const sector = String(this.form.get('Sector')?.value || '').trim() || '—';
+  const direccion = String(this.form.get('Direccion')?.value || '').trim() || '—';
+  const cantidadTours = this.tours().length;
+
+  return [
+    `Vas a crear el punto de encuentro ${nombrePunto}.`,
+    `Sector: ${sector}.`,
+    `Dirección: ${direccion}.`,
+    `Se configurarán horarios para ${cantidadTours} tours.`,
+    '¿Deseas continuar?'
+  ].join(' ');
+}
+
+private requestCreatePointConfirmation(): Promise<boolean> {
+  return new Promise((resolve) => {
+    this.navbar.alert?.set?.({
+      type: 'info',
+      title: '¿Todo listo?',
+      message: this.buildCreatePointConfirmationMessage(),
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => {
+            this.navbar.alert?.set?.(null);
+            resolve(false);
+          }
+        },
+        {
+          text: 'Guardar Punto',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert?.set?.(null);
+            resolve(true);
+          }
+        }
+      ]
+    });
   });
 }
 

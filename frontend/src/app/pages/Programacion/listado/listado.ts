@@ -35,6 +35,7 @@ export class Listado implements OnInit {
   isPageLoading = true;
   isUpdatingDate = false;
   modoVista: 'dashboard' | 'editor' = 'dashboard';
+  skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
 
   tourSeleccionado: TourProgramacion | null = null;
   planSeleccionado: Sugerencia | null = null;

@@ -1,7 +1,9 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal, computed, ViewChild } from '@angular/core';
 import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
+import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { Reservas } from '../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 
@@ -37,6 +39,9 @@ type DuplicarPanelProps = {
 export class DuplicarPanelComponent implements OnInit {
   private api = inject(Reservas);
   private navbar = inject(DynamicIslandGlobalService);
+  private cdr = inject(ChangeDetectorRef);
+
+  @ViewChild('fechaFp') fechaFp?: FlatpickrInputDirective;
 
   // Props
   props: DuplicarPanelProps = {};
@@ -50,20 +55,144 @@ export class DuplicarPanelComponent implements OnInit {
 
   // UX state
   isSubmitting = signal(false);
+  isLoadingDisponibilidad = signal(false);
   errorMsg = signal<string | null>(null);
+
+  private disponibilidadActual: any = null;
 
   // Validación
   isValid = computed(() => !!this.Id_Tour() && !!this.Fecha_Tour());
 
-  ngOnInit(): void {
+  fpOptionsFecha: Partial<FlatpickrOptions> = {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: false,
+    disableMobile: true,
+    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
+
+    altInputClass: 'form-input flatpickr-input flatpickr-alt',
+
+    onReady: (_sel, _str, inst: any) => {
+      // SSR guard antes de tocar el DOM.
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+      const cal: HTMLElement = inst?.calendarContainer;
+      if (!cal) return;
+
+      cal.classList.add('sir-flatpickr');
+
+      const clampDay = (y: number, m: number, d: number) => {
+        const last = new Date(y, m + 1, 0).getDate();
+        return Math.min(Math.max(d, 1), last);
+      };
+
+      let yearSelect: HTMLSelectElement | null = null;
+
+      const ensureYearSelect = () => {
+        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
+        if (!monthWrap) return null;
+
+        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
+        if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
+
+        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
+        const container = curMonth ?? monthWrap;
+
+        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
+        if (yearSelect) return yearSelect;
+
+        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
+        if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
+
+        yearSelect = document.createElement('select');
+        yearSelect.className = 'sir-year-select';
+        yearSelect.setAttribute('aria-label', 'Seleccionar año');
+
+        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
+        return yearSelect;
+      };
+
+      const buildYears = (centerYear: number) => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const start = centerYear - 20;
+        const end = centerYear + 20;
+
+        sel.innerHTML = '';
+        for (let y = end; y >= start; y--) {
+          const opt = document.createElement('option');
+          opt.value = String(y);
+          opt.textContent = String(y);
+          sel.appendChild(opt);
+        }
+        sel.value = String(centerYear);
+      };
+
+      const syncSelectValue = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const y = inst.currentYear ?? new Date().getFullYear();
+        const exists = !!sel.querySelector(`option[value="${y}"]`);
+        if (!exists) buildYears(y);
+        sel.value = String(y);
+      };
+
+      const getSafeDay = () => {
+        const d: Date | undefined = inst.selectedDates?.[0];
+        return d ? d.getDate() : 1;
+      };
+
+      const onChange = () => {
+        const sel = ensureYearSelect();
+        if (!sel) return;
+
+        const y = Number(sel.value);
+        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
+        const day = clampDay(y, m, getSafeDay());
+
+        const newDate = new Date(y, m, day);
+
+        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
+
+        if (inst.selectedDates?.length) {
+          inst.setDate(newDate, true);
+        }
+      };
+
+      buildYears(inst.currentYear ?? new Date().getFullYear());
+      syncSelectValue();
+
+      const sel0 = ensureYearSelect();
+      sel0?.addEventListener('change', onChange);
+
+      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
+        const prev = inst.config[key];
+        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
+        inst.config[key] = [...arr, fn];
+      };
+
+      wrap('onMonthChange', () => syncSelectValue());
+      wrap('onYearChange', () => syncSelectValue());
+
+      const prevOnDestroy = inst.config.onDestroy;
+      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
+      inst.config.onDestroy = [
+        ...destroyArr,
+        () => sel0?.removeEventListener('change', onChange)
+      ];
+    }
+  };
+
+  async ngOnInit(): Promise<void> {
     const p = this.navbar.panel();
     this.props = (p?.props || {}) as DuplicarPanelProps;
 
     this.tours = this.props.tours ?? [];
 
-    const defaultTour = this.tours?.[0]?.Id_Tour ?? null;
-
-    this.Id_Tour.set(this.toNumberOrNull(this.props.Id_Tour) ?? defaultTour);
+    this.Id_Tour.set(null);
     this.Fecha_Tour.set(this.normalizeDate(this.props.Fecha_Tour));
     this.Observaciones.set(this.props.Observaciones ?? null);
 
@@ -71,6 +200,14 @@ export class DuplicarPanelComponent implements OnInit {
     if (!this.tours?.length) {
       this.errorMsg.set('No hay tours disponibles para duplicar.');
     }
+
+    await this.cargarDisponibilidadTour(this.Id_Tour());
+  }
+
+  async onTourChange(value: number | string | null): Promise<void> {
+    const idTour = this.toNumberOrNull(value);
+    this.Id_Tour.set(idTour);
+    await this.cargarDisponibilidadTour(idTour);
   }
 
   cancelar(): void {
@@ -131,6 +268,131 @@ export class DuplicarPanelComponent implements OnInit {
   }
 
   // Helpers
+  private async cargarDisponibilidadTour(idTour: number | null): Promise<void> {
+    this.isLoadingDisponibilidad.set(true);
+
+    if (!idTour) {
+      this.disponibilidadActual = null;
+      this.applyDisponibilidadToDatepicker();
+      this.isLoadingDisponibilidad.set(false);
+      return;
+    }
+
+    try {
+      const dispo = await firstValueFrom(this.api.getDisponibilidadTour(idTour));
+      this.disponibilidadActual = dispo || null;
+    } catch {
+      this.disponibilidadActual = null;
+    } finally {
+      this.applyDisponibilidadToDatepicker();
+      this.isLoadingDisponibilidad.set(false);
+    }
+  }
+
+  private applyDisponibilidadToDatepicker(): void {
+    const dispo = this.disponibilidadActual;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const onlyDate = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+
+    const normalizeDiaToWeekday = (d: string) => {
+      if (!d) return null;
+      const s = String(d).trim().toLowerCase();
+      switch (s) {
+        case 'lunes': return 1;
+        case 'martes': return 2;
+        case 'miercoles':
+        case 'miércoles': return 3;
+        case 'jueves': return 4;
+        case 'viernes': return 5;
+        case 'sabado':
+        case 'sábado': return 6;
+        case 'domingo': return 0;
+        default: return null;
+      }
+    };
+
+    let disable: ((date: Date) => boolean)[] = [];
+
+    if (dispo) {
+      const modoRaw = (dispo.Modo || 'TODO_EL_AÑO').toString().toUpperCase();
+      const modoNorm = modoRaw
+        .replace(/Ñ/g, 'N')
+        .replace(/Á/g, 'A')
+        .replace(/É/g, 'E')
+        .replace(/Í/g, 'I')
+        .replace(/Ó/g, 'O')
+        .replace(/Ú/g, 'U');
+
+      const diasBaseSet = new Set<number>(
+        (dispo.Dias_Base || [])
+          .map((d: string) => normalizeDiaToWeekday(d))
+          .filter((x: any) => x !== null)
+      );
+
+      const temporadas = Array.isArray(dispo.Temporadas)
+        ? dispo.Temporadas.map((t: any) => ({
+          inicio: t.Fecha_Inicio ? new Date(t.Fecha_Inicio) : null,
+          fin: t.Fecha_Fin ? new Date(t.Fecha_Fin) : null,
+          dias: (t.Dias || [])
+            .map((d: string) => normalizeDiaToWeekday(d))
+            .filter((x: any) => x !== null) as number[],
+        }))
+        : [];
+
+      const isAllowed = (date: Date) => {
+        const d = onlyDate(date);
+        const wk = d.getDay();
+        if (d < today) return false;
+
+        for (const t of temporadas) {
+          if (!t.inicio || !t.fin) continue;
+
+          const ini = onlyDate(t.inicio);
+          const fin = onlyDate(t.fin);
+
+          if (d >= ini && d <= fin) {
+            if (!t.dias || t.dias.length === 0) return true;
+            return t.dias.includes(wk);
+          }
+        }
+
+        if (modoNorm === 'SOLO_TEMPORADAS') return false;
+        if (diasBaseSet.size > 0) return diasBaseSet.has(wk);
+        return false;
+      };
+
+      disable = [(date: Date) => !isAllowed(date)];
+    }
+
+    this.fpOptionsFecha = {
+      ...this.fpOptionsFecha,
+      minDate: today,
+      disable,
+    };
+
+    const fp = this.fechaFp?.instance;
+    if (fp) {
+      fp.set('minDate', today);
+      fp.set('disable', disable);
+      fp.redraw();
+    }
+
+    const cur = this.Fecha_Tour();
+    const disableFn = disable[0];
+    if (cur) {
+      const curDate = fp?.parseDate ? fp.parseDate(cur, 'Y-m-d') : new Date(cur);
+      if (curDate && (onlyDate(curDate) < today || disableFn?.(curDate))) {
+        this.Fecha_Tour.set(null);
+        fp?.clear();
+      }
+    }
+
+    this.cdr.markForCheck();
+  }
+
   private toNumberOrNull(v: any): number | null {
     if (v === null || v === undefined || v === '') return null;
     const n = Number(v);

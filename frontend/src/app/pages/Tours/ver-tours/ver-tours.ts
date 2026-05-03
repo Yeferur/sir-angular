@@ -21,6 +21,7 @@ export class VerToursComponent implements OnInit {
 
     tours = signal<Tour[]>([]);
     isLoading = signal(true);
+    skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
 
     private refreshToursEffect = effect(() => {
         const entity = this.navbar.needsRefresh();

@@ -30,9 +30,11 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   permisos: any[] = [];
   selectedPermisos: number[] = [];
 
-  isLoading = signal(false);
+  isLoading = signal(true);
   catalogLoading = signal(false);
   isSubmitting = signal(false);
+  skeletonCards = [0, 1, 2];
+  skeletonPermissionRows = [0, 1, 2, 3, 4, 5];
   private pendingLoads = 0;
   errorMsg = '';
 
@@ -78,6 +80,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.isLoading.set(true);
     this.catalogLoading.set(true);
     this.pendingLoads = 0;
     this.loadRoles();
@@ -152,6 +155,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   private checkLoadingFinish() {
     if (this.pendingLoads <= 0) {
       this.catalogLoading.set(false);
+      this.isLoading.set(false);
       this.cdr.markForCheck();
     }
   }
@@ -178,9 +182,14 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   togglePermiso(idPermiso: number) {
-    const idx = this.selectedPermisos.indexOf(idPermiso);
-    if (idx >= 0) this.selectedPermisos.splice(idx, 1);
-    else this.selectedPermisos.push(idPermiso);
+    const id = Number(idPermiso);
+
+    if (this.selectedPermisos.includes(id)) {
+      this.selectedPermisos = this.selectedPermisos.filter((permisoId) => permisoId !== id);
+    } else {
+      this.selectedPermisos = [...this.selectedPermisos, id];
+    }
+
     this.cdr.markForCheck();
   }
 
@@ -315,21 +324,18 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   private confirmCreateUser(payload: any) {
     if (this.isSubmitting()) return;
     this.isSubmitting.set(true);
-    this.isLoading.set(true);
     this.cdr.markForCheck();
 
     this.usuariosService.crearUsuario(payload).subscribe({
       next: () => {
         this.form.markAsPristine();
         this.isSubmitting.set(false);
-        this.isLoading.set(false);
         this.global.successToast('Usuario creado', 'El usuario se creó correctamente.');
         this.cdr.markForCheck();
         this.router.navigate(['/Usuarios']);
       },
       error: (err: any) => {
         this.isSubmitting.set(false);
-        this.isLoading.set(false);
         this.errorMsg = err?.error?.error || 'Error creando usuario';
         this.global.errorToast('Error', this.errorMsg);
         this.cdr.markForCheck();

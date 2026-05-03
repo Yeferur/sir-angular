@@ -1,12 +1,12 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+
 import { Tours } from '../../../services/Tours/tours';
 import { ConfirmacionService } from '../../../services/confirmacion.service';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
-
 import { ComisionesService } from '../../../services/Comisiones/comisiones.service';
 import { SegurosService } from '../../../services/Seguros/seguros.service';
 
@@ -20,14 +20,20 @@ import { SegurosService } from '../../../services/Seguros/seguros.service';
 export class ConfirmacionComponent implements OnInit {
     toursList: any[] = [];
     pasajeros: any[] = [];
+    skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
 
-    // Variable auxiliar para el checkbox "Todos" del encabezado
-    allChecked: boolean = false;
+    allChecked = false;
+    hasSearched = false;
+    isLoading = false;
+    isSubmitting = false;
+    isExportingReports = false;
 
     filters = {
         Id_Tour: '',
         Fecha: ''
     };
+
+    private savedConfirmaciones = new Map<number, number>();
 
     fpOptionsFecha: Partial<FlatpickrOptions> = {
         dateFormat: 'Y-m-d',
@@ -36,11 +42,8 @@ export class ConfirmacionComponent implements OnInit {
         allowInput: false,
         disableMobile: true,
         monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-
         altInputClass: 'form-input flatpickr-input flatpickr-alt',
-
         onReady: (_sel, _str, inst: any) => {
-            // ✅ SSR guard ANTES DE TODO
             if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
             const cal: HTMLElement = inst?.calendarContainer;
@@ -48,36 +51,32 @@ export class ConfirmacionComponent implements OnInit {
 
             cal.classList.add('sir-flatpickr');
 
-            // util: clamp día al máximo del mes
             const clampDay = (y: number, m: number, d: number) => {
-                const last = new Date(y, m + 1, 0).getDate(); // último día del mes
+                const last = new Date(y, m + 1, 0).getDate();
                 return Math.min(Math.max(d, 1), last);
             };
 
-            // --- Inyectar select en el header estable (flatpickr-month) ---
-            let yearDiv: HTMLDivElement | null = null;
             let yearSelect: HTMLSelectElement | null = null;
 
             const ensureYearSelect = () => {
-                // contenedor header
                 const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
                 if (!monthWrap) return null;
 
-                // elimina el input numérico (cuando exista)
                 const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-                if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
+                if (numWrap) {
+                    try { numWrap.remove(); } catch { /* ignore */ }
+                }
 
-                // preferimos insertar dentro del pill .flatpickr-current-month
                 const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
                 const container = curMonth ?? monthWrap;
 
-                // evita duplicados
                 yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
                 if (yearSelect) return yearSelect;
 
-                // elimina cualquier wrapper previo para mantener DOM limpio
-                const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-                if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
+                const oldSelect = monthWrap.querySelector('.sir-year-select') as HTMLSelectElement | null;
+                if (oldSelect) {
+                    try { oldSelect.remove(); } catch { /* ignore */ }
+                }
 
                 yearSelect = document.createElement('select');
                 yearSelect.className = 'sir-year-select';
@@ -126,38 +125,29 @@ export class ConfirmacionComponent implements OnInit {
                 const y = Number(sel.value);
                 const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
                 const day = clampDay(y, m, getSafeDay());
-
                 const newDate = new Date(y, m, day);
 
-                // siempre mueve la vista
                 if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-                // solo setea si ya había selección
                 if (inst.selectedDates?.length) {
-                    inst.setDate(newDate, true); // true => triggerChange para reactive forms
+                    inst.setDate(newDate, true);
                 }
             };
 
-            // init
             buildYears(inst.currentYear ?? new Date().getFullYear());
             syncSelectValue();
 
-            // listeners
             const sel0 = ensureYearSelect();
             sel0?.addEventListener('change', onChange);
 
-            // hook sin pisar otros callbacks
             const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
                 const prev = inst.config[key];
                 const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
                 inst.config[key] = [...arr, fn];
             };
 
-            // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
             wrap('onMonthChange', () => syncSelectValue());
             wrap('onYearChange', () => syncSelectValue());
 
-            // cleanup
             const prevOnDestroy = inst.config.onDestroy;
             const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
             inst.config.onDestroy = [
@@ -166,24 +156,6 @@ export class ConfirmacionComponent implements OnInit {
             ];
         }
     };
-
-    onFechaChange(event: any) {
-        // Flatpickr usually returns [Date] or "YYYY-MM-DD" depending on config.
-        // Directives using ControlValueAccessor update the model automatically.
-        // However, if we need to trigger manual change detection or validation:
-        // this.cdr.detectChanges(); 
-
-        // This method can be used if explicit handling is needed, 
-        // but often [(ngModel)] handles updates. 
-        // If the user's snippet used (change)="onFechaChange($event)", we keep it compatible.
-        // Assuming event.target.value or similar if it's a DOM event, 
-        // but with Flatpickr directive, value change is often handled via model.
-        // Let's ensure filters.Fecha is updated if passed explicitly.
-    }
-
-    isLoading = false;
-    isSubmitting = false;
-    private savedConfirmaciones = new Map<number, number>();
 
     constructor(
         private toursService: Tours,
@@ -198,19 +170,39 @@ export class ConfirmacionComponent implements OnInit {
         const today = new Date();
         today.setDate(today.getDate() - 1);
         this.filters.Fecha = today.toISOString().split('T')[0];
-
         this.loadTours();
     }
 
-    // MEJORA DE RENDIMIENTO: Evita que Angular redibuje toda la fila si solo cambia un dato
-    trackByPasajero(index: number, item: any): number {
+    onFechaChange(_event: any) {
+        // Compatible with the current Flatpickr directive binding.
+        // The ngModel already keeps filters.Fecha in sync.
+    }
+
+    trackByPasajero(_index: number, item: any): number {
         return item.Id_Pasajero;
+    }
+
+    get totalConfirmados(): number {
+        return this.pasajeros.filter((p) => Number(p.Confirmacion ?? 0) === 1).length;
+    }
+
+    get totalPendientes(): number {
+        return this.pasajeros.length - this.totalConfirmados;
+    }
+
+    get nombreTourSeleccionado(): string {
+        const tour = this.toursList.find((t) => Number(t.Id_Tour) === Number(this.filters.Id_Tour));
+        return tour?.Nombre_Tour || 'el tour seleccionado';
+    }
+
+    get canExportReports(): boolean {
+        return !!this.filters.Id_Tour && !!this.filters.Fecha && this.pasajeros.length > 0;
     }
 
     loadTours() {
         this.toursService.getTours().subscribe({
             next: (data: any[]) => {
-                this.toursList = data;
+                this.toursList = data || [];
                 this.cdr.detectChanges();
             },
             error: (err: any) => console.error('Error cargando tours', err)
@@ -223,26 +215,24 @@ export class ConfirmacionComponent implements OnInit {
             return;
         }
 
+        this.hasSearched = true;
         this.isLoading = true;
-        this.pasajeros = []; // Limpiar lista anterior visualmente
-        this.cdr.detectChanges(); // Forzar vista de carga
+        this.pasajeros = [];
+        this.allChecked = false;
+        this.cdr.detectChanges();
 
         this.confirmacionService.getPasajeros(Number(this.filters.Id_Tour), this.filters.Fecha).subscribe({
             next: (data: any[]) => {
-                // Convertir 1/0 a true/false para manejo más rápido en UI (opcional pero recomendado)
-                // Aquí mantenemos 1/0 pero aseguramos que la UI lo interprete bien
-                this.pasajeros = data.sort((a, b) => a.Id_Reserva - b.Id_Reserva);
-                this.savedConfirmaciones = new Map(
-                    this.pasajeros.map((p) => [Number(p.Id_Pasajero), Number(p.Confirmacion ? 1 : 0)])
-                );
-                this.checkAllStatus(); // Verificar estado inicial del "Select All"
-
+                this.pasajeros = this.normalizePasajeros(data);
+                this.syncSavedConfirmaciones();
+                this.checkAllStatus();
                 this.isLoading = false;
 
                 if (this.pasajeros.length === 0) {
-                    this.navbar.infoToast('Sin resultados', 'No hay pasajeros registrados para este tour.');
+                    this.navbar.infoToast('Sin pasajeros', 'No hay pasajeros registrados para este tour y fecha.');
                 }
-                this.cdr.detectChanges(); // Actualización final
+
+                this.cdr.detectChanges();
             },
             error: (err: any) => {
                 console.error('Error', err);
@@ -253,56 +243,75 @@ export class ConfirmacionComponent implements OnInit {
         });
     }
 
-    // Lógica optimizada para el toggle general
     toggleAll(event: any) {
-        const isChecked = event.target.checked;
+        const isChecked = !!event?.target?.checked;
         this.allChecked = isChecked;
-
-        // Actualizamos los datos
-        this.pasajeros.forEach(p => p.Confirmacion = isChecked ? 1 : 0);
-
-        // Forzamos la detección de cambios manual para respuesta instantánea
+        this.pasajeros.forEach((p) => (p.Confirmacion = isChecked ? 1 : 0));
         this.cdr.detectChanges();
     }
 
-    // Actualizar estado del checkbox header si se cambian items individuales
     checkAllStatus() {
-        // Si todos están en 1, allChecked = true
-        this.allChecked = this.pasajeros.every(p => p.Confirmacion == 1);
-        // No necesitamos detectChanges aquí obligatoriamente, pero ayuda a la reactividad del header
-        // this.cdr.detectChanges(); 
+        this.allChecked = this.pasajeros.length > 0 && this.pasajeros.every((p) => Number(p.Confirmacion ?? 0) === 1);
+    }
+
+    requestSave() {
+        if (this.pasajeros.length === 0 || this.isSubmitting) return;
+
+        const total = this.pasajeros.length;
+        const confirmados = this.totalConfirmados;
+        const pendientes = this.totalPendientes;
+        const nombreTour = this.nombreTourSeleccionado;
+        const fecha = this.filters.Fecha || 'sin fecha';
+
+        this.navbar.alert.set({
+            type: 'warning',
+            title: '¿Guardar confirmación?',
+            message: `Vas a guardar la confirmación de viaje para ${nombreTour} el ${fecha}. Pasajeros: ${total}. Confirmados: ${confirmados}. Pendientes: ${pendientes}. ¿Deseas continuar?`,
+            autoClose: false,
+            buttons: [
+                {
+                    text: 'Cancelar',
+                    style: 'secondary',
+                    onClick: () => this.navbar.alert.set(null),
+                },
+                {
+                    text: 'Guardar',
+                    style: 'primary',
+                    onClick: () => {
+                        this.navbar.alert.set(null);
+                        this.performSave();
+                    },
+                },
+            ],
+        });
     }
 
     save() {
+        this.requestSave();
+    }
+
+    private performSave() {
         if (this.pasajeros.length === 0 || this.isSubmitting) return;
 
         this.isSubmitting = true;
-        this.isLoading = true;
         this.cdr.detectChanges();
 
-        const payload = this.pasajeros.map(p => ({
+        const payload = this.pasajeros.map((p) => ({
             Id_Pasajero: p.Id_Pasajero,
             Confirmacion: p.Confirmacion ? 1 : 0
         }));
 
         this.confirmacionService.saveConfirmacion(payload).subscribe({
-            next: (res) => {
-                this.savedConfirmaciones = new Map(
-                    this.pasajeros.map((p) => [Number(p.Id_Pasajero), Number(p.Confirmacion ? 1 : 0)])
-                );
-                this.isLoading = false;
+            next: () => {
+                this.syncSavedConfirmaciones();
                 this.isSubmitting = false;
-                this.navbar.successToast('Guardado', 'Confirmación actualizada correctamente.');
+                this.navbar.successToast('Confirmación guardada correctamente', 'La confirmación de viaje se actualizó correctamente.');
                 this.cdr.detectChanges();
 
-                const tourFound = this.toursList.find(t => t.Id_Tour == this.filters.Id_Tour);
-                const nombreTour = tourFound ? tourFound.Nombre_Tour : '';
-                this.comisionesService.exportarExcel(this.filters, nombreTour);
-                this.segurosService.exportarExcel(this.filters, nombreTour);
-                this.navbar.infoToast('Reportes generados', 'Se descargaron Comisiones y Seguros.');
+                setTimeout(() => this.askReportDownloads(), 150);
             },
             error: (err) => {
-                this.isLoading = false;
+                console.error('Error al guardar confirmación', err);
                 this.isSubmitting = false;
                 this.navbar.errorToast('Error', 'No se pudo guardar.');
                 this.cdr.detectChanges();
@@ -310,11 +319,109 @@ export class ConfirmacionComponent implements OnInit {
         });
     }
 
+    private askReportDownloads() {
+        const fecha = this.filters.Fecha || 'sin fecha';
+
+        this.navbar.alert.set({
+            type: 'info',
+            title: '¿Descargar reportes?',
+            message: `Puedes descargar los archivos de Comisiones y Seguros para este tour y fecha (${fecha}).`,
+            autoClose: false,
+            buttons: [
+                {
+                    text: 'Descargar ambos',
+                    style: 'primary',
+                    onClick: () => {
+                        this.navbar.alert.set(null);
+                        this.downloadReports('both');
+                    },
+                },
+                {
+                    text: 'Solo comisiones',
+                    style: 'secondary',
+                    onClick: () => {
+                        this.navbar.alert.set(null);
+                        this.downloadReports('comisiones');
+                    },
+                },
+                {
+                    text: 'Solo seguros',
+                    style: 'secondary',
+                    onClick: () => {
+                        this.navbar.alert.set(null);
+                        this.downloadReports('seguros');
+                    },
+                },
+                {
+                    text: 'Ahora no',
+                    style: 'secondary',
+                    onClick: () => this.navbar.alert.set(null),
+                },
+            ],
+        });
+    }
+
+    downloadComisiones() {
+        this.downloadReports('comisiones');
+    }
+
+    downloadSeguros() {
+        this.downloadReports('seguros');
+    }
+
+    downloadAmbos() {
+        this.downloadReports('both');
+    }
+
+    private downloadReports(mode: 'both' | 'comisiones' | 'seguros') {
+        if (!this.canExportReports) {
+            this.navbar.warningToast('Sin datos', 'Primero carga pasajeros antes de descargar reportes.');
+            return;
+        }
+
+        const nombreTour = this.nombreTourSeleccionado;
+        this.isExportingReports = true;
+
+        if (mode === 'both' || mode === 'comisiones') {
+            this.comisionesService.exportarExcel(this.filters, nombreTour);
+        }
+
+        if (mode === 'both' || mode === 'seguros') {
+            this.segurosService.exportarExcel(this.filters, nombreTour);
+        }
+
+        const label =
+            mode === 'both' ? 'Comisiones y Seguros' :
+            mode === 'comisiones' ? 'Comisiones' : 'Seguros';
+
+        this.navbar.infoToast('Descarga iniciada', `Se generó la descarga de ${label}.`);
+
+        setTimeout(() => {
+            this.isExportingReports = false;
+            this.cdr.detectChanges();
+        }, 1200);
+    }
+
+    private normalizePasajeros(data: any[]): any[] {
+        return [...(data || [])]
+            .sort((a, b) => Number(a.Id_Reserva) - Number(b.Id_Reserva))
+            .map((p) => ({
+                ...p,
+                Confirmacion: Number(p.Confirmacion) === 1 ? 1 : 0
+            }));
+    }
+
+    private syncSavedConfirmaciones() {
+        this.savedConfirmaciones = new Map(
+            this.pasajeros.map((p) => [Number(p.Id_Pasajero), Number(p.Confirmacion ?? 0)])
+        );
+    }
+
     hasUnsavedChanges(): boolean {
         if (!this.pasajeros?.length || this.isSubmitting) return false;
         return this.pasajeros.some((p) => {
             const prev = this.savedConfirmaciones.get(Number(p.Id_Pasajero)) ?? 0;
-            const current = Number(p.Confirmacion ? 1 : 0);
+            const current = Number(p.Confirmacion ?? 0);
             return prev !== current;
         });
     }
