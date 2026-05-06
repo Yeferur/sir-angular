@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { PermisosService, MenuItem } from '../../../services/Permisos/permisos.service';
+import { AuthService } from '../../../services/Login/login-service';
+import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { Subject, takeUntil } from 'rxjs';
 
 @Component({
@@ -45,6 +47,7 @@ import { Subject, takeUntil } from 'rxjs';
                 <li *ngIf="esAdmin"><a class="dropdown-item" href="#" (click)="irAAdministracion($event)">Administración</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="#" (click)="cerrarSesion($event)">Cerrar Sesión</a></li>
+                <li><a class="dropdown-item" href="#" (click)="cerrarSesionesEnTodosMisDispositivos($event)">Cerrar sesión en todos mis dispositivos</a></li>
               </ul>
             </li>
           </ul>
@@ -98,7 +101,9 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
 
   constructor(
     private permisosService: PermisosService,
-    private router: Router
+    private router: Router,
+    private auth: AuthService,
+    private navbar: DynamicIslandGlobalService
   ) {}
 
   ngOnInit() {
@@ -146,8 +151,45 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
 
   cerrarSesion(event: Event) {
     event.preventDefault();
-    localStorage.removeItem('auth_token');
-    this.permisosService.limpiarPermisos();
-    this.router.navigate(['/login']);
+    this.auth.logout();
+    this.menuOpen = false;
+    this.userDropdownOpen = false;
+  }
+
+  cerrarSesionesEnTodosMisDispositivos(event: Event) {
+    event.preventDefault();
+    this.navbar.alert.set({
+      type: 'info',
+      title: 'Cerrar sesión en todos mis dispositivos',
+      message: 'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Cerrar sesiones',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.menuOpen = false;
+            this.userDropdownOpen = false;
+
+            this.auth.logoutAllSessions().subscribe({
+              next: () => {
+                this.navbar.successToast('Sesión cerrada', 'Cerraste sesión en todos tus dispositivos.');
+                this.auth.clearLocalSession();
+              },
+              error: (err) => {
+                console.error('Error cerrando sesiones en todos los dispositivos:', err);
+                this.navbar.warningToast('Sesión cerrada', 'No pudimos confirmar el cierre remoto, pero tu sesión local fue cerrada.');
+                this.auth.clearLocalSession();
+              }
+            });
+          }
+        }
+      ]
+    });
   }
 }

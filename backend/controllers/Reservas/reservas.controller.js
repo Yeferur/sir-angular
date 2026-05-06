@@ -55,7 +55,7 @@ function sendSuccess(res, { data = null, message = 'OK', status = 200 } = {}) {
 }
 
 function sendError(res, { status = 500, message = 'Error interno del servidor', errorCode = 'INTERNAL_ERROR' } = {}) {
-  return res.status(status).json({ success: false, data: null, message, errorCode });
+  return res.status(status).json({ success: false, data: null, message, error: message, errorCode });
 }
 
 function buildFilesMap(files = []) {
@@ -74,7 +74,7 @@ const asyncHandler = fn => (req, res, next) => {
   return Promise.resolve(fn(req, res, next)).catch(e => {
     console.error(`Error en ${req.path}:`, e);
     const statusCode = e.status || 500;
-    const errorMessage = e.status ? e.message : 'Error interno del servidor';
+    const errorMessage = e.message || 'Error interno del servidor';
     const errorCode = e.errorCode || (statusCode === 409 ? 'CONFLICT' : statusCode === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR');
     return sendError(res, { status: statusCode, message: errorMessage, errorCode });
   });

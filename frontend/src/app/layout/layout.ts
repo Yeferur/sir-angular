@@ -189,16 +189,12 @@ export class layout implements OnInit {
   }
 
   async handleLogout() {
-    try {
-      this.userService.clearUser();
-      this.authService.logout();
-    } finally {
-      this.ready.set(false);
-      this.user.set(null);
-      this.activeMenu.set(null);
-      this.isSidebarOpen.set(false);
-      await this.router.navigateByUrl('/login');
-    }
+    this.userService.clearUser();
+    this.authService.logout();
+    this.ready.set(false);
+    this.user.set(null);
+    this.activeMenu.set(null);
+    this.isSidebarOpen.set(false);
   }
 
   // -----------------------

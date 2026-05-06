@@ -65,45 +65,61 @@ async function ensureHistorialIdRegistroTextColumn() {
   return historialIdRegistroSchemaPromise;
 }
 
-async function recordHistorial({ conexion = null, tabla, id_registro = null, accion, id_usuario = null, detalles = [] }) {
-  // If a connection is provided, use it (inside transaction), else get a new one
-  const useExternalConn = !!conexion;
-  const conn = conexion || await db.getConnection();
+function normalizeHistorialInput(input, maybeData = {}) {
+  if (input && typeof input === 'object' && !Array.isArray(input) && (
+    Object.prototype.hasOwnProperty.call(input, 'tabla') ||
+    Object.prototype.hasOwnProperty.call(input, 'conexion') ||
+    Object.prototype.hasOwnProperty.call(input, 'accion')
+  )) {
+    return input;
+  }
+
+  if (input && typeof input.query === 'function') {
+    return { conexion: input, ...(maybeData || {}) };
+  }
+
+  return { ...(maybeData || {}) };
+}
+
+async function registrarHistorial(input, maybeData = {}) {
+  const data = normalizeHistorialInput(input, maybeData);
+  const useExternalConn = !!data.conexion;
+  const conn = data.conexion || await db.getConnection();
 
   try {
     await ensureHistorialIdRegistroTextColumn();
 
     // En tablas con FK a usuarios, usar NULL cuando no exista usuario válido
-    const safeUser = normalizeOptionalUserId(id_usuario);
-    const safeRegistro = (id_registro == null || id_registro === '') ? null : String(id_registro);
+    const safeUser = normalizeOptionalUserId(data.id_usuario);
+    const safeRegistro = (data.id_registro == null || data.id_registro === '') ? null : String(data.id_registro);
 
     // Resolver acción concreta si viniera como 'CREAR_O_ACTUALIZAR'
-    let finalAccion = accion;
-    if (accion === 'CREAR_O_ACTUALIZAR') {
-      if (!id_registro || id_registro === 0) {
+    let finalAccion = data.accion;
+    if (data.accion === 'CREAR_O_ACTUALIZAR') {
+      if (!data.id_registro || data.id_registro === 0) {
         finalAccion = 'CREAR';
       } else {
         try {
           // Intentar obtener la columna PRIMARY KEY de la tabla
           const [pkRows] = await conn.query(
             "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_KEY = 'PRI' LIMIT 1",
-            [tabla]
+            [data.tabla]
           );
 
           const pkCol = pkRows && pkRows[0] && pkRows[0].COLUMN_NAME;
           if (pkCol) {
             const [exists] = await conn.query(
-              `SELECT 1 FROM \`${tabla}\` WHERE \`${pkCol}\` = ? LIMIT 1`,
-              [id_registro]
+              `SELECT 1 FROM \`${data.tabla}\` WHERE \`${pkCol}\` = ? LIMIT 1`,
+              [data.id_registro]
             );
             finalAccion = (exists && exists.length) ? 'ACTUALIZAR' : 'CREAR';
           } else {
             // Fallback: intentar con patrón Id_<singular>
-            const guessed = `Id_${tabla.slice(0, -1)}`;
+            const guessed = `Id_${String(data.tabla || '').slice(0, -1)}`;
             try {
               const [exists2] = await conn.query(
-                `SELECT 1 FROM \`${tabla}\` WHERE \`${guessed}\` = ? LIMIT 1`,
-                [id_registro]
+                `SELECT 1 FROM \`${data.tabla}\` WHERE \`${guessed}\` = ? LIMIT 1`,
+                [data.id_registro]
               );
               finalAccion = (exists2 && exists2.length) ? 'ACTUALIZAR' : 'CREAR';
             } catch (e) {
@@ -118,15 +134,15 @@ async function recordHistorial({ conexion = null, tabla, id_registro = null, acc
 
     const [res] = await conn.query(
       'INSERT INTO historial (Tabla, Id_Registro, Accion, Id_Usuario) VALUES (?, ?, ?, ?)',
-      [tabla, safeRegistro, finalAccion, safeUser]
+      [data.tabla, safeRegistro, finalAccion, safeUser]
     );
 
     const Id_Historial = res.insertId;
 
-    if (Array.isArray(detalles) && detalles.length) {
-      const placeholders = detalles.map(() => '(?, ?, ?, ?)').join(',');
+    if (Array.isArray(data.detalles) && data.detalles.length) {
+      const placeholders = data.detalles.map(() => '(?, ?, ?, ?)').join(',');
       const params = [];
-      for (const d of detalles) {
+      for (const d of data.detalles) {
         params.push(Id_Historial, d.columna || '', (d.anterior == null) ? '' : String(d.anterior), (d.nuevo == null) ? '' : String(d.nuevo));
       }
       await conn.query(
@@ -140,6 +156,8 @@ async function recordHistorial({ conexion = null, tabla, id_registro = null, acc
     if (!useExternalConn && conn) conn.release();
   }
 }
+
+const recordHistorial = registrarHistorial;
 
 async function logSistema({ mensaje, nivel = 'error', id_usuario = null, meta = null }) {
   const now = new Date();
@@ -195,4 +213,4 @@ async function recordHistorialCambioReserva({
   }
 }
 
-module.exports = { recordHistorial, logSistema, recordHistorialCambioReserva, ensureHistorialCambiosTable };
+module.exports = { registrarHistorial, recordHistorial, logSistema, recordHistorialCambioReserva, ensureHistorialCambiosTable };

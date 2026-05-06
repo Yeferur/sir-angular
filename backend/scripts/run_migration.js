@@ -4,20 +4,31 @@ const path = require('path');
 
 async function runMigration() {
     try {
-        const sqlPath = path.join(__dirname, '../database/migrations/create_auth_tables.sql');
-        const sql = fs.readFileSync(sqlPath, 'utf8');
+        const migrationsDir = path.join(__dirname, '../database/migrations');
+        const migrationFiles = fs.existsSync(migrationsDir)
+            ? fs.readdirSync(migrationsDir).filter((file) => file.toLowerCase().endsWith('.sql')).sort()
+            : [];
 
-        // Split statements by semicolon (simple split, assumes valid SQL for this case)
-        const statements = sql
-            .split(';')
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+        if (!migrationFiles.length) {
+            console.log('No SQL migrations found.');
+            process.exit(0);
+        }
 
-        console.log(`Found ${statements.length} SQL statements to execute.`);
+        for (const migrationFile of migrationFiles) {
+            const sqlPath = path.join(migrationsDir, migrationFile);
+            const sql = fs.readFileSync(sqlPath, 'utf8');
 
-        for (const statement of statements) {
-            await db.query(statement);
-            console.log('Executed statement.');
+            const statements = sql
+                .split(';')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            console.log(`Running migration ${migrationFile} with ${statements.length} SQL statements.`);
+
+            for (const statement of statements) {
+                await db.query(statement);
+                console.log('Executed statement.');
+            }
         }
 
         console.log('Migration completed successfully.');

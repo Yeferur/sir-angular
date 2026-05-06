@@ -1,59 +1,188 @@
-// backend/websocketManager.js
 const db = require('./database/db');
 
-const clients = new Map(); // userId -> Set<WebSocket>
+// userId -> Map(token -> Set<WebSocket>)
+const clientsByUser = new Map();
+// token -> { userId, sockets: Set<WebSocket> }
+const clientsByToken = new Map();
+const wsMeta = new WeakMap();
 
 function isOpen(ws) {
   return ws && ws.readyState === 1; // WebSocket.OPEN
 }
 
-function getSet(uid) {
-  let set = clients.get(uid);
-  if (!set) {
-    set = new Set();
-    clients.set(uid, set);
+function getOrCreateUserMap(userId) {
+  const uid = Number(userId);
+  let userMap = clientsByUser.get(uid);
+  if (!userMap) {
+    userMap = new Map();
+    clientsByUser.set(uid, userMap);
   }
-  return set;
+  return userMap;
 }
 
-async function addClient(userId, ws) {
+function getOrCreateTokenEntry(token, userId) {
+  const safeToken = String(token || '');
+  let entry = clientsByToken.get(safeToken);
+  if (!entry) {
+    entry = { userId: Number(userId), sockets: new Set() };
+    clientsByToken.set(safeToken, entry);
+  } else if (userId != null) {
+    entry.userId = Number(userId);
+  }
+  return entry;
+}
+
+function cleanupUserMap(userId) {
   const uid = Number(userId);
-  const set = getSet(uid);
+  const userMap = clientsByUser.get(uid);
+  if (!userMap || userMap.size === 0) {
+    clientsByUser.delete(uid);
+  }
+}
 
-  set.add(ws);
+function cleanupTokenEntry(token) {
+  const safeToken = String(token || '');
+  const entry = clientsByToken.get(safeToken);
+  if (!entry || entry.sockets.size === 0) {
+    clientsByToken.delete(safeToken);
+  }
+}
 
-  console.log(`✅ addClient uid=${uid} sockets=${set.size} usuarios=${clients.size}`);
+function detachSocket(ws) {
+  const meta = wsMeta.get(ws);
+  if (!meta) return null;
+
+  const { userId, token } = meta;
+  const uid = Number(userId);
+  const safeToken = String(token || '');
+
+  const userMap = clientsByUser.get(uid);
+  if (userMap) {
+    const tokenSet = userMap.get(safeToken);
+    if (tokenSet) {
+      tokenSet.delete(ws);
+      if (tokenSet.size === 0) {
+        userMap.delete(safeToken);
+      }
+    }
+  }
+
+  const tokenEntry = clientsByToken.get(safeToken);
+  if (tokenEntry) {
+    tokenEntry.sockets.delete(ws);
+    if (tokenEntry.sockets.size === 0) {
+      clientsByToken.delete(safeToken);
+    }
+  }
+
+  wsMeta.delete(ws);
+  cleanupUserMap(uid);
+  cleanupTokenEntry(safeToken);
+
+  return { userId: uid, token: safeToken };
+}
+
+function trackSocket(userId, token, ws) {
+  const uid = Number(userId);
+  const safeToken = String(token || '');
+  const userMap = getOrCreateUserMap(uid);
+  const tokenSet = userMap.get(safeToken) || new Set();
+  tokenSet.add(ws);
+  userMap.set(safeToken, tokenSet);
+
+  const tokenEntry = getOrCreateTokenEntry(safeToken, uid);
+  tokenEntry.sockets.add(ws);
+  wsMeta.set(ws, { userId: uid, token: safeToken });
+}
+
+async function addClient(userId, token, ws) {
+  const uid = Number(userId);
+  const safeToken = String(token || '');
+
+  if (!uid || !safeToken) {
+    return 0;
+  }
+
+  trackSocket(uid, safeToken, ws);
+
+  const userMap = clientsByUser.get(uid);
+  const tokenSet = userMap?.get(safeToken);
+  console.log(`✅ addClient uid=${uid} tokenSockets=${tokenSet?.size || 0} tokens=${userMap?.size || 0} usuarios=${clientsByUser.size}`);
   await broadcastActiveUsers();
+  return tokenSet?.size || 0;
 }
 
-async function removeClient(userId, ws) {
+async function removeClient(userId, tokenOrWs, maybeWs) {
+  let ws = maybeWs;
+  let token = tokenOrWs;
+
+  if (tokenOrWs && typeof tokenOrWs === 'object' && !maybeWs) {
+    ws = tokenOrWs;
+    token = null;
+  }
+
+  if (ws) {
+    const meta = wsMeta.get(ws);
+    if (meta) {
+      token = meta.token;
+      userId = meta.userId;
+    }
+  }
+
+  if (userId == null || token == null || !ws) return;
+
   const uid = Number(userId);
-  const set = clients.get(uid);
-  if (!set) return;
+  const safeToken = String(token || '');
 
-  if (ws) set.delete(ws);
+  const userMap = clientsByUser.get(uid);
+  if (userMap) {
+    const tokenSet = userMap.get(safeToken);
+    if (tokenSet) {
+      tokenSet.delete(ws);
+      if (tokenSet.size === 0) {
+        userMap.delete(safeToken);
+      }
+    }
+  }
 
-  if (set.size === 0) clients.delete(uid);
+  const tokenEntry = clientsByToken.get(safeToken);
+  if (tokenEntry) {
+    tokenEntry.sockets.delete(ws);
+    if (tokenEntry.sockets.size === 0) {
+      clientsByToken.delete(safeToken);
+    }
+  }
 
-  console.log(`❌ removeClient uid=${uid} sockets=${set.size || 0} usuarios=${clients.size}`);
+  wsMeta.delete(ws);
+  cleanupUserMap(uid);
+  cleanupTokenEntry(safeToken);
+
+  const remaining = userMap?.get(safeToken)?.size || 0;
+  console.log(`❌ removeClient uid=${uid} tokenSockets=${remaining} tokens=${userMap?.size || 0} usuarios=${clientsByUser.size}`);
   await broadcastActiveUsers();
 }
 
 function getClients(userId) {
   const uid = Number(userId);
-  const set = clients.get(uid);
-  return set ? Array.from(set) : [];
+  const userMap = clientsByUser.get(uid);
+  if (!userMap) return [];
+
+  const sockets = [];
+  for (const set of userMap.values()) {
+    sockets.push(...Array.from(set));
+  }
+  return sockets;
 }
 
 function getAllActiveUsers() {
-  return Array.from(clients.keys());
+  return Array.from(clientsByUser.keys());
 }
 
 async function broadcastActiveUsers() {
   try {
     const usuarios = getAllActiveUsers();
     const [rows] = await db.query('SELECT Id_Usuario FROM sesiones');
-    const sesionesDB = rows.map(r => Number(r.Id_Usuario));
+    const sesionesDB = Array.from(new Set(rows.map((r) => Number(r.Id_Usuario))));
 
     const payload = JSON.stringify({
       type: 'usuarios_conectados_actualizados',
@@ -63,9 +192,11 @@ async function broadcastActiveUsers() {
 
     console.log(`📡 BroadcastActiveUsers: ${usuarios.length} conectados, ${sesionesDB.length} en DB`);
 
-    for (const set of clients.values()) {
-      for (const ws of set) {
-        if (isOpen(ws)) ws.send(payload);
+    for (const userMap of clientsByUser.values()) {
+      for (const set of userMap.values()) {
+        for (const ws of set) {
+          if (isOpen(ws)) ws.send(payload);
+        }
       }
     }
   } catch (err) {
@@ -85,13 +216,15 @@ function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId = n
 
     let enviados = 0;
 
-    for (const [uid, set] of clients.entries()) {
+    for (const [uid, userMap] of clientsByUser.entries()) {
       if (userId != null && uid === Number(userId)) continue;
 
-      for (const ws of set) {
-        if (isOpen(ws)) {
-          ws.send(payload);
-          enviados++;
+      for (const set of userMap.values()) {
+        for (const ws of set) {
+          if (isOpen(ws)) {
+            ws.send(payload);
+            enviados++;
+          }
         }
       }
     }
@@ -107,11 +240,13 @@ function broadcastReservaEvento(evento) {
     const payload = JSON.stringify(evento);
 
     let enviados = 0;
-    for (const set of clients.values()) {
-      for (const ws of set) {
-        if (isOpen(ws)) {
-          ws.send(payload);
-          enviados++;
+    for (const userMap of clientsByUser.values()) {
+      for (const set of userMap.values()) {
+        for (const ws of set) {
+          if (isOpen(ws)) {
+            ws.send(payload);
+            enviados++;
+          }
         }
       }
     }
@@ -122,31 +257,87 @@ function broadcastReservaEvento(evento) {
   }
 }
 
-// ✅ Logout forzado a todas las pestañas/navegadores del usuario
-function sendForceLogout(userId, reason = 'logout_remoto') {
-  const uid = Number(userId);
-  const set = clients.get(uid);
-  if (!set || set.size === 0) return 0;
+function sendSessionLogout(token, reason = 'self_logout_current_session') {
+  const safeToken = String(token || '');
+  const entry = clientsByToken.get(safeToken);
+  if (!entry || entry.sockets.size === 0) return 0;
 
   let enviados = 0;
+  const payload = JSON.stringify({ type: 'logout', reason });
 
-  for (const ws of set) {
-    if (!isOpen(ws)) continue;
+  for (const ws of Array.from(entry.sockets)) {
+    if (!isOpen(ws)) {
+      detachSocket(ws);
+      continue;
+    }
 
     try {
-      ws.send(JSON.stringify({ type: 'forceLogout', reason }));
+      ws.send(payload);
       enviados++;
     } catch {}
 
     try {
-      ws.close(1000, 'force_logout');
+      ws.close(1000, 'session_logout');
     } catch {}
+    detachSocket(ws);
   }
 
-  set.clear();
-  clients.delete(uid);
-
+  cleanupTokenEntry(safeToken);
   return enviados;
+}
+
+function sendLogoutToUser(userId, { type, reason, closeCode = 'force_logout' }) {
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) return 0;
+  const userMap = clientsByUser.get(uid);
+  if (!userMap || userMap.size === 0) return 0;
+
+  let enviados = 0;
+  const payload = JSON.stringify({
+    type,
+    reason
+  });
+
+  for (const [token, wsSet] of Array.from(userMap.entries())) {
+    for (const ws of Array.from(wsSet)) {
+      if (!isOpen(ws)) {
+        detachSocket(ws);
+        continue;
+      }
+
+      try {
+        ws.send(payload);
+        enviados++;
+      } catch {}
+
+      try {
+        ws.close(1000, closeCode);
+      } catch {}
+      detachSocket(ws);
+    }
+
+    cleanupTokenEntry(token);
+  }
+
+  clientsByUser.delete(uid);
+  return enviados;
+}
+
+// ✅ Logout forzado a todas las pestañas/navegadores del usuario
+function sendForceLogout(userId, reason = 'admin_force_logout') {
+  return sendLogoutToUser(userId, {
+    type: 'forceLogout',
+    reason,
+    closeCode: 'force_logout'
+  });
+}
+
+function sendLogoutAllSessions(userId, reason = 'self_logout_all_sessions') {
+  return sendLogoutToUser(userId, {
+    type: 'selfLogoutAllSessions',
+    reason,
+    closeCode: 'session_logout'
+  });
 }
 
 module.exports = {
@@ -157,5 +348,7 @@ module.exports = {
   broadcastActiveUsers,
   broadcastAforoActualizado,
   broadcastReservaEvento,
-  sendForceLogout
+  sendSessionLogout,
+  sendForceLogout,
+  sendLogoutAllSessions
 };

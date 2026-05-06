@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { TransferService } from '../../services/Transfers/transfers';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
 
@@ -37,6 +38,7 @@ interface Transfer {
   TipoVuelo?: string;
   Estado?: string;
   Observaciones?: string;
+  Comprobantes?: ComprobanteTransfer[];
 }
 
 interface Pago {
@@ -49,9 +51,21 @@ interface Pago {
   Pago_Comprobante?: string | null;
 }
 
+interface ComprobanteTransfer {
+  id?: number | string;
+  Id_Pago?: number | string;
+  nombre?: string;
+  filename?: string;
+  url?: string;
+  tipo?: string;
+  fecha?: string;
+}
+
 interface TransferDetalle {
   transfer: Transfer;
   pagos: Pago[];
+  Comprobantes?: ComprobanteTransfer[];
+  comprobantes?: ComprobanteTransfer[];
 }
 
 @Component({
@@ -136,29 +150,47 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   cancelarTransfer(): void {
     const id = this.transfer.Id_Transfer || this.Id_Transfer;
     if (!id) return;
-    const confirmed = window.confirm(`Cancelar el transfer #${this.transferCodigo}? La información se conservará para consulta futura.`);
-    if (!confirmed) return;
 
-    this.api.cancelarTransfer(id).subscribe({
-      next: () => {
-        this.navbar.alert.set({
-          type: 'success',
-          title: 'Transfer cancelado',
-          message: `El transfer #${this.transferCodigo} quedó en estado Cancelado.`,
-          autoClose: true,
-          autoCloseTime: 3000
-        });
-        this.loadTransferData(id);
-      },
-      error: (err) => {
-        this.navbar.alert.set({
-          type: 'error',
-          title: 'No se pudo cancelar',
-          message: err?.error?.message || err?.message || 'Intenta nuevamente.',
-          autoClose: true,
-          autoCloseTime: 4000
-        });
-      }
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Cancelar transfer',
+      message: `¿Cancelar el transfer #${this.transferCodigo}? La información se conservará para consulta futura.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Mantener',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Cancelar transfer',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.api.cancelarTransfer(id).subscribe({
+              next: () => {
+                this.navbar.alert.set({
+                  type: 'success',
+                  title: 'Transfer cancelado',
+                  message: `El transfer #${this.transferCodigo} quedó en estado Cancelado.`,
+                  autoClose: true,
+                  autoCloseTime: 3000
+                });
+                this.loadTransferData(id);
+              },
+              error: (err) => {
+                this.navbar.alert.set({
+                  type: 'error',
+                  title: 'No se pudo cancelar',
+                  message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+                  autoClose: true,
+                  autoCloseTime: 4000
+                });
+              }
+            });
+          }
+        }
+      ]
     });
   }
 
@@ -184,112 +216,247 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     return (this.transfer.Estado || 'Pendiente').toLowerCase();
   }
 
+  private formatCurrency(value: any): string {
+    const n = Number(value || 0);
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      maximumFractionDigits: 0
+    }).format(n);
+  }
+
+  private formatDate(value: any): string {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('es-CO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  private ensurePdfSpace(doc: jsPDF & { lastAutoTable?: any }, currentY: number, needed = 30): number {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    if (currentY + needed > pageHeight - 15) {
+      doc.addPage();
+      return 15;
+    }
+    return currentY;
+  }
+
+  private normalizeComprobanteName(value: string): string {
+    const clean = String(value || '').split('?')[0].split('#')[0];
+    const parts = clean.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || clean || '';
+    try {
+      return decodeURIComponent(last);
+    } catch {
+      return last;
+    }
+  }
+
+  private getExtensionFromUrl(url: string): string {
+    const clean = String(url || '').split('?')[0];
+    const ext = clean.includes('.') ? clean.split('.').pop() : '';
+    return ext ? `.${ext}` : '';
+  }
+
+  private getExtensionFromMime(mime: string): string {
+    const lower = String(mime || '').toLowerCase();
+    if (lower.includes('pdf')) return '.pdf';
+    if (lower.includes('jpeg')) return '.jpg';
+    if (lower.includes('jpg')) return '.jpg';
+    if (lower.includes('png')) return '.png';
+    if (lower.includes('webp')) return '.webp';
+    return '';
+  }
+
+  private normalizeComprobanteFromPago(pago: any, index: number): ComprobanteTransfer | null {
+    const url = pago?.Pago_Comprobante || pago?.Ruta_Comprobante || pago?.SoporteUrl || pago?.Comprobante || pago?.UrlComprobante || pago?.Archivo;
+    if (!url) return null;
+
+    return {
+      id: pago?.Id_Pago ?? index + 1,
+      Id_Pago: pago?.Id_Pago,
+      nombre: pago?.NombreArchivo || pago?.filename || this.normalizeComprobanteName(url),
+      filename: pago?.NombreArchivo || pago?.filename || this.normalizeComprobanteName(url),
+      url,
+      tipo: pago?.Metodo || pago?.Tipo || pago?.FormaPago || 'Comprobante',
+      fecha: pago?.Fecha_Pago || pago?.fecha || ''
+    };
+  }
+
+  get comprobantesDisponibles(): ComprobanteTransfer[] {
+    const raw = this.data?.Comprobantes || (this.data as any)?.comprobantes;
+    if (Array.isArray(raw) && raw.length) {
+      return raw.map((c: any, index: number) => ({
+        id: c?.id ?? c?.Id_Pago ?? index + 1,
+        Id_Pago: c?.Id_Pago,
+        nombre: c?.nombre || c?.filename || this.normalizeComprobanteName(c?.url || c?.Pago_Comprobante || c?.Ruta_Comprobante || c?.SoporteUrl || ''),
+        filename: c?.filename || c?.nombre || this.normalizeComprobanteName(c?.url || c?.Pago_Comprobante || c?.Ruta_Comprobante || c?.SoporteUrl || ''),
+        url: c?.url || c?.Pago_Comprobante || c?.Ruta_Comprobante || c?.SoporteUrl || c?.Comprobante || c?.UrlComprobante || c?.Archivo || '',
+        tipo: c?.tipo || c?.Metodo || c?.FormaPago || 'Comprobante',
+        fecha: c?.fecha || c?.Fecha_Pago || ''
+      })).filter(c => Boolean(c.url));
+    }
+
+    return this.pagos
+      .map((pago, index) => this.normalizeComprobanteFromPago(pago, index))
+      .filter((item): item is ComprobanteTransfer => Boolean(item?.url));
+  }
+
   private buildTransferPdfDoc(): jsPDF & { lastAutoTable?: any } {
     const t = this.transfer;
     const doc = new jsPDF() as jsPDF & { lastAutoTable?: any };
 
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
     doc.addImage(logoBase64, 'PNG', 10, 10, 40, 15);
-    doc.setFontSize(18); doc.setTextColor(40, 40, 40);
-    doc.text(`Transfer #${this.transferCodigo}`, 60, 20);
-    doc.setFontSize(12); doc.setTextColor(90);
-    doc.text(`Estado: ${t.Estado || 'Pendiente'}`, 60, 28);
-    doc.line(10, 35, 200, 35);
+    doc.setFontSize(18);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Confirmacion de Transfer', 58, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Transfer ${this.transferCodigo}`, 58, 25);
+    doc.text(`Estado: ${t.Estado || 'Pendiente'}`, 58, 31);
+    doc.text(`Generado: ${this.formatDate(new Date())}`, 58, 37);
+    doc.line(10, 43, pageWidth - 10, 43);
 
-    let lastY = 40;
+    let currentY = 48;
 
-    const detallesServicio = [
+    const infoRows = [
+      ['Transfer', this.transferCodigo],
+      ['Estado', t.Estado || 'Pendiente'],
+      ['Tour', t.Nombre_Servicio || '—'],
+      ['Fecha del servicio', this.formatDate(t.Fecha_Transfer)],
+      ['Idioma', (t as any).Idioma || '—'],
       ['Titular', t.Nombre_Titular || '—'],
-      ['DNI', t.DNI || '—'],
-      ['Teléfono Titular', t.Telefono_Titular || '—'],
-      ['Servicio', t.Nombre_Servicio || '—'],
-      ['Rango', t.RangoDescripcion || '—'],
-      ['Punto de Salida', t.Punto_Salida || '—'],
-      ['Punto de Llegada', t.Punto_Destino || '—'],
-      ['Fecha', t.Fecha_Transfer || '—'],
-      ['Hora de Recogida', t.Hora_Recogida || '—'],
+      ['Teléfono de contacto', t.Telefono_Titular || '—'],
+      ['Responsable', t.Nombre_Reportante || '—'],
+      ['Teléfono responsable', t.Telefono_Reportante || '—']
     ];
 
-    if (t.Vuelo) detallesServicio.push(['Vuelo', t.Vuelo]);
-    if (t.TipoVuelo) detallesServicio.push(['Tipo de Vuelo', t.TipoVuelo]);
-
+    currentY = this.ensurePdfSpace(doc, currentY, 50);
     autoTable(doc, {
-      head: [['Detalles del Servicio', '']],
-      body: detallesServicio,
-      startY: lastY,
+      head: [['Campo', 'Detalle']],
+      body: infoRows,
+      startY: currentY,
       theme: 'grid',
-      styles: { fontSize: 10 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
       headStyles: { fillColor: [22, 160, 133], textColor: 255, fontStyle: 'bold' },
+      margin: { left: 10, right: 10 }
     });
 
-    lastY = (doc.lastAutoTable?.finalY ?? 60) + 10;
+    currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
 
-    const responsable = [
-      ['Reportante', t.Nombre_Reportante || '—'],
-      ['Teléfono Reportante', t.Telefono_Reportante || '—'],
+    const pagosRows = [
+      ['Valor total', this.formatCurrency(t.Valor || 0)],
+      ['Pagado', this.formatCurrency(this.totalPagado)],
+      ['Pendiente', this.formatCurrency(this.saldoPendiente)],
+      ['Tipo de pago', this.pagos.length === 0
+        ? 'Paga en punto'
+        : this.pagos.length === 1 && this.pagos[0].Metodo === 'Completo'
+          ? 'Ya pagó'
+          : 'Abonos']
     ];
 
+    currentY = this.ensurePdfSpace(doc, currentY, 36);
     autoTable(doc, {
-      head: [['Responsable', '']],
-      body: responsable,
-      startY: lastY,
+      head: [['Campo', 'Detalle']],
+      body: pagosRows,
+      startY: currentY,
       theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
-    });
-
-    lastY = (doc.lastAutoTable?.finalY ?? 60) + 10;
-
-    const valor = [
-      ['Valor Total', `${t.MonedaCodigo || 'COP'} ${this.valorTotal}`],
-      ['Total Pagado', `${t.MonedaCodigo || 'COP'} ${this.totalPagado}`],
-      ['Saldo Pendiente', `${t.MonedaCodigo || 'COP'} ${this.saldoPendiente}`],
-    ];
-
-    autoTable(doc, {
-      head: [['Pago', '']],
-      body: valor,
-      startY: lastY,
-      theme: 'grid',
-      styles: { fontSize: 10 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
       headStyles: { fillColor: [155, 89, 182], textColor: 255, fontStyle: 'bold' },
+      margin: { left: 10, right: 10 }
     });
+
+    currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
 
     if (this.pagos.length > 0) {
-      lastY = (doc.lastAutoTable?.finalY ?? 60) + 10;
-      const pagosBody = this.pagos.map(p => [
+      const pagosBody = this.pagos.map((p) => [
         p.Metodo || '—',
-        `${t.MonedaCodigo || 'COP'} ${p.Monto}`,
-        p.Fecha_Pago || '—',
+        this.formatCurrency(p.Monto),
+        this.formatDate(p.Fecha_Pago),
         p.Estado || '—',
         p.Observaciones || '—',
         p.Pago_Comprobante ? 'Sí' : 'No'
       ]);
 
+      currentY = this.ensurePdfSpace(doc, currentY, 40);
       autoTable(doc, {
-        head: [['Método', 'Monto', 'Fecha', 'Estado', 'Observaciones', 'Comprobante']],
+        head: [['Tipo', 'Monto', 'Fecha', 'Estado', 'Observaciones', 'Comprobante']],
         body: pagosBody,
-        startY: lastY,
+        startY: currentY,
         theme: 'striped',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+        styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 26 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 50 },
+          5: { cellWidth: 18 }
+        },
+        margin: { left: 10, right: 10 }
       });
+
+      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
+    }
+
+    const comprobantes = this.comprobantesDisponibles;
+    if (comprobantes.length > 0) {
+      currentY = this.ensurePdfSpace(doc, currentY, 32);
+      autoTable(doc, {
+        head: [['Comprobante', 'Fecha', 'Estado']],
+        body: comprobantes.map((c) => [
+          c.tipo || 'Comprobante',
+          this.formatDate(c.fecha),
+          'Disponible'
+        ]),
+        startY: currentY,
+        theme: 'grid',
+        styles: { fontSize: 8.8, cellPadding: 2 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 35 }
+        },
+        margin: { left: 10, right: 10 }
+      });
+      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
     }
 
     if (t.Observaciones) {
-      lastY = (doc.lastAutoTable?.finalY ?? 60) + 10;
+      currentY = this.ensurePdfSpace(doc, currentY, 28);
       autoTable(doc, {
         head: [['Observaciones']],
         body: [[t.Observaciones]],
-        startY: lastY,
+        startY: currentY,
         theme: 'grid',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [189, 195, 199], textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
+        headStyles: { fillColor: [189, 195, 199], textColor: 15, fontStyle: 'bold' },
+        margin: { left: 10, right: 10 }
       });
+      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
     }
 
-    const fecha = new Date().toLocaleDateString('es-CO');
-    doc.setFontSize(9); doc.setTextColor(120);
-    doc.text(`Generado por SIR – Sistema Integrado de Reservas | ${fecha}`, 10, 290);
+    if (currentY + 12 > pageHeight - 15) {
+      doc.addPage();
+      currentY = 18;
+    }
+
+    const footerText = 'Este documento confirma los datos registrados del transfer. Ante cualquier duda, comunicate con Maxitours.';
+    doc.setFontSize(8.5);
+    doc.setTextColor(107, 114, 128);
+    const footerLines = doc.splitTextToSize(footerText, pageWidth - 20);
+    doc.text(footerLines, 10, Math.min(pageHeight - 14, currentY + 10));
+    doc.text(`SIR - Sistema Integrado de Transfers | ${this.formatDate(new Date())}`, 10, pageHeight - 8);
 
     return doc;
   }
@@ -303,7 +470,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  descargarTransfer(): void {
+  async descargarTransfer(): Promise<void> {
     const t = this.transfer;
     if (!t?.Id_Transfer) return;
 
@@ -330,28 +497,53 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     this.onClose.emit();
   }
 
-  descargarComprobante(rutaComprobante: string | null | undefined): void {
+  async descargarComprobante(rutaComprobante: string | null | undefined, index = 1): Promise<void> {
     if (!rutaComprobante) return;
 
-    const nombreArchivo = rutaComprobante.split('/').pop();
+    const nombreArchivo = this.normalizeComprobanteName(rutaComprobante);
     if (!nombreArchivo) return;
 
-    this.api.descargarComprobante(nombreArchivo).subscribe({
-      next: (blob: Blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = nombreArchivo;
-        link.click();
-        window.URL.revokeObjectURL(url);
-      },
-      error: (err) => {
-        console.error('Error descargando comprobante:', err);
-      }
-    });
+    try {
+      const blob = await firstValueFrom(this.api.descargarComprobante(nombreArchivo));
+      const ext = this.getExtensionFromUrl(nombreArchivo) || this.getExtensionFromMime(blob.type || '') || '.pdf';
+      const safeBase = this.transferCodigo || 'Transfer';
+      this.downloadBlob(blob, `${safeBase}-comprobante-${index}${ext}`);
+    } catch (err) {
+      console.error('Error descargando comprobante:', err);
+      const fallbackUrl = this.api.getComprobanteUrl(nombreArchivo);
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    }
   }
 
   tieneComprobante(pago: Pago): boolean {
     return Boolean(pago.Pago_Comprobante);
+  }
+
+  async descargarComprobantesTransfer(): Promise<void> {
+    const comprobantes = this.comprobantesDisponibles;
+    if (!comprobantes.length) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Sin comprobantes',
+        message: 'Este transfer no tiene comprobantes asociados.',
+        autoClose: true,
+        autoCloseTime: 3000
+      });
+      return;
+    }
+
+    for (let i = 0; i < comprobantes.length; i += 1) {
+      await this.descargarComprobante(comprobantes[i].url || null, i + 1);
+    }
+
+    if (comprobantes.length > 1) {
+      this.navbar.alert.set({
+        type: 'success',
+        title: 'Comprobantes descargados',
+        message: `Se descargaron ${comprobantes.length} comprobantes asociados al transfer.`,
+        autoClose: true,
+        autoCloseTime: 3000
+      });
+    }
   }
 }

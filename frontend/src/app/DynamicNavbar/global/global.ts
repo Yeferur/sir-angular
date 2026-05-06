@@ -9,8 +9,6 @@ import { LoginContentComponent } from '../login/login';
 import { Mapa } from '../mapa/mapa';
 import { ReservasDynamicComponent } from '../reserva/reserva';
 import { TransferDynamicComponent } from '../transfer/transfer';
-import { Combinaciones } from '../combinaciones/combinaciones';
-import { PreviewComponent } from '../preview/preview';
 import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 
 @Component({
@@ -24,8 +22,6 @@ import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
     ReservasDynamicComponent,
     TransferDynamicComponent,
     Mapa,
-    Combinaciones,
-    PreviewComponent,
     DuplicarPanelComponent
 ],
   templateUrl: './global.html',
@@ -50,7 +46,6 @@ export class DynamicNavbarComponent implements OnInit {
   isDarkMode = true;
 
   islandState = computed(() => {
-    if (this.global.previewUrl()) return 'preview';
     if (this.global.panel()) return 'panel';
     if (this.mode() === 'login') return 'full-screen';
     if (this.alert()?.loading) return 'loading';
@@ -60,7 +55,6 @@ export class DynamicNavbarComponent implements OnInit {
     if (this.transfer()) return 'transfer';
   
     if (Array.isArray(this.mapa()) && this.mapa().length > 0) return 'mapa';
-    if (this.sugerencias()) return 'sugerencias';
     return 'compact';
   });
 

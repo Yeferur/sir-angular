@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, comput
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
-import { firstValueFrom, of } from 'rxjs';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray, AbstractControl } from '@angular/forms';
+import { firstValueFrom, of, from } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { TransferService } from '../../../services/Transfers/transfers';
@@ -31,6 +31,408 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
   }
 
+  private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
+    return (
+      error?.error?.message ||
+      error?.error?.error ||
+      error?.error?.mensaje ||
+      error?.message ||
+      fallback
+    );
+  }
+
+  private getFriendlyReservaErrorMessage(error: any): string {
+    const raw = String(this.getApiErrorMessage(error));
+    const normalized = raw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    if (normalized.includes('fecha reservada') && normalized.includes('no puede ser pasada')) {
+      return 'No puedes guardar esta reserva porque la fecha del tour ya pasó. Selecciona una fecha vigente o revisa la reserva solo como consulta.';
+    }
+
+    if (normalized.includes('fecha') && normalized.includes('pasada')) {
+      return 'No puedes guardar cambios sobre una reserva con fecha pasada. Revisa la fecha del tour antes de continuar.';
+    }
+
+    if (normalized.includes('cupos') && (
+      normalized.includes('insuficiente') ||
+      normalized.includes('disponible') ||
+      normalized.includes('supera') ||
+      normalized.includes('sobrepasa')
+    )) {
+      return 'No hay cupos suficientes para guardar esta reserva. Ajusta la cantidad de pasajeros o selecciona otra fecha.';
+    }
+
+    if (normalized.includes('dni') && (
+      normalized.includes('duplicado') ||
+      normalized.includes('registrado') ||
+      normalized.includes('existe')
+    )) {
+      return 'Uno de los pasajeros ya aparece registrado para esta fecha. Revisa el documento antes de continuar.';
+    }
+
+    if (normalized.includes('telefono') || normalized.includes('teléfono')) {
+      return 'Revisa el teléfono ingresado. Debe tener el formato correcto, por ejemplo +573001234567.';
+    }
+
+    if (normalized.includes('correo') || normalized.includes('email')) {
+      return 'Revisa el correo ingresado. Debe tener un formato válido.';
+    }
+
+    if (normalized.includes('punto') && normalized.includes('horario')) {
+      return 'No se pudo asignar un horario para el punto de encuentro seleccionado. Elige otro punto o revisa la configuración del tour.';
+    }
+
+    if (normalized.includes('horario')) {
+      return 'No se encontró un horario válido para esta reserva. Revisa el tour, la fecha y el punto de encuentro.';
+    }
+
+    if (
+      normalized.includes('pago') ||
+      normalized.includes('abono') ||
+      normalized.includes('comprobante')
+    ) {
+      return 'Hay un problema con la información de pago. Revisa los abonos, comprobantes o la forma de pago antes de guardar.';
+    }
+
+    if (
+      normalized.includes('inviabilidad logistica') ||
+      normalized.includes('validacion logistica') ||
+      normalized.includes('rutas distintas') ||
+      normalized.includes('distancia maxima')
+    ) {
+      return 'La reserva tiene una inviabilidad logística. Revisa los puntos de encuentro seleccionados antes de guardar.';
+    }
+
+    if (
+      normalized.includes('reserva no existe') ||
+      normalized.includes('no encontrada') ||
+      normalized.includes('no pudo encontrarse')
+    ) {
+      return 'La reserva ya no existe o no pudo encontrarse. Actualiza la página e intenta nuevamente.';
+    }
+
+    return raw;
+  }
+
+  private normalizarDni(dni: unknown): string {
+    return String(dni ?? '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
+    const dniCtrl = pasajeroCtrl.get('DNI');
+    if (!dniCtrl?.errors?.[key]) return;
+
+    const errors = { ...(dniCtrl.errors ?? {}) };
+    delete errors[key];
+    dniCtrl.setErrors(Object.keys(errors).length ? errors : null);
+  }
+
+  private validarDnisDuplicadosEnFormulario(): boolean {
+    const vistos = new Map<string, number[]>();
+
+    this.pasajeros.controls.forEach((ctrl, index) => {
+      const dni = this.normalizarDni(ctrl.get('DNI')?.value);
+      if (!dni) return;
+
+      const arr = vistos.get(dni) ?? [];
+      arr.push(index);
+      vistos.set(dni, arr);
+    });
+
+    let hayDuplicados = false;
+
+    this.pasajeros.controls.forEach((ctrl) => {
+      const dniCtrl = ctrl.get('DNI');
+      if (!dniCtrl) return;
+
+      const errors = { ...(dniCtrl.errors ?? {}) };
+      delete errors['duplicadoEnFormulario'];
+      dniCtrl.setErrors(Object.keys(errors).length ? errors : null);
+    });
+
+    vistos.forEach((indexes) => {
+      if (indexes.length <= 1) return;
+
+      hayDuplicados = true;
+
+      indexes.forEach((index) => {
+        const dniCtrl = this.pasajeros.at(index).get('DNI');
+        if (!dniCtrl) return;
+        const errors = { ...(dniCtrl.errors ?? {}) };
+        errors['duplicadoEnFormulario'] = true;
+        dniCtrl.setErrors(errors);
+        dniCtrl.markAsTouched();
+      });
+    });
+
+    if (hayDuplicados) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'DNI repetido en esta reserva',
+        message: 'Hay pasajeros con el mismo documento dentro de la reserva actual. Corrige los DNI antes de guardar.',
+        autoClose: false,
+        buttons: [
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+        ]
+      });
+    }
+
+    this.cdr.markForCheck();
+    return !hayDuplicados;
+  }
+
+  private async validarDniPasajeroContraReservas(
+    pasajeroCtrl: AbstractControl,
+    options?: { silent?: boolean }
+  ): Promise<boolean> {
+    const dniCtrl = pasajeroCtrl.get('DNI');
+    const dni = this.normalizarDni(dniCtrl?.value);
+    const fecha = this.form.get('Fecha_Tour')?.value;
+
+    if (!dni || dni.length < 5 || !fecha) {
+      this.limpiarErrorDni(pasajeroCtrl, 'duplicadoEnBd');
+      return true;
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.reservasSvc.verificarDniDuplicado(dni, fecha, undefined)
+      );
+
+      if (res?.exists) {
+        const errors = { ...(dniCtrl?.errors ?? {}) };
+        errors['duplicadoEnBd'] = { reserva: res.reserva };
+        dniCtrl?.setErrors(errors);
+        dniCtrl?.markAsTouched();
+
+        if (!options?.silent) {
+        const reserva = res.reserva;
+          this.mostrarAlertaDniReservado(dni, reserva, { blocking: false });
+        }
+
+        this.cdr.markForCheck();
+        return false;
+      }
+
+      this.limpiarErrorDni(pasajeroCtrl, 'duplicadoEnBd');
+      this.cdr.markForCheck();
+      return true;
+    } catch (error) {
+      if (!options?.silent) {
+        this.showApiError(error, 'No se pudo validar el DNI');
+      }
+      return false;
+    }
+  }
+
+  private async validarTodosLosDniAntesDeGuardar(): Promise<boolean> {
+    const internosOk = this.validarDnisDuplicadosEnFormulario();
+    if (!internosOk) return false;
+
+    const dnisUnicos = new Map<string, AbstractControl>();
+
+    for (const ctrl of this.pasajeros.controls) {
+      const dni = this.normalizarDni(ctrl.get('DNI')?.value);
+      if (!dni || dni.length < 5) continue;
+
+      if (!dnisUnicos.has(dni)) {
+        dnisUnicos.set(dni, ctrl);
+      }
+    }
+
+    for (const ctrl of dnisUnicos.values()) {
+      const ok = await this.validarDniPasajeroContraReservas(ctrl, { silent: true });
+      if (!ok) {
+        const dni = this.normalizarDni(ctrl.get('DNI')?.value);
+        const reserva = ctrl.get('DNI')?.errors?.['duplicadoEnBd']?.reserva;
+
+        this.mostrarAlertaDniReservado(dni, reserva, { blocking: true });
+
+        this.cdr.markForCheck();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private conectarValidacionDniPasajero(fg: FormGroup): void {
+    fg.get('DNI')?.valueChanges.pipe(
+      debounceTime(700),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+      switchMap(() => {
+        this.validarDnisDuplicadosEnFormulario();
+
+        const fecha = this.form.get('Fecha_Tour')?.value;
+        const dni = this.normalizarDni(fg.get('DNI')?.value);
+
+        if (!fecha || !dni || dni.length < 5) {
+          this.limpiarErrorDni(fg, 'duplicadoEnBd');
+          return of(true);
+        }
+
+        return from(this.validarDniPasajeroContraReservas(fg, { silent: false }));
+      })
+    ).subscribe();
+  }
+
+  private async revalidarDnisPorCambioDeFecha(): Promise<void> {
+    if (!this.form.get('Fecha_Tour')?.value) return;
+    if (!this.pasajeros?.length) return;
+
+    this.validarDnisDuplicadosEnFormulario();
+
+    for (const ctrl of this.pasajeros.controls) {
+      const dni = this.normalizarDni(ctrl.get('DNI')?.value);
+      if (!dni || dni.length < 5) continue;
+
+      await this.validarDniPasajeroContraReservas(ctrl, { silent: true });
+    }
+
+    const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
+
+    if (dupCtrl) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'DNI con reserva existente',
+        message: 'Al cambiar la fecha, uno o más pasajeros ya aparecen reservados para esa misma fecha. Revisa los campos marcados antes de guardar.',
+        autoClose: false,
+        buttons: [
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+        ]
+      });
+    }
+
+    this.cdr.markForCheck();
+  }
+
+  private showApiError(error: any, title = 'No se pudo completar la operación'): void {
+    const message = this.getFriendlyReservaErrorMessage(error);
+
+    this.navbar.alert.set({
+      type: 'error',
+      title,
+      message,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cerrar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        }
+      ]
+    });
+  }
+
+  private mostrarAlertaDniReservado(dni: string, reserva?: any, options?: { blocking?: boolean }): void {
+    const idReserva = reserva?.Id_Reserva || reserva?.idReserva || reserva?.id_reserva;
+    const buttons: any[] = [];
+
+    if (idReserva) {
+      buttons.push({
+        text: 'Ver reserva',
+        style: 'primary',
+        onClick: () => {
+          this.navbar.alert.set(null);
+          try { this.navbar.closePanel(); } catch {}
+          this.navbar.Id_Reserva.set(String(idReserva));
+        }
+      });
+    }
+
+    buttons.push({
+      text: options?.blocking ? 'Corregir DNI' : 'Entendido',
+      style: 'secondary',
+      onClick: () => this.navbar.alert.set(null)
+    });
+
+    this.navbar.alert.set({
+      type: options?.blocking ? 'error' : 'warning',
+      title: 'Pasajero ya reservado',
+      message: idReserva
+        ? `El documento ${dni} ya tiene una reserva para esta misma fecha: ${idReserva}. Puedes revisar la reserva existente o corregir el DNI.`
+        : `El documento ${dni} ya tiene una reserva para esta misma fecha. Corrige el DNI o revisa la reserva existente.`,
+      autoClose: false,
+      buttons
+    });
+  }
+
+  private tipoOcupaAsiento(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): boolean {
+    return tipo !== 'INFANTE';
+  }
+
+  private async refrescarCuposPorEvento(): Promise<void> {
+    const ok = await this.verificarCuposDisponibles({ silent: true });
+    // verificarCuposDisponibles ya actualiza navbar.cuposInfo directamente.
+
+    if (!ok) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Cupos actualizados',
+        message: 'La disponibilidad cambió y ahora esta reserva supera los cupos disponibles. Ajusta los pasajeros antes de guardar o selecciona otra fecha.',
+        autoClose: false,
+        buttons: [
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+        ]
+      });
+    }
+  }
+
+  async verificarCuposDisponibles(options?: { silent?: boolean }): Promise<boolean> {
+    const Fecha = this.form.get('Fecha_Tour')?.value;
+    const Id_Tour = this.form.get('SelectTour')?.value;
+    const cant = this.pasajerosConAsiento();
+    if (!Fecha || !Id_Tour) {
+      this.cuposValidosActuales.set(true);
+      this.cuposDisponiblesActuales.set(null);
+      this.navbar.cuposInfo.set(null);
+      return true;
+    }
+
+    try {
+      const data = await firstValueFrom(
+        this.reservasSvc.verificarCupos(Fecha, Number(Id_Tour), cant)
+      );
+
+      const disponible = !!data?.disponible;
+      const cupos = Number(data?.cuposDisponibles ?? 0);
+
+      this.cuposDisponiblesActuales.set(cupos);
+      this.cuposValidosActuales.set(disponible);
+      this.navbar.cuposInfo.set({ ...data });
+
+      if (!disponible && !options?.silent) {
+        this.navbar.alert.set({
+          type: 'warning',
+          title: 'Cupos insuficientes',
+          message: cupos <= 0
+            ? 'Este tour no tiene cupos disponibles para la fecha seleccionada. No puedes agregar más pasajeros.'
+            : `Solo hay ${cupos} cupos disponibles para este tour. Ajusta la cantidad de pasajeros.`,
+          autoClose: false,
+          buttons: [
+            {
+              text: 'Entendido',
+              style: 'secondary',
+              onClick: () => this.navbar.alert.set(null)
+            }
+          ]
+        });
+      }
+
+      this.cdr.markForCheck();
+      return disponible;
+    } catch (error) {
+      this.cuposValidosActuales.set(false);
+      this.navbar.cuposInfo.set(null);
+      this.showApiError(error, 'Error al verificar cupos');
+      this.cdr.markForCheck();
+      return false;
+    }
+  }
 
   private wsService = inject(WebSocketService);
   private transferSvc = inject(TransferService);
@@ -44,6 +446,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  cuposDisponiblesActuales = signal<number | null>(null);
+  cuposValidosActuales = signal<boolean>(true);
+  adultosCantidadInput = signal<number>(0);
+  ninosCantidadInput = signal<number>(0);
+  infantesCantidadInput = signal<number>(0);
+  isSyncingPassengerCounts = signal<boolean>(false);
   form!: FormGroup;
 
   // Exponemos Number al template para usarlo en @if
@@ -394,7 +802,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       ComprobantePago: [null],
       PagoObservaciones: [''],
     });
-    this.wsService.messages$
+    this.wsService.reservationEvents$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((msg: any) => {
         this.zone.run(() => {
@@ -403,15 +811,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
           // Reservas que afectan cupos del tour/fecha actual
           if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
-            this.CuposDisponiblesNavbar();
-            this.verificarCuposDisponibles();
+            void this.refrescarCuposPorEvento();
           }
 
           // Cambios de aforo del tour actual (si el evento trae fecha, intenta matchear)
           if (msg?.type === 'aforoActualizado' && msg?.Id_Tour == tour) {
             if (!msg?.Fecha || msg.Fecha === fecha) {
-              this.CuposDisponiblesNavbar();
-              this.verificarCuposDisponibles();
+              void this.refrescarCuposPorEvento();
             }
           }
         });
@@ -503,7 +909,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
     this.evaluarConflictoRutasEnTiempoReal();
     await this.fijarHorarioAutomatico();
-    this.verificarCuposDisponibles();
+    await this.verificarCuposDisponibles({ silent: false });
   }
 
   async eliminarPunto(p: Punto) {
@@ -518,7 +924,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       await this.fijarHorarioAutomatico();
     }
     this.evaluarConflictoRutasEnTiempoReal();
-    this.verificarCuposDisponibles();
+    await this.verificarCuposDisponibles({ silent: false });
   }
 
   // ====== Horario auto ======
@@ -548,16 +954,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
           autoClose: true,
         });
       }
-    } catch {
+    } catch (error) {
       this.horarioSeleccionado.set(null);
       this.form.get('Id_Horario')?.setValue(null);
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error al asignar horario',
-        message: 'No fue posible obtener el horario del punto principal.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-      });
+      this.showApiError(error, 'Error al asignar horario');
     }
   }
 
@@ -567,7 +967,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.form.patchValue({ Id_Plan: null, Id_Horario: null }, { emitEvent: false });
     this.horarioSeleccionado.set(null);
     this.preciosRef.set({});
-    if (!idTour) return;
+    if (!idTour) {
+      this.cuposDisponiblesActuales.set(null);
+      this.cuposValidosActuales.set(true);
+      this.CuposDisponiblesNavbar();
+      return;
+    }
 
     try {
       this.ensureDefaultCanal();
@@ -611,15 +1016,11 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       }
 
       this.tourRules.resetSession();
+      await this.verificarCuposDisponibles({ silent: false });
+      await this.revalidarDnisPorCambioDeFecha();
       this.cdr.markForCheck();
-    } catch {
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error al cambiar tour',
-        message: 'No se pudieron cargar los datos del tour seleccionado.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-      });
+    } catch (error) {
+      this.showApiError(error, 'Error al cambiar tour');
     }
 
     if (idTour === 5) {
@@ -661,14 +1062,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.preciosRef.set(precios || {});
       if (!soloCargar) await this.autollenarPrecios();
       this.recalcularTotales();
-    } catch {
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error al cargar precios',
-        message: 'No fue posible obtener los precios para el plan/moneda.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-      });
+    } catch (error) {
+      this.showApiError(error, 'Error al cargar precios');
     }
   }
 
@@ -717,16 +1112,187 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   private comisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
     return Number(this.form.get(this.comisionControlPorTipo(tipo))?.value || 0);
   }
+
+  private getCantidadInputSignal(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
+    switch (tipo) {
+      case 'ADULTO': return this.adultosCantidadInput;
+      case 'NINO': return this.ninosCantidadInput;
+      case 'INFANTE': return this.infantesCantidadInput;
+    }
+  }
+
+  private syncCantidadInputsFromFormArray(): void {
+    this.adultosCantidadInput.set(this.countByTipo('ADULTO'));
+    this.ninosCantidadInput.set(this.countByTipo('NINO'));
+    this.infantesCantidadInput.set(this.countByTipo('INFANTE'));
+  }
+
+  private findLastPassengerIndexByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+    for (let i = this.pasajeros.length - 1; i >= 0; i--) {
+      if (this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value === tipo) return i;
+    }
+    return -1;
+  }
+
   private removeInfantes(): void {
     for (let i = this.pasajeros.length - 1; i >= 0; i--) {
       if (this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value === 'INFANTE') this.pasajeros.removeAt(i);
     }
     this.recalcularTotales();
+    this.syncCantidadInputsFromFormArray();
   }
 
-  agregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE', omitirCalculos = false) {
+  private async puedeAjustarCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', target: number): Promise<boolean> {
+    if (!this.tipoOcupaAsiento(tipo)) return true;
+
+    const Fecha = this.form.get('Fecha_Tour')?.value;
+    const Id_Tour = this.form.get('SelectTour')?.value;
+
+    if (!Fecha || !Id_Tour) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Datos incompletos',
+        message: 'Selecciona tour y fecha antes de agregar pasajeros.',
+        autoClose: true
+      });
+      return false;
+    }
+
+    const otrosConAsiento = this.pasajeros.controls.filter(c => {
+      const t = c.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+      return t !== tipo && this.tipoOcupaAsiento(t);
+    }).length;
+
+    const cantidadFinalConAsiento = otrosConAsiento + (this.tipoOcupaAsiento(tipo) ? target : 0);
+
+    try {
+      const data = await firstValueFrom(
+        this.reservasSvc.verificarCupos(
+          Fecha,
+          Number(Id_Tour),
+          cantidadFinalConAsiento
+        )
+      );
+
+      const disponible = !!data?.disponible;
+      const cupos = Number(data?.cuposDisponibles ?? 0);
+
+      this.cuposDisponiblesActuales.set(cupos);
+      this.cuposValidosActuales.set(disponible);
+      this.navbar.cuposInfo.set({ ...data });
+
+      if (!disponible) {
+        this.navbar.alert.set({
+          type: 'warning',
+          title: 'Cupos insuficientes',
+          message: cupos <= 0
+            ? 'Este tour no tiene cupos disponibles para la fecha seleccionada.'
+            : `Solo hay ${cupos} cupos disponibles. Ajusta la cantidad de pasajeros.`,
+          autoClose: false,
+          buttons: [
+            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          ]
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.showApiError(error, 'Error al verificar cupos');
+      return false;
+    }
+  }
+
+  private async puedeAgregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): Promise<boolean> {
+    if (!this.tipoOcupaAsiento(tipo)) return true;
+
+    const Fecha = this.form.get('Fecha_Tour')?.value;
+    const Id_Tour = this.form.get('SelectTour')?.value;
+
+    if (!Fecha || !Id_Tour) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Datos incompletos',
+        message: 'Selecciona tour y fecha antes de agregar pasajeros.',
+        autoClose: true
+      });
+      return false;
+    }
+
+    const cantidadSimulada = this.pasajerosConAsiento() + 1;
+
+    try {
+      const data = await firstValueFrom(
+        this.reservasSvc.verificarCupos(Fecha, Number(Id_Tour), cantidadSimulada)
+      );
+
+      const disponible = !!data?.disponible;
+      const cupos = Number(data?.cuposDisponibles ?? 0);
+
+      this.cuposDisponiblesActuales.set(cupos);
+      this.cuposValidosActuales.set(disponible);
+
+      if (!disponible) {
+        this.navbar.alert.set({
+          type: 'warning',
+          title: 'Cupos insuficientes',
+          message: cupos <= 0
+            ? 'Este tour ya no tiene cupos disponibles para la fecha seleccionada.'
+            : `Solo quedan ${cupos} cupos disponibles. No puedes superar esa cantidad.`,
+          autoClose: false,
+          buttons: [
+            {
+              text: 'Entendido',
+              style: 'secondary',
+              onClick: () => this.navbar.alert.set(null)
+            }
+          ]
+        });
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.showApiError(error, 'Error al verificar cupos');
+      return false;
+    }
+  }
+
+  async agregarPasajero(
+    tipo: 'ADULTO' | 'NINO' | 'INFANTE',
+    omitirCalculos = false,
+    options?: { skipCuposCheck?: boolean }
+  ): Promise<boolean> {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
-    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
+    if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return false;
+
+    const Fecha = this.form.get('Fecha_Tour')?.value;
+    const Id_Tour = this.form.get('SelectTour')?.value;
+
+    if (!Id_Tour) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Datos incompletos',
+        message: 'Selecciona un tour antes de agregar pasajeros.',
+        autoClose: true
+      });
+      return false;
+    }
+
+    if (!Fecha) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Datos incompletos',
+        message: 'Selecciona la fecha del tour antes de agregar pasajeros.',
+        autoClose: true
+      });
+      return false;
+    }
+
+    if (!options?.skipCuposCheck && this.tipoOcupaAsiento(tipo)) {
+      const puede = await this.puedeAgregarPasajero(tipo);
+      if (!puede) return false;
+    }
 
     // Usar el primer punto seleccionado (punto principal)
     const principalPunto = this.puntosSeleccionados()[0]?.Id_Punto ?? null;
@@ -747,46 +1313,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Comision: [comisionInicial],
     });
 
-    fg.get('DNI')?.valueChanges
-      .pipe(
-        debounceTime(800),
-        distinctUntilChanged(),
-        switchMap((dni: string) => {
-          if (!dni || dni.trim().length < 3) {
-            const ctrl = fg.get('DNI');
-            if (ctrl?.errors?.['duplicadoEnBd']) {
-              const errs = { ...ctrl.errors };
-              delete errs['duplicadoEnBd'];
-              ctrl.setErrors(Object.keys(errs).length ? errs : null);
-            }
-            return of(null);
-          }
-          const fecha = this.form.get('Fecha_Tour')?.value;
-          if (!fecha) return of(null);
-          return this.reservasSvc.verificarDniDuplicado(dni.trim(), fecha).pipe(
-            catchError(() => of(null))
-          );
-        }),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe((resultado: any) => {
-        if (!resultado) return;
-        const ctrl = fg.get('DNI');
-        if (resultado.exists && resultado.reserva) {
-          if (ctrl) {
-            const existing = ctrl.errors ? { ...ctrl.errors } : {};
-            existing['duplicadoEnBd'] = { reserva: resultado.reserva };
-            ctrl.setErrors(existing);
-          }
-          const reserva = resultado.reserva;
-          this.navbar.alert.set({
-            type: 'warning',
-            title: 'Pasajero duplicado',
-            message: `El DNI ya está registrado en la reserva ${reserva.Id_Reserva} el ${this.form.get('Fecha_Tour')?.value}.`,
-            autoClose: true
-          });
-        }
-      });
+    this.conectarValidacionDniPasajero(fg);
 
     this.pasajeros.push(fg);
 
@@ -795,35 +1322,75 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (!omitirCalculos) {
       this.recalcularTotales();
     }
+
+    this.syncCantidadInputsFromFormArray();
+
+    return true;
   }
 
   eliminarPasajero(i: number) {
     this.pasajeros.removeAt(i);
     this.recalcularTotales();
+    this.syncCantidadInputsFromFormArray();
+    this.validarDnisDuplicadosEnFormulario();
   }
 
-  adultosInputValue(): number { return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'ADULTO').length; }
-  ninosInputValue(): number { return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'NINO').length; }
-  infantesInputValue(): number { return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'INFANTE').length; }
+  adultosInputValue(): number { return this.adultosCantidadInput(); }
+  ninosInputValue(): number { return this.ninosCantidadInput(); }
+  infantesInputValue(): number { return this.infantesCantidadInput(); }
 
-  setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any) {
+  onCantidadInputChange(tipo: 'ADULTO' | 'NINO' | 'INFANTE', value: any): void {
+    const parsed = Number(value);
+    const safe = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+    this.getCantidadInputSignal(tipo).set(safe);
+  }
+
+  async commitCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): Promise<void> {
+    const target = this.getCantidadInputSignal(tipo)();
+    await this.setCantidadPasajeros(tipo, target);
+    this.syncCantidadInputsFromFormArray();
+    await this.verificarCuposDisponibles({ silent: true });
+    this.cdr.markForCheck();
+  }
+
+  async setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any): Promise<void> {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
     if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
-    const n = Math.max(0, Number(val || 0));
-    const cur = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
+    const n = Math.max(0, Math.floor(Number(val || 0)));
+    const cur = this.countByTipo(tipo);
 
-    if (n === cur) return;
-
-    if (n > cur) {
-      for (let i = 0; i < (n - cur); i++) this.agregarPasajero(tipo, true);
-    } else {
-      for (let i = cur - 1; i >= n; i--) {
-        const idx = this.pasajeros.controls.findIndex(c => c.get('Tipo_Pasajero')?.value === tipo);
-        if (idx >= 0) this.pasajeros.removeAt(idx);
-      }
+    if (n === cur) {
+      this.syncCantidadInputsFromFormArray();
+      return;
     }
 
-    this.recalcularTotales();
+    this.isSyncingPassengerCounts.set(true);
+    this.cdr.markForCheck();
+
+    try {
+      if (n > cur) {
+        const ok = await this.puedeAjustarCantidadPasajeros(tipo, n);
+        if (!ok) return;
+
+        for (let i = 0; i < (n - cur); i++) {
+          const agregado = await this.agregarPasajero(tipo, true, { skipCuposCheck: true });
+          if (!agregado) break;
+        }
+      } else {
+        for (let i = cur - 1; i >= n; i--) {
+          const idx = this.findLastPassengerIndexByTipo(tipo);
+          if (idx >= 0) this.pasajeros.removeAt(idx);
+        }
+      }
+
+      this.recalcularTotales();
+      this.syncCantidadInputsFromFormArray();
+      this.validarDnisDuplicadosEnFormulario();
+    } finally {
+      this.isSyncingPassengerCounts.set(false);
+      this.syncCantidadInputsFromFormArray();
+      this.cdr.markForCheck();
+    }
   }
 
   async autollenarPrecios() {
@@ -1080,45 +1647,25 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   recalcularTotales() { /* getters ya recalculan */ }
 
   // ====== Cupos ======
-  async verificarCuposDisponibles(): Promise<void> {
-    const Fecha = this.form.get('Fecha_Tour')?.value;
-    const Id_Tour = this.form.get('SelectTour')?.value;
-    const cant = this.pasajerosConAsiento();
-    if (!Fecha || !Id_Tour) return;
-
-    try {
-      const data = await firstValueFrom(this.reservasSvc.verificarCupos(Fecha, Number(Id_Tour), cant));
-      if (!data?.disponible) {
-        this.navbar.alert.set({
-          type: 'warning', title: 'Cupos insuficientes',
-          message: `Solo hay ${data?.cuposDisponibles ?? 0} cupos disponibles para este tour.`,
-          autoClose: false,
-          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-        });
-      }
-    } catch {
-      this.navbar.alert.set({
-        type: 'error', title: 'Error al verificar cupos',
-        message: 'No fue posible verificar los cupos disponibles.', autoClose: false,
-        buttons: [
-          { text: 'Reintentar', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.verificarCuposDisponibles(); } },
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-        ],
-      });
-    }
-  }
-
   CuposDisponiblesNavbar(): void {
     const { Fecha_Tour, SelectTour, Tipo_Reserva } = this.form.value;
     const totalPasajeros = this.pasajerosConAsiento();
     if (Tipo_Reserva !== 'Grupal') { this.navbar.cuposInfo.set(null); return; }
     if (Fecha_Tour && SelectTour) {
       this.reservasSvc.verificarCupos(Fecha_Tour, SelectTour, totalPasajeros).subscribe({
-        next: (data) => this.navbar.cuposInfo.set({ ...data }),
+        next: (data) => {
+          const cupos = Number(data?.cuposDisponibles ?? 0);
+          const disponible = !!data?.disponible;
+          this.cuposDisponiblesActuales.set(cupos);
+          this.cuposValidosActuales.set(disponible);
+          this.navbar.cuposInfo.set({ ...data });
+        },
         error: () => this.navbar.cuposInfo.set(null)
       });
     } else {
       this.navbar.cuposInfo.set(null);
+      this.cuposDisponiblesActuales.set(null);
+      this.cuposValidosActuales.set(true);
     }
   }
 
@@ -1231,26 +1778,6 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // ===== Verificar duplicados por DNI =====
-    const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
-    if (dupCtrl) {
-      const dupErr = dupCtrl.get('DNI')?.errors?.['duplicadoEnBd'];
-      const reserva = dupErr?.reserva;
-      const dniVal = dupCtrl.get('DNI')?.value;
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Pasajero duplicado',
-        message: `No es posible crear la reserva: el DNI ${dniVal} ya aparece en la reserva ${reserva?.Id_Reserva} (${reserva?.Nombre_Tour}) el ${this.form.get('Fecha_Tour')?.value}.`,
-        autoClose: false,
-        buttons: [
-          { text: 'Ver reserva existente', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.verReservaDuplicada(reserva?.Id_Reserva); } },
-          { text: 'Corregir DNI', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
-        ]
-      });
-      this.isSubmitting.set(false);
-      return;
-    }
-
     // ===== Confirmación con resumen =====
     const tourNombre =
       this.tours().find(t => t.Id_Tour === Number(this.form.get('SelectTour')?.value))?.Nombre_Tour ?? '—';
@@ -1259,6 +1786,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const ni = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'NINO').length;
     const infa = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'INFANTE').length;
     const totalNeto = this.totalNeto();
+
+    const dnisOk = await this.validarTodosLosDniAntesDeGuardar();
+    if (!dnisOk) {
+      this.isSubmitting.set(false);
+      return;
+    }
 
     const ok = await confirmar(
       '¿Todo listo?',
@@ -1273,12 +1806,18 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const cuposOk = await this.verificarCuposDisponibles({ silent: false });
+    if (!cuposOk) {
+      this.isSubmitting.set(false);
+      return;
+    }
+
     try {
 
       // ===== PASAJEROS =====
       const pax = this.pasajeros.controls.map(c => ({
         Nombre_Pasajero: c.get('Nombre_Pasajero')?.value || '',
-        DNI: c.get('DNI')?.value || null,
+        DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: (() => {
@@ -1387,6 +1926,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         this.horarioSeleccionado.set(null);
         this.preciosRef.set({});
         this.navbar.cuposInfo.set(null);
+        this.syncCantidadInputsFromFormArray();
         this.form.reset();
         window.scrollTo({ top: 0, behavior: 'smooth' });
         this.openSummary = false;
@@ -1403,13 +1943,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Error al crear reserva:', err);
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error al crear reserva',
-        message: 'Ocurrió un problema al enviar la reserva al servidor.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-      });
+      this.showApiError(err, 'Error al crear reserva');
     } finally {
       this.isSubmitting.set(false);
     }

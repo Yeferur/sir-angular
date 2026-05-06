@@ -11,6 +11,7 @@ exports.authMiddleware = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.authToken = token;
 
     // Validar que el token exista en la base de datos
     const [rows] = await db.query(

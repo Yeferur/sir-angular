@@ -24,7 +24,12 @@
           </span>
         </div>
          <div class="header-actions">
-          <button class="btn-secondary" (click)="descargarTransfer();">Descargar</button>
+          <button class="btn-secondary" (click)="descargarTransfer();">Descargar PDF</button>
+          @if (comprobantesDisponibles.length) {
+            <button class="btn-secondary" (click)="descargarComprobantesTransfer()">
+              Comprobantes
+            </button>
+          }
           @if (puedeCancelar) {
             <button class="btn-danger" (click)="cancelarTransfer()">Cancelar</button>
           }
@@ -199,6 +204,26 @@
                     </div>
                   }
                 </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (comprobantesDisponibles.length) {
+        <div class="card detail-card">
+          <div class="card-header"><h2>Comprobantes</h2></div>
+          <div class="card-body">
+            @for (c of comprobantesDisponibles; track c.id ?? c.url) {
+              <div class="info-row">
+                <span class="info-label">{{ c.tipo || 'Comprobante' }}</span>
+                <span class="info-value">
+                  {{ c.fecha ? (c.fecha | date:'mediumDate':'':'es-CO') : 'Disponible' }}
+                </span>
+                <button type="button" class="btn-comprobante"
+                        (click)="descargarComprobante(c.url, $index + 1)">
+                  Descargar
+                </button>
               </div>
             }
           </div>

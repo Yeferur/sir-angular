@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, forkJoin, of, firstValueFrom } from 'rxjs';
-import { tap, catchError, map } from 'rxjs/operators';
+import { Observable, BehaviorSubject, firstValueFrom } from 'rxjs';
+import { tap, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 export interface Permiso {
@@ -73,7 +73,7 @@ export class PermisosService {
   // CARGA RÁPIDA: localStorage + backend
   // =====================================================
 
-  async loadSessionData(options?: { token?: string | null }): Promise<void> {
+  async loadSessionData(options?: { token?: string | null }): Promise<boolean> {
     // 1) hidratar desde localStorage
     this.cargarPermisosDesdeLocalStorage();
 
@@ -81,21 +81,20 @@ export class PermisosService {
     const token = options?.token ?? this.getTokenFromStorage();
     if (!token) {
       this.readySubject.next(true);
-      return;
+      return true;
     }
 
     // 3) refresca desde backend
     try {
       // Solo solicitamos los permisos desde backend.
       // El menú se mantiene estático/en el layout y no depende de la tabla `modulos`.
-      await firstValueFrom(
-        this.obtenerMisPermisos().pipe(catchError(() => of({ permisos: [] as Permiso[] })), map(() => true))
-      );
-
+      await firstValueFrom(this.obtenerMisPermisos().pipe(map(() => true)));
       this.readySubject.next(true);
+      return true;
     } catch (e) {
       console.error('[PermisosService] loadSessionData error:', e);
       this.readySubject.next(true);
+      return false;
     }
   }
 

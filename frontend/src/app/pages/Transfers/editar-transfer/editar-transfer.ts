@@ -21,12 +21,10 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
-  showDuplicate = true;
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
-  isDuplicateMode = false;
-  private isNavigatingToDuplicate = false;
+  private isHydrating = false;
 
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
@@ -173,6 +171,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     const id = this.form?.get('TipoServicio')?.value;
     const servicio = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(id));
     return servicio ? servicio.Servicio : '—';
+  }
+
+  get transferHeaderCode(): string {
+    const id = this.getTransferIdFromRoute();
+    return id ? `#${this.formatTransferCode(id)}` : '';
   }
 
   get abonos(): FormArray {
@@ -351,6 +354,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     return normalizedId || null;
   }
 
+  private formatTransferCode(idTransfer: string | number): string {
+    const numeric = String(idTransfer || '').replace(/\D/g, '');
+    return numeric ? `TRS${numeric.padStart(5, '0')}` : String(idTransfer || '').trim() || 'TRS';
+  }
+
   private unwrapListResponse(response: any): any[] {
     if (Array.isArray(response)) return response;
     if (Array.isArray(response?.data)) return response.data;
@@ -394,6 +402,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.form.get('Rango')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rangoId) => {
+        if (this.isHydrating) return;
         if (!rangoId || rangoId === 'Seleccionar') {
           this.selectedRangoDescripcion = null;
           this.precioSeleccionado = null;
@@ -422,6 +431,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.form.get('Moneda')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((mon) => {
+        if (this.isHydrating) return;
         const rangoId = this.form.get('Rango')?.value;
         if (!rangoId || rangoId === 'Seleccionar') return;
         this.transferSvc.getPreciosPorRango(rangoId).subscribe({
@@ -438,6 +448,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.form.get('TipoServicio')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((serviceId) => {
+        if (this.isHydrating) return;
         const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
         const isHotelToAirport = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
         this.showFlightFields = Boolean(isHotelToAirport);
@@ -463,6 +474,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.form.get('TipoVuelo')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((tipo) => {
+        if (this.isHydrating) return;
         if (!this.showFlightFields) return;
         const msg = tipo === 'Internacional'
           ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
@@ -487,10 +499,6 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       this.isLoading.set(false);
       return;
     }
-
-    const duplicarParam = this.route.snapshot.queryParamMap.get('duplicar');
-    this.isDuplicateMode = !!duplicarParam;
-    this.showDuplicate = !this.isDuplicateMode;
 
     forkJoin({
       servicios: this.transferSvc.getServicios().pipe(catchError(() => of([]))),
@@ -527,70 +535,73 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     const transfer = data.transfer || data;
     const pagos = data.pagos || [];
 
-    // Llenar formulario con datos del transfer
-    this.form.patchValue({
-      Titular: transfer.Nombre_Titular || '',
-      DNI: transfer.DNI || '',
-      TelefonoTitular: transfer.Telefono_Titular || '',
-      Rango: transfer.Id_Rango || 'Seleccionar',
-      Moneda: transfer.MonedaCodigo || 'COP',
-      TipoServicio: transfer.Id_Servicio || 'Seleccionar',
-      Salida: transfer.Punto_Salida || '',
-      Llegada: transfer.Punto_Destino || '',
-      Fecha: transfer.Fecha_Transfer || '',
-      Hora: transfer.Hora_Recogida || '',
-      TipoVuelo: transfer.TipoVuelo || '',
-      Reporta: transfer.Nombre_Reportante || '',
-      Vuelo: transfer.Vuelo || '',
-      Valor: Number(transfer.Valor || 0),
-      TelefonoReserva: transfer.Telefono_Reportante || '',
-      Observaciones: transfer.Observaciones || ''
-    }, { emitEvent: false });
+    this.isHydrating = true;
+    try {
+      // Llenar formulario con datos del transfer
+      this.form.patchValue({
+        Titular: transfer.Nombre_Titular || '',
+        DNI: transfer.DNI || '',
+        TelefonoTitular: transfer.Telefono_Titular || '',
+        Rango: transfer.Id_Rango || 'Seleccionar',
+        Moneda: transfer.MonedaCodigo || 'COP',
+        TipoServicio: transfer.Id_Servicio || 'Seleccionar',
+        Salida: transfer.Punto_Salida || '',
+        Llegada: transfer.Punto_Destino || '',
+        Fecha: transfer.Fecha_Transfer || '',
+        Hora: transfer.Hora_Recogida || '',
+        TipoVuelo: transfer.TipoVuelo || '',
+        Reporta: transfer.Nombre_Reportante || '',
+        Vuelo: transfer.Vuelo || '',
+        Valor: Number(transfer.Valor || 0),
+        TelefonoReserva: transfer.Telefono_Reportante || '',
+        Observaciones: transfer.Observaciones || ''
+      }, { emitEvent: false });
 
-    // Determinar tipo de pago
-    if (pagos.length === 0 || (pagos.length === 1 && pagos[0].Metodo === 'Paga en punto')) {
-      this.form.patchValue({ TipoPago: 'PagaEnPunto' }, { emitEvent: false });
-    } else if (pagos.length === 1 && pagos[0].Metodo === 'Completo') {
-      this.form.patchValue({ TipoPago: 'Completo' }, { emitEvent: false });
-      this.form.get('PagoObservaciones')?.setValue(pagos[0].Observaciones || '');
-      this.form.get('ComprobantePago')?.setValue(pagos[0].Pago_Comprobante
-        ? { Id_Pago: pagos[0].Id_Pago, SoporteUrl: pagos[0].Pago_Comprobante }
-        : null
-      );
-    } else {
-      this.form.patchValue({ TipoPago: 'Abonos' }, { emitEvent: false });
-      // Llenar abonos
-      const abonosArray = this.form.get('Abonos') as FormArray;
-      abonosArray.clear();
-      pagos.forEach((pago: any) => {
-        if (pago.Metodo === 'Abono') {
-          abonosArray.push(this.crearAbonoGroup({
-            ...pago,
-            Monto: Number(pago.Monto || 0)
-          }));
-        }
-      });
+      // Determinar tipo de pago
+      if (pagos.length === 0 || (pagos.length === 1 && pagos[0].Metodo === 'Paga en punto')) {
+        this.form.patchValue({ TipoPago: 'PagaEnPunto' }, { emitEvent: false });
+      } else if (pagos.length === 1 && pagos[0].Metodo === 'Completo') {
+        this.form.patchValue({ TipoPago: 'Completo' }, { emitEvent: false });
+        this.form.get('PagoObservaciones')?.setValue(pagos[0].Observaciones || '', { emitEvent: false });
+        this.form.get('ComprobantePago')?.setValue(
+          pagos[0].Pago_Comprobante
+            ? { Id_Pago: pagos[0].Id_Pago, SoporteUrl: pagos[0].Pago_Comprobante }
+            : null,
+          { emitEvent: false }
+        );
+      } else {
+        this.form.patchValue({ TipoPago: 'Abonos' }, { emitEvent: false });
+        // Llenar abonos
+        const abonosArray = this.form.get('Abonos') as FormArray;
+        abonosArray.clear();
+        pagos.forEach((pago: any) => {
+          if (pago.Metodo === 'Abono') {
+            abonosArray.push(this.crearAbonoGroup({
+              ...pago,
+              Monto: Number(pago.Monto || 0)
+            }));
+          }
+        });
+      }
+
+      // Actualizar descripciones
+      const rangoId = this.form.get('Rango')?.value;
+      if (rangoId && rangoId !== 'Seleccionar') {
+        const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
+        this.selectedRangoDescripcion = r ? r.Descripcion : null;
+      }
+
+      // Detectar si necesita campos de vuelo
+      const serviceId = this.form.get('TipoServicio')?.value;
+      if (serviceId && serviceId !== 'Seleccionar') {
+        const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
+        this.showFlightFields = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
+      }
+
+      this.form.markAsPristine();
+    } finally {
+      this.isHydrating = false;
     }
-
-    // Actualizar descripciones
-    const rangoId = this.form.get('Rango')?.value;
-    if (rangoId && rangoId !== 'Seleccionar') {
-      const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
-      this.selectedRangoDescripcion = r ? r.Descripcion : null;
-    }
-
-    // Detectar si necesita campos de vuelo
-    const serviceId = this.form.get('TipoServicio')?.value;
-    if (serviceId && serviceId !== 'Seleccionar') {
-      const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
-      this.showFlightFields = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
-    }
-
-    if (this.isDuplicateMode) {
-      this.applyDuplicateTransferState(transfer);
-    }
-
-    this.form.markAsPristine();
   }
 
   async onSubmit(): Promise<void> {
@@ -631,28 +642,6 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.processSubmit();
   }
 
-  duplicarTransfer(): void {
-    if (!this.getTransferIdFromRoute()) {
-      this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
-      return;
-    }
-
-    this.openSummary = false;
-    this.isDuplicateMode = true;
-    this.showDuplicate = false;
-    this.isNavigatingToDuplicate = false;
-    this.form.markAsPristine();
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { duplicar: 'true' },
-      queryParamsHandling: 'merge',
-      replaceUrl: true
-    }).then(() => {
-      this.applyDuplicateTransferState();
-      this.form.markAsDirty();
-    });
-  }
-
   private processSubmit(): void {
     this.isSubmitting.set(true);
 
@@ -687,21 +676,14 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
           .filter((abono) => abono.Monto > 0)
       : [];
 
-    const isDuplicate = this.isDuplicateMode;
-    const pagoFinal: any = isDuplicate
-      ? {
-          Tipo: 'PagaEnPunto',
-          Observaciones: null,
-          Abonos: []
-        }
-      : {
-          Tipo: tipoPago,
-          Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
-          Pago_Comprobante: tipoPago === 'Completo' ? pagoCompletoRutaActual : null,
-          Abonos: abonosPayload
-        };
+    const pagoFinal: any = {
+      Tipo: tipoPago,
+      Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
+      Pago_Comprobante: tipoPago === 'Completo' ? pagoCompletoRutaActual : null,
+      Abonos: abonosPayload
+    };
 
-    const transferData = {
+    const transferData: any = {
       Titular: this.form.value.Titular,
       DNI: this.form.value.DNI || '',
       Tel_Contacto: this.form.value.TelefonoTitular || '',
@@ -718,28 +700,18 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
-      Observaciones: isDuplicate ? this.buildDuplicatedTransferObservaciones(this.form.value.Observaciones) : this.form.value.Observaciones,
-      Estado: isDuplicate ? 'Pendiente' : null,
-      ModoDuplicado: isDuplicate,
+      Observaciones: this.form.value.Observaciones,
+      Estado: null,
       Pago: pagoFinal
     };
 
-    const request$ = isDuplicate
-      ? this.transferSvc.crearTransfer(transferData)
-      : this.transferSvc.actualizarTransfer(transferId, transferData);
-
-    request$.subscribe({
+    this.transferSvc.actualizarTransfer(transferId, transferData).subscribe({
       next: (data) => {
         const idTransfer = data?.data?.Id_Transfer || transferId;
         const pagos = data?.data?.pagos || [];
 
-        if (!isDuplicate && idTransfer && this.hasComprobantesToUpload()) {
+        if (idTransfer && this.hasComprobantesToUpload()) {
           this.uploadComprobantesTransfer(idTransfer, pagos);
-          return;
-        }
-
-        if (isDuplicate) {
-          this.finishDuplicateSuccess(idTransfer, data?.data?.Codigo_Transfer || null);
           return;
         }
 
@@ -747,7 +719,8 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error:', err);
-        this.navbar.errorToast('Error', isDuplicate ? 'Hubo un error al duplicar el transfer.' : 'Hubo un error al actualizar el transfer.');
+        const message = err?.error?.message || err?.error?.error || err?.message || 'Hubo un error al actualizar el transfer.';
+        this.navbar.errorToast('Error', message);
         this.isSubmitting.set(false);
       }
     });
@@ -802,62 +775,13 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.router.navigate(['/Transfers/VerTransfers']);
   }
 
-  private finishDuplicateSuccess(idTransfer: number | string, codigoTransfer: string | null): void {
-    this.navbar.successToast('Transfer duplicado', 'Transfer duplicado correctamente.');
-    this.form.markAsPristine();
-    this.isSubmitting.set(false);
-
-    const targetId = String(idTransfer || '').trim();
-    if (targetId) {
-      this.router.navigate(['/Transfers/EditarTransfer', targetId], {
-        queryParams: codigoTransfer ? { codigo: codigoTransfer } : {}
-      });
-      return;
-    }
-
-    this.router.navigate(['/Transfers/VerTransfers']);
-  }
-
-  private applyDuplicateTransferState(transfer?: any): void {
-    this.form.patchValue({
-      TipoPago: 'PagaEnPunto',
-      Observaciones: this.buildDuplicatedTransferObservaciones(transfer?.Observaciones)
-    }, { emitEvent: false });
-
-    this.abonos.clear();
-    this.form.get('ComprobantePago')?.setValue(null);
-    this.pagoPagadoFile = null;
-    this.pagoPagadoFileName = null;
-    this.pagoCompletoSoporteUrlParaReemplazo = null;
-    this.abonoFiles.clear();
-    this.abonoFileNames.clear();
-  }
-
-  private buildDuplicatedTransferObservaciones(baseObservaciones?: string | null): string {
-    const currentObs = String(baseObservaciones ?? this.form.get('Observaciones')?.value ?? '').trim();
-    const codigoTransfer = this.getTransferCodeFromCurrentContext();
-    const duplicateNote = `Duplicado desde Transfer #${codigoTransfer}.`;
-    const cleaned = currentObs
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && line !== duplicateNote)
-      .join('\n');
-
-    return [cleaned, duplicateNote].filter(Boolean).join('\n');
-  }
-
-  private getTransferCodeFromCurrentContext(): string {
-    const transferId = this.getTransferIdFromRoute();
-    return `TRS${String(transferId || '').padStart(5, '0')}`;
-  }
-
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     if (this.navbar?.alert) this.navbar.alert.set(null);
   }
 
   hasUnsavedChanges(): boolean {
-    return this.form?.dirty && !this.isSubmitting() && !this.isNavigatingToDuplicate;
+    return this.form?.dirty && !this.isSubmitting();
   }
 
   getPhoneError(controlName: string): string {

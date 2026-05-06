@@ -5,7 +5,7 @@ import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router } from '@angular/router';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
@@ -30,8 +30,6 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
-  isDuplicateMode = false;
-  duplicarFromId: string | null = null;
 
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
@@ -193,7 +191,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     private transferSvc: TransferService,
     private cdr: ChangeDetectorRef,
     private router: Router,
-    private route: ActivatedRoute,
     private destroyRef: DestroyRef
   ) { }
 
@@ -479,16 +476,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   private loadCatalogos(): void {
     this.isLoading.set(true);
 
-    const duplicarId = this.route.snapshot.queryParamMap.get('duplicar');
-    if (duplicarId) {
-      this.router.navigate(['/Transfers/EditarTransfer', duplicarId], {
-        queryParams: { duplicar: 'true' },
-        replaceUrl: true
-      });
-      this.isLoading.set(false);
-      return;
-    }
-
     const requests: any = {
       servicios: this.transferSvc.getServicios().pipe(catchError(() => of([] as any[]))),
       rangos: this.transferSvc.getRangos().pipe(catchError(() => of([] as any[]))),
@@ -519,54 +506,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.cdr.markForCheck();
       }
     });
-  }
-
-  private fillFormWithDuplicateData(data: any): void {
-    const transfer = data.transfer || data;
-
-    // Llenar formulario con datos del transfer
-    this.form.patchValue({
-      Titular: transfer.Nombre_Titular || '',
-      DNI: transfer.DNI || '',
-      TelefonoTitular: transfer.Telefono_Titular || '',
-      Rango: transfer.Id_Rango || 'Seleccionar',
-      Moneda: transfer.MonedaCodigo || 'COP',
-      TipoServicio: transfer.Id_Servicio || 'Seleccionar',
-      Salida: transfer.Punto_Salida || '',
-      Llegada: transfer.Punto_Destino || '',
-      Fecha: transfer.Fecha_Transfer || '',
-      Hora: transfer.Hora_Recogida || '',
-      TipoVuelo: transfer.TipoVuelo || '',
-      Reporta: transfer.Nombre_Reportante || '',
-      Vuelo: transfer.Vuelo || '',
-      Valor: Number(transfer.Valor || 0),
-      TelefonoReserva: transfer.Telefono_Reportante || '',
-      Observaciones: `Duplicado desde Transfer #${transfer.Codigo_Transfer || `TRS${String(transfer.Id_Transfer || '').padStart(5, '0')}`}`,
-      TipoPago: 'PagaEnPunto'
-    }, { emitEvent: false });
-
-    this.abonos.clear();
-    this.form.get('ComprobantePago')?.setValue(null);
-    this.pagoPagadoFile = null;
-    this.pagoPagadoFileName = null;
-    this.abonoFiles.clear();
-    this.abonoFileNames.clear();
-
-    // Actualizar descripciones
-    const rangoId = this.form.get('Rango')?.value;
-    if (rangoId && rangoId !== 'Seleccionar') {
-      const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
-      this.selectedRangoDescripcion = r ? r.Descripcion : null;
-    }
-
-    // Detectar si necesita campos de vuelo
-    const serviceId = this.form.get('TipoServicio')?.value;
-    if (serviceId && serviceId !== 'Seleccionar') {
-      const nombre = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(serviceId))?.Servicio || '';
-      this.showFlightFields = /hotel\s*\/?\s*aeropuerto/i.test(nombre);
-    }
-
-    this.form.markAsPristine();
   }
 
   async onSubmit(): Promise<void> {

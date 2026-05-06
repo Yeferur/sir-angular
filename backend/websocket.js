@@ -7,12 +7,39 @@ const websocketManager = require('./websocketManager');
 process.on('uncaughtException', e => console.error('uncaughtException:', e));
 process.on('unhandledRejection', e => console.error('unhandledRejection:', e));
 
+function parseOrigins(value) {
+  return String(value || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (process.env.NODE_ENV !== 'production') return true;
+
+  const allowedOrigins = parseOrigins(
+    process.env.WS_ALLOWED_ORIGINS || process.env.CORS_ORIGIN || process.env.FRONTEND_URL
+  );
+
+  return allowedOrigins.includes(origin);
+}
+
 function initWebSocket(httpServer) {
   // ✅ Comparte el MISMO proceso/servidor
-  const wss = new WebSocket.Server({ server: httpServer, path: '/ws' });
+  const wss = new WebSocket.Server({
+    server: httpServer,
+    path: '/ws',
+    verifyClient: ({ origin }, done) => {
+      if (isAllowedOrigin(origin)) return done(true);
+      console.warn(`WS origin rechazado: ${origin}`);
+      return done(false, 403, 'Origen WebSocket no permitido');
+    }
+  });
 
   wss.on('connection', (ws) => {
     let userId = null;
+    let sessionToken = null;
 
     ws.on('message', async (message) => {
       try {
@@ -21,7 +48,8 @@ function initWebSocket(httpServer) {
         if (data.type === 'auth') {
           try {
             if (!process.env.JWT_SECRET) {
-              ws.send(JSON.stringify({ type: 'error', message: 'JWT_SECRET no definido' }));
+              console.error('WS auth error: JWT_SECRET no definido');
+              ws.send(JSON.stringify({ type: 'error', message: 'No se pudo validar la sesión en tiempo real.' }));
               ws.close(1011, 'server_config_error');
               return;
             }
@@ -43,12 +71,14 @@ function initWebSocket(httpServer) {
             }
 
             userId = Number(decoded.id);
-            await websocketManager.addClient(userId, ws);
+            sessionToken = String(data.token || '');
+            await websocketManager.addClient(userId, sessionToken, ws);
 
             ws.send(JSON.stringify({ type: 'success', message: 'Autenticado' }));
             return;
           } catch (err) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Auth error: ' + err.message }));
+            console.error('WS auth error:', err?.message || err);
+            ws.send(JSON.stringify({ type: 'error', message: 'No se pudo validar la sesión en tiempo real.' }));
             ws.close(1008, 'auth_error');
             return;
           }
@@ -65,14 +95,15 @@ function initWebSocket(httpServer) {
         }
 
       } catch (err) {
+        console.error('WS message processing error:', err?.message || err);
         try {
-          ws.send(JSON.stringify({ type: 'error', message: 'Error procesando mensaje: ' + err.message }));
+          ws.send(JSON.stringify({ type: 'error', message: 'No se pudo procesar el mensaje WebSocket.' }));
         } catch {}
       }
     });
 
     ws.on('close', () => {
-      if (userId) websocketManager.removeClient(userId, ws);
+      if (userId || sessionToken) websocketManager.removeClient(userId, sessionToken, ws);
     });
 
     ws.on('error', (e) => {
@@ -80,7 +111,7 @@ function initWebSocket(httpServer) {
     });
   });
 
-  console.log('✅ WebSocket inicializado en path /ws (mismo server HTTP)');
+  console.log('✅ WebSocket inicializado en path /ws');
   return wss;
 }
 

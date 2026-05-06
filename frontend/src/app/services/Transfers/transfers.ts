@@ -58,6 +58,10 @@ export class TransferService {
   }
 
   descargarComprobante(nombreArchivo: string): Observable<Blob> {
-    return this.http.get(`${this.apiUrl}/Transfer/Comprobante/${nombreArchivo}`, { responseType: 'blob' });
+    return this.http.get(`${this.apiUrl}/Transfer/Comprobante/${encodeURIComponent(nombreArchivo)}`, { responseType: 'blob' });
+  }
+
+  getComprobanteUrl(nombreArchivo: string): string {
+    return `${this.apiUrl}/Transfer/Comprobante/${encodeURIComponent(nombreArchivo)}`;
   }
 }

@@ -61,16 +61,16 @@ export class InicioService {
   }
 
   private setupWebSocketListeners() {
-    this.ws.messages$.subscribe(msg => {
+    this.ws.aforoEvents$.subscribe(msg => {
       // Asegura que la escritura del signal ocurra dentro de Angular
       this.zone.run(() => {
-        if (msg.type === 'aforoActualizado') {
-          this.aforoActualizado.set(msg);
-        }
+        this.aforoActualizado.set(msg);
+      });
+    });
 
-        if (msg.type === 'reservaCreada' || msg.type === 'reservaActualizada' || msg.type === 'reservaEliminada') {
-          this.reservaActualizada.set(msg);
-        }
+    this.ws.reservationEvents$.subscribe(msg => {
+      this.zone.run(() => {
+        this.reservaActualizada.set(msg);
       });
     });
   }

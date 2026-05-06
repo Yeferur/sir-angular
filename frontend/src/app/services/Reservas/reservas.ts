@@ -102,7 +102,7 @@ export class Reservas {
   }
 
   private setupWebSocketListeners() {
-    this.ws.messages$.subscribe(msg => {
+    this.ws.reservationEvents$.subscribe(msg => {
       if (msg.type === 'reservaCreada' || msg.type === 'reservaActualizada' || msg.type === 'reservaEliminada') {
         console.log('📡 Evento de reserva recibido:', msg);
         this.reservaActualizada.set(msg);
@@ -280,6 +280,12 @@ export class Reservas {
 
   eliminarComprobantePagoReserva(Id_Reserva: number | string, Id_Pago: number | string): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/reservas/${Id_Reserva}/pagos/${Id_Pago}/comprobante`);
+  }
+
+  descargarComprobanteSeguro(nombreArchivo: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/reservas/comprobante/${encodeURIComponent(nombreArchivo)}`, {
+      responseType: 'blob',
+    });
   }
 
   cancelarReserva(Id_Reserva: number | string): Observable<any> {

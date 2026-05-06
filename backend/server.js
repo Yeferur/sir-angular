@@ -8,6 +8,25 @@ const http = require('http');
 
 const app = express();
 
+function parseOrigins(value) {
+  return String(value || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+const allowedOrigins = parseOrigins(process.env.CORS_ORIGIN || process.env.FRONTEND_URL);
+const isProduction = process.env.NODE_ENV === 'production';
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (!isProduction) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+};
+
 // ✅ Expose uploads folder as static (for profile photos, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -43,8 +62,9 @@ const transfersRoutes = require('./routes/Transfers/transfers.routes');
 const historialNewRoutes = require('./routes/Historial/historial.routes');
 const permisosRoutes = require('./routes/Permisos/permisos.routes');
 
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_LIMIT || '10mb' }));
 
 app.use('/api', loginRoutes);
 app.use('/api', inicioRoutes);
@@ -74,7 +94,7 @@ const DEFAULT_PORT = Number(process.env.PORT || 4000);
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const server = http.createServer(app);
 
-// ✅ Iniciar WS en el MISMO server
+// ✅ Iniciar WS sobre el mismo servidor HTTP: ws://host:puerto/ws
 const { initWebSocket } = require('./websocket');
 initWebSocket(server);
 

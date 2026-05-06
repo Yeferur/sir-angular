@@ -384,7 +384,7 @@ exports.actualizarUsuario = async (req, res) => {
       conexion: conn,
       tabla: 'usuarios',
       id_registro: id,
-      accion: 'ACTUALIZAR',
+      accion: 'ACTUALIZAR_USUARIO',
       id_usuario: req.user?.id || null,
       detalles: [
         { columna: 'Nombres_Apellidos', anterior: current.Nombres_Apellidos, nuevo: Nombres_Apellidos },
@@ -460,7 +460,7 @@ exports.eliminarUsuario = async (req, res) => {
       conexion: conn,
       tabla: 'usuarios',
       id_registro: id,
-      accion: 'SOFT_DELETE',
+      accion: 'ELIMINAR_USUARIO',
       id_usuario: req.user?.id || null,
       detalles: [
         { columna: 'Activo', anterior: current.Activo, nuevo: 0 },
@@ -570,7 +570,7 @@ exports.crearUsuario = async (req, res) => {
       conexion: conn,
       tabla: 'usuarios',
       id_registro: Id_Usuario,
-      accion: 'CREAR',
+      accion: 'CREAR_USUARIO',
       id_usuario: req.user?.id || null,
       detalles: [
         { columna: 'Id_Usuario', anterior: null, nuevo: Id_Usuario },

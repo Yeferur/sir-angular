@@ -19,6 +19,9 @@
     <div class="dashboard-grid is-loading" aria-hidden="true">
       @for (slot of skeletonCards; track slot) {
       <article class="aforo-card" [style.--animation-order]="slot">
+        <div class="aforo-progress-bar skeleton-progress-bar">
+          <div class="skeleton-progress-fill"></div>
+        </div>
         <header class="aforo-header">
           <div class="tour-title-group">
             <div class="skeleton-shape skeleton-title"></div>
@@ -38,21 +41,25 @@
         </div>
         <footer class="aforo-footer">
           <div class="skeleton-shape skeleton-pill"></div>
+          <div class="skeleton-shape skeleton-footer-dot"></div>
         </footer>
       </article>
       }
 
-      <article class="transfer-card" [style.--animation-order]="skeletonCards.length">
+      <article class="transfer-card transfer-card-skeleton" [style.--animation-order]="skeletonCards.length">
         <header class="aforo-header">
           <div class="tour-title-group">
             <div class="skeleton-shape skeleton-title"></div>
             <div class="skeleton-shape skeleton-subtitle"></div>
           </div>
-          <div class="skeleton-shape skeleton-pill"></div>
+          <div class="skeleton-shape skeleton-transfer-total"></div>
         </header>
         <div class="transfer-body">
           @for (metric of [1,2,3]; track metric) {
-          <div class="skeleton-shape skeleton-row"></div>
+          <div class="transfer-row transfer-row-skeleton">
+            <div class="skeleton-shape skeleton-transfer-label"></div>
+            <div class="skeleton-shape skeleton-transfer-value"></div>
+          </div>
           }
         </div>
       </article>
@@ -256,11 +263,11 @@
 
       <div class="transfer-body">
         <div class="transfer-row">
-          <span class="transfer-label">Hotel → Aeropuerto</span>
+          <span class="transfer-label">Hotel/Aeropuerto</span>
           <strong class="transfer-value">{{ transfersSummary.hotelAeropuerto }}</strong>
         </div>
         <div class="transfer-row">
-          <span class="transfer-label">Aeropuerto → Hotel</span>
+          <span class="transfer-label">Aeropuerto/Hotel</span>
           <strong class="transfer-value">{{ transfersSummary.aeropuertoHotel }}</strong>
         </div>
         <div class="transfer-row">

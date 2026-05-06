@@ -15,7 +15,7 @@
           appFlatpickrInput
           [fpOptions]="fpOptionsFecha"
           [(ngModel)]="fechaSeleccionada"
-          (change)="cargarToursDelDia()"
+          (ngModelChange)="onFechaOperacionChange()"
         />
       </div>
     </div>
@@ -306,6 +306,12 @@
       <div class="editor-title">
         <h3>Editor de Listado</h3>
         <p>{{ tourSeleccionado?.NombreTour }}</p>
+        @if (editorStatusText) {
+        <span class="editor-pill" [class.persisted]="listadoPersistido && !listadoDirty"
+          [class.dirty]="listadoDirty" [class.new]="listadoOrigen === 'nuevo' && !listadoPersistido">
+          {{ editorStatusText }}
+        </span>
+        }
       </div>
       <div class="editor-actions">
         <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
@@ -357,14 +363,14 @@
               </div>
 
               <div class="bus-item-mid">
-                <input class="form-input small" placeholder="Placa" [(ngModel)]="bus.id" />
-                <input class="form-input small" placeholder="Guía" [(ngModel)]="bus.guia" />
+                <input class="form-input small" placeholder="Placa" [(ngModel)]="bus.id" (ngModelChange)="markDirty()" />
+                <input class="form-input small" placeholder="Guía" [(ngModel)]="bus.guia" (ngModelChange)="markDirty()" />
               </div>
 
               <div class="bus-item-bottom">
                 <span>{{ bus.reservas.length }} reservas</span>
                 <div class="bus-actions">
-                  <button class="btn-secondary" (click)="verMapa(bus)">Ver mapa</button>
+                  <button class="btn-secondary" (click)="verMapa(bus, i)">Ver mapa</button>
                   <button class="btn-primary" (click)="descargarListadoBus(i)">Descargar</button>
                 </div>
               </div>

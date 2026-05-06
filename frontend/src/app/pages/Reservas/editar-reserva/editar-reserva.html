@@ -175,7 +175,7 @@
 <div class="booking-dashboard" [formGroup]="form">
   <div class="page-header">
     <div>
-      <h1>Editar Reserva</h1>
+      <h1>Editar Reserva {{ reservaId() || '' }}</h1>
    <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     </div>
   </div>
@@ -198,7 +198,7 @@
             <select class="form-select"
               [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
               formControlName="SelectTour"
-              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar();">
+              (change)="onTourChange()">
               <option value="" disabled>Seleccionar un tour...</option>
 
               @for (tour of tours(); track tour.Id_Tour) {
@@ -232,7 +232,7 @@
             <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
               formControlName="Fecha_Tour"
               [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
-              (change)="onTourChange(); verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+              (change)="onTourChange()" />
 
             @if (form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid) {
             <div class="errorMessage">Selecciona una fecha válida.</div>
@@ -368,15 +368,21 @@
       <div class="form-group">
         <label class="form-label">Adultos</label>
         <input type="number" min="0" class="form-input" [value]="adultosInputValue()"
-          (input)="setCantidadPasajeros('ADULTO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
-          (change)="verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+          [disabled]="isSyncingPassengerCounts()"
+          (input)="onCantidadInputChange('ADULTO', $any($event.target).value)"
+          (blur)="commitCantidadPasajeros('ADULTO')"
+          (keydown.enter)="commitCantidadPasajeros('ADULTO')"
+          (focus)="seleccionarTexto($event)" />
       </div>
 
       <div class="form-group">
         <label class="form-label">Niños</label>
         <input type="number" min="0" class="form-input" [value]="ninosInputValue()"
-          (input)="setCantidadPasajeros('NINO', $any($event.target).value)" (focus)="seleccionarTexto($event)"
-          (change)="verificarCuposDisponibles(); CuposDisponiblesNavbar()" />
+          [disabled]="isSyncingPassengerCounts()"
+          (input)="onCantidadInputChange('NINO', $any($event.target).value)"
+          (blur)="commitCantidadPasajeros('NINO')"
+          (keydown.enter)="commitCantidadPasajeros('NINO')"
+          (focus)="seleccionarTexto($event)" />
 
         @if (isRioClaroTour()) {
         <small class="hint">En Río Claro, los niños deben tener 5 o más años.</small>
@@ -388,7 +394,11 @@
       <div class="form-group">
         <label class="form-label">Infantes</label>
         <input type="number" min="0" class="form-input" [value]="infantesInputValue()"
-          (input)="setCantidadPasajeros('INFANTE', $any($event.target).value)" (focus)="seleccionarTexto($event)" />
+          [disabled]="isSyncingPassengerCounts()"
+          (input)="onCantidadInputChange('INFANTE', $any($event.target).value)"
+          (blur)="commitCantidadPasajeros('INFANTE')"
+          (keydown.enter)="commitCantidadPasajeros('INFANTE')"
+          (focus)="seleccionarTexto($event)" />
       </div>
       }
     </div>
@@ -417,6 +427,16 @@
       <div class="form-group">
         <label class="form-label">DNI/Pasaporte</label>
         <input type="text" class="form-input" formControlName="DNI" />
+        @if (pasajero.get('DNI')?.touched && pasajero.get('DNI')?.errors?.['duplicadoEnFormulario']) {
+        <div class="errorMessage">
+          Este documento está repetido dentro de esta reserva.
+        </div>
+        }
+        @if (pasajero.get('DNI')?.touched && pasajero.get('DNI')?.errors?.['duplicadoEnBd']) {
+        <div class="errorMessage">
+          Este pasajero ya tiene una reserva para la fecha seleccionada.
+        </div>
+        }
       </div>
 
       @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {

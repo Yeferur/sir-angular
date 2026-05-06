@@ -1,11 +1,65 @@
 import { Injectable, NgZone } from '@angular/core';
-import { ReplaySubject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
+
+export type WebSocketEventType =
+  | 'forceLogout'
+  | 'force-logout'
+  | 'logout'
+  | 'selfLogoutCurrentSession'
+  | 'selfLogoutAllSessions'
+  | 'adminForceLogout'
+  | 'usuarios_conectados_actualizados'
+  | 'aforoActualizado'
+  | 'reservaCreada'
+  | 'reservaActualizada'
+  | 'reservaEliminada'
+  | 'transferCreado'
+  | 'transferActualizado'
+  | 'transferEliminado'
+  | 'tourActualizado'
+  | 'puntoActualizado'
+  | 'puntoActualizada'
+  | 'listadoActualizado'
+  | 'catalogoActualizado'
+  | 'monedaActualizada'
+  | 'canalActualizado'
+  | 'rangoTransferActualizado'
+  | 'precioTransferActualizado'
+  | string;
+
+export interface WebSocketEvent<T = any> {
+  type: WebSocketEventType;
+  payload: T;
+  raw: any;
+  receivedAt: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
   private ws: WebSocket | null = null;
 
-  public messages$ = new ReplaySubject<any>(1);
+  private messagesSubject = new Subject<any>();
+  public messages$: Observable<any> = this.messagesSubject.asObservable();
+
+  private eventsSubject = new Subject<WebSocketEvent>();
+  public events$: Observable<WebSocketEvent> = this.eventsSubject.asObservable();
+
+  public readonly systemEvents$ = this.streamForTypes([
+    'forceLogout',
+    'force-logout',
+    'logout',
+    'selfLogoutCurrentSession',
+    'selfLogoutAllSessions',
+    'adminForceLogout'
+  ]);
+  public readonly presenceEvents$ = this.streamForTypes(['usuarios_conectados_actualizados']);
+  public readonly aforoEvents$ = this.streamForTypes(['aforoActualizado']);
+  public readonly reservationEvents$ = this.streamForTypes(['reservaCreada', 'reservaActualizada', 'reservaEliminada']);
+  public readonly transferEvents$ = this.streamForTypes(['transferCreado', 'transferActualizado', 'transferEliminado', 'rangoTransferActualizado', 'precioTransferActualizado']);
+  public readonly tourEvents$ = this.streamForTypes(['tourActualizado']);
+  public readonly pointEvents$ = this.streamForTypes(['puntoActualizado', 'puntoActualizada']);
+  public readonly listingEvents$ = this.streamForTypes(['listadoActualizado']);
+  public readonly catalogEvents$ = this.streamForTypes(['catalogoActualizado', 'monedaActualizada', 'canalActualizado']);
 
   private reconnectTimer: any = null;
   private reconnectAttempts = 0;
@@ -16,6 +70,28 @@ export class WebSocketService {
   private manualClose = false;
 
   constructor(private ngZone: NgZone) {}
+
+  private normalizeEvent(data: any): WebSocketEvent {
+    const type = String(data?.type || '') as WebSocketEventType;
+    return {
+      type,
+      payload: data,
+      raw: data,
+      receivedAt: Date.now(),
+    };
+  }
+
+  private streamForTypes(types: string[]): Observable<any> {
+    return new Observable<any>((subscriber) => {
+      const subscription = this.events$.subscribe((event) => {
+        if (types.includes(String(event.type))) {
+          subscriber.next(event.payload);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    });
+  }
 
   connect(token: string) {
     this.currentToken = token;
@@ -42,7 +118,6 @@ export class WebSocketService {
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('✅ WebSocket conectado:', wsUrl);
       this.reconnectAttempts = 0;
       this.send({ type: 'auth', token });
     };
@@ -69,7 +144,10 @@ export class WebSocketService {
         return;
       }
 
-      this.ngZone.run(() => this.messages$.next(data));
+      this.ngZone.run(() => {
+        this.messagesSubject.next(data);
+        this.eventsSubject.next(this.normalizeEvent(data));
+      });
     };
 
     this.ws.onclose = (e) => {

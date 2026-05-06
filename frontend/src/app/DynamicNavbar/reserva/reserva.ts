@@ -9,8 +9,10 @@ import {
   ChangeDetectorRef,
   SimpleChanges
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { environment } from '../../../environments/environment';
 import { Reservas } from '../../services/Reservas/reservas';
 
 import jsPDF from 'jspdf';
@@ -34,12 +36,36 @@ interface Pasajero {
   Comision?: number | string;
   Fecha?: string;
   Confirmacion?: number;
+  Id_Punto?: number | string | null;
+  Nombre_Punto?: string;
+  HoraSalida?: string;
 }
 
 type ResponsableVM = { nombre: string; telefono: string; CanalReserva: string };
 
+interface PuntoReservaPdf {
+  Id_Punto?: number | string;
+  NombrePunto: string;
+  HoraSalida?: string;
+  Direccion?: string;
+  Referencia?: string;
+  Ruta?: string;
+}
+
+interface ComprobanteReserva {
+  id?: number | string;
+  Id_Pago?: number | string;
+  nombre?: string;
+  filename?: string;
+  url?: string;
+  tipo?: string;
+  fecha?: string;
+  ruta?: string;
+}
+
 interface Reserva {
   Id_Reserva: string;
+  Id_Tour?: number | string;
   Estado?: string;
   NumeroPasajeros?: number;
   TotalNeto?: number;
@@ -54,6 +80,8 @@ interface Reserva {
   CanalReserva?: string;
   Pasajeros?: Pasajero[];
   Pagos?: any[];
+  Puntos?: PuntoReservaPdf[];
+  Comprobantes?: ComprobanteReserva[];
 }
 
 @Component({
@@ -113,29 +141,46 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
   cancelarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id) return;
-    const confirmed = window.confirm(`Cancelar la reserva #${id}? La información se conservará para consulta futura.`);
-    if (!confirmed) return;
-
-    this.api.cancelarReserva(id).subscribe({
-      next: () => {
-        this.navbar.alert.set({
-          type: 'success',
-          title: 'Reserva cancelada',
-          message: `La reserva #${id} quedó en estado Cancelada.`,
-          autoClose: true,
-          autoCloseTime: 3000
-        });
-        this.loadReservaData(id);
-      },
-      error: (err) => {
-        this.navbar.alert.set({
-          type: 'error',
-          title: 'No se pudo cancelar',
-          message: err?.error?.message || err?.message || 'Intenta nuevamente.',
-          autoClose: true,
-          autoCloseTime: 4000
-        });
-      }
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Cancelar reserva',
+      message: `¿Deseas cancelar la reserva #${id}? La información se conservará para consulta futura.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar reserva',
+          style: 'secondary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.api.cancelarReserva(id).subscribe({
+              next: () => {
+                this.navbar.alert.set({
+                  type: 'success',
+                  title: 'Reserva cancelada',
+                  message: `La reserva #${id} quedó en estado Cancelada.`,
+                  autoClose: true,
+                  autoCloseTime: 3000
+                });
+                this.loadReservaData(id);
+              },
+              error: (err) => {
+                this.navbar.alert.set({
+                  type: 'error',
+                  title: 'No se pudo cancelar',
+                  message: err?.error?.message || err?.message || 'Intenta nuevamente.',
+                  autoClose: true,
+                  autoCloseTime: 4000
+                });
+              }
+            });
+          }
+        },
+        {
+          text: 'Cerrar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        }
+      ]
     });
   }
 
@@ -145,45 +190,230 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return { uno: tipos === 1, dos: tipos === 2, tres: tipos === 3 };
   }
 
+  get comprobantesDisponibles(): ComprobanteReserva[] {
+    return this.reserva?.Comprobantes || [];
+  }
+
+  private normalizarTipoPasajero(tipo: any): TipoPasajero {
+    const value = String(tipo ?? '').trim().toUpperCase();
+    if (value === 'ADULTO' || value === 'ADULTOS') return 'Adulto';
+    if (value === 'NINO' || value === 'NIÑO' || value === 'CHILD') return 'Niño';
+    return 'Infante';
+  }
+
+  private formatCurrency(value: any): string {
+    const n = Number(value || 0);
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      maximumFractionDigits: 0
+    }).format(Number.isFinite(n) ? n : 0);
+  }
+
+  private formatDate(value: any): string {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('es-CO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  private ensurePdfSpace(doc: jsPDF & { lastAutoTable?: any }, currentY: number, needed = 30): number {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    if (currentY + needed > pageHeight - 15) {
+      doc.addPage();
+      return 15;
+    }
+    return currentY;
+  }
+
+  private extractFileNameFromPath(pathOrUrl: string): string {
+    const clean = String(pathOrUrl || '').trim().replace(/\\/g, '/').split('?')[0];
+    if (!clean) return '';
+    const last = clean.split('/').pop() || '';
+    return last || '';
+  }
+
+  private resolveFileUrl(pathOrUrl: string): string {
+    const value = String(pathOrUrl || '').trim();
+    if (!value || value.toUpperCase() === 'N/A') return '';
+    if (/^https?:\/\//i.test(value)) return value;
+
+    const fileName = this.extractFileNameFromPath(value);
+    if (!fileName) return '';
+
+    const baseUrl = String(this.api.apiUrl || environment.apiUrl || '').replace(/\/$/, '');
+    return `${baseUrl}/reservas/comprobante/${encodeURIComponent(fileName)}`;
+  }
+
+  private getFileExtensionFromUrl(url: string): string {
+    const clean = String(url || '').trim().split('?')[0];
+    const ext = clean.includes('.') ? clean.split('.').pop() : '';
+    return ext ? `.${ext}` : '';
+  }
+
+  private getExtensionFromMime(mime: string): string {
+    const value = String(mime || '').toLowerCase();
+    if (value.includes('pdf')) return '.pdf';
+    if (value.includes('jpeg') || value.includes('jpg')) return '.jpg';
+    if (value.includes('png')) return '.png';
+    if (value.includes('webp')) return '.webp';
+    return '';
+  }
+
+  private normalizePuntosReserva(base: any): PuntoReservaPdf[] {
+    const raw =
+      base?.Puntos ||
+      base?.puntos ||
+      base?.PuntosEncuentro ||
+      base?.puntosEncuentro ||
+      [];
+
+    if (Array.isArray(raw) && raw.length) {
+      return raw.map((p: any) => ({
+        Id_Punto: p.Id_Punto ?? p.id ?? p.IdPunto,
+        NombrePunto: p.NombrePunto ?? p.PuntoEncuentro ?? p.Nombre_Punto ?? p.nombre ?? '—',
+        HoraSalida: p.HoraSalida ?? p.Hora_Salida ?? p.hora ?? '—',
+        Direccion: p.Direccion ?? p.direccion ?? '',
+        Referencia: p.Referencia ?? p.referencia ?? '',
+        Ruta: p.ruta ?? p.Ruta ?? '',
+      }));
+    }
+
+    const fromPassengers = new Map<string, PuntoReservaPdf>();
+
+    for (const p of base?.Pasajeros || []) {
+      const idPunto = p?.Id_Punto ?? p?.IdPunto ?? null;
+      const nombre = p?.Nombre_Punto ?? p?.NombrePunto ?? p?.PuntoEncuentro ?? '';
+      const hora = p?.HoraSalida ?? p?.Hora_Salida ?? base?.HoraSalida ?? '—';
+
+      if (!nombre && idPunto == null) continue;
+
+      const key = `${idPunto ?? nombre}|${hora}`;
+      if (!fromPassengers.has(key)) {
+        fromPassengers.set(key, {
+          Id_Punto: idPunto ?? undefined,
+          NombrePunto: nombre || '—',
+          HoraSalida: hora || '—',
+          Direccion: p?.Direccion ?? '',
+          Referencia: p?.Referencia ?? '',
+          Ruta: p?.Ruta ?? p?.ruta ?? '',
+        });
+      }
+    }
+
+    if (fromPassengers.size) {
+      return [...fromPassengers.values()];
+    }
+
+    return [{
+      Id_Punto: base?.Id_Punto ?? base?.IdPunto ?? null,
+      NombrePunto: base?.PuntoEncuentro ?? base?.Nombre_Punto ?? '—',
+      HoraSalida: base?.HoraSalida ?? '—',
+      Direccion: base?.Direccion ?? '',
+      Referencia: base?.Referencia ?? '',
+      Ruta: base?.Ruta ?? base?.ruta ?? '',
+    }];
+  }
+
+  private normalizeComprobantes(base: any): ComprobanteReserva[] {
+    const pagos = base?.Pagos || base?.pagos || [];
+    const comprobantes: ComprobanteReserva[] = [];
+
+    for (const pago of pagos) {
+      const rawPath =
+        pago?.Ruta_Comprobante ||
+        pago?.SoporteUrl ||
+        pago?.Comprobante ||
+        pago?.ComprobantePago ||
+        pago?.UrlComprobante ||
+        pago?.url ||
+        pago?.Archivo ||
+        pago?.archivo;
+
+      const url = this.resolveFileUrl(rawPath);
+      const filename = this.extractFileNameFromPath(rawPath || url) || pago?.NombreArchivo || pago?.filename || '';
+
+      if (!rawPath || String(rawPath).trim().toUpperCase() === 'N/A') continue;
+
+      comprobantes.push({
+        id: pago?.Id_Pago ?? pago?.id,
+        Id_Pago: pago?.Id_Pago ?? pago?.id,
+        nombre: pago?.NombreArchivo ?? pago?.filename ?? filename ?? `comprobante-${comprobantes.length + 1}`,
+        filename,
+        url,
+        tipo: pago?.Tipo ?? pago?.TipoPago ?? pago?.FormaPago ?? pago?.tipo,
+        fecha: pago?.Fecha_Pago ?? pago?.FechaPago ?? pago?.fecha,
+        ruta: String(rawPath || ''),
+      });
+    }
+
+    return comprobantes;
+  }
+
   private normalizeApi(data: any) {
-    const hasFlat = !!data?.Id_Reserva;
-    const base = hasFlat
-      ? data
+    const payload = data?.data ?? data?.reserva ?? data;
+    const base = payload?.Id_Reserva
+      ? payload
       : {
-          ...(data?.reserva || {}),
-          Pasajeros: data?.pasajeros || [],
-          Pagos: data?.pagos || [],
+          ...(payload || {}),
+          Pasajeros: payload?.Pasajeros || payload?.pasajeros || [],
+          Pagos: payload?.Pagos || payload?.pagos || [],
         };
+
+    const pasajeros: Pasajero[] = (base.Pasajeros || []).map((p: any) => ({
+      id: p.id ?? p.Id_Pasajero,
+      NombrePasajero: p.NombrePasajero ?? p.Nombre_Pasajero ?? '—',
+      TipoPasajero: this.normalizarTipoPasajero(p.TipoPasajero ?? p.Tipo_Pasajero),
+      IdPas: p.IdPas ?? p.DNI ?? '',
+      TelefonoPasajero: p.TelefonoPasajero ?? p.Telefono_Pasajero ?? '',
+      Precio_Pasajero: p.Precio_Pasajero ?? 0,
+      Comision: p.Comision ?? 0,
+      Fecha: p.Fecha ?? base.FechaReserva ?? base.Fecha_Tour ?? '',
+      Confirmacion: Number(p.Confirmacion ?? 0),
+      Id_Punto: p.Id_Punto ?? p.IdPunto ?? null,
+      Nombre_Punto: p.Nombre_Punto ?? p.NombrePunto ?? p.PuntoEncuentro ?? '',
+      HoraSalida: p.HoraSalida ?? p.Hora_Salida ?? '',
+    }));
 
     const totalNeto = base.TotalNeto != null ? Number(base.TotalNeto) : undefined;
     const pendiente = base.Pendiente != null ? Number(base.Pendiente) : undefined;
+    const puntos = this.normalizePuntosReserva({ ...base, Pasajeros: pasajeros });
+    const comprobantes = this.normalizeComprobantes({ ...base, Pagos: base.Pagos || [] });
 
-    const r = {
-      Id_Reserva: base.Id_Reserva,
+    const r: Reserva = {
+      Id_Reserva: String(base.Id_Reserva ?? ''),
+      Id_Tour: base.Id_Tour ?? base.idTour ?? null,
       Estado: base.Estado ?? 'Pendiente',
-      NumeroPasajeros: (base.Pasajeros || []).length,
+      NumeroPasajeros: pasajeros.length,
       TotalNeto: totalNeto,
       Pendiente: pendiente,
       TourReserva: base.TourReserva ?? base.Nombre_Tour ?? '—',
-      PuntoEncuentro: base.PuntoEncuentro ?? base.Nombre_Punto ?? '—',
+      PuntoEncuentro: base.PuntoEncuentro ?? base.Nombre_Punto ?? puntos[0]?.NombrePunto ?? '—',
       FechaReserva: base.FechaReserva ?? base.Fecha_Tour ?? null,
-      HoraSalida: base.HoraSalida ?? '—',
+      HoraSalida: base.HoraSalida ?? puntos[0]?.HoraSalida ?? '—',
       IdiomaReserva: base.IdiomaReserva ?? base.Idioma_Reserva ?? '—',
       Observaciones: base.Observaciones ?? '',
       Reportante: base.Reportante ?? { Nombre: base.Nombre_Reportante, Telefono: base.Telefono_Reportante },
       CanalReserva: base.CanalReserva ?? base.Nombre_Canal ?? '—',
-      Pasajeros: base.Pasajeros || [],
+      Pasajeros: pasajeros,
       Pagos: base.Pagos || [],
+      Puntos: puntos,
+      Comprobantes: comprobantes,
     };
 
-    const adultos = r.Pasajeros.filter((p: any) => (p.TipoPasajero || p.tipoPasajero) === 'Adulto');
-    const ninos = r.Pasajeros.filter((p: any) => (p.TipoPasajero || p.tipoPasajero) === 'Niño');
-    const infantes = r.Pasajeros.filter((p: any) => (p.TipoPasajero || p.tipoPasajero) === 'Infante');
+    const adultos = pasajeros.filter((p) => p.TipoPasajero === 'Adulto');
+    const ninos = pasajeros.filter((p) => p.TipoPasajero === 'Niño');
+    const infantes = pasajeros.filter((p) => p.TipoPasajero === 'Infante');
 
     const rep = r.Reportante || {};
     const responsable: ResponsableVM = {
-      nombre: rep.Nombre ?? rep.nombre ?? '—',
-      telefono: rep.Telefono ?? rep.telefono ?? '—',
+      nombre: rep.Nombre ?? '—',
+      telefono: rep.Telefono ?? '—',
       CanalReserva: r.CanalReserva ?? '—',
     };
 
@@ -206,52 +436,138 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       error: (err) => {
         console.error('Error al cargar la reserva:', err);
         this.isLoading = false;
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'No se pudo cargar la reserva',
+          message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+          autoClose: true,
+          autoCloseTime: 4000
+        });
+        this.cdr.markForCheck();
       },
     });
+  }
+
+  private getPassengerPointInfo(p: Pasajero): PuntoReservaPdf | null {
+    const idPunto = p.Id_Punto != null ? String(p.Id_Punto) : '';
+    const byId = this.reserva?.Puntos?.find((pto) => {
+      if (pto.Id_Punto == null) return false;
+      return String(pto.Id_Punto) === idPunto;
+    });
+
+    if (byId) return byId;
+
+    if (p.Nombre_Punto || p.HoraSalida) {
+      return {
+        Id_Punto: p.Id_Punto ?? null,
+        NombrePunto: p.Nombre_Punto || '—',
+        HoraSalida: p.HoraSalida || this.reserva?.HoraSalida || '—',
+      };
+    }
+
+    return null;
+  }
+
+  private renderPdfFooter(doc: jsPDF & { lastAutoTable?: any }) {
+    const totalPages = doc.getNumberOfPages();
+    const fechaGeneracion = new Date().toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Este documento confirma los datos registrados de la reserva. Ante cualquier duda, comunícate con Maxitours.', 10, pageHeight - 10, { maxWidth: pageWidth - 20 });
+      doc.text(`Generado por SIR | ${fechaGeneracion}`, 10, pageHeight - 5);
+      doc.text(`Página ${i} de ${totalPages}`, pageWidth - 10, pageHeight - 5, { align: 'right' });
+    }
   }
 
   private buildReservaPdfDoc(): jsPDF & { lastAutoTable?: any } {
     const r = this.reserva;
     const doc = new jsPDF() as jsPDF & { lastAutoTable?: any };
 
-    doc.addImage(logoBase64, 'PNG', 10, 10, 40, 15);
-    doc.setFontSize(18); doc.setTextColor(40, 40, 40);
-    doc.text(`Reserva #${r.Id_Reserva}`, 60, 20);
-    doc.setFontSize(12); doc.setTextColor(90);
-    doc.text(`Estado: ${r.Estado}`, 60, 28);
-    doc.line(10, 35, 200, 35);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 12;
 
-    let lastY = 40;
+    doc.addImage(logoBase64, 'PNG', 10, 10, 36, 14);
+    doc.setFontSize(18);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Confirmación de Reserva', 50, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Reserva #${r?.Id_Reserva || '—'}`, 50, 25);
+    doc.text(`Estado: ${r?.Estado || '—'}`, 50, 31);
+    doc.text(`Generada: ${this.formatDate(new Date())}`, 50, 37);
+    doc.line(10, 42, pageWidth - 10, 42);
 
-    const datos = [
-      ['Pasajeros', r.NumeroPasajeros ?? '—'],
-      ['Tour', r.TourReserva ?? '—'],
-      ['Punto de Encuentro', r.PuntoEncuentro ?? '—'],
-      ['Fecha del Tour',
-        r.FechaReserva
-          ? new Date(r.FechaReserva).toLocaleDateString('es-CO', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })
-          : '—'
-      ],
-      ['Hora de Salida', r.HoraSalida ?? '—'],
-      ['Idioma', r.IdiomaReserva ?? '—'],
-      ['Teléfono', this.responsable.telefono],
-    ];
+    y = 48;
+
+    y = this.ensurePdfSpace(doc, y, 36);
+    doc.setFontSize(12);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Información de la reserva', 10, y);
+    y += 3;
 
     autoTable(doc, {
-      head: [['Datos de la Reserva', '']],
-      body: datos,
-      startY: lastY,
+      startY: y + 2,
+      margin: { left: 10, right: 10 },
       theme: 'grid',
-      styles: { fontSize: 10 },
+      styles: { fontSize: 9, cellPadding: 2, valign: 'top' },
       headStyles: { fillColor: [22, 160, 133], textColor: 255, fontStyle: 'bold' },
+      head: [['Campo', 'Detalle']],
+      body: [
+        ['Reserva', r?.Id_Reserva || '—'],
+        ['Estado', r?.Estado || '—'],
+        ['Tour', r?.TourReserva || '—'],
+        ['Fecha del tour', this.formatDate(r?.FechaReserva)],
+        ['Idioma', r?.IdiomaReserva || '—'],
+        ['Pasajeros', String(r?.NumeroPasajeros ?? 0)],
+        ['Responsable', this.responsable?.nombre || r?.Reportante?.Nombre || '—'],
+        ['Teléfono de contacto', this.responsable?.telefono || r?.Reportante?.Telefono || '—'],
+        ['Canal', this.responsable?.CanalReserva || r?.CanalReserva || '—'],
+      ],
     });
 
-    lastY = (doc.lastAutoTable?.finalY ?? 60) + 10;
+    y = (doc.lastAutoTable?.finalY ?? y) + 8;
+
+    const puntos = this.reserva?.Puntos || [];
+    if (puntos.length) {
+      y = this.ensurePdfSpace(doc, y, 40);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Puntos de encuentro y horarios', 10, y);
+      y += 3;
+
+      autoTable(doc, {
+        startY: y + 2,
+        margin: { left: 10, right: 10 },
+        theme: 'grid',
+        styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
+        head: [[
+          'Punto de encuentro',
+          'Hora de salida',
+          'Dirección / referencia',
+          'Ruta',
+        ]],
+        body: puntos.map((pto) => [
+          pto.NombrePunto || '—',
+          pto.HoraSalida || '—',
+          [pto.Direccion, pto.Referencia].filter(Boolean).join(' · ') || '—',
+          pto.Ruta || '—',
+        ]),
+      });
+
+      y = (doc.lastAutoTable?.finalY ?? y) + 8;
+    }
 
     const todos: Pasajero[] = [
       ...this.pasajeros.adultos,
@@ -260,25 +576,124 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     ];
 
     if (todos.length) {
+      y = this.ensurePdfSpace(doc, y, 48);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Pasajeros', 10, y);
+      y += 3;
+
       autoTable(doc, {
-        startY: lastY,
-        head: [['Nombre', 'Tipo', 'DNI/Pasaporte', 'Teléfono', 'Precio']],
-        body: todos.map((p) => [
-          p.NombrePasajero || '—',
-          p.TipoPasajero || '—',
-          p.IdPas || '—',
-          p.TelefonoPasajero || '—',
-          p.Precio_Pasajero ?? '—',
-        ]),
+        startY: y + 2,
+        margin: { left: 10, right: 10 },
         theme: 'striped',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [52, 73, 94], textColor: 255 },
+        styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
+        head: [[
+          'Nombre',
+          'Tipo',
+          'DNI / Pasaporte',
+          'Teléfono',
+          'Punto',
+          'Hora',
+          'Precio',
+        ]],
+        body: todos.map((p) => {
+          const punto = this.getPassengerPointInfo(p);
+          return [
+            p.NombrePasajero || '—',
+            p.TipoPasajero || '—',
+            p.IdPas || '—',
+            p.TelefonoPasajero || '—',
+            punto?.NombrePunto || p.Nombre_Punto || r?.PuntoEncuentro || '—',
+            punto?.HoraSalida || p.HoraSalida || r?.HoraSalida || '—',
+            this.formatCurrency(p.Precio_Pasajero),
+          ];
+        }),
       });
+
+      y = (doc.lastAutoTable?.finalY ?? y) + 8;
     }
 
-    const fecha = new Date().toLocaleDateString('es-CO');
-    doc.setFontSize(9); doc.setTextColor(120);
-    doc.text(`Generado por SIR – Sistema Integrado de Reservas | ${fecha}`, 10, 290);
+    y = this.ensurePdfSpace(doc, y, 40);
+    doc.setFontSize(12);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Estado de pago', 10, y);
+    y += 3;
+
+    const totalNeto = Number(r?.TotalNeto ?? 0);
+    const pendiente = Number(r?.Pendiente ?? 0);
+    const pagado = Math.max(0, totalNeto - pendiente);
+    const estadoPago = pendiente <= 0 && totalNeto > 0
+      ? 'Pagado'
+      : pagado > 0 && pendiente > 0
+        ? 'Parcial'
+        : totalNeto > 0
+          ? 'Pendiente'
+          : '—';
+
+    autoTable(doc, {
+      startY: y + 2,
+      margin: { left: 10, right: 10 },
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [22, 160, 133], textColor: 255, fontStyle: 'bold' },
+      head: [['Concepto', 'Valor']],
+      body: [
+        ['Total', this.formatCurrency(totalNeto)],
+        ['Pagado', this.formatCurrency(pagado)],
+        ['Pendiente', this.formatCurrency(pendiente)],
+        ['Estado de pago', estadoPago],
+      ],
+    });
+
+    y = (doc.lastAutoTable?.finalY ?? y) + 8;
+
+    const pagos = this.reserva?.Pagos || [];
+    if (pagos.length) {
+      y = this.ensurePdfSpace(doc, y, 36);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Abonos y comprobantes', 10, y);
+      y += 3;
+
+      autoTable(doc, {
+        startY: y + 2,
+        margin: { left: 10, right: 10 },
+        theme: 'grid',
+        styles: { fontSize: 8.4, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
+        head: [[
+          'Fecha',
+          'Método / tipo',
+          'Valor',
+          'Comprobante',
+        ]],
+        body: pagos.map((p: any) => [
+          this.formatDate(p.Fecha_Pago || p.Fecha || p.fecha),
+          p.Tipo || p.TipoPago || p.FormaPago || '—',
+          this.formatCurrency(p.Monto ?? p.monto ?? 0),
+          p.Ruta_Comprobante || p.SoporteUrl ? 'Sí' : 'No',
+        ]),
+      });
+
+      y = (doc.lastAutoTable?.finalY ?? y) + 8;
+    }
+
+    if (r?.Observaciones) {
+      y = this.ensurePdfSpace(doc, y, 28);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Observaciones', 10, y);
+      y += 4;
+
+      doc.setFontSize(9.5);
+      doc.setTextColor(60, 60, 60);
+      const lines = doc.splitTextToSize(String(r.Observaciones), pageWidth - 20);
+      doc.text(lines, 10, y);
+      y += lines.length * 4 + 4;
+    }
+
+    this.renderPdfFooter(doc);
 
     return doc;
   }
@@ -344,6 +759,73 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     });
 
     return blob;
+  }
+
+  async descargarComprobantesReserva(): Promise<void> {
+    const comprobantes = this.comprobantesDisponibles;
+
+    if (!comprobantes.length) {
+      this.navbar.alert.set({
+        type: 'warning',
+        title: 'Sin comprobantes',
+        message: 'Esta reserva no tiene comprobantes asociados.',
+        autoClose: true,
+        autoCloseTime: 3000
+      });
+      return;
+    }
+
+    let descargados = 0;
+    for (let i = 0; i < comprobantes.length; i++) {
+      const ok = await this.descargarComprobante(comprobantes[i], i + 1, { silent: true });
+      if (ok) descargados++;
+    }
+
+    this.navbar.alert.set({
+      type: descargados === comprobantes.length ? 'success' : 'warning',
+      title: descargados === comprobantes.length ? 'Comprobantes descargados' : 'Descarga parcial',
+      message: descargados === comprobantes.length
+        ? `Se descargaron ${descargados} comprobantes de la reserva.`
+        : `Se procesaron ${descargados} de ${comprobantes.length} comprobantes.`,
+      autoClose: true,
+      autoCloseTime: 3500
+    });
+  }
+
+  private async descargarComprobante(
+    comprobante: ComprobanteReserva,
+    index: number,
+    options?: { silent?: boolean }
+  ): Promise<boolean> {
+    const idReserva = this.reserva?.Id_Reserva;
+    const rawName = comprobante.filename || this.extractFileNameFromPath(comprobante.url || comprobante.ruta || '') || '';
+    const archivo = rawName || `comprobante-${index}`;
+
+    try {
+      const blob = await firstValueFrom(this.api.descargarComprobanteSeguro(archivo));
+      const ext = this.getFileExtensionFromUrl(archivo) || this.getExtensionFromMime(blob.type) || '.bin';
+      const filename = `reserva-${idReserva || 'archivo'}-comprobante-${index}${ext}`;
+      this.downloadBlob(blob, filename);
+      return true;
+    } catch (error) {
+      const fallbackUrl = comprobante.url || this.resolveFileUrl(comprobante.ruta || archivo);
+      if (fallbackUrl) {
+        window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+        return true;
+      }
+
+      if (!options?.silent) {
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'Error descargando comprobante',
+          message: 'No fue posible descargar uno de los comprobantes asociados.',
+          autoClose: true,
+          autoCloseTime: 4000
+        });
+      }
+
+      return false;
+    }
   }
 
 

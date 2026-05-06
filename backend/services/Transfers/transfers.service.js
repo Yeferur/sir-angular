@@ -2,6 +2,7 @@ const db = require('../../database/db');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
+const { recordHistorial, logSistema } = require('../Historial/logger');
 
 const COMPROBANTE_TRANSFER_FILE_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -292,7 +293,19 @@ async function crearTransferSvc(payload) {
       }
     }
 
-    // Commit transacción
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'transfers',
+      id_registro: idTransfer,
+      accion: 'CREAR_TRANSFER',
+      id_usuario: payload?.Id_Usuario || payload?.userId || null,
+      detalles: [
+        { columna: 'Nombre_Titular', anterior: null, nuevo: payload.Titular || null },
+        { columna: 'Fecha_Transfer', anterior: null, nuevo: payload.FechaTransfer || null },
+        { columna: 'Estado', anterior: null, nuevo: estadoCalculado }
+      ]
+    });
+
     await conn.commit();
 
     return { success: true, Id_Transfer: idTransfer, Codigo_Transfer: formatoCodigoTransfer(idTransfer), pagos: pagosCreados, message: 'Transfer creado correctamente.' };
@@ -435,9 +448,22 @@ async function getDetalleTransferSvc(Id_Transfer) {
     ORDER BY Fecha_Pago ASC, Id_Pago ASC
   `, [Id_Transfer]);
 
+  const comprobantes = (pagos || [])
+    .filter(pago => pago?.Pago_Comprobante)
+    .map((pago, index) => ({
+      id: pago.Id_Pago ?? index + 1,
+      Id_Pago: pago.Id_Pago,
+      nombre: path.basename(String(pago.Pago_Comprobante || '')) || `comprobante-${index + 1}`,
+      filename: path.basename(String(pago.Pago_Comprobante || '')) || `comprobante-${index + 1}`,
+      url: pago.Pago_Comprobante,
+      tipo: pago.Metodo || 'Comprobante',
+      fecha: pago.Fecha_Pago || null
+    }));
+
   return {
     transfer,
-    pagos: pagos || []
+    pagos: pagos || [],
+    comprobantes
   };
 }
 
@@ -484,6 +510,17 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
       'UPDATE pagos_transfers SET Pago_Comprobante = ? WHERE Id_Pago = ?',
       [rutaComprobante, Id_Pago]
     );
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'transfers',
+      id_registro: Id_Transfer,
+      accion: 'AGREGAR_COMPROBANTE_TRANSFER',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Pago_Comprobante', anterior: rutaAnterior || null, nuevo: rutaNueva || null }
+      ]
+    });
 
     await conn.commit();
     conn.release();
@@ -684,6 +721,19 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       }
     }
 
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'transfers',
+      id_registro: Id_Transfer,
+      accion: 'ACTUALIZAR_TRANSFER',
+      id_usuario: payload?.Id_Usuario || payload?.userId || null,
+      detalles: [
+        { columna: 'Nombre_Titular', anterior: transferActualRows?.[0]?.Nombre_Titular ?? null, nuevo: payload?.Titular || null },
+        { columna: 'Fecha_Transfer', anterior: transferActualRows?.[0]?.Fecha_Transfer ?? null, nuevo: payload?.FechaTransfer || null },
+        { columna: 'Estado', anterior: transferActualRows?.[0]?.Estado ?? null, nuevo: estadoCalculado }
+      ]
+    });
+
     // Commit transacción
     await conn.commit();
 
@@ -710,18 +760,47 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
 }
 
 async function cancelarTransferSvc(Id_Transfer) {
-  const [result] = await db.query(
-    'UPDATE transfers SET Estado = ? WHERE Id_Transfer = ?',
-    ['Cancelado', Id_Transfer]
-  );
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  if (!result.affectedRows) {
-    const err = new Error('Transfer no encontrado');
-    err.status = 404;
-    throw err;
+    const [rows] = await conn.query(
+      'SELECT Estado, Nombre_Titular, Fecha_Transfer FROM transfers WHERE Id_Transfer = ? LIMIT 1 FOR UPDATE',
+      [Id_Transfer]
+    );
+
+    if (!rows.length) {
+      const err = new Error('Transfer no encontrado');
+      err.status = 404;
+      throw err;
+    }
+
+    const estadoAnterior = rows[0].Estado || null;
+    await conn.query(
+      'UPDATE transfers SET Estado = ? WHERE Id_Transfer = ?',
+      ['Cancelado', Id_Transfer]
+    );
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'transfers',
+      id_registro: Id_Transfer,
+      accion: 'CANCELAR_TRANSFER',
+      detalles: [
+        { columna: 'Estado', anterior: estadoAnterior, nuevo: 'Cancelado' },
+        { columna: 'Nombre_Titular', anterior: rows[0].Nombre_Titular ?? null, nuevo: rows[0].Nombre_Titular ?? null },
+        { columna: 'Fecha_Transfer', anterior: rows[0].Fecha_Transfer ?? null, nuevo: rows[0].Fecha_Transfer ?? null }
+      ]
+    });
+
+    await conn.commit();
+    return { Id_Transfer, Codigo_Transfer: formatoCodigoTransfer(Id_Transfer), Estado: 'Cancelado' };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
   }
-
-  return { Id_Transfer, Codigo_Transfer: formatoCodigoTransfer(Id_Transfer), Estado: 'Cancelado' };
 }
 
 async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {

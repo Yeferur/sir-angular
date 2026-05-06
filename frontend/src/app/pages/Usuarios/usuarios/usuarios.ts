@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import type { Usuario } from '../../../services/Usuarios/usuarios';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { AuthService } from '../../../services/Login/login-service';
 
 @Component({
   selector: 'app-usuarios',
@@ -21,6 +22,7 @@ export class Usuarios implements OnInit {
 
   // Search signal
   searchQuery = signal('');
+  currentUserId = signal('');
 
   // Computed filtered list
   filteredUsuarios = computed(() => {
@@ -49,9 +51,14 @@ export class Usuarios implements OnInit {
     return count;
   });
 
-  constructor(private usuariosService: UsuariosService, private navbar: DynamicIslandGlobalService) {
+  constructor(
+    private usuariosService: UsuariosService,
+    private navbar: DynamicIslandGlobalService,
+    private auth: AuthService
+  ) {
     this.usuarios = this.usuariosService.getUsuariosSignal();
     this.estados = this.usuariosService.getEstadosSignal();
+    this.currentUserId.set(String(this.auth.getUser()?.id || ''));
   }
 
   ngOnInit(): void {
@@ -64,7 +71,16 @@ export class Usuarios implements OnInit {
     this.searchQuery.set(val);
   }
 
+  isCurrentUser(userId: string): boolean {
+    return String(this.currentUserId()) === String(userId);
+  }
+
   forzarCierreSesion(userId: string) {
+    if (this.isCurrentUser(userId)) {
+      this.cerrarMisSesiones();
+      return;
+    }
+
     this.navbar.alert.set({
       type: 'warning',
       title: 'Cierre de Sesión',
@@ -96,6 +112,39 @@ export class Usuarios implements OnInit {
         console.error('❌ Error cerrando sesión:', err);
         this.navbar.errorToast('Error', 'Ocurrió un error cerrando la sesión.');
       }
+    });
+  }
+
+  cerrarMisSesiones() {
+    this.navbar.alert.set({
+      type: 'info',
+      title: 'Cerrar sesión en todos mis dispositivos',
+      message: 'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Cerrar sesiones',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.auth.logoutAllSessions().subscribe({
+              next: () => {
+                this.auth.clearLocalSession();
+                this.navbar.successToast('Sesión cerrada', 'Cerraste sesión en todos tus dispositivos.');
+              },
+              error: (err) => {
+                console.error('❌ Error cerrando sesiones en todos los dispositivos:', err);
+                this.auth.clearLocalSession();
+                this.navbar.warningToast('Sesión cerrada', 'No pudimos confirmar el cierre remoto, pero tu sesión local fue cerrada.');
+              }
+            });
+          }
+        }
+      ]
     });
   }
 

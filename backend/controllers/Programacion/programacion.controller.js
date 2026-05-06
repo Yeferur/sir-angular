@@ -1,5 +1,6 @@
 // backend/controllers/Programacion/programacion.controller.inteligente.js
 const cerebro = require('../../services/Programacion/programacion.service');
+const { recordHistorial } = require('../../services/Historial/logger');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 /**
@@ -65,6 +66,22 @@ exports.exportarListadoBusController = async (req, res) => {
         const tourName = nombreTour ? String(nombreTour).replace(/\s+/g, '_') : 'Tour';
         const fileName = `${fecha}_${tourName}_${placa}.xlsx`;
 
+        try {
+            await recordHistorial({
+                tabla: 'programacion',
+                id_registro: `${fecha}|${idTour}|${placa}`,
+                accion: 'EXPORTAR_EXCEL_LISTADO',
+                id_usuario: req.user?.id || null,
+                detalles: [
+                    { columna: 'Fecha', anterior: null, nuevo: fecha },
+                    { columna: 'Id_Tour', anterior: null, nuevo: String(idTour) },
+                    { columna: 'Bus', anterior: null, nuevo: String(bus.id || placa) }
+                ]
+            });
+        } catch (historialError) {
+            console.error('No se pudo registrar historial de exportación de listado:', historialError);
+        }
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.send(buffer);
@@ -108,7 +125,7 @@ exports.guardarListadoFinalController = async (req, res) => {
     }
 
     try {
-        const resultado = await cerebro.guardarListadoFinal({ fecha, idsTours: tours, buses });
+        const resultado = await cerebro.guardarListadoFinal({ fecha, idsTours: tours, buses, userId: req.user?.id || null });
         return sendSuccess(res, { data: resultado, message: 'Listado final guardado correctamente' });
     } catch (error) {
         console.error('Error al guardar listado final:', error);

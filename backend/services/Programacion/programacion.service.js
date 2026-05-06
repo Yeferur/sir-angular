@@ -2,6 +2,7 @@ const db = require('../../database/db'); // Asegúrate de que la ruta a tu conex
 const fs = require('fs').promises;
 const path = require('path');
 const ExcelJS = require('exceljs');
+const { recordHistorial } = require('../Historial/logger');
 
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
@@ -11,6 +12,7 @@ const CONFIG = {
     PUNTO_BASE: { lat: 6.212757856694648, lon: -75.57759200491337, NombrePunto: 'Punto Base' },
     GRAFO_PATH: 'grafo_antioquia.json',
 };
+const ORDEN_RUTAS_EMPRESA = [0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 7, 8, 9, 14];
 
 // =================================================================
 // --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
@@ -30,7 +32,10 @@ async function obtenerReservas(fecha, idsTours) {
             MIN(p.Id_Punto) AS Id_Punto,
             MIN(pt.Nombre_Punto) AS NombrePunto,
             MIN(pt.Latitud) AS Latitud,
-            MIN(pt.Longitud) AS Longitud
+            MIN(pt.Longitud) AS Longitud,
+            MIN(pt.ruta) AS ruta,
+            MIN(pt.posicion) AS ordenRuta,
+            MIN(pt.posicion) AS Posicion
         FROM reservas r
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -49,6 +54,10 @@ async function obtenerReservas(fecha, idsTours) {
             NumeroPasajeros: parseInt(r.NumeroPasajeros, 10),
             Latitud: r.Latitud !== null && r.Latitud !== undefined ? Number(r.Latitud) : null,
             Longitud: r.Longitud !== null && r.Longitud !== undefined ? Number(r.Longitud) : null,
+            ruta: r.ruta || null,
+            ordenRuta: r.ordenRuta !== null && r.ordenRuta !== undefined ? Number(r.ordenRuta) : null,
+            Orden_Ruta: r.ordenRuta !== null && r.ordenRuta !== undefined ? Number(r.ordenRuta) : null,
+            Posicion: r.Posicion !== null && r.Posicion !== undefined ? Number(r.Posicion) : null,
         }));
     } catch (error) {
         console.error("Error al obtener reservas:", error);
@@ -56,96 +65,417 @@ async function obtenerReservas(fecha, idsTours) {
     }
 }
 
-function calcularDistancia(lat1, lon1, lat2, lon2) {
-    const tieneCoords = (v) => Number.isFinite(Number(v));
-    if (!tieneCoords(lat1) || !tieneCoords(lon1) || !tieneCoords(lat2) || !tieneCoords(lon2)) {
-        return Number.MAX_VALUE;
-    }
+function getPointKey(reserva) {
+    const id = reserva.Id_Punto || reserva.idPunto || reserva.IdPunto;
+    if (id) return `punto-${id}`;
+    const nombre = String(reserva.NombrePunto || reserva.PuntoEncuentro || 'SIN_PUNTO').trim().toUpperCase();
+    return `nombre-${nombre || 'SIN_PUNTO'}`;
+}
+
+function hasValidCoords(item) {
+    const lat = Number(item.Latitud);
+    const lon = Number(item.Longitud);
+    return Number.isFinite(lat) && Number.isFinite(lon);
+}
+
+function haversineKm(a, b) {
+    if (!hasValidCoords(a) || !hasValidCoords(b)) return Number.POSITIVE_INFINITY;
 
     const toRad = (deg) => (Number(deg) * Math.PI) / 180;
+    const lat1 = Number(a.Latitud);
+    const lon1 = Number(a.Longitud);
+    const lat2 = Number(b.Latitud);
+    const lon2 = Number(b.Longitud);
     const R = 6371;
-    const dLat = toRad(Number(lat2) - Number(lat1));
-    const dLon = toRad(Number(lon2) - Number(lon1));
-    const a =
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const x =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
     return R * c;
+}
+
+function normalizeRoute(value) {
+    const ruta = String(value ?? '').trim().toUpperCase();
+    return ruta && ruta !== 'PENDIENTE' ? ruta : '';
+}
+
+function getRouteRank(ruta) {
+    const raw = String(ruta ?? '').trim();
+    if (!raw) return Number.MAX_SAFE_INTEGER;
+
+    const match = raw.match(/\d+/);
+    const routeNumber = match ? Number(match[0]) : Number(raw);
+    if (!Number.isFinite(routeNumber)) return Number.MAX_SAFE_INTEGER;
+
+    const idx = ORDEN_RUTAS_EMPRESA.indexOf(routeNumber);
+    return idx === -1 ? Number.MAX_SAFE_INTEGER - 1 : idx;
+}
+
+function getRouteDistanceRank(a, b) {
+    const ra = getRouteRank(a?.ruta ?? a);
+    const rb = getRouteRank(b?.ruta ?? b);
+    const unknownLimit = Number.MAX_SAFE_INTEGER - 1;
+
+    if (ra >= unknownLimit || rb >= unknownLimit) return 999;
+    return Math.abs(ra - rb);
+}
+
+function getRouteOrder(reserva) {
+    const raw = reserva.Orden_Ruta ?? reserva.ordenRuta ?? reserva.Posicion ?? reserva.Orden ?? null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+}
+
+function getReservationPax(reserva) {
+    const n = Number(reserva.NumeroPasajeros || 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function chooseSmallestCapacity(totalPax) {
+    return CONFIG.CAPACIDADES_BUSES.find(capacidad => totalPax <= capacidad) || null;
+}
+
+function groupReservationsByPoint(reservas) {
+    const stopsMap = new Map();
+
+    for (let index = 0; index < reservas.length; index++) {
+        const reserva = reservas[index];
+        const key = getPointKey(reserva);
+        if (!stopsMap.has(key)) {
+            stopsMap.set(key, {
+                key,
+                Id_Punto: reserva.Id_Punto || reserva.idPunto || reserva.IdPunto || null,
+                NombrePunto: reserva.NombrePunto || reserva.PuntoEncuentro || 'SIN_PUNTO',
+                ruta: normalizeRoute(reserva.ruta ?? reserva.Ruta),
+                ordenRuta: getRouteOrder(reserva),
+                Latitud: reserva.Latitud !== null && reserva.Latitud !== undefined ? Number(reserva.Latitud) : null,
+                Longitud: reserva.Longitud !== null && reserva.Longitud !== undefined ? Number(reserva.Longitud) : null,
+                reservas: [],
+                totalPax: 0,
+                originalIndex: index
+            });
+        }
+
+        const stop = stopsMap.get(key);
+        stop.reservas.push({ ...reserva, __ordenOriginal: index });
+        stop.totalPax += getReservationPax(reserva);
+
+        if (!stop.ruta) stop.ruta = normalizeRoute(reserva.ruta ?? reserva.Ruta);
+        if (stop.ordenRuta === null) stop.ordenRuta = getRouteOrder(reserva);
+        if (!hasValidCoords(stop) && hasValidCoords(reserva)) {
+            stop.Latitud = Number(reserva.Latitud);
+            stop.Longitud = Number(reserva.Longitud);
+        }
+    }
+
+    return Array.from(stopsMap.values());
+}
+
+function stableStopCompare(a, b) {
+    const rutaA = normalizeRoute(a.ruta);
+    const rutaB = normalizeRoute(b.ruta);
+    const rankA = getRouteRank(rutaA);
+    const rankB = getRouteRank(rutaB);
+
+    if (rankA !== rankB) return rankA - rankB;
+
+    const ordenA = getRouteOrder(a);
+    const ordenB = getRouteOrder(b);
+    if (ordenA !== null && ordenB !== null && ordenA !== ordenB) return ordenA - ordenB;
+    if (ordenA !== null && ordenB === null) return -1;
+    if (ordenA === null && ordenB !== null) return 1;
+
+    return (a.originalIndex || 0) - (b.originalIndex || 0);
+}
+
+function nearestNeighborOrder(stops) {
+    const pendientes = [...stops].sort(stableStopCompare);
+    const ordenadas = [];
+    let actual = pendientes.shift();
+
+    while (actual) {
+        ordenadas.push(actual);
+        if (!pendientes.length) break;
+
+        let mejorIdx = 0;
+        let mejorScore = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < pendientes.length; i++) {
+            const candidata = pendientes[i];
+            const distancia = haversineKm(actual, candidata);
+            const mismaRuta = normalizeRoute(actual.ruta) && normalizeRoute(actual.ruta) === normalizeRoute(candidata.ruta);
+            const distanciaRuta = getRouteDistanceRank(actual, candidata);
+            const ordenActual = getRouteOrder(actual);
+            const ordenCandidato = getRouteOrder(candidata);
+            const continuidad = ordenActual !== null && ordenCandidato !== null ? Math.abs(ordenCandidato - ordenActual) : 99;
+            const score =
+                (Number.isFinite(distancia) ? distancia : 20) -
+                (mismaRuta ? 8 : 0) +
+                Math.min(distanciaRuta, 10) * 0.75 +
+                Math.min(continuidad, 10) * 0.2;
+            if (score < mejorScore) {
+                mejorScore = score;
+                mejorIdx = i;
+            }
+        }
+
+        actual = pendientes.splice(mejorIdx, 1)[0];
+    }
+
+    return ordenadas;
+}
+
+function sortStopsByRouteThenGeo(stops) {
+    if (!Array.isArray(stops) || stops.length <= 1) return stops || [];
+
+    const ordered = [...stops].sort(stableStopCompare);
+    const todasConRutaOrden = ordered.every(stop => normalizeRoute(stop.ruta) && getRouteOrder(stop) !== null);
+    const rutas = new Set(ordered.map(stop => normalizeRoute(stop.ruta)).filter(Boolean));
+
+    if (todasConRutaOrden && rutas.size === 1) return ordered;
+
+    const porRuta = new Map();
+    const sinRuta = [];
+    for (const stop of ordered) {
+        const ruta = normalizeRoute(stop.ruta);
+        if (!ruta) {
+            sinRuta.push(stop);
+            continue;
+        }
+        if (!porRuta.has(ruta)) porRuta.set(ruta, []);
+        porRuta.get(ruta).push(stop);
+    }
+
+    const bloques = Array.from(porRuta.keys())
+        .sort((a, b) => getRouteRank(a) - getRouteRank(b))
+        .map(ruta => {
+            const bloque = porRuta.get(ruta);
+            const conOrden = bloque.every(stop => getRouteOrder(stop) !== null);
+            return conOrden ? bloque.sort(stableStopCompare) : nearestNeighborOrder(bloque);
+        });
+
+    return bloques.flat().concat(nearestNeighborOrder(sinRuta));
+}
+
+function sortBusReservations(bus) {
+    const stops = sortStopsByRouteThenGeo(groupReservationsByPoint(bus.reservas || []));
+    return stops.flatMap(stop => stop.reservas.sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0)));
+}
+
+function estimateRouteKm(stops) {
+    const ordenadas = sortStopsByRouteThenGeo(stops || []);
+    let total = 0;
+
+    for (let i = 1; i < ordenadas.length; i++) {
+        const distancia = haversineKm(ordenadas[i - 1], ordenadas[i]);
+        if (Number.isFinite(distancia)) total += distancia;
+    }
+
+    return Number(total.toFixed(2));
+}
+
+function minDistanceToGroup(stop, groupStops) {
+    let min = Number.POSITIVE_INFINITY;
+    for (const groupStop of groupStops) {
+        const distancia = haversineKm(stop, groupStop);
+        if (distancia < min) min = distancia;
+    }
+    return min;
+}
+
+function scoreCandidateStop({ stop, groupStops, totalPax, maxCapacity }) {
+    const lastStop = groupStops[groupStops.length - 1];
+    const distanceToLast = haversineKm(lastStop, stop);
+    const minDistance = minDistanceToGroup(stop, groupStops);
+    const distancia = Number.isFinite(distanceToLast) ? distanceToLast : minDistance;
+    const rutaStop = normalizeRoute(stop.ruta);
+    const rutasGrupo = new Set(groupStops.map(s => normalizeRoute(s.ruta)).filter(Boolean));
+    const mismaRuta = rutaStop && rutasGrupo.has(rutaStop);
+    const mezclaRutas = rutaStop && rutasGrupo.size > 0 && !mismaRuta;
+    const routeDistance = Math.min(...groupStops.map(groupStop => getRouteDistanceRank(stop, groupStop)));
+    const ordenStop = getRouteOrder(stop);
+    const ordenLast = getRouteOrder(lastStop);
+    const continuidad = ordenStop !== null && ordenLast !== null ? Math.abs(ordenStop - ordenLast) : null;
+    const ocupacion = (totalPax + stop.totalPax) / maxCapacity;
+
+    let score = Number.isFinite(distancia) ? distancia : 10;
+    if (distancia > 2 && distancia <= 5) score += 2;
+    if (distancia > 6) score += 10;
+    if (!Number.isFinite(distancia)) score += 6;
+    if (mismaRuta) {
+        score -= 100;
+    } else if (routeDistance <= 1) {
+        score += 8;
+    } else if (routeDistance <= 3) {
+        score += 18;
+    } else if (routeDistance < 999) {
+        score += 35;
+    }
+    if (mismaRuta && continuidad !== null) score -= Math.max(0, 5 - Math.min(continuidad, 5));
+    if (mezclaRutas) score += 5;
+    score -= ocupacion * 3;
+
+    return {
+        score,
+        distancia: Number.isFinite(distancia) ? distancia : null,
+        mismaRuta,
+        mezclaRutas,
+        routeDistance
+    };
+}
+
+function canMixStop({ stop, groupStops, scoreInfo }) {
+    if (scoreInfo.mismaRuta) return true;
+    if (scoreInfo.routeDistance <= 1) return true;
+    if (scoreInfo.distancia === null) return true;
+    if (scoreInfo.routeDistance <= 3 && scoreInfo.distancia <= 6) return true;
+    if (scoreInfo.distancia <= 2) return true;
+
+    const hasRouteContext = normalizeRoute(stop.ruta) && groupStops.some(s => normalizeRoute(s.ruta));
+    return !hasRouteContext && scoreInfo.distancia <= 8;
+}
+
+function splitOversizedStops(stops, maxCapacity, reservasSinAsignar) {
+    const result = [];
+    for (const stop of stops) {
+        if (stop.totalPax <= maxCapacity) {
+            result.push(stop);
+            continue;
+        }
+
+        let chunk = { ...stop, key: `${stop.key}-chunk-1`, reservas: [], totalPax: 0 };
+        let chunkIndex = 1;
+
+        for (const reserva of stop.reservas) {
+            const pax = getReservationPax(reserva);
+            if (pax > maxCapacity) {
+                reservasSinAsignar.push({ ...reserva, motivoNoAsignacion: 'SUPERA_CAPACIDAD_MAXIMA' });
+                continue;
+            }
+
+            if (chunk.reservas.length && chunk.totalPax + pax > maxCapacity) {
+                result.push(chunk);
+                chunkIndex += 1;
+                chunk = { ...stop, key: `${stop.key}-chunk-${chunkIndex}`, reservas: [], totalPax: 0 };
+            }
+
+            chunk.reservas.push(reserva);
+            chunk.totalPax += pax;
+        }
+
+        if (chunk.reservas.length) result.push(chunk);
+    }
+
+    return result;
+}
+
+function buildBusFromStops(stops, contadorBus) {
+    const ordenadas = sortStopsByRouteThenGeo(stops);
+    const reservas = ordenadas.flatMap(stop => stop.reservas.sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0)));
+    const ocupados = reservas.reduce((sum, r) => sum + getReservationPax(r), 0);
+    return {
+        id: `Bus ${contadorBus}`,
+        capacidad: chooseSmallestCapacity(ocupados) || CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1],
+        ocupados,
+        reservas: reservas.map(({ __ordenOriginal, ...reserva }) => reserva),
+        recorridoKm: estimateRouteKm(ordenadas),
+        guia: '',
+        __stops: ordenadas
+    };
+}
+
+function tryMergeSmallBuses(buses) {
+    const maxCapacity = CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1];
+    let changed = true;
+
+    while (changed) {
+        changed = false;
+        outer:
+        for (let i = 0; i < buses.length; i++) {
+            for (let j = i + 1; j < buses.length; j++) {
+                const a = buses[i];
+                const b = buses[j];
+                const totalPax = a.ocupados + b.ocupados;
+                if (totalPax > maxCapacity) continue;
+
+                const stopsA = a.__stops || groupReservationsByPoint(a.reservas);
+                const stopsB = b.__stops || groupReservationsByPoint(b.reservas);
+                const distancia = Math.min(...stopsB.map(stop => minDistanceToGroup(stop, stopsA)));
+                const compartenRuta = stopsA.some(sa => stopsB.some(sb => normalizeRoute(sa.ruta) && normalizeRoute(sa.ruta) === normalizeRoute(sb.ruta)));
+                const distanciaRuta = Math.min(...stopsB.map(stopB => Math.min(...stopsA.map(stopA => getRouteDistanceRank(stopA, stopB)))));
+                const puedeFusionar = compartenRuta || distanciaRuta <= 1 || !Number.isFinite(distancia) || distancia <= 5;
+                if (!puedeFusionar) continue;
+
+                const fusionado = buildBusFromStops(stopsA.concat(stopsB), i + 1);
+                buses[i] = fusionado;
+                buses.splice(j, 1);
+                changed = true;
+                break outer;
+            }
+        }
+    }
+
+    return buses.map((bus, index) => ({ ...bus, id: `Bus ${index + 1}` }));
+}
+
+// TODO: integrar routeEngine cuando /ruta-optima exponga una funcion estable para distancia entre puntos.
+// TODO: reemplazar Haversine por distancia de grafo cuando graph JSON este listo y no sea obligatorio para generar listados.
+async function getDistanceKmBetweenStops(a, b) {
+    return haversineKm(a, b);
 }
 
 async function generarPlanLogistico(fecha, idsTours) {
     try {
         const reservas = await obtenerReservas(fecha, idsTours);
-        const reservasPendientes = [...reservas];
-        if (reservasPendientes.length === 0) return [];
+        if (reservas.length === 0) return { buses: [], reservasSinAsignar: [] };
 
+        const maxCapacity = CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1];
+        const reservasSinAsignar = [];
+        const stopsIniciales = groupReservationsByPoint(reservas);
+        const stops = sortStopsByRouteThenGeo(splitOversizedStops(stopsIniciales, maxCapacity, reservasSinAsignar));
+        const pendientes = [...stops];
         const buses = [];
-        let contadorBus = 1;
-        const CAPACIDAD_BUS = 38;
 
-        while (reservasPendientes.length > 0) {
-            let idxSemilla = 0;
-            for (let i = 1; i < reservasPendientes.length; i++) {
-                const paxActual = Number(reservasPendientes[i].NumeroPasajeros || 0);
-                const paxSemilla = Number(reservasPendientes[idxSemilla].NumeroPasajeros || 0);
-                if (paxActual > paxSemilla) {
-                    idxSemilla = i;
-                }
-            }
+        while (pendientes.length > 0) {
+            const semilla = pendientes.shift();
+            const groupStops = [semilla];
+            let totalPax = semilla.totalPax;
 
-            const [reservaSemilla] = reservasPendientes.splice(idxSemilla, 1);
-            const nuevoBus = {
-                id: `Bus ${contadorBus}`,
-                capacidad: CAPACIDAD_BUS,
-                ocupados: Number(reservaSemilla.NumeroPasajeros || 0),
-                reservas: [reservaSemilla],
-                guia: ''
-            };
-
-            let referencia = reservaSemilla;
-
-            while (nuevoBus.ocupados < CAPACIDAD_BUS) {
-                const espacioRestante = CAPACIDAD_BUS - nuevoBus.ocupados;
+            while (totalPax < maxCapacity && pendientes.length > 0) {
                 let mejorIdx = -1;
-                let mejorDistancia = Number.MAX_VALUE;
-                let mejorPax = -1;
+                let mejorScore = Number.POSITIVE_INFINITY;
 
-                for (let i = 0; i < reservasPendientes.length; i++) {
-                    const candidata = reservasPendientes[i];
-                    const pax = Number(candidata.NumeroPasajeros || 0);
-                    if (pax > espacioRestante) continue;
+                for (let i = 0; i < pendientes.length; i++) {
+                    const stop = pendientes[i];
+                    if (totalPax + stop.totalPax > maxCapacity) continue;
 
-                    const distancia = calcularDistancia(
-                        referencia.Latitud,
-                        referencia.Longitud,
-                        candidata.Latitud,
-                        candidata.Longitud
-                    );
-
-                    if (
-                        distancia < mejorDistancia ||
-                        (distancia === mejorDistancia && pax > mejorPax)
-                    ) {
-                        mejorDistancia = distancia;
-                        mejorPax = pax;
+                    const scoreInfo = scoreCandidateStop({ stop, groupStops, totalPax, maxCapacity });
+                    if (!canMixStop({ stop, groupStops, scoreInfo })) continue;
+                    if (scoreInfo.score < mejorScore) {
+                        mejorScore = scoreInfo.score;
                         mejorIdx = i;
                     }
                 }
 
-                if (mejorIdx === -1) break;
+                if (mejorIdx === -1 || mejorScore > 18) break;
 
-                const [reservaSeleccionada] = reservasPendientes.splice(mejorIdx, 1);
-                nuevoBus.reservas.push(reservaSeleccionada);
-                nuevoBus.ocupados += Number(reservaSeleccionada.NumeroPasajeros || 0);
-                referencia = reservaSeleccionada;
+                const [seleccionado] = pendientes.splice(mejorIdx, 1);
+                groupStops.push(seleccionado);
+                totalPax += seleccionado.totalPax;
             }
 
-            buses.push(nuevoBus);
-            contadorBus += 1;
+            buses.push(buildBusFromStops(groupStops, buses.length + 1));
         }
 
-        return buses;
+        const busesOptimizados = tryMergeSmallBuses(buses)
+            .map(({ __stops, ...bus }) => ({
+                ...bus,
+                reservas: sortBusReservations(bus).map(({ __ordenOriginal, ...reserva }) => reserva),
+            }));
+
+        return { buses: busesOptimizados, reservasSinAsignar };
 
     } catch (error) {
         console.error("Fallo crítico en la generación del plan logístico:", error);
@@ -153,7 +483,7 @@ async function generarPlanLogistico(fecha, idsTours) {
     }
 }
 
-async function guardarListadoFinal({ fecha, idsTours, buses }) {
+async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
     if (!fecha || !idsTours || !Array.isArray(buses)) {
         throw new Error('Datos inválidos para guardar el listado.');
     }
@@ -237,6 +567,20 @@ async function guardarListadoFinal({ fecha, idsTours, buses }) {
             );
         }
 
+        await recordHistorial({
+            conexion: conn,
+            tabla: 'programacion',
+            id_registro: `${fecha}|${tours.join(',')}`,
+            accion: 'GUARDAR_LISTADO',
+            id_usuario: userId,
+            detalles: [
+                { columna: 'Fecha', anterior: null, nuevo: fecha },
+                { columna: 'Tours', anterior: null, nuevo: tours.join(',') },
+                { columna: 'Buses', anterior: null, nuevo: String(buses.length) },
+                { columna: 'Reservas_Actualizadas', anterior: null, nuevo: String(reservasActualizadas) }
+            ]
+        });
+
         await conn.commit();
         return { ok: true, buses: buses.length, reservas: reservasActualizadas };
     } catch (error) {
@@ -291,7 +635,13 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
     const buses = busesRows.map((row, index) => {
         const placa = row.Placa_Bus ? String(row.Placa_Bus).trim() : `Bus ${index + 1}`;
         const reservasBus = reservasPorPlaca.get(placa) || [];
-        reservasBus.sort((a, b) => (a.Orden_Ruta || 0) - (b.Orden_Ruta || 0));
+        reservasBus.sort((a, b) => {
+            const ordenA = a.Orden_Ruta !== null && a.Orden_Ruta !== undefined ? Number(a.Orden_Ruta) : Number.MAX_SAFE_INTEGER;
+            const ordenB = b.Orden_Ruta !== null && b.Orden_Ruta !== undefined ? Number(b.Orden_Ruta) : Number.MAX_SAFE_INTEGER;
+            if (ordenA !== ordenB) return ordenA - ordenB;
+            return 0;
+        });
+        const stopsBus = groupReservationsByPoint(reservasBus);
 
         const ocupados = reservasBus.reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
 
@@ -300,7 +650,7 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
             capacidad: Number(row.Capacidad || 0),
             ocupados,
             reservas: reservasBus,
-            recorridoKm: 0,
+            recorridoKm: estimateRouteKm(stopsBus),
             guia: row.Guia || ''
         };
     });
@@ -526,7 +876,12 @@ async function obtenerReservasConPlaca(fecha, idsTours) {
              r.Placa_Bus, r.Orden_Ruta,
              COUNT(p.Id_Pasajero) AS NumeroPasajeros,
              MIN(p.Id_Punto) AS Id_Punto,
-             MIN(pt.Latitud) AS Latitud, MIN(pt.Longitud) AS Longitud, MIN(pt.Nombre_Punto) AS NombrePunto
+             MIN(pt.Latitud) AS Latitud,
+             MIN(pt.Longitud) AS Longitud,
+             MIN(pt.Nombre_Punto) AS NombrePunto,
+             MIN(pt.ruta) AS ruta,
+             MIN(pt.posicion) AS ordenRuta,
+             MIN(pt.posicion) AS Posicion
         FROM reservas r
         LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
         JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -544,7 +899,10 @@ async function obtenerReservasConPlaca(fecha, idsTours) {
             Latitud: r.Latitud ? parseFloat(r.Latitud) : null,
             Longitud: r.Longitud ? parseFloat(r.Longitud) : null,
             Placa_Bus: r.Placa_Bus ? String(r.Placa_Bus).trim() : null,
-            Orden_Ruta: r.Orden_Ruta ? Number(r.Orden_Ruta) : null
+            Orden_Ruta: r.Orden_Ruta ? Number(r.Orden_Ruta) : null,
+            ruta: r.ruta || null,
+            ordenRuta: r.ordenRuta !== null && r.ordenRuta !== undefined ? Number(r.ordenRuta) : null,
+            Posicion: r.Posicion !== null && r.Posicion !== undefined ? Number(r.Posicion) : null
         }));
     } catch (error) {
         console.error("Error al obtener reservas con placa:", error);

@@ -7,7 +7,7 @@
     <div class="dynamic-island"
          [attr.role]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'dialog' : null"
          [attr.aria-modal]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'true' : null"
-         [attr.aria-label]="islandState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'sugerencias' ? 'Sugerencias' : islandState() === 'panel' ? 'Panel' : null">
+         [attr.aria-label]="islandState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'panel' ? 'Panel' : null">
         <div class="island-content">
             @if (islandState() === 'compact') {
             <div class="activity-content">
@@ -57,21 +57,6 @@
             @if (islandState() === 'mapa' && mapa()) {
             <div class="activity-content">
                 <app-mapa [puntos]="mapa()" (onClose)="clearPuntos()" />
-            </div>
-            }
-
-            @if (islandState() === 'sugerencias' && sugerencias()) {
-            <div class="activity-content">
-                <app-combinaciones [tour]="sugerencias()?.tour" [sugerencias]="sugerencias()?.sugerencias"
-                    [flotaManual]="sugerencias()?.flotaManual"
-                    (onSeleccionarSugerencia)="seleccionarSugerenciaDesdeNavbar($event)"
-                    (onGenerarManual)="generarManual($event)" (onClose)="clearCombinaciones()" />
-            </div>
-            }
-
-            @if (islandState() === 'preview' && preview()) {
-            <div class="activity-content">
-                <app-preview [rawUrl]="preview()" [title]="previewTitle()"></app-preview>
             </div>
             }
 

@@ -106,10 +106,11 @@
 }
 
 .navbar-container[data-state="cupos"] .dynamic-island {
-  width: clamp(320px, 95vw, 350px);
-  height: 120px;
-  border-radius: 30px;
+  width: clamp(300px, 92vw, 360px);
+  height: 128px;
+  border-radius: 24px;
   top: 0;
+  padding: 0;
 }
 
 .navbar-container[data-state="alert"] .dynamic-island {

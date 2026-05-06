@@ -110,19 +110,16 @@ async function reordenarPuntosRuta(rutaInput, idsOrdenados, userId = null) {
 
     await compactarRuta(conn, ruta);
 
-    await conn.commit();
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'puntos',
+      id_registro: 0,
+      accion: 'REORDENAR_RUTA',
+      id_usuario: userId,
+      detalles: [{ columna: 'ruta', anterior: null, nuevo: ruta }]
+    });
 
-    try {
-      await recordHistorial({
-        tabla: 'puntos',
-        id_registro: 0,
-        accion: 'REORDENAR_RUTA',
-        id_usuario: userId,
-        detalles: [{ columna: 'ruta', anterior: null, nuevo: ruta }]
-      });
-    } catch (err) {
-      console.error('Failed historial reordenarPuntosRuta:', err);
-    }
+    await conn.commit();
 
     return { ok: true, ruta, total: finalOrder.length };
   } catch (e) {
@@ -236,19 +233,16 @@ async function actualizarOrdenPuntosRuta(rutaInput, ordenItems, userId = null) {
     );
 
     await compactarRuta(conn, ruta);
-    await conn.commit();
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'puntos',
+      id_registro: 0,
+      accion: 'REORDENAR_RUTA',
+      id_usuario: userId,
+      detalles: [{ columna: 'ruta', anterior: null, nuevo: ruta }]
+    });
 
-    try {
-      await recordHistorial({
-        tabla: 'puntos',
-        id_registro: 0,
-        accion: 'REORDENAR_RUTA',
-        id_usuario: userId,
-        detalles: [{ columna: 'ruta', anterior: null, nuevo: ruta }]
-      });
-    } catch (err) {
-      console.error('Failed historial actualizarOrdenPuntosRuta:', err);
-    }
+    await conn.commit();
 
     return { ok: true, ruta, total: finalOrder.length };
   } catch (e) {
@@ -473,7 +467,7 @@ async function crearPunto(punto, userId = null) {
       await recordHistorial({
         tabla: 'puntos',
         id_registro: result.insertId,
-        accion: 'CREAR',
+        accion: 'CREAR_PUNTO',
         id_usuario: userId,
         detalles: [
           { columna: 'Nombre_Punto', anterior: null, nuevo: punto.Nombre_Punto || punto.NombrePunto },
@@ -627,19 +621,15 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
       }
     }
 
-    await conn.commit();
+    const detalles = [
+      { columna: 'Nombre_Punto', anterior: prev.Nombre_Punto, nuevo: punto.Nombre_Punto || punto.NombrePunto },
+      { columna: 'Sector', anterior: prev.Sector, nuevo: punto.Sector || null },
+      { columna: 'Direccion', anterior: prev.Direccion, nuevo: punto.Direccion || null },
+      { columna: 'ruta', anterior: prev.ruta, nuevo: rutaNueva }
+    ];
+    await recordHistorial({ conexion: conn, tabla: 'puntos', id_registro: Id_Punto, accion: 'ACTUALIZAR_PUNTO', id_usuario: userId, detalles });
 
-    try {
-      const detalles = [
-        { columna: 'Nombre_Punto', anterior: prev.Nombre_Punto, nuevo: punto.Nombre_Punto || punto.NombrePunto },
-        { columna: 'Sector', anterior: prev.Sector, nuevo: punto.Sector || null },
-        { columna: 'Direccion', anterior: prev.Direccion, nuevo: punto.Direccion || null },
-        { columna: 'ruta', anterior: prev.ruta, nuevo: rutaNueva }
-      ];
-      await recordHistorial({ conexion: conn, tabla: 'puntos', id_registro: Id_Punto, accion: 'ACTUALIZAR', id_usuario: userId, detalles });
-    } catch (errRec) {
-      console.error('Failed to write historial for actualizarPunto:', errRec);
-    }
+    await conn.commit();
   } catch (e) {
     await conn.rollback();
     try { await logSistema({ mensaje: `actualizarPunto error: ${e.message || e}`, meta: { Id_Punto, punto } }); } catch (_) {}
@@ -670,18 +660,14 @@ async function eliminarPunto(Id_Punto, userId = null) {
 
     await compactarRuta(conn, ruta);
 
-    await conn.commit();
+    const detalles = [
+      { columna: 'Nombre_Punto', anterior: prev.Nombre_Punto, nuevo: null },
+      { columna: 'Direccion', anterior: prev.Direccion, nuevo: null },
+      { columna: 'ruta', anterior: prev.ruta, nuevo: null }
+    ];
+    await recordHistorial({ conexion: conn, tabla: 'puntos', id_registro: Id_Punto, accion: 'ELIMINAR_PUNTO', id_usuario: userId, detalles });
 
-    try {
-      const detalles = [
-        { columna: 'Nombre_Punto', anterior: prev.Nombre_Punto, nuevo: null },
-        { columna: 'Direccion', anterior: prev.Direccion, nuevo: null },
-        { columna: 'ruta', anterior: prev.ruta, nuevo: null }
-      ];
-      await recordHistorial({ conexion: conn, tabla: 'puntos', id_registro: Id_Punto, accion: 'ELIMINAR', id_usuario: userId, detalles });
-    } catch (errRec) {
-      console.error('Failed to write historial for eliminarPunto:', errRec);
-    }
+    await conn.commit();
 
     return result;
   } catch (e) {

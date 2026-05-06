@@ -171,3 +171,8 @@
   animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   animation-delay: 0.25s;
 }
+
+.forgot-password-link:hover,
+.forgot-password-link:focus-visible {
+  text-decoration: underline;
+}

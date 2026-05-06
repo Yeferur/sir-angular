@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, from, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DynamicIslandGlobalService } from '../DynamicNavbar/global';
 import { jwtDecode } from 'jwt-decode';
@@ -21,12 +21,17 @@ interface LoginResponse {
   menu?: MenuItem[];
 }
 
+interface GenericMessageResponse {
+  message: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   public apiUrl = environment.apiUrl;
-  private loggedIn$ = new BehaviorSubject<boolean>(this.hasToken());
+  private loggedIn$ = new BehaviorSubject<boolean>(false);
+  private sessionBootstrapping$ = new BehaviorSubject<boolean>(false);
   private logoutTimer: any;
 
   constructor(
@@ -39,68 +44,123 @@ export class AuthService {
 
   login(username: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.apiUrl}/login`, { username, password }).pipe(
-      tap(response => {
-        // ✅ token
-        this.setSession(response.token);
-
-        // ✅ permisos + menú inmediato (sin refresh)
-        this.permisosService.setSessionData(
-          response.permisos || [],
-          response.menu || []
-        );
-      })
+      switchMap((response) => from(this.prepareSession(response)))
     );
   }
 
-  private setSession(token: string) {
-    localStorage.setItem('token', token);
-    const payload = this.decodeToken(token);
+  forgotPassword(email: string): Observable<GenericMessageResponse> {
+    return this.http.post<GenericMessageResponse>(`${this.apiUrl}/auth/forgot-password`, { email });
+  }
 
-    if (payload?.exp) {
-      const expiresInMs = (payload.exp * 1000) - Date.now();
-      if (this.logoutTimer) clearTimeout(this.logoutTimer);
+  resetPassword(token: string, password: string): Observable<GenericMessageResponse> {
+    return this.http.post<GenericMessageResponse>(`${this.apiUrl}/auth/reset-password`, { token, password });
+  }
 
-      this.logoutTimer = setTimeout(() => {
-        this.logout();
-      }, expiresInMs);
+private setSession(token: string) {
+  localStorage.setItem('token', token);
+  const payload = this.decodeToken(token);
+
+  if (payload?.exp) {
+    const expiresInMs = (payload.exp * 1000) - Date.now();
+
+    if (this.logoutTimer) {
+      clearTimeout(this.logoutTimer);
     }
 
-    this.loggedIn$.next(true);
+    if (expiresInMs <= 0) {
+      this.logout();
+      return;
+    }
+
+    const MAX_SAFE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+    const timeoutMs = Math.min(expiresInMs, MAX_SAFE_TIMEOUT_MS);
+
+    this.logoutTimer = setTimeout(() => {
+      const currentToken = this.getToken();
+      const currentPayload = currentToken ? this.decodeToken(currentToken) : null;
+
+      if (!currentPayload?.exp || Date.now() >= currentPayload.exp * 1000) {
+        this.logout();
+        return;
+      }
+
+      this.setSession(currentToken);
+    }, timeoutMs);
+  }
+}
+
+  private async prepareSession(response: LoginResponse): Promise<LoginResponse> {
+    const token = response?.token;
+    if (!token) {
+      throw new Error('SESSION_PREPARATION_FAILED');
+    }
+
+    this.sessionBootstrapping$.next(true);
+
+    try {
+      this.setSession(token);
+
+      this.permisosService.setSessionData(
+        response.permisos || [],
+        response.menu || []
+      );
+
+      const loaded = await this.permisosService.loadSessionData({ token });
+      if (!loaded) {
+        throw new Error('SESSION_PREPARATION_FAILED');
+      }
+
+      this.loggedIn$.next(true);
+      return response;
+    } catch (error) {
+      this.clearLocalSession();
+      throw error;
+    } finally {
+      this.sessionBootstrapping$.next(false);
+    }
   }
 
   logout(): void {
+    if (!this.getToken()) {
+      this.clearLocalSession();
+      return;
+    }
+
     this.logoutRequest().subscribe({
-      next: () => this.clearSession(),
-      error: () => this.clearSession()
+      next: () => this.clearLocalSession(),
+      error: () => this.clearLocalSession()
     });
   }
 
   private logoutRequest(): Observable<any> {
-    const token = this.getToken();
-    if (!token) {
+    if (!this.getToken()) {
       return new Observable(observer => observer.complete());
     }
 
-    const userId = this.getUser()?.id;
-    if (!userId) {
-      return new Observable(observer => {
-        observer.error('No se pudo obtener userId del token.');
-        observer.complete();
-      });
-    }
-
-    return this.http.post(`${this.apiUrl}/logout`, { userId }, {
+    return this.http.post(`${this.apiUrl}/logout`, {}, {
       headers: this.getAuthHeaders()
     });
   }
 
-  private clearSession() {
+  logoutAllSessions(): Observable<GenericMessageResponse> {
+    if (!this.getToken()) {
+      return new Observable<GenericMessageResponse>(observer => observer.complete());
+    }
+
+    return this.http.post<GenericMessageResponse>(`${this.apiUrl}/logout/all`, {}, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  clearLocalSession() {
     localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
 
     // ✅ limpiar permisos + menú también
     this.permisosService.limpiarPermisos();
 
     this.loggedIn$.next(false);
+    this.sessionBootstrapping$.next(false);
     this.navbar.mode.set('login');
 
     if (this.logoutTimer) clearTimeout(this.logoutTimer);
@@ -110,12 +170,16 @@ export class AuthService {
     return this.loggedIn$.asObservable();
   }
 
+  isSessionBootstrapping(): Observable<boolean> {
+    return this.sessionBootstrapping$.asObservable();
+  }
+
   private hasToken(): boolean {
-    return !!localStorage.getItem('token');
+    return !!this.getToken();
   }
 
   getToken(): string | null {
-    return localStorage.getItem('token');
+    return localStorage.getItem('token') || localStorage.getItem('auth_token');
   }
 
   getUser(): JwtPayload | null {
@@ -137,17 +201,27 @@ export class AuthService {
     if (token) {
       const payload = this.decodeToken(token);
       if (payload?.exp && Date.now() < payload.exp * 1000) {
-        this.setSession(token);
-
-        // ✅ rehidratar permisos/menu de storage o backend
-        // rápido: storage
-        this.permisosService.cargarPermisosDesdeLocalStorage();
-
-        // si quieres refrescar desde backend:
-        // this.permisosService.loadSessionData({ token }).catch(() => {});
+        void this.restoreSessionFromToken(token);
       } else {
-        this.clearSession();
+        this.clearLocalSession();
       }
+    }
+  }
+
+  private async restoreSessionFromToken(token: string): Promise<void> {
+    this.sessionBootstrapping$.next(true);
+
+    try {
+      this.setSession(token);
+      const loaded = await this.permisosService.loadSessionData({ token });
+      if (!loaded) {
+        throw new Error('SESSION_PREPARATION_FAILED');
+      }
+      this.loggedIn$.next(true);
+    } catch (error) {
+      this.clearLocalSession();
+    } finally {
+      this.sessionBootstrapping$.next(false);
     }
   }
 

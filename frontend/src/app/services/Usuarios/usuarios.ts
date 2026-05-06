@@ -30,9 +30,8 @@ export class UsuariosService {
     this.loadUsuariosYEstados();
 
     // Escuchar WebSocket
-    this.ws.messages$.subscribe(msg => {
+    this.ws.presenceEvents$.subscribe(msg => {
       if (msg.type === 'usuarios_conectados_actualizados') {
-        console.log('📨 Mensaje WebSocket recibido:', msg);
         this.actualizarEstados(msg);
       }
     });
@@ -57,8 +56,6 @@ export class UsuariosService {
         const enWebSocket = usuariosWS.includes(id);
         const enDB = sesionesDBActuales.has(id);
 
-        console.log('id', id, '| enWebSocket:', enWebSocket, '| enDB:', enDB);
-
         if (enWebSocket && enDB) {
           nuevosEstados.set(id, 'activa');
         } else if (!enWebSocket && enDB) {
@@ -67,8 +64,6 @@ export class UsuariosService {
           nuevosEstados.set(id, 'cerrada');
         }
       }
-
-      console.log('✅ Nuevo Map de estados:', nuevosEstados);
       this.estados.set(nuevosEstados);
     });
   }

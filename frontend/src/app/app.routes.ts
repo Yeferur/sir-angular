@@ -4,6 +4,16 @@ import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
+    path: 'forgot-password',
+    loadComponent: () => import('./pages/Auth/forgot-password/forgot-password').then((m) => m.ForgotPasswordPageComponent),
+    title: 'SIR · Recuperar contraseña',
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () => import('./pages/Auth/reset-password/reset-password').then((m) => m.ResetPasswordPageComponent),
+    title: 'SIR · Restablecer contraseña',
+  },
+  {
     path: '',
     loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
     data: { preload: true },

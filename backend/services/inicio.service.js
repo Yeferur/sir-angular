@@ -176,11 +176,9 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
     const [[tourRow]] = await conn.query('SELECT Nombre_Tour FROM tours WHERE Id_Tour = ?', [Id_Tour]);
     const Nombre_Tour = tourRow?.Nombre_Tour || '';
 
-    await conn.commit();
+    await recordHistorial({ conexion: conn, tabla: 'aforos', id_registro: Id_Tour, accion: 'CAMBIAR_AFORO_TOUR', id_usuario: userId, detalles: [{ columna: 'Fecha_Aforo', anterior: null, nuevo: Fecha }, { columna: 'Cupo', anterior: previoCupo, nuevo: NuevoCupo }] });
 
-    try {
-      await recordHistorial({ conexion: conn, tabla: 'aforos', id_registro: Id_Tour, accion: 'CREAR_O_ACTUALIZAR', id_usuario: userId, detalles: [{ columna: 'Fecha_Aforo', anterior: null, nuevo: Fecha }, { columna: 'Cupo', anterior: previoCupo, nuevo: NuevoCupo }] });
-    } catch (errRec) { console.error('Failed to write historial for guardarAforo:', errRec); }
+    await conn.commit();
 
     // 4. Emitir evento WebSocket a los usuarios activos (después del commit)
     try {

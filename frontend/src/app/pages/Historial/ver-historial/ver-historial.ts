@@ -52,7 +52,26 @@ export class VerHistorialComponent implements OnInit {
     'LOGIN',
     'LOGOUT',
     'EXPORT',
-    'IMPORT'
+    'IMPORT',
+    'CREAR_RESERVA',
+    'DUPLICAR_RESERVA',
+    'ACTUALIZAR_RESERVA',
+    'CANCELAR_RESERVA',
+    'CREAR_TRANSFER',
+    'ACTUALIZAR_TRANSFER',
+    'CANCELAR_TRANSFER',
+    'CREAR_TOUR',
+    'ACTUALIZAR_TOUR',
+    'CREAR_PUNTO',
+    'ACTUALIZAR_PUNTO',
+    'GUARDAR_LISTADO',
+    'EXPORTAR_EXCEL_LISTADO',
+    'CREAR_USUARIO',
+    'ACTUALIZAR_USUARIO',
+    'LOGOUT_ALL_SESSIONS',
+    'FORCE_LOGOUT_USER',
+    'PASSWORD_RESET_REQUEST',
+    'PASSWORD_CHANGED_BY_RESET'
   ]);
 
   tablasAfectadas = signal<string[]>([
@@ -62,7 +81,8 @@ export class VerHistorialComponent implements OnInit {
     'transfers',
     'puntos',
     'programacion',
-    'aforos'
+    'aforos',
+    'sesiones'
   ]);
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
@@ -326,7 +346,27 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       LOGIN: '#007bff',
       LOGOUT: '#6c757d',
       EXPORT: '#20c997',
-      IMPORT: '#6610f2'
+      IMPORT: '#6610f2',
+      CREAR_RESERVA: '#28a745',
+      DUPLICAR_RESERVA: '#0a84ff',
+      ACTUALIZAR_RESERVA: '#ffc107',
+      CANCELAR_RESERVA: '#dc3545',
+      CREAR_TRANSFER: '#28a745',
+      ACTUALIZAR_TRANSFER: '#ffc107',
+      CANCELAR_TRANSFER: '#dc3545',
+      CREAR_TOUR: '#28a745',
+      ACTUALIZAR_TOUR: '#ffc107',
+      CREAR_PUNTO: '#28a745',
+      ACTUALIZAR_PUNTO: '#ffc107',
+      GUARDAR_LISTADO: '#17a2b8',
+      EXPORTAR_EXCEL_LISTADO: '#20c997',
+      CREAR_USUARIO: '#28a745',
+      ACTUALIZAR_USUARIO: '#ffc107',
+      LOGOUT_ALL_SESSIONS: '#6c757d',
+      FORCE_LOGOUT_USER: '#dc3545',
+      PASSWORD_RESET_REQUEST: '#17a2b8',
+      PASSWORD_CHANGED_BY_RESET: '#28a745',
+      CAMBIAR_AFORO_TOUR: '#17a2b8'
     };
     return colors[accion] || '#6c757d';
   }
@@ -340,13 +380,48 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       LOGIN: 'Iniciar Sesión',
       LOGOUT: 'Cerrar Sesión',
       EXPORT: 'Exportar',
-      IMPORT: 'Importar'
+      IMPORT: 'Importar',
+      CREAR_RESERVA: 'Crear reserva',
+      DUPLICAR_RESERVA: 'Duplicar reserva',
+      ACTUALIZAR_RESERVA: 'Actualizar reserva',
+      CANCELAR_RESERVA: 'Cancelar reserva',
+      CREAR_TRANSFER: 'Crear transfer',
+      ACTUALIZAR_TRANSFER: 'Actualizar transfer',
+      CANCELAR_TRANSFER: 'Cancelar transfer',
+      CREAR_TOUR: 'Crear tour',
+      ACTUALIZAR_TOUR: 'Actualizar tour',
+      CREAR_PUNTO: 'Crear punto',
+      ACTUALIZAR_PUNTO: 'Actualizar punto',
+      GUARDAR_LISTADO: 'Guardar listado',
+      EXPORTAR_EXCEL_LISTADO: 'Exportar listado Excel',
+      CREAR_USUARIO: 'Crear usuario',
+      ACTUALIZAR_USUARIO: 'Actualizar usuario',
+      LOGOUT_ALL_SESSIONS: 'Cerrar todas mis sesiones',
+      FORCE_LOGOUT_USER: 'Forzar cierre de sesión',
+      PASSWORD_RESET_REQUEST: 'Solicitar restablecimiento',
+      PASSWORD_CHANGED_BY_RESET: 'Cambiar contraseña',
+      CAMBIAR_AFORO_TOUR: 'Cambiar aforo'
     };
-    return labels[accion] || accion;
+    if (labels[accion]) {
+      return labels[accion];
+    }
+
+    return String(accion || '')
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (match) => match.toUpperCase());
   }
 
   getAccionClass(accion: string): string {
-    return (accion || '').toLowerCase();
+    const raw = String(accion || '').toUpperCase();
+    if (raw.startsWith('CREAR_') || raw === 'CREATE' || raw === 'DUPLICAR_RESERVA') return 'create';
+    if (raw.startsWith('ACTUALIZAR_') || raw.startsWith('CAMBIAR_') || raw === 'UPDATE') return 'update';
+    if (raw.startsWith('ELIMINAR_') || raw.startsWith('CANCELAR_') || raw.startsWith('DESACTIVAR_') || raw === 'DELETE') return 'delete';
+    if (raw.startsWith('EXPORTAR_') || raw === 'EXPORT') return 'export';
+    if (raw.startsWith('IMPORTAR_') || raw === 'IMPORT') return 'import';
+    if (raw === 'LOGIN') return 'login';
+    if (raw === 'LOGOUT' || raw === 'LOGOUT_ALL_SESSIONS' || raw === 'FORCE_LOGOUT_USER') return 'logout';
+    return raw.toLowerCase().replace(/_/g, '-');
   }
 
   // TODO: Revisar en una pasada posterior la lógica completa del historial y los logs del sistema

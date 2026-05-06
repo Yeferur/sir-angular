@@ -77,8 +77,56 @@ async function getHistorial(filters = {}) {
 
   const [rows] = await db.query(query, params);
 
+  const idsHistorial = rows.map((row) => row.Id_Historial).filter(Boolean);
+  let detalles = [];
+  if (idsHistorial.length) {
+    const placeholders = idsHistorial.map(() => '?').join(',');
+    const [detalleRows] = await db.query(
+      `SELECT Id_Historial, Columna, Valor_Anterior, Valor_Nuevo
+         FROM detalle_historial
+        WHERE Id_Historial IN (${placeholders})
+        ORDER BY Id_Historial ASC, Id_Detalle ASC`,
+      idsHistorial
+    );
+    detalles = detalleRows || [];
+  }
+
+  const detalleMap = new Map();
+  for (const detalle of detalles) {
+    const key = Number(detalle.Id_Historial);
+    if (!detalleMap.has(key)) detalleMap.set(key, []);
+    detalleMap.get(key).push({
+      columna: detalle.Columna,
+      anterior: detalle.Valor_Anterior,
+      nuevo: detalle.Valor_Nuevo,
+    });
+  }
+
+  const buildDescripcion = (accion, tabla, detalleList) => {
+    if (!Array.isArray(detalleList) || detalleList.length === 0) {
+      return `${accion} sobre ${tabla}`;
+    }
+
+    const partes = detalleList.slice(0, 4).map((d) => {
+      const anterior = d.anterior == null || d.anterior === '' ? '—' : String(d.anterior);
+      const nuevo = d.nuevo == null || d.nuevo === '' ? '—' : String(d.nuevo);
+      return `${d.columna}: ${anterior} → ${nuevo}`;
+    });
+
+    return partes.join(' · ');
+  };
+
+  const rowsWithDetails = rows.map((row) => {
+    const detalleList = detalleMap.get(Number(row.Id_Historial)) || [];
+    return {
+      ...row,
+      Descripcion: buildDescripcion(row.Tipo_Accion, row.Tabla_Afectada, detalleList),
+      Detalles: detalleList,
+    };
+  });
+
   return {
-    data: rows,
+    data: rowsWithDetails,
     total,
     page: parseInt(page),
     limit: parseInt(limit),

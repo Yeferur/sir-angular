@@ -7,7 +7,7 @@
   max-width: 1100px;
   margin: 36px auto 72px;
   padding: 0 24px;
-  animation: pageEnter .35s ease both;
+  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
 /* =========================================================

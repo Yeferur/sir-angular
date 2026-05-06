@@ -13,13 +13,18 @@
 export interface Reserva {
   Id_Reserva: string;
   NumeroPasajeros: number;
-  Id_Punto: number | string;
+  Id_Punto: number | string | null;
+  idPunto?: number | string | null;
+  IdPunto?: number | string | null;
   NombrePunto: string;
+  PuntoEncuentro?: string;
   Posicion: number;
-  Latitud: string;
-  Longitud: string;
+  Latitud: string | number | null;
+  Longitud: string | number | null;
   Placa_Bus?: string | null;
   Orden_Ruta?: number | null;
+  ordenRuta?: number | null;
+  ruta?: string | null;
 }
 
 /**

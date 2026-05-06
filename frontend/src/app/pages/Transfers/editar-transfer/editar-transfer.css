@@ -9,7 +9,7 @@
   gap: 30px;
   max-width: 1350px;
   margin: auto;
-  animation: fadeIn 0.5s ease;
+  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
   padding-top: 20px;
   margin-bottom: 50px;
 }
@@ -34,18 +34,6 @@
   margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: .95rem;
-}
-
-.duplicate-banner {
-  margin: 0 0 20px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  border: 1px solid rgba(10, 132, 255, 0.24);
-  background: linear-gradient(180deg, rgba(10, 132, 255, 0.12), rgba(10, 132, 255, 0.08));
-  color: var(--text-primary);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
-  line-height: 1.55;
-  font-size: 0.95rem;
 }
 
 .main-content {
@@ -191,15 +179,15 @@ input[type=number] {
 /* =========================================================
    LOADING / ANIMATION
    ========================================================= */
-@keyframes fadeIn {
+@keyframes pageEnter {
   from {
     opacity: 0;
-    transform: scale(.98);
+    transform: translateY(12px);
   }
 
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -370,24 +358,6 @@ input[type=number] {
   opacity: .55;
   cursor: not-allowed;
   transform: none;
-}
-
-.btn-duplicate {
-  width: 100%;
-  border: none;
-  border-radius: 14px;
-  background: var(--warning-color);
-  color: #1a1a1a;
-  font-size: 0.98rem;
-  font-weight: 700;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
-}
-
-.btn-duplicate:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 15, 15, 0.08);
 }
 
 /* ---------------- Estados ---------------- */

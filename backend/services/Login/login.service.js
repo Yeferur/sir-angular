@@ -1,9 +1,13 @@
 // backend/services/Login/login.service.js
+const crypto = require('crypto');
 const db = require('../../database/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const permisosService = require('../Permisos/permisos.service');
 const wsManager = require('../../websocketManager');
+
+const PASSWORD_HASH_ROUNDS = 10;
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
 
 /**
  * Buscar usuario por username/email/id
@@ -14,6 +18,124 @@ async function findUserByUsername(username) {
     [username, username, username]
   );
   return rows[0];
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function generatePasswordResetToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashPasswordResetToken(token) {
+  return crypto.createHash('sha256').update(String(token || '').trim()).digest('hex');
+}
+
+async function withTransaction(work) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await work(conn);
+    await conn.commit();
+    return result;
+  } catch (error) {
+    try {
+      await conn.rollback();
+    } catch (rollbackError) {
+      console.error('rollback error:', rollbackError);
+    }
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function findUserByEmail(email, executor = db) {
+  const normalizedEmail = normalizeEmail(email);
+  const [rows] = await executor.query(
+    `SELECT Id_Usuario, Nombres_Apellidos, Usuario, Correo, Activo
+     FROM usuarios
+     WHERE Activo = 1 AND LOWER(Correo) = LOWER(?)
+     LIMIT 1`,
+    [normalizedEmail]
+  );
+  return rows[0] || null;
+}
+
+async function createPasswordResetTokenForEmail(email) {
+  return withTransaction(async (conn) => {
+    const user = await findUserByEmail(email, conn);
+
+    if (!user) {
+      return { user: null, rawToken: null, expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES };
+    }
+
+    await conn.query(
+      'DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL',
+      [user.Id_Usuario]
+    );
+
+    const rawToken = generatePasswordResetToken();
+    const tokenHash = hashPasswordResetToken(rawToken);
+
+    await conn.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, used_at, created_at)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL, NOW())`,
+      [user.Id_Usuario, tokenHash, PASSWORD_RESET_TOKEN_TTL_MINUTES]
+    );
+
+    return { user, rawToken, expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES };
+  });
+}
+
+async function resetPasswordWithToken(rawToken, password) {
+  const tokenHash = hashPasswordResetToken(rawToken);
+
+  return withTransaction(async (conn) => {
+    const [rows] = await conn.query(
+      `SELECT id, user_id
+       FROM password_reset_tokens
+       WHERE token_hash = ?
+         AND used_at IS NULL
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [tokenHash]
+    );
+
+    const tokenRow = rows[0];
+    if (!tokenRow) {
+      return null;
+    }
+
+    const passwordHash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
+
+    await conn.query(
+      'UPDATE usuarios SET Contrasena = ?, Fecha_Actualizacion = NOW() WHERE Id_Usuario = ?',
+      [passwordHash, tokenRow.user_id]
+    );
+
+    await conn.query(
+      'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?',
+      [tokenRow.id]
+    );
+
+    await conn.query(
+      'DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL AND id <> ?',
+      [tokenRow.user_id, tokenRow.id]
+    );
+
+    await conn.query(
+      'DELETE FROM sesiones WHERE Id_Usuario = ?',
+      [tokenRow.user_id]
+    );
+
+    wsManager.sendLogoutAllSessions(tokenRow.user_id, 'password_reset');
+
+    return { userId: tokenRow.user_id };
+  });
 }
 
 /**
@@ -27,6 +149,9 @@ async function comparePasswords(password, hash) {
  * Generar token JWT
  */
 function generateToken(user) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET no configurado');
+  }
   return jwt.sign(
     {
       id: user.Id_Usuario,
@@ -36,7 +161,7 @@ function generateToken(user) {
       role: user.Rol
     },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 }
 
@@ -44,34 +169,63 @@ function generateToken(user) {
  * Guardar la sesión en base de datos
  */
 async function saveSession(userId, token) {
+  const sessionDays = Number(process.env.SESSION_EXPIRES_DAYS || 7);
   await db.query(
     `INSERT INTO sesiones (Id_Usuario, Token, Fecha_Inicio, Fecha_Expira)
-     VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))`,
-    [userId, token]
+     VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? DAY))`,
+    [userId, token, sessionDays]
   );
 }
 
-/**
- * Cierra todas las sesiones de un usuario, notifica y desconecta WS.
- * - isForced=true: cierre remoto/forzado
- * - isForced=false: logout normal del mismo usuario
- */
-async function logoutUserById(userId, isForced = false) {
-  const uid = Number(userId);
-
-  // 1) eliminar sesiones
-  await db.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [uid]);
-
-  // 2) avisar y desconectar websockets del usuario (todas sus pestañas)
-  if (isForced) {
-    wsManager.sendForceLogout(uid, 'sesion_cerrada_remotamente');
-  } else {
-    // logout normal: también puedes cerrar todas sus pestañas si quieres
-    wsManager.sendForceLogout(uid, 'logout');
+async function logoutCurrentSession(token) {
+  const sessionToken = String(token || '').trim();
+  if (!sessionToken) {
+    return 0;
   }
 
-  // 3) refrescar conectados
+  const [result] = await db.query(
+    'DELETE FROM sesiones WHERE Token = ?',
+    [sessionToken]
+  );
+
+  wsManager.sendSessionLogout(sessionToken, 'self_logout_current_session');
   await wsManager.broadcastActiveUsers();
+  return result?.affectedRows || 0;
+}
+
+async function logoutAllSessionsForUser(userId, options = {}) {
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) {
+    return 0;
+  }
+  const {
+    eventType = 'selfLogoutAllSessions',
+    reason = 'self_logout_all_sessions',
+  } = options;
+
+  const [result] = await db.query(
+    'DELETE FROM sesiones WHERE Id_Usuario = ?',
+    [uid]
+  );
+
+  if (eventType === 'forceLogout') {
+    wsManager.sendForceLogout(uid, reason);
+  } else if (eventType === 'selfLogoutAllSessions') {
+    wsManager.sendLogoutAllSessions(uid, reason);
+  }
+
+  await wsManager.broadcastActiveUsers();
+  return result?.affectedRows || 0;
+}
+
+/**
+ * Cierra todas las sesiones de un usuario. Se deja como wrapper compatible.
+ */
+async function logoutUserById(userId, isForced = false) {
+  return logoutAllSessionsForUser(userId, {
+    eventType: isForced ? 'forceLogout' : 'selfLogoutAllSessions',
+    reason: isForced ? 'admin_force_logout' : 'self_logout_all_sessions'
+  });
 }
 
 // Obtener usuario por ID
@@ -107,10 +261,17 @@ async function getPermisosYMenu(userId) {
 
 module.exports = {
   findUserByUsername,
+  findUserByEmail,
   comparePasswords,
   generateToken,
   saveSession,
+  logoutCurrentSession,
+  logoutAllSessionsForUser,
   logoutUserById,
   getUserById,
-  getPermisosYMenu
+  getPermisosYMenu,
+  createPasswordResetTokenForEmail,
+  resetPasswordWithToken,
+  hashPasswordResetToken,
+  generatePasswordResetToken
 };

@@ -229,16 +229,11 @@ async function crearTour(data, userId = null) {
     // 4) Disponibilidad + Temporadas
     const disponibilidad = await guardarDisponibilidadYTemporadas(conn, nuevoIdTour, data);
 
+    await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: nuevoIdTour, accion: 'CREAR_TOUR', id_usuario: userId, detalles: [
+      { columna: 'Nombre_Tour', anterior: null, nuevo: Nombre_Tour },
+      { columna: 'Abreviacion', anterior: null, nuevo: Abreviacion }
+    ] });
     await conn.commit();
-    // record historial (inside same transaction)
-    try {
-      await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: nuevoIdTour, accion: 'CREAR', id_usuario: userId, detalles: [
-        { columna: 'Nombre_Tour', anterior: null, nuevo: Nombre_Tour },
-        { columna: 'Abreviacion', anterior: null, nuevo: Abreviacion }
-      ] });
-    } catch (errRec) {
-      console.error('Failed to write historial for crearTour:', errRec);
-    }
 
     return { success: true, Id_Tour: nuevoIdTour, disponibilidad };
   } catch (e) {
@@ -304,10 +299,8 @@ async function upsertPreciosTour(Id_Tour, Id_Plan, Id_Moneda, preciosMap, userId
       }
     }
 
+    await recordHistorial({ conexion: conn, tabla: 'tour_precios', id_registro: Id_Tour, accion: 'UPSERT_PRECIOS', id_usuario: userId, detalles: [{ columna: 'Id_Plan', anterior: null, nuevo: Id_Plan }, { columna: 'Id_Moneda', anterior: null, nuevo: Id_Moneda }, { columna: 'precios', anterior: null, nuevo: JSON.stringify(preciosMap) }] });
     await conn.commit();
-    try {
-      await recordHistorial({ tabla: 'tour_precios', id_registro: Id_Tour, accion: 'UPSERT_PRECIOS', id_usuario: userId, detalles: [{ columna: 'Id_Plan', anterior: null, nuevo: Id_Plan }, { columna: 'Id_Moneda', anterior: null, nuevo: Id_Moneda }, { columna: 'precios', anterior: null, nuevo: JSON.stringify(preciosMap) }] });
-    } catch (errRec) { console.error('Failed to write historial for upsertPreciosTour:', errRec); }
     return { success: true };
   } catch (e) {
     await conn.rollback();
@@ -547,14 +540,12 @@ async function actualizarTour(Id_Tour, data, userId = null) {
       }
     }
 
+    const detalles = [
+      { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: Nombre_Tour },
+      { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: Abreviacion }
+    ];
+    await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'ACTUALIZAR_TOUR', id_usuario: userId, detalles });
     await conn.commit();
-    try {
-      const detalles = [
-        { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: Nombre_Tour },
-        { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: Abreviacion }
-      ];
-      await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'ACTUALIZAR', id_usuario: userId, detalles });
-    } catch (errRec) { console.error('Failed to write historial for actualizarTour:', errRec); }
     return { success: true, affectedRows: result.affectedRows };
   } catch (e) {
     await conn.rollback();
@@ -586,8 +577,8 @@ async function eliminarTour(Id_Tour, userId = null) {
 
     const [result] = await conn.query('UPDATE tours SET Activo = 0 WHERE Id_Tour = ?', [Id_Tour]);
 
+    await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'DESACTIVAR_TOUR', id_usuario: userId, detalles: [ { columna: 'Activo', anterior: 1, nuevo: 0 }, { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null } ] });
     await conn.commit();
-    try { await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'SOFT_DELETE', id_usuario: userId, detalles: [ { columna: 'Activo', anterior: 1, nuevo: 0 }, { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null } ] }); } catch (errRec) { console.error('Failed to write historial for eliminarTour:', errRec); }
     return { success: true, affectedRows: result.affectedRows };
   } catch (e) {
     await conn.rollback();

@@ -103,21 +103,16 @@
 <div class="booking-dashboard" [formGroup]="form">
   <div class="page-header">
     <div>
-      <h1>Editar Transfer</h1>
+      <h1>Editar Transfer {{ transferHeaderCode }}</h1>
       <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     </div>
   </div>
-  @if (isDuplicateMode) {
-    <div class="duplicate-banner" role="status" aria-live="polite">
-      Estás creando un nuevo transfer basado en otro existente. Los pagos, abonos y comprobantes no se copian. Debes registrar nuevamente la forma de pago correspondiente.
-    </div>
-  }
   <div class="main-content">
 
     <!-- DETALLES DEL SERVICIO -->
     <div class="card">
       <div class="card-header">
-        <h2>Editar Transfer</h2>
+        <h2>Detalles del Transfer</h2>
       </div>
 
       <div class="form-grid">
@@ -540,13 +535,7 @@
       </div>
     </div>
 
-    <div class="summary-actions" [class.two-actions]="showDuplicate">
-      @if (showDuplicate) {
-        <button type="button" class="btn-duplicate" (click)="duplicarTransfer()">
-          Duplicar Transfer
-        </button>
-      }
-
+    <div class="summary-actions">
       <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
         {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
       </button>

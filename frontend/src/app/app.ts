@@ -18,9 +18,28 @@ import { Subject, takeUntil, distinctUntilChanged } from 'rxjs';
 })
 export class App implements OnInit, OnDestroy {
   loggedIn = false;
+  publicAuthRoute = false;
 
   private destroy$ = new Subject<void>();
   private wsStarted = false;
+
+  private isAdminForceLogoutEvent(msg: any): boolean {
+    const type = String(msg?.type || '');
+    const reason = String(msg?.reason || '');
+    return type === 'forceLogout' || type === 'force-logout' || type === 'adminForceLogout' || reason === 'admin_force_logout';
+  }
+
+  private isSelfLogoutAllSessionsEvent(msg: any): boolean {
+    const type = String(msg?.type || '');
+    const reason = String(msg?.reason || '');
+    return type === 'selfLogoutAllSessions' || reason === 'self_logout_all_sessions';
+  }
+
+  private isCurrentSessionLogoutEvent(msg: any): boolean {
+    const type = String(msg?.type || '');
+    const reason = String(msg?.reason || '');
+    return type === 'logout' || type === 'selfLogoutCurrentSession' || reason === 'self_logout_current_session';
+  }
 
   constructor(
     public navbar: DynamicIslandGlobalService,
@@ -31,23 +50,51 @@ export class App implements OnInit, OnDestroy {
     private router: Router
   ) {}
 
+  private isPublicAuthRoute(url: string): boolean {
+    const normalizedUrl = url || '';
+    return normalizedUrl.startsWith('/forgot-password') || normalizedUrl.startsWith('/reset-password');
+  }
+
+  private syncShellForUrl(url: string) {
+    this.publicAuthRoute = this.isPublicAuthRoute(url);
+
+    if (!this.loggedIn) {
+      this.navbar.mode.set(this.publicAuthRoute ? '' : 'login');
+      if (this.publicAuthRoute) {
+        const currentAlert = this.navbar.alert();
+        if (currentAlert) {
+          this.navbar.alert.set(null);
+        }
+      }
+    }
+
+    this.cdr.markForCheck();
+  }
+
   ngOnInit() {
+    this.syncShellForUrl(this.router.url);
+
     this.router.events
       .pipe(takeUntil(this.destroy$))
       .subscribe((event: RouterEvent) => {
         if (event instanceof NavigationStart) {
-          
-          this.navbar.alert.set({
-            type: 'info',
-            loading: true,
-            title: 'Cargando datos...'
-          });
-          this.cdr.markForCheck();
+          this.syncShellForUrl(event.url);
+          if (!this.publicAuthRoute) {
+            this.navbar.alert.set({
+              type: 'info',
+              loading: true,
+              title: 'Cargando datos...'
+            });
+            this.cdr.markForCheck();
+          }
         } else if (
           event instanceof NavigationEnd ||
           event instanceof NavigationCancel ||
           event instanceof NavigationError
         ) {
+          const url = event instanceof NavigationEnd ? event.urlAfterRedirects : this.router.url;
+          this.syncShellForUrl(url);
+
           const currentAlert = this.navbar.alert();
           if (currentAlert?.loading) {
             this.navbar.alert.set(null);
@@ -58,24 +105,20 @@ export class App implements OnInit, OnDestroy {
 
     this.permisosService.cargarPermisosDesdeLocalStorage();
 
-    this.ws.messages$
+    this.ws.systemEvents$
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg: any) => {
-        const type = (msg?.type || '').toString();
-        const isForce = type === 'forceLogout' || type === 'force-logout';
-        const isLogout = type === 'logout';
-
-        if (isForce) {
+        if (this.isAdminForceLogoutEvent(msg)) {
           this.navbar.alert.set({
             type: 'warning',
             title: 'Sesión Cerrada',
-            message: 'Tu sesión fue cerrada en otro lugar o por un administrador.',
+            message: 'Tu sesión fue cerrada por un administrador.',
           });
 
           setTimeout(() => {
             this.navbar.alert.set(null);
             this.ws.disconnect();
-            this.auth.logout();
+            this.auth.clearLocalSession();
             this.permisosService.limpiarPermisos();
             this.wsStarted = false;
             this.cdr.markForCheck();
@@ -84,9 +127,28 @@ export class App implements OnInit, OnDestroy {
           return;
         }
 
-        if (isLogout) {
+        if (this.isSelfLogoutAllSessionsEvent(msg)) {
+          this.navbar.alert.set({
+            type: 'info',
+            title: 'Sesión cerrada',
+            message: 'Tu sesión fue cerrada en todos tus dispositivos.',
+          });
+
+          setTimeout(() => {
+            this.navbar.alert.set(null);
+            this.ws.disconnect();
+            this.auth.clearLocalSession();
+            this.permisosService.limpiarPermisos();
+            this.wsStarted = false;
+            this.cdr.markForCheck();
+          }, 900);
+
+          return;
+        }
+
+        if (this.isCurrentSessionLogoutEvent(msg)) {
           this.ws.disconnect();
-          this.auth.logout();
+          this.auth.clearLocalSession();
           this.permisosService.limpiarPermisos();
           this.wsStarted = false;
           this.cdr.markForCheck();
@@ -98,7 +160,7 @@ export class App implements OnInit, OnDestroy {
       .pipe(distinctUntilChanged(), takeUntil(this.destroy$))
       .subscribe((logged) => {
         this.loggedIn = logged;
-        this.navbar.mode.set(logged ? '' : 'login');
+        this.navbar.mode.set(logged ? '' : (this.publicAuthRoute ? '' : 'login'));
         this.cdr.markForCheck();
 
         if (logged) {
@@ -108,7 +170,6 @@ export class App implements OnInit, OnDestroy {
             this.wsStarted = true;
           }
           this.permisosService.cargarPermisosDesdeLocalStorage();
-          this.permisosService.loadSessionData({ token }).catch(() => {});
         } else {
           this.ws.disconnect();
           this.permisosService.limpiarPermisos();

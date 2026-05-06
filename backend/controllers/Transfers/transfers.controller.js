@@ -103,7 +103,12 @@ exports.createTransfer = async (req, res) => {
     return sendSuccess(res, { data: result, message: 'Transfer creado correctamente' });
   } catch (e) {
     console.error(e);
-    return sendError(res, { status: 500, message: 'Error al crear transfer', errorCode: 'INTERNAL_ERROR' });
+    const status = e?.status || 500;
+    return sendError(res, {
+      status,
+      message: e?.message || 'Error al crear transfer',
+      errorCode: e?.errorCode || (status === 409 ? 'CONFLICT' : status === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR')
+    });
   }
 };
 
@@ -119,7 +124,12 @@ exports.updateTransfer = async (req, res) => {
     return sendSuccess(res, { data: result, message: 'Transfer actualizado correctamente' });
   } catch (e) {
     console.error(e);
-    return sendError(res, { status: 500, message: 'Error al actualizar transfer', errorCode: 'INTERNAL_ERROR' });
+    const status = e?.status || 500;
+    return sendError(res, {
+      status,
+      message: e?.message || 'Error al actualizar transfer',
+      errorCode: e?.errorCode || (status === 409 ? 'CONFLICT' : status === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR')
+    });
   }
 };
 
@@ -153,7 +163,12 @@ exports.getDetalleTransfer = async (req, res) => {
     return sendSuccess(res, { data, message: 'Detalle de transfer obtenido correctamente' });
   } catch (e) {
     console.error(e);
-    return sendError(res, { status: 500, message: 'Error al obtener detalle del transfer', errorCode: 'INTERNAL_ERROR' });
+    const status = e?.status || 500;
+    return sendError(res, {
+      status,
+      message: e?.message || 'Error al obtener detalle del transfer',
+      errorCode: e?.errorCode || (status === 409 ? 'CONFLICT' : status === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR')
+    });
   }
 };
 

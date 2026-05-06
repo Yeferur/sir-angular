@@ -18,7 +18,10 @@
           </span>
         </div>
         <div class="header-actions">
-          <button class="btn-secondary" (click)="descargarArchivoReserva()">Descargar</button>
+          <button class="btn-secondary" (click)="descargarArchivoReserva()">Descargar PDF</button>
+          @if (comprobantesDisponibles.length) {
+            <button class="btn-secondary" (click)="descargarComprobantesReserva()">Comprobantes</button>
+          }
           @if (puedeCancelar) {
             <button class="btn-danger" (click)="cancelarReserva()">Cancelar</button>
           }
@@ -136,6 +139,26 @@
               <div class="observations-text">
                 {{ reserva.Observaciones }}
               </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (comprobantesDisponibles.length) {
+        <div class="observations-section">
+          <div class="card detail-card">
+            <div class="card-header"><h2>Comprobantes</h2></div>
+            <div class="card-body">
+              @for (c of comprobantesDisponibles; track c.id ?? c.url ?? c.filename) {
+                <div class="info-row">
+                  <span class="info-label">
+                    {{ c.tipo || c.nombre || 'Comprobante' }}
+                  </span>
+                  <span class="info-value">
+                    {{ c.fecha ? (c.fecha | date:'mediumDate':'':'es-CO') : 'Disponible' }}
+                  </span>
+                </div>
+              }
             </div>
           </div>
         </div>

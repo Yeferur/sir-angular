@@ -133,7 +133,19 @@
             </svg>
           </button>
 
-          <!-- Botón Forzar Cierre (Siempre visible, deshabilitado si no activa) -->
+          @if (isCurrentUser(user.id_user)) {
+          <button class="action-btn logout" [disabled]="estados().get(user.id_user.toString()) !== 'activa'"
+            [class.disabled]="estados().get(user.id_user.toString()) !== 'activa'"
+            (click)="cerrarMisSesiones()" title="Cerrar sesión en todos mis dispositivos">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 13v-2H7V8l-5 4 5 4v-3z"></path>
+              <path
+                d="M20 3h-9c-1.103 0-2 .897-2 2v4h2V5h9v14h-9v-4H9v4c0 1.103.897 2 2 2h9c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2z">
+              </path>
+            </svg>
+          </button>
+          } @else {
+          <!-- Botón Forzar Cierre -->
           <button class="action-btn logout" [disabled]="estados().get(user.id_user.toString()) !== 'activa'"
             [class.disabled]="estados().get(user.id_user.toString()) !== 'activa'"
             (click)="forzarCierreSesion(user.id_user)" title="Forzar Cierre de Sesión">
@@ -144,6 +156,7 @@
               </path>
             </svg>
           </button>
+          }
 
           <!-- Botón Eliminar -->
           <button class="action-btn delete" (click)="eliminarUsuario(user.id_user)" title="Eliminar">

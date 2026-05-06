@@ -6,15 +6,20 @@ import { FormsModule } from '@angular/forms';
 import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
 import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/Programacion/reservas';
-import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { forkJoin, switchMap, of, finalize } from 'rxjs';
 
 type ViewStop = {
   key: string;
+  Id_Punto?: number | string | null;
   NombrePunto: string;
   reservas: Reserva[];
   totalPax: number;
+  ruta?: string | null;
+  ordenRuta?: number | null;
+  Latitud?: number | string | null;
+  Longitud?: number | string | null;
 };
 
 @Component({
@@ -39,6 +44,9 @@ export class Listado implements OnInit {
 
   tourSeleccionado: TourProgramacion | null = null;
   planSeleccionado: Sugerencia | null = null;
+  listadoDirty = false;
+  listadoPersistido = false;
+  listadoOrigen: 'nuevo' | 'db' | null = null;
 
   readonly CAPACIDADES_BUSES = [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b);
 
@@ -50,11 +58,27 @@ export class Listado implements OnInit {
   activeBusIndex = 0;
   activeStops: ViewStop[] = [];
 
-  // guarda el orden de paradas por bus (solo UI)
+  // Orden transitorio solo para drag/drop de la sesion actual; el array bus.reservas es la fuente de verdad.
   private stopOrderByBus = new Map<number, string[]>();
 
   ngOnInit(): void {
     this.cargarToursDelDia();
+  }
+
+  get editorStatusText(): string {
+    if (this.listadoPersistido && !this.listadoDirty) {
+      return 'Listado guardado';
+    }
+
+    if (this.listadoOrigen === 'nuevo' && !this.listadoPersistido) {
+      return 'Borrador sin guardar';
+    }
+
+    if (this.listadoDirty) {
+      return 'Cambios sin guardar';
+    }
+
+    return '';
   }
 
 
@@ -247,6 +271,67 @@ export class Listado implements OnInit {
     });
   }
 
+  onFechaOperacionChange(): void {
+    this.confirmarPerdidaCambios(() => {
+      this.resetEditorState();
+      this.modoVista = 'dashboard';
+      this.cargarToursDelDia();
+    });
+  }
+
+  private resetEditorState(): void {
+    this.planSeleccionado = null;
+    this.tourSeleccionado = null;
+    this.activeBusIndex = 0;
+    this.activeStops = [];
+    this.stopOrderByBus.clear();
+    this.listadoDirty = false;
+    this.listadoPersistido = false;
+    this.listadoOrigen = null;
+  }
+
+  markDirty(): void {
+    this.listadoDirty = true;
+  }
+
+  private confirmarPerdidaCambios(continuar: () => void): void {
+    if (!this.listadoDirty) {
+      continuar();
+      return;
+    }
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Cambios sin guardar',
+      message: 'Tienes cambios en el listado que aún no han sido guardados. ¿Qué deseas hacer?',
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Guardar cambios',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.guardarListadoFinal();
+          }
+        },
+        {
+          text: 'Salir sin guardar',
+          style: 'danger',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.listadoDirty = false;
+            continuar();
+          }
+        },
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        }
+      ]
+    });
+  }
+
   generarPlan(tour: TourProgramacion): void {
     this.isPageLoading = true;
 
@@ -284,13 +369,11 @@ export class Listado implements OnInit {
   }
 
   volverAlDashboard(): void {
-    this.modoVista = 'dashboard';
-    this.planSeleccionado = null;
-    this.reservasSinAsignar = [];
-    this.tourSeleccionado = null;
-    this.activeBusIndex = 0;
-    this.activeStops = [];
-    this.stopOrderByBus.clear();
+    this.confirmarPerdidaCambios(() => {
+      this.resetEditorState();
+      this.modoVista = 'dashboard';
+      this.cdr.markForCheck();
+    });
   }
 
   selectBus(i: number): void {
@@ -299,6 +382,7 @@ export class Listado implements OnInit {
     if (i !== -1 && (i < 0 || i >= this.planSeleccionado.buses.length)) return;
     this.activeBusIndex = i;
     this.rebuildActiveStops();
+    this.updateOpenMapForActiveBus();
     this.cdr.markForCheck();
   }
 
@@ -321,6 +405,7 @@ export class Listado implements OnInit {
     if (!this.planSeleccionado?.buses?.length) return;
     this.activeBusIndex = (this.activeBusIndex - 1 + this.planSeleccionado.buses.length) % this.planSeleccionado.buses.length;
     this.rebuildActiveStops();
+    this.updateOpenMapForActiveBus();
     this.cdr.markForCheck();
   }
 
@@ -328,6 +413,7 @@ export class Listado implements OnInit {
     if (!this.planSeleccionado?.buses?.length) return;
     this.activeBusIndex = (this.activeBusIndex + 1) % this.planSeleccionado.buses.length;
     this.rebuildActiveStops();
+    this.updateOpenMapForActiveBus();
     this.cdr.markForCheck();
   }
 
@@ -351,20 +437,20 @@ export class Listado implements OnInit {
     this.cdr.markForCheck();
   }
 
-  // Reordenar paradas (solo UI)
+  // Reordenar paradas: actualiza el array real para que mapa, guardado y Excel vean el mismo orden.
   dropStop(event: CdkDragDrop<ViewStop[]>): void {
     if (event.previousContainer !== event.container) return;
 
     moveItemInArray(this.activeStops, event.previousIndex, event.currentIndex);
 
-    const order = this.activeStops.map(s => s.NombrePunto);
+    const order = this.activeStops.map(s => s.key);
     this.stopOrderByBus.set(this.activeBusIndex, order);
 
-    if (this.navbar.puntos()) {
-      const reservasReordenadas = this.activeStops.flatMap(stop => stop.reservas);
-      this.navbar.puntos.set(reservasReordenadas);
+    if (this.activeBusIndex !== -1 && this.planSeleccionado?.buses?.[this.activeBusIndex]) {
+      this.planSeleccionado.buses[this.activeBusIndex].reservas = this.activeStops.flatMap(stop => stop.reservas);
     }
 
+    this.syncAfterPlanMutation({ updateMap: true });
     this.cdr.markForCheck();
   }
 
@@ -377,59 +463,28 @@ export class Listado implements OnInit {
     const reserva = event.previousContainer.data[event.previousIndex];
     if (!reserva) return;
 
-    // Crear nuevo bus
-    if (event.container.id === 'unassigned-bus') {
-      transferArrayItem(
-        event.previousContainer.data,
-        this.reservasSinAsignar,
-        event.previousIndex,
-        event.currentIndex
-      );
-      this.recalcularOcupacion();
-      this.removerBusesVacios();
-      // Si el bus activo era el unassigned, reconstruir
-      if (this.activeBusIndex === -1) this.rebuildActiveStops();
-      // Si el bus origen se vació y se borró, ajustar index
-      if (this.activeBusIndex >= this.planSeleccionado.buses.length) {
-        this.activeBusIndex = this.planSeleccionado.buses.length - 1;
-      }
+    if (event.previousContainer === event.container) {
       this.cdr.markForCheck();
+      return;
+    }
+
+    if (event.container.id === 'unassigned-bus') {
+      const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
+      if (!moved) return;
+
+      this.reservasSinAsignar.splice(event.currentIndex, 0, moved);
+      this.syncAfterPlanMutation({ updateMap: true });
       return;
     }
 
     if (event.container.id === 'new-bus') {
-      transferArrayItem(
-        event.previousContainer.data,
-        this.newBusDropData,
-        event.previousIndex,
-        0
-      );
+      const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
+      if (!moved) return;
 
-      this.crearNuevoBus(reserva);
-      this.newBusDropData.length = 0;
-
-      this.recalcularOcupacion();
-      this.removerBusesVacios();
-
-      // si removimos buses y el index cambió, lo ajustamos
-      // si removimos buses y el index cambió, lo ajustamos
-      // FIX: allow -1
-      if (this.activeBusIndex !== -1) {
-        this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
-        if (this.activeBusIndex < 0) this.activeBusIndex = 0;
-      }
-
+      this.crearNuevoBus(moved);
+      this.activeBusIndex = this.planSeleccionado.buses.length - 1;
       this.rebuildActiveStops();
-      if (this.activeBus && this.navbar.puntos()) {
-        const reservasActualizadas = this.activeStops.flatMap(stop => stop.reservas);
-        this.navbar.puntos.set(reservasActualizadas);
-      }
-      this.cdr.markForCheck();
-      return;
-    }
-
-    // Si sueltan en el mismo contenedor, no reordenamos (sorting disabled en active-bus)
-    if (event.previousContainer === event.container) {
+      this.syncAfterPlanMutation({ updateMap: true });
       this.cdr.markForCheck();
       return;
     }
@@ -454,35 +509,24 @@ export class Listado implements OnInit {
 
     destinoBus.capacidad = mejorCapacidad;
 
-    transferArrayItem(
-      event.previousContainer.data,
-      event.container.data,
-      event.previousIndex,
-      event.currentIndex
-    );
+    const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
+    if (!moved) return;
 
-    this.recalcularOcupacion();
-    this.removerBusesVacios();
+    event.container.data.splice(event.currentIndex, 0, moved);
 
-    this.removerBusesVacios();
-
-    if (this.activeBusIndex !== -1) {
-      this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
-      if (this.activeBusIndex < 0) this.activeBusIndex = 0;
-    }
-
-    this.rebuildActiveStops();
-    if (this.activeBus && this.navbar.puntos()) {
-      const reservasActualizadas = this.activeStops.flatMap(stop => stop.reservas);
-      this.navbar.puntos.set(reservasActualizadas);
-    }
+    this.syncAfterPlanMutation({ updateMap: true });
     this.cdr.markForCheck();
   }
 
   verMapa(bus: any, busIndex?: number): void {
     const reservas = Array.isArray(bus?.reservas) ? bus.reservas : [];
-    const order = typeof busIndex === 'number' ? this.stopOrderByBus.get(busIndex) : undefined;
-    const reservasOrdenadas = this.groupStops(reservas, order).flatMap(stop => stop.reservas);
+    const idx = typeof busIndex === 'number'
+      ? busIndex
+      : this.planSeleccionado?.buses ? this.planSeleccionado.buses.indexOf(bus) : -1;
+    const order = idx >= 0 ? this.stopOrderByBus.get(idx) : undefined;
+    const reservasOrdenadas = order
+      ? this.groupStops(reservas, order).flatMap(stop => stop.reservas)
+      : reservas;
     this.navbar.puntos.set(reservasOrdenadas);
   }
 
@@ -493,7 +537,8 @@ export class Listado implements OnInit {
       const placa = (b.id || '').trim();
       return {
         ...b,
-        id: placa.length ? placa : `Bus ${i + 1}`
+        id: placa.length ? placa : `Bus ${i + 1}`,
+        guia: b.guia ? String(b.guia).trim() : ''
       };
     });
 
@@ -504,9 +549,9 @@ export class Listado implements OnInit {
       return;
     }
 
-    const busesOrdenados = this.planSeleccionado.buses.map((bus, idx) => ({
+    const busesOrdenados = this.planSeleccionado.buses.map((bus) => ({
       ...bus,
-      reservas: this.ordenarReservasPorParadas(bus.reservas || [], idx)
+      reservas: bus.reservas || []
     }));
 
     const payload: any = {
@@ -524,8 +569,14 @@ export class Listado implements OnInit {
     this.programacionService.guardarListadoFinal(payload).subscribe({
       next: () => {
         this.isPageLoading = false;
+        this.listadoDirty = false;
+        this.listadoPersistido = true;
+        this.listadoOrigen = 'db';
         this.navbar.alert.set({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
-        this.volverAlDashboard();
+        this.reservasSinAsignar = [];
+        this.resetEditorState();
+        this.modoVista = 'dashboard';
+        this.cargarToursDelDia();
       },
       error: (err) => {
         this.isPageLoading = false;
@@ -580,21 +631,21 @@ export class Listado implements OnInit {
   private generarPlanDesdeCero(tour: TourProgramacion): void {
     this.isPageLoading = true;
 
-    const payloadGen: any = { fecha: this.fechaSeleccionada };
-    if ((tour as any).idsTours) {
-      payloadGen.idsTours = (tour as any).idsTours;
-    } else {
-      payloadGen.idTour = tour.Id_Tour;
-    }
-
     this.programacionService.generarPlanLogistico(this.fechaSeleccionada, ((tour as any).idsTours || tour.Id_Tour) as any).subscribe({
       next: (plan: any) => {
-        const esFormatoNuevo = Array.isArray(plan);
+        const esFormatoNuevo = Array.isArray(plan) || Array.isArray(plan?.buses);
+        this.listadoPersistido = false;
+        this.listadoDirty = true;
+        this.listadoOrigen = 'nuevo';
 
         if (esFormatoNuevo) {
-          const sugerencia = this.construirSugerenciaDesdeListado({ buses: plan, reservasSinAsignar: [] });
-          const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0);
-          const totalReservas = sugerencia.buses.reduce((sum, b) => sum + (b.reservas?.length || 0), 0);
+          const busesGenerados = Array.isArray(plan) ? plan : (plan?.buses || []);
+          const reservasSinAsignar = Array.isArray(plan) ? [] : (plan?.reservasSinAsignar || []);
+          const sugerencia = this.construirSugerenciaDesdeListado({ buses: busesGenerados, reservasSinAsignar });
+          const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0)
+            + reservasSinAsignar.reduce((sum: number, r: Reserva) => sum + (r.NumeroPasajeros || 0), 0);
+          const totalReservas = sugerencia.buses.reduce((sum, b) => sum + (b.reservas?.length || 0), 0)
+            + reservasSinAsignar.length;
 
           tour.planGenerado = {
             analisis: {
@@ -606,16 +657,14 @@ export class Listado implements OnInit {
             sugerencias: [sugerencia],
             mensaje: 'Plan logistico generado correctamente'
           } as any;
-          tour.estado = 'Generado';
           tour.totalPasajeros = totalPasajeros;
           tour.totalReservas = totalReservas;
 
-          this.reservasSinAsignar = [];
+          this.reservasSinAsignar = reservasSinAsignar;
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
           this.modoVista = 'editor';
         } else {
           tour.planGenerado = plan;
-          tour.estado = 'Generado';
           tour.totalPasajeros = plan?.analisis?.totalPasajeros || 0;
           tour.totalReservas = plan?.analisis?.totalReservas || 0;
 
@@ -656,7 +705,9 @@ export class Listado implements OnInit {
   }
 
   private aplicarPlan(tour: TourProgramacion, sugerencia: Sugerencia, reservasSinAsignar: Reserva[]): void {
-    tour.estado = 'Generado';
+    this.listadoPersistido = true;
+    this.listadoDirty = false;
+    this.listadoOrigen = 'db';
 
     const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0)
       + reservasSinAsignar.reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
@@ -716,14 +767,26 @@ export class Listado implements OnInit {
     };
 
     this.planSeleccionado.buses.push(nuevoBus);
+    this.markDirty();
   }
 
   removerBusesVacios(): void {
     if (!this.planSeleccionado) return;
-    this.planSeleccionado.buses = this.planSeleccionado.buses.filter(bus => bus.reservas && bus.reservas.length > 0);
+    const busesAnteriores = [...this.planSeleccionado.buses];
+    const ordenAnterior = new Map(this.stopOrderByBus);
+    const busesFiltrados = this.planSeleccionado.buses.filter(bus => bus.reservas && bus.reservas.length > 0);
 
-    // resetea orden si cambian índices por filtrado
-    this.stopOrderByBus.clear();
+    this.planSeleccionado.buses = busesFiltrados;
+
+    const nuevaMapa = new Map<number, string[]>();
+    busesFiltrados.forEach((bus, newIndex) => {
+      const oldIndex = busesAnteriores.findIndex(b => b === bus);
+      if (oldIndex !== -1 && ordenAnterior.has(oldIndex)) {
+        nuevaMapa.set(newIndex, ordenAnterior.get(oldIndex) || []);
+      }
+    });
+
+    this.stopOrderByBus = nuevaMapa;
   }
 
   recalcularOcupacion(): void {
@@ -754,12 +817,12 @@ export class Listado implements OnInit {
     const order = this.stopOrderByBus.get(busIndex);
     if (!order?.length) return [...reservas];
 
-    const rank = new Map(order.map((nombre, i) => [nombre, i]));
+    const rank = new Map(order.map((key, i) => [key, i]));
     return [...reservas]
       .map((r, idx) => ({ r, idx }))
       .sort((a, b) => {
-        const ra = rank.get(a.r?.NombrePunto || '');
-        const rb = rank.get(b.r?.NombrePunto || '');
+        const ra = rank.get(this.getReservaPointKey(a.r));
+        const rb = rank.get(this.getReservaPointKey(b.r));
         const oa = ra !== undefined ? ra : Number.MAX_SAFE_INTEGER;
         const ob = rb !== undefined ? rb : Number.MAX_SAFE_INTEGER;
         if (oa !== ob) return oa - ob;
@@ -777,10 +840,6 @@ export class Listado implements OnInit {
 
     const order = this.stopOrderByBus.get(this.activeBusIndex);
     this.activeStops = this.groupStops(bus.reservas, order);
-
-    if (!order) {
-      this.stopOrderByBus.set(this.activeBusIndex, this.activeStops.map(s => s.NombrePunto));
-    }
   }
 
   private groupStops(reservas: Reserva[], preferredOrder?: string[]): ViewStop[] {
@@ -788,19 +847,25 @@ export class Listado implements OnInit {
     const appearanceOrder: string[] = [];
 
     for (const r of reservas) {
-      const nombre = r.NombrePunto || 'Sin punto';
+      const key = this.getReservaPointKey(r);
+      const nombre = String(r.NombrePunto || r.PuntoEncuentro || 'Sin punto').trim() || 'Sin punto';
 
-      if (!map.has(nombre)) {
-        map.set(nombre, {
-          key: `stop-${nombre}`,
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          Id_Punto: r.Id_Punto ?? (r as any).idPunto ?? (r as any).IdPunto ?? null,
           NombrePunto: nombre,
           reservas: [],
-          totalPax: 0
+          totalPax: 0,
+          ruta: (r as any).ruta ?? null,
+          ordenRuta: r.Orden_Ruta ?? (r as any).ordenRuta ?? null,
+          Latitud: r.Latitud ?? null,
+          Longitud: r.Longitud ?? null
         });
-        appearanceOrder.push(nombre);
+        appearanceOrder.push(key);
       }
 
-      const stop = map.get(nombre)!;
+      const stop = map.get(key)!;
       stop.reservas.push(r);
       stop.totalPax += r.NumeroPasajeros || 0;
     }
@@ -811,19 +876,65 @@ export class Listado implements OnInit {
     if (preferredOrder?.length) {
       const rank = new Map(preferredOrder.map((n, i) => [n, i]));
       stops.sort((a, b) =>
-        (rank.get(a.NombrePunto) ?? 999) - (rank.get(b.NombrePunto) ?? 999)
+        (rank.get(a.key) ?? 999) - (rank.get(b.key) ?? 999)
       );
       return stops;
     }
 
-    // ⬇️ ORDEN ORIGINAL (primera aparición)
+    // Orden recibido/actual del array: backend, DB o drag/drop ya convertido a bus.reservas.
     stops.sort(
       (a, b) =>
-        appearanceOrder.indexOf(a.NombrePunto) -
-        appearanceOrder.indexOf(b.NombrePunto)
+        appearanceOrder.indexOf(a.key) -
+        appearanceOrder.indexOf(b.key)
     );
 
     return stops;
+  }
+
+  private getReservaPointKey(reserva: Reserva): string {
+    const idPunto = reserva.Id_Punto ?? (reserva as any).idPunto ?? (reserva as any).IdPunto;
+    if (idPunto !== null && idPunto !== undefined && String(idPunto).trim() !== '') {
+      return `punto-${idPunto}`;
+    }
+    const nombre = String(reserva.NombrePunto || (reserva as any).PuntoEncuentro || 'SIN_PUNTO').trim().toUpperCase();
+    return `nombre-${nombre}`;
+  }
+
+  private syncAfterPlanMutation(options?: { updateMap?: boolean }): void {
+    this.recalcularOcupacion();
+    this.removerBusesVacios();
+    this.normalizarActiveBusIndex();
+    this.rebuildActiveStops();
+    this.markDirty();
+
+    if (options?.updateMap) {
+      this.updateOpenMapForActiveBus();
+    }
+
+    this.cdr.markForCheck();
+  }
+
+  private normalizarActiveBusIndex(): void {
+    if (!this.planSeleccionado?.buses?.length) {
+      this.activeBusIndex = 0;
+      return;
+    }
+
+    if (this.activeBusIndex === -1) return;
+
+    this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
+    if (this.activeBusIndex < 0) this.activeBusIndex = 0;
+  }
+
+  private getReservasOrdenadasDelBusActivo(): Reserva[] {
+    if (!this.activeBus) return [];
+    if (this.activeBusIndex === -1) return this.reservasSinAsignar || [];
+    return this.ordenarReservasPorParadas(this.activeBus.reservas || [], this.activeBusIndex);
+  }
+
+  private updateOpenMapForActiveBus(): void {
+    if (!this.navbar.puntos()) return;
+    this.navbar.puntos.set(this.getReservasOrdenadasDelBusActivo());
   }
 
 }

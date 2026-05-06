@@ -8,7 +8,7 @@
   margin: auto;
   padding-top: 30px;
   padding-bottom: 50px;
-  animation: fadeIn 0.5s ease;
+  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
 /* === ENCABEZADO Y KPI CARDS === */
@@ -311,12 +311,10 @@
 .skeleton-shape {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    var(--bg-tertiary) 0%,
-    color-mix(in srgb, var(--bg-tertiary) 82%, white 8%) 50%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-tertiary) 0%,
+      color-mix(in srgb, var(--bg-tertiary) 82%, white 8%) 50%,
+      var(--bg-tertiary) 100%);
   background-size: 200% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
 }
@@ -400,10 +398,10 @@
   border: 2px dashed var(--separator-color);
 }
 
-@keyframes fadeIn {
+@keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
 
   to {

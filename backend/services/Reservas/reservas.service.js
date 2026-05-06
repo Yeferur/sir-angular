@@ -152,6 +152,63 @@ function contarCuposSolicitados(pasajerosArray = []) {
   }, 0);
 }
 
+function normalizarDni(dni) {
+  return String(dni ?? '').trim().replace(/\s+/g, '').toUpperCase();
+}
+
+async function validarDnisUnicosPorFecha(connection, pasajeros, fechaTour, idReservaExcluir = null) {
+  const lista = Array.isArray(pasajeros) ? pasajeros : [];
+  const dnis = [...new Set(
+    lista
+      .map((p) => normalizarDni(p?.DNI || p?.Dni || p?.Documento))
+      .filter((dni) => dni.length >= 5)
+  )];
+
+  if (!dnis.length || !fechaTour) return;
+
+  const conteo = new Map();
+  for (const p of lista) {
+    const dni = normalizarDni(p?.DNI || p?.Dni || p?.Documento);
+    if (!dni) continue;
+    conteo.set(dni, (conteo.get(dni) || 0) + 1);
+  }
+
+  const internoDuplicado = [...conteo.entries()].find(([, count]) => count > 1);
+  if (internoDuplicado) {
+    const error = new Error(`El documento ${internoDuplicado[0]} está repetido dentro de esta reserva.`);
+    error.status = 409;
+    error.errorCode = 'DNI_DUPLICADO_EN_PAYLOAD';
+    throw error;
+  }
+
+  let sql = `
+    SELECT
+      UPPER(REPLACE(TRIM(P.DNI), ' ', '')) AS DNI,
+      R.Id_Reserva
+    FROM pasajeros P
+    INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
+    WHERE DATE(R.Fecha_Tour) = DATE(?)
+      AND UPPER(REPLACE(TRIM(P.DNI), ' ', '')) IN (?)
+      AND (R.Estado IS NULL OR R.Estado NOT IN ('Cancelado', 'Anulado'))
+  `;
+
+  const params = [fechaTour, dnis];
+  if (idReservaExcluir) {
+    sql += ' AND R.Id_Reserva <> ?';
+    params.push(idReservaExcluir);
+  }
+
+  const [rows] = await connection.query(sql, params);
+  if (rows?.length) {
+    const first = rows[0];
+    const dni = normalizarDni(first.DNI);
+    const error = new Error(`El pasajero con DNI ${dni} ya tiene una reserva para la fecha ${normalizarFechaYMD(fechaTour)}: ${first.Id_Reserva}.`);
+    error.status = 409;
+    error.errorCode = 'DNI_DUPLICADO_EN_FECHA';
+    throw error;
+  }
+}
+
 function normalizarTourParaCupos(idTour) {
   return (idTour == 1 || idTour == 5) ? 5 : Number(idTour);
 }
@@ -299,7 +356,10 @@ async function validarPuntosRecogidaLogistica(pasajeros, dbConnection) {
 
       const distancia = distanciaHaversineKm(lat1, lon1, lat2, lon2);
       if (distancia > 6) {
-        throw new Error('Inviabilidad Logística: Los puntos de encuentro de rutas distintas están demasiado separados (> 6km). Por favor, divida la reserva.');
+        const err = new Error('Inviabilidad Logística: Los puntos de encuentro de rutas distintas están demasiado separados (> 6km). Por favor, divida la reserva.');
+        err.status = 400;
+        err.errorCode = 'LOGISTIC_CONFLICT';
+        throw err;
       }
     }
   }
@@ -597,6 +657,7 @@ async function obtenerReserva(Id_Reserva) {
         ), 0)
       ) AS Pendiente,
       t.Nombre_Tour,
+      h.Id_Tour,
       c.Nombre_Canal,
       h.Hora_Salida,
       pto.Nombre_Punto AS PuntoEncuentro
@@ -625,12 +686,26 @@ async function obtenerReserva(Id_Reserva) {
       Tipo_Pasajero,
       Precio_Pasajero,
       Id_Punto,
+      (
+        SELECT Nombre_Punto
+        FROM puntos pt
+        WHERE pt.Id_Punto = p.Id_Punto
+        LIMIT 1
+      ) AS Nombre_Punto,
+      (
+        SELECT h2.Hora_Salida
+        FROM horarios h2
+        WHERE h2.Id_Tour = ?
+          AND h2.Id_Punto = p.Id_Punto
+        ORDER BY h2.Id_Horario DESC
+        LIMIT 1
+      ) AS Hora_Salida,
       Confirmacion
-    FROM pasajeros
-    WHERE Id_Reserva = ?
+    FROM pasajeros p
+    WHERE p.Id_Reserva = ?
     ORDER BY Id_Pasajero ASC
     `,
-    [Id_Reserva]
+    [cab.Id_Tour || null, Id_Reserva]
   );
 
   const [pagosRows] = await db.query(
@@ -660,6 +735,9 @@ async function obtenerReserva(Id_Reserva) {
     IdPas: p.DNI || '',
     TelefonoPasajero: p.Telefono_Pasajero || '',
     Precio_Pasajero: Number(p.Precio_Pasajero) || 0,
+    Id_Punto: p.Id_Punto || null,
+    Nombre_Punto: p.Nombre_Punto || '',
+    HoraSalida: p.Hora_Salida || '',
     Precio: '',
     Comision: '',
     Fecha: cab.Fecha_Tour,
@@ -840,7 +918,9 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
   let conn;
   try {
     if (!payload || !payload.cabeceraReserva) {
-      throw new Error('Payload inválido: falta cabeceraReserva');
+      const err = new Error('Payload inválido: falta cabeceraReserva');
+      err.status = 400;
+      throw err;
     }
     if (!payload.cabeceraReserva.Fecha_Tour) {
       const err = new Error('La fecha del tour es obligatoria');
@@ -861,6 +941,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
     const tipoReserva = r.Tipo_Reserva || 'Grupal';
     const pasajerosArray = Array.isArray(payload.pasajeros) ? payload.pasajeros : [];
     const cantidadSolicitada = contarCuposSolicitados(pasajerosArray);
+    await validarDnisUnicosPorFecha(conn, pasajerosArray, normalizarFechaYMD(r.Fecha_Tour));
 
     // Primera operación transaccional: bloqueo y verificación de disponibilidad.
     if (tipoReserva.toLowerCase() === 'grupal' && cantidadSolicitada > 0) {
@@ -969,7 +1050,25 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
       }
     }
 
-    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: idReserva, accion: 'CREAR', id_usuario: userId, detalles: [ { columna: 'Id_Tour', anterior: null, nuevo: r.Id_Tour }, { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour }, { columna: 'Estado', anterior: null, nuevo: estadoCalculado } ] });
+    const esDuplicado = !!payload?.esDuplicado;
+    const accionHistorial = esDuplicado ? 'DUPLICAR_RESERVA' : 'CREAR_RESERVA';
+    const idReservaOrigen = payload?.Id_Reserva_Origen || payload?.reservaOrigen || payload?.reservaOrigenId || null;
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'reservas',
+      id_registro: idReserva,
+      accion: accionHistorial,
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Id_Tour', anterior: null, nuevo: r.Id_Tour },
+        { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour },
+        { columna: 'Estado', anterior: null, nuevo: estadoCalculado },
+        ...(esDuplicado ? [
+          { columna: 'Id_Reserva_Origen', anterior: null, nuevo: idReservaOrigen || 'N/A' },
+          { columna: 'Id_Reserva_Nueva', anterior: null, nuevo: idReserva }
+        ] : [])
+      ]
+    });
 
     await conn.commit();
 
@@ -1197,6 +1296,8 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       throw err;
     }
 
+    await validarDnisUnicosPorFecha(conn, pasajerosArray, fechaTourFinal, Id_Reserva);
+
     // Primera operación transaccional: bloqueo y verificación de disponibilidad.
     if (tipoReservaFinal.toLowerCase() === 'grupal') {
       const cuposAntes = await obtenerCuposActualesReserva(conn, Id_Reserva);
@@ -1337,7 +1438,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       }
     }
 
-    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva, accion: 'ACTUALIZAR', id_usuario: userId, detalles: [ { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado }, { columna: 'Id_Tour', anterior: currentReserva.Id_Tour_Actual, nuevo: idTourFinal }, { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal } ] });
+    await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva, accion: 'ACTUALIZAR_RESERVA', id_usuario: userId, detalles: [ { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado }, { columna: 'Id_Tour', anterior: currentReserva.Id_Tour_Actual, nuevo: idTourFinal }, { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal } ] });
 
     await conn.commit();
 
@@ -1390,7 +1491,7 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
         conexion: conn,
         tabla: 'reservas',
         id_registro: Id_Reserva,
-        accion: 'CANCELAR',
+        accion: 'CANCELAR_RESERVA',
         id_usuario: userId,
         detalles: [{ columna: 'Estado', anterior: estadoAnterior, nuevo: 'Cancelada' }]
       });
@@ -1447,7 +1548,7 @@ async function eliminarComprobantePagoReserva(Id_Reserva, Id_Pago, userId = null
       conexion: conn,
       tabla: 'reservas',
       id_registro: Id_Reserva,
-      accion: 'ACTUALIZAR',
+      accion: 'ELIMINAR_COMPROBANTE_RESERVA',
       id_usuario: userId,
       detalles: [
         {

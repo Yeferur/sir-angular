@@ -9,7 +9,7 @@
   max-width: 1350px;
   margin: 36px auto 72px;
   padding: 0 24px;
-  animation: fadeIn 0.45s ease;
+  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
 .page-header {
@@ -363,12 +363,10 @@
 .sk-avatar {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    var(--bg-tertiary) 0%,
-    color-mix(in oklab, var(--bg-tertiary) 90%, white 10%) 50%,
-    var(--bg-tertiary) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-tertiary) 0%,
+      color-mix(in oklab, var(--bg-tertiary) 90%, white 10%) 50%,
+      var(--bg-tertiary) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
@@ -455,10 +453,10 @@
   }
 }
 
-@keyframes fadeIn {
+@keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
   }
 
   to {
@@ -522,6 +520,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .booking-dashboard,
   .avatar-wrapper,
   .avatar-image.preview,
