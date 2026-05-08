@@ -196,8 +196,8 @@
 }
 
 .navbar-container[data-state="panel"] .dynamic-island {
-  width: clamp(320px, 95vw, 500px);
-  height: 550px;
+  width: clamp(320px, 95vw, 620px);
+  height: min(82vh, 640px);
   border-radius: 28px;
   padding: 20px;
   top: 0;

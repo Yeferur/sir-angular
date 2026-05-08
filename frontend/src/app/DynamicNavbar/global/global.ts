@@ -10,6 +10,7 @@ import { Mapa } from '../mapa/mapa';
 import { ReservasDynamicComponent } from '../reserva/reserva';
 import { TransferDynamicComponent } from '../transfer/transfer';
 import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
+import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel';
 
 @Component({
   selector: 'app-dynamic-navbar',
@@ -22,7 +23,8 @@ import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
     ReservasDynamicComponent,
     TransferDynamicComponent,
     Mapa,
-    DuplicarPanelComponent
+    DuplicarPanelComponent,
+    AppUpdatesPanelComponent
 ],
   templateUrl: './global.html',
   styleUrls: ['./global.css'],
@@ -70,6 +72,10 @@ export class DynamicNavbarComponent implements OnInit {
 
   clearPreview() {
     this.global.closePreview();
+  }
+
+  openAppUpdates() {
+    this.global.openAppUpdates();
   }
 
   clearAlert() {

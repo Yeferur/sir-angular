@@ -24,6 +24,8 @@ const SUBMENU_ROUTES: Record<number, string> = {
   6: '/Configuracion', // Configuración no tiene un prefijo único, ver isSubmenuActive
 };
 
+const APP_UPDATES_VERSION = 'v1.0.0-beta';
+
 @Component({
   selector: 'app-sidebar',
   standalone: true,
@@ -102,6 +104,7 @@ export class layout implements OnInit {
 
       // 4) listo
       this.ready.set(true);
+      this.openAppUpdatesOnceForUser();
     } catch (e: any) {
       console.error('Layout init error:', e);
       this.loadingError.set('No se pudieron cargar permisos');
@@ -188,6 +191,11 @@ export class layout implements OnInit {
     localStorage.setItem('theme', theme);
   }
 
+  openAppUpdates(): void {
+    this.navbar.openAppUpdates();
+    this.isSidebarOpen.set(false);
+  }
+
   async handleLogout() {
     this.userService.clearUser();
     this.authService.logout();
@@ -200,6 +208,22 @@ export class layout implements OnInit {
   // -----------------------
   // Helpers
   // -----------------------
+  private openAppUpdatesOnceForUser(): void {
+    const user = this.user();
+    const userKey = String(user?.id || user?.username || user?.email || '').trim();
+    if (!userKey) return;
+
+    const storageKey = `sir:app-updates:${APP_UPDATES_VERSION}:seen:${userKey}`;
+    if (localStorage.getItem(storageKey) === 'true') return;
+
+    localStorage.setItem(storageKey, 'true');
+    setTimeout(() => {
+      if (!this.navbar.panel()) {
+        this.navbar.openAppUpdates();
+      }
+    }, 250);
+  }
+
   private resetNavbarStates() {
     const currentAlert = this.navbar?.alert?.();
 

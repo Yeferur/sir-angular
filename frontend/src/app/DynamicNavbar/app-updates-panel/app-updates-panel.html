@@ -1,0 +1,55 @@
+<section class="updates-panel" aria-labelledby="updates-title">
+  <header class="updates-header">
+    <div>
+      <p class="eyebrow">Novedades de la app</p>
+      <h2 id="updates-title">SIR Angular</h2>
+      <div class="version-row" aria-label="Información de versión">
+        <span>{{ version }}</span>
+        <span>{{ status }}</span>
+        <span>{{ date }}</span>
+      </div>
+    </div>
+
+    <button type="button" class="close-button" (click)="close()" aria-label="Cerrar novedades">
+      <span aria-hidden="true">×</span>
+    </button>
+  </header>
+
+  <div class="updates-scroll">
+    <article class="hero-card">
+      <span class="status-pill">{{ status }}</span>
+      <h3>Validación activa en producción</h3>
+      <p>{{ mainNotice }}</p>
+    </article>
+
+    <div class="updates-grid">
+      <article class="update-card warning-card">
+        <span class="card-kicker">Aviso importante</span>
+        <h3>App en fase de pruebas</h3>
+        <p>Estamos observando el comportamiento real de la plataforma para estabilizar cada flujo crítico.</p>
+      </article>
+
+      <article class="update-card">
+        <span class="card-kicker">Versión beta</span>
+        <h3>Nuevo SIR</h3>
+        <p>La app ya opera con una experiencia renovada, más rápida y preparada para seguir creciendo.</p>
+      </article>
+
+      <article class="update-card report-card">
+        <span class="card-kicker">Soporte</span>
+        <h3>Reporte de errores</h3>
+        <p>{{ reportInstructions }}</p>
+      </article>
+
+      <!-- <article class="update-card changes-card">
+        <span class="card-kicker">Registro</span>
+        <h3>Cambios recientes</h3>
+        <ul>
+          <li>Dynamic Island con paneles globales.</li>
+          <li>Mejoras visuales en el acceso rápido del navbar.</li>
+          <li>Base lista para comunicar versiones y avisos internos.</li>
+        </ul>
+      </article> -->
+    </div>
+  </div>
+</section>

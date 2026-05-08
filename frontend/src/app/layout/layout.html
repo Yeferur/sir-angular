@@ -140,6 +140,7 @@
         <a *appPermiso="'USUARIOS.CREAR'" routerLink="/Usuarios/NuevoUsuario"
            routerLinkActive="active-link" (click)="clickPage()">Crear Usuarios</a>
         <a routerLink="/Ayuda" routerLinkActive="active-link" (click)="clickPage()">Ayuda</a>
+        <a (click)="openAppUpdates()">Novedades</a>
         <a (click)="toggleTheme()">
           Tema: {{ isDarkMode ? 'Oscuro' : 'Claro' }}
         </a>

@@ -5,9 +5,10 @@ import { Observable } from 'rxjs';
 
 export interface DynamicPanelState {
   id: string;
-  title: string;
-  component: any;       // componente standalone a renderizar
+  title?: string;
+  component?: any;       // componente standalone a renderizar
   props?: Record<string, any>;
+  data?: any;
   open: boolean;
 }
 
@@ -95,6 +96,10 @@ export class DynamicIslandGlobalService {
 
   openPanel(state: Omit<DynamicPanelState, 'open'>) {
     this.panel.set({ ...state, open: true });
+  }
+
+  openAppUpdates() {
+    this.panel.set({ open: true, id: 'app-updates', data: null });
   }
 
   closePanel() {
