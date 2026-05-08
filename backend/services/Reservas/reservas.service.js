@@ -44,7 +44,7 @@ function validarFechaTourBogota(fechaTourIso) {
   const fechaRecibidaStr = String(fechaTourIso).split('T')[0];
   const fechaRecibidaDate = new Date(`${fechaRecibidaStr}T00:00:00`);
   
-  if (fechaRecibidaDate < hoyBogotaDate) {
+  if (fechaRecibidaDate > hoyBogotaDate) {
     const err = new Error(`La fecha reservada (${fechaRecibidaStr}) no puede ser pasada respecto a la fecha actual en America/Bogota.`);
     err.status = 400;
     throw err;
@@ -492,7 +492,10 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
   const efectivos = Number(cupoInfo.cuposDisponibles || 0) + Number(cantidadAnterior || 0);
 
   if (efectivos < Number(cantidadNueva || 0)) {
-    const err = new Error(`No hay cupos suficientes. Solicitados: ${cantidadNueva}, Disponibles: ${efectivos}`);
+    const aumentaReservaExistente = Number(cantidadAnterior || 0) > 0 && Number(cantidadNueva || 0) > Number(cantidadAnterior || 0);
+    const err = new Error(aumentaReservaExistente
+      ? 'No hay cupos suficientes para agregar más pasajeros a esta reserva.'
+      : `No hay cupos suficientes. Solicitados: ${cantidadNueva}, Disponibles: ${efectivos}`);
     err.status = 409;
     err.errorCode = 'OVERBOOKING_CONFLICT';
     throw err;
@@ -617,8 +620,8 @@ async function filtrarReservas(q) {
     ORDER BY r.Fecha_Registro DESC
   `;
 
-  console.log(where, values);
   const [rows] = await db.query(sql, values);
+  console.log('filtrarReservas - SQL:', rows);
   return rows;
 }
 
@@ -985,6 +988,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
 
     if (pasajerosArray.length > 0) {
       for (const p of pasajerosArray) {
+        const idPuntoPasajero = Number(p.Id_Punto || r.Id_Punto || 0) || null;
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
@@ -999,7 +1003,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
             p.Comision ?? 0,
-            p.Id_Punto || null,
+            idPuntoPasajero,
             p.Confirmacion ? 1 : 0
           ]
         );
@@ -1352,6 +1356,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       await conn.query('DELETE FROM pasajeros WHERE Id_Reserva = ?', [Id_Reserva]);
 
       for (const p of pasajerosArray) {
+        const idPuntoPasajero = Number(p.Id_Punto || r.Id_Punto || 0) || null;
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
@@ -1366,7 +1371,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
             p.Comision ?? 0,
-            p.Id_Punto || null,
+            idPuntoPasajero,
             p.Confirmacion ? 1 : 0
           ]
         );

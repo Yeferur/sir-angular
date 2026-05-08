@@ -195,8 +195,7 @@
             </label>
             <select class="form-select"
               [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
-              formControlName="SelectTour"
-              (change)="onTourChange()">
+              formControlName="SelectTour" (change)="onTourChange()">
               <option value="" disabled>Seleccionar un tour...</option>
               @for (tour of tours(); track tour.Id_Tour) {
               <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
@@ -227,8 +226,7 @@
             <input type="text" class="form-input"
               [ngClass]="form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid ? 'errorInput' : ''"
               formControlName="Fecha_Tour" appFlatpickrInput #fechaFp="fp" [fpOptions]="fpOptionsFecha"
-              placeholder="Selecciona una fecha"
-              (change)="onTourChange()" />
+              placeholder="Selecciona una fecha" (change)="onTourChange()" />
             @if (form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid) {
             <div class="errorMessage">Selecciona una fecha válida.</div>
             }
@@ -353,20 +351,16 @@
         <div class="form-group">
           <label class="form-label">Adultos</label>
           <input type="number" min="0" class="form-input" [value]="adultosInputValue()"
-            [disabled]="isSyncingPassengerCounts()"
-            (input)="onCantidadInputChange('ADULTO', $any($event.target).value)"
-            (blur)="commitCantidadPasajeros('ADULTO')"
-            (keydown.enter)="commitCantidadPasajeros('ADULTO')"
+            [disabled]="isSyncingPassengerCounts()" (input)="onCantidadInputChange('ADULTO', $any($event.target).value)"
+            (blur)="commitCantidadPasajeros('ADULTO')" (keydown.enter)="commitCantidadPasajeros('ADULTO')"
             (focus)="seleccionarTexto($event)" />
         </div>
 
         <div class="form-group">
           <label class="form-label">Niños</label>
           <input type="number" min="0" class="form-input" [value]="ninosInputValue()"
-            [disabled]="isSyncingPassengerCounts()"
-            (input)="onCantidadInputChange('NINO', $any($event.target).value)"
-            (blur)="commitCantidadPasajeros('NINO')"
-            (keydown.enter)="commitCantidadPasajeros('NINO')"
+            [disabled]="isSyncingPassengerCounts()" (input)="onCantidadInputChange('NINO', $any($event.target).value)"
+            (blur)="commitCantidadPasajeros('NINO')" (keydown.enter)="commitCantidadPasajeros('NINO')"
             (focus)="seleccionarTexto($event)" />
           @if (isRioClaroTour()) {
           <small class="hint">En Río Claro, los niños deben tener 5 o más años.</small>
@@ -379,8 +373,7 @@
           <input type="number" min="0" class="form-input" [value]="infantesInputValue()"
             [disabled]="isSyncingPassengerCounts()"
             (input)="onCantidadInputChange('INFANTE', $any($event.target).value)"
-            (blur)="commitCantidadPasajeros('INFANTE')"
-            (keydown.enter)="commitCantidadPasajeros('INFANTE')"
+            (blur)="commitCantidadPasajeros('INFANTE')" (keydown.enter)="commitCantidadPasajeros('INFANTE')"
             (focus)="seleccionarTexto($event)" />
         </div>
         }
@@ -596,10 +589,10 @@
 
               <div class="payment-file-status">
                 @if (abonos.controls[i].get('Comprobante')?.value) {
-                  <span class="payment-chip loaded">Cargado</span>
-                  <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
+                <span class="payment-chip loaded">Cargado</span>
+                <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
                 } @else {
-                  <span class="file-name text-muted">Sin archivo</span>
+                <span class="file-name text-muted">Sin archivo</span>
                 }
               </div>
 
@@ -608,15 +601,16 @@
                   (change)="onAbonoFileSelected($event, i)" style="display:none" />
 
                 @if (!abonos.controls[i].get('Comprobante')?.value) {
-                  <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+                <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
                 } @else {
-                  <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
-                  <button type="button" class="btn-payment-action danger" (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+                <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
+                <button type="button" class="btn-payment-action danger"
+                  (click)="eliminarComprobanteAbono(i)">Eliminar</button>
                 }
 
                 @if (abonos.length > 1) {
-                  <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
-                    (click)="eliminarAbono(i)">✕</button>
+                <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
+                  (click)="eliminarAbono(i)">✕</button>
                 }
               </div>
 
@@ -648,34 +642,34 @@
           <div class="pc-grid">
             <div class="payment-file-row">
               <div class="payment-file-status">
-              @if (form.get('ComprobantePago')?.value; as f) {
+                @if (form.get('ComprobantePago')?.value; as f) {
 
-              @if (f?.SoporteUrl) {
-              <span class="payment-chip saved">Guardado</span>
-              <span class="file-name">Comprobante guardado</span>
-              } @else {
-              <span class="payment-chip loaded">Cargado</span>
-              <span class="file-name">{{ f?.name }}</span>
-              }
+                @if (f?.SoporteUrl) {
+                <span class="payment-chip saved">Guardado</span>
+                <span class="file-name">Comprobante guardado</span>
+                } @else {
+                <span class="payment-chip loaded">Cargado</span>
+                <span class="file-name">{{ f?.name }}</span>
+                }
 
-              } @else {
-              <span class="file-name text-muted">Sin archivo</span>
-              }
+                } @else {
+                <span class="file-name text-muted">Sin archivo</span>
+                }
               </div>
 
               <div class="payment-actions">
-                <input type="file" id="ComprobantePago" accept=".pdf,.jpg,.jpeg,.png"
-                  (change)="onFileSelected($event)" style="display:none" />
+                <input type="file" id="ComprobantePago" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelected($event)"
+                  style="display:none" />
 
                 @if (!form.get('ComprobantePago')?.value) {
-                  <label class="btn-payment-action primary" for="ComprobantePago">Subir comprobante</label>
+                <label class="btn-payment-action primary" for="ComprobantePago">Subir comprobante</label>
                 } @else {
-                  @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
-                    <button type="button" class="btn-payment-action secondary"
-                      (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
-                  }
-                  <label class="btn-payment-action secondary" for="ComprobantePago">Reemplazar</label>
-                  <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
+                @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
+                <button type="button" class="btn-payment-action secondary"
+                  (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
+                }
+                <label class="btn-payment-action secondary" for="ComprobantePago">Reemplazar</label>
+                <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
                 }
               </div>
             </div>
@@ -789,12 +783,7 @@
     </div>
 
     <!-- ACCIONES (1 botón en crear, 2 en editar) -->
-    <div class="summary-actions" [class.two-actions]="showDuplicate">
-      @if (showDuplicate) {
-      <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
-        Duplicar Reserva
-      </button>
-      }
+    <div class="summary-actions">
 
       <button type="button" class="btn-save-summary" (click)="onSubmit()"
         [disabled]="isSubmitting() || tieneConflictoLogisticoActual()">

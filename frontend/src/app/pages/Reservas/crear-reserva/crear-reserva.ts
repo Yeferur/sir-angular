@@ -14,17 +14,17 @@ import {
 } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 @Component({
   selector: 'app-crear-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, FlatpickrInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, FlatpickrInputDirective, UppercaseInputDirective],
   templateUrl: './crear-reserva.html',
   styleUrls: ['./crear-reserva.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
   openSummary = false;
-  showDuplicate = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
   toggleSummary(force?: boolean) {
@@ -119,6 +119,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private normalizarDni(dni: unknown): string {
     return String(dni ?? '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  private toUpperText(value: unknown): string {
+    return String(value ?? '').trim().toLocaleUpperCase('es-CO');
   }
 
   private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
@@ -435,7 +439,6 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   private wsService = inject(WebSocketService);
-  private transferSvc = inject(TransferService);
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
   private reservasSvc = inject(Reservas);
@@ -524,6 +527,33 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   // puntos de encuentro
   puntosSeleccionados = signal<Punto[]>([]);
   puntoBusquedaResults = signal<Punto[]>([]);
+  private sincronizarPuntosPasajeros(): void {
+    const puntos = this.puntosSeleccionados();
+    const puntoPrincipal = puntos[0]?.Id_Punto ? Number(puntos[0].Id_Punto) : null;
+    const idsValidos = new Set(
+      puntos
+        .map((p) => Number(p.Id_Punto))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    );
+
+    for (const ctrl of this.pasajeros.controls) {
+      const idActual = Number(ctrl.get('Id_Punto')?.value || 0);
+
+      if (!puntoPrincipal) {
+        ctrl.get('Id_Punto')?.setValue(null, { emitEvent: false });
+        continue;
+      }
+
+      if (puntos.length === 1) {
+        ctrl.get('Id_Punto')?.setValue(puntoPrincipal, { emitEvent: false });
+        continue;
+      }
+
+      if (!idActual || !idsValidos.has(idActual)) {
+        ctrl.get('Id_Punto')?.setValue(puntoPrincipal, { emitEvent: false });
+      }
+    }
+  }
   private conflictoRutasNotificado = signal<boolean>(false);
   rutasLogisticasSeleccionadas = computed(() => {
     const rutas = new Set(
@@ -907,6 +937,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     const principal = this.puntosSeleccionados()[0];
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
+    this.sincronizarPuntosPasajeros();
     this.evaluarConflictoRutasEnTiempoReal();
     await this.fijarHorarioAutomatico();
     await this.verificarCuposDisponibles({ silent: false });
@@ -916,6 +947,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.puntosSeleccionados.update(arr => arr.filter(x => x.Id_Punto !== p.Id_Punto));
     const principal = this.puntosSeleccionados()[0] || null;
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
+    this.sincronizarPuntosPasajeros();
 
     if (!principal) {
       this.horarioSeleccionado.set(null);
@@ -1316,6 +1348,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.conectarValidacionDniPasajero(fg);
 
     this.pasajeros.push(fg);
+    this.sincronizarPuntosPasajeros();
 
     this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
 
@@ -1813,10 +1846,11 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     }
 
     try {
+      this.sincronizarPuntosPasajeros();
 
       // ===== PASAJEROS =====
       const pax = this.pasajeros.controls.map(c => ({
-        Nombre_Pasajero: c.get('Nombre_Pasajero')?.value || '',
+        Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
@@ -1855,7 +1889,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
           Monto: totalNeto,
           Tipo: 'Pago Completo',
           fileField: 'comprobante_pago',
-          Observaciones: this.form.get('PagoObservaciones')?.value || null
+          Observaciones: this.toUpperText(this.form.get('PagoObservaciones')?.value) || null
         } as any);
         archivos.completo = file;
         comprobanteCompletoFile = file;
@@ -1869,7 +1903,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
               Tipo: 'Abono',
               fileField: `abono_${i}`,
               Fecha_Pago: g.get('Fecha_Pago')?.value || null,
-              Observaciones: g.get('Observaciones')?.value || null
+              Observaciones: this.toUpperText(g.get('Observaciones')?.value) || null
             } as any);
           }
           archivos.abonos!.push(f);
@@ -1888,10 +1922,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         Id_Horario: this.form.get('Id_Horario')?.value || null,
         Fecha_Tour: this.form.get('Fecha_Tour')?.value,
         Id_Canal: this.form.get('Id_Canal')?.value,
-        Idioma_Reserva: this.form.get('Idioma_Reserva')?.value,
+        Idioma_Reserva: this.toUpperText(this.form.get('Idioma_Reserva')?.value),
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
-        Nombre_Reportante: this.form.get('Nombre_Reportante')?.value,
-        Observaciones: this.form.get('Observaciones')?.value,
+        Nombre_Reportante: this.toUpperText(this.form.get('Nombre_Reportante')?.value),
+        Observaciones: this.toUpperText(this.form.get('Observaciones')?.value),
         Id_Tour: this.form.get('SelectTour')?.value,
         Id_Punto: this.form.get('Id_Punto')?.value,
         Estado: estado, // <- persistimos el estado decidido

@@ -7,11 +7,12 @@ import { finalize, forkJoin, firstValueFrom } from 'rxjs';
 // Importa tus servicios
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [CommonModule, DatePipe, FlatpickrInputDirective],
+  imports: [CommonModule, DatePipe, FlatpickrInputDirective, UppercaseInputDirective],
   templateUrl: './ver-reservas.html',
   styleUrls: ['./ver-reservas.css']
 })

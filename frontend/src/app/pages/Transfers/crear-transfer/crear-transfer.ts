@@ -9,6 +9,7 @@ import { Router } from '@angular/router';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 type CrearTransferLoadResult = {
   servicios: any[];
@@ -19,13 +20,17 @@ type CrearTransferLoadResult = {
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, FlatpickrInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, FlatpickrInputDirective, UppercaseInputDirective],
   templateUrl: './crear-transfer.html',
   styleUrls: ['./crear-transfer.css']
 })
 export class CrearTransferComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+
+  private toUpperText(value: unknown): string {
+    return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+  }
 
   openSummary = false;
   isLoading = signal<boolean>(true);
@@ -646,34 +651,34 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       ? this.abonos.controls
           .map((control) => ({
             Monto: Number(control.get('Monto')?.value || 0),
-            Observaciones: control.get('Observaciones')?.value || null,
+            Observaciones: this.toUpperText(control.get('Observaciones')?.value) || null,
             Fecha_Pago: control.get('Fecha_Pago')?.value || null
           }))
           .filter((abono) => abono.Monto > 0)
       : [];
 
     const transferData = {
-      Titular: this.form.value.Titular,
-      DNI: this.form.value.DNI || '',
+      Titular: this.toUpperText(this.form.value.Titular),
+      DNI: this.toUpperText(this.form.value.DNI),
       Tel_Contacto: this.form.value.TelefonoTitular || '',
       Id_Rango: this.form.value.Rango,
       RangoDescripcion: this.selectedRangoDescripcion,
       Servicio: this.form.value.TipoServicio,
-      Salida: this.form.value.Salida,
-      Llegada: this.form.value.Llegada,
+      Salida: this.toUpperText(this.form.value.Salida),
+      Llegada: this.toUpperText(this.form.value.Llegada),
       FechaTransfer: this.form.value.Fecha,
-      NombreReporta: this.form.value.Reporta,
+      NombreReporta: this.toUpperText(this.form.value.Reporta),
       HoraRecogida: this.form.value.Hora,
-      Vuelo: this.form.value.Vuelo,
-      TipoVuelo: this.form.value.TipoVuelo,
+      Vuelo: this.toUpperText(this.form.value.Vuelo),
+      TipoVuelo: this.toUpperText(this.form.value.TipoVuelo),
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
       ValorServicio: this.form.value.Valor,
       Moneda: this.form.value.Moneda,
-      Observaciones: this.form.value.Observaciones || null,
+      Observaciones: this.toUpperText(this.form.value.Observaciones) || null,
       Estado: estadoInfo.estado,
       Pago: {
         Tipo: tipoPago,
-        Observaciones: tipoPago === 'Completo' ? this.form.value.PagoObservaciones || null : null,
+        Observaciones: tipoPago === 'Completo' ? this.toUpperText(this.form.value.PagoObservaciones) || null : null,
         Abonos: abonosPayload
       }
     };

@@ -7,12 +7,13 @@ const { recordHistorial } = require('../Historial/logger');
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
 // =================================================================
+const CAPACIDAD_BUS_GENERACION = 38;
+
 const CONFIG = {
-    CAPACIDADES_BUSES: [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b), // Ordenar de menor a mayor
+    CAPACIDADES_BUSES: [CAPACIDAD_BUS_GENERACION],
     PUNTO_BASE: { lat: 6.212757856694648, lon: -75.57759200491337, NombrePunto: 'Punto Base' },
     GRAFO_PATH: 'grafo_antioquia.json',
 };
-const ORDEN_RUTAS_EMPRESA = [0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 7, 8, 9, 14];
 
 // =================================================================
 // --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
@@ -106,20 +107,17 @@ function getRouteRank(ruta) {
     const raw = String(ruta ?? '').trim();
     if (!raw) return Number.MAX_SAFE_INTEGER;
 
-    const match = raw.match(/\d+/);
-    const routeNumber = match ? Number(match[0]) : Number(raw);
-    if (!Number.isFinite(routeNumber)) return Number.MAX_SAFE_INTEGER;
-
-    const idx = ORDEN_RUTAS_EMPRESA.indexOf(routeNumber);
-    return idx === -1 ? Number.MAX_SAFE_INTEGER - 1 : idx;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
 }
 
 function getRouteDistanceRank(a, b) {
     const ra = getRouteRank(a?.ruta ?? a);
     const rb = getRouteRank(b?.ruta ?? b);
-    const unknownLimit = Number.MAX_SAFE_INTEGER - 1;
 
-    if (ra >= unknownLimit || rb >= unknownLimit) return 999;
+    if (ra === Number.MAX_SAFE_INTEGER || rb === Number.MAX_SAFE_INTEGER) {
+        return Number.MAX_SAFE_INTEGER;
+    }
     return Math.abs(ra - rb);
 }
 
@@ -132,10 +130,6 @@ function getRouteOrder(reserva) {
 function getReservationPax(reserva) {
     const n = Number(reserva.NumeroPasajeros || 0);
     return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-function chooseSmallestCapacity(totalPax) {
-    return CONFIG.CAPACIDADES_BUSES.find(capacidad => totalPax <= capacidad) || null;
 }
 
 function groupReservationsByPoint(reservas) {
@@ -351,7 +345,10 @@ function splitOversizedStops(stops, maxCapacity, reservasSinAsignar) {
         for (const reserva of stop.reservas) {
             const pax = getReservationPax(reserva);
             if (pax > maxCapacity) {
-                reservasSinAsignar.push({ ...reserva, motivoNoAsignacion: 'SUPERA_CAPACIDAD_MAXIMA' });
+                reservasSinAsignar.push({
+                    ...reserva,
+                    motivoNoAsignacion: 'Reserva supera la capacidad de 38 pasajeros.'
+                });
                 continue;
             }
 
@@ -377,7 +374,7 @@ function buildBusFromStops(stops, contadorBus) {
     const ocupados = reservas.reduce((sum, r) => sum + getReservationPax(r), 0);
     return {
         id: `Bus ${contadorBus}`,
-        capacidad: chooseSmallestCapacity(ocupados) || CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1],
+        capacidad: CAPACIDAD_BUS_GENERACION,
         ocupados,
         reservas: reservas.map(({ __ordenOriginal, ...reserva }) => reserva),
         recorridoKm: estimateRouteKm(ordenadas),

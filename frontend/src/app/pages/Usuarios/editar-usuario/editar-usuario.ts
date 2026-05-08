@@ -7,6 +7,7 @@ import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
     const pass = group.get('Contrasena')?.value;
@@ -20,7 +21,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 @Component({
     selector: 'app-editar-usuario',
     standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
+    imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective],
     templateUrl: './editar-usuario.html',
     styleUrls: ['./editar-usuario.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -28,6 +29,10 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 export class EditarUsuarioComponent implements OnInit, OnDestroy {
     form: FormGroup;
     userId: string | null = null;
+
+    private toUpperText(value: unknown): string {
+        return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+    }
 
     roles: Rol[] = [];
     permisos: any[] = [];
@@ -351,7 +356,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         }
 
         const payload = {
-            Nombres_Apellidos: String(this.form.value.Nombres_Apellidos),
+            Nombres_Apellidos: this.toUpperText(this.form.value.Nombres_Apellidos),
             Telefono_Usuario: this.form.value.Telefono_Usuario ? String(this.form.value.Telefono_Usuario) : null,
             Usuario: String(this.form.value.Usuario),
             Correo: String(this.form.value.Correo),

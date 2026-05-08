@@ -7,6 +7,7 @@ import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const pass = group.get('Contrasena')?.value;
@@ -18,13 +19,17 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 @Component({
   selector: 'app-crear-usuario',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective],
   templateUrl: './crear-usuario.html',
   styleUrls: ['./crear-usuario.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CrearUsuarioComponent implements OnInit, OnDestroy {
   form: FormGroup;
+
+  private toUpperText(value: unknown): string {
+    return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+  }
 
   roles: Rol[] = [];
   permisos: any[] = [];
@@ -298,7 +303,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
     const payload = {
       Id_Usuario: String(this.form.value.Id_Usuario),
-      Nombres_Apellidos: String(this.form.value.Nombres_Apellidos),
+      Nombres_Apellidos: this.toUpperText(this.form.value.Nombres_Apellidos),
       Telefono_Usuario: this.form.value.Telefono_Usuario ? String(this.form.value.Telefono_Usuario) : null,
       Usuario: String(this.form.value.Usuario),
       Correo: String(this.form.value.Correo),

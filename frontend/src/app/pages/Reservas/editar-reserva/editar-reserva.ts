@@ -14,6 +14,7 @@ import {
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { DuplicarPanelComponent } from '../../../DynamicNavbar/duplicar-panel/duplicar-panel';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
+import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
@@ -21,7 +22,7 @@ import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, FlatpickrInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, FlatpickrInputDirective, UppercaseInputDirective],
   templateUrl: './editar-reserva.html',
   styleUrls: ['./editar-reserva.css'],
 })
@@ -123,6 +124,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private normalizarDni(dni: unknown): string {
     return String(dni ?? '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  private toUpperText(value: unknown): string {
+    return String(value ?? '').trim().toLocaleUpperCase('es-CO');
   }
 
   private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
@@ -369,11 +374,41 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     return tipo !== 'INFANTE';
   }
 
+  private esEdicionExistente(): boolean {
+    return !!this.reservaId() && !this.isDuplicateMode;
+  }
+
+  private pasajerosConAsientoActual(): number {
+    return this.pasajerosConAsiento();
+  }
+
+  private incrementoPasajerosConAsiento(): number {
+    return Math.max(0, this.pasajerosConAsientoActual() - this.pasajerosConAsientoOriginal);
+  }
+
+  private puedeGuardarSinBloquearPorCupos(): boolean {
+    return this.esEdicionExistente() && this.incrementoPasajerosConAsiento() === 0;
+  }
+
+  private mostrarAlertaIncrementoSinCupos(cupos: number): void {
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Cupos insuficientes',
+      message: 'No hay cupos suficientes para agregar más pasajeros. Puedes guardar otros cambios sin aumentar la cantidad de pasajeros.',
+      autoClose: false,
+      buttons: [
+        { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+      ]
+    });
+    this.cuposDisponiblesActuales.set(cupos);
+    this.cuposValidosActuales.set(false);
+  }
+
   private async refrescarCuposPorEvento(): Promise<void> {
     const ok = await this.verificarCuposDisponibles({ silent: true });
     // verificarCuposDisponibles ya actualiza navbar.cuposInfo directamente.
 
-    if (!ok) {
+    if (!ok && !this.puedeGuardarSinBloquearPorCupos()) {
       this.navbar.alert.set({
         type: 'warning',
         title: 'Cupos actualizados',
@@ -410,6 +445,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   isSyncingPassengerCounts = signal<boolean>(false);
   reservaId = signal<string | null>(null);
   form!: FormGroup;
+  private pasajerosConAsientoOriginal = 0;
 
   comprobantesAEliminar: number[] = [];
   comprobantesAReemplazar: number[] = [];
@@ -478,6 +514,33 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   // Puntos de encuentro (chips + búsqueda)
   puntosSeleccionados = signal<Punto[]>([]);
   puntoBusquedaResults = signal<Punto[]>([]);
+  private sincronizarPuntosPasajeros(): void {
+    const puntos = this.puntosSeleccionados();
+    const puntoPrincipal = puntos[0]?.Id_Punto ? Number(puntos[0].Id_Punto) : null;
+    const idsValidos = new Set(
+      puntos
+        .map((p) => Number(p.Id_Punto))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    );
+
+    for (const ctrl of this.pasajeros.controls) {
+      const idActual = Number(ctrl.get('Id_Punto')?.value || 0);
+
+      if (!puntoPrincipal) {
+        ctrl.get('Id_Punto')?.setValue(null, { emitEvent: false });
+        continue;
+      }
+
+      if (puntos.length === 1) {
+        ctrl.get('Id_Punto')?.setValue(puntoPrincipal, { emitEvent: false });
+        continue;
+      }
+
+      if (!idActual || !idsValidos.has(idActual)) {
+        ctrl.get('Id_Punto')?.setValue(puntoPrincipal, { emitEvent: false });
+      }
+    }
+  }
   private conflictoRutasNotificado = signal<boolean>(false);
   rutasLogisticasSeleccionadas = computed(() => {
     const rutas = new Set(
@@ -901,6 +964,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
       const principalCargado = this.puntosSeleccionados()[0] ?? null;
       this.form.get('Id_Punto')?.setValue(principalCargado?.Id_Punto ?? null, { emitEvent: false });
+      this.sincronizarPuntosPasajeros();
       this.evaluarConflictoRutasEnTiempoReal();
 
       // Horario auto
@@ -931,8 +995,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         fg.get('Comision')?.markAsDirty();
         this.pasajeros.push(fg);
       }
+      this.sincronizarPuntosPasajeros();
 
       this.syncCantidadInputsFromFormArray();
+      this.pasajerosConAsientoOriginal = this.pasajerosConAsiento();
 
       // Hidratar controles globales con el primer pasajero existente de cada tipo
       const primerosPorTipo = new Map<string, any>();
@@ -1149,6 +1215,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.puntoBusquedaResults.set([]);
     const principal = this.puntosSeleccionados()[0];
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
+    this.sincronizarPuntosPasajeros();
     this.evaluarConflictoRutasEnTiempoReal();
     await this.fijarHorarioAutomatico();
     await this.verificarCuposDisponibles({ silent: true });
@@ -1157,6 +1224,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.puntosSeleccionados.update(arr => arr.filter(x => x.Id_Punto !== p.Id_Punto));
     const principal = this.puntosSeleccionados()[0] || null;
     this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
+    this.sincronizarPuntosPasajeros();
     if (!principal) {
       this.horarioSeleccionado.set(null);
       this.form.get('Id_Horario')?.setValue(null);
@@ -1425,6 +1493,11 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     const cantidadFinalConAsiento = otrosConAsiento + (this.tipoOcupaAsiento(tipo) ? target : 0);
 
+    if (this.esEdicionExistente() && cantidadFinalConAsiento <= this.pasajerosConAsientoOriginal) {
+      this.cuposValidosActuales.set(true);
+      return true;
+    }
+
     try {
       const data = await firstValueFrom(
         this.reservasSvc.verificarCupos(
@@ -1443,17 +1516,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.navbar.cuposInfo.set({ ...data });
 
       if (!disponible) {
-        this.navbar.alert.set({
-          type: 'warning',
-          title: 'Cupos insuficientes',
-          message: cupos <= 0
-            ? 'Este tour no tiene cupos disponibles para la fecha seleccionada.'
-            : `Solo hay ${cupos} cupos disponibles. Ajusta la cantidad de pasajeros.`,
-          autoClose: false,
-          buttons: [
-            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
-          ]
-        });
+        this.mostrarAlertaIncrementoSinCupos(cupos);
         return false;
       }
 
@@ -1496,6 +1559,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.conectarValidacionDniPasajero(fg);
 
     this.pasajeros.push(fg);
+    this.sincronizarPuntosPasajeros();
     this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
 
     if (!omitirCalculos) {
@@ -1732,24 +1796,18 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const data = await firstValueFrom(this.reservasSvc.verificarCupos(Fecha, Number(Id_Tour), cant, Id_Reserva));
       const disponible = !!data?.disponible;
       const cupos = Number(data?.cuposDisponibles ?? 0);
+      const puedeGuardarSinAumentar = this.puedeGuardarSinBloquearPorCupos();
+      const cuposValidos = disponible || puedeGuardarSinAumentar;
 
       this.cuposDisponiblesActuales.set(cupos);
-      this.cuposValidosActuales.set(disponible);
+      this.cuposValidosActuales.set(cuposValidos);
       this.navbar.cuposInfo.set({ ...data });
 
-      if (!disponible && !options?.silent) {
-        this.navbar.alert.set({
-          type: 'warning',
-          title: 'Cupos insuficientes',
-          message: cupos <= 0
-            ? 'Este tour no tiene cupos disponibles para la fecha seleccionada.'
-            : `Solo hay ${cupos} cupos disponibles para este tour.`,
-          autoClose: false,
-          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
-        });
+      if (!disponible && !puedeGuardarSinAumentar && !options?.silent) {
+        this.mostrarAlertaIncrementoSinCupos(cupos);
       }
       this.cdr.markForCheck();
-      return disponible;
+      return cuposValidos;
     } catch (error) {
       this.cuposValidosActuales.set(false);
       this.navbar.cuposInfo.set(null);
@@ -1772,8 +1830,9 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.reservasSvc.verificarCupos(Fecha_Tour, SelectTour, totalPasajeros, Id_Reserva).subscribe({
         next: (data) => {
           const cupos = Number(data?.cuposDisponibles ?? 0);
+          const disponible = !!data?.disponible || this.puedeGuardarSinBloquearPorCupos();
           this.cuposDisponiblesActuales.set(cupos);
-          this.cuposValidosActuales.set(!!data?.disponible);
+          this.cuposValidosActuales.set(disponible);
           this.navbar.cuposInfo.set({ ...data });
         },
         error: () => {
@@ -1859,7 +1918,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
             await this.crearReservaDuplicada({
               Id_Tour: targetTourId,
               Fecha_Tour: targetFecha,
-              Observaciones: typeof Observaciones === 'string' ? Observaciones.trim() : null
+              Observaciones: typeof Observaciones === 'string' ? this.toUpperText(Observaciones) : null
             });
           }
         }
@@ -1878,8 +1937,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const targetTourId = overrides.Id_Tour;
 
       let pax = this.pasajeros.controls.map(c => ({
-        Nombre_Pasajero: c.get('Nombre_Pasajero')?.value || '',
-        DNI: c.get('DNI')?.value || null,
+        Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
+        DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
@@ -1947,9 +2006,9 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         Id_Horario: horarioId,
         Fecha_Tour: overrides.Fecha_Tour,
         Id_Canal: idCanal,
-        Idioma_Reserva: this.form.get('Idioma_Reserva')?.value,
+        Idioma_Reserva: this.toUpperText(this.form.get('Idioma_Reserva')?.value),
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
-        Nombre_Reportante: this.form.get('Nombre_Reportante')?.value,
+        Nombre_Reportante: this.toUpperText(this.form.get('Nombre_Reportante')?.value),
         Observaciones: this.buildDuplicatedObservaciones(overrides.Observaciones),
         Id_Tour: targetTourId,
         Id_Punto: Id_Punto,
@@ -2016,8 +2075,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private buildDuplicatedObservaciones(observacionExtra?: string | null): string {
-    const originalObs = String(this.form.get('Observaciones')?.value || '').trim();
-    const extraObs = String(observacionExtra || '').trim();
+    const originalObs = this.toUpperText(this.form.get('Observaciones')?.value);
+    const extraObs = this.toUpperText(observacionExtra);
     const duplicateNote = `Duplicado desde Reserva #${this.reservaId() || 'N/A'}.`;
     return [originalObs, extraObs, duplicateNote].filter(Boolean).join('\n');
   }
@@ -2104,9 +2163,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
 
     try {
+      this.sincronizarPuntosPasajeros();
       // Pasajeros payload
       const pax = this.pasajeros.controls.map(c => ({
-        Nombre_Pasajero: c.get('Nombre_Pasajero')?.value || '',
+        Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
@@ -2182,10 +2242,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         Id_Horario: this.form.get('Id_Horario')?.value || null,
         Fecha_Tour: this.form.get('Fecha_Tour')?.value,
         Id_Canal: this.form.get('Id_Canal')?.value,
-        Idioma_Reserva: this.form.get('Idioma_Reserva')?.value,
+        Idioma_Reserva: this.toUpperText(this.form.get('Idioma_Reserva')?.value),
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
-        Nombre_Reportante: this.form.get('Nombre_Reportante')?.value,
-        Observaciones: this.form.get('Observaciones')?.value,
+        Nombre_Reportante: this.toUpperText(this.form.get('Nombre_Reportante')?.value),
+        Observaciones: this.toUpperText(this.form.get('Observaciones')?.value),
         Id_Tour: this.form.get('SelectTour')?.value,
         Id_Punto: this.form.get('Id_Punto')?.value,
         Estado: estado, // si tu backend recalcula, puedes omitir enviar Estado
