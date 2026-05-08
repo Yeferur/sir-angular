@@ -247,8 +247,8 @@ async function getPermisosYMenu(userId) {
   ]);
 
   return {
-    permisos: permisos.map(p => p.Codigo_Permiso),
-    menu: menu.map(m => ({
+    permisos: (permisos || []).map(p => p.Codigo_Permiso).filter(Boolean),
+    menu: (menu || []).map(m => ({
       id: m.Id_Modulo,
       nombre: m.Nombre_Modulo,
       codigo: m.Codigo_Modulo,

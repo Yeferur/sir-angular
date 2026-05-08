@@ -1,5 +1,38 @@
 const pool = require('../../database/db');
 
+async function consultarPermisosBase(executor, userId) {
+  const [rows] = await executor.query(`
+    SELECT DISTINCT
+      p.Id_Permiso,
+      p.Codigo_Permiso,
+      p.Descripcion,
+      p.Accion
+    FROM usuarios u
+    INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
+    INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
+    INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
+    WHERE u.Id_Usuario = ?
+      AND r.Activo = 1
+
+    UNION
+
+    SELECT DISTINCT
+      p.Id_Permiso,
+      p.Codigo_Permiso,
+      p.Descripcion,
+      p.Accion
+    FROM usuario_permisos up
+    INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
+    WHERE up.Id_Usuario = ?
+  `, [userId, userId]);
+
+  return (rows || []).sort((a, b) => {
+    const codigoA = String(a?.Codigo_Permiso || '');
+    const codigoB = String(b?.Codigo_Permiso || '');
+    return codigoA.localeCompare(codigoB);
+  });
+}
+
 /**
  * Obtener todos los permisos de un usuario por su ID
  * Considera:
@@ -12,66 +45,8 @@ const pool = require('../../database/db');
 async function obtenerPermisosPorUsuario(userId) {
   const conexion = await pool.getConnection();
   try {
-    // 1. Obtener permisos del rol
-    // Se agrega m.Orden al SELECT para que DISTINCT permita el ORDER BY
-    const [permisosRol] = await conexion.query(`
-      SELECT DISTINCT 
-        p.Id_Permiso,
-        p.Codigo_Permiso,
-        p.Accion,
-        m.Codigo_Modulo,
-        m.Nombre_Modulo,
-        p.Descripcion,
-        m.Orden
-      FROM usuarios u
-      INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
-      INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
-      INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
-      WHERE u.Id_Usuario = ?
-        AND r.Activo = 1
-        AND m.Activo = 1
-      ORDER BY m.Orden, p.Accion
-    `, [userId]);
-
-    // 2. Obtener permisos individuales adicionales (ALLOW)
-    // También agregamos m.Orden para mantener la consistencia
-    const [permisosAdicionales] = await conexion.query(`
-      SELECT 
-        p.Id_Permiso,
-        p.Codigo_Permiso,
-        p.Accion,
-        m.Codigo_Modulo,
-        m.Nombre_Modulo,
-        p.Descripcion,
-        m.Orden
-      FROM usuario_permisos up
-      INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
-      WHERE up.Id_Usuario = ?
-        AND m.Activo = 1
-    `, [userId]);
-
-    // 3. Combinar permisos: rol + adicionales (sin duplicados)
-    const permisosFinales = new Map();
-    
-    // Agregar permisos del rol
-    for (const permiso of permisosRol) {
-      permisosFinales.set(permiso.Id_Permiso, permiso);
-    }
-
-    // Agregar permisos individuales (si no estaban ya en el rol)
-    for (const permiso of permisosAdicionales) {
-      if (!permisosFinales.has(permiso.Id_Permiso)) {
-        permisosFinales.set(permiso.Id_Permiso, permiso);
-      }
-    }
-
-    // Retornamos el array de valores únicos
-    // Opcional: Podrías añadir un .sort() aquí si el orden es vital en el frontend
-    return Array.from(permisosFinales.values()).sort((a, b) => a.Orden - b.Orden);
+    return await consultarPermisosBase(conexion, userId);
   } finally {
-    // Liberar la conexión al pool
     conexion.release();
   }
 }
@@ -127,79 +102,8 @@ async function verificarPermiso(userId, codigoPermiso) {
  * @returns {Promise<Array>} Lista de módulos accesibles
  */
 async function obtenerMenuPorUsuario(userId) {
-  const conexion = await pool.getConnection();
-  try {
-    // 1. Obtener módulos accesibles por el rol
-    const [modulosRol] = await conexion.query(`
-      SELECT DISTINCT 
-        m.Id_Modulo,
-        m.Nombre_Modulo,
-        m.Codigo_Modulo,
-        m.Icono,
-        m.Ruta,
-        m.Orden
-      FROM usuarios u
-      INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
-      INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
-      INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
-      WHERE u.Id_Usuario = ?
-        AND r.Activo = 1
-        AND m.Activo = 1
-      ORDER BY m.Orden
-    `, [userId]);
-
-    // 2. Obtener módulos adicionales de permisos individuales (ALLOW)
-    const [modulosAdicionales] = await conexion.query(`
-      SELECT DISTINCT
-        m.Id_Modulo,
-        m.Nombre_Modulo,
-        m.Codigo_Modulo,
-        m.Icono,
-        m.Ruta,
-        m.Orden
-      FROM usuario_permisos up
-      INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
-      WHERE up.Id_Usuario = ?
-        AND m.Activo = 1
-      ORDER BY m.Orden
-    `, [userId]);
-
-    // 3. Combinar módulos (sin duplicados)
-    const moduloMap = new Map();
-
-    // Agregar módulos del rol
-    for (const modulo of modulosRol) {
-      moduloMap.set(modulo.Id_Modulo, {
-        Id_Modulo: modulo.Id_Modulo,
-        Nombre_Modulo: modulo.Nombre_Modulo,
-        Codigo_Modulo: modulo.Codigo_Modulo,
-        Icono: modulo.Icono,
-        Ruta: modulo.Ruta,
-        Orden: modulo.Orden
-      });
-    }
-
-    // Agregar módulos adicionales (si no estaban ya)
-    for (const modulo of modulosAdicionales) {
-      if (!moduloMap.has(modulo.Id_Modulo)) {
-        moduloMap.set(modulo.Id_Modulo, {
-          Id_Modulo: modulo.Id_Modulo,
-          Nombre_Modulo: modulo.Nombre_Modulo,
-          Codigo_Modulo: modulo.Codigo_Modulo,
-          Icono: modulo.Icono,
-          Ruta: modulo.Ruta,
-          Orden: modulo.Orden
-        });
-      }
-    }
-
-    // 4. Retornar ordenado
-    return Array.from(moduloMap.values()).sort((a, b) => a.Orden - b.Orden);
-  } finally {
-    conexion.release();
-  }
+  void userId;
+  return [];
 }
 
 /**
@@ -225,17 +129,7 @@ async function obtenerRoles() {
  * @returns {Promise<Array>}
  */
 async function obtenerModulos() {
-  const conexion = await pool.getConnection();
-  try {
-    const [rows] = await conexion.query(`
-      SELECT Id_Modulo, Nombre_Modulo, Codigo_Modulo, Descripcion, Icono, Ruta, Orden, Activo
-      FROM modulos
-      ORDER BY Orden
-    `);
-    return rows;
-  } finally {
-    conexion.release();
-  }
+  return [];
 }
 
 /**
@@ -246,17 +140,16 @@ async function obtenerTodosPermisos() {
   const conexion = await pool.getConnection();
   try {
     const [rows] = await conexion.query(`
-      SELECT 
+      SELECT
         p.Id_Permiso,
         p.Codigo_Permiso,
         p.Accion,
         p.Descripcion,
-        m.Id_Modulo,
-        m.Nombre_Modulo,
-        m.Codigo_Modulo
+        NULL AS Id_Modulo,
+        NULL AS Nombre_Modulo,
+        NULL AS Codigo_Modulo
       FROM permisos p
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
-      ORDER BY m.Orden, p.Accion
+      ORDER BY p.Codigo_Permiso, p.Accion
     `);
     return rows;
   } finally {
@@ -273,18 +166,17 @@ async function obtenerPermisosPorRol(idRol) {
   const conexion = await pool.getConnection();
   try {
     const [rows] = await conexion.query(`
-      SELECT 
+      SELECT
         p.Id_Permiso,
         p.Codigo_Permiso,
         p.Accion,
         p.Descripcion,
-        m.Nombre_Modulo,
-        m.Codigo_Modulo
+        NULL AS Nombre_Modulo,
+        NULL AS Codigo_Modulo
       FROM rol_permisos rp
       INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
-      INNER JOIN modulos m ON p.Id_Modulo = m.Id_Modulo
       WHERE rp.Id_Rol = ?
-      ORDER BY m.Orden, p.Accion
+      ORDER BY p.Codigo_Permiso, p.Accion
     `, [idRol]);
     return rows;
   } finally {
