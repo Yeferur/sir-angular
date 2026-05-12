@@ -406,7 +406,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
     return this.fb.group({
       Id_Plan: [idPlan],
-      Nombre_Plan: [{ value: planName, disabled: isBase }, [Validators.required, Validators.maxLength(255)]],
+      Nombre_Plan: [planName, [Validators.required, Validators.maxLength(255)]],
       AllowNino: [true],
       AllowInfante: [true],
       monedas: currenciesFA,

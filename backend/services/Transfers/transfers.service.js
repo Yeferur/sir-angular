@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 const { recordHistorial, logSistema } = require('../Historial/logger');
+const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 
 const COMPROBANTE_TRANSFER_FILE_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -52,10 +53,73 @@ async function eliminarArchivoComprobanteTransferFisico(relativePath) {
   }
 }
 
+function fechaMysqlDatetimeSegura(fecha) {
+  const normalizada = normalizarFechaMysql(fecha, { tipo: 'datetime' });
+  if (normalizada) return normalizada;
+
+  const partes = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(new Date());
+
+  return partes.replace('T', ' ');
+}
+
+async function guardarComprobanteTransferInicial(idTransfer, file) {
+  if (!file || !file.buffer) {
+    const err = new Error('El comprobante de pago es obligatorio para registrar el pago del transfer.');
+    err.status = 400;
+    err.errorCode = 'BAD_REQUEST';
+    throw err;
+  }
+
+  const baseDir = path.join(__dirname, '../../uploads', 'transfers', String(idTransfer));
+  fs.mkdirSync(baseDir, { recursive: true });
+
+  const ext = getExtensionForMime(file);
+  const fileName = `${randomUUID()}${ext}`;
+  const filePath = path.join(baseDir, fileName);
+
+  fs.writeFileSync(filePath, file.buffer);
+
+  return `transfers/${idTransfer}/${fileName}`;
+}
+
+function obtenerArchivoPorCampo(files = [], ...fieldNames) {
+  if (!Array.isArray(files)) return null;
+  return files.find((file) => fieldNames.includes(file?.fieldname)) || null;
+}
+
+async function resolverComprobanteInicialTransfer({
+  idTransfer,
+  file,
+  ruta,
+  requeridoMensaje,
+  archivosCreados
+}) {
+  if (file) {
+    const guardado = await guardarComprobanteTransferInicial(idTransfer, file);
+    if (Array.isArray(archivosCreados)) archivosCreados.push(guardado);
+    return guardado;
+  }
+
+  const normalizada = normalizarRutaComprobanteTransferSalida(ruta, idTransfer);
+  if (normalizada) return normalizada;
+
+  const err = new Error(requeridoMensaje);
+  err.status = 400;
+  err.errorCode = 'BAD_REQUEST';
+  throw err;
+}
+
 function normalizarFechaTransferYMD(fecha) {
-  if (!fecha) return '';
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
+  return normalizarFechaMysql(fecha, { tipo: 'date' }) || '';
 }
 
 function hoyBogotaYMD() {
@@ -90,7 +154,6 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
   const abonos = Array.isArray(pago.Abonos) ? pago.Abonos : [];
   const totalAbonado = abonos.reduce((sum, abono) => sum + Number(abono?.Monto || 0), 0);
   const pagoOk = pago.Tipo === 'Completo'
-    || pago.Tipo === 'PagaEnPunto'
     || (valorServicio > 0 && totalAbonado >= valorServicio);
 
   const vueloParcial = tieneTexto(payload.Vuelo) || tieneTexto(payload.TipoVuelo);
@@ -171,8 +234,9 @@ async function getServiciosTransferSvc() {
   return rows.map(r => ({ id: r.Id_Servicio, Servicio: r.Nombre_Servicio }));
 }
 
-async function crearTransferSvc(payload) {
+async function crearTransferSvc(payload, files = {}) {
   const conn = await db.getConnection();
+  const rutasComprobantesCreadas = [];
 
   try {
     // Iniciar transacción
@@ -245,48 +309,70 @@ async function crearTransferSvc(payload) {
     if (payload.Pago && payload.Pago.Tipo) {
       const valorServicio = payload.ValorServicio || payload.Valor || 0;
       const ahora = new Date();
+      const fechaPagoAhora = fechaMysqlDatetimeSegura(ahora);
 
       if (payload.Pago.Tipo === 'Completo') {
         // Un pago completo
+        const comprobanteCompleto = await resolverComprobanteInicialTransfer({
+          idTransfer,
+          file: files.comprobantePago || null,
+          ruta: payload.Pago.Pago_Comprobante || null,
+          requeridoMensaje: 'El comprobante de pago es obligatorio para registrar un pago completo del transfer.',
+          archivosCreados: rutasComprobantesCreadas
+        });
         const [pagRes] = await conn.query(
           `INSERT INTO pagos_transfers
            (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [idTransfer, valorServicio, 'Completo', ahora, 'Pagado', payload.Pago.Observaciones || 'Pago completo registrado al crear transfer', null]
+          [
+            idTransfer,
+            valorServicio,
+            'Completo',
+            fechaPagoAhora,
+            'Pagado',
+            payload.Pago.Observaciones || 'Pago completo registrado al crear transfer',
+            comprobanteCompleto
+          ]
         );
         pagosCreados.push({
           Id_Pago: pagRes.insertId,
           Monto: valorServicio,
-          Metodo: 'Completo'
+          Metodo: 'Completo',
+          Pago_Comprobante: comprobanteCompleto
         });
       } else if (payload.Pago.Tipo === 'PagaEnPunto') {
-        // Un pago pendiente en punto
-        const [pagRes] = await conn.query(
-          `INSERT INTO pagos_transfers
-           (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [idTransfer, 0, 'Paga en punto', ahora, 'Pendiente', 'Pago pendiente en punto', null]
-        );
-        pagosCreados.push({
-          Id_Pago: pagRes.insertId,
-          Monto: 0,
-          Metodo: 'Paga en punto'
-        });
+        // No se crea pago real para PagaEnPunto.
       } else if (payload.Pago.Tipo === 'Abonos' && Array.isArray(payload.Pago.Abonos)) {
         // Insertar un registro por cada abono
-        for (const abono of payload.Pago.Abonos) {
+        for (const [index, abono] of payload.Pago.Abonos.entries()) {
           if (abono.Monto && Number(abono.Monto) > 0) {
-            const fechaPago = abono.Fecha_Pago ? new Date(abono.Fecha_Pago) : ahora;
+            const fechaPagoRaw = abono.Fecha_Pago ?? abono.Fecha ?? null;
+            const fechaPagoNormalizada = normalizarFechaMysql(fechaPagoRaw, { tipo: 'datetime' });
+            const fechaPago = fechaPagoNormalizada ?? (fechaPagoRaw ? null : fechaPagoAhora);
+            const archivoAbono = obtenerArchivoPorCampo(
+              files.comprobantesAbonos || [],
+              `comprobanteAbono_${index}`,
+              `comprobantesAbonos_${index}`,
+              `abono_${index}`
+            );
+            const comprobanteAbono = await resolverComprobanteInicialTransfer({
+              idTransfer,
+              file: archivoAbono,
+              ruta: abono.Pago_Comprobante || null,
+              requeridoMensaje: `El comprobante del abono ${index + 1} es obligatorio.`,
+              archivosCreados: rutasComprobantesCreadas
+            });
             const [pagRes] = await conn.query(
               `INSERT INTO pagos_transfers
                (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [idTransfer, Number(abono.Monto), 'Abono', fechaPago, 'Pagado', abono.Observaciones || null, null]
+              [idTransfer, Number(abono.Monto), 'Abono', fechaPago, 'Pagado', abono.Observaciones || null, comprobanteAbono]
             );
             pagosCreados.push({
               Id_Pago: pagRes.insertId,
               Monto: Number(abono.Monto),
-              Metodo: 'Abono'
+              Metodo: 'Abono',
+              Pago_Comprobante: comprobanteAbono
             });
           }
         }
@@ -312,6 +398,11 @@ async function crearTransferSvc(payload) {
   } catch (error) {
     // Rollback en caso de error
     await conn.rollback();
+    if (rutasComprobantesCreadas.length > 0) {
+      await Promise.all(
+        rutasComprobantesCreadas.map((ruta) => eliminarArchivoComprobanteTransferFisico(ruta).catch(() => false))
+      );
+    }
     throw error;
   } finally {
     // Liberar conexión
@@ -674,12 +765,20 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       const ahora = new Date();
 
       if (payload.Pago.Tipo === 'Completo') {
-        const pagoComprobante = payload.Pago.Pago_Comprobante || null;
+        const pagoComprobante = normalizarRutaComprobanteTransferSalida(payload.Pago.Pago_Comprobante, Id_Transfer);
         const [pagRes] = await conn.query(
           `INSERT INTO pagos_transfers
            (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [Id_Transfer, valorServicio, 'Completo', ahora, 'Pagado', payload.Pago.Observaciones || 'Pago completo registrado al actualizar transfer', pagoComprobante]
+          [
+            Id_Transfer,
+            valorServicio,
+            'Completo',
+            fechaMysqlDatetimeSegura(ahora),
+            'Pagado',
+            payload.Pago.Observaciones || 'Pago completo registrado al actualizar transfer',
+            pagoComprobante
+          ]
         );
         pagosCreados.push({
           Id_Pago: pagRes.insertId,
@@ -688,22 +787,14 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
           Pago_Comprobante: pagoComprobante
         });
       } else if (payload.Pago.Tipo === 'PagaEnPunto') {
-        const [pagRes] = await conn.query(
-          `INSERT INTO pagos_transfers
-           (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [Id_Transfer, 0, 'Paga en punto', ahora, 'Pendiente', 'Pago pendiente en punto', null]
-        );
-        pagosCreados.push({
-          Id_Pago: pagRes.insertId,
-          Monto: 0,
-          Metodo: 'Paga en punto'
-        });
+        // No se crea registro de pago para PagaEnPunto.
       } else if (payload.Pago.Tipo === 'Abonos' && Array.isArray(payload.Pago.Abonos)) {
         for (const abono of payload.Pago.Abonos) {
           if (abono.Monto && Number(abono.Monto) > 0) {
-            const fechaPago = abono.Fecha_Pago ? new Date(abono.Fecha_Pago) : ahora;
-            const pagoComprobante = abono.Pago_Comprobante || null;
+            const fechaPagoRaw = abono.Fecha_Pago ?? abono.Fecha ?? null;
+            const fechaPagoNormalizada = normalizarFechaMysql(fechaPagoRaw, { tipo: 'datetime' });
+            const fechaPago = fechaPagoNormalizada ?? (fechaPagoRaw ? null : fechaMysqlDatetimeSegura(ahora));
+            const pagoComprobante = normalizarRutaComprobanteTransferSalida(abono.Pago_Comprobante, Id_Transfer);
             const [pagRes] = await conn.query(
               `INSERT INTO pagos_transfers
                (Id_Transfer, Monto, Metodo, Fecha_Pago, Estado, Observaciones, Pago_Comprobante)

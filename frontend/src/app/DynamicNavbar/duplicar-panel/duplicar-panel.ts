@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, inject, OnInit, signal, computed, ViewChild } from '@angular/core';
 import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { isTourDateAvailable, toDateOnly } from '../../shared/utils/calendar-date';
 
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -294,8 +295,7 @@ export class DuplicarPanelComponent implements OnInit {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    const onlyDate = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const todayYmd = toDateOnly(today) || '';
 
     const normalizeDiaToWeekday = (d: string) => {
       if (!d) return null;
@@ -334,8 +334,8 @@ export class DuplicarPanelComponent implements OnInit {
 
       const temporadas = Array.isArray(dispo.Temporadas)
         ? dispo.Temporadas.map((t: any) => ({
-          inicio: t.Fecha_Inicio ? new Date(t.Fecha_Inicio) : null,
-          fin: t.Fecha_Fin ? new Date(t.Fecha_Fin) : null,
+          inicio: toDateOnly(t.Fecha_Inicio),
+          fin: toDateOnly(t.Fecha_Fin),
           dias: (t.Dias || [])
             .map((d: string) => normalizeDiaToWeekday(d))
             .filter((x: any) => x !== null) as number[],
@@ -343,25 +343,11 @@ export class DuplicarPanelComponent implements OnInit {
         : [];
 
       const isAllowed = (date: Date) => {
-        const d = onlyDate(date);
-        const wk = d.getDay();
-        if (d < today) return false;
-
-        for (const t of temporadas) {
-          if (!t.inicio || !t.fin) continue;
-
-          const ini = onlyDate(t.inicio);
-          const fin = onlyDate(t.fin);
-
-          if (d >= ini && d <= fin) {
-            if (!t.dias || t.dias.length === 0) return true;
-            return t.dias.includes(wk);
-          }
-        }
-
-        if (modoNorm === 'SOLO_TEMPORADAS') return false;
-        if (diasBaseSet.size > 0) return diasBaseSet.has(wk);
-        return false;
+        const d = toDateOnly(date);
+        if (!d) return false;
+        if (d < todayYmd) return false;
+        const tour = { Modo: modoNorm, Dias_Base: Array.from(diasBaseSet), Temporadas: temporadas };
+        return isTourDateAvailable(d, tour);
       };
 
       disable = [(date: Date) => !isAllowed(date)];
@@ -384,7 +370,8 @@ export class DuplicarPanelComponent implements OnInit {
     const disableFn = disable[0];
     if (cur) {
       const curDate = fp?.parseDate ? fp.parseDate(cur, 'Y-m-d') : new Date(cur);
-      if (curDate && (onlyDate(curDate) < today || disableFn?.(curDate))) {
+      const curYmd = toDateOnly(curDate);
+      if (curYmd && (curYmd < todayYmd || disableFn?.(curDate))) {
         this.Fecha_Tour.set(null);
         fp?.clear();
       }

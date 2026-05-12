@@ -42,6 +42,19 @@ const uploadComprobante = multer({
   }
 });
 
+const uploadCreateTransfer = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      const err = new Error('Tipo de archivo no permitido. Solo JPG, PNG o PDF.');
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
+  }
+});
+
 const asyncHandler = fn => (req, res, next) => {
   return Promise.resolve(fn(req, res, next)).catch(e => {
     console.error(`Error en ${req.path}:`, e);
@@ -94,23 +107,55 @@ exports.getTransfers = async (req, res) => {
   }
 };
 
-exports.createTransfer = async (req, res) => {
-  try {
-    const payload = req.body;
-    if (!payload) return sendError(res, { status: 400, message: 'Falta body', errorCode: 'BAD_REQUEST' });
+function parseCreateTransferPayload(body = {}) {
+  if (!body) return null;
 
-    const result = await crearTransferSvc(payload);
-    return sendSuccess(res, { data: result, message: 'Transfer creado correctamente' });
-  } catch (e) {
-    console.error(e);
-    const status = e?.status || 500;
-    return sendError(res, {
-      status,
-      message: e?.message || 'Error al crear transfer',
-      errorCode: e?.errorCode || (status === 409 ? 'CONFLICT' : status === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR')
-    });
+  if (typeof body.payload === 'string' && body.payload.trim()) {
+    try {
+      return JSON.parse(body.payload);
+    } catch (error) {
+      const err = new Error('El payload del transfer no tiene un formato válido.');
+      err.status = 400;
+      err.errorCode = 'BAD_REQUEST';
+      throw err;
+    }
   }
-};
+
+  if (body.payload && typeof body.payload === 'object') {
+    return body.payload;
+  }
+
+  return body;
+}
+
+function agruparArchivosPorCampo(files = []) {
+  return files.reduce((acc, file) => {
+    if (!file?.fieldname) return acc;
+    if (!acc[file.fieldname]) acc[file.fieldname] = [];
+    acc[file.fieldname].push(file);
+    return acc;
+  }, {});
+}
+
+exports.createTransfer = [
+  uploadCreateTransfer.any(),
+  asyncHandler(async (req, res) => {
+    const payload = parseCreateTransferPayload(req.body);
+    if (!payload) {
+      return sendError(res, { status: 400, message: 'Falta body', errorCode: 'BAD_REQUEST' });
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    const filesByField = agruparArchivosPorCampo(files);
+
+    const result = await crearTransferSvc(payload, {
+      comprobantePago: filesByField.comprobantePago?.[0] || null,
+      comprobantesAbonos: files,
+    });
+
+    return sendSuccess(res, { data: result, message: 'Transfer creado correctamente' });
+  })
+];
 
 exports.updateTransfer = async (req, res) => {
   try {

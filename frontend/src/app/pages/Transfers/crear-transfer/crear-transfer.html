@@ -330,18 +330,22 @@
               }
             </div>
 
-            <div class="payment-actions">
-              <input type="file" id="ComprobantePago" accept=".pdf,.jpg,.jpeg,.png"
-                (change)="onFileSelected($event)" style="display:none" />
+          <div class="payment-actions">
+            <input type="file" id="ComprobantePago" accept=".pdf,.jpg,.jpeg,.png"
+              (change)="onFileSelected($event)" style="display:none" />
 
               @if (!form.get('ComprobantePago')?.value) {
                 <label class="btn-payment-action primary" for="ComprobantePago">Subir comprobante</label>
               } @else {
-                <label class="btn-payment-action secondary" for="ComprobantePago">Reemplazar</label>
-                <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
-              }
-            </div>
+              <label class="btn-payment-action secondary" for="ComprobantePago">Reemplazar</label>
+              <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
+            }
           </div>
+        </div>
+
+        @if (form.get('ComprobantePago')?.touched && form.get('ComprobantePago')?.hasError('required')) {
+          <div class="errorMessage">El comprobante es obligatorio para registrar un pago completo.</div>
+        }
 
           <div class="payment-notes">
             <label class="form-label">Observaciones del pago</label>
@@ -411,6 +415,10 @@
                     (click)="removeAbono(i)">✕</button>
                 }
               </div>
+
+              @if (abonos.controls[i].get('Comprobante')?.touched && abonos.controls[i].get('Comprobante')?.hasError('required')) {
+                <div class="errorMessage full-width">El comprobante es obligatorio para este abono.</div>
+              }
             </div>
             }
           </div>

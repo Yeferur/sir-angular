@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
 const { recordHistorial, logSistema } = require('../Historial/logger');
+const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const fsp = fs.promises;
 
 /* ===========================
@@ -214,9 +215,7 @@ function normalizarTourParaCupos(idTour) {
 }
 
 function normalizarFechaYMD(fecha) {
-  if (!fecha) return '';
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
+  return normalizarFechaMysql(fecha, { tipo: 'date' }) || '';
 }
 
 function hoyBogotaYMD() {
@@ -1046,7 +1045,11 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
             idReserva,
             Number(pago.Monto || 0),
             tipo,
-            pago.Fecha_Pago || new Date(),
+            (() => {
+              const fechaPagoRaw = pago.Fecha_Pago ?? pago.Fecha ?? null;
+              const fechaPagoNormalizada = normalizarFechaMysql(fechaPagoRaw, { tipo: 'datetime' });
+              return fechaPagoNormalizada ?? (fechaPagoRaw ? null : new Date());
+            })(),
             pago.Observaciones || null,
             rutaComprobante
           ]
@@ -1435,7 +1438,11 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
             Id_Reserva,
             Number(pago.Monto || 0),
             tipo,
-            pago.Fecha || new Date(),
+            (() => {
+              const fechaPagoRaw = pago.Fecha_Pago ?? pago.Fecha ?? null;
+              const fechaPagoNormalizada = normalizarFechaMysql(fechaPagoRaw, { tipo: 'datetime' });
+              return fechaPagoNormalizada ?? (fechaPagoRaw ? null : new Date());
+            })(),
             pago.Observaciones || null,
             rutaComprobante
           ]
