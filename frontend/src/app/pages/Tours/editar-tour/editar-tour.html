@@ -180,7 +180,7 @@
             <label class="form-label">Copiar Horarios de Tour Existente <span
                 class="label-optional">(Opcional)</span></label>
             <select formControlName="Id_Tour_Origen" class="form-select">
-              <option [ngValue]="null">Sin copiar — todos en Pendiente</option>
+              <option [ngValue]="null">Sin copiar</option>
               @for (tour of toursExistentes; track tour.Id_Tour) {
               <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
               }
@@ -237,11 +237,6 @@
             </div>
           </div>
           <button type="button" class="btn-secondary" (click)="addNewPlan()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
             Agregar plan
           </button>
         </div>
@@ -391,11 +386,6 @@
           <div class="section-header-row">
             <span class="form-label">Temporadas</span>
             <button type="button" class="btn-secondary btn-sm" (click)="addTemporada()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
               Agregar temporada
             </button>
           </div>

@@ -1094,8 +1094,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
     if (origenId) {
       partes.push(`Copiará horarios desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
-    } else {
-      partes.push('Los horarios quedarán pendientes/configurables.');
     }
 
     partes.push('¿Deseas continuar?');
