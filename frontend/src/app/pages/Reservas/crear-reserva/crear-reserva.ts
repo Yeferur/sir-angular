@@ -1485,70 +1485,16 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   private applyDisponibilidadToDatepicker() {
-    const dispo = this.disponibilidadActual;
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayYmd = toDateOnly(today) || '';
-
-    const normalizeDiaToWeekday = (d: string) => {
-      if (!d) return null;
-      const s = String(d).trim().toLowerCase();
-      switch (s) {
-        case 'lunes': return 1;
-        case 'martes': return 2;
-        case 'miercoles':
-        case 'miércoles': return 3;
-        case 'jueves': return 4;
-        case 'viernes': return 5;
-        case 'sabado':
-        case 'sábado': return 6;
-        case 'domingo': return 0;
-        default: return null;
-      }
-    };
-
-    // Si no hay dispo: solo bloquea pasado
-    if (!dispo) {
-      this.fpOptionsFecha = { ...this.fpOptionsFecha, minDate: today, disable: [] };
-
-      const fp = this.fechaFp?.instance;
-      if (fp) {
-        fp.set('minDate', today);
-        fp.set('disable', []);
-        fp.redraw();
-      }
-
-      this.cdr.markForCheck();
-      return;
-    }
-
-    // modo
-    const modoRaw = (dispo.Modo || 'TODO_EL_AÑO').toString().toUpperCase();
-    const modoNorm = modoRaw.replace(/Ñ/g, 'N').replace(/Á/g, 'A').replace(/É/g, 'E').replace(/Í/g, 'I').replace(/Ó/g, 'O').replace(/Ú/g, 'U');
-
-    const diasBaseSet = new Set<number>(
-      (dispo.Dias_Base || [])
-        .map((d: string) => normalizeDiaToWeekday(d))
-        .filter((x: any) => x !== null)
-    );
-
-    const temporadas = Array.isArray(dispo.Temporadas)
-      ? dispo.Temporadas.map((t: any) => ({
-        inicio: toDateOnly(t.Fecha_Inicio),
-        fin: toDateOnly(t.Fecha_Fin),
-        dias: (t.Dias || [])
-          .map((d: string) => normalizeDiaToWeekday(d))
-          .filter((x: any) => x !== null) as number[],
-      }))
-      : [];
 
     const isAllowed = (date: Date) => {
       const d = toDateOnly(date);
       if (!d) return false;
       if (d < todayYmd) return false;
-      const tour = { Modo: modoNorm, Dias_Base: Array.from(diasBaseSet), Temporadas: temporadas };
-      return isTourDateAvailable(d, tour);
+      if (!this.disponibilidadActual) return true;
+      return isTourDateAvailable(d, this.disponibilidadActual);
     };
 
     const disableFn = (date: Date) => !isAllowed(date);
@@ -1571,10 +1517,16 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     // 3) Limpia fecha inválida si quedó seleccionada/typed
     const cur = this.form.get('Fecha_Tour')?.value;
     if (cur) {
-      // si viene como string en el formato interno, mejor validar con flatpickr si existe:
-      const curDate = fp?.parseDate ? fp.parseDate(cur, 'Y-m-d') : new Date(cur);
+      const curDate = fp?.parseDate
+        ? fp.parseDate(cur, 'Y-m-d')
+        : (() => {
+            const curYmd = toDateOnly(cur);
+            if (!curYmd) return null;
+            const [y, m, d] = curYmd.split('-').map(Number);
+            return new Date(y, m - 1, d);
+          })();
       const curYmd = toDateOnly(curDate);
-      if (curYmd && (curYmd < todayYmd || disableFn(curDate))) {
+      if (curDate && curYmd && (curYmd < todayYmd || disableFn(curDate))) {
         this.form.get('Fecha_Tour')?.setValue(null);
         fp?.clear();
       }

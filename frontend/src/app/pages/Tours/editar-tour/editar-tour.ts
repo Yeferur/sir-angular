@@ -89,6 +89,8 @@ export class EditarTourComponent implements OnInit {
   private toursLoaded = false;
   private currenciesLoaded = false;
   private tourLoaded = false;
+  private isHydratingTour = false;
+  private readonly dayKeys: DiaSemana[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
   tourId = 0;
 
@@ -284,13 +286,6 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       }),
       temporadas: this.fb.array([], [this.temporadasValidator()]),
     });
-    this.fpOptionsFecha = {
-      dateFormat: 'Y-m-d',
-      altInput: true,
-      altFormat: 'd/m/Y',
-      disableMobile: true,
-      altInputClass: 'form-input flatpickr-input flatpickr-alt'
-    };
   }
 
   /* =========================================================
@@ -681,7 +676,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       domingo: [false],
     });
 
-    return this.fb.group(
+    const g = this.fb.group(
       {
         Nombre_Temporada: ['Temporada', [Validators.required, Validators.maxLength(255)]],
         Fecha_Inicio: [null, [Validators.required]],
@@ -690,6 +685,65 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       },
       { validators: [this.rangoFechasValidator(), this.alMenosUnDiaValidator()] }
     );
+
+    const triggerAutoDays = () => this.aplicarDiasAutomaticosTemporada(g);
+    g.get('Fecha_Inicio')?.valueChanges.subscribe(triggerAutoDays);
+    g.get('Fecha_Fin')?.valueChanges.subscribe(triggerAutoDays);
+
+    return g;
+  }
+
+  private parseYmdLocal(ymd: string): Date | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ''))) return null;
+    const [y, m, d] = String(ymd).split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  private toYmdLocal(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private getDiasEnRango(inicio: string, fin: string): DiaSemana[] {
+    if (!inicio || !fin || String(fin) < String(inicio)) return [];
+
+    const start = this.parseYmdLocal(inicio);
+    const end = this.parseYmdLocal(fin);
+    if (!start || !end) return [];
+
+    const dias = new Set<DiaSemana>();
+    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
+    while (this.toYmdLocal(cursor) <= fin) {
+      dias.add(this.dayKeys[cursor.getDay()]);
+      cursor.setDate(cursor.getDate() + 1);
+      if (dias.size === 7) break;
+    }
+
+    const order: DiaSemana[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+    return order.filter((dia) => dias.has(dia));
+  }
+
+  private aplicarDiasAutomaticosTemporada(tempGroup: FormGroup): void {
+    if (this.isHydratingTour) return;
+
+    const inicio = String(tempGroup.get('Fecha_Inicio')?.value || '');
+    const fin = String(tempGroup.get('Fecha_Fin')?.value || '');
+    const diasFG = tempGroup.get('dias') as FormGroup | null;
+
+    if (!inicio || !fin || !diasFG || String(fin) < String(inicio)) return;
+
+    const dias = this.getDiasEnRango(inicio, fin);
+    if (!dias.length) return;
+
+    Object.keys(diasFG.controls).forEach((k) => {
+      diasFG.get(k)?.setValue(dias.includes(k as DiaSemana), { emitEvent: false });
+    });
+
+    tempGroup.updateValueAndValidity({ emitEvent: false });
   }
 
   private rangoFechasValidator(): ValidatorFn {
@@ -753,6 +807,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   cargarTour(): void {
     this.tours.getTourById(this.tourId).subscribe({
       next: (tour: any) => {
+        this.isHydratingTour = true;
         try {
           // básicos
           this.form.patchValue(
@@ -886,18 +941,21 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             this.markInitialLoadStep('tour');
             this.adjustControlsAfterPopulate();
             try { this.cd.detectChanges(); } catch {}
-
+            this.isHydratingTour = false;
             return;
           }
 
           // si no hay planes, deja base vacío
           this.markInitialLoadStep('tour');
+          this.isHydratingTour = false;
         } catch (e) {
           console.error('Error mapping tour:', e);
           this.markInitialLoadStep('tour');
+          this.isHydratingTour = false;
         }
       },
       error: (err) => {
+        this.isHydratingTour = false;
         this.markInitialLoadStep('tour');
         this.navbar.errorToast('Error al cargar tour', err?.error?.error || 'No se pudo cargar la información del tour');
         this.router.navigate(['/Tours/VerTours']);

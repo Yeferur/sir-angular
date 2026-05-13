@@ -8,10 +8,11 @@ const DIAS_VALIDOS = new Set([
 
 function normalizeDia(d) {
   if (d == null) return null;
-  const s = String(d).trim().toLowerCase();
-  // por si llega con tilde desde algún lado
-  if (s === 'miércoles') return 'miercoles';
-  if (s === 'sábado') return 'sabado';
+  const s = String(d)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
   return s;
 }
 
@@ -41,96 +42,90 @@ function assertRangoFechas(inicio, fin) {
 }
 
 async function guardarDisponibilidadYTemporadas(conn, Id_Tour, data) {
-  // Soportamos tanto la forma antigua (campos en root) como la nueva: data.Disponibilidad
   const dispo = data?.Disponibilidad || data || {};
-  const modoRaw = (dispo?.Modo_Disponibilidad || dispo?.Modo || 'TODO_EL_ANO').toString().trim().toUpperCase();
-  // Normalizamos para comparar (aceptar Ñ o N)
-  const modoNorm = modoRaw.replace(/Ñ/g, 'N');
-  const temporadas = Array.isArray(dispo?.Temporadas) ? dispo.Temporadas : Array.isArray(dispo?.temporadas) ? dispo.temporadas : [];
+  const temporadas = Array.isArray(dispo?.Temporadas)
+    ? dispo.Temporadas
+    : Array.isArray(dispo?.temporadas)
+      ? dispo.temporadas
+      : [];
 
-  // Dias base puede llegar como objeto {lunes:true,...} (forma antigua) o como array ['lunes', ...] (frontend nuevo)
+  const tieneDiasBase = Object.prototype.hasOwnProperty.call(dispo, 'Dias_Base')
+    || Object.prototype.hasOwnProperty.call(dispo, 'diasBase');
+  const tieneTemporadas = Object.prototype.hasOwnProperty.call(dispo, 'Temporadas')
+    || Object.prototype.hasOwnProperty.call(dispo, 'temporadas');
+
   let diasBaseSel = [];
   if (Array.isArray(dispo?.Dias_Base)) {
-    diasBaseSel = dispo.Dias_Base.map((d) => normalizeDia(d)).filter((d) => DIAS_VALIDOS.has(d));
+    diasBaseSel = dispo.Dias_Base
+      .map((d) => normalizeDia(d))
+      .filter((d) => DIAS_VALIDOS.has(d));
   } else if (dispo?.diasBase && typeof dispo.diasBase === 'object') {
     diasBaseSel = pickDiasSeleccionados(dispo.diasBase);
-  } else {
-    diasBaseSel = [];
   }
 
-  if (!['TODO_EL_ANO', 'SOLO_TEMPORADAS'].includes(modoNorm)) {
-    throw new Error('Modo_Disponibilidad inválido');
-  }
-
-  // Reglas
-  if (modoNorm === 'SOLO_TEMPORADAS' && temporadas.length === 0) {
-    throw new Error('Debes agregar al menos una temporada en el modo SOLO_TEMPORADAS');
-  }
-  const hasDiasBaseProvided = data && Object.prototype.hasOwnProperty.call(data, 'diasBase');
-  if (modoNorm === 'TODO_EL_ANO' && hasDiasBaseProvided && diasBaseSel.length === 0) {
-    throw new Error('Debes seleccionar al menos un día base en TODO_EL_ANO');
-  }
-
-  // 1) Días base: solo si TODO_EL_ANO
-  if (modoNorm === 'TODO_EL_ANO') {
-    // si tu app crea tour y luego lo edita, esto evita duplicados
+  if (tieneDiasBase) {
     await conn.query('DELETE FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
-
     for (const dia of diasBaseSel) {
       await conn.query(
         'INSERT INTO tours_dias (Id_Tour, Dia_Semana) VALUES (?, ?)',
         [Id_Tour, dia]
       );
     }
-  } else {
-    // si cambian modos en un update futuro, esto limpia
-    await conn.query('DELETE FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
   }
 
-  // 2) Temporadas (siempre permitidas)
-  // Nota: en crearTour no hay nada previo, pero igual queda “idempotente” para reutilizar en update
-  const [tempsExist] = await conn.query('SELECT Id_Temporada FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
-  if (tempsExist.length) {
-    const ids = tempsExist.map(x => x.Id_Temporada);
-    await conn.query(`DELETE FROM tours_temporada_dias WHERE Id_Temporada IN (${ids.map(() => '?').join(',')})`, ids);
-    await conn.query('DELETE FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
-  }
-
-  for (const t of temporadas) {
-    const nombre = (t?.Nombre_Temporada || '').toString().trim();
-    if (!nombre) throw new Error('Nombre_Temporada es obligatorio en temporadas');
-
-    const inicio = assertFechaISO(t?.Fecha_Inicio, 'Fecha_Inicio');
-    const fin = assertFechaISO(t?.Fecha_Fin, 'Fecha_Fin');
-    assertRangoFechas(inicio, fin);
-
-    // Acepta tanto `Dias` como arreglo (nueva forma) como `dias` objeto (antigua forma)
-    let diasTempSel = [];
-    if (Array.isArray(t?.Dias)) {
-      diasTempSel = t.Dias.map((d) => normalizeDia(d)).filter((d) => DIAS_VALIDOS.has(d));
-    } else {
-      diasTempSel = pickDiasSeleccionados(t?.dias);
-    }
-    if (diasTempSel.length === 0) throw new Error(`Selecciona al menos un día para la temporada: ${nombre}`);
-
-    const [ins] = await conn.query(
-      `INSERT INTO tours_temporadas (Id_Tour, Nombre_Temporada, Fecha_Inicio, Fecha_Fin)
-       VALUES (?, ?, ?, ?)`,
-      [Id_Tour, nombre, inicio, fin]
+  if (tieneTemporadas) {
+    const [tempsExist] = await conn.query(
+      'SELECT Id_Temporada FROM tours_temporadas WHERE Id_Tour = ?',
+      [Id_Tour]
     );
-    const Id_Temporada = ins.insertId;
 
-    for (const dia of diasTempSel) {
+    if (tempsExist.length) {
+      const ids = tempsExist.map((x) => x.Id_Temporada);
       await conn.query(
-        'INSERT INTO tours_temporada_dias (Id_Temporada, Dia_Semana) VALUES (?, ?)',
-        [Id_Temporada, dia]
+        `DELETE FROM tours_temporada_dias WHERE Id_Temporada IN (${ids.map(() => '?').join(',')})`,
+        ids
       );
+      await conn.query('DELETE FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
+    }
+
+    for (const t of temporadas) {
+      const nombre = (t?.Nombre_Temporada || '').toString().trim();
+      if (!nombre) throw new Error('Nombre_Temporada es obligatorio en temporadas');
+
+      const inicio = assertFechaISO(t?.Fecha_Inicio, 'Fecha_Inicio');
+      const fin = assertFechaISO(t?.Fecha_Fin, 'Fecha_Fin');
+      assertRangoFechas(inicio, fin);
+
+      let diasTempSel = [];
+      if (Array.isArray(t?.Dias)) {
+        diasTempSel = t.Dias
+          .map((d) => normalizeDia(d))
+          .filter((d) => DIAS_VALIDOS.has(d));
+      } else {
+        diasTempSel = pickDiasSeleccionados(t?.dias);
+      }
+      if (diasTempSel.length === 0) {
+        throw new Error(`Selecciona al menos un día para la temporada: ${nombre}`);
+      }
+
+      const [ins] = await conn.query(
+        `INSERT INTO tours_temporadas (Id_Tour, Nombre_Temporada, Fecha_Inicio, Fecha_Fin)
+         VALUES (?, ?, ?, ?)`,
+        [Id_Tour, nombre, inicio, fin]
+      );
+      const Id_Temporada = ins.insertId;
+
+      for (const dia of diasTempSel) {
+        await conn.query(
+          'INSERT INTO tours_temporada_dias (Id_Temporada, Dia_Semana) VALUES (?, ?)',
+          [Id_Temporada, dia]
+        );
+      }
     }
   }
 
-  // Devolvemos en formato más legible (con Ñ) y con keys consistentes
-  const modoDisplay = modoNorm === 'TODO_EL_ANO' ? 'TODO_EL_AÑO' : 'SOLO_TEMPORADAS';
-  return { Modo: modoDisplay, Dias_Base: diasBaseSel, Temporadas: temporadas.length };
+  const modoDisplay = diasBaseSel.length > 0 ? 'TODO_EL_AÑO' : (temporadas.length > 0 ? 'SOLO_TEMPORADAS' : 'TODO_EL_AÑO');
+  return { Modo: modoDisplay, Dias_Base: diasBaseSel, Temporadas: temporadas };
 }
 
 async function crearTour(data, userId = null) {
@@ -507,7 +502,13 @@ async function actualizarTour(Id_Tour, data, userId = null) {
     );
 
     // Opcional: actualizar disponibilidad/temporadas
-    if (data?.Modo_Disponibilidad || data?.diasBase || data?.temporadas || data?.Disponibilidad) {
+    if (
+      Object.prototype.hasOwnProperty.call(data || {}, 'Dias_Base') ||
+      Object.prototype.hasOwnProperty.call(data || {}, 'diasBase') ||
+      Object.prototype.hasOwnProperty.call(data || {}, 'Temporadas') ||
+      Object.prototype.hasOwnProperty.call(data || {}, 'temporadas') ||
+      Object.prototype.hasOwnProperty.call(data || {}, 'Disponibilidad')
+    ) {
       await guardarDisponibilidadYTemporadas(conn, Id_Tour, data);
     }
 
@@ -604,26 +605,45 @@ async function obtenerDisponibilidadTour(Id_Tour) {
   const [rowsTour] = await db.query('SELECT Id_Tour FROM tours WHERE Id_Tour = ? AND Activo = 1 LIMIT 1', [Id_Tour]);
   if (!rowsTour.length) return null;
 
-  // Modo
   const [diasRows] = await db.query('SELECT Dia_Semana FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
-  const diasBase = diasRows.map(r => r.Dia_Semana).filter(Boolean);
+  const diasBase = Array.from(
+    new Set(
+      diasRows
+        .map((r) => normalizeDia(r.Dia_Semana))
+        .filter((dia) => DIAS_VALIDOS.has(dia))
+    )
+  ).sort((a, b) => ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].indexOf(a) - ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].indexOf(b));
 
-  // Temporadas y sus días
-  const [temps] = await db.query('SELECT Id_Temporada, Nombre_Temporada, Fecha_Inicio, Fecha_Fin FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
+  const [temps] = await db.query(
+    `SELECT
+      Id_Temporada,
+      Nombre_Temporada,
+      DATE_FORMAT(Fecha_Inicio, '%Y-%m-%d') AS Fecha_Inicio,
+      DATE_FORMAT(Fecha_Fin, '%Y-%m-%d') AS Fecha_Fin
+    FROM tours_temporadas
+    WHERE Id_Tour = ?
+    ORDER BY Fecha_Inicio ASC`,
+    [Id_Tour]
+  );
   const temporadas = [];
   for (const t of temps) {
     const [td] = await db.query('SELECT Dia_Semana FROM tours_temporada_dias WHERE Id_Temporada = ?', [t.Id_Temporada]);
     temporadas.push({
       Id_Temporada: t.Id_Temporada,
       Nombre_Temporada: t.Nombre_Temporada,
-      Fecha_Inicio: (function(d){ if (!d) return null; if (d instanceof Date) return d.toISOString().slice(0,10); const s=String(d); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:s; })(t.Fecha_Inicio),
-      Fecha_Fin: (function(d){ if (!d) return null; if (d instanceof Date) return d.toISOString().slice(0,10); const s=String(d); const m=s.match(/^\d{4}-\d{2}-\d{2}/); return m?m[0]:s; })(t.Fecha_Fin),
-      Dias: td.map(x => x.Dia_Semana).filter(Boolean),
+      Fecha_Inicio: t.Fecha_Inicio,
+      Fecha_Fin: t.Fecha_Fin,
+      Dias: Array.from(
+        new Set(
+          td
+            .map((x) => normalizeDia(x.Dia_Semana))
+            .filter((dia) => DIAS_VALIDOS.has(dia))
+        )
+      ).sort((a, b) => ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].indexOf(a) - ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].indexOf(b)),
     });
   }
-  const modoNorm = (diasBase && diasBase.length > 0) ? 'TODO_EL_AÑO' : (temporadas.length ? 'SOLO_TEMPORADAS' : 'TODO_EL_AÑO');
+  const modoNorm = diasBase.length > 0 ? 'TODO_EL_AÑO' : (temporadas.length > 0 ? 'SOLO_TEMPORADAS' : 'TODO_EL_AÑO');
   const result = { Modo: modoNorm, Dias_Base: diasBase, Temporadas: temporadas };
-  console.log('Disponibilidad tour', Id_Tour, result);
   return result;
 }
 

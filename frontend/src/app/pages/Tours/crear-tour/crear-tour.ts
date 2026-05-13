@@ -75,6 +75,7 @@ export class CrearTourComponent implements OnInit {
   isSubmitting = signal(false);
   private toursLoaded = false;
   private currenciesLoaded = false;
+  private readonly dayKeys: DiaSemana[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
@@ -594,7 +595,62 @@ private createTemporadaGroup(): FormGroup {
     { validators: [this.rangoFechasValidator(), this.alMenosUnDiaValidator()] }
   );
 
+  const triggerAutoDays = () => this.aplicarDiasAutomaticosTemporada(g);
+  g.get('Fecha_Inicio')?.valueChanges.subscribe(triggerAutoDays);
+  g.get('Fecha_Fin')?.valueChanges.subscribe(triggerAutoDays);
+
   return g;
+}
+
+private parseYmdLocal(ymd: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ''))) return null;
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+private toYmdLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+private getDiasEnRango(inicio: string, fin: string): DiaSemana[] {
+  if (!inicio || !fin || String(fin) < String(inicio)) return [];
+
+  const start = this.parseYmdLocal(inicio);
+  const end = this.parseYmdLocal(fin);
+  if (!start || !end) return [];
+
+  const dias = new Set<DiaSemana>();
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
+  while (this.toYmdLocal(cursor) <= fin) {
+    dias.add(this.dayKeys[cursor.getDay()]);
+    cursor.setDate(cursor.getDate() + 1);
+    if (dias.size === 7) break;
+  }
+
+  const order: DiaSemana[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+  return order.filter((dia) => dias.has(dia));
+}
+
+private aplicarDiasAutomaticosTemporada(tempGroup: FormGroup): void {
+  const inicio = String(tempGroup.get('Fecha_Inicio')?.value || '');
+  const fin = String(tempGroup.get('Fecha_Fin')?.value || '');
+  const diasFG = tempGroup.get('dias') as FormGroup | null;
+
+  if (!inicio || !fin || !diasFG || String(fin) < String(inicio)) return;
+
+  const dias = this.getDiasEnRango(inicio, fin);
+  if (!dias.length) return;
+
+  Object.keys(diasFG.controls).forEach((k) => {
+    diasFG.get(k)?.setValue(dias.includes(k as DiaSemana), { emitEvent: false });
+  });
+
+  tempGroup.updateValueAndValidity({ emitEvent: false });
 }
 
 private rangoFechasValidator(): ValidatorFn {

@@ -1,14 +1,19 @@
 type TourDisponibilidadLike = {
-  Modo?: string;
-  Modo_Disponibilidad?: string;
   Dias_Base?: unknown[];
-  diasBase?: unknown;
   Temporadas?: unknown[];
-  temporadas?: unknown[];
 };
 
-function normalizeDay(value: unknown): number | null {
+function normalizeDayText(value: unknown): string | null {
   const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeDay(value: unknown): number | null {
+  const raw = normalizeDayText(value);
+  if (!raw) return null;
   switch (raw) {
     case '0':
     case 'domingo':
@@ -63,7 +68,7 @@ export function getDayFromDateOnly(dateOnly: string): number {
   const [year, month, day] = ymd.split('-').map(Number);
   if (!year || !month || !day) return NaN;
 
-  return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
+  return new Date(year, month - 1, day).getDay();
 }
 
 export function isTourDateAvailable(dateOnly: string, tour: TourDisponibilidadLike | null | undefined): boolean {
@@ -73,33 +78,25 @@ export function isTourDateAvailable(dateOnly: string, tour: TourDisponibilidadLi
   const weekDay = getDayFromDateOnly(ymd);
   if (!Number.isFinite(weekDay)) return false;
 
-  const modoRaw = String(tour.Modo ?? tour.Modo_Disponibilidad ?? 'TODO_EL_ANO')
-    .trim()
-    .toUpperCase()
-    .replace(/Ñ/g, 'N')
-    .replace(/Á/g, 'A')
-    .replace(/É/g, 'E')
-    .replace(/Í/g, 'I')
-    .replace(/Ó/g, 'O')
-    .replace(/Ú/g, 'U');
-
   const diasBase = Array.isArray(tour.Dias_Base)
     ? tour.Dias_Base
-    : Array.isArray(tour.diasBase)
-      ? Object.values(tour.diasBase as unknown as object).filter(Boolean)
-      : [];
+    : [];
 
-  const diasBaseSet = new Set<number>();
+  const diasBaseSet = new Set<string>();
   for (const dia of diasBase) {
-    const normalized = normalizeDay(dia);
-    if (normalized !== null) diasBaseSet.add(normalized);
+    const normalized = normalizeDayText(dia);
+    if (normalized) diasBaseSet.add(normalized);
   }
 
   const temporadasRaw = Array.isArray(tour.Temporadas)
     ? tour.Temporadas
-    : Array.isArray(tour.temporadas)
-      ? tour.temporadas
-      : [];
+    : [];
+
+  const dayNameMap = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const dayName = dayNameMap[weekDay] || null;
+  if (!dayName) return false;
+
+  const cumpleDiaBase = diasBaseSet.has(dayName);
 
   const cumpleTemporada = temporadasRaw.some((temp: any) => {
     const inicio = toDateOnly(temp?.Fecha_Inicio);
@@ -107,18 +104,17 @@ export function isTourDateAvailable(dateOnly: string, tour: TourDisponibilidadLi
     if (!inicio || !fin) return false;
     if (ymd < inicio || ymd > fin) return false;
 
-    const diasTemporada = Array.isArray(temp?.Dias) ? temp.Dias : Array.isArray(temp?.dias) ? temp.dias : [];
-    const diasTemporadaSet = new Set<number>();
+    const diasTemporada = Array.isArray(temp?.Dias) ? temp.Dias : [];
+    const diasTemporadaSet = new Set<string>();
     for (const dia of diasTemporada) {
-      const normalized = normalizeDay(dia);
-      if (normalized !== null) diasTemporadaSet.add(normalized);
+      const normalized = normalizeDayText(dia);
+      if (normalized) diasTemporadaSet.add(normalized);
     }
-    return diasTemporadaSet.has(weekDay);
+
+    return diasTemporadaSet.has(dayName);
   });
 
-  const cumpleDiaNormal = diasBaseSet.has(weekDay);
-  if (modoRaw === 'SOLO_TEMPORADAS') return cumpleTemporada;
-  return cumpleDiaNormal || cumpleTemporada;
+  return cumpleDiaBase || cumpleTemporada;
 }
 
 export const toCalendarYmd = toDateOnly;
