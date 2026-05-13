@@ -32,6 +32,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
   }
 
+  private closeSummaryIfOpen(): void {
+    if (this.openSummary) {
+      this.openSummary = false;
+    }
+  }
+
   private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
     return (
       error?.error?.message ||
@@ -317,6 +323,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private showApiError(error: any, title = 'No se pudo completar la operación'): void {
     const message = this.getFriendlyReservaErrorMessage(error);
+    this.closeSummaryIfOpen();
 
     this.navbar.alert.set({
       type: 'error',
@@ -336,6 +343,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   private mostrarAlertaDniReservado(dni: string, reserva?: any, options?: { blocking?: boolean }): void {
     const idReserva = reserva?.Id_Reserva || reserva?.idReserva || reserva?.id_reserva;
     const buttons: any[] = [];
+    this.closeSummaryIfOpen();
 
     if (idReserva) {
       buttons.push({
@@ -375,6 +383,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     // verificarCuposDisponibles ya actualiza navbar.cuposInfo directamente.
 
     if (!ok) {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'warning',
         title: 'Cupos actualizados',
@@ -411,6 +420,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.navbar.cuposInfo.set({ ...data });
 
       if (!disponible && !options?.silent) {
+        this.closeSummaryIfOpen();
         this.navbar.alert.set({
           type: 'warning',
           title: 'Cupos insuficientes',
@@ -1667,10 +1677,11 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   async onSubmit(): Promise<void> {
     if (this.isSubmitting()) return;
     this.isSubmitting.set(true);
-    this.openSummary = false;
+    this.closeSummaryIfOpen();
     // ===== Helpers locales =====
     const confirmar = (titulo: string, mensaje: string): Promise<boolean> =>
       new Promise<boolean>((resolve) => {
+        this.closeSummaryIfOpen();
         this.navbar.alert.set({
           type: 'info',
           title: titulo,
@@ -1708,6 +1719,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       const msg = fields.length
         ? `Revisa los siguientes campos: ${fields.join(', ')}`
         : 'Hay campos inválidos en el formulario.';
+      this.closeSummaryIfOpen();
 
       this.navbar.alert.set({
         type: 'error',
@@ -1721,6 +1733,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     }
 
     if (this.tieneConflictoLogistico()) {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'error',
         title: 'Inviabilidad logística',
@@ -1736,6 +1749,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     // Validar que haya al menos un pasajero
     if (this.pasajeros.length === 0) {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'error',
         title: 'Sin pasajeros',

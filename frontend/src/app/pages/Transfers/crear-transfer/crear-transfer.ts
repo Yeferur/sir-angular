@@ -32,6 +32,70 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     return String(value ?? '').trim().toLocaleUpperCase('es-CO');
   }
 
+  private getTodayYmd(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private normalizeYmd(value: unknown): string | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+
+    const parts = raw.split('-');
+    if (parts.length !== 3) return null;
+
+    const [yearPart, monthPart, dayPart] = parts;
+    if (!/^\d{4}$/.test(yearPart) || !/^\d{1,2}$/.test(monthPart) || !/^\d{1,2}$/.test(dayPart)) {
+      return null;
+    }
+
+    const year = Number(yearPart);
+    const month = Number(monthPart);
+    const day = Number(dayPart);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    const parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() !== month - 1 ||
+      parsed.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return `${yearPart}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  private fechaNoPasadaValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const normalized = this.normalizeYmd(control.value);
+      if (!normalized) return control.value ? { fechaInvalida: true } : null;
+      return normalized < this.getTodayYmd() ? { fechaPasada: true } : null;
+    };
+  }
+
+  private validateFechaTransferBeforeSubmit(): boolean {
+    const fechaCtrl = this.form?.get('Fecha');
+    if (!fechaCtrl) return true;
+
+    const normalized = this.normalizeYmd(fechaCtrl.value);
+    if (!normalized) return true;
+
+    if (normalized < this.getTodayYmd()) {
+      const currentErrors = fechaCtrl.errors ?? {};
+      fechaCtrl.setErrors({ ...currentErrors, fechaPasada: true });
+      fechaCtrl.markAsTouched();
+      this.navbar.errorToast('Fecha inválida', 'La fecha del servicio no puede ser anterior a hoy.');
+      return false;
+    }
+
+    return true;
+  }
+
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
@@ -39,8 +103,11 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
   resultsMonedas: any[] = [];
+  selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
+  valorEsEditable = false;
+  private rangoLookupSeq = 0;
   showFlightFields = false;
 
   // Archivos de comprobantes
@@ -55,6 +122,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   altFormat: 'd/m/Y',
   allowInput: false,
   disableMobile: true,
+  minDate: this.getTodayYmd(),
   monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
   
   altInputClass: 'form-input flatpickr-input flatpickr-alt',
@@ -206,8 +274,109 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     };
   }
 
+  private cantidadPersonasValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const raw = control.value;
+      if (raw === null || raw === undefined || raw === '') return { required: true };
+      const cantidad = Number(raw);
+      if (!Number.isInteger(cantidad) || cantidad < 1) return { cantidadInvalida: true };
+      return null;
+    };
+  }
+
+  private normalizarCantidadPersonas(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const cantidad = Number(value);
+    return Number.isInteger(cantidad) && cantidad > 0 ? cantidad : null;
+  }
+
+  private getMonedaSeleccionada(): any | null {
+    const monedaCodigo = String(this.form?.get('Moneda')?.value || '').trim();
+    if (!monedaCodigo) return null;
+    return this.resultsMonedas.find((m: any) => String(m.Codigo || '').trim() === monedaCodigo) || null;
+  }
+
+  private obtenerRangoDetectado(cantidad: number | null): any | null {
+    if (cantidad === null) return null;
+    return this.resultsRangos.find((r) => {
+      const minimo = Number(r?.Minimo ?? NaN);
+      const maximoRaw = r?.Maximo;
+      const maximo = maximoRaw === null || maximoRaw === undefined || maximoRaw === '' ? null : Number(maximoRaw);
+      return Number.isFinite(minimo)
+        && cantidad >= minimo
+        && (maximo === null || cantidad <= maximo);
+    }) ?? null;
+  }
+
+  private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinPrecio?: boolean } = {}): void {
+    if (!this.form) return;
+
+    const cantidad = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+    const rangoCtrl = this.form.get('Rango');
+    const valorCtrl = this.form.get('Valor');
+    const rango = this.obtenerRangoDetectado(cantidad);
+
+    this.selectedRango = rango;
+    this.selectedRangoDescripcion = rango?.Descripcion || null;
+
+    if (!cantidad || !rango) {
+      rangoCtrl?.setValue(null, { emitEvent: false });
+      this.precioSeleccionado = null;
+      this.valorEsEditable = true;
+      if (!opts.preservarValor) {
+        valorCtrl?.setValue(0, { emitEvent: false });
+      }
+      this.cdr.markForCheck();
+      return;
+    }
+
+    rangoCtrl?.setValue(rango.Id_Rango ?? rango.id, { emitEvent: false });
+    const moneda = this.getMonedaSeleccionada();
+    const lookupSeq = ++this.rangoLookupSeq;
+
+    this.transferSvc.getPrecioBasePorRangoYMoneda(String(rango.Id_Rango ?? rango.id), String(moneda?.Id_Moneda ?? ''))
+      .pipe(
+        catchError(() => of({ found: false, precio: 0 })),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: (result) => {
+          if (lookupSeq !== this.rangoLookupSeq) return;
+
+          const precio = Number(result?.precio ?? 0);
+          const precioValido = Boolean(result?.found) && Number.isFinite(precio);
+
+          this.precioSeleccionado = precioValido ? precio : null;
+          this.valorEsEditable = true;
+
+          if (precioValido) {
+            valorCtrl?.setValue(precio, { emitEvent: false });
+          } else {
+            valorCtrl?.setValue(0, { emitEvent: false });
+          }
+
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          if (lookupSeq !== this.rangoLookupSeq) return;
+          this.precioSeleccionado = null;
+          this.valorEsEditable = true;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  private syncValorManualState(): void {
+  }
+
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
+  }
+
+  private closeSummaryIfOpen(): void {
+    if (this.openSummary) {
+      this.openSummary = false;
+    }
   }
 
   public getNombreServicio(): string {
@@ -325,7 +494,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Titular: this.toUpperText(this.form.value.Titular),
       DNI: this.toUpperText(this.form.value.DNI),
       Tel_Contacto: this.form.value.TelefonoTitular || '',
-      Id_Rango: this.form.value.Rango,
+      Cantidad_Personas: this.normalizarCantidadPersonas(this.form.value.Cantidad_Personas),
+      Id_Rango: this.selectedRango?.Id_Rango ?? this.form.value.Rango ?? null,
       RangoDescripcion: this.selectedRangoDescripcion,
       Servicio: this.form.value.TipoServicio,
       Salida: this.toUpperText(this.form.value.Salida),
@@ -336,7 +506,9 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Vuelo: this.toUpperText(this.form.value.Vuelo),
       TipoVuelo: this.toUpperText(this.form.value.TipoVuelo),
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
-      ValorServicio: this.form.value.Valor,
+      Id_Moneda: this.getMonedaSeleccionada()?.Id_Moneda ?? null,
+      ValorServicio: Number(this.form.value.Valor || 0),
+      Valor: Number(this.form.value.Valor || 0),
       Moneda: this.form.value.Moneda,
       Observaciones: this.toUpperText(this.form.value.Observaciones) || null,
       Estado: 'Pendiente',
@@ -469,12 +641,13 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       Titular: ['', Validators.required],
       DNI: [''],
       TelefonoTitular: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
-      Rango: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
+      Cantidad_Personas: [null, [this.cantidadPersonasValidator()]],
+      Rango: [null],
       Moneda: ['COP'],
       TipoServicio: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Salida: ['', Validators.required],
       Llegada: ['', Validators.required],
-      Fecha: ['', Validators.required],
+      Fecha: ['', [Validators.required, this.fechaNoPasadaValidator()]],
       Hora: [''],
       TipoVuelo: [''],
       Reporta: ['', Validators.required],
@@ -499,51 +672,22 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
     this.loadCatalogos();
 
-    // escuchar cambio de rango para obtener precio inmediato
-    this.form.get('Rango')?.valueChanges
+    // detectar rango automáticamente a partir de la cantidad real de personas
+    this.form.get('Cantidad_Personas')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((rangoId) => {
-        if (!rangoId || rangoId === 'Seleccionar') {
-          this.selectedRangoDescripcion = null;
-          this.precioSeleccionado = null;
-          this.form.get('Valor')?.setValue(0);
-          return;
-        }
-        const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
-        this.selectedRangoDescripcion = r ? r.Descripcion : null;
-        // pedir precios por rango
-        const rId = String(rangoId);
-        this.transferSvc.getPreciosPorRango(rId as any).subscribe({
-          next: (rows) => {
-            // buscar precio según moneda seleccionada
-            const monedaSel = this.form.get('Moneda')?.value || 'COP';
-            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === monedaSel);
-            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-            this.precioSeleccionado = precio;
-            this.form.get('Valor')?.setValue(precio ?? 0);
-            this.cdr.markForCheck();
-          },
-          error: () => {
-            this.precioSeleccionado = null;
-            this.form.get('Valor')?.setValue(0);
-          }
-        });
+      .subscribe(() => {
+        this.actualizarRangoDetectado({ preservarValor: false, notificarSinPrecio: true });
       });
-    // reacción a cambio de moneda: si hay rango seleccionado, reconsultar precios
+
+    this.form.get('Valor')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+      });
+
     this.form.get('Moneda')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((mon) => {
-        const rangoId = this.form.get('Rango')?.value;
-        if (!rangoId || rangoId === 'Seleccionar') return;
-        this.transferSvc.getPreciosPorRango(rangoId).subscribe({
-          next: (rows) => {
-            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === mon);
-            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-            this.precioSeleccionado = precio;
-            this.form.get('Valor')?.setValue(precio ?? 0);
-            this.cdr.markForCheck();
-          }, error: () => { /* ignore */ }
-        });
+      .subscribe(() => {
+        this.actualizarRangoDetectado({ preservarValor: false, notificarSinPrecio: true });
       });
     // detectar cuando el tipo de servicio cambia para activar campos de vuelo
     this.form.get('TipoServicio')?.valueChanges
@@ -580,6 +724,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         const msg = tipo === 'Internacional'
           ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
           : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
+        this.closeSummaryIfOpen();
         this.navbar.alert.set({
           type: 'info',
           title: 'Recomendación',
@@ -631,9 +776,14 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   async onSubmit(): Promise<void> {
       if (this.isSubmitting()) return;
+    this.closeSummaryIfOpen();
 
     this.syncPaymentFileValidators();
     this.form.updateValueAndValidity({ emitEvent: false });
+    if (!this.validateFechaTransferBeforeSubmit()) {
+      this.isSubmitting.set(false);
+      return;
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.markPaymentFilesTouched();
@@ -642,11 +792,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       const friendly: Record<string, string> = {
         Titular: 'Titular',
         TelefonoTitular: 'Teléfono del titular (ej: +573001234567)',
-        Rango: 'Rango de pasajeros',
+        Cantidad_Personas: 'Cantidad de personas',
         TipoServicio: 'Tipo de servicio',
         Salida: 'Punto de salida',
         Llegada: 'Punto de llegada',
-        Fecha: 'Fecha del servicio',
+        Fecha: 'Fecha del servicio (no puede ser anterior a hoy)',
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
         Reporta: 'Nombre del reportante',
@@ -656,6 +806,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
       const fields = invalid.map(f => friendly[f] || f);
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
+      this.closeSummaryIfOpen();
 
       this.navbar.alert.set({
         type: 'error',
@@ -667,6 +818,14 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       return;
     }
 
+    const cantidadPersonas = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+    if (cantidadPersonas !== null && !this.selectedRango) {
+      this.navbar.errorToast('Rango no encontrado', 'No existe un rango configurado para la cantidad de personas indicada.');
+      return;
+    }
+
+    this.closeSummaryIfOpen();
+
     const confirmed = await this.requestCreateTransferConfirmation();
     if (!confirmed) return;
 
@@ -674,35 +833,25 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   private buildCreateTransferConfirmationMessage(): string {
-    const titular = String(this.form.get('Titular')?.value || '').trim();
     const fecha = String(this.form.get('Fecha')?.value || '').trim();
-    const servicioNombre = this.getNombreServicio();
+    const cantidad = String(this.form.get('Cantidad_Personas')?.value || '').trim();
+    const rangoDescripcion = this.selectedRangoDescripcion || '—';
     const salida = String(this.form.get('Salida')?.value || '').trim();
     const llegada = String(this.form.get('Llegada')?.value || '').trim();
     const moneda = String(this.form.get('Moneda')?.value || 'COP').trim();
     const valor = Number(this.form.get('Valor')?.value || 0);
-    const tipoPago = String(this.form.get('TipoPago')?.value || '').trim();
-
-    const partes = [
-      `Vas a crear el transfer para ${titular || '—'} el ${fecha || '—'}.`,
-      `Servicio: ${servicioNombre}.`,
+    return [
+      `Fecha: ${fecha || '—'}.`,
+      `Pasajeros: ${cantidad || '—'} (${rangoDescripcion}).`,
       `Ruta: ${salida || '—'} → ${llegada || '—'}.`,
-      `Valor: ${moneda} ${valor.toLocaleString('es-CO')}.`,
-      `Tipo de pago: ${tipoPago || '—'}.`,
-    ];
-
-    if (this.showFlightFields) {
-      const vuelo = String(this.form.get('Vuelo')?.value || '').trim();
-      const tipoVuelo = String(this.form.get('TipoVuelo')?.value || '').trim();
-      partes.push(`Vuelo: ${vuelo || '—'} (${tipoVuelo || '—'}).`);
-    }
-
-    partes.push('¿Deseas continuar?');
-    return partes.join('\n');
+      `Total: ${moneda} ${valor.toLocaleString('es-CO')}.`,
+      '¿Deseas continuar con la creación del transfer?'
+    ].join('\n');
   }
 
   private requestCreateTransferConfirmation(): Promise<boolean> {
     return new Promise((resolve) => {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'info',
         title: '¿Todo listo?',
@@ -733,6 +882,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   private processSubmit(): void {
     this.isSubmitting.set(true);
 
+    if (!this.validateFechaTransferBeforeSubmit()) {
+      this.isSubmitting.set(false);
+      return;
+    }
+
     // validar campos de vuelo si aplica (se requiere tipo y número de vuelo)
     if (this.showFlightFields) {
       if (!this.form.value.Vuelo || !this.form.value.TipoVuelo) {
@@ -746,6 +900,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.markPaymentFilesTouched();
+      this.closeSummaryIfOpen();
       this.navbar.errorToast('Faltan datos', 'Revisa el formulario antes de guardar.');
       this.isSubmitting.set(false);
       return;
@@ -771,7 +926,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.abonos.clear();
     this.form.reset({
       TipoServicio: 'Seleccionar',
-      Rango: 'Seleccionar',
+      Cantidad_Personas: null,
+      Rango: null,
       Moneda: 'COP',
       Valor: 0,
       TipoPago: 'PagaEnPunto',
@@ -784,6 +940,10 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.pagoPagadoFileName = null;
     this.abonoFiles.clear();
     this.abonoFileNames.clear();
+    this.selectedRango = null;
+    this.selectedRangoDescripcion = null;
+    this.precioSeleccionado = null;
+    this.valorEsEditable = false;
     this.toggleSummary(false);
     this.syncPaymentFileValidators();
   }

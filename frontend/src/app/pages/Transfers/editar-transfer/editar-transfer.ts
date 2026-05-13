@@ -10,6 +10,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-editar-transfer',
@@ -21,9 +22,74 @@ import { UppercaseInputDirective } from '../../../shared/directives/uppercase-in
 export class EditarTransferComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+  private originalTransfer: any = null;
 
   private toUpperText(value: unknown): string {
     return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+  }
+
+  private getTodayYmd(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private normalizeYmd(value: unknown): string | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+
+    const parts = raw.split('-');
+    if (parts.length !== 3) return null;
+
+    const [yearPart, monthPart, dayPart] = parts;
+    if (!/^\d{4}$/.test(yearPart) || !/^\d{1,2}$/.test(monthPart) || !/^\d{1,2}$/.test(dayPart)) {
+      return null;
+    }
+
+    const year = Number(yearPart);
+    const month = Number(monthPart);
+    const day = Number(dayPart);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    const parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() !== month - 1 ||
+      parsed.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return `${yearPart}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  private fechaNoPasadaValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const normalized = this.normalizeYmd(control.value);
+      if (!normalized) return control.value ? { fechaInvalida: true } : null;
+      return normalized < this.getTodayYmd() ? { fechaPasada: true } : null;
+    };
+  }
+
+  private validateFechaTransferBeforeSubmit(): boolean {
+    const fechaCtrl = this.form?.get('Fecha');
+    if (!fechaCtrl) return true;
+
+    const normalized = this.normalizeYmd(fechaCtrl.value);
+    if (!normalized) return true;
+
+    if (normalized < this.getTodayYmd()) {
+      const currentErrors = fechaCtrl.errors ?? {};
+      fechaCtrl.setErrors({ ...currentErrors, fechaPasada: true });
+      fechaCtrl.markAsTouched();
+      this.navbar.errorToast('Fecha inválida', 'La fecha del servicio no puede ser anterior a hoy.');
+      return false;
+    }
+
+    return true;
   }
 
   openSummary = false;
@@ -34,8 +100,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
   resultsMonedas: any[] = [];
+  selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
+  valorEsEditable = false;
+  private rangoLookupSeq = 0;
   showFlightFields = false;
 
   // Archivos de comprobantes
@@ -51,6 +120,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     altFormat: 'd/m/Y',
     allowInput: false,
     disableMobile: true,
+    minDate: this.getTodayYmd(),
     monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
     altInputClass: 'form-input flatpickr-input flatpickr-alt',
     onReady: (_sel, _str, inst: any) => {
@@ -158,7 +228,8 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private router: Router,
     private route: ActivatedRoute,
-    private destroyRef: DestroyRef
+    private destroyRef: DestroyRef,
+    private permisosSvc: PermisosService
   ) { }
 
   private notSeleccionarValidator(): ValidatorFn {
@@ -168,8 +239,111 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     };
   }
 
+  private cantidadPersonasValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const raw = control.value;
+      if (raw === null || raw === undefined || raw === '') return { required: true };
+      const cantidad = Number(raw);
+      if (!Number.isInteger(cantidad) || cantidad < 1) return { cantidadInvalida: true };
+      return null;
+    };
+  }
+
+  private normalizarCantidadPersonas(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const cantidad = Number(value);
+    return Number.isInteger(cantidad) && cantidad > 0 ? cantidad : null;
+  }
+
+  private getMonedaSeleccionada(): any | null {
+    const monedaCodigo = String(this.form?.get('Moneda')?.value || '').trim();
+    if (!monedaCodigo) return null;
+    return this.resultsMonedas.find((m: any) => String(m.Codigo || '').trim() === monedaCodigo) || null;
+  }
+
+  private obtenerRangoDetectado(cantidad: number | null): any | null {
+    if (cantidad === null) return null;
+    return this.resultsRangos.find((r) => {
+      const minimo = Number(r?.Minimo ?? NaN);
+      const maximoRaw = r?.Maximo;
+      const maximo = maximoRaw === null || maximoRaw === undefined || maximoRaw === '' ? null : Number(maximoRaw);
+      return Number.isFinite(minimo)
+        && cantidad >= minimo
+        && (maximo === null || cantidad <= maximo);
+    }) ?? null;
+  }
+
+private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinPrecio?: boolean } = {}): void {
+    if (this.isHydrating || !this.form) return;
+
+    const cantidad = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+    const rangoCtrl = this.form.get('Rango');
+    const valorCtrl = this.form.get('Valor');
+    const rango = this.obtenerRangoDetectado(cantidad);
+
+    this.selectedRango = rango;
+    this.selectedRangoDescripcion = rango?.Descripcion || null;
+
+    if (!cantidad || !rango) {
+      rangoCtrl?.setValue(null, { emitEvent: false });
+      this.precioSeleccionado = null;
+      this.valorEsEditable = true;
+      if (!opts.preservarValor) {
+        valorCtrl?.setValue(0, { emitEvent: false });
+      }
+      this.cdr.markForCheck();
+      return;
+    }
+
+    rangoCtrl?.setValue(rango.Id_Rango ?? rango.id, { emitEvent: false });
+    const moneda = this.getMonedaSeleccionada();
+    const lookupSeq = ++this.rangoLookupSeq;
+
+    this.transferSvc.getPrecioBasePorRangoYMoneda(String(rango.Id_Rango ?? rango.id), String(moneda?.Id_Moneda ?? ''))
+      .pipe(
+        catchError(() => of({ found: false, precio: 0 })),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: (result) => {
+          if (lookupSeq !== this.rangoLookupSeq) return;
+
+          const precio = Number(result?.precio ?? 0);
+          const precioValido = Boolean(result?.found) && Number.isFinite(precio);
+
+          this.precioSeleccionado = precioValido ? precio : null;
+          this.valorEsEditable = true;
+
+          if (opts.preservarValor === true) {
+            this.cdr.markForCheck();
+            return;
+          }
+
+          if (precioValido) {
+            valorCtrl?.setValue(precio, { emitEvent: false });
+          } else {
+            valorCtrl?.setValue(0, { emitEvent: false });
+          }
+
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          if (lookupSeq !== this.rangoLookupSeq) return;
+          this.precioSeleccionado = null;
+          this.valorEsEditable = true;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
+  }
+
+  private closeSummaryIfOpen(): void {
+    if (this.openSummary) {
+      this.openSummary = false;
+    }
   }
 
   public getNombreServicio(): string {
@@ -381,12 +555,13 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       Titular: ['', Validators.required],
       DNI: [''],
       TelefonoTitular: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
-      Rango: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
+      Cantidad_Personas: [null, [this.cantidadPersonasValidator()]],
+      Rango: [null],
       Moneda: ['COP'],
       TipoServicio: ['Seleccionar', [Validators.required, this.notSeleccionarValidator()]],
       Salida: ['', Validators.required],
       Llegada: ['', Validators.required],
-      Fecha: ['', Validators.required],
+      Fecha: ['', [Validators.required, this.fechaNoPasadaValidator()]],
       Hora: [''],
       TipoVuelo: [''],
       Reporta: ['', Validators.required],
@@ -404,50 +579,18 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     this.loadCatalogosAndTransferData();
 
     // Listeners para cambios
-    this.form.get('Rango')?.valueChanges
+    this.form.get('Cantidad_Personas')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((rangoId) => {
+      .subscribe(() => {
         if (this.isHydrating) return;
-        if (!rangoId || rangoId === 'Seleccionar') {
-          this.selectedRangoDescripcion = null;
-          this.precioSeleccionado = null;
-          this.form.get('Valor')?.setValue(0);
-          return;
-        }
-        const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
-        this.selectedRangoDescripcion = r ? r.Descripcion : null;
-        const rId = String(rangoId);
-        this.transferSvc.getPreciosPorRango(rId as any).subscribe({
-          next: (rows) => {
-            const monedaSel = this.form.get('Moneda')?.value || 'COP';
-            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === monedaSel);
-            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-            this.precioSeleccionado = precio;
-            this.form.get('Valor')?.setValue(precio ?? 0);
-            this.cdr.markForCheck();
-          },
-          error: () => {
-            this.precioSeleccionado = null;
-            this.form.get('Valor')?.setValue(0);
-          }
-        });
+        this.actualizarRangoDetectado({ preservarValor: false, notificarSinPrecio: true });
       });
 
     this.form.get('Moneda')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((mon) => {
+      .subscribe(() => {
         if (this.isHydrating) return;
-        const rangoId = this.form.get('Rango')?.value;
-        if (!rangoId || rangoId === 'Seleccionar') return;
-        this.transferSvc.getPreciosPorRango(rangoId).subscribe({
-          next: (rows) => {
-            const precioMoneda = rows.find((p: any) => p.MonedaCodigo === mon);
-            const precio = precioMoneda ? Number(precioMoneda.Precio) : (rows[0] ? Number(rows[0].Precio) : null);
-            this.precioSeleccionado = precio;
-            this.form.get('Valor')?.setValue(precio ?? 0);
-            this.cdr.markForCheck();
-          }, error: () => { }
-        });
+        this.actualizarRangoDetectado({ preservarValor: false, notificarSinPrecio: true });
       });
 
     this.form.get('TipoServicio')?.valueChanges
@@ -484,6 +627,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         const msg = tipo === 'Internacional'
           ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
           : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
+        this.closeSummaryIfOpen();
         this.navbar.alert.set({
           type: 'info',
           title: 'Recomendación',
@@ -539,6 +683,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   private fillFormWithTransferData(data: any): void {
     const transfer = data.transfer || data;
     const pagos = data.pagos || [];
+    this.originalTransfer = structuredClone(transfer);
 
     this.isHydrating = true;
     try {
@@ -547,7 +692,8 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         Titular: transfer.Nombre_Titular || '',
         DNI: transfer.DNI || '',
         TelefonoTitular: transfer.Telefono_Titular || '',
-        Rango: transfer.Id_Rango || 'Seleccionar',
+        Cantidad_Personas: transfer.Cantidad_Personas ?? null,
+        Rango: transfer.Id_Rango || null,
         Moneda: transfer.MonedaCodigo || 'COP',
         TipoServicio: transfer.Id_Servicio || 'Seleccionar',
         Salida: transfer.Punto_Salida || '',
@@ -589,13 +735,6 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         });
       }
 
-      // Actualizar descripciones
-      const rangoId = this.form.get('Rango')?.value;
-      if (rangoId && rangoId !== 'Seleccionar') {
-        const r = this.resultsRangos.find(rr => String(rr.Id_Rango ?? rr.id) === String(rangoId));
-        this.selectedRangoDescripcion = r ? r.Descripcion : null;
-      }
-
       // Detectar si necesita campos de vuelo
       const serviceId = this.form.get('TipoServicio')?.value;
       if (serviceId && serviceId !== 'Seleccionar') {
@@ -606,13 +745,19 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       this.form.markAsPristine();
     } finally {
       this.isHydrating = false;
+      this.actualizarRangoDetectado({ preservarValor: true, notificarSinPrecio: false });
     }
   }
 
   async onSubmit(): Promise<void> {
     if (this.isSubmitting()) return;
+    this.closeSummaryIfOpen();
 
     this.form.updateValueAndValidity({ emitEvent: false });
+    if (!this.validateFechaTransferBeforeSubmit()) {
+      this.isSubmitting.set(false);
+      return;
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
 
@@ -620,11 +765,11 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       const friendly: Record<string, string> = {
         Titular: 'Titular',
         TelefonoTitular: 'Teléfono del titular (ej: +573001234567)',
-        Rango: 'Rango de pasajeros',
+        Cantidad_Personas: 'Cantidad de personas',
         TipoServicio: 'Tipo de servicio',
         Salida: 'Punto de salida',
         Llegada: 'Punto de llegada',
-        Fecha: 'Fecha del servicio',
+        Fecha: 'Fecha del servicio (no puede ser anterior a hoy)',
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
         Reporta: 'Nombre del reportante',
@@ -633,6 +778,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
 
       const fields = invalid.map(f => friendly[f] || f);
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
+      this.closeSummaryIfOpen();
 
       this.navbar.alert.set({
         type: 'error',
@@ -644,11 +790,168 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const cantidadPersonas = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+    if (cantidadPersonas !== null && !this.selectedRango) {
+      this.navbar.errorToast('Rango no encontrado', 'No existe un rango configurado para la cantidad de personas indicada.');
+      return;
+    }
+
+    this.closeSummaryIfOpen();
+
+    const confirmed = await this.requestUpdateTransferConfirmation();
+    if (!confirmed) return;
+
     this.processSubmit();
+  }
+
+  private buildUpdateTransferConfirmationMessage(): string {
+    const fecha = String(this.form.get('Fecha')?.value || '').trim();
+    const cantidad = String(this.form.get('Cantidad_Personas')?.value || '').trim();
+    const rangoDescripcion = this.selectedRangoDescripcion || '—';
+    const salida = String(this.form.get('Salida')?.value || '').trim();
+    const llegada = String(this.form.get('Llegada')?.value || '').trim();
+    const moneda = String(this.form.get('Moneda')?.value || 'COP').trim();
+    const valor = Number(this.form.get('Valor')?.value || 0);
+
+    return [
+      `Fecha: ${fecha || '—'}.`,
+      `Pasajeros: ${cantidad || '—'} (${rangoDescripcion}).`,
+      `Ruta: ${salida || '—'} → ${llegada || '—'}.`,
+      `Total: ${moneda} ${valor.toLocaleString('es-CO')}.`,
+      '¿Deseas continuar con la actualización del transfer?'
+    ].join('\n');
+  }
+
+  private requestUpdateTransferConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.closeSummaryIfOpen();
+      this.navbar.alert.set({
+        type: 'info',
+        title: '¿Confirmar actualización?',
+        message: this.buildUpdateTransferConfirmationMessage(),
+        autoClose: false,
+        buttons: [
+          {
+            text: 'Cancelar',
+            style: 'secondary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              resolve(false);
+            }
+          },
+          {
+            text: 'Actualizar',
+            style: 'primary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              resolve(true);
+            }
+          }
+        ]
+      });
+    });
+  }
+
+  get puedeCancelarTransfer(): boolean {
+    const estado = String(this.originalTransfer?.Estado ?? '').trim().toLowerCase();
+    return !!this.getTransferIdFromRoute() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
+
+  get canDeleteTransfer(): boolean {
+    return this.permisosSvc.tienePermiso('TRANSFERS.ELIMINAR');
+  }
+
+  cancelarTransfer(): void {
+    const id = this.getTransferIdFromRoute();
+    if (!id || !this.puedeCancelarTransfer) return;
+
+    this.closeSummaryIfOpen();
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Cancelar transfer',
+      message: `¿Deseas cancelar el transfer #${id}? La información no se eliminará y quedará sólo para consulta futura.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Mantener',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Cancelar transfer',
+          style: 'primary',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.isSubmitting.set(true);
+            this.transferSvc.cancelarTransfer(id).subscribe({
+              next: () => {
+                this.navbar.successToast('Transfer cancelado', `El transfer #${id} quedó en estado Cancelado.`);
+                this.form.markAsPristine();
+                this.isSubmitting.set(false);
+                this.router.navigate(['/Transfers/VerTransfers']);
+              },
+              error: (err) => {
+                const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo cancelar el transfer.';
+                this.navbar.errorToast('No se pudo cancelar', message);
+                this.isSubmitting.set(false);
+              }
+            });
+          }
+        }
+      ]
+    });
+  }
+
+  eliminarTransfer(): void {
+    const id = this.getTransferIdFromRoute();
+    if (!id || !this.canDeleteTransfer) return;
+
+    this.closeSummaryIfOpen();
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar transfer',
+      message: `¿Deseas eliminar el transfer #${id}? Esta acción eliminará el registro de forma permanente.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Eliminar',
+          style: 'delete',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.isSubmitting.set(true);
+            this.transferSvc.deleteTransfer(id).subscribe({
+              next: () => {
+                this.navbar.needsRefresh.set('transfers');
+                this.navbar.successToast('Transfer eliminado', `El transfer #${id} fue eliminado correctamente.`);
+                this.isSubmitting.set(false);
+                this.router.navigate(['/Transfers/VerTransfers']);
+              },
+              error: (err) => {
+                const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo eliminar el transfer.';
+                this.navbar.errorToast('No se pudo eliminar', message);
+                this.isSubmitting.set(false);
+              }
+            });
+          }
+        }
+      ]
+    });
   }
 
   private processSubmit(): void {
     this.isSubmitting.set(true);
+
+    if (!this.validateFechaTransferBeforeSubmit()) {
+      this.isSubmitting.set(false);
+      return;
+    }
 
     const transferId = this.getTransferIdFromRoute();
     if (!transferId) {
@@ -692,7 +995,8 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       Titular: this.toUpperText(this.form.value.Titular),
       DNI: this.toUpperText(this.form.value.DNI),
       Tel_Contacto: this.form.value.TelefonoTitular || '',
-      Id_Rango: this.form.value.Rango,
+      Cantidad_Personas: this.normalizarCantidadPersonas(this.form.value.Cantidad_Personas),
+      Id_Rango: this.selectedRango?.Id_Rango ?? this.form.value.Rango ?? null,
       RangoDescripcion: this.selectedRangoDescripcion,
       Servicio: this.form.value.TipoServicio,
       Salida: this.toUpperText(this.form.value.Salida),
@@ -703,7 +1007,9 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       Vuelo: this.toUpperText(this.form.value.Vuelo),
       TipoVuelo: this.toUpperText(this.form.value.TipoVuelo),
       TelefonoTransfer: this.form.value.TelefonoReserva || '',
-      ValorServicio: this.form.value.Valor,
+      Id_Moneda: this.getMonedaSeleccionada()?.Id_Moneda ?? null,
+      ValorServicio: Number(this.form.value.Valor || 0),
+      Valor: Number(this.form.value.Valor || 0),
       Moneda: this.form.value.Moneda,
       Observaciones: this.toUpperText(this.form.value.Observaciones),
       Estado: null,

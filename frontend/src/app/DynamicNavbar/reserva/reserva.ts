@@ -14,11 +14,13 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
 import { Reservas } from '../../services/Reservas/reservas';
+import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { logoBase64 } from '../../../../public/assets/img/logoBase64';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
+import { PermisosService } from '../../services/Permisos/permisos.service';
 
 // PDF.js
 import * as pdfjsLib from 'pdfjs-dist';
@@ -110,7 +112,8 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     private api: Reservas,
     private cdr: ChangeDetectorRef,
     private router: Router,
-    private navbar: DynamicIslandGlobalService
+    private navbar: DynamicIslandGlobalService,
+    private permisosService: PermisosService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -128,6 +131,14 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return !!this.reserva?.Id_Reserva && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
+  get canDeleteReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
+  }
+
+  get estadoNormalizado(): string {
+    return String(this.reserva?.Estado || 'pendiente').toLowerCase();
+  }
+
   editarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id) return;
@@ -136,6 +147,34 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     try { this.navbar.closePanel(); } catch {}
     try { this.onClose.emit(); } catch {}
     this.router.navigate([`/Reservas/EditarReserva`, this.reserva.Id_Reserva]);
+  }
+
+  async abrirDuplicarReserva() {
+    const reserva = this.reserva;
+    if (!reserva?.Id_Reserva) return;
+
+    try {
+      const tours = await firstValueFrom(this.api.getTours());
+      this.navbar.openPanel({
+        id: 'duplicar-reserva',
+        component: DuplicarPanelComponent,
+        props: {
+          tours,
+          Id_Tour: reserva.Id_Tour ?? null,
+          Fecha_Tour: reserva.FechaReserva ?? null,
+          Observaciones: reserva.Observaciones ?? null,
+        },
+      });
+    } catch (error) {
+      console.error('No se pudo abrir el panel de duplicado:', error);
+      this.navbar.alert.set({
+        type: 'error',
+        title: 'No se pudo abrir duplicar',
+        message: 'No fue posible cargar los tours disponibles. Intenta nuevamente.',
+        autoClose: true,
+        autoCloseTime: 4000,
+      });
+    }
   }
 
   cancelarReserva() {
@@ -179,6 +218,50 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           text: 'Cerrar',
           style: 'secondary',
           onClick: () => this.navbar.alert.set(null)
+        }
+      ]
+    });
+  }
+
+  eliminarReserva() {
+    const id = this.reserva?.Id_Reserva;
+    if (!id || !this.canDeleteReserva) return;
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar reserva',
+      message: `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Eliminar',
+          style: 'delete',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.api.deleteReserva(id).subscribe({
+              next: () => {
+                this.navbar.needsRefresh.set('reservas');
+                this.navbar.Id_Reserva.set(null);
+                try { this.navbar.closePanel(); } catch {}
+                try { this.onClose.emit(); } catch {}
+                this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
+              },
+              error: (err) => {
+                this.navbar.alert.set({
+                  type: 'error',
+                  title: 'No se pudo eliminar',
+                  message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+                  autoClose: true,
+                  autoCloseTime: 4000
+                });
+              }
+            });
+          }
         }
       ]
     });
@@ -504,11 +587,10 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     doc.setFontSize(11);
     doc.setTextColor(90, 90, 90);
     doc.text(`Reserva #${r?.Id_Reserva || '—'}`, 50, 25);
-    doc.text(`Estado: ${r?.Estado || '—'}`, 50, 31);
-    doc.text(`Generada: ${this.formatDate(new Date())}`, 50, 37);
-    doc.line(10, 42, pageWidth - 10, 42);
+    doc.text(`Generada: ${this.formatDate(new Date())}`, 50, 31);
+    doc.line(10, 36, pageWidth - 10, 36);
 
-    y = 48;
+    y = 42;
 
     y = this.ensurePdfSpace(doc, y, 36);
     doc.setFontSize(12);
@@ -525,14 +607,11 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       head: [['Campo', 'Detalle']],
       body: [
         ['Reserva', r?.Id_Reserva || '—'],
-        ['Estado', r?.Estado || '—'],
         ['Tour', r?.TourReserva || '—'],
         ['Fecha del tour', this.formatDate(r?.FechaReserva)],
         ['Idioma', r?.IdiomaReserva || '—'],
         ['Pasajeros', String(r?.NumeroPasajeros ?? 0)],
-        ['Responsable', this.responsable?.nombre || r?.Reportante?.Nombre || '—'],
         ['Teléfono de contacto', this.responsable?.telefono || r?.Reportante?.Telefono || '—'],
-        ['Canal', this.responsable?.CanalReserva || r?.CanalReserva || '—'],
       ],
     });
 

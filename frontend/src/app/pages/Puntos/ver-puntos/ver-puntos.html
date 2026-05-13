@@ -123,9 +123,11 @@
             <button type="button" class="btn-action btn-action--edit" (click)="editarPunto(p)">
               Editar
             </button>
-            <button type="button" class="btn-action btn-action--delete" (click)="confirmEliminarPunto(p)">
-              Eliminar
-            </button>
+            @if (canDeletePunto) {
+              <button type="button" class="btn-action btn-action--delete" (click)="confirmEliminarPunto(p)">
+                Eliminar
+              </button>
+            }
           </div>
 
         </div>

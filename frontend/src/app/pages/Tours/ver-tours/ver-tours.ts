@@ -5,6 +5,7 @@ import { Reservas, Tour } from '../../../services/Reservas/reservas';
 import { Tours } from '../../../services/Tours/tours';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { Router } from '@angular/router';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
     selector: 'app-ver-tours',
@@ -18,6 +19,7 @@ export class VerToursComponent implements OnInit {
     private toursService = inject(Tours);
     private navbar = inject(DynamicIslandGlobalService);
     private router = inject(Router);
+    private permisosService = inject(PermisosService);
 
     tours = signal<Tour[]>([]);
     isLoading = signal(true);
@@ -33,6 +35,10 @@ export class VerToursComponent implements OnInit {
 
     // filtro simple - por ahora devuelve todos, expón como función para template
     toursFiltrados = () => this.tours();
+
+    get canDeleteTour(): boolean {
+        return this.permisosService.tienePermiso('TOURS.ELIMINAR');
+    }
 
     ngOnInit(): void {
         this.listar();

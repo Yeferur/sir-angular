@@ -72,7 +72,9 @@
 
           <div class="card-footer">
             <button class="btn-secondary" (click)="editarTour(tour)">Editar</button>
-            <button class="btn-danger" (click)="eliminarTour(tour)">Eliminar</button>
+            @if (canDeleteTour) {
+              <button class="btn-danger" (click)="eliminarTour(tour)">Eliminar</button>
+            }
           </div>
 
         </div>

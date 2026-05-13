@@ -844,10 +844,25 @@
       </div>
     </div>
 
-    <div class="summary-actions" [class.two-actions]="showDuplicate">
+    <div class="summary-actions"
+      [class.two-actions]="showDuplicate || puedeCancelarReserva || canDeleteReserva"
+      [class.three-actions]="(showDuplicate && puedeCancelarReserva) || (showDuplicate && canDeleteReserva) || (puedeCancelarReserva && canDeleteReserva)"
+      [class.four-actions]="showDuplicate && puedeCancelarReserva && canDeleteReserva">
       @if (showDuplicate) {
         <button type="button" class="btn-duplicate" (click)="duplicarReserva()">
           Duplicar Reserva
+        </button>
+      }
+
+      @if (puedeCancelarReserva) {
+        <button type="button" class="btn-cancel-summary" (click)="cancelarReserva()" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Procesando...' : 'Cancelar reserva' }}
+        </button>
+      }
+
+      @if (canDeleteReserva) {
+        <button type="button" class="btn-delete-summary" (click)="eliminarReserva()" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Procesando...' : 'Eliminar reserva' }}
         </button>
       }
 

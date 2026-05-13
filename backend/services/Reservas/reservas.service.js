@@ -511,6 +511,26 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
   return { cuposDisponibles: restantes, cuposTotales: cupoInfo.cuposTotales };
 }
 
+async function devolverCuposReservaEliminada({ conn, idTour, fechaTour, cantidadLiberada }) {
+  const cupoInfo = await bloquearDisponibilidad(conn, idTour, fechaTour);
+  const nuevosDisponibles = Math.min(
+    Number(cupoInfo.cuposTotales || 0),
+    Number(cupoInfo.cuposDisponibles || 0) + Number(cantidadLiberada || 0)
+  );
+
+  await conn.query(
+    `UPDATE Disponibilidad
+        SET Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
+      WHERE Id_Tour = ? AND Fecha_Tour = ?`,
+    [nuevosDisponibles, idTour, fechaTour]
+  );
+
+  return {
+    cuposTotales: Number(cupoInfo.cuposTotales || 0),
+    cuposDisponibles: nuevosDisponibles,
+  };
+}
+
 /* ===========================
  * LISTADOS / LECTURA
  * =========================== */
@@ -1520,6 +1540,114 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
   }
 }
 
+async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
+  let conn;
+  try {
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT
+          r.Id_Reserva,
+          r.Estado,
+          r.Tipo_Reserva,
+          r.Fecha_Tour,
+          r.Nombre_Reportante,
+          h.Id_Tour
+       FROM reservas r
+       LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+      WHERE r.Id_Reserva = ?
+      LIMIT 1
+      FOR UPDATE`,
+      [Id_Reserva]
+    );
+
+    if (!rows?.length) {
+      const err = new Error('Reserva no encontrada');
+      err.status = 404;
+      err.errorCode = 'RESERVA_NOT_FOUND';
+      throw err;
+    }
+
+    const reserva = rows[0];
+
+    const [[resumenDeps]] = await conn.query(
+      `SELECT
+          COALESCE((SELECT COUNT(*) FROM pasajeros WHERE Id_Reserva = ?), 0) AS pasajeros,
+          COALESCE((SELECT COUNT(*) FROM pagos_reservas WHERE Id_Reserva = ?), 0) AS pagos,
+          COALESCE((
+            SELECT COUNT(*)
+              FROM pagos_reservas
+             WHERE Id_Reserva = ?
+               AND Ruta_Comprobante IS NOT NULL
+               AND Ruta_Comprobante <> ''
+               AND Ruta_Comprobante <> 'N/A'
+          ), 0) AS comprobantes`,
+      [Id_Reserva, Id_Reserva, Id_Reserva]
+    );
+
+    let cuposLiberados = null;
+    const tipoReserva = String(reserva.Tipo_Reserva || '').toLowerCase();
+    const fechaTour = normalizarFechaYMD(reserva.Fecha_Tour);
+    const idTour = Number(reserva.Id_Tour || 0) || null;
+    const cantidadPasajeros = await obtenerCuposActualesReserva(conn, Id_Reserva);
+    const debeLiberarCupos = tipoReserva === 'grupal'
+      && cantidadPasajeros > 0
+      && reserva.Estado !== 'Cancelada'
+      && idTour
+      && fechaTour;
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'reservas',
+      id_registro: Id_Reserva,
+      accion: 'ELIMINAR_RESERVA',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Estado', anterior: reserva.Estado || null, nuevo: 'ELIMINADA' },
+        { columna: 'Tipo_Reserva', anterior: reserva.Tipo_Reserva || null, nuevo: null },
+        { columna: 'Fecha_Tour', anterior: fechaTour || null, nuevo: null },
+        { columna: 'Id_Tour', anterior: reserva.Id_Tour || null, nuevo: null },
+        { columna: 'Nombre_Reportante', anterior: reserva.Nombre_Reportante || null, nuevo: null },
+        { columna: 'Pasajeros_Eliminados', anterior: resumenDeps.pasajeros || 0, nuevo: 0 },
+        { columna: 'Pagos_Eliminados', anterior: resumenDeps.pagos || 0, nuevo: 0 },
+      ]
+    });
+
+    await conn.query('DELETE FROM pagos_reservas WHERE Id_Reserva = ?', [Id_Reserva]);
+    await conn.query('DELETE FROM pasajeros WHERE Id_Reserva = ?', [Id_Reserva]);
+    await conn.query('DELETE FROM reservas WHERE Id_Reserva = ?', [Id_Reserva]);
+
+    if (debeLiberarCupos) {
+      cuposLiberados = await devolverCuposReservaEliminada({
+        conn,
+        idTour,
+        fechaTour,
+        cantidadLiberada: cantidadPasajeros,
+      });
+    }
+
+    await conn.commit();
+
+    return {
+      Id_Reserva: String(Id_Reserva),
+      dependenciasEliminadas: {
+        pasajeros: Number(resumenDeps.pasajeros || 0),
+        pagos: Number(resumenDeps.pagos || 0),
+        comprobantesReferenciados: Number(resumenDeps.comprobantes || 0),
+      },
+      cuposLiberados,
+      comprobantesFisicosEliminados: false,
+    };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    try { await logSistema({ mensaje: `eliminarReserva error: ${error.message || error}`, meta: { Id_Reserva, userId, clientIp } }); } catch (_) {}
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
 async function eliminarComprobantePagoReserva(Id_Reserva, Id_Pago, userId = null, clientIp = null) {
   let conn;
   let rutaEliminar = null;
@@ -1738,6 +1866,7 @@ module.exports = {
   crearReservaConPasajerosYPagos,
   actualizarReservaConPasajerosYPagos,
   cancelarReservaSvc,
+  eliminarReservaSvc,
   // detail + aux
   obtenerReservaDetalle,
   obtenerComisiones,

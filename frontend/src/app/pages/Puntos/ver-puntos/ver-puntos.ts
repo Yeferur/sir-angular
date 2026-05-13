@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import {
@@ -36,6 +37,7 @@ export class VerPuntos implements OnInit {
   private puntosSvc = inject(puntosService);
   private navbar = inject(DynamicIslandGlobalService);
   private router = inject(Router);
+  private permisosService = inject(PermisosService);
 
   // ui
   searchTerm = '';
@@ -86,6 +88,10 @@ export class VerPuntos implements OnInit {
   );
 
   ngOnInit(): void { }
+
+  get canDeletePunto(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.ELIMINAR');
+  }
 
   /* ===============================
      NAV

@@ -15,12 +15,17 @@ exports.authMiddleware = async (req, res, next) => {
 
     // Validar que el token exista en la base de datos
     const [rows] = await db.query(
-      'SELECT * FROM sesiones WHERE Token = ?',
+      `SELECT s.Token, s.Id_Usuario
+       FROM sesiones s
+       INNER JOIN usuarios u ON u.Id_Usuario = s.Id_Usuario
+       WHERE s.Token = ?
+         AND u.Activo = 1
+       LIMIT 1`,
       [token]
     );
 
     if (rows.length === 0) {
-      return res.status(401).json({ error: 'Sesión inválida o cerrada' });
+      return res.status(401).json({ error: 'Sesión inválida, cerrada o usuario inactivo' });
     }
 
     req.user = decoded;

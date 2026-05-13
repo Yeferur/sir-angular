@@ -19,6 +19,7 @@ const {
   obtenerReservaDetalle,
   actualizarReservaConPasajerosYPagos,
   cancelarReservaSvc,
+  eliminarReservaSvc,
   getPuntoByIdSvc,
   verificarDniDuplicado,
   obtenerHistorialCambiosReserva,
@@ -235,4 +236,12 @@ exports.cancelReserva = asyncHandler(async (req, res) => {
   const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
   const data = await cancelarReservaSvc(id, userId, clientIp);
   return sendSuccess(res, { data, message: 'Reserva cancelada correctamente' });
+});
+
+exports.deleteReserva = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id || null;
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
+  const data = await eliminarReservaSvc(id, userId, clientIp);
+  return sendSuccess(res, { data, message: 'Reserva eliminada correctamente' });
 });

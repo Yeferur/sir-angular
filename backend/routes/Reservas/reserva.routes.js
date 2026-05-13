@@ -27,6 +27,7 @@ router.get('/reservas/:id/detalle', authMiddleware, checkPermission('RESERVAS.LE
 router.get('/reservas/:id/historial-cambios', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getReservaHistorialCambios);
 router.put('/reservas/:id', authMiddleware, checkPermission('RESERVAS.ACTUALIZAR'), reservasController.updateReserva);
 router.patch('/reservas/:id/cancelar', authMiddleware, checkPermission('RESERVAS.ACTUALIZAR'), reservasController.cancelReserva);
+router.delete('/reservas/:id', authMiddleware, checkPermission('RESERVAS.ELIMINAR'), reservasController.deleteReserva);
 
 // (opcional) Punto por Id para hidratar tokens de puntos
 router.get('/reservas/puntos/:id', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getPuntoById);

@@ -1,85 +1,72 @@
 <!-- components/reserva/reserva.html -->
 <div class="page-container">
-
   @if (isLoading) {
     <div class="loading-state">
       <div class="spinner"></div>
       <p>Cargando reserva...</p>
     </div>
   } @else if (reserva) {
-    <div class="reserva-view">
-      <!-- Encabezado Sticky -->
-      <div class="view-header-top">
-        <div class="header-main">
-          <h1 class="reserva-id">#{{ reserva.Id_Reserva }}</h1>
-          <span class="status-tag"
-                [ngClass]="'status-' + (reserva.Estado || 'pendiente')!.toLowerCase()">
-            {{ reserva.Estado }}
-          </span>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary" (click)="descargarArchivoReserva()">Descargar PDF</button>
-          @if (comprobantesDisponibles.length) {
-            <button class="btn-secondary" (click)="descargarComprobantesReserva()">Comprobantes</button>
-          }
-          @if (puedeCancelar) {
-            <button class="btn-danger" (click)="cancelarReserva()">Cancelar</button>
-          }
-          <button class="btn-primary" (click)="editarReserva()">Editar</button>
-          <button class="btn-close" (click)="onClose.emit()">✕</button>
-        </div>
-      </div>
-
-      <div class="view-header">
-        <div class="metrics-row">
-          <div class="metric-cell">
-            <span class="metric-value">{{ reserva.NumeroPasajeros || 0 }}</span>
-            <span class="metric-label">Pasajeros</span>
+    <div class="reserva-view detail-shell">
+      <header class="detail-header view-header-top">
+        <div class="header-copy detail-header-main detail-header-text header-main">
+          <div class="header-title-row">
+            <h1 class="reserva-title">{{ reserva.Id_Reserva }}</h1>
+            <span class="status-tag" [ngClass]="'status-' + estadoNormalizado">
+              {{ reserva.Estado || 'Pendiente' }}
+            </span>
           </div>
-
-          @if (reserva.TotalNeto != null) {
-            <div class="metric-divider"></div>
-            <div class="metric-cell">
-              <span class="metric-value">
-                {{ reserva.TotalNeto | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-              </span>
-              <span class="metric-label">Total</span>
-            </div>
-          }
-
-          @if (reserva.Pendiente != null) {
-            <div class="metric-divider"></div>
-            <div class="metric-cell">
-              <span class="metric-value">
-                {{ reserva.Pendiente | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-              </span>
-              <span class="metric-label">Pendiente</span>
-            </div>
-          }
         </div>
 
-        @if (reserva.TotalNeto != null && reserva.Pendiente != null) {
-          @let total = reserva.TotalNeto;
-          @let pendiente = reserva.Pendiente;
-          @let pagadoPct = total > 0 ? ((total - pendiente) / total) * 100 : 0;
-          <div class="payment-progress">
-            <div class="progress-track">
-              <div class="progress-fill"
-                [class.green]="pagadoPct >= 100"
-                [class.blue]="pagadoPct >= 50 && pagadoPct < 100"
-                [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
-                [class.red]="pagadoPct === 0"
-                [style.width.%]="pagadoPct">
+        <button class="btn-close" (click)="onClose.emit()">✕</button>
+      </header>
+
+      <main class="detail-scroll">
+        <div class="view-header">
+          <div class="summary-strip">
+            <div class="summary-item">
+              <span class="summary-label">Pasajeros</span>
+              <span class="summary-value">{{ reserva.NumeroPasajeros || 0 }}</span>
+            </div>
+
+            @if (reserva.TotalNeto != null) {
+              <div class="summary-item">
+                <span class="summary-label">Total</span>
+                <span class="summary-value">
+                  {{ reserva.TotalNeto | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                </span>
               </div>
-            </div>
-            <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
-          </div>
-        }
-      </div>
+            }
 
-      <!-- Detalles -->
-      <div class="details-grid">
-        <!-- Detalles del Tour -->
+            @if (reserva.Pendiente != null) {
+              <div class="summary-item">
+                <span class="summary-label">Pendiente</span>
+                <span class="summary-value">
+                  {{ reserva.Pendiente | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                </span>
+              </div>
+            }
+          </div>
+
+          @if (reserva.TotalNeto != null && reserva.Pendiente != null) {
+            @let total = reserva.TotalNeto;
+            @let pendiente = reserva.Pendiente;
+            @let pagadoPct = total > 0 ? ((total - pendiente) / total) * 100 : 0;
+            <div class="payment-progress">
+              <div class="progress-track">
+                <div class="progress-fill"
+                  [class.green]="pagadoPct >= 100"
+                  [class.blue]="pagadoPct >= 50 && pagadoPct < 100"
+                  [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
+                  [class.red]="pagadoPct === 0"
+                  [style.width.%]="pagadoPct">
+                </div>
+              </div>
+              <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
+            </div>
+          }
+        </div>
+
+        <div class="details-grid">
         <div class="card detail-card">
           <div class="card-header"><h2>Detalles del Tour</h2></div>
           <div class="card-body">
@@ -89,9 +76,7 @@
             </div>
             <div class="info-row">
               <span class="info-label">Fecha</span>
-              <span class="info-value">
-                {{ reserva.FechaReserva | date:'fullDate':'':'es-CO' }}
-              </span>
+              <span class="info-value">{{ reserva.FechaReserva | date:'fullDate':'':'es-CO' }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Punto de Encuentro</span>
@@ -101,7 +86,6 @@
               <span class="info-label">Hora de Salida</span>
               <span class="info-value">{{ reserva.HoraSalida || '—' }}</span>
             </div>
-
             @if (reserva.IdiomaReserva) {
               <div class="info-row">
                 <span class="info-label">Idioma</span>
@@ -111,7 +95,6 @@
           </div>
         </div>
 
-        <!-- Responsable -->
         <div class="card detail-card">
           <div class="card-header"><h2>Responsable</h2></div>
           <div class="card-body">
@@ -135,7 +118,7 @@
         <div class="observations-section">
           <div class="card detail-card">
             <div class="card-header"><h2>Observaciones</h2></div>
-            <div class="card-body">
+            <div class="card-body compact-rows">
               <div class="observations-text">
                 {{ reserva.Observaciones }}
               </div>
@@ -148,9 +131,9 @@
         <div class="observations-section">
           <div class="card detail-card">
             <div class="card-header"><h2>Comprobantes</h2></div>
-            <div class="card-body">
+            <div class="card-body compact-rows">
               @for (c of comprobantesDisponibles; track c.id ?? c.url ?? c.filename) {
-                <div class="info-row">
+                <div class="info-row info-row-compact">
                   <span class="info-label">
                     {{ c.tipo || c.nombre || 'Comprobante' }}
                   </span>
@@ -164,56 +147,81 @@
         </div>
       }
 
-      <!-- Pasajeros -->
       <div class="passengers-section">
-        <div class="passengers-title-row">
-          <h2>Pasajeros ({{ reserva.NumeroPasajeros || 0 }})</h2>
+        <div class="section-head">
+          <h2>Pasajeros</h2>
+          <span class="section-count">{{ reserva.NumeroPasajeros || 0 }}</span>
         </div>
 
         <div class="passengers-grid" [ngClass]="tipoClases">
-          <!-- Adultos -->
           @for (p of pasajeros.adultos; track p.id ?? p.NombrePasajero; let i = $index) {
             <div class="passenger-card passenger-card-adulto">
-              <div class="passenger-card-header">
-                <span class="passenger-pill adulto">Adulto</span>
-                <span class="passenger-price">
-                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-                </span>
+              <div class="passenger-row">
+                <div class="passenger-main">
+                  <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
+                  <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                </div>
+                <div class="passenger-side">
+                  <span class="passenger-pill adulto">Adulto</span>
+                  <span class="passenger-price">
+                    {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                  </span>
+                </div>
               </div>
-              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
-              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
             </div>
           }
 
-          <!-- Niños -->
           @for (p of pasajeros.ninos; track p.id ?? p.NombrePasajero; let i = $index) {
             <div class="passenger-card passenger-card-nino">
-              <div class="passenger-card-header">
-                <span class="passenger-pill nino">Niño</span>
-                <span class="passenger-price">
-                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-                </span>
+              <div class="passenger-row">
+                <div class="passenger-main">
+                  <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
+                  <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                </div>
+                <div class="passenger-side">
+                  <span class="passenger-pill nino">Niño</span>
+                  <span class="passenger-price">
+                    {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                  </span>
+                </div>
               </div>
-              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
-              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
             </div>
           }
 
-          <!-- Infantes -->
           @for (p of pasajeros.infantes; track p.id ?? p.NombrePasajero; let i = $index) {
             <div class="passenger-card passenger-card-infante">
-              <div class="passenger-card-header">
-                <span class="passenger-pill infante">Infante</span>
-                <span class="passenger-price">
-                  {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
-                </span>
+              <div class="passenger-row">
+                <div class="passenger-main">
+                  <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
+                  <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                </div>
+                <div class="passenger-side">
+                  <span class="passenger-pill infante">Infante</span>
+                  <span class="passenger-price">
+                    {{ (p.Precio_Pasajero || 0) | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+                  </span>
+                </div>
               </div>
-              <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
-              <span class="passenger-detail">{{ p.IdPas || '—' }}</span>
             </div>
           }
         </div>
       </div>
+      </main>
+
+      <footer class="detail-footer actions-footer">
+        <button class="btn-secondary action-pill" (click)="descargarArchivoReserva()">Descargar PDF</button>
+        @if (comprobantesDisponibles.length) {
+          <button class="btn-secondary action-pill" (click)="descargarComprobantesReserva()">Descargar comprobantes</button>
+        }
+        <button class="btn-secondary action-pill" (click)="abrirDuplicarReserva()">Duplicar</button>
+        @if (puedeCancelar) {
+          <button class="btn-danger" (click)="cancelarReserva()">Cancelar</button>
+        }
+        @if (canDeleteReserva) {
+          <button class="btn-danger action-pill" (click)="eliminarReserva()">Eliminar</button>
+        }
+        <button class="btn-primary" (click)="editarReserva()">Editar</button>
+      </footer>
     </div>
   }
 </div>

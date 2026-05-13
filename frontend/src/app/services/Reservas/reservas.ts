@@ -291,4 +291,8 @@ export class Reservas {
   cancelarReserva(Id_Reserva: number | string): Observable<any> {
     return this.http.patch<any>(`${this.apiUrl}/reservas/${Id_Reserva}/cancelar`, {});
   }
+
+  deleteReserva(Id_Reserva: number | string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/reservas/${Id_Reserva}`);
+  }
 }

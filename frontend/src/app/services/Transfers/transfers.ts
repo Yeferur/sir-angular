@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -23,6 +24,10 @@ export class TransferService {
   cancelarTransfer(id: string | number): Observable<any> {
     return this.http.patch<any>(`${this.apiUrl}/Transfer/${id}/Cancelar`, {});
   }
+
+  deleteTransfer(id: string | number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/Transfer/${id}`);
+  }
   
   getRangos(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/Rangos`);
@@ -30,6 +35,37 @@ export class TransferService {
 
   getPreciosPorRango(Id_Rango: number | string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/Precios`, { params: { Id_Rango: String(Id_Rango) } });
+  }
+
+  getPrecioBasePorRangoYMoneda(Id_Rango: number | string, Id_Moneda: number | string): Observable<{ found: boolean; precio: number }> {
+    if (Id_Rango === null || Id_Rango === undefined || Id_Rango === '' || Id_Moneda === null || Id_Moneda === undefined || Id_Moneda === '') {
+      return of({ found: false, precio: 0 });
+    }
+
+    return this.http.get<any>(`${this.apiUrl}/Transfer/Precios`, {
+      params: {
+        Id_Rango: String(Id_Rango),
+        Id_Moneda: String(Id_Moneda)
+      }
+    }).pipe(
+      map((response: any) => {
+        if (Array.isArray(response)) {
+          const first = response[0] || null;
+          const precio = Number(first?.Precio ?? first?.precio ?? 0);
+          const found = Number.isFinite(precio) && precio > 0;
+          return { found, precio: found ? precio : 0 };
+        }
+
+        if (response && typeof response === 'object') {
+          const precio = Number(response.precio ?? response.Precio ?? 0);
+          const found = response.found === true || Number.isFinite(precio) && precio > 0;
+          return { found, precio: found ? precio : 0 };
+        }
+
+        return { found: false, precio: 0 };
+      }),
+      catchError(() => of({ found: false, precio: 0 }))
+    );
   }
 
   getTransfers(params: any) {

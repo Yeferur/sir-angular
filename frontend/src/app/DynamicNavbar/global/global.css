@@ -129,34 +129,48 @@
   top: 0;
 }
 
-.navbar-container[data-state="reserva"] .dynamic-island {
-  width: clamp(320px, 95vw, 1000px);
-  height: min(95vh, 1000px);
-  border-radius: 28px;
-  padding: 20px;
-  top: 0;
-}
-
+.navbar-container[data-state="reserva"] .dynamic-island,
 .navbar-container[data-state="transfer"] .dynamic-island {
-  width: clamp(320px, 95vw, 1000px);
-  height: min(95vh, 1000px);
+  width: clamp(340px, 88vw, 980px);
+  height: min(88vh, 820px);
+  max-height: min(88vh, 820px);
   border-radius: 28px;
-  padding: 20px;
+  padding: 0;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
+.navbar-container[data-state="reserva"] .island-content,
 .navbar-container[data-state="transfer"] .island-content {
+  display: flex;
+  flex: 1 1 auto;
   height: 100%;
+  min-height: 0;
 }
 
+.navbar-container[data-state="reserva"] .activity-content,
 .navbar-container[data-state="transfer"] .activity-content {
   position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
+  min-height: 0;
   align-items: stretch;
   justify-content: flex-start;
+}
+
+@media (max-width: 600px) {
+  .navbar-container[data-state="reserva"] .dynamic-island,
+  .navbar-container[data-state="transfer"] .dynamic-island {
+    width: min(94vw, 430px);
+    height: min(98vh, 960px);
+    max-height: 98vh;
+    border-radius: 24px;
+  }
 }
 
 .navbar-container[data-state="mapa"] .dynamic-island {

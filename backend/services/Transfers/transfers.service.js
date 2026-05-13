@@ -234,6 +234,124 @@ async function getServiciosTransferSvc() {
   return rows.map(r => ({ id: r.Id_Servicio, Servicio: r.Nombre_Servicio }));
 }
 
+function normalizarCantidadPersonasInput(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const cantidad = Number(value);
+  if (!Number.isInteger(cantidad) || cantidad < 1) {
+    const err = new Error('Cantidad_Personas debe ser un entero mayor o igual a 1.');
+    err.status = 400;
+    err.errorCode = 'BAD_REQUEST';
+    throw err;
+  }
+  return cantidad;
+}
+
+async function getRangoPorCantidadSvc(conn, cantidadPersonas) {
+  const [rows] = await conn.query(
+    `SELECT Id_Rango, Descripcion, Minimo, Maximo
+       FROM transfers_rangos
+      WHERE ? >= Minimo
+        AND (Maximo IS NULL OR ? <= Maximo)
+      ORDER BY Minimo ASC
+      LIMIT 1`,
+    [cantidadPersonas, cantidadPersonas]
+  );
+
+  return rows?.[0] || null;
+}
+
+async function getRangoPorIdSvc(conn, idRango) {
+  const [rows] = await conn.query(
+    `SELECT Id_Rango, Descripcion, Minimo, Maximo
+       FROM transfers_rangos
+      WHERE Id_Rango = ?
+      LIMIT 1`,
+    [idRango]
+  );
+
+  return rows?.[0] || null;
+}
+
+async function getPrecioBasePorRangoSvc(conn, idRango, idMoneda = null) {
+  const params = [idRango];
+  let sql = `
+    SELECT tp.Id_PrecioTransfer, tp.Id_Rango, tp.Id_Moneda, m.Codigo AS MonedaCodigo, tp.Precio
+      FROM transfers_precios tp
+      LEFT JOIN monedas m ON tp.Id_Moneda = m.Id_Moneda
+     WHERE tp.Id_Rango = ?`;
+
+  if (idMoneda === null || idMoneda === undefined || idMoneda === '') {
+    sql += ' AND tp.Id_Moneda IS NULL';
+  } else {
+    sql += ' AND tp.Id_Moneda = ?';
+    params.push(idMoneda);
+  }
+
+  sql += ' ORDER BY tp.Id_PrecioTransfer ASC LIMIT 1';
+
+  const [rows] = await conn.query(sql, params);
+  return rows?.[0] || null;
+}
+
+async function resolverRangoYValorTransfer(conn, payload = {}, opciones = {}) {
+  const cantidadIngresada = Object.prototype.hasOwnProperty.call(payload, 'Cantidad_Personas');
+  const cantidadFuente = cantidadIngresada ? payload.Cantidad_Personas : opciones.cantidadActual;
+  const cantidadPersonas = cantidadFuente === null || cantidadFuente === undefined || cantidadFuente === ''
+    ? null
+    : normalizarCantidadPersonasInput(cantidadFuente);
+
+  if (cantidadPersonas === null) {
+    const err = new Error('Cantidad_Personas es obligatoria para calcular el rango del transfer.');
+    err.status = 400;
+    err.errorCode = 'MISSING_PARAMS';
+    throw err;
+  }
+
+  const rango = await getRangoPorCantidadSvc(conn, cantidadPersonas);
+  if (!rango) {
+    const err = new Error('No existe un rango configurado para la cantidad de personas indicada.');
+    err.status = 400;
+    err.errorCode = 'RANGE_NOT_FOUND';
+    throw err;
+  }
+
+  const idRangoFinal = rango.Id_Rango;
+  const precioBaseRow = await getPrecioBasePorRangoSvc(conn, idRangoFinal, opciones.idMoneda ?? null);
+  const precioBase = precioBaseRow?.Precio !== undefined && precioBaseRow?.Precio !== null
+    ? Number(precioBaseRow.Precio)
+    : null;
+  const valorIngresadoRaw = Object.prototype.hasOwnProperty.call(payload, 'ValorServicio')
+    ? payload.ValorServicio
+    : payload.Valor;
+  const valorIngresadoTexto = String(valorIngresadoRaw ?? '').trim();
+  const tieneValorIngresado = valorIngresadoTexto !== '';
+
+  let valorFinal = null;
+  if (tieneValorIngresado) {
+    const valorIngresado = Number(valorIngresadoRaw);
+    if (!Number.isFinite(valorIngresado) || valorIngresado < 0) {
+      const err = new Error('El valor del transfer no tiene un formato numérico válido.');
+      err.status = 400;
+      err.errorCode = 'BAD_REQUEST';
+      throw err;
+    }
+    valorFinal = valorIngresado;
+  } else if (precioBase !== null && !Number.isNaN(precioBase)) {
+    valorFinal = precioBase;
+  } else {
+    valorFinal = 0;
+  }
+
+  return {
+    cantidadPersonas,
+    idRango: idRangoFinal,
+    rango,
+    precioBase,
+    precioBaseRow,
+    valorFinal
+  };
+}
+
 async function crearTransferSvc(payload, files = {}) {
   const conn = await db.getConnection();
   const rutasComprobantesCreadas = [];
@@ -252,9 +370,14 @@ async function crearTransferSvc(payload, files = {}) {
       idMoneda = monedas?.[0]?.Id_Moneda || null;
     }
 
+    const pricing = await resolverRangoYValorTransfer(conn, payload, { idMoneda });
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
       Id_Moneda: idMoneda,
+      Id_Rango: pricing.idRango,
+      Rango: pricing.idRango,
+      ValorServicio: pricing.valorFinal,
+      Valor: pricing.valorFinal,
     });
     const idTransfer = await generarIdTransferUnico(conn);
 
@@ -263,6 +386,7 @@ async function crearTransferSvc(payload, files = {}) {
       Nombre_Titular,
       DNI,
       Telefono_Titular,
+      Cantidad_Personas,
       Id_Rango,
       Id_Servicio,
       Punto_Salida,
@@ -277,14 +401,15 @@ async function crearTransferSvc(payload, files = {}) {
       TipoVuelo,
       Estado,
       Observaciones
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
     const params = [
       idTransfer,
       payload.Titular || null,
       payload.DNI || null,
       payload.Tel_Contacto || null,
-      payload.Id_Rango || payload.Rango || null,
+      pricing.cantidadPersonas,
+      pricing.idRango,
       payload.Servicio || null,
       payload.Salida || null,
       payload.Llegada || null,
@@ -292,7 +417,7 @@ async function crearTransferSvc(payload, files = {}) {
       payload.HoraRecogida || null,
       payload.NombreReporta || null,
       payload.TelefonoTransfer || null,
-      payload.ValorServicio || payload.Valor || null,
+      pricing.valorFinal,
       idMoneda,
       payload.Vuelo || null,
       payload.TipoVuelo || null,
@@ -468,7 +593,9 @@ async function filtrarTransfersSvc(q) {
       tr.Nombre_Titular,
       tr.Telefono_Titular,
       tr.DNI,
+      tr.Cantidad_Personas,
       tr.Id_Rango,
+      rg.Descripcion AS RangoDescripcion,
       tr.Valor,
       tr.Id_Moneda,
       m.Codigo AS MonedaCodigo,
@@ -478,6 +605,7 @@ async function filtrarTransfersSvc(q) {
       tr.Fecha_Registro
     FROM transfers tr
     LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
+    LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
     LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
     ${where}
     ORDER BY tr.Fecha_Registro DESC
@@ -488,13 +616,46 @@ async function filtrarTransfersSvc(q) {
 }
 
 async function getRangosSvc() {
-  const [rows] = await db.query('SELECT Id_Rango, Descripcion, Minimo, Maximo FROM transfers_rangos ORDER BY Minimo');
-  return rows.map(r => ({ id: r.Id_Rango, Descripcion: r.Descripcion, Minimo: r.Minimo, Maximo: r.Maximo }));
+  const [rows] = await db.query(`
+    SELECT Id_Rango, Descripcion, Minimo, Maximo
+    FROM transfers_rangos
+    ORDER BY Minimo
+  `);
+
+  return rows.map(r => ({
+    id: r.Id_Rango,
+    Id_Rango: r.Id_Rango,
+    Descripcion: r.Descripcion,
+    Minimo: r.Minimo,
+    Maximo: r.Maximo
+  }));
 }
 
 async function getPreciosPorRangoSvc(Id_Rango) {
   const [rows] = await db.query('SELECT tp.Id_PrecioTransfer, tp.Id_Rango, tp.Id_Moneda, m.Codigo AS MonedaCodigo, tp.Precio FROM transfers_precios tp LEFT JOIN monedas m ON tp.Id_Moneda = m.Id_Moneda WHERE tp.Id_Rango = ?', [Id_Rango]);
   return rows;
+}
+
+async function getPrecioBasePorRangoYMonedaSvc(Id_Rango, Id_Moneda) {
+  if (!Id_Rango || !Id_Moneda) {
+    return { found: false, precio: 0 };
+  }
+
+  const [rows] = await db.query(
+    `SELECT tp.Precio
+       FROM transfers_precios tp
+      WHERE tp.Id_Rango = ?
+        AND tp.Id_Moneda = ?
+      LIMIT 1`,
+    [Id_Rango, Id_Moneda]
+  );
+
+  const precio = rows?.[0]?.Precio;
+  if (precio === undefined || precio === null) {
+    return { found: false, precio: 0 };
+  }
+
+  return { found: true, precio: Number(precio) };
 }
 
 async function getDetalleTransferSvc(Id_Transfer) {
@@ -681,15 +842,39 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       idMoneda = monedas?.[0]?.Id_Moneda || null;
     }
 
+    const [transferDataActualRows] = await conn.query(
+      `SELECT Id_Rango, Valor, Cantidad_Personas, Id_Moneda
+         FROM transfers
+        WHERE Id_Transfer = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [Id_Transfer]
+    );
+    const transferActual = transferDataActualRows?.[0] || {};
+    if (!idMoneda) {
+      idMoneda = transferActual.Id_Moneda ?? null;
+    }
+
+    const pricing = await resolverRangoYValorTransfer(conn, payload, {
+      idMoneda,
+      valorActual: transferActual.Valor ?? null,
+      cantidadActual: transferActual.Cantidad_Personas ?? null
+    });
+
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
       Id_Moneda: idMoneda,
+      Id_Rango: pricing.idRango,
+      Rango: pricing.idRango,
+      ValorServicio: pricing.valorFinal,
+      Valor: pricing.valorFinal,
     }, transferActualRows[0].Estado || null);
 
     const sql = `UPDATE transfers SET
       Nombre_Titular = ?,
       DNI = ?,
       Telefono_Titular = ?,
+      Cantidad_Personas = ?,
       Id_Rango = ?,
       Id_Servicio = ?,
       Punto_Salida = ?,
@@ -710,7 +895,8 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       payload.Titular || null,
       payload.DNI || null,
       payload.Tel_Contacto || null,
-      payload.Id_Rango || payload.Rango || null,
+      pricing.cantidadPersonas !== null ? pricing.cantidadPersonas : transferActual.Cantidad_Personas ?? null,
+      pricing.idRango,
       payload.Servicio || null,
       payload.Salida || null,
       payload.Llegada || null,
@@ -718,7 +904,7 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       payload.HoraRecogida || null,
       payload.NombreReporta || null,
       payload.TelefonoTransfer || null,
-      payload.ValorServicio || payload.Valor || null,
+      pricing.valorFinal,
       idMoneda,
       payload.Vuelo || null,
       payload.TipoVuelo || null,
@@ -894,6 +1080,83 @@ async function cancelarTransferSvc(Id_Transfer) {
   }
 }
 
+async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT
+          Id_Transfer,
+          Estado,
+          Nombre_Titular,
+          Fecha_Transfer
+       FROM transfers
+      WHERE Id_Transfer = ?
+      LIMIT 1
+      FOR UPDATE`,
+      [Id_Transfer]
+    );
+
+    if (!rows.length) {
+      const err = new Error('Transfer no encontrado');
+      err.status = 404;
+      err.errorCode = 'TRANSFER_NOT_FOUND';
+      throw err;
+    }
+
+    const transfer = rows[0];
+    const [pagos] = await conn.query(
+      `SELECT Id_Pago, Pago_Comprobante
+         FROM pagos_transfers
+        WHERE Id_Transfer = ?
+        FOR UPDATE`,
+      [Id_Transfer]
+    );
+
+    const pagosCount = Number(pagos?.length || 0);
+    const comprobantesCount = (pagos || []).filter((p) => {
+      const ruta = String(p?.Pago_Comprobante || '').trim();
+      return ruta && ruta !== 'N/A';
+    }).length;
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'transfers',
+      id_registro: Id_Transfer,
+      accion: 'ELIMINAR_TRANSFER',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Estado', anterior: transfer.Estado || null, nuevo: 'ELIMINADO' },
+        { columna: 'Nombre_Titular', anterior: transfer.Nombre_Titular || null, nuevo: null },
+        { columna: 'Fecha_Transfer', anterior: normalizarFechaTransferYMD(transfer.Fecha_Transfer), nuevo: null },
+        { columna: 'Pagos_Eliminados', anterior: pagosCount, nuevo: 0 },
+      ]
+    });
+
+    await conn.query('DELETE FROM pagos_transfers WHERE Id_Transfer = ?', [Id_Transfer]);
+    await conn.query('DELETE FROM transfers WHERE Id_Transfer = ?', [Id_Transfer]);
+
+    await conn.commit();
+
+    return {
+      Id_Transfer: Number(Id_Transfer),
+      Codigo_Transfer: formatoCodigoTransfer(Id_Transfer),
+      dependenciasEliminadas: {
+        pagos: pagosCount,
+        comprobantesReferenciados: comprobantesCount,
+      },
+      comprobantesFisicosEliminados: false,
+    };
+  } catch (error) {
+    await conn.rollback();
+    try { await logSistema({ mensaje: `eliminarTransfer error: ${error.message || error}`, meta: { Id_Transfer, userId, clientIp } }); } catch (_) {}
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   // Validar que nombreArchivo no intente path traversal
   if (nombreArchivo.includes('..') || nombreArchivo.includes('/') || nombreArchivo.includes('\\')) {
@@ -933,4 +1196,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre };
+module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre };

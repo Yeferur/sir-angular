@@ -9,10 +9,11 @@ import {
   ChangeDetectorRef
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { TransferService } from '../../services/Transfers/transfers';
 import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
+import { PermisosService } from '../../services/Permisos/permisos.service';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -26,6 +27,7 @@ interface Transfer {
   Telefono_Titular?: string;
   Nombre_Servicio?: string;
   RangoDescripcion?: string;
+  Cantidad_Personas?: number | string;
   Punto_Salida?: string;
   Punto_Destino?: string;
   Fecha_Transfer?: string;
@@ -39,6 +41,7 @@ interface Transfer {
   Estado?: string;
   Observaciones?: string;
   Comprobantes?: ComprobanteTransfer[];
+  Pasajeros?: TransferPasajero[];
 }
 
 interface Pago {
@@ -61,11 +64,22 @@ interface ComprobanteTransfer {
   fecha?: string;
 }
 
+interface TransferPasajero {
+  id?: number | string;
+  NombrePasajero?: string;
+  DNI?: string;
+  TelefonoPasajero?: string;
+  TipoPasajero?: string;
+  Precio_Pasajero?: number | string;
+}
+
 interface TransferDetalle {
   transfer: Transfer;
   pagos: Pago[];
   Comprobantes?: ComprobanteTransfer[];
   comprobantes?: ComprobanteTransfer[];
+  Pasajeros?: TransferPasajero[];
+  pasajeros?: TransferPasajero[];
 }
 
 @Component({
@@ -79,6 +93,8 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   @Input() Id_Transfer!: string | number;
   @Output() onClose = new EventEmitter<void>();
 
+  private readonly datePipe = new DatePipe('es-CO');
+
   isLoading = true;
   isError = false;
   errorMessage = '';
@@ -88,7 +104,8 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   constructor(
     private api: TransferService,
     private cdr: ChangeDetectorRef,
-    private navbar: DynamicIslandGlobalService
+    private navbar: DynamicIslandGlobalService,
+    private permisosService: PermisosService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -142,9 +159,28 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     return this.data?.pagos || [];
   }
 
+  get pasajeros(): TransferPasajero[] {
+    const raw = this.data?.Pasajeros || (this.data as any)?.pasajeros || this.transfer.Pasajeros || [];
+    return Array.isArray(raw) ? raw : [];
+  }
+
   get puedeCancelar(): boolean {
     const estado = (this.transfer.Estado || '').toLowerCase();
     return !!this.transfer.Id_Transfer && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
+
+  get canDeleteTransfer(): boolean {
+    return this.permisosService.tienePermiso('TRANSFERS.ELIMINAR');
+  }
+
+
+  get transferSublinea(): string {
+    return [
+      this.transfer.Punto_Salida || '—',
+      this.transfer.Punto_Destino || '—',
+      this.formatDate(this.transfer.Fecha_Transfer),
+      this.transfer.Hora_Recogida || '—'
+    ].join(' · ');
   }
 
   cancelarTransfer(): void {
@@ -194,6 +230,49 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     });
   }
 
+  eliminarTransfer(): void {
+    const id = this.transfer.Id_Transfer || this.Id_Transfer;
+    if (!id || !this.canDeleteTransfer) return;
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar transfer',
+      message: `¿Deseas eliminar el transfer #${this.transferCodigo}? Esta acción eliminará el registro de forma permanente.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Eliminar',
+          style: 'delete',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.api.deleteTransfer(id).subscribe({
+              next: () => {
+                this.navbar.needsRefresh.set('transfers');
+                this.navbar.Id_Transfer.set(null);
+                this.close();
+                this.navbar.successToast('Transfer eliminado', `El transfer #${this.transferCodigo} fue eliminado correctamente.`);
+              },
+              error: (err) => {
+                this.navbar.alert.set({
+                  type: 'error',
+                  title: 'No se pudo eliminar',
+                  message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+                  autoClose: true,
+                  autoCloseTime: 4000
+                });
+              }
+            });
+          }
+        }
+      ]
+    });
+  }
+
   get valorTotal(): number {
     return Number(this.transfer.Valor || 0);
   }
@@ -214,6 +293,14 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
 
   get estadoNormalizado(): string {
     return (this.transfer.Estado || 'Pendiente').toLowerCase();
+  }
+
+  get estadoClase(): string {
+    return String(this.transfer.Estado || 'pendiente')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '-');
   }
 
   private formatCurrency(value: any): string {
@@ -321,22 +408,18 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     doc.setFontSize(11);
     doc.setTextColor(71, 85, 105);
     doc.text(`Transfer ${this.transferCodigo}`, 58, 25);
-    doc.text(`Estado: ${t.Estado || 'Pendiente'}`, 58, 31);
-    doc.text(`Generado: ${this.formatDate(new Date())}`, 58, 37);
-    doc.line(10, 43, pageWidth - 10, 43);
+    doc.text(`Generado: ${this.formatDate(new Date())}`, 58, 31);
+    doc.line(10, 37, pageWidth - 10, 37);
 
-    let currentY = 48;
+    let currentY = 42;
 
     const infoRows = [
       ['Transfer', this.transferCodigo],
-      ['Estado', t.Estado || 'Pendiente'],
       ['Tour', t.Nombre_Servicio || '—'],
       ['Fecha del servicio', this.formatDate(t.Fecha_Transfer)],
       ['Idioma', (t as any).Idioma || '—'],
       ['Titular', t.Nombre_Titular || '—'],
-      ['Teléfono de contacto', t.Telefono_Titular || '—'],
-      ['Responsable', t.Nombre_Reportante || '—'],
-      ['Teléfono responsable', t.Telefono_Reportante || '—']
+      ['Teléfono de contacto', t.Telefono_Titular || '—']
     ];
 
     currentY = this.ensurePdfSpace(doc, currentY, 50);

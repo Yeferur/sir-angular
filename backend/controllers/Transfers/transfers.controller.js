@@ -8,13 +8,14 @@ const {
   crearTransferSvc,
   actualizarTransferSvc,
   cancelarTransferSvc,
+  eliminarTransferSvc,
   getDetalleTransferSvc,
   subirComprobanteTransferSvc,
   resolverComprobanteSeguroTransferPorNombre
 } = require('../../services/Transfers/transfers.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
-const { getRangosSvc, getPreciosPorRangoSvc } = require('../../services/Transfers/transfers.service');
+const { getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc } = require('../../services/Transfers/transfers.service');
 const { filtrarTransfersSvc } = require('../../services/Transfers/transfers.service');
 
 // Configuración multer para comprobantes
@@ -87,7 +88,13 @@ exports.getRangos = async (_req, res) => {
 
 exports.getPrecios = async (req, res) => {
   try {
-    const { Id_Rango } = req.query;
+    const { Id_Rango, Id_Moneda } = req.query;
+
+    if (Id_Rango && Id_Moneda) {
+      const result = await getPrecioBasePorRangoYMonedaSvc(Id_Rango, Id_Moneda);
+      return sendSuccess(res, { data: result, message: 'Precio base obtenido correctamente' });
+    }
+
     if (!Id_Rango) return sendError(res, { status: 400, message: 'Falta Id_Rango', errorCode: 'MISSING_PARAMS' });
     const rows = await getPreciosPorRangoSvc(Id_Rango);
     return sendSuccess(res, { data: rows, message: 'Precios obtenidos correctamente' });
@@ -191,6 +198,25 @@ exports.cancelTransfer = async (req, res) => {
       status,
       message: status === 404 ? 'Transfer no encontrado' : 'Error al cancelar transfer',
       errorCode: status === 404 ? 'TRANSFER_NOT_FOUND' : 'INTERNAL_ERROR'
+    });
+  }
+};
+
+exports.deleteTransfer = async (req, res) => {
+  try {
+    const { Id_Transfer } = req.params;
+    if (!Id_Transfer) return sendError(res, { status: 400, message: 'Falta Id_Transfer', errorCode: 'MISSING_PARAMS' });
+
+    const userId = req.user?.id || null;
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
+    const result = await eliminarTransferSvc(Id_Transfer, userId, clientIp);
+    return sendSuccess(res, { data: result, message: 'Transfer eliminado correctamente' });
+  } catch (e) {
+    const status = e?.status || 500;
+    return sendError(res, {
+      status,
+      message: status === 404 ? 'Transfer no encontrado' : (e?.message || 'Error al eliminar transfer'),
+      errorCode: e?.errorCode || (status === 404 ? 'TRANSFER_NOT_FOUND' : 'INTERNAL_ERROR')
     });
   }
 };

@@ -3,7 +3,7 @@ import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-in
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray, AbstractControl } from '@angular/forms';
 import { firstValueFrom, of, from } from 'rxjs';
@@ -18,6 +18,7 @@ import { UppercaseInputDirective } from '../../../shared/directives/uppercase-in
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-editar-reserva',
@@ -31,9 +32,16 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   showDuplicate: boolean = true;
   openSummary = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+  private readonly permisosService = inject(PermisosService);
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
+  }
+
+  private closeSummaryIfOpen(): void {
+    if (this.openSummary) {
+      this.openSummary = false;
+    }
   }
 
   private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
@@ -321,6 +329,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private showApiError(error: any, title = 'No se pudo completar la operación'): void {
     const message = this.getFriendlyReservaErrorMessage(error);
+    this.closeSummaryIfOpen();
 
     this.navbar.alert.set({
       type: 'error',
@@ -340,6 +349,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private mostrarAlertaDniReservado(dni: string, reserva?: any, options?: { blocking?: boolean }): void {
     const idReserva = reserva?.Id_Reserva || reserva?.idReserva || reserva?.id_reserva;
     const buttons: any[] = [];
+    this.closeSummaryIfOpen();
 
     if (idReserva) {
       buttons.push({
@@ -429,6 +439,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private reservasSvc = inject(Reservas);
   private navbar = inject(DynamicIslandGlobalService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
   private injector = inject(Injector);
   private destroyRef = inject(DestroyRef);
@@ -1851,6 +1862,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   // ===================== Guardado (ACTUALIZAR) =====================
   private confirmar(titulo: string, mensaje: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'info',
         title: titulo,
@@ -1864,9 +1876,69 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     });
   }
 
+  get puedeCancelarReserva(): boolean {
+    const estado = String(this.originalReserva?.Cabecera?.Estado ?? this.originalReserva?.Estado ?? '').trim().toLowerCase();
+    return !!this.reservaId() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
+
+  get canDeleteReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
+  }
+
+  async cancelarReserva(): Promise<void> {
+    const id = this.reservaId();
+    if (!id || !this.puedeCancelarReserva) return;
+
+    this.closeSummaryIfOpen();
+
+    const ok = await this.confirmar(
+      'Cancelar reserva',
+      `¿Deseas cancelar la reserva #${id}? La información no se eliminará y quedará sólo para consulta futura.`
+    );
+    if (!ok) return;
+
+    this.isSubmitting.set(true);
+    try {
+      await firstValueFrom(this.reservasSvc.cancelarReserva(id));
+      this.navbar.successToast('Reserva cancelada', `La reserva #${id} quedó en estado Cancelada.`);
+      this.form.markAsPristine();
+      this.router.navigate(['/Reservas/VerReservas']);
+    } catch (err) {
+      this.showApiError(err, 'No se pudo cancelar la reserva');
+    } finally {
+      this.isSubmitting.set(false);
+    }
+  }
+
+  async eliminarReserva(): Promise<void> {
+    const id = this.reservaId();
+    if (!id || !this.canDeleteReserva) return;
+
+    this.closeSummaryIfOpen();
+
+    const ok = await this.confirmar(
+      'Eliminar reserva',
+      `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`
+    );
+    if (!ok) return;
+
+    this.isSubmitting.set(true);
+    try {
+      await firstValueFrom(this.reservasSvc.deleteReserva(id));
+      this.navbar.needsRefresh.set('reservas');
+      this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
+      this.router.navigate(['/Reservas/VerReservas']);
+    } catch (err) {
+      this.showApiError(err, 'No se pudo eliminar la reserva');
+    } finally {
+      this.isSubmitting.set(false);
+    }
+  }
+
   // Mostrar diálogo con opciones (retorna la key del botón pulsado)
   private confirmarOpciones(titulo: string, mensaje: string, opciones: Array<{ key: string; text: string; style?: string }>): Promise<string | null> {
     return new Promise<string | null>((resolve) => {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'warning',
         title: titulo,
@@ -2083,6 +2155,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   async onSubmit(): Promise<void> {
     if (this.isSubmitting()) return;
+    this.closeSummaryIfOpen();
     this.isSubmitting.set(true);
 
     // ===== Validación del formulario ANTES de confirmar =====
@@ -2107,6 +2180,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const msg = fields.length
         ? `Revisa los siguientes campos: ${fields.join(', ')}`
         : 'Hay campos invalidos en el formulario.';
+      this.closeSummaryIfOpen();
 
       this.navbar.alert.set({
         type: 'error',
@@ -2120,6 +2194,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
 
     if (this.tieneConflictoLogistico()) {
+      this.closeSummaryIfOpen();
       this.navbar.alert.set({
         type: 'error',
         title: 'Inviabilidad logística',
@@ -2133,6 +2208,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     const dnisOk = await this.validarTodosLosDniAntesDeGuardar();
     if (!dnisOk) {
+      this.closeSummaryIfOpen();
       this.isSubmitting.set(false);
       return;
     }

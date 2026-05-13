@@ -1,10 +1,11 @@
-import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-ver-transfers',
@@ -17,6 +18,7 @@ export class VerTransfersComponent implements OnInit {
   private navbar = inject(DynamicIslandGlobalService);
   private router = inject(Router);
   private transferService = inject(TransferService);
+  private permisosService = inject(PermisosService);
 
   readonly estadoOptions = ['Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completado', 'Cancelado'];
 
@@ -48,8 +50,22 @@ export class VerTransfersComponent implements OnInit {
     Empty: false
   });
 
+  private readonly refreshEffect = effect(() => {
+    const entity = this.navbar.needsRefresh();
+    if (entity === 'transfers') {
+      if (this.hasSearched()) {
+        this.buscarTransfers();
+      }
+      this.navbar.needsRefresh.set('');
+    }
+  });
+
   ngOnInit(): void {
     this.loadInitialData();
+  }
+
+  get canDeleteTransfer(): boolean {
+    return this.permisosService.tienePermiso('TRANSFERS.ELIMINAR');
   }
 
   fpOptionsFecha: Partial<FlatpickrOptions> = {
@@ -201,6 +217,67 @@ export class VerTransfersComponent implements OnInit {
 
   crearTransfer() {
     this.router.navigate(['/Transfers/NuevoTransfer']);
+  }
+
+  editarTransfer(Id_Transfer: string | number) {
+    this.router.navigate(['/Transfers/EditarTransfer', Id_Transfer]);
+  }
+
+  confirmEliminarTransfer(transfer: any): void {
+    const id = transfer?.Id_Transfer;
+    if (!id || !this.canDeleteTransfer) return;
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar transfer',
+      message: `¿Deseas eliminar el transfer #${transfer?.Codigo_Transfer || id}? Esta acción eliminará el registro de forma permanente.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Eliminar',
+          style: 'delete',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.deleteTransfer(transfer);
+          }
+        }
+      ]
+    });
+  }
+
+  private deleteTransfer(transfer: any): void {
+    const id = transfer?.Id_Transfer;
+    if (!id) return;
+
+    this.transferService.deleteTransfer(id).subscribe({
+      next: () => {
+        this.transfers.update((items) => items.filter((item) => String(item?.Id_Transfer) !== String(id)));
+        if (String(this.navbar.Id_Transfer() || '') === String(id)) {
+          this.navbar.Id_Transfer.set(null);
+        }
+        this.navbar.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
+      },
+      error: (err) => {
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'No se pudo eliminar',
+          message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible eliminar el transfer.',
+          autoClose: false,
+          buttons: [
+            {
+              text: 'Cerrar',
+              style: 'secondary',
+              onClick: () => this.navbar.alert.set(null)
+            }
+          ]
+        });
+      }
+    });
   }
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {

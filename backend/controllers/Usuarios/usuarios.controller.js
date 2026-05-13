@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const db = require('../../database/db');
 const { recordHistorial } = require('../../services/Historial/logger');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const wsManager = require('../../websocketManager');
 const fs = require('fs');
 const path = require('path');
 
@@ -414,6 +415,7 @@ exports.actualizarUsuario = async (req, res) => {
 
 exports.eliminarUsuario = async (req, res) => {
   let conn;
+  let deactivatedUserId = null;
   try {
     const { id } = req.params;
 
@@ -429,7 +431,11 @@ exports.eliminarUsuario = async (req, res) => {
     await conn.beginTransaction();
 
     const [currentRows] = await conn.query(
-      'SELECT Id_Usuario, Nombres_Apellidos, Activo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      `SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Activo, u.Id_Rol, r.Nombre_Rol
+       FROM usuarios u
+       LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+       WHERE u.Id_Usuario = ?
+       LIMIT 1`,
       [id]
     );
 
@@ -443,6 +449,7 @@ exports.eliminarUsuario = async (req, res) => {
     }
 
     const current = currentRows[0];
+    const roleName = String(current.Nombre_Rol || '').trim().toLowerCase();
 
     if (Number(current.Activo) === 0) {
       await conn.rollback();
@@ -452,6 +459,33 @@ exports.eliminarUsuario = async (req, res) => {
         errorCode: 'USER_ALREADY_INACTIVE',
       });
     }
+
+    if (roleName === 'administrador') {
+      const [adminRows] = await conn.query(
+        `SELECT COUNT(*) AS total
+         FROM usuarios u
+         INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
+         WHERE u.Activo = 1
+           AND u.Id_Usuario <> ?
+           AND LOWER(TRIM(r.Nombre_Rol)) = 'administrador'`,
+        [id]
+      );
+
+      if (Number(adminRows[0]?.total || 0) === 0) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 409,
+          message: 'No puedes desactivar el ultimo usuario con rol Administrador.',
+          errorCode: 'LAST_ADMIN_FORBIDDEN',
+        });
+      }
+    }
+
+    const [sessionRows] = await conn.query(
+      'SELECT COUNT(*) AS total FROM sesiones WHERE Id_Usuario = ?',
+      [id]
+    );
+    const totalSesionesCerradas = Number(sessionRows[0]?.total || 0);
 
     await conn.query('UPDATE usuarios SET Activo = 0 WHERE Id_Usuario = ?', [id]);
     await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
@@ -464,10 +498,20 @@ exports.eliminarUsuario = async (req, res) => {
       id_usuario: req.user?.id || null,
       detalles: [
         { columna: 'Activo', anterior: current.Activo, nuevo: 0 },
+        { columna: 'Rol', anterior: current.Nombre_Rol || null, nuevo: current.Nombre_Rol || null },
+        { columna: 'Sesiones_Cerradas', anterior: totalSesionesCerradas, nuevo: 0 },
       ],
     });
 
     await conn.commit();
+    deactivatedUserId = Number(id);
+
+    try {
+      wsManager.sendForceLogout(deactivatedUserId, 'user_deactivated');
+      await wsManager.broadcastActiveUsers();
+    } catch (socketError) {
+      console.error('eliminarUsuario websocket warning:', socketError);
+    }
 
     return sendSuccess(res, {
       data: null,

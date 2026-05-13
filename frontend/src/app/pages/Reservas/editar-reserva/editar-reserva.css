@@ -758,7 +758,7 @@ input[type=number] {
 
 .floating-summary[data-state="expanded"] {
   width: clamp(320px, 95vw, 500px);
-  height: 450px;
+  height: 460px;
   border-radius: 28px;
 
   box-shadow:
@@ -860,6 +860,14 @@ input[type=number] {
   grid-template-columns: 1fr 1fr;
 }
 
+.summary-actions.three-actions {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.summary-actions.four-actions {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* ---------------- Botones ---------------- */
 
 .btn-save-summary {
@@ -900,6 +908,49 @@ input[type=number] {
 .btn-duplicate:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(15, 15, 15, 0.08);
+}
+
+.btn-cancel-summary {
+  width: 100%;
+  border: 1px solid var(--accent-red);
+  border-radius: 14px;
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--accent-red);
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease, color 0.2s ease;
+}
+
+.btn-cancel-summary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 59, 48, 0.18);
+}
+
+.btn-delete-summary {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent-red);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+.btn-delete-summary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(255, 59, 48, 0.22);
+}
+
+.btn-delete-summary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ---------------- Estados ---------------- */
@@ -992,7 +1043,9 @@ input[type=number] {
     width: calc(100% - 20px);
   }
 
-  .summary-actions.two-actions {
+  .summary-actions.two-actions,
+  .summary-actions.three-actions,
+  .summary-actions.four-actions {
     grid-template-columns: 1fr;
   }
 }
@@ -1132,7 +1185,7 @@ input[type=number] {
   }
 
   .floating-summary[data-state="expanded"] {
-    height: 480px;
+    height: 580px;
     max-height: 80vh;
     padding: 8px;
   }

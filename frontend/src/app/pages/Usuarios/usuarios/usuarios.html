@@ -159,6 +159,7 @@
           }
 
           <!-- Botón Eliminar -->
+          @if (canDeleteUsers() && !isCurrentUser(user.id_user)) {
           <button class="action-btn delete" (click)="eliminarUsuario(user.id_user)" title="Eliminar">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -167,6 +168,7 @@
               <path d="M9 10h2v8H9zm4 0h2v8h-2z"></path>
             </svg>
           </button>
+          }
         </div>
       </div>
       }

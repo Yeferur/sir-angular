@@ -222,7 +222,7 @@ input[type=number] {
 }
 
 .floating-summary[data-state="compact"] {
-  width: 320px;
+  width: 340px;
   height: 50px;
   border-radius: 25px;
 }
@@ -331,6 +331,10 @@ input[type=number] {
   grid-template-columns: 1fr 1fr;
 }
 
+.summary-actions.three-actions {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 /* ---------------- Botones ---------------- */
 
 .btn-save-summary {
@@ -358,6 +362,49 @@ input[type=number] {
   opacity: .55;
   cursor: not-allowed;
   transform: none;
+}
+
+.btn-cancel-summary {
+  width: 100%;
+  border: 1px solid var(--accent-red);
+  border-radius: 14px;
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--accent-red);
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease, color 0.2s ease;
+}
+
+.btn-cancel-summary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 59, 48, 0.18);
+}
+
+.btn-delete-summary {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent-red);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+.btn-delete-summary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(255, 59, 48, 0.22);
+}
+
+.btn-delete-summary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ---------------- Estados ---------------- */
@@ -550,7 +597,8 @@ input[type=number] {
     white-space: normal;
   }
 
-  .summary-actions.two-actions {
+  .summary-actions.two-actions,
+  .summary-actions.three-actions {
     grid-template-columns: 1fr;
   }
 }
@@ -568,7 +616,7 @@ input[type=number] {
   }
 
   .floating-summary[data-state="expanded"] {
-    height: 420px;
+    height: 470px;
     max-height: 80vh;
     padding: 8px;
   }

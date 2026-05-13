@@ -8,6 +8,7 @@ router.get('/Transfer/ServicioTransfer', authMiddleware, checkPermission('TRANSF
 router.post('/Transfer/NuevoTransfer', authMiddleware, checkPermission('TRANSFERS.CREAR'), transfersController.createTransfer);
 router.put('/Transfer/:Id_Transfer', authMiddleware, checkPermission('TRANSFERS.CREAR'), transfersController.updateTransfer);
 router.patch('/Transfer/:Id_Transfer/Cancelar', authMiddleware, checkPermission('TRANSFERS.CREAR'), transfersController.cancelTransfer);
+router.delete('/Transfer/:Id_Transfer', authMiddleware, checkPermission('TRANSFERS.ELIMINAR'), transfersController.deleteTransfer);
 router.get('/Transfer/Rangos', authMiddleware, checkPermission('TRANSFERS.LEER'), transfersController.getRangos);
 router.get('/Transfer/Precios', authMiddleware, checkPermission('TRANSFERS.LEER'), transfersController.getPrecios);
 router.get('/Transfer/Buscar', authMiddleware, checkPermission('TRANSFERS.LEER'), transfersController.getTransfers);

@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import type { Usuario } from '../../../services/Usuarios/usuarios';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { AuthService } from '../../../services/Login/login-service';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-usuarios',
@@ -54,7 +55,8 @@ export class Usuarios implements OnInit {
   constructor(
     private usuariosService: UsuariosService,
     private navbar: DynamicIslandGlobalService,
-    private auth: AuthService
+    private auth: AuthService,
+    private permisosService: PermisosService
   ) {
     this.usuarios = this.usuariosService.getUsuariosSignal();
     this.estados = this.usuariosService.getEstadosSignal();
@@ -73,6 +75,10 @@ export class Usuarios implements OnInit {
 
   isCurrentUser(userId: string): boolean {
     return String(this.currentUserId()) === String(userId);
+  }
+
+  canDeleteUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.ELIMINAR');
   }
 
   forzarCierreSesion(userId: string) {
@@ -149,10 +155,19 @@ export class Usuarios implements OnInit {
   }
 
   eliminarUsuario(userId: string) {
+    if (!this.canDeleteUsers()) {
+      return;
+    }
+
+    if (this.isCurrentUser(userId)) {
+      this.navbar.warningToast('Acción no permitida', 'No puedes eliminar tu propio usuario desde tu sesión activa.');
+      return;
+    }
+
     this.navbar.alert.set({
       type: 'error', // Red alert for danger
       title: '¿Eliminar Usuario?',
-      message: 'Esta acción eliminará al usuario y sus permisos. Si tiene datos asociados (historial, reservas) podría fallar.',
+      message: 'Esta acción desactivará al usuario, cerrará sus sesiones activas y lo ocultará del listado. El historial seguirá conservando la relación con su Id_Usuario.',
       buttons: [
         { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
         {
@@ -176,7 +191,7 @@ export class Usuarios implements OnInit {
 
     this.usuariosService.eliminarUsuario(userId).subscribe({
       next: () => {
-        this.navbar.successToast('Eliminado', 'Usuario eliminado correctamente.');
+        this.navbar.successToast('Usuario desactivado', 'El usuario fue desactivado y sus sesiones quedaron cerradas.');
       },
       error: (err) => {
         this.usuariosService.restoreUsuarioInSignal(removed.user!, removed.estado, removed.index);

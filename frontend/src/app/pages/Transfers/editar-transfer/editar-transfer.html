@@ -145,17 +145,21 @@
 
         <div class="form-group">
           <label class="form-label">
-            Rango de pasajeros <span class="required-star">*</span>
+            Cantidad de personas <span class="required-star">*</span>
           </label>
-          <select formControlName="Rango" class="form-select"
-            [ngClass]="form.get('Rango')?.touched && form.get('Rango')?.invalid ? 'errorInput' : ''">
-            <option value="Seleccionar" disabled>SELECCIONAR</option>
-            @for (rango of resultsRangos; track rango.Id_Rango ?? rango.id) {
-            <option [value]="rango.Id_Rango ?? rango.id">{{ rango.Descripcion }} ({{ rango.Minimo }}-{{ rango.Maximo }} pax)</option>
-            }
-          </select>
-          @if (form.get('Rango')?.touched && form.get('Rango')?.invalid) {
-          <div class="errorMessage">Rango es requerido.</div>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            formControlName="Cantidad_Personas"
+            class="form-input"
+            [ngClass]="form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.invalid ? 'errorInput' : ''"
+            placeholder="Ej: 5"
+          />
+          @if (form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.hasError('required')) {
+          <div class="errorMessage">Cantidad de personas es requerida.</div>
+          } @else if (form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.hasError('cantidadInvalida')) {
+          <div class="errorMessage">Ingresa una cantidad válida mayor o igual a 1.</div>
           }
         </div>
 
@@ -285,7 +289,11 @@
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Valor del servicio</label>
-          <input type="number" formControlName="Valor" class="form-input" />
+          <input
+            type="number"
+            formControlName="Valor"
+            class="form-input"
+          />
         </div>
         <div class="form-group">
           <label class="form-label">Moneda</label>
@@ -489,8 +497,8 @@
         </div>
 
         <div class="summary-item">
-          <label class="form-label">Rango de pasajeros</label>
-          <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
+          <label class="form-label">Cantidad de Personas</label>
+          <span class="summary-value">{{ form.get('Cantidad_Personas')?.value || '—' }}</span>
         </div>
 
         <div class="summary-item">
@@ -508,11 +516,6 @@
         <div class="summary-item">
           <label class="form-label">Punto de llegada</label>
           <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
-        </div>
-
-        <div class="summary-item">
-          <label class="form-label">Tipo de Pago</label>
-          <span class="summary-value">{{ form.get('TipoPago')?.value || '—' }}</span>
         </div>
 
         @if (form.get('TipoPago')?.value === 'Abonos') {
@@ -535,7 +538,19 @@
       </div>
     </div>
 
-    <div class="summary-actions">
+    <div class="summary-actions" [class.two-actions]="puedeCancelarTransfer || canDeleteTransfer" [class.three-actions]="puedeCancelarTransfer && canDeleteTransfer">
+      @if (puedeCancelarTransfer) {
+        <button type="button" class="btn-cancel-summary" (click)="cancelarTransfer()" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Procesando...' : 'Cancelar transfer' }}
+        </button>
+      }
+
+      @if (canDeleteTransfer) {
+        <button type="button" class="btn-delete-summary" (click)="eliminarTransfer()" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Procesando...' : 'Eliminar transfer' }}
+        </button>
+      }
+
       <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
         {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
       </button>

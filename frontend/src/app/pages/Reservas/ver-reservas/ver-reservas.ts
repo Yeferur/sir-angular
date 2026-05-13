@@ -8,6 +8,7 @@ import { finalize, forkJoin, firstValueFrom } from 'rxjs';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-ver-reservas',
@@ -132,6 +133,7 @@ seleccionarPuntoAutocomplete(p: any) {
   private router = inject(Router);
   private reservasService = inject(Reservas);
   private cdr = inject(ChangeDetectorRef);
+  private permisosService = inject(PermisosService);
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
@@ -167,8 +169,13 @@ seleccionarPuntoAutocomplete(p: any) {
     const entity = this.navbar.needsRefresh();
     if (entity === 'reservas') {
       this.listar();
+      this.navbar.needsRefresh.set('');
     }
   });
+
+  get canDeleteReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
+  }
 
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
@@ -320,6 +327,67 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   crearReserva() {
     this.router.navigate(['/Reservas/NuevaReserva']);
+  }
+
+  editarReserva(Id_Reserva: string | number) {
+    this.router.navigate(['/Reservas/EditarReserva', Id_Reserva]);
+  }
+
+  confirmEliminarReserva(reserva: any): void {
+    const id = reserva?.Id_Reserva;
+    if (!id || !this.canDeleteReserva) return;
+
+    this.navbar.alert.set({
+      type: 'warning',
+      title: 'Eliminar reserva',
+      message: `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
+      autoClose: false,
+      buttons: [
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.alert.set(null)
+        },
+        {
+          text: 'Eliminar',
+          style: 'delete',
+          onClick: () => {
+            this.navbar.alert.set(null);
+            this.deleteReserva(reserva);
+          }
+        }
+      ]
+    });
+  }
+
+  private deleteReserva(reserva: any): void {
+    const id = reserva?.Id_Reserva;
+    if (!id) return;
+
+    this.reservasService.deleteReserva(id).subscribe({
+      next: () => {
+        this.reservas.update((items) => items.filter((item) => String(item?.Id_Reserva) !== String(id)));
+        if (String(this.navbar.Id_Reserva() || '') === String(id)) {
+          this.navbar.Id_Reserva.set(null);
+        }
+        this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
+      },
+      error: (error) => {
+        this.navbar.alert.set({
+          type: 'error',
+          title: 'No se pudo eliminar',
+          message: this.getApiErrorMessage(error, 'No fue posible eliminar la reserva.'),
+          autoClose: false,
+          buttons: [
+            {
+              text: 'Cerrar',
+              style: 'secondary',
+              onClick: () => this.navbar.alert.set(null)
+            }
+          ]
+        });
+      }
+    });
   }
 
   clearFechaReserva(): void {
@@ -539,5 +607,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   verReserva(Id_Reserva: string) {
     this.navbar.Id_Reserva.set(Id_Reserva);
+  }
+
+  private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
+    return (
+      error?.error?.message ||
+      error?.error?.error ||
+      error?.error?.mensaje ||
+      error?.message ||
+      fallback
+    );
   }
 }
