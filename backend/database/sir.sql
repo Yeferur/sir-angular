@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1:3306
--- Generation Time: May 08, 2026 at 07:21 AM
--- Server version: 9.1.0
--- PHP Version: 8.3.14
+-- Servidor: 127.0.0.1:3306
+-- Tiempo de generación: 13-05-2026 a las 07:04:56
+-- Versión del servidor: 9.1.0
+-- Versión de PHP: 8.3.14
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `sir2`
+-- Base de datos: `sir2`
 --
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `aforos`
+-- Estructura de tabla para la tabla `aforos`
 --
 
 DROP TABLE IF EXISTS `aforos`;
@@ -35,12 +35,12 @@ CREATE TABLE IF NOT EXISTS `aforos` (
   `Fecha_Aforo` date DEFAULT NULL,
   PRIMARY KEY (`Id_Aforo`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `asignacion_buses`
+-- Estructura de tabla para la tabla `asignacion_buses`
 --
 
 DROP TABLE IF EXISTS `asignacion_buses`;
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `asignacion_buses` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `canales_reservas`
+-- Estructura de tabla para la tabla `canales_reservas`
 --
 
 DROP TABLE IF EXISTS `canales_reservas`;
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `canales_reservas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `canales_reservas`
+-- Volcado de datos para la tabla `canales_reservas`
 --
 
 INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
@@ -88,7 +88,7 @@ INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `detalle_historial`
+-- Estructura de tabla para la tabla `detalle_historial`
 --
 
 DROP TABLE IF EXISTS `detalle_historial`;
@@ -100,12 +100,12 @@ CREATE TABLE IF NOT EXISTS `detalle_historial` (
   `Valor_Nuevo` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`Id_Detalle`),
   KEY `Id_Historial` (`Id_Historial`)
-) ENGINE=InnoDB AUTO_INCREMENT=279 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=299 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `disponibilidad`
+-- Estructura de tabla para la tabla `disponibilidad`
 --
 
 DROP TABLE IF EXISTS `disponibilidad`;
@@ -120,18 +120,10 @@ CREATE TABLE IF NOT EXISTS `disponibilidad` (
   UNIQUE KEY `ux_disponibilidad_tour_fecha` (`Id_Tour`,`Fecha_Tour`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Dumping data for table `disponibilidad`
---
-
-INSERT INTO `disponibilidad` (`Id_Disponibilidad`, `Id_Tour`, `Fecha_Tour`, `Cupos_Totales`, `Cupos_Disponibles`, `Updated_At`) VALUES
-(1, 2, '2026-04-10', 380, 370, '2026-04-09 05:27:14.525'),
-(2, 2, '2026-01-22', 479, 14, '2026-05-07 19:37:15.772');
-
 -- --------------------------------------------------------
 
 --
--- Table structure for table `historial`
+-- Estructura de tabla para la tabla `historial`
 --
 
 DROP TABLE IF EXISTS `historial`;
@@ -144,12 +136,12 @@ CREATE TABLE IF NOT EXISTS `historial` (
   `Fecha_Hora_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Historial`),
   KEY `Id_Usuario` (`Id_Usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=176 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=186 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `horarios`
+-- Estructura de tabla para la tabla `horarios`
 --
 
 DROP TABLE IF EXISTS `horarios`;
@@ -164,7 +156,7 @@ CREATE TABLE IF NOT EXISTS `horarios` (
 ) ENGINE=InnoDB AUTO_INCREMENT=8926 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `horarios`
+-- Volcado de datos para la tabla `horarios`
 --
 
 INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALUES
@@ -6392,7 +6384,7 @@ INSERT INTO `horarios` (`Id_Horario`, `Id_Punto`, `Id_Tour`, `Hora_Salida`) VALU
 -- --------------------------------------------------------
 
 --
--- Table structure for table `logs_sistema`
+-- Estructura de tabla para la tabla `logs_sistema`
 --
 
 DROP TABLE IF EXISTS `logs_sistema`;
@@ -6411,7 +6403,7 @@ CREATE TABLE IF NOT EXISTS `logs_sistema` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `mensajes`
+-- Estructura de tabla para la tabla `mensajes`
 --
 
 DROP TABLE IF EXISTS `mensajes`;
@@ -6430,7 +6422,7 @@ CREATE TABLE IF NOT EXISTS `mensajes` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `mensaje_destinatario`
+-- Estructura de tabla para la tabla `mensaje_destinatario`
 --
 
 DROP TABLE IF EXISTS `mensaje_destinatario`;
@@ -6447,7 +6439,7 @@ CREATE TABLE IF NOT EXISTS `mensaje_destinatario` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `monedas`
+-- Estructura de tabla para la tabla `monedas`
 --
 
 DROP TABLE IF EXISTS `monedas`;
@@ -6460,7 +6452,7 @@ CREATE TABLE IF NOT EXISTS `monedas` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `monedas`
+-- Volcado de datos para la tabla `monedas`
 --
 
 INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
@@ -6471,7 +6463,7 @@ INSERT INTO `monedas` (`Id_Moneda`, `Codigo`, `Nombre_Moneda`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `pagos_reservas`
+-- Estructura de tabla para la tabla `pagos_reservas`
 --
 
 DROP TABLE IF EXISTS `pagos_reservas`;
@@ -6490,7 +6482,7 @@ CREATE TABLE IF NOT EXISTS `pagos_reservas` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `pagos_transfers`
+-- Estructura de tabla para la tabla `pagos_transfers`
 --
 
 DROP TABLE IF EXISTS `pagos_transfers`;
@@ -6510,7 +6502,7 @@ CREATE TABLE IF NOT EXISTS `pagos_transfers` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `pasajeros`
+-- Estructura de tabla para la tabla `pasajeros`
 --
 
 DROP TABLE IF EXISTS `pasajeros`;
@@ -6534,7 +6526,27 @@ CREATE TABLE IF NOT EXISTS `pasajeros` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `permisos`
+-- Estructura de tabla para la tabla `password_reset_tokens`
+--
+
+DROP TABLE IF EXISTS `password_reset_tokens`;
+CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `token_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_password_reset_tokens_user_id` (`user_id`),
+  KEY `idx_password_reset_tokens_token_hash` (`token_hash`),
+  KEY `idx_password_reset_tokens_expires_at` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `permisos`
 --
 
 DROP TABLE IF EXISTS `permisos`;
@@ -6550,7 +6562,7 @@ CREATE TABLE IF NOT EXISTS `permisos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `permisos`
+-- Volcado de datos para la tabla `permisos`
 --
 
 INSERT INTO `permisos` (`Id_Permiso`, `Id_Modulo`, `Accion`, `Codigo_Permiso`, `Descripcion`) VALUES
@@ -6598,7 +6610,7 @@ INSERT INTO `permisos` (`Id_Permiso`, `Id_Modulo`, `Accion`, `Codigo_Permiso`, `
 -- --------------------------------------------------------
 
 --
--- Table structure for table `planes_tours`
+-- Estructura de tabla para la tabla `planes_tours`
 --
 
 DROP TABLE IF EXISTS `planes_tours`;
@@ -6608,10 +6620,10 @@ CREATE TABLE IF NOT EXISTS `planes_tours` (
   `Nombre_Plan` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Plan`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `planes_tours`
+-- Volcado de datos para la tabla `planes_tours`
 --
 
 INSERT INTO `planes_tours` (`Id_Plan`, `Id_Tour`, `Nombre_Plan`) VALUES
@@ -6624,13 +6636,13 @@ INSERT INTO `planes_tours` (`Id_Plan`, `Id_Tour`, `Nombre_Plan`) VALUES
 (10, 10, 'Plan básico'),
 (12, 19, 'Plan básico'),
 (14, 2, 'Plan básico'),
-(15, 5, 'Plan básico'),
-(18, 1, 'Plan básico');
+(18, 1, 'Plan básico'),
+(19, 5, 'Plan básico');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `puntos`
+-- Estructura de tabla para la tabla `puntos`
 --
 
 DROP TABLE IF EXISTS `puntos`;
@@ -6648,7 +6660,7 @@ CREATE TABLE IF NOT EXISTS `puntos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=632 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `puntos`
+-- Volcado de datos para la tabla `puntos`
 --
 
 INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `ruta`, `posicion`, `Latitud`, `Longitud`) VALUES
@@ -7284,7 +7296,7 @@ INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `ruta`,
 -- --------------------------------------------------------
 
 --
--- Table structure for table `recordatorios`
+-- Estructura de tabla para la tabla `recordatorios`
 --
 
 DROP TABLE IF EXISTS `recordatorios`;
@@ -7307,7 +7319,7 @@ CREATE TABLE IF NOT EXISTS `recordatorios` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `reservas`
+-- Estructura de tabla para la tabla `reservas`
 --
 
 DROP TABLE IF EXISTS `reservas`;
@@ -7334,7 +7346,7 @@ CREATE TABLE IF NOT EXISTS `reservas` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `roles`
+-- Estructura de tabla para la tabla `roles`
 --
 
 DROP TABLE IF EXISTS `roles`;
@@ -7349,7 +7361,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `roles`
+-- Volcado de datos para la tabla `roles`
 --
 
 INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Creacion`) VALUES
@@ -7359,7 +7371,7 @@ INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Cre
 -- --------------------------------------------------------
 
 --
--- Table structure for table `rol_permisos`
+-- Estructura de tabla para la tabla `rol_permisos`
 --
 
 DROP TABLE IF EXISTS `rol_permisos`;
@@ -7374,7 +7386,7 @@ CREATE TABLE IF NOT EXISTS `rol_permisos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `rol_permisos`
+-- Volcado de datos para la tabla `rol_permisos`
 --
 
 INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asignacion`) VALUES
@@ -7431,7 +7443,7 @@ INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asi
 -- --------------------------------------------------------
 
 --
--- Table structure for table `servicios_transfer`
+-- Estructura de tabla para la tabla `servicios_transfer`
 --
 
 DROP TABLE IF EXISTS `servicios_transfer`;
@@ -7442,7 +7454,7 @@ CREATE TABLE IF NOT EXISTS `servicios_transfer` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `servicios_transfer`
+-- Volcado de datos para la tabla `servicios_transfer`
 --
 
 INSERT INTO `servicios_transfer` (`Id_Servicio`, `Nombre_Servicio`) VALUES
@@ -7453,7 +7465,7 @@ INSERT INTO `servicios_transfer` (`Id_Servicio`, `Nombre_Servicio`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `sesiones`
+-- Estructura de tabla para la tabla `sesiones`
 --
 
 DROP TABLE IF EXISTS `sesiones`;
@@ -7465,12 +7477,12 @@ CREATE TABLE IF NOT EXISTS `sesiones` (
   `Fecha_Expira` datetime DEFAULT NULL,
   PRIMARY KEY (`Id_Sesion`),
   KEY `Id_Usuario` (`Id_Usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tours`
+-- Estructura de tabla para la tabla `tours`
 --
 
 DROP TABLE IF EXISTS `tours`;
@@ -7489,7 +7501,7 @@ CREATE TABLE IF NOT EXISTS `tours` (
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `tours`
+-- Volcado de datos para la tabla `tours`
 --
 
 INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, `Comision_Agencia`, `Comision_Freelance`, `Cupo_Base`, `Latitud`, `Longitud`, `Activo`) VALUES
@@ -7508,7 +7520,7 @@ INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Comision_Hotel`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tours_dias`
+-- Estructura de tabla para la tabla `tours_dias`
 --
 
 DROP TABLE IF EXISTS `tours_dias`;
@@ -7518,10 +7530,10 @@ CREATE TABLE IF NOT EXISTS `tours_dias` (
   `Dia_Semana` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_TourDia`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `tours_dias`
+-- Volcado de datos para la tabla `tours_dias`
 --
 
 INSERT INTO `tours_dias` (`Id_TourDia`, `Id_Tour`, `Dia_Semana`) VALUES
@@ -7536,21 +7548,21 @@ INSERT INTO `tours_dias` (`Id_TourDia`, `Id_Tour`, `Dia_Semana`) VALUES
 (21, 2, 'viernes'),
 (22, 2, 'sabado'),
 (23, 2, 'domingo'),
-(24, 5, 'miercoles'),
-(25, 5, 'jueves'),
-(26, 5, 'viernes'),
-(27, 5, 'sabado'),
-(28, 5, 'domingo'),
 (41, 1, 'miercoles'),
 (42, 1, 'jueves'),
 (43, 1, 'viernes'),
 (44, 1, 'sabado'),
-(45, 1, 'domingo');
+(45, 1, 'domingo'),
+(46, 5, 'miercoles'),
+(47, 5, 'jueves'),
+(48, 5, 'viernes'),
+(49, 5, 'sabado'),
+(50, 5, 'domingo');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tours_temporadas`
+-- Estructura de tabla para la tabla `tours_temporadas`
 --
 
 DROP TABLE IF EXISTS `tours_temporadas`;
@@ -7562,19 +7574,20 @@ CREATE TABLE IF NOT EXISTS `tours_temporadas` (
   `Fecha_Fin` date DEFAULT NULL,
   PRIMARY KEY (`Id_Temporada`),
   KEY `Id_Tour` (`Id_Tour`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `tours_temporadas`
+-- Volcado de datos para la tabla `tours_temporadas`
 --
 
 INSERT INTO `tours_temporadas` (`Id_Temporada`, `Id_Tour`, `Nombre_Temporada`, `Fecha_Inicio`, `Fecha_Fin`) VALUES
-(2, 19, 'Temporada alta', '2026-01-01', '2026-01-30');
+(2, 19, 'Temporada alta', '2026-01-01', '2026-01-30'),
+(3, 5, 'Festivo', '2026-05-18', '2026-05-18');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tours_temporada_dias`
+-- Estructura de tabla para la tabla `tours_temporada_dias`
 --
 
 DROP TABLE IF EXISTS `tours_temporada_dias`;
@@ -7584,10 +7597,10 @@ CREATE TABLE IF NOT EXISTS `tours_temporada_dias` (
   `Dia_Semana` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Temporada_Dia`),
   KEY `Id_Temporada` (`Id_Temporada`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `tours_temporada_dias`
+-- Volcado de datos para la tabla `tours_temporada_dias`
 --
 
 INSERT INTO `tours_temporada_dias` (`Id_Temporada_Dia`, `Id_Temporada`, `Dia_Semana`) VALUES
@@ -7596,12 +7609,13 @@ INSERT INTO `tours_temporada_dias` (`Id_Temporada_Dia`, `Id_Temporada`, `Dia_Sem
 (10, 2, 'jueves'),
 (11, 2, 'viernes'),
 (12, 2, 'sabado'),
-(13, 2, 'domingo');
+(13, 2, 'domingo'),
+(14, 3, 'lunes');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tour_precios`
+-- Estructura de tabla para la tabla `tour_precios`
 --
 
 DROP TABLE IF EXISTS `tour_precios`;
@@ -7616,10 +7630,10 @@ CREATE TABLE IF NOT EXISTS `tour_precios` (
   KEY `Id_Tour` (`Id_Tour`),
   KEY `Id_Plan` (`Id_Plan`),
   KEY `Id_Moneda` (`Id_Moneda`)
-) ENGINE=InnoDB AUTO_INCREMENT=121 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=130 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `tour_precios`
+-- Volcado de datos para la tabla `tour_precios`
 --
 
 INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, `Tipo_Pasajero`, `Precio`) VALUES
@@ -7662,15 +7676,6 @@ INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, 
 (82, 2, 14, 3, 'ADULTO', 0),
 (83, 2, 14, 3, 'NINO', 0),
 (84, 2, 14, 3, 'INFANTE', 0),
-(85, 5, 15, 1, 'ADULTO', 269000),
-(86, 5, 15, 1, 'NINO', 259000),
-(87, 5, 15, 1, 'INFANTE', 10000),
-(88, 5, 15, 2, 'ADULTO', 0),
-(89, 5, 15, 2, 'NINO', 0),
-(90, 5, 15, 2, 'INFANTE', 0),
-(91, 5, 15, 3, 'ADULTO', 0),
-(92, 5, 15, 3, 'NINO', 0),
-(93, 5, 15, 3, 'INFANTE', 0),
 (112, 1, 18, 1, 'ADULTO', 229000),
 (113, 1, 18, 1, 'NINO', 229000),
 (114, 1, 18, 1, 'INFANTE', 0),
@@ -7679,12 +7684,21 @@ INSERT INTO `tour_precios` (`Id_PrecioTour`, `Id_Tour`, `Id_Plan`, `Id_Moneda`, 
 (117, 1, 18, 2, 'INFANTE', 0),
 (118, 1, 18, 3, 'ADULTO', 0),
 (119, 1, 18, 3, 'NINO', 0),
-(120, 1, 18, 3, 'INFANTE', 0);
+(120, 1, 18, 3, 'INFANTE', 0),
+(121, 5, 19, 1, 'ADULTO', 269000),
+(122, 5, 19, 1, 'NINO', 259000),
+(123, 5, 19, 1, 'INFANTE', 10000),
+(124, 5, 19, 2, 'ADULTO', 0),
+(125, 5, 19, 2, 'NINO', 0),
+(126, 5, 19, 2, 'INFANTE', 0),
+(127, 5, 19, 3, 'ADULTO', 0),
+(128, 5, 19, 3, 'NINO', 0),
+(129, 5, 19, 3, 'INFANTE', 0);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `transfers`
+-- Estructura de tabla para la tabla `transfers`
 --
 
 DROP TABLE IF EXISTS `transfers`;
@@ -7693,6 +7707,7 @@ CREATE TABLE IF NOT EXISTS `transfers` (
   `Nombre_Titular` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `DNI` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Telefono_Titular` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Cantidad_Personas` int UNSIGNED DEFAULT NULL,
   `Id_Rango` bigint UNSIGNED DEFAULT NULL,
   `Id_Servicio` bigint UNSIGNED DEFAULT NULL,
   `Punto_Salida` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7717,7 +7732,7 @@ CREATE TABLE IF NOT EXISTS `transfers` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `transfers_precios`
+-- Estructura de tabla para la tabla `transfers_precios`
 --
 
 DROP TABLE IF EXISTS `transfers_precios`;
@@ -7729,24 +7744,23 @@ CREATE TABLE IF NOT EXISTS `transfers_precios` (
   PRIMARY KEY (`Id_PrecioTransfer`),
   KEY `Id_Rango` (`Id_Rango`),
   KEY `Id_Moneda` (`Id_Moneda`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `transfers_precios`
+-- Volcado de datos para la tabla `transfers_precios`
 --
 
 INSERT INTO `transfers_precios` (`Id_PrecioTransfer`, `Id_Rango`, `Id_Moneda`, `Precio`) VALUES
-(1, 1, 1, 120000.00),
-(2, 1, 2, 32.00),
-(3, 1, 3, 30.00),
-(4, 2, 1, 250000.00),
-(5, 2, 2, 65.00),
-(6, 2, 3, 60.00);
+(1, 1, 1, 130000.00),
+(2, 2, 1, 350000.00),
+(3, 3, 1, 450000.00),
+(4, 4, 1, 600000.00),
+(5, 5, 1, 600000.00);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `transfers_rangos`
+-- Estructura de tabla para la tabla `transfers_rangos`
 --
 
 DROP TABLE IF EXISTS `transfers_rangos`;
@@ -7756,20 +7770,23 @@ CREATE TABLE IF NOT EXISTS `transfers_rangos` (
   `Minimo` int DEFAULT NULL,
   `Maximo` int DEFAULT NULL,
   PRIMARY KEY (`Id_Rango`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `transfers_rangos`
+-- Volcado de datos para la tabla `transfers_rangos`
 --
 
 INSERT INTO `transfers_rangos` (`Id_Rango`, `Descripcion`, `Minimo`, `Maximo`) VALUES
-(1, '1-3 personas', 1, 3),
-(2, '4-12 personas', 4, 12);
+(1, '1 a 3 personas', 1, 3),
+(2, '4 a 12 personas', 4, 12),
+(3, '13 a 25 personas', 13, 25),
+(4, '26 a 32 personas', 26, 32),
+(5, '33 personas en adelante', 33, NULL);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `usuarios`
+-- Estructura de tabla para la tabla `usuarios`
 --
 
 DROP TABLE IF EXISTS `usuarios`;
@@ -7792,7 +7809,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `usuarios`
+-- Volcado de datos para la tabla `usuarios`
 --
 
 INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `Usuario`, `Correo`, `Avatar`, `Contrasena`, `Id_Rol`, `Activo`, `Fecha_Creacion`, `Fecha_Actualizacion`) VALUES
@@ -7818,7 +7835,7 @@ INSERT INTO `usuarios` (`Id_Usuario`, `Nombres_Apellidos`, `Telefono_Usuario`, `
 -- --------------------------------------------------------
 
 --
--- Table structure for table `usuario_permisos`
+-- Estructura de tabla para la tabla `usuario_permisos`
 --
 
 DROP TABLE IF EXISTS `usuario_permisos`;
@@ -7834,7 +7851,7 @@ CREATE TABLE IF NOT EXISTS `usuario_permisos` (
 ) ENGINE=InnoDB AUTO_INCREMENT=388 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `usuario_permisos`
+-- Volcado de datos para la tabla `usuario_permisos`
 --
 
 INSERT INTO `usuario_permisos` (`Id_Usuario_Permiso`, `Id_Usuario`, `Id_Permiso`, `Tipo`, `Fecha_Asignacion`) VALUES
@@ -8126,130 +8143,136 @@ INSERT INTO `usuario_permisos` (`Id_Usuario_Permiso`, `Id_Usuario`, `Id_Permiso`
 (387, 1018372156, 17, 'ALLOW', '2026-04-23 00:52:00');
 
 --
--- Constraints for dumped tables
+-- Restricciones para tablas volcadas
 --
 
 --
--- Constraints for table `aforos`
+-- Filtros para la tabla `aforos`
 --
 ALTER TABLE `aforos`
   ADD CONSTRAINT `fk_aforos_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `asignacion_buses`
+-- Filtros para la tabla `asignacion_buses`
 --
 ALTER TABLE `asignacion_buses`
   ADD CONSTRAINT `fk_asignbus_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `detalle_historial`
+-- Filtros para la tabla `detalle_historial`
 --
 ALTER TABLE `detalle_historial`
   ADD CONSTRAINT `fk_detalle_historial` FOREIGN KEY (`Id_Historial`) REFERENCES `historial` (`Id_Historial`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `historial`
+-- Filtros para la tabla `historial`
 --
 ALTER TABLE `historial`
   ADD CONSTRAINT `fk_historial_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `horarios`
+-- Filtros para la tabla `horarios`
 --
 ALTER TABLE `horarios`
   ADD CONSTRAINT `fk_horarios_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_horarios_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `logs_sistema`
+-- Filtros para la tabla `logs_sistema`
 --
 ALTER TABLE `logs_sistema`
   ADD CONSTRAINT `fk_log_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `mensajes`
+-- Filtros para la tabla `mensajes`
 --
 ALTER TABLE `mensajes`
   ADD CONSTRAINT `fk_mensajes_emisor` FOREIGN KEY (`Id_Emisor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `mensaje_destinatario`
+-- Filtros para la tabla `mensaje_destinatario`
 --
 ALTER TABLE `mensaje_destinatario`
   ADD CONSTRAINT `fk_mensajedest_mensaje` FOREIGN KEY (`Id_Mensaje`) REFERENCES `mensajes` (`Id_Mensaje`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_mensajedest_receptor` FOREIGN KEY (`Receptor`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `pagos_reservas`
+-- Filtros para la tabla `pagos_reservas`
 --
 ALTER TABLE `pagos_reservas`
   ADD CONSTRAINT `fk_pagosreserva_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `pagos_transfers`
+-- Filtros para la tabla `pagos_transfers`
 --
 ALTER TABLE `pagos_transfers`
   ADD CONSTRAINT `fk_pagostransfers_transfer` FOREIGN KEY (`Id_Transfer`) REFERENCES `transfers` (`Id_Transfer`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `pasajeros`
+-- Filtros para la tabla `pasajeros`
 --
 ALTER TABLE `pasajeros`
   ADD CONSTRAINT `fk_pasajeros_punto` FOREIGN KEY (`Id_Punto`) REFERENCES `puntos` (`Id_Punto`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pasajeros_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `planes_tours`
+-- Filtros para la tabla `password_reset_tokens`
+--
+ALTER TABLE `password_reset_tokens`
+  ADD CONSTRAINT `fk_password_reset_tokens_usuario` FOREIGN KEY (`user_id`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `planes_tours`
 --
 ALTER TABLE `planes_tours`
   ADD CONSTRAINT `fk_planes_tours` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `recordatorios`
+-- Filtros para la tabla `recordatorios`
 --
 ALTER TABLE `recordatorios`
   ADD CONSTRAINT `fk_recordatorios_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `reservas`
+-- Filtros para la tabla `reservas`
 --
 ALTER TABLE `reservas`
   ADD CONSTRAINT `fk_reservas_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `rol_permisos`
+-- Filtros para la tabla `rol_permisos`
 --
 ALTER TABLE `rol_permisos`
   ADD CONSTRAINT `fk_rol_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_rol_permisos_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `sesiones`
+-- Filtros para la tabla `sesiones`
 --
 ALTER TABLE `sesiones`
   ADD CONSTRAINT `fk_sesiones_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `tours_dias`
+-- Filtros para la tabla `tours_dias`
 --
 ALTER TABLE `tours_dias`
   ADD CONSTRAINT `fk_toursdias_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `tours_temporadas`
+-- Filtros para la tabla `tours_temporadas`
 --
 ALTER TABLE `tours_temporadas`
   ADD CONSTRAINT `fk_temporada_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `tours_temporada_dias`
+-- Filtros para la tabla `tours_temporada_dias`
 --
 ALTER TABLE `tours_temporada_dias`
   ADD CONSTRAINT `fk_tempdias_temporada` FOREIGN KEY (`Id_Temporada`) REFERENCES `tours_temporadas` (`Id_Temporada`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `tour_precios`
+-- Filtros para la tabla `tour_precios`
 --
 ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
@@ -8257,7 +8280,7 @@ ALTER TABLE `tour_precios`
   ADD CONSTRAINT `fk_preciotour_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `transfers`
+-- Filtros para la tabla `transfers`
 --
 ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
@@ -8265,20 +8288,20 @@ ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `transfers_precios`
+-- Filtros para la tabla `transfers_precios`
 --
 ALTER TABLE `transfers_precios`
   ADD CONSTRAINT `fk_pt_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_pt_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `usuarios`
+-- Filtros para la tabla `usuarios`
 --
 ALTER TABLE `usuarios`
   ADD CONSTRAINT `fk_usuarios_rol` FOREIGN KEY (`Id_Rol`) REFERENCES `roles` (`Id_Rol`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `usuario_permisos`
+-- Filtros para la tabla `usuario_permisos`
 --
 ALTER TABLE `usuario_permisos`
   ADD CONSTRAINT `fk_usuario_permisos_permiso` FOREIGN KEY (`Id_Permiso`) REFERENCES `permisos` (`Id_Permiso`) ON DELETE CASCADE ON UPDATE CASCADE;
