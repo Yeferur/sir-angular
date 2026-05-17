@@ -122,14 +122,16 @@
       <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     </div>
     <div class="page-header-actions">
-      <button class="btn-submit" type="submit" form="tourForm" [disabled]="isSubmitting()">
-        @if (isSubmitting()) {
-        <span class="btn-spinner"></span>
-        Guardando...
-        } @else {
-        Guardar Cambios
-        }
-      </button>
+      @if (canUpdateTour) {
+        <button class="btn-submit" type="submit" form="tourForm" [disabled]="isSubmitting()">
+          @if (isSubmitting()) {
+          <span class="btn-spinner"></span>
+          Guardando...
+          } @else {
+          Guardar Cambios
+          }
+        </button>
+      }
     </div>
   </div>
 

@@ -93,14 +93,38 @@ export class VerPuntos implements OnInit {
     return this.permisosService.tienePermiso('PUNTOS.ELIMINAR');
   }
 
+  get canCreatePunto(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.CREAR');
+  }
+
+  get canSortPuntos(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.ORDENAR');
+  }
+
+  get canExportPuntos(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.EXPORTAR');
+  }
+
+  get canUpdatePunto(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
+  }
+
   /* ===============================
      NAV
      =============================== */
   crearPunto() {
+    if (!this.canCreatePunto) {
+      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear puntos.');
+      return;
+    }
     this.router.navigate(['/Puntos/NuevoPunto']);
   }
 
   irAOrdenarPuntos() {
+    if (!this.canSortPuntos) {
+      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para ordenar puntos.');
+      return;
+    }
     this.router.navigate(['/Puntos/OrdenarPuntos']);
   }
 
@@ -118,27 +142,25 @@ export class VerPuntos implements OnInit {
     const id = Number((p as any).Id_Punto || (p as any).IdPunto);
     if (isNaN(id)) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar punto',
-      message: '¿Deseas eliminar este punto? Esta acción no se puede deshacer.',
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar punto',
+      '¿Deseas eliminar este punto? Esta acción no se puede deshacer.',
+      [
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.deletePunto(p);
           }
         },
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
-    });
+    );
   }
 
   private deletePunto(p: Punto) {
@@ -153,7 +175,7 @@ export class VerPuntos implements OnInit {
         setTimeout(() => {
           // recargar lista
           this.page$.next(this.page);
-          this.navbar.alert.set({
+          this.navbar.showAlert({
             type: 'success',
             title: 'Eliminado',
             message: 'Punto eliminado correctamente',
@@ -163,7 +185,7 @@ export class VerPuntos implements OnInit {
       },
       error: err => {
         console.error('Error eliminando punto', err);
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudo eliminar el punto',
@@ -211,6 +233,11 @@ export class VerPuntos implements OnInit {
   descargandoExcel = false;
 
   descargarExcel() {
+    if (!this.canExportPuntos) {
+      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para exportar puntos.');
+      return;
+    }
+
     this.descargandoExcel = true;
     this.puntosSvc.exportarExcel(this.searchTerm).subscribe({
       next: (blob: Blob) => {
@@ -224,7 +251,7 @@ export class VerPuntos implements OnInit {
       },
       error: (err: any) => {
         console.error('Error al exportar puntos al Excel', err);
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudieron exportar los puntos desde el servidor.',

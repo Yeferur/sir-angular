@@ -185,23 +185,94 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
 }
 
 async function actualizarEstadosTransfersVencidos(conexion = db) {
-  await conexion.query(`
-    UPDATE transfers
-       SET Estado = CASE
-         WHEN Estado IN ('Activo', 'Confirmada') AND Fecha_Transfer < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00')) THEN 'Completado'
-         WHEN Estado IN ('Activo', 'Confirmada') THEN 'Confirmado'
-         WHEN Estado = 'Completada' THEN 'Completado'
-         WHEN Estado = 'Cancelada' THEN 'Cancelado'
-         WHEN Estado = 'Confirmado' THEN 'Completado'
-         WHEN Estado IN ('Pendiente', 'Pendiente de datos', 'Pendiente de pago') THEN 'Cancelado'
-         ELSE Estado
-       END
-     WHERE Estado IN ('Activo', 'Confirmada', 'Completada', 'Cancelada')
-        OR (
-          Fecha_Transfer < DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '-05:00'))
-          AND Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
-        )
-  `);
+  const useExternalConn = !!conexion && conexion !== db;
+  const conn = useExternalConn ? conexion : await db.getConnection();
+  const hoyBogota = hoyBogotaYMD();
+  const resumen = { evaluados: 0, actualizados: 0, idsActualizados: [] };
+
+  const resolverTransicionTransferVencido = (estadoActual, fechaTransfer) => {
+    const estado = String(estadoActual || '').trim();
+    const vencida = fechaTransferEsPasadaBogota(fechaTransfer);
+
+    if ((estado === 'Activo' || estado === 'Confirmada') && vencida) {
+      return { nuevoEstado: 'Completado', motivo: 'VENCIMIENTO_AUTOMATICO' };
+    }
+    if (estado === 'Activo' || estado === 'Confirmada') {
+      return { nuevoEstado: 'Confirmado', motivo: 'NORMALIZACION_LEGACY' };
+    }
+    if (estado === 'Completada') {
+      return { nuevoEstado: 'Completado', motivo: 'NORMALIZACION_LEGACY' };
+    }
+    if (estado === 'Cancelada') {
+      return { nuevoEstado: 'Cancelado', motivo: 'NORMALIZACION_LEGACY' };
+    }
+    if (estado === 'Confirmado' && vencida) {
+      return { nuevoEstado: 'Completado', motivo: 'VENCIMIENTO_AUTOMATICO' };
+    }
+    if (['Pendiente', 'Pendiente de datos', 'Pendiente de pago'].includes(estado) && vencida) {
+      return { nuevoEstado: 'Cancelado', motivo: 'VENCIMIENTO_AUTOMATICO' };
+    }
+    return null;
+  };
+
+  try {
+    if (!useExternalConn) await conn.beginTransaction();
+
+    const [candidatos] = await conn.query(
+      `SELECT Id_Transfer, Estado, Fecha_Transfer
+         FROM transfers
+        WHERE Estado IN ('Activo', 'Confirmada', 'Completada', 'Cancelada')
+           OR (
+             Fecha_Transfer < ?
+             AND Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
+           )`,
+      [hoyBogota]
+    );
+
+    resumen.evaluados = Number(candidatos?.length || 0);
+
+    for (const row of candidatos || []) {
+      const transicion = resolverTransicionTransferVencido(row.Estado, row.Fecha_Transfer);
+      if (!transicion || transicion.nuevoEstado === row.Estado) continue;
+
+      const [updateResult] = await conn.query(
+        `UPDATE transfers
+            SET Estado = ?
+          WHERE Id_Transfer = ?
+            AND Estado = ?`,
+        [transicion.nuevoEstado, row.Id_Transfer, row.Estado]
+      );
+
+      if (!updateResult?.affectedRows) continue;
+
+      await recordHistorial({
+        conexion: conn,
+        tabla: 'transfers',
+        id_registro: row.Id_Transfer,
+        accion: 'ACTUALIZAR_ESTADO_AUTOMATICO',
+        id_usuario: null,
+        detalles: [
+          { columna: 'Estado', anterior: row.Estado || null, nuevo: transicion.nuevoEstado },
+          { columna: 'Motivo', anterior: null, nuevo: transicion.motivo }
+        ]
+      });
+
+      resumen.actualizados += 1;
+      resumen.idsActualizados.push(Number(row.Id_Transfer));
+    }
+
+    if (!useExternalConn) await conn.commit();
+    return resumen;
+  } catch (error) {
+    if (!useExternalConn) await conn.rollback();
+    throw error;
+  } finally {
+    if (!useExternalConn) conn.release();
+  }
+}
+
+function resolverUsuarioHistorialTransfer(explicitUserId = null) {
+  return explicitUserId ?? null;
 }
 
 function formatoCodigoTransfer(idTransfer) {
@@ -355,6 +426,7 @@ async function resolverRangoYValorTransfer(conn, payload = {}, opciones = {}) {
 async function crearTransferSvc(payload, files = {}) {
   const conn = await db.getConnection();
   const rutasComprobantesCreadas = [];
+  const historialUserId = resolverUsuarioHistorialTransfer(files?.userId);
 
   try {
     // Iniciar transacción
@@ -509,7 +581,7 @@ async function crearTransferSvc(payload, files = {}) {
       tabla: 'transfers',
       id_registro: idTransfer,
       accion: 'CREAR_TRANSFER',
-      id_usuario: payload?.Id_Usuario || payload?.userId || null,
+      id_usuario: historialUserId,
       detalles: [
         { columna: 'Nombre_Titular', anterior: null, nuevo: payload.Titular || null },
         { columna: 'Fecha_Transfer', anterior: null, nuevo: payload.FechaTransfer || null },
@@ -539,8 +611,6 @@ async function crearTransferSvc(payload, files = {}) {
 // exports consolidated at end of file
 
 async function filtrarTransfersSvc(q) {
-  await actualizarEstadosTransfersVencidos();
-
   const {
     Fecha_Transfer,
     Id_Servicio,
@@ -659,8 +729,6 @@ async function getPrecioBasePorRangoYMonedaSvc(Id_Rango, Id_Moneda) {
 }
 
 async function getDetalleTransferSvc(Id_Transfer) {
-  await actualizarEstadosTransfersVencidos();
-
   // Obtener detalles completos del transfer
   const [transferData] = await db.query(`
     SELECT
@@ -809,9 +877,10 @@ function getExtensionForMime(file) {
   return ext || '.bin';
 }
 
-async function actualizarTransferSvc(Id_Transfer, payload) {
+async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
   const conn = await db.getConnection();
   let rutasPendientesEliminar = [];
+  const historialUserId = resolverUsuarioHistorialTransfer(userId);
 
   try {
     // Iniciar transacción
@@ -1003,7 +1072,7 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
       tabla: 'transfers',
       id_registro: Id_Transfer,
       accion: 'ACTUALIZAR_TRANSFER',
-      id_usuario: payload?.Id_Usuario || payload?.userId || null,
+      id_usuario: historialUserId,
       detalles: [
         { columna: 'Nombre_Titular', anterior: transferActualRows?.[0]?.Nombre_Titular ?? null, nuevo: payload?.Titular || null },
         { columna: 'Fecha_Transfer', anterior: transferActualRows?.[0]?.Fecha_Transfer ?? null, nuevo: payload?.FechaTransfer || null },
@@ -1036,8 +1105,9 @@ async function actualizarTransferSvc(Id_Transfer, payload) {
   }
 }
 
-async function cancelarTransferSvc(Id_Transfer) {
+async function cancelarTransferSvc(Id_Transfer, userId = null) {
   const conn = await db.getConnection();
+  const historialUserId = resolverUsuarioHistorialTransfer(userId);
   try {
     await conn.beginTransaction();
 
@@ -1063,6 +1133,7 @@ async function cancelarTransferSvc(Id_Transfer) {
       tabla: 'transfers',
       id_registro: Id_Transfer,
       accion: 'CANCELAR_TRANSFER',
+      id_usuario: historialUserId,
       detalles: [
         { columna: 'Estado', anterior: estadoAnterior, nuevo: 'Cancelado' },
         { columna: 'Nombre_Titular', anterior: rows[0].Nombre_Titular ?? null, nuevo: rows[0].Nombre_Titular ?? null },
@@ -1196,4 +1267,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre };
+module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos };

@@ -177,6 +177,14 @@ seleccionarPuntoAutocomplete(p: any) {
     return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
   }
 
+  get canCreateReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.CREAR');
+  }
+
+  get canUpdateReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ACTUALIZAR');
+  }
+
 fpOptionsFecha: Partial<FlatpickrOptions> = {
   dateFormat: 'Y-m-d',
   altInput: true,
@@ -326,6 +334,10 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   crearReserva() {
+    if (!this.canCreateReserva) {
+      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear reservas.');
+      return;
+    }
     this.router.navigate(['/Reservas/NuevaReserva']);
   }
 
@@ -337,27 +349,25 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     const id = reserva?.Id_Reserva;
     if (!id || !this.canDeleteReserva) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar reserva',
-      message: `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar reserva',
+      `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.deleteReserva(reserva);
           }
         }
       ]
-    });
+    );
   }
 
   private deleteReserva(reserva: any): void {
@@ -373,7 +383,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
       },
       error: (error) => {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'No se pudo eliminar',
           message: this.getApiErrorMessage(error, 'No fue posible eliminar la reserva.'),
@@ -382,7 +392,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             {
               text: 'Cerrar',
               style: 'secondary',
-              onClick: () => this.navbar.alert.set(null)
+              onClick: () => this.navbar.clearOverlay()
             }
           ]
         });
@@ -543,7 +553,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     const filtros = this.buildApiFilters();
     // Si el filtro es por punto, solo buscar si el punto fue seleccionado del autocompletar
     if (filtros.Punto && !this.puntoSeleccionado) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'info',
         title: 'Selecciona un punto',
         message: 'Debes seleccionar un punto de encuentro del autocompletar.',
@@ -556,7 +566,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     // Si no hay ningún filtro relevante, no buscar
     if (Object.keys(filtros).length === 0 ||
       (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal)) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'info',
         title: 'Sin filtros',
         message: 'Debes aplicar al menos un filtro para buscar.',
@@ -581,7 +591,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.reservas.set(data);
         this.cdr.markForCheck();
         if (data.length === 0) {
-          this.navbar.alert.set({
+          this.navbar.showAlert({
             type: 'info',
             title: 'Sin resultados',
             message: 'No se encontraron reservas con los filtros actuales.',
@@ -593,7 +603,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         }
       },
       error: (error) => {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'Error en la búsqueda',
           message: error.message,

@@ -17,6 +17,7 @@ import { ChangeDetectorRef, signal } from '@angular/core';
 import { Tours } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 /* =========================================================
  * TYPES
@@ -253,7 +254,8 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     private router: Router,
     private route: ActivatedRoute,
     private navbar: DynamicIslandGlobalService,
-    private cd: ChangeDetectorRef
+    private cd: ChangeDetectorRef,
+    private permisosService: PermisosService
   ) {
     this.form = this.fb.group({
       Nombre_Tour: ['', [Validators.required, Validators.maxLength(255)]],
@@ -286,6 +288,10 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       }),
       temporadas: this.fb.array([], [this.temporadasValidator()]),
     });
+  }
+
+  get canUpdateTour(): boolean {
+    return this.permisosService.tienePermiso('TOURS.ACTUALIZAR');
   }
 
   /* =========================================================

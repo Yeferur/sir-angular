@@ -81,32 +81,39 @@ export class Usuarios implements OnInit {
     return this.permisosService.tienePermiso('USUARIOS.ELIMINAR');
   }
 
+  canCreateUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.CREAR');
+  }
+
+  canUpdateUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.ACTUALIZAR');
+  }
+
   forzarCierreSesion(userId: string) {
     if (this.isCurrentUser(userId)) {
       this.cerrarMisSesiones();
       return;
     }
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Cierre de Sesión',
-      message: 'Estás a punto de cerrar la sesión de este usuario.',
-      buttons: [
+    this.navbar.showConfirm(
+      'Cierre de Sesión',
+      'Estás a punto de cerrar la sesión de este usuario.',
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Cerrar Sesión',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null); // Close confirm
+            this.navbar.clearOverlay();
             this.performLogout(userId);
           }
         }
       ]
-    });
+    );
   }
 
   private performLogout(userId: string) {
@@ -122,21 +129,20 @@ export class Usuarios implements OnInit {
   }
 
   cerrarMisSesiones() {
-    this.navbar.alert.set({
-      type: 'info',
-      title: 'Cerrar sesión en todos mis dispositivos',
-      message: 'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
-      buttons: [
+    this.navbar.showConfirm(
+      'Cerrar sesión en todos mis dispositivos',
+      'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Cerrar sesiones',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.auth.logoutAllSessions().subscribe({
               next: () => {
                 this.auth.clearLocalSession();
@@ -151,7 +157,7 @@ export class Usuarios implements OnInit {
           }
         }
       ]
-    });
+    );
   }
 
   eliminarUsuario(userId: string) {
@@ -164,20 +170,19 @@ export class Usuarios implements OnInit {
       return;
     }
 
-    this.navbar.alert.set({
-      type: 'error', // Red alert for danger
-      title: '¿Eliminar Usuario?',
-      message: 'Esta acción desactivará al usuario, cerrará sus sesiones activas y lo ocultará del listado. El historial seguirá conservando la relación con su Id_Usuario.',
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+    this.navbar.showConfirm(
+      '¿Eliminar Usuario?',
+      'Esta acción desactivará al usuario, cerrará sus sesiones activas y lo ocultará del listado. El historial seguirá conservando la relación con su Id_Usuario.',
+      [
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
         {
           text: 'Eliminar', style: 'primary', onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.confirmEliminar(userId);
           }
         }
       ]
-    });
+    );
   }
 
   private confirmEliminar(userId: string) {

@@ -135,12 +135,12 @@ export class EditarPerfilComponent implements OnInit {
         ? `Revisa los siguientes campos: ${fields.join(', ')}`
         : 'Hay campos inválidos en el formulario.';
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }],
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }],
       });
       return;
     }
@@ -164,27 +164,26 @@ export class EditarPerfilComponent implements OnInit {
       confirmationParts.push('También se actualizará tu foto de perfil.');
     }
 
-    this.navbar.alert.set({
-      type: 'info',
-      title: '¿Guardar cambios?',
-      message: confirmationParts.join(' '),
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      '¿Guardar cambios?',
+      confirmationParts.join(' '),
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null),
+          onClick: () => this.navbar.clearOverlay(),
         },
         {
           text: 'Guardar cambios',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.ejecutarGuardado(payload);
           },
         },
       ],
-    });
+      { type: 'info' }
+    );
   }
 
   private ejecutarGuardado(payload: any): void {
@@ -325,17 +324,15 @@ export class EditarPerfilComponent implements OnInit {
       return;
     }
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar foto de perfil',
-      message: '¿Estás seguro de que deseas eliminar tu foto de perfil? Esta acción no se puede deshacer.',
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar foto de perfil',
+      '¿Estás seguro de que deseas eliminar tu foto de perfil? Esta acción no se puede deshacer.',
+      [
         {
           text: 'Eliminar',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.ejecutarEliminacionAvatar();
           },
         },
@@ -343,11 +340,12 @@ export class EditarPerfilComponent implements OnInit {
           text: 'Cancelar',
           style: 'secondary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
           },
         },
       ],
-    });
+      { type: 'warning' }
+    );
   }
 
   private ejecutarEliminacionAvatar(): void {

@@ -111,19 +111,27 @@
         <div class="summary-actions">
           @if (canExportReports) {
             <div class="report-actions">
-              <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadComisiones()">Descargar Comisiones</button>
-              <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadSeguros()">Descargar Seguros</button>
-              <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadAmbos()">Descargar ambos</button>
+              @if (canExportComisiones) {
+                <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadComisiones()">Descargar Comisiones</button>
+              }
+              @if (canExportSeguros) {
+                <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadSeguros()">Descargar Seguros</button>
+              }
+              @if (canExportAmbos) {
+                <button type="button" class="btn-secondary" [disabled]="isExportingReports || isSubmitting" (click)="downloadAmbos()">Descargar ambos</button>
+              }
             </div>
           }
 
-          <label class="toggle-all-label">
-            <span class="toggle-all-text">Marcar todos</span>
-            <label class="toggle-switch">
-              <input type="checkbox" [checked]="allChecked" (change)="toggleAll($event)" class="toggle-checkbox sr-only">
-              <div class="toggle-bg"><div class="toggle-dot"></div></div>
+          @if (canUpdateAsistencia) {
+            <label class="toggle-all-label">
+              <span class="toggle-all-text">Marcar todos</span>
+              <label class="toggle-switch">
+                <input type="checkbox" [checked]="allChecked" (change)="toggleAll($event)" class="toggle-checkbox sr-only">
+                <div class="toggle-bg"><div class="toggle-dot"></div></div>
+              </label>
             </label>
-          </label>
+          }
         </div>
       </div>
 
@@ -163,10 +171,14 @@
                 </td>
                 <td class="td">{{ p.PuntoEncuentro || '—' }}</td>
                 <td class="td td-center">
-                  <label class="toggle-switch">
-                    <input type="checkbox" [(ngModel)]="p.Confirmacion" (change)="checkAllStatus()" class="toggle-checkbox sr-only">
-                    <div class="toggle-bg"><div class="toggle-dot"></div></div>
-                  </label>
+                  @if (canUpdateAsistencia) {
+                    <label class="toggle-switch">
+                      <input type="checkbox" [(ngModel)]="p.Confirmacion" (change)="checkAllStatus()" class="toggle-checkbox sr-only">
+                      <div class="toggle-bg"><div class="toggle-dot"></div></div>
+                    </label>
+                  } @else {
+                    <span>{{ isConfirmado(p) ? 'Sí' : 'No' }}</span>
+                  }
                 </td>
               </tr>
             }
@@ -178,7 +190,7 @@
 </div>
 
 <!-- FLOATING SAVE -->
-@if (pasajeros.length > 0) {
+@if (pasajeros.length > 0 && canUpdateAsistencia) {
   <button (click)="save()" [disabled]="isSubmitting || isLoading" class="floating-save-btn">
     @if (isSubmitting) {
       <span class="btn-spinner"></span>

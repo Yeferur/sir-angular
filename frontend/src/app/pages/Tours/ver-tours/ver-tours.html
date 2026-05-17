@@ -6,7 +6,9 @@
       </div>
 
       <div class="header-actions">
-        <button class="btn-primary" (click)="crearTour()">+ Nuevo Tour</button>
+        @if (canCreateTour) {
+          <button class="btn-primary" (click)="crearTour()">+ Nuevo Tour</button>
+        }
       </div>
     </div>
 
@@ -34,7 +36,9 @@
         <div class="empty-state-icon">✦</div>
         <h2>No hay tours registrados</h2>
         <p>Crea tu primer tour para empezar a configurar cupos, comisiones y programación.</p>
-        <button class="btn-primary" type="button" (click)="crearTour()">+ Nuevo Tour</button>
+        @if (canCreateTour) {
+          <button class="btn-primary" type="button" (click)="crearTour()">+ Nuevo Tour</button>
+        }
       </section>
     } @else {
     <div class="dashboard-grid">
@@ -71,7 +75,9 @@
           </div>
 
           <div class="card-footer">
-            <button class="btn-secondary" (click)="editarTour(tour)">Editar</button>
+            @if (canUpdateTour) {
+              <button class="btn-secondary" (click)="editarTour(tour)">Editar</button>
+            }
             @if (canDeleteTour) {
               <button class="btn-danger" (click)="eliminarTour(tour)">Eliminar</button>
             }

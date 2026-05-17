@@ -65,7 +65,7 @@ router.post(
 router.post(
     '/guardar-listado',
     authMiddleware,
-    checkPermission('PROGRAMACION.CREAR'),
+    checkPermission('PROGRAMACION.ACTUALIZAR'),
     guardarListadoFinalController
 );
 

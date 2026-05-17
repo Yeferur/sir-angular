@@ -81,12 +81,12 @@ async onSubmitCrearPunto() {
       ? `Revisa los siguientes campos: ${fields.join(', ')}`
       : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'error',
       title: 'Campos requeridos incompletos',
       message: msg,
       autoClose: true,
-      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
     });
     return;
   }

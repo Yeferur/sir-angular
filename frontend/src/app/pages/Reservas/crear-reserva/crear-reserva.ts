@@ -180,13 +180,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     });
 
     if (hayDuplicados) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'DNI repetido en esta reserva',
         message: 'Hay pasajeros con el mismo documento dentro de la reserva actual. Corrige los DNI antes de guardar.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -307,13 +307,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
 
     if (dupCtrl) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'DNI con reserva existente',
         message: 'Al cambiar la fecha, uno o más pasajeros ya aparecen reservados para esa misma fecha. Revisa los campos marcados antes de guardar.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -325,7 +325,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const message = this.getFriendlyReservaErrorMessage(error);
     this.closeSummaryIfOpen();
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'error',
       title,
       message,
@@ -334,7 +334,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         {
           text: 'Cerrar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
     });
@@ -350,7 +350,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         text: 'Ver reserva',
         style: 'primary',
         onClick: () => {
-          this.navbar.alert.set(null);
+          this.navbar.clearOverlay();
           try { this.navbar.closePanel(); } catch {}
           this.navbar.Id_Reserva.set(String(idReserva));
         }
@@ -360,10 +360,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     buttons.push({
       text: options?.blocking ? 'Corregir DNI' : 'Entendido',
       style: 'secondary',
-      onClick: () => this.navbar.alert.set(null)
+      onClick: () => this.navbar.clearOverlay()
     });
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: options?.blocking ? 'error' : 'warning',
       title: 'Pasajero ya reservado',
       message: idReserva
@@ -384,13 +384,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     if (!ok) {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Cupos actualizados',
         message: 'La disponibilidad cambió y ahora esta reserva supera los cupos disponibles. Ajusta los pasajeros antes de guardar o selecciona otra fecha.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -421,7 +421,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
       if (!disponible && !options?.silent) {
         this.closeSummaryIfOpen();
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Cupos insuficientes',
           message: cupos <= 0
@@ -432,7 +432,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
             {
               text: 'Entendido',
               style: 'secondary',
-              onClick: () => this.navbar.alert.set(null)
+              onClick: () => this.navbar.clearOverlay()
             }
           ]
         });
@@ -644,7 +644,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   private evaluarConflictoRutasEnTiempoReal(): void {
     const hayConflicto = this.tieneConflictoLogistico();
     if (hayConflicto && !this.conflictoRutasNotificado()) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Inviabilidad logística detectada',
         message: this.mensajeInviabilidadLogistica() || 'Los puntos seleccionados no cumplen la validación logística.',
@@ -875,16 +875,15 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.ensureDefaultCanal();
       this.monedas.set(monedas || []);
     } catch {
-      this.navbar.alert.set({
-        type: 'error',
-        title: 'Error cargando datos',
-        message: 'No fue posible cargar Tours, Canales o Monedas.',
-        autoClose: false,
-        buttons: [
-          { text: 'Reintentar', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.ngOnInit(); } },
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+      this.navbar.showConfirm(
+        'Error cargando datos',
+        'No fue posible cargar Tours, Canales o Monedas.',
+        [
+          { text: 'Reintentar', style: 'primary', onClick: () => { this.navbar.clearOverlay(); this.ngOnInit(); } },
+          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
         ],
-      });
+        { type: 'error' }
+      );
     } finally {
       this.isLoading.set(false);
       this.cdr.markForCheck();
@@ -928,7 +927,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.puntoBusquedaResults.set(results || []);
     } catch {
       this.puntoBusquedaResults.set([]);
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Error buscando puntos',
         message: 'No fue posible obtener los puntos de encuentro.',
@@ -990,7 +989,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       } else {
         this.horarioSeleccionado.set(null);
         this.form.get('Id_Horario')?.setValue(null);
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Sin horario',
           message: 'No se encontró horario para el punto principal con el tour seleccionado.',
@@ -1050,7 +1049,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       const teniaInfantes = this.countByTipo('INFANTE') > 0;
       if (teniaInfantes && !this.tourRules.allowsPassengerType(idTour, 'INFANTE')) {
         this.removeInfantes();
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Infantes no permitidos',
           message: 'En este tour no se aceptan infantes. Han sido removidos.',
@@ -1070,21 +1069,21 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       const ninos = this.countByTipo('NINO');
       const infantes = this.countByTipo('INFANTE');
       if (ninos > 0 && infantes > 0) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Política de Niños e Infantes',
           message: 'En Hacienda Nápoles, los niños mayores de 5 años van como ADULTOS y los infantes mayores de 1 año como NIÑOS.',
           autoClose: true,
         });
       } else if (infantes > 0) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Política de Infantes',
           message: 'En Hacienda Nápoles, los infantes mayores de 1 año deben ser NIÑOS.',
           autoClose: true,
         });
       } else if (ninos > 0) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Política de Niños',
           message: 'En Hacienda Nápoles, niños mayores de 5 años deben ir como ADULTOS.',
@@ -1192,7 +1191,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const Id_Tour = this.form.get('SelectTour')?.value;
 
     if (!Fecha || !Id_Tour) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona tour y fecha antes de agregar pasajeros.',
@@ -1225,7 +1224,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.navbar.cuposInfo.set({ ...data });
 
       if (!disponible) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Cupos insuficientes',
           message: cupos <= 0
@@ -1233,7 +1232,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
             : `Solo hay ${cupos} cupos disponibles. Ajusta la cantidad de pasajeros.`,
           autoClose: false,
           buttons: [
-            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
           ]
         });
         return false;
@@ -1253,7 +1252,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const Id_Tour = this.form.get('SelectTour')?.value;
 
     if (!Fecha || !Id_Tour) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona tour y fecha antes de agregar pasajeros.',
@@ -1276,7 +1275,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.cuposValidosActuales.set(disponible);
 
       if (!disponible) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Cupos insuficientes',
           message: cupos <= 0
@@ -1287,7 +1286,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
             {
               text: 'Entendido',
               style: 'secondary',
-              onClick: () => this.navbar.alert.set(null)
+              onClick: () => this.navbar.clearOverlay()
             }
           ]
         });
@@ -1313,7 +1312,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const Id_Tour = this.form.get('SelectTour')?.value;
 
     if (!Id_Tour) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona un tour antes de agregar pasajeros.',
@@ -1323,7 +1322,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     }
 
     if (!Fecha) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona la fecha del tour antes de agregar pasajeros.',
@@ -1653,24 +1652,22 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   // Añade esto dentro de tu componente (CrearReservaComponent)
   private confirmarReserva(titulo: string, mensaje: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      this.navbar.alert.set({
-        type: 'info',
-        title: titulo,
-        message: mensaje,
-        autoClose: false,
-        buttons: [
+      this.navbar.showConfirm(
+        titulo,
+        mensaje,
+        [
           {
             text: 'Cancelar',
             style: 'secondary',
-            onClick: () => { this.navbar.alert.set(null); resolve(false); },
+            onClick: () => { this.navbar.clearOverlay(); resolve(false); },
           },
           {
             text: 'Confirmar',
             style: 'primary',
-            onClick: () => { this.navbar.alert.set(null); resolve(true); },
+            onClick: () => { this.navbar.clearOverlay(); resolve(true); },
           },
-        ],
-      });
+        ]
+      );
     });
   }
 
@@ -1682,16 +1679,14 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const confirmar = (titulo: string, mensaje: string): Promise<boolean> =>
       new Promise<boolean>((resolve) => {
         this.closeSummaryIfOpen();
-        this.navbar.alert.set({
-          type: 'info',
-          title: titulo,
-          message: mensaje,
-          autoClose: false,
-          buttons: [
-            { text: 'Cancelar', style: 'secondary', onClick: () => { this.navbar.alert.set(null); resolve(false); } },
-            { text: 'Confirmar', style: 'primary', onClick: () => { this.navbar.alert.set(null); resolve(true); } },
-          ],
-        });
+        this.navbar.showConfirm(
+          titulo,
+          mensaje,
+          [
+            { text: 'Cancelar', style: 'secondary', onClick: () => { this.navbar.clearOverlay(); resolve(false); } },
+            { text: 'Confirmar', style: 'primary', onClick: () => { this.navbar.clearOverlay(); resolve(true); } },
+          ]
+        );
       });
 
     // (Helpers transferidos a métodos privados de la clase)
@@ -1721,12 +1716,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         : 'Hay campos inválidos en el formulario.';
       this.closeSummaryIfOpen();
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       this.isSubmitting.set(false);
       return;
@@ -1734,12 +1729,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     if (this.tieneConflictoLogistico()) {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Inviabilidad logística',
         message: this.mensajeInviabilidadLogistica() || 'Corrige los puntos de encuentro antes de guardar.',
         autoClose: false,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       this.isSubmitting.set(false);
       return;
@@ -1750,12 +1745,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     // Validar que haya al menos un pasajero
     if (this.pasajeros.length === 0) {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Sin pasajeros',
         message: 'Debes agregar al menos un pasajero para crear la reserva.',
         autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }]
       });
       this.isSubmitting.set(false);
       return;
@@ -1889,7 +1884,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         this.navbar.needsRefresh.set('reservas');
 
         const estadoTexto = subestado ? `${estado} ${subestado}` : estado;
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'success',
           title: 'Reserva creada',
           message: `
@@ -1898,8 +1893,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         `,
           autoClose: false,
           buttons: [
-            { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(res.Id_Reserva); } },
+            { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
+            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.clearOverlay(); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(res.Id_Reserva); } },
           ],
         });
 
@@ -1917,12 +1912,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         this.form.markAsPristine();
         this.cdr.markForCheck();
       } else {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'Error al crear reserva',
           message: 'No se pudo crear la reserva. Revisa los datos e intenta nuevamente.',
           autoClose: false,
-          buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
+          buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
         });
       }
     } catch (err) {
@@ -1949,7 +1944,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
-    if (this.navbar?.alert) this.navbar.alert.set(null);
+    this.navbar?.clearOverlay?.();
   }
 
 
@@ -1968,7 +1963,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     // Validación de tamaño
     if (file.size > 5 * 1024 * 1024) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Archivo muy grande',
         message: 'El máximo permitido es 5 MB.',
@@ -1982,7 +1977,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     // Validación de tipo
     const ok = /\.(pdf|jpe?g|png)$/i.test(file.name);
     if (!ok) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Formato no permitido',
         message: 'Sólo PDF, JPG o PNG.',
@@ -1999,7 +1994,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     ctrl.updateValueAndValidity({ emitEvent: false });
 
     // Mostrar nombre del archivo en la interfaz
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'success',
       title: 'Archivo cargado',
       message: `Se ha cargado el comprobante: ${file.name}`,
@@ -2008,7 +2003,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     // Lógica adicional para Pago Completo
     if (this.form.get('FormaPago')?.value === 'Completo') {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'success',
         title: 'Archivo cargado',
         message: `Se ha cargado el archivo: ${file.name}`,
@@ -2026,7 +2021,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     // Validación de tamaño
     if (file.size > 5 * 1024 * 1024) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Archivo muy grande',
         message: 'El máximo permitido es 5 MB.',
@@ -2040,7 +2035,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     // Validación de tipo
     const ok = /\.(pdf|jpe?g|png)$/i.test(file.name);
     if (!ok) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Formato no permitido',
         message: 'Sólo PDF, JPG o PNG.',
@@ -2057,7 +2052,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     abonoControl.updateValueAndValidity({ emitEvent: false });
 
     // Mostrar nombre del archivo en la interfaz
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'success',
       title: 'Archivo cargado',
       message: `Se ha cargado el archivo: ${file.name}`,
@@ -2080,7 +2075,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (!url) return;
     const href = this.resolveComprobanteUrl(url);
     if (!href) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Comprobante inválido',
         message: 'No se pudo resolver la URL del comprobante.',
@@ -2100,18 +2095,16 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const ctrl = this.form.get('ComprobantePago');
     const currentValue: any = ctrl?.value;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar comprobante',
-      message: 'Esta acción eliminará el comprobante actual. ¿Deseas continuar?',
-      autoClose: false,
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+    this.navbar.showConfirm(
+      'Eliminar comprobante',
+      'Esta acción eliminará el comprobante actual. ¿Deseas continuar?',
+      [
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
         {
           text: 'Eliminar',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
 
             const idPago = Number(currentValue?.Id_Pago);
             const idReservaRaw = currentValue?.Id_Reserva || this.navbar.Id_Reserva?.();
@@ -2121,7 +2114,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
               this.reservasSvc.eliminarComprobantePagoReserva(idReserva, idPago).subscribe({
                 next: () => {
                   this.clearComprobanteLocalState();
-                  this.navbar.alert.set({
+                  this.navbar.showAlert({
                     type: 'success',
                     title: 'Comprobante eliminado',
                     message: 'El comprobante se eliminó correctamente del servidor.',
@@ -2129,7 +2122,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
                   });
                 },
                 error: () => {
-                  this.navbar.alert.set({
+                  this.navbar.showAlert({
                     type: 'error',
                     title: 'Error al eliminar',
                     message: 'No se pudo eliminar el comprobante en el servidor.',
@@ -2141,7 +2134,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
             }
 
             this.clearComprobanteLocalState();
-            this.navbar.alert.set({
+            this.navbar.showAlert({
               type: 'info',
               title: 'Archivo eliminado',
               message: 'Se eliminó del formulario local. Guarda para persistir cambios.',
@@ -2150,7 +2143,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
           },
         },
       ],
-    });
+      { type: 'warning' }
+    );
   }
 
   private clearComprobanteLocalState(): void {

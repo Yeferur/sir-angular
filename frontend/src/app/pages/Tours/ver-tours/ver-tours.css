@@ -106,7 +106,6 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-height: 214px;
     border: 1px solid color-mix(in srgb, var(--separator-color) 86%, transparent 14%);
     box-shadow:
       0 1px 0 rgba(255, 255, 255, 0.02) inset,
@@ -204,7 +203,7 @@
     display: flex;
     gap: 10px;
     justify-content: flex-end;
-    margin-top: auto;
+    margin-top: 15px;
 }
 
 /* Empty state */

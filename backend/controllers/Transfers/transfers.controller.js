@@ -154,8 +154,10 @@ exports.createTransfer = [
 
     const files = Array.isArray(req.files) ? req.files : [];
     const filesByField = agruparArchivosPorCampo(files);
+    const userId = req.user?.id || null;
 
     const result = await crearTransferSvc(payload, {
+      userId,
       comprobantePago: filesByField.comprobantePago?.[0] || null,
       comprobantesAbonos: files,
     });
@@ -168,11 +170,12 @@ exports.updateTransfer = async (req, res) => {
   try {
     const { Id_Transfer } = req.params;
     const payload = req.body;
+    const userId = req.user?.id || null;
 
     if (!Id_Transfer) return sendError(res, { status: 400, message: 'Falta Id_Transfer', errorCode: 'MISSING_PARAMS' });
     if (!payload) return sendError(res, { status: 400, message: 'Falta body', errorCode: 'BAD_REQUEST' });
 
-    const result = await actualizarTransferSvc(Id_Transfer, payload);
+    const result = await actualizarTransferSvc(Id_Transfer, payload, userId);
     return sendSuccess(res, { data: result, message: 'Transfer actualizado correctamente' });
   } catch (e) {
     console.error(e);
@@ -188,9 +191,10 @@ exports.updateTransfer = async (req, res) => {
 exports.cancelTransfer = async (req, res) => {
   try {
     const { Id_Transfer } = req.params;
+    const userId = req.user?.id || null;
     if (!Id_Transfer) return sendError(res, { status: 400, message: 'Falta Id_Transfer', errorCode: 'MISSING_PARAMS' });
 
-    const result = await cancelarTransferSvc(Id_Transfer);
+    const result = await cancelarTransferSvc(Id_Transfer, userId);
     return sendSuccess(res, { data: result, message: 'Transfer cancelado correctamente' });
   } catch (e) {
     const status = e?.status || 500;

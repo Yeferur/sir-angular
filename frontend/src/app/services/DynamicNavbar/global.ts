@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, WritableSignal, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -20,26 +20,61 @@ export interface UiToast {
   durationMs: number;
 }
 
+export interface LegacyAlertState {
+  type?: 'success' | 'info' | 'error' | 'warning';
+  title?: string;
+  message?: string;
+  buttons?: { text: string, style: string, onClick: () => void }[];
+  loading?: boolean;
+  autoClose?: boolean;
+  autoCloseTime?: number;
+}
+
+export interface DynamicOverlayState extends LegacyAlertState {
+  id: string;
+  kind: 'loading' | 'alert' | 'confirm';
+  priority: number;
+  createdAt: number;
+  dedupeKey: string;
+  source?: string;
+}
+
+export interface DynamicBaseStateOptions {
+  cupos?: boolean;
+  reserva?: boolean;
+  transfer?: boolean;
+  puntos?: boolean;
+  panel?: boolean;
+  preview?: boolean;
+  sugerencias?: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class DynamicIslandGlobalService {
+  private readonly OVERLAY_PRIORITIES = {
+    confirm: 500,
+    error: 400,
+    warning: 300,
+    loading: 200,
+    success: 100,
+    info: 100,
+  } as const;
+  private readonly MAX_QUEUE_LENGTH = 6;
+  private overlaySequence = 0;
+  private overlayQueue = signal<DynamicOverlayState[]>([]);
 
   apiUrl = environment.apiUrl;
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {
+    this.alert = this.createAlertCompatSignal();
+  }
 
   mode = signal<'login' | ''>('login');
-  // Definir la señal como propiedad pública
-  alert = signal<{
-    type?: 'success' | 'info' | 'error' | 'warning',
-    title?: string,
-    message?: string,
-    buttons?: { text: string, style: string, onClick: () => void }[],
-    loading?: boolean,
-    autoClose?: boolean,
-    autoCloseTime?: number
-  } | null>(null);
+  overlay = signal<DynamicOverlayState | null>(null);
+  // Compatibilidad: los consumidores existentes pueden seguir usando alert.set(...)
+  alert: WritableSignal<LegacyAlertState | null>;
 
   toasts = signal<UiToast[]>([]);
 
@@ -84,6 +119,241 @@ export class DynamicIslandGlobalService {
   previewUrl = signal<string | null>(null);
   previewTitle = signal<string | null>(null);
 
+  private normalizeOverlayState(
+    state: LegacyAlertState & Partial<Pick<DynamicOverlayState, 'kind' | 'source'>>
+  ): DynamicOverlayState {
+    const buttons = Array.isArray(state.buttons) ? state.buttons : [];
+    const inferredKind =
+      state.kind
+      ?? (state.loading ? 'loading' : buttons.length > 1 ? 'confirm' : 'alert');
+    const normalizedType =
+      state.type === 'success'
+      || state.type === 'info'
+      || state.type === 'error'
+      || state.type === 'warning'
+        ? state.type
+        : inferredKind === 'confirm'
+          ? 'warning'
+          : 'info';
+    const createdAt = Date.now();
+    const priority = this.getOverlayPriority(inferredKind, normalizedType);
+
+    return {
+      ...state,
+      id: `overlay-${++this.overlaySequence}`,
+      kind: inferredKind,
+      type: normalizedType,
+      buttons,
+      priority,
+      createdAt,
+      dedupeKey: this.buildOverlayDedupeKey({
+        ...state,
+        kind: inferredKind,
+        type: normalizedType,
+      }),
+    };
+  }
+
+  private createAlertCompatSignal(): WritableSignal<LegacyAlertState | null> {
+    const compat = ((() => this.overlay()) as unknown) as WritableSignal<LegacyAlertState | null>;
+    compat.set = (value: LegacyAlertState | null) => {
+      if (value == null) {
+        this.clearOverlay();
+        return;
+      }
+      this.showOverlay(value);
+    };
+    compat.update = (updater: (value: LegacyAlertState | null) => LegacyAlertState | null) => {
+      compat.set(updater(compat()));
+    };
+    compat.asReadonly = () => this.overlay.asReadonly() as any;
+    return compat;
+  }
+
+  private getOverlayPriority(
+    kind: DynamicOverlayState['kind'],
+    type: NonNullable<DynamicOverlayState['type']>
+  ): number {
+    if (kind === 'confirm') return this.OVERLAY_PRIORITIES.confirm;
+    if (kind === 'loading') return this.OVERLAY_PRIORITIES.loading;
+    if (type === 'error') return this.OVERLAY_PRIORITIES.error;
+    if (type === 'warning') return this.OVERLAY_PRIORITIES.warning;
+    if (type === 'success') return this.OVERLAY_PRIORITIES.success;
+    return this.OVERLAY_PRIORITIES.info;
+  }
+
+  private buildOverlayDedupeKey(
+    state: Pick<DynamicOverlayState, 'kind' | 'type' | 'title' | 'message' | 'loading' | 'source'>
+  ): string {
+    return JSON.stringify({
+      kind: state.kind,
+      type: state.type || 'info',
+      title: state.title || '',
+      message: state.message || '',
+      loading: !!state.loading,
+      source: state.source || '',
+    });
+  }
+
+  private isSameOverlay(
+    a: Pick<DynamicOverlayState, 'dedupeKey'> | null | undefined,
+    b: Pick<DynamicOverlayState, 'dedupeKey'> | null | undefined
+  ): boolean {
+    return !!a && !!b && a.dedupeKey === b.dedupeKey;
+  }
+
+  private isNavigationLoading(overlay: DynamicOverlayState): boolean {
+    return overlay.kind === 'loading' && overlay.source === 'navigation';
+  }
+
+  private shouldReplaceCurrentOverlay(current: DynamicOverlayState, next: DynamicOverlayState): boolean {
+    if (current.kind === 'confirm') return false;
+    if (next.kind === 'confirm') return true;
+    if (current.kind === 'loading' && next.priority > current.priority) return true;
+    if (next.kind === 'loading') {
+      return current.kind === 'loading';
+    }
+    return next.priority > current.priority;
+  }
+
+  private enqueueOverlay(overlay: DynamicOverlayState): void {
+    this.overlayQueue.update((queue) => {
+      if (queue.some((item) => this.isSameOverlay(item, overlay))) {
+        return queue;
+      }
+
+      const nextQueue = [...queue, overlay]
+        .sort((a, b) => (b.priority - a.priority) || (a.createdAt - b.createdAt));
+
+      if (nextQueue.length <= this.MAX_QUEUE_LENGTH) {
+        return nextQueue;
+      }
+
+      const overflow = nextQueue.length - this.MAX_QUEUE_LENGTH;
+      const trimmed = [...nextQueue];
+      let removed = 0;
+
+      for (let i = trimmed.length - 1; i >= 0 && removed < overflow; i--) {
+        if (trimmed[i].priority <= this.OVERLAY_PRIORITIES.info) {
+          trimmed.splice(i, 1);
+          removed++;
+        }
+      }
+
+      while (trimmed.length > this.MAX_QUEUE_LENGTH) {
+        trimmed.pop();
+      }
+
+      return trimmed;
+    });
+  }
+
+  private dequeueNextOverlay(): DynamicOverlayState | null {
+    const queue = this.overlayQueue();
+    if (!queue.length) return null;
+    const [next, ...rest] = queue;
+    this.overlayQueue.set(rest);
+    return next;
+  }
+
+  private showNextOverlay(): void {
+    if (this.overlay()) return;
+    const next = this.dequeueNextOverlay();
+    if (next) {
+      this.overlay.set(next);
+    }
+  }
+
+  private clearOverlayQueue(): void {
+    this.overlayQueue.set([]);
+  }
+
+  showOverlay(
+    state: LegacyAlertState & Partial<Pick<DynamicOverlayState, 'kind' | 'source'>>
+  ): void {
+    const next = this.normalizeOverlayState(state);
+    const current = this.overlay();
+
+    if (current && this.isSameOverlay(current, next)) {
+      if (current.kind === 'loading' && next.kind === 'loading') {
+        this.overlay.set(next);
+      }
+      return;
+    }
+
+    if (!current) {
+      this.overlay.set(next);
+      return;
+    }
+
+    if (current.kind === 'confirm') {
+      if (next.kind === 'loading') {
+        return;
+      }
+      this.enqueueOverlay(next);
+      return;
+    }
+
+    if (next.kind === 'loading' && !this.shouldReplaceCurrentOverlay(current, next)) {
+      return;
+    }
+
+    if (this.shouldReplaceCurrentOverlay(current, next)) {
+      this.overlay.set(next);
+      return;
+    }
+
+    this.enqueueOverlay(next);
+  }
+
+  clearOverlay(expectedKind?: DynamicOverlayState['kind']): void {
+    const current = this.overlay();
+    if (!current) return;
+    if (expectedKind && current.kind !== expectedKind) return;
+    this.overlay.set(null);
+    this.showNextOverlay();
+  }
+
+  showLoading(
+    title = 'Cargando datos...',
+    message = '',
+    options?: Omit<LegacyAlertState, 'title' | 'message' | 'loading'> & { source?: string }
+  ): void {
+    this.showOverlay({
+      ...options,
+      kind: 'loading',
+      loading: true,
+      title,
+      message,
+      autoClose: false,
+    });
+  }
+
+  showAlert(
+    state: LegacyAlertState & { source?: string }
+  ): void {
+    this.showOverlay({
+      ...state,
+      kind: state.buttons?.length && state.buttons.length > 1 ? 'confirm' : 'alert',
+    });
+  }
+
+  showConfirm(
+    title: string,
+    message: string,
+    buttons: { text: string, style: string, onClick: () => void }[],
+    options?: Omit<LegacyAlertState, 'title' | 'message' | 'buttons'> & { source?: string }
+  ): void {
+    this.showOverlay({
+      ...options,
+      kind: 'confirm',
+      title,
+      message,
+      buttons,
+      autoClose: false,
+    });
+  }
+
   openPreview(url: string, title?: string) {
     this.previewUrl.set(url);
     this.previewTitle.set(title || 'Preview');
@@ -104,6 +374,41 @@ export class DynamicIslandGlobalService {
 
   closePanel() {
  this.panel.set(null);
+  }
+
+  clearBaseState(options: DynamicBaseStateOptions = {}): void {
+    const {
+      cupos = true,
+      reserva = true,
+      transfer = true,
+      puntos = true,
+      panel = false,
+      preview = false,
+      sugerencias = false,
+    } = options;
+
+    if (cupos) this.cuposInfo.set(null);
+    if (reserva) this.Id_Reserva.set(null);
+    if (transfer) this.Id_Transfer.set(null);
+    if (puntos) this.puntos.set(null);
+    if (panel) this.closePanel();
+    if (preview) this.closePreview();
+    if (sugerencias) this.sugerencias.set(null);
+  }
+
+  resetSessionUi(): void {
+    this.clearOverlayQueue();
+    this.overlay.set(null);
+    this.clearBaseState({
+      cupos: true,
+      reserva: true,
+      transfer: true,
+      puntos: true,
+      panel: true,
+      preview: true,
+      sugerencias: true,
+    });
+    this.mode.set('login');
   }
 
   togglePanel(state: Omit<DynamicPanelState, 'open'>) {

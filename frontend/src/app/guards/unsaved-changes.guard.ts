@@ -19,17 +19,15 @@ export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (componen
   const navbar = inject(DynamicIslandGlobalService);
   
   return new Promise<boolean>((resolve) => {
-    navbar.alert.set({
-      type: 'warning',
-      title: 'Cambios sin guardar',
-      message: 'Tienes cambios sin guardar. Si sales ahora perderás esos cambios.',
-      autoClose: false,
-      buttons: [
+    navbar.showConfirm(
+      'Cambios sin guardar',
+      'Tienes cambios sin guardar. Si sales ahora perderás esos cambios.',
+      [
         {
           text: 'Abandonar',
           style: 'secondary',
           onClick: () => {
-            navbar.alert.set(null);
+            navbar.clearOverlay();
             resolve(true); // Permitir salir
           }
         },
@@ -37,11 +35,12 @@ export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (componen
           text: 'Continuar editando',
           style: 'primary',
           onClick: () => {
-            navbar.alert.set(null);
+            navbar.clearOverlay();
             resolve(false); // Bloquear salida
           }
         }
-      ]
-    });
+      ],
+      { type: 'warning' }
+    );
   });
 };

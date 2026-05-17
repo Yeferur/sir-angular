@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
@@ -9,6 +9,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
 import { ComisionesService } from '../../../services/Comisiones/comisiones.service';
 import { SegurosService } from '../../../services/Seguros/seguros.service';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
     selector: 'app-confirmacion',
@@ -18,6 +19,8 @@ import { SegurosService } from '../../../services/Seguros/seguros.service';
     styleUrl: './confirmacion.css'
 })
 export class ConfirmacionComponent implements OnInit {
+    private permisosService = inject(PermisosService);
+
     toursList: any[] = [];
     pasajeros: any[] = [];
     skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -199,6 +202,22 @@ export class ConfirmacionComponent implements OnInit {
         return !!this.filters.Id_Tour && !!this.filters.Fecha && this.pasajeros.length > 0;
     }
 
+    get canUpdateAsistencia(): boolean {
+        return this.permisosService.tienePermiso('CONTROL_VIAJE.ACTUALIZAR_ASISTENCIA');
+    }
+
+    get canExportComisiones(): boolean {
+        return this.permisosService.tienePermiso('CONTROL_VIAJE.EXPORTAR_COMISIONES');
+    }
+
+    get canExportSeguros(): boolean {
+        return this.permisosService.tienePermiso('CONTROL_VIAJE.EXPORTAR_SEGUROS');
+    }
+
+    get canExportAmbos(): boolean {
+        return this.canExportComisiones && this.canExportSeguros;
+    }
+
     loadTours() {
         this.toursService.getTours().subscribe({
             next: (data: any[]) => {
@@ -244,6 +263,12 @@ export class ConfirmacionComponent implements OnInit {
     }
 
     toggleAll(event: any) {
+        if (!this.canUpdateAsistencia) {
+            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para actualizar la asistencia.');
+            event?.target && (event.target.checked = this.allChecked);
+            return;
+        }
+
         const isChecked = !!event?.target?.checked;
         this.allChecked = isChecked;
         this.pasajeros.forEach((p) => (p.Confirmacion = isChecked ? 1 : 0));
@@ -254,7 +279,16 @@ export class ConfirmacionComponent implements OnInit {
         this.allChecked = this.pasajeros.length > 0 && this.pasajeros.every((p) => Number(p.Confirmacion ?? 0) === 1);
     }
 
+    isConfirmado(pasajero: any): boolean {
+        return Number(pasajero?.Confirmacion ?? 0) === 1;
+    }
+
     requestSave() {
+        if (!this.canUpdateAsistencia) {
+            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para actualizar la asistencia.');
+            return;
+        }
+
         if (this.pasajeros.length === 0 || this.isSubmitting) return;
 
         const total = this.pasajeros.length;
@@ -263,27 +297,25 @@ export class ConfirmacionComponent implements OnInit {
         const nombreTour = this.nombreTourSeleccionado;
         const fecha = this.filters.Fecha || 'sin fecha';
 
-        this.navbar.alert.set({
-            type: 'warning',
-            title: '¿Guardar confirmación?',
-            message: `Vas a guardar la confirmación de viaje para ${nombreTour} el ${fecha}. Pasajeros: ${total}. Confirmados: ${confirmados}. Pendientes: ${pendientes}. ¿Deseas continuar?`,
-            autoClose: false,
-            buttons: [
+        this.navbar.showConfirm(
+            '¿Guardar confirmación?',
+            `Vas a guardar la confirmación de viaje para ${nombreTour} el ${fecha}. Pasajeros: ${total}. Confirmados: ${confirmados}. Pendientes: ${pendientes}. ¿Deseas continuar?`,
+            [
                 {
                     text: 'Cancelar',
                     style: 'secondary',
-                    onClick: () => this.navbar.alert.set(null),
+                    onClick: () => this.navbar.clearOverlay(),
                 },
                 {
                     text: 'Guardar',
                     style: 'primary',
                     onClick: () => {
-                        this.navbar.alert.set(null);
+                        this.navbar.clearOverlay();
                         this.performSave();
                     },
                 },
             ],
-        });
+        );
     }
 
     save() {
@@ -320,42 +352,58 @@ export class ConfirmacionComponent implements OnInit {
     }
 
     private askReportDownloads() {
+        const buttons: Array<{ text: string; style: string; onClick: () => void }> = [];
+
+        if (this.canExportAmbos) {
+            buttons.push({
+                text: 'Descargar ambos',
+                style: 'primary',
+                onClick: () => {
+                    this.navbar.clearOverlay();
+                    this.downloadReports('both');
+                },
+            });
+        }
+
+        if (this.canExportComisiones) {
+            buttons.push({
+                text: 'Solo comisiones',
+                style: 'secondary',
+                onClick: () => {
+                    this.navbar.clearOverlay();
+                    this.downloadReports('comisiones');
+                },
+            });
+        }
+
+        if (this.canExportSeguros) {
+            buttons.push({
+                text: 'Solo seguros',
+                style: 'secondary',
+                onClick: () => {
+                    this.navbar.clearOverlay();
+                    this.downloadReports('seguros');
+                },
+            });
+        }
+
+        if (!buttons.length) {
+            return;
+        }
+
         const fecha = this.filters.Fecha || 'sin fecha';
 
-        this.navbar.alert.set({
+        this.navbar.showAlert({
             type: 'info',
             title: '¿Descargar reportes?',
             message: `Puedes descargar los archivos de Comisiones y Seguros para este tour y fecha (${fecha}).`,
             autoClose: false,
             buttons: [
-                {
-                    text: 'Descargar ambos',
-                    style: 'primary',
-                    onClick: () => {
-                        this.navbar.alert.set(null);
-                        this.downloadReports('both');
-                    },
-                },
-                {
-                    text: 'Solo comisiones',
-                    style: 'secondary',
-                    onClick: () => {
-                        this.navbar.alert.set(null);
-                        this.downloadReports('comisiones');
-                    },
-                },
-                {
-                    text: 'Solo seguros',
-                    style: 'secondary',
-                    onClick: () => {
-                        this.navbar.alert.set(null);
-                        this.downloadReports('seguros');
-                    },
-                },
+                ...buttons,
                 {
                     text: 'Ahora no',
                     style: 'secondary',
-                    onClick: () => this.navbar.alert.set(null),
+                    onClick: () => this.navbar.clearOverlay(),
                 },
             ],
         });
@@ -376,6 +424,21 @@ export class ConfirmacionComponent implements OnInit {
     private downloadReports(mode: 'both' | 'comisiones' | 'seguros') {
         if (!this.canExportReports) {
             this.navbar.warningToast('Sin datos', 'Primero carga pasajeros antes de descargar reportes.');
+            return;
+        }
+
+        if (mode === 'both' && !this.canExportAmbos) {
+            this.navbar.errorToast('Acceso denegado', 'Necesitas permisos para exportar comisiones y seguros.');
+            return;
+        }
+
+        if (mode === 'comisiones' && !this.canExportComisiones) {
+            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para exportar comisiones.');
+            return;
+        }
+
+        if (mode === 'seguros' && !this.canExportSeguros) {
+            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para exportar seguros.');
             return;
         }
 

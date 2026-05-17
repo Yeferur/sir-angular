@@ -73,7 +73,7 @@ export class TourRulesService {
     if (alertConfig) {
       if (!this.alertasMostradas.has(alertConfig.key)) {
         this.alertasMostradas.add(alertConfig.key);
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: alertConfig.type,
           title: alertConfig.title,
           message: alertConfig.message,

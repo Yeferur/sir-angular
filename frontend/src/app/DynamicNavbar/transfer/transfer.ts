@@ -173,6 +173,10 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     return this.permisosService.tienePermiso('TRANSFERS.ELIMINAR');
   }
 
+  get canUpdateTransfer(): boolean {
+    return this.permisosService.tienePermiso('TRANSFERS.ACTUALIZAR');
+  }
+
 
   get transferSublinea(): string {
     return [
@@ -187,25 +191,23 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     const id = this.transfer.Id_Transfer || this.Id_Transfer;
     if (!id) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Cancelar transfer',
-      message: `¿Cancelar el transfer #${this.transferCodigo}? La información se conservará para consulta futura.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Cancelar transfer',
+      `¿Cancelar el transfer #${this.transferCodigo}? La información se conservará para consulta futura.`,
+      [
         {
           text: 'Mantener',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Cancelar transfer',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.api.cancelarTransfer(id).subscribe({
               next: () => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'success',
                   title: 'Transfer cancelado',
                   message: `El transfer #${this.transferCodigo} quedó en estado Cancelado.`,
@@ -215,7 +217,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
                 this.loadTransferData(id);
               },
               error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'error',
                   title: 'No se pudo cancelar',
                   message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
@@ -227,29 +229,27 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
           }
         }
       ]
-    });
+    );
   }
 
   eliminarTransfer(): void {
     const id = this.transfer.Id_Transfer || this.Id_Transfer;
     if (!id || !this.canDeleteTransfer) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar transfer',
-      message: `¿Deseas eliminar el transfer #${this.transferCodigo}? Esta acción eliminará el registro de forma permanente.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar transfer',
+      `¿Deseas eliminar el transfer #${this.transferCodigo}? Esta acción eliminará el registro de forma permanente.`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.api.deleteTransfer(id).subscribe({
               next: () => {
                 this.navbar.needsRefresh.set('transfers');
@@ -258,7 +258,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
                 this.navbar.successToast('Transfer eliminado', `El transfer #${this.transferCodigo} fue eliminado correctamente.`);
               },
               error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'error',
                   title: 'No se pudo eliminar',
                   message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
@@ -270,7 +270,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
           }
         }
       ]
-    });
+    );
   }
 
   get valorTotal(): number {
@@ -563,7 +563,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
       const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
       this.downloadBlob(pdfBlob, `Transfer_${this.transferCodigo}.pdf`);
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         title: 'PDF descargado',
         message: 'Transfer descargado correctamente.',
         autoClose: true,
@@ -605,7 +605,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   async descargarComprobantesTransfer(): Promise<void> {
     const comprobantes = this.comprobantesDisponibles;
     if (!comprobantes.length) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Sin comprobantes',
         message: 'Este transfer no tiene comprobantes asociados.',
@@ -620,7 +620,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     }
 
     if (comprobantes.length > 1) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'success',
         title: 'Comprobantes descargados',
         message: `Se descargaron ${comprobantes.length} comprobantes asociados al transfer.`,

@@ -118,7 +118,11 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   }
 
   private navbar(title: string, message: string, loading = false, autoClose = true) {
-    this.global.alert.set({ title, message, loading, autoClose });
+    if (loading) {
+      this.global.showLoading(title, message, { autoClose });
+      return;
+    }
+    this.global.showAlert({ title, message, autoClose });
   }
 
   private loadRoles() {
@@ -314,16 +318,14 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     };
 
     // Show confirmation using global navbar alert with action buttons
-    this.global.alert?.set?.({
-      type: 'info',
-      title: '¿Crear usuario?',
-      message: 'Se creará el usuario con los datos ingresados. ¿Deseas continuar?',
-      autoClose: false,
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.global.alert?.set?.(null) },
-        { text: 'Crear', style: 'primary', onClick: () => { this.global.alert?.set?.(null); this.confirmCreateUser(payload); } }
+    this.global.showConfirm(
+      '¿Crear usuario?',
+      'Se creará el usuario con los datos ingresados. ¿Deseas continuar?',
+      [
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.global.clearOverlay() },
+        { text: 'Crear', style: 'primary', onClick: () => { this.global.clearOverlay(); this.confirmCreateUser(payload); } }
       ]
-    });
+    );
   }
 
   private confirmCreateUser(payload: any) {

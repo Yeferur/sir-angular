@@ -40,6 +40,14 @@ export class VerToursComponent implements OnInit {
         return this.permisosService.tienePermiso('TOURS.ELIMINAR');
     }
 
+    get canCreateTour(): boolean {
+        return this.permisosService.tienePermiso('TOURS.CREAR');
+    }
+
+    get canUpdateTour(): boolean {
+        return this.permisosService.tienePermiso('TOURS.ACTUALIZAR');
+    }
+
     ngOnInit(): void {
         this.listar();
     }
@@ -59,7 +67,7 @@ export class VerToursComponent implements OnInit {
                 queueMicrotask(() => this.tours.set(data || []));
             },
             error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                     type: 'error',
                     title: 'Error al cargar tours',
                     message: err?.error?.message || 'Ha ocurrido un error inesperado.',
@@ -68,7 +76,7 @@ export class VerToursComponent implements OnInit {
             },
             complete: () => {
                 queueMicrotask(() => {
-                    this.navbar.alert.set(null);
+                    this.navbar.clearOverlay();
                 });
             }
         });
@@ -78,6 +86,10 @@ export class VerToursComponent implements OnInit {
     showNumber(v: any) { return (v === null || v === undefined) ? '—' : v; }
 
     crearTour() {
+        if (!this.canCreateTour) {
+            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear tours.');
+            return;
+        }
         this.router.navigate(['/Tours/NuevoTour']);
     }
 
@@ -86,33 +98,31 @@ export class VerToursComponent implements OnInit {
     }
 
     verProgramacion(tour: Tour) {
-        this.navbar.alert.set({ type: 'info', title: 'Ver Programación', message: `Abrir programación para ${tour.Nombre_Tour}`, autoClose: true });
+        this.navbar.showAlert({ type: 'info', title: 'Ver Programación', message: `Abrir programación para ${tour.Nombre_Tour}`, autoClose: true });
     }
 
     eliminarTour(tour: Tour) {
-        this.navbar.alert.set({
-            type: 'warning',
-            title: '¿Eliminar tour?',
-            message: `¿Estás seguro de que deseas eliminar el tour "${tour.Nombre_Tour}"? Esta acción no se puede deshacer.`,
-            autoClose: false,
-            buttons: [
-                { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+        this.navbar.showConfirm(
+            '¿Eliminar tour?',
+            `¿Estás seguro de que deseas eliminar el tour "${tour.Nombre_Tour}"? Esta acción no se puede deshacer.`,
+            [
+                { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
                 {
                     text: 'Eliminar',
                     style: 'primary',
                     onClick: () => {
-                        this.navbar.alert.set(null);
+                        this.navbar.clearOverlay();
                         this.confirmarEliminacion(tour);
                     }
                 }
             ]
-        });
+        );
     }
 
     private confirmarEliminacion(tour: Tour) {
         this.toursService.deleteTour(tour.Id_Tour!).subscribe({
             next: () => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                     type: 'success',
                     title: 'Tour eliminado',
                     message: `El tour "${tour.Nombre_Tour}" ha sido eliminado exitosamente.`,
@@ -122,12 +132,12 @@ export class VerToursComponent implements OnInit {
                 this.loadTours();
             },
             error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                     type: 'error',
                     title: 'Error al eliminar',
                     message: err?.error?.error || 'No se pudo eliminar el tour.',
                     autoClose: false,
-                    buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }]
+                    buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }]
                 });
             }
         });

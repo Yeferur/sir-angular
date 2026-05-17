@@ -5,6 +5,7 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 @Component({
   selector: 'app-editar-punto',
@@ -29,7 +30,7 @@ export class EditarPuntoComponent implements OnInit {
   private toursLoaded = false;
   private puntoLoaded = false;
 
-  constructor(private fb: FormBuilder, private puntos: puntosService, private route: ActivatedRoute, private router: Router, private reservasSvc: Reservas, private navbar: DynamicIslandGlobalService) {
+  constructor(private fb: FormBuilder, private puntos: puntosService, private route: ActivatedRoute, private router: Router, private reservasSvc: Reservas, private navbar: DynamicIslandGlobalService, private permisosService: PermisosService) {
     this.form = this.fb.group({
       NombrePunto: ['', [Validators.required, Validators.maxLength(255)]],
       Sector: ['', [Validators.required, Validators.maxLength(255)]],
@@ -37,6 +38,10 @@ export class EditarPuntoComponent implements OnInit {
       Latitud: [null, [Validators.required, Validators.min(-90), Validators.max(90)]],
       Longitud: [null, [Validators.required, Validators.min(-180), Validators.max(180)]]
     });
+  }
+
+  get canUpdatePunto(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
   }
 
   ngOnInit(): void {
@@ -126,12 +131,12 @@ async onSubmitGuardarCambios() {
     const fields = invalid.map(f => friendly[f] || f);
     const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'error',
       title: 'Campos requeridos incompletos',
       message: msg,
       autoClose: true,
-      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+      buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
     });
     return;
   }

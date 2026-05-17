@@ -107,7 +107,7 @@ export class Mapa implements OnInit, OnDestroy {
     const waypoints = agrupadosConBase.map(p => L.latLng(p.lat, p.lng));
 
     if (waypoints.length < 2) {
-      this.global.alert.set({
+      this.global.showAlert({
         type: 'warning',
         title: 'Coordenadas inválidas',
         message: 'No se puede mostrar el mapa porque hay menos de 2 puntos válidos con coordenadas.',
@@ -129,7 +129,7 @@ export class Mapa implements OnInit, OnDestroy {
     const Routing = (L as any).Routing || globalL?.Routing;
 
     if (!Routing) {
-      this.global.alert.set({
+      this.global.showAlert({
         type: 'error',
         title: 'Error de mapa',
         message: 'No se pudo cargar el módulo de rutas (Leaflet Routing Machine).',

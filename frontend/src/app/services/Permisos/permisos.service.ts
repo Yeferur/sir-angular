@@ -54,6 +54,8 @@ export interface PermisoCompleto {
 })
 export class PermisosService {
   private baseUrl = environment.apiUrl;
+  private permisosHydrated = false;
+  private loadingPermisosPromise: Promise<boolean> | null = null;
 
   // permisos actuales (solo códigos)
   private permisosSubject = new BehaviorSubject<string[]>([]);
@@ -74,28 +76,7 @@ export class PermisosService {
   // =====================================================
 
   async loadSessionData(options?: { token?: string | null }): Promise<boolean> {
-    // 1) hidratar desde localStorage
-    this.cargarPermisosDesdeLocalStorage();
-
-    // 2) si no hay token, listo
-    const token = options?.token ?? this.getTokenFromStorage();
-    if (!token) {
-      this.readySubject.next(true);
-      return true;
-    }
-
-    // 3) refresca desde backend
-    try {
-      // Solo solicitamos los permisos desde backend.
-      // El menú se mantiene estático/en el layout y no depende de la tabla `modulos`.
-      await firstValueFrom(this.obtenerMisPermisos().pipe(map(() => true)));
-      this.readySubject.next(true);
-      return true;
-    } catch (e) {
-      console.error('[PermisosService] loadSessionData error:', e);
-      this.readySubject.next(true);
-      return false;
-    }
+    return this.asegurarPermisosCargados({ token: options?.token ?? null });
   }
 
   private getTokenFromStorage(): string | null {
@@ -112,6 +93,8 @@ export class PermisosService {
         const codigosPermisos = (response.permisos || []).map(p => p.codigo);
         this.permisosSubject.next(codigosPermisos);
         localStorage.setItem('user_permissions', JSON.stringify(codigosPermisos));
+        this.permisosHydrated = true;
+        this.readySubject.next(true);
       })
     );
   }
@@ -142,6 +125,7 @@ export class PermisosService {
     localStorage.setItem('user_permissions', JSON.stringify(safePermisos));
     localStorage.setItem('user_menu', JSON.stringify(safeMenu));
 
+    this.permisosHydrated = true;
     this.readySubject.next(true);
   }
 
@@ -167,25 +151,79 @@ export class PermisosService {
   // LOCALSTORAGE
   // =====================================================
 
-  cargarPermisosDesdeLocalStorage(): void {
+  cargarPermisosDesdeLocalStorage(): boolean {
     const permisos = localStorage.getItem('user_permissions');
     const menu = localStorage.getItem('user_menu');
+    const hasPermisosCache = permisos !== null;
 
     if (permisos) {
       try { this.permisosSubject.next(JSON.parse(permisos)); } catch {}
+    } else if (hasPermisosCache) {
+      this.permisosSubject.next([]);
     }
 
     if (menu) {
       try { this.menuSubject.next(JSON.parse(menu)); } catch {}
     }
+
+    if (hasPermisosCache) {
+      this.permisosHydrated = true;
+      this.readySubject.next(true);
+    }
+
+    return hasPermisosCache;
   }
 
   limpiarPermisos(): void {
     this.permisosSubject.next([]);
     this.menuSubject.next([]);
+    this.permisosHydrated = false;
+    this.loadingPermisosPromise = null;
     this.readySubject.next(false);
     localStorage.removeItem('user_permissions');
     localStorage.removeItem('user_menu');
+  }
+
+  async asegurarPermisosCargados(options?: { token?: string | null; forceBackend?: boolean }): Promise<boolean> {
+    const token = options?.token ?? this.getTokenFromStorage();
+    const forceBackend = !!options?.forceBackend;
+
+    if (!forceBackend && this.permisosHydrated) {
+      return true;
+    }
+
+    const hasStorageCache = this.cargarPermisosDesdeLocalStorage();
+    if (!forceBackend && this.permisosHydrated) {
+      return true;
+    }
+
+    if (!token) {
+      this.permisosHydrated = true;
+      this.readySubject.next(true);
+      return true;
+    }
+
+    if (this.loadingPermisosPromise) {
+      return this.loadingPermisosPromise;
+    }
+
+    this.loadingPermisosPromise = (async () => {
+      try {
+        await firstValueFrom(this.obtenerMisPermisos().pipe(map(() => true)));
+        return true;
+      } catch (e) {
+        console.error('[PermisosService] asegurarPermisosCargados error:', e);
+        if (hasStorageCache) {
+          return true;
+        }
+        this.readySubject.next(true);
+        return false;
+      } finally {
+        this.loadingPermisosPromise = null;
+      }
+    })();
+
+    return this.loadingPermisosPromise;
   }
 
   // =====================================================

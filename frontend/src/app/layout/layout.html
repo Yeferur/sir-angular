@@ -31,121 +31,64 @@
   </div>
 
   <div class="menu">
-    <!-- Inicio -->
-    <a *appPermiso="'INICIO.LEER'" routerLink="/" routerLinkActive="active-link"
-       [routerLinkActiveOptions]="{exact:true}" (click)="clickPage()">
-      <i class="bx bxs-dashboard"></i><span>Inicio</span>
-    </a>
-
-    <!-- Informes / Dashboard -->
-    <a *appPermiso="'INFORMES.LEER'" routerLink="/Dashboard" routerLinkActive="active-link" (click)="clickPage()">
-      <i class="bx bx-line-chart"></i><span>Dashboard</span>
-    </a>
-
-    <!-- Historial -->
-    <a *appPermiso="'HISTORIAL.LEER'" routerLink="/Historial" routerLinkActive="active-link" (click)="clickPage()">
-      <i class="bx bx-history"></i><span>Historial</span>
-    </a>
-
-    <!-- Reservas -->
-    <div *appPermiso="'RESERVAS.LEER'" class="menu-item"
-         [class.active]="activeMenu() === 1"
-         [class.has-active-child]="isSubmenuActive(1)">
-      <a (click)="toggleMenu(1)" class="link">
-        <i class="bx bx-calendar-plus"></i>
-        <span>Reservas</span>
-        <i class="bx bx-chevron-down chevron"></i>
-      </a>
-      <div class="submenu">
-        <a *appPermiso="'RESERVAS.CREAR'" routerLink="/Reservas/NuevaReserva"
-           routerLinkActive="active-link" (click)="clickPage()">Nueva Reserva</a>
-        <a *appPermiso="'RESERVAS.LEER'" routerLink="/Reservas/VerReservas"
-           routerLinkActive="active-link" (click)="clickPage()">Ver Reservas</a>
-        <a *appPermiso="'RESERVAS.LEER'" routerLink="/Reservas/Confirmacion"
-           routerLinkActive="active-link" (click)="clickPage()">Control de Viaje</a>
-      </div>
-    </div>
-
-    <!-- Transfer -->
-    <div *appPermiso="'TRANSFERS.LEER'" class="menu-item"
-         [class.active]="activeMenu() === 2"
-         [class.has-active-child]="isSubmenuActive(2)">
-      <a (click)="toggleMenu(2)" class="link">
-        <i class="bx bx-car"></i>
-        <span>Transfer</span>
-        <i class="bx bx-chevron-down chevron"></i>
-      </a>
-      <div class="submenu">
-        <a *appPermiso="'TRANSFERS.CREAR'" routerLink="/Transfers/NuevoTransfer"
-           routerLinkActive="active-link" (click)="clickPage()">Nuevo Transfer</a>
-        <a *appPermiso="'TRANSFERS.LEER'" routerLink="/Transfers/VerTransfers"
-           routerLinkActive="active-link" (click)="clickPage()">Ver Transfer</a>
-      </div>
-    </div>
-
-    <!-- Tours -->
-    <div *appPermiso="'TOURS.LEER'" class="menu-item"
-         [class.active]="activeMenu() === 3"
-         [class.has-active-child]="isSubmenuActive(3)">
-      <a (click)="toggleMenu(3)" class="link">
-        <i class="bx bx-flag"></i>
-        <span>Tours</span>
-        <i class="bx bx-chevron-down chevron"></i>
-      </a>
-      <div class="submenu">
-        <a *appPermiso="'TOURS.CREAR'" routerLink="/Tours/NuevoTour"
-           routerLinkActive="active-link" (click)="clickPage()">Nuevo Tour</a>
-        <a *appPermiso="'TOURS.LEER'" routerLink="/Tours/VerTours"
-           routerLinkActive="active-link" (click)="clickPage()">Ver Tours</a>
-      </div>
-    </div>
-
-    <!-- Puntos de Encuentro -->
-    <div *appPermiso="'PUNTOS.LEER'" class="menu-item"
-         [class.active]="activeMenu() === 4"
-         [class.has-active-child]="isSubmenuActive(4)">
-      <a (click)="toggleMenu(4)" class="link">
-        <i class="bx bx-map"></i>
-        <span>Puntos de encuentro</span>
-        <i class="bx bx-chevron-down chevron"></i>
-      </a>
-      <div class="submenu">
-        <a *appPermiso="'PUNTOS.CREAR'" routerLink="/Puntos/NuevoPunto"
-           routerLinkActive="active-link" (click)="clickPage()">Nuevo Punto</a>
-        <a *appPermiso="'PUNTOS.LEER'" routerLink="/Puntos/VerPuntos"
-           routerLinkActive="active-link" (click)="clickPage()">Ver Puntos</a>
-      </div>
-    </div>
-
-    <!-- Listados de buses -->
-    <a *appPermiso="'PROGRAMACION.LEER'" routerLink="/Programacion/Listado"
-       routerLinkActive="active-link" (click)="clickPage()">
-      <i class="bx bx-list-check"></i><span>Listados de buses</span>
-    </a>
-
-    <!-- Configuración -->
-    <div class="menu-item"
-         [class.active]="activeMenu() === 6"
-         [class.has-active-child]="isSubmenuActive(6)">
-      <a (click)="toggleMenu(6)" class="link">
-        <i class="bx bx-cog"></i>
-        <span>Configuración</span>
-        <i class="bx bx-chevron-down chevron"></i>
-      </a>
-      <div class="submenu">
-        <a routerLink="/Perfil/Editar" routerLinkActive="active-link" (click)="clickPage()">Perfil</a>
-        <a *appPermiso="'USUARIOS.LEER'" routerLink="/Usuarios"
-           routerLinkActive="active-link" [routerLinkActiveOptions]="{exact:true}"
-           (click)="clickPage()">Administrar Usuarios</a>
-        <a *appPermiso="'USUARIOS.CREAR'" routerLink="/Usuarios/NuevoUsuario"
-           routerLinkActive="active-link" (click)="clickPage()">Crear Usuarios</a>
-        <a routerLink="/Ayuda" routerLinkActive="active-link" (click)="clickPage()">Ayuda</a>
-        <a (click)="openAppUpdates()">Novedades</a>
-        <a (click)="toggleTheme()">
-          Tema: {{ isDarkMode ? 'Oscuro' : 'Claro' }}
-        </a>
-      </div>
-    </div>
+    @for (item of getVisibleMenuItems(); track item.key) {
+      @if (shouldRenderAsDropdown(item)) {
+        <div class="menu-item"
+             [class.active]="isMenuOpen(item)"
+             [class.has-active-child]="isSubmenuActive(item)">
+          <a (click)="toggleMenu(item.key)" class="link">
+            <i [class]="item.icon"></i>
+            <span>{{ item.label }}</span>
+            <i class="bx bx-chevron-down chevron"></i>
+          </a>
+          <div class="submenu">
+            @for (child of getVisibleChildren(item); track child.key) {
+              @if (child.route) {
+                <a [routerLink]="child.route"
+                   routerLinkActive="active-link"
+                   [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
+                   (click)="clickPage()">
+                  {{ getItemLabel(child) }}
+                </a>
+              } @else if (child.action) {
+                <a (click)="handleMenuAction(child.action)">
+                  {{ getItemLabel(child) }}
+                </a>
+              }
+            }
+          </div>
+        </div>
+      } @else if (shouldRenderAsDirectLink(item)) {
+        @if (getDirectRouteForSingleChild(item)) {
+          <a class="link"
+             [routerLink]="getDirectRouteForSingleChild(item)!"
+             routerLinkActive="active-link"
+             [routerLinkActiveOptions]="{ exact: getSingleVisibleChild(item)?.exact ?? false }"
+             (click)="clickPage()">
+            <i [class]="item.icon"></i>
+            <span>{{ item.label }}</span>
+          </a>
+        } @else if (getDirectActionForSingleChild(item)) {
+          <a class="link" (click)="handleMenuAction(getDirectActionForSingleChild(item)!)">
+            <i [class]="item.icon"></i>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+      } @else {
+        @if (item.route) {
+          <a [routerLink]="item.route"
+             routerLinkActive="active-link"
+             [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+             (click)="clickPage()">
+            <i [class]="item.icon"></i><span>{{ getItemLabel(item) }}</span>
+          </a>
+        } @else if (item.action) {
+          <a (click)="handleMenuAction(item.action)">
+            <i [class]="item.icon"></i><span>{{ getItemLabel(item) }}</span>
+          </a>
+        }
+      }
+    }
   </div>
 
   <div class="logout">

@@ -220,7 +220,9 @@
         @if (canDeleteReserva) {
           <button class="btn-danger action-pill" (click)="eliminarReserva()">Eliminar</button>
         }
-        <button class="btn-primary" (click)="editarReserva()">Editar</button>
+        @if (canUpdateReserva) {
+          <button class="btn-primary" (click)="editarReserva()">Editar</button>
+        }
       </footer>
     </div>
   }

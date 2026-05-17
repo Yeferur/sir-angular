@@ -82,9 +82,11 @@
         <button class="btn-secondary" type="button" routerLink="/Puntos/VerPuntos">
           Cancelar
         </button>
-        <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Guardando...' : 'Guardar cambios' }}
-        </button>
+        @if (canUpdatePunto) {
+          <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
+            {{ isSubmitting() ? 'Guardando...' : 'Guardar cambios' }}
+          </button>
+        }
       </div>
     </div>
 

@@ -178,13 +178,13 @@
     <div class="capacity-dashboard">
       @for (tour of toursDelDia; track tour.Id_Tour) {
       <div class="capacity-card" role="button" tabindex="0"
-        (click)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
-        (keydown.enter)="tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
-        (keydown.space)="$event.preventDefault(); tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        (click)="canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        (keydown.enter)="canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
+        (keydown.space)="$event.preventDefault(); canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
         [attr.aria-label]="'Generar plan para ' + tour.NombreTour"
-        [attr.aria-disabled]="!tour.totalPasajeros || tour.totalPasajeros === 0 ? 'true' : null"
+        [attr.aria-disabled]="!canCreateProgramacion || !tour.totalPasajeros || tour.totalPasajeros === 0 ? 'true' : null"
         [class.generated]="tour.estado === 'Generado'"
-        [class.disabled]="!tour.totalPasajeros || tour.totalPasajeros === 0">
+        [class.disabled]="!canCreateProgramacion || !tour.totalPasajeros || tour.totalPasajeros === 0">
 
         <div class="card-content">
           <div class="stats-container">
@@ -315,7 +315,9 @@
       </div>
       <div class="editor-actions">
         <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
-        <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
+        @if (canUpdateProgramacion) {
+          <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
+        }
         <button class="btn-primary" (click)="descargarTodosLosListados()">Descargar todos (Excel)</button>
       </div>
     </div>

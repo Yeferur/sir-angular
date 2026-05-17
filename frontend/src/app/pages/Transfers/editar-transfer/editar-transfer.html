@@ -551,10 +551,12 @@
         </button>
       }
 
-      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
-        {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
-      </button>
-    </div>
+      @if (canUpdateTransfer) {
+        <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
+        </button>
+      }
   </div>
+</div>
 </div>
 }

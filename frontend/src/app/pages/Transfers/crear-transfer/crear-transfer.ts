@@ -725,12 +725,12 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
           ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
           : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
         this.closeSummaryIfOpen();
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Recomendación',
           message: msg,
           autoClose: true,
-          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
         });
       });
   }
@@ -808,12 +808,12 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
       this.closeSummaryIfOpen();
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       return;
     }
@@ -852,17 +852,15 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   private requestCreateTransferConfirmation(): Promise<boolean> {
     return new Promise((resolve) => {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
-        type: 'info',
-        title: '¿Todo listo?',
-        message: this.buildCreateTransferConfirmationMessage(),
-        autoClose: false,
-        buttons: [
+      this.navbar.showConfirm(
+        '¿Todo listo?',
+        this.buildCreateTransferConfirmationMessage(),
+        [
           {
             text: 'Cancelar',
             style: 'secondary',
             onClick: () => {
-              this.navbar.alert.set(null);
+              this.navbar.clearOverlay();
               resolve(false);
             }
           },
@@ -870,12 +868,12 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             text: 'Crear',
             style: 'primary',
             onClick: () => {
-              this.navbar.alert.set(null);
+              this.navbar.clearOverlay();
               resolve(true);
             }
           }
         ]
-      });
+      );
     });
   }
 
@@ -950,7 +948,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
-    if (this.navbar?.alert) this.navbar.alert.set(null);
+    this.navbar?.clearOverlay?.();
   }
 
   hasUnsavedChanges(): boolean {

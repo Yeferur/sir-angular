@@ -61,6 +61,7 @@ const toursRoutes = require('./routes/Tours/tours.routes');
 const transfersRoutes = require('./routes/Transfers/transfers.routes');
 const historialNewRoutes = require('./routes/Historial/historial.routes');
 const permisosRoutes = require('./routes/Permisos/permisos.routes');
+const { iniciarVencimientosJob } = require('./jobs/vencimientos.job');
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
@@ -128,4 +129,5 @@ server.on('error', (err) => {
 });
 
 // ✅ Levantar server
+iniciarVencimientosJob();
 startServer(DEFAULT_PORT);

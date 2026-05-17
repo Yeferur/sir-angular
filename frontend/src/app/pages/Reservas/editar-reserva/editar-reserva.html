@@ -866,9 +866,11 @@
         </button>
       }
 
-      <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting() || tieneConflictoLogistico()">
-        {{ isSubmitting() ? 'Guardando...' : 'Guardar Reserva' }}
-      </button>
+      @if (canUpdateReserva) {
+        <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting() || tieneConflictoLogistico()">
+          {{ isSubmitting() ? 'Guardando...' : 'Guardar Reserva' }}
+        </button>
+      }
     </div>
   </div>
 </div>

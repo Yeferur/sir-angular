@@ -15,19 +15,25 @@
         </p>
       </div>
       <div class="header-actions">
-        <button class="btn-icon-only" type="button" (click)="irAOrdenarPuntos()" title="Ordenar puntos">
-          Ordenar
-        </button>
-        <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
-          @if (descargandoExcel) {
-            <span class="btn-spinner"></span> Exportando...
-          } @else {
-            Exportar
-          }
-        </button>
-        <button class="btn-primary" type="button" (click)="crearPunto()">
-          Crear Punto
-        </button>
+        @if (canSortPuntos) {
+          <button class="btn-icon-only" type="button" (click)="irAOrdenarPuntos()" title="Ordenar puntos">
+            Ordenar
+          </button>
+        }
+        @if (canExportPuntos) {
+          <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
+            @if (descargandoExcel) {
+              <span class="btn-spinner"></span> Exportando...
+            } @else {
+              Exportar
+            }
+          </button>
+        }
+        @if (canCreatePunto) {
+          <button class="btn-primary" type="button" (click)="crearPunto()">
+            Crear Punto
+          </button>
+        }
       </div>
     </div>
 
@@ -74,7 +80,7 @@
       <div class="empty-icon">•</div>
       <h3>Sin resultados</h3>
       <p>{{ searchTerm?.length ? 'Prueba con otro término de búsqueda.' : 'Aún no hay puntos creados.' }}</p>
-      @if (!searchTerm?.length) {
+      @if (!searchTerm?.length && canCreatePunto) {
         <button class="btn-primary" type="button" (click)="crearPunto()">Crear primer punto</button>
       }
     </div>
@@ -120,9 +126,11 @@
 
           <!-- ACTIONS -->
           <div class="card-actions">
-            <button type="button" class="btn-action btn-action--edit" (click)="editarPunto(p)">
-              Editar
-            </button>
+            @if (canUpdatePunto) {
+              <button type="button" class="btn-action btn-action--edit" (click)="editarPunto(p)">
+                Editar
+              </button>
+            }
             @if (canDeletePunto) {
               <button type="button" class="btn-action btn-action--delete" (click)="confirmEliminarPunto(p)">
                 Eliminar

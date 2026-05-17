@@ -71,14 +71,16 @@
           <p class="subtitle">Modifica los datos del usuario. La cédula no se puede cambiar.</p>
         </div>
         <div class="page-header-actions">
+        @if (canUpdateUsers()) {
           <button class="btn-submit" type="submit" form="usuarioForm" [disabled]="isSubmitting()">
-            @if (isSubmitting()) {
-              <span class="btn-spinner"></span>
-              Guardando...
-            } @else {
-              Guardar Cambios
-            }
+              @if (isSubmitting()) {
+                <span class="btn-spinner"></span>
+                Guardando...
+              } @else {
+                Guardar Cambios
+              }
           </button>
+        }
         </div>
       </div>
 

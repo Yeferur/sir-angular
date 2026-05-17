@@ -135,13 +135,17 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
   }
 
+  get canUpdateReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ACTUALIZAR');
+  }
+
   get estadoNormalizado(): string {
     return String(this.reserva?.Estado || 'pendiente').toLowerCase();
   }
 
   editarReserva() {
     const id = this.reserva?.Id_Reserva;
-    if (!id) return;
+    if (!id || !this.canUpdateReserva) return;
 
     this.navbar.Id_Reserva.set(String(id));
     try { this.navbar.closePanel(); } catch {}
@@ -167,7 +171,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       });
     } catch (error) {
       console.error('No se pudo abrir el panel de duplicado:', error);
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'No se pudo abrir duplicar',
         message: 'No fue posible cargar los tours disponibles. Intenta nuevamente.',
@@ -180,20 +184,18 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
   cancelarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id) return;
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Cancelar reserva',
-      message: `¿Deseas cancelar la reserva #${id}? La información se conservará para consulta futura.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Cancelar reserva',
+      `¿Deseas cancelar la reserva #${id}? La información se conservará para consulta futura.`,
+      [
         {
           text: 'Cancelar reserva',
           style: 'secondary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.api.cancelarReserva(id).subscribe({
               next: () => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'success',
                   title: 'Reserva cancelada',
                   message: `La reserva #${id} quedó en estado Cancelada.`,
@@ -203,7 +205,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
                 this.loadReservaData(id);
               },
               error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'error',
                   title: 'No se pudo cancelar',
                   message: err?.error?.message || err?.message || 'Intenta nuevamente.',
@@ -217,32 +219,30 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         {
           text: 'Cerrar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
-    });
+    );
   }
 
   eliminarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id || !this.canDeleteReserva) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar reserva',
-      message: `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar reserva',
+      `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.api.deleteReserva(id).subscribe({
               next: () => {
                 this.navbar.needsRefresh.set('reservas');
@@ -252,7 +252,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
                 this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
               },
               error: (err) => {
-                this.navbar.alert.set({
+                this.navbar.showAlert({
                   type: 'error',
                   title: 'No se pudo eliminar',
                   message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
@@ -264,7 +264,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           }
         }
       ]
-    });
+    );
   }
 
   get tipoClases() {
@@ -519,7 +519,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       error: (err) => {
         console.error('Error al cargar la reserva:', err);
         this.isLoading = false;
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'No se pudo cargar la reserva',
           message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
@@ -844,7 +844,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     const comprobantes = this.comprobantesDisponibles;
 
     if (!comprobantes.length) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Sin comprobantes',
         message: 'Esta reserva no tiene comprobantes asociados.',
@@ -860,7 +860,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       if (ok) descargados++;
     }
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: descargados === comprobantes.length ? 'success' : 'warning',
       title: descargados === comprobantes.length ? 'Comprobantes descargados' : 'Descarga parcial',
       message: descargados === comprobantes.length
@@ -894,7 +894,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       }
 
       if (!options?.silent) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'Error descargando comprobante',
           message: 'No fue posible descargar uno de los comprobantes asociados.',
@@ -930,7 +930,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         const pngBlob = await this.pdfFirstPageToPngBlob(pdfArrayBuffer, 2);
         const copied = await this.copyImageToClipboard(pngBlob);
 
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           title: copied ? 'Imagen copiada' : 'PDF descargado',
           message: copied
             ? 'Imagen de la reserva copiada al portapapeles.'
@@ -939,7 +939,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
             autoCloseTime: 4000
         });
       } else {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           title: 'PDF descargado',
           message: `Esta reserva genera ${pages} páginas, por eso no se copia imagen. Envía el PDF.`,
           autoClose: true,
@@ -948,7 +948,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       }
     } catch (e) {
       console.error(e);
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Error',
         message: 'No se pudo generar el archivo. Revisa consola.',

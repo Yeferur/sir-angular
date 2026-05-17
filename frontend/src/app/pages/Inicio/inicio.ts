@@ -360,13 +360,13 @@ export class Inicio implements OnInit {
 
   guardarAforo(tour: Tour) {
     if (!this.canEditarAforo()) {
-      this.global.alert.set({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.', autoClose: true });
+      this.global.showAlert({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.', autoClose: true });
       return;
     }
 
     const cupo = this.nuevoCupo[tour.Id_Tour];
     if (!cupo || isNaN(+cupo)) {
-      this.global.alert.set({
+      this.global.showAlert({
         type: 'error',
         title: 'Dato inválido',
         message: 'Debes ingresar un número válido de cupos.',
@@ -375,25 +375,20 @@ export class Inicio implements OnInit {
       return;
     }
 
-    this.global.alert.set({
-      type: 'warning',
-      title: 'Confirmación',
-      message: `¿Deseas actualizar el aforo de ${tour.Nombre_Tour} a ${cupo} cupos para la fecha ${this.fecha}?`,
-      buttons: [
+    this.global.showConfirm(
+      'Confirmación',
+      `¿Deseas actualizar el aforo de ${tour.Nombre_Tour} a ${cupo} cupos para la fecha ${this.fecha}?`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.global.alert.set(null),
+          onClick: () => this.global.clearOverlay(),
         },
         {
           text: 'Guardar',
           style: 'primary',
           onClick: () => {
-            this.global.alert.set({
-              title: 'Guardando aforo...',
-              message: 'Por favor espera un momento.',
-              autoClose: false
-            });
+            this.global.showLoading('Guardando aforo...', 'Por favor espera un momento.');
 
             this.inicioService.guardarCupo({
               SelectTour: tour.Id_Tour,
@@ -408,7 +403,7 @@ export class Inicio implements OnInit {
                     ? (res as { message?: string }).message
                     : undefined) || 'Aforo actualizado exitosamente.';
 
-                this.global.alert.set({
+                this.global.showAlert({
                   type: 'success',
                   title: '¡Listo!',
                   message: successMessage,
@@ -428,7 +423,7 @@ export class Inicio implements OnInit {
                   err?.message ||
                   'No se pudo actualizar el aforo.';
 
-                this.global.alert.set({
+                this.global.showAlert({
                   type: 'error',
                   title: 'Error',
                   message: backendError,
@@ -440,6 +435,7 @@ export class Inicio implements OnInit {
           },
         },
       ],
-    });
+      { type: 'warning' }
+    );
   }
 }

@@ -628,12 +628,12 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
           ? 'Para vuelos internacionales se recomienda 4 horas de anticipación con el titular.'
           : 'Para vuelos nacionales se recomienda 2 horas de anticipación con el titular.';
         this.closeSummaryIfOpen();
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Recomendación',
           message: msg,
           autoClose: true,
-          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
         });
       });
   }
@@ -780,12 +780,12 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
       this.closeSummaryIfOpen();
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       return;
     }
@@ -825,17 +825,15 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
   private requestUpdateTransferConfirmation(): Promise<boolean> {
     return new Promise((resolve) => {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
-        type: 'info',
-        title: '¿Confirmar actualización?',
-        message: this.buildUpdateTransferConfirmationMessage(),
-        autoClose: false,
-        buttons: [
+      this.navbar.showConfirm(
+        '¿Confirmar actualización?',
+        this.buildUpdateTransferConfirmationMessage(),
+        [
           {
             text: 'Cancelar',
             style: 'secondary',
             onClick: () => {
-              this.navbar.alert.set(null);
+              this.navbar.clearOverlay();
               resolve(false);
             }
           },
@@ -843,12 +841,12 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
             text: 'Actualizar',
             style: 'primary',
             onClick: () => {
-              this.navbar.alert.set(null);
+              this.navbar.clearOverlay();
               resolve(true);
             }
           }
         ]
-      });
+      );
     });
   }
 
@@ -861,28 +859,30 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     return this.permisosSvc.tienePermiso('TRANSFERS.ELIMINAR');
   }
 
+  get canUpdateTransfer(): boolean {
+    return this.permisosSvc.tienePermiso('TRANSFERS.ACTUALIZAR');
+  }
+
   cancelarTransfer(): void {
     const id = this.getTransferIdFromRoute();
     if (!id || !this.puedeCancelarTransfer) return;
 
     this.closeSummaryIfOpen();
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Cancelar transfer',
-      message: `¿Deseas cancelar el transfer #${id}? La información no se eliminará y quedará sólo para consulta futura.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Cancelar transfer',
+      `¿Deseas cancelar el transfer #${id}? La información no se eliminará y quedará sólo para consulta futura.`,
+      [
         {
           text: 'Mantener',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Cancelar transfer',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.isSubmitting.set(true);
             this.transferSvc.cancelarTransfer(id).subscribe({
               next: () => {
@@ -900,7 +900,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
           }
         }
       ]
-    });
+    );
   }
 
   eliminarTransfer(): void {
@@ -909,22 +909,20 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
     this.closeSummaryIfOpen();
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar transfer',
-      message: `¿Deseas eliminar el transfer #${id}? Esta acción eliminará el registro de forma permanente.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar transfer',
+      `¿Deseas eliminar el transfer #${id}? Esta acción eliminará el registro de forma permanente.`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.isSubmitting.set(true);
             this.transferSvc.deleteTransfer(id).subscribe({
               next: () => {
@@ -942,7 +940,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
           }
         }
       ]
-    });
+    );
   }
 
   private processSubmit(): void {
@@ -1088,7 +1086,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
-    if (this.navbar?.alert) this.navbar.alert.set(null);
+    this.navbar?.clearOverlay?.();
   }
 
   hasUnsavedChanges(): boolean {

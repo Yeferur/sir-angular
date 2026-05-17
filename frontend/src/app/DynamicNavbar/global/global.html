@@ -1,13 +1,13 @@
-<div class="navbar-container" [attr.data-state]="islandState()">
+<div class="navbar-container" [attr.data-state]="islandState()" [attr.data-base-state]="baseState()">
     <div class="sidebar-widget left">
         <a routerLink="/Reservas/VerReservas" class="quick-button">Ver Reservas</a>
         <a routerLink="/Reservas/NuevaReserva" class="quick-button">Crear Reserva</a>
     </div>
 
     <div class="dynamic-island"
-         [attr.role]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'dialog' : null"
-         [attr.aria-modal]="['alert','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'true' : null"
-         [attr.aria-label]="islandState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'panel' ? 'Panel' : null">
+         [attr.role]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'dialog' : null"
+         [attr.aria-modal]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'true' : null"
+         [attr.aria-label]="overlayState() === 'loading' ? 'Cargando' : overlayState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'panel' ? 'Panel' : null">
         <div class="island-content">
             @if (islandState() === 'compact') {
             <div class="activity-content">
@@ -27,12 +27,13 @@
             </div>
             }
 
-            @if (islandState() === 'alert' || (islandState() === 'loading' && alert())) {
+            @if (overlayState() && overlay()) {
             <div class="activity-content">
-                <app-alert-content [type]="alert()?.type || 'info'" [title]="alert()?.title || ''"
-                    [message]="alert()?.message || ''" [buttons]="alert()?.buttons || []"
-                    [loading]="alert()?.loading || false" [autoClose]="alert()?.autoClose || false"
-                    [autoCloseTime]="alert()?.autoCloseTime || 3000" (onClose)="clearAlert()">
+                <app-alert-content [type]="overlay()?.type === 'success' || overlay()?.type === 'info' || overlay()?.type === 'error' || overlay()?.type === 'warning' ? overlay()?.type! : (overlay()?.kind === 'confirm' ? 'warning' : 'info')" [title]="overlay()?.title || ''"
+                    [overlayId]="overlay()?.id || ''"
+                    [message]="overlay()?.message || ''" [buttons]="overlay()?.buttons || []"
+                    [loading]="overlay()?.loading || false" [autoClose]="overlay()?.autoClose || false"
+                    [autoCloseTime]="overlay()?.autoCloseTime || 3000" (onClose)="clearOverlay()">
                 </app-alert-content>
             </div>
             }

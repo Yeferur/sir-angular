@@ -158,21 +158,20 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
 
   cerrarSesionesEnTodosMisDispositivos(event: Event) {
     event.preventDefault();
-    this.navbar.alert.set({
-      type: 'info',
-      title: 'Cerrar sesión en todos mis dispositivos',
-      message: 'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
-      buttons: [
+    this.navbar.showConfirm(
+      'Cerrar sesión en todos mis dispositivos',
+      'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Cerrar sesiones',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.menuOpen = false;
             this.userDropdownOpen = false;
 
@@ -189,7 +188,8 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
             });
           }
         }
-      ]
-    });
+      ],
+      { type: 'info' }
+    );
   }
 }

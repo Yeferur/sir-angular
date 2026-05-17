@@ -1,6 +1,5 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
 
 import { UserService } from '../services/userdata';
@@ -8,28 +7,26 @@ import { DynamicIslandGlobalService } from '../services/DynamicNavbar/global';
 import { AuthService } from '../services/Login/login-service';
 import { PermisosService } from '../services/Permisos/permisos.service';
 import { UsuariosService } from '../services/Usuarios/usuarios';
-import { PermisoDirective } from '../shared/directives/permiso.directive';
 
-/**
- * Mapa que asocia cada índice de submenú con el prefijo de ruta padre.
- * Se usa para:
- *   1) Marcar el padre como "has-active-child" cuando una ruta hija está activa.
- *   2) Abrir automáticamente el submenú correspondiente al navegar a una ruta hija.
- */
-const SUBMENU_ROUTES: Record<number, string> = {
-  1: '/Reservas',
-  2: '/Transfers',
-  3: '/Tours',
-  4: '/Puntos',
-  6: '/Configuracion', // Configuración no tiene un prefijo único, ver isSubmenuActive
-};
+type MenuAction = 'openAppUpdates' | 'toggleTheme';
+
+interface SidebarItem {
+  key: string;
+  label: string;
+  icon: string;
+  route?: string;
+  permission?: string;
+  action?: MenuAction;
+  exact?: boolean;
+  children?: SidebarItem[];
+}
 
 const APP_UPDATES_VERSION = 'v1.0.0-beta';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, PermisoDirective, CommonModule],
+  imports: [RouterLink, RouterLinkActive],
   styleUrl: './layout.css',
   templateUrl: './layout.html',
 })
@@ -44,7 +41,7 @@ export class layout implements OnInit {
 
   // UI state
   isSidebarOpen = signal(false);
-  activeMenu = signal<number | null>(null);
+  activeMenu = signal<string | null>(null);
   isDarkMode = false;
 
   // Ruta actual reactiva (para resaltar el padre del submenú activo)
@@ -57,6 +54,190 @@ export class layout implements OnInit {
   // ✅ CLAVE: no renderizar el menú hasta tener permisos cargados
   ready = signal(false);
   loadingError = signal<string | null>(null);
+
+  private readonly menuItems: SidebarItem[] = [
+    {
+      key: 'inicio',
+      label: 'Inicio',
+      icon: 'bx bxs-dashboard',
+      route: '/',
+      permission: 'INICIO.LEER',
+      exact: true,
+    },
+    {
+      key: 'dashboard',
+      label: 'Dashboard',
+      icon: 'bx bx-line-chart',
+      route: '/Dashboard',
+      permission: 'INFORMES.LEER',
+      exact: true,
+    },
+    {
+      key: 'historial',
+      label: 'Historial',
+      icon: 'bx bx-history',
+      route: '/Historial',
+      permission: 'HISTORIAL.LEER',
+      exact: true,
+    },
+    {
+      key: 'reservas',
+      label: 'Reservas',
+      icon: 'bx bx-calendar-plus',
+      children: [
+        {
+          key: 'reservas-nueva',
+          label: 'Nueva Reserva',
+          icon: 'bx bx-plus',
+          route: '/Reservas/NuevaReserva',
+          permission: 'RESERVAS.CREAR',
+          exact: true,
+        },
+        {
+          key: 'reservas-ver',
+          label: 'Ver Reservas',
+          icon: 'bx bx-list-ul',
+          route: '/Reservas/VerReservas',
+          permission: 'RESERVAS.LEER',
+          exact: true,
+        },
+        {
+          key: 'reservas-control',
+          label: 'Control de Viaje',
+          icon: 'bx bx-check-shield',
+          route: '/Reservas/Confirmacion',
+          permission: 'CONTROL_VIAJE.LEER',
+          exact: true,
+        },
+      ],
+    },
+    {
+      key: 'transfers',
+      label: 'Transfer',
+      icon: 'bx bx-car',
+      children: [
+        {
+          key: 'transfers-nuevo',
+          label: 'Nuevo Transfer',
+          icon: 'bx bx-plus',
+          route: '/Transfers/NuevoTransfer',
+          permission: 'TRANSFERS.CREAR',
+          exact: true,
+        },
+        {
+          key: 'transfers-ver',
+          label: 'Ver Transfer',
+          icon: 'bx bx-list-ul',
+          route: '/Transfers/VerTransfers',
+          permission: 'TRANSFERS.LEER',
+          exact: true,
+        },
+      ],
+    },
+    {
+      key: 'tours',
+      label: 'Tours',
+      icon: 'bx bx-flag',
+      children: [
+        {
+          key: 'tours-nuevo',
+          label: 'Nuevo Tour',
+          icon: 'bx bx-plus',
+          route: '/Tours/NuevoTour',
+          permission: 'TOURS.CREAR',
+          exact: true,
+        },
+        {
+          key: 'tours-ver',
+          label: 'Ver Tours',
+          icon: 'bx bx-list-ul',
+          route: '/Tours/VerTours',
+          permission: 'TOURS.LEER',
+          exact: true,
+        },
+      ],
+    },
+    {
+      key: 'puntos',
+      label: 'Puntos de encuentro',
+      icon: 'bx bx-map',
+      children: [
+        {
+          key: 'puntos-nuevo',
+          label: 'Nuevo Punto',
+          icon: 'bx bx-plus',
+          route: '/Puntos/NuevoPunto',
+          permission: 'PUNTOS.CREAR',
+          exact: true,
+        },
+        {
+          key: 'puntos-ver',
+          label: 'Ver Puntos',
+          icon: 'bx bx-map-alt',
+          route: '/Puntos/VerPuntos',
+          permission: 'PUNTOS.LEER',
+          exact: true,
+        },
+      ],
+    },
+    {
+      key: 'programacion',
+      label: 'Listados de buses',
+      icon: 'bx bx-list-check',
+      route: '/Programacion/Listado',
+      permission: 'PROGRAMACION.LEER',
+      exact: true,
+    },
+    {
+      key: 'configuracion',
+      label: 'Configuración',
+      icon: 'bx bx-cog',
+      children: [
+        {
+          key: 'perfil',
+          label: 'Perfil',
+          icon: 'bx bx-user-circle',
+          route: '/Perfil/Editar',
+          exact: true,
+        },
+        {
+          key: 'usuarios',
+          label: 'Administrar Usuarios',
+          icon: 'bx bx-group',
+          route: '/Usuarios',
+          permission: 'USUARIOS.LEER',
+          exact: true,
+        },
+        {
+          key: 'usuarios-nuevo',
+          label: 'Crear Usuarios',
+          icon: 'bx bx-user-plus',
+          route: '/Usuarios/NuevoUsuario',
+          permission: 'USUARIOS.CREAR',
+          exact: true,
+        },
+        {
+          key: 'ayuda',
+          label: 'Ayuda',
+          icon: 'bx bx-help-circle',
+          route: '/Ayuda',
+          exact: true,
+        },
+        {
+          key: 'novedades',
+          label: 'Novedades',
+          icon: 'bx bx-bell',
+          action: 'openAppUpdates',
+        },
+        {
+          key: 'tema',
+          label: 'Tema',
+          icon: 'bx bx-moon',
+          action: 'toggleTheme',
+        },
+      ],
+    },
+  ];
 
   // -----------------------
   // Lifecycle
@@ -113,45 +294,86 @@ export class layout implements OnInit {
   }
 
   // -----------------------
-  // Submenu logic
+  // Menú dinámico
   // -----------------------
-
-  /**
-   * Devuelve true si el submenú con índice dado contiene la ruta activa.
-   * Se usa desde la plantilla para aplicar la clase `has-active-child` al padre.
-   */
-  isSubmenuActive(index: number): boolean {
-    const url = this.currentUrl();
-    const prefix = SUBMENU_ROUTES[index];
-    if (!prefix) return false;
-
-    // Caso especial: el menú "Configuración" agrupa rutas dispersas
-    if (index === 6) {
-      return (
-        url.startsWith('/Perfil') ||
-        url.startsWith('/Usuarios') ||
-        url.startsWith('/Ayuda')
-      );
-    }
-
-    return url.startsWith(prefix);
+  getVisibleMenuItems(): SidebarItem[] {
+    return this.menuItems.filter((item) => this.isVisibleItem(item));
   }
 
-  /**
-   * Abre automáticamente el submenú cuyo padre coincide con la ruta actual.
-   * En desktop colapsado el CSS lo mantiene cerrado visualmente, pero el
-   * estado lógico queda correcto para cuando el usuario haga hover.
-   */
-  private syncActiveSubmenu(): void {
-    for (const idxStr of Object.keys(SUBMENU_ROUTES)) {
-      const idx = Number(idxStr);
-      if (this.isSubmenuActive(idx)) {
-        this.activeMenu.set(idx);
-        return;
-      }
+  getVisibleChildren(item: SidebarItem): SidebarItem[] {
+    return (item.children ?? []).filter((child) => this.isVisibleItem(child));
+  }
+
+  getSingleVisibleChild(item: SidebarItem): SidebarItem | null {
+    const [child] = this.getVisibleChildren(item);
+    return child ?? null;
+  }
+
+  tienePermiso(permission?: string): boolean {
+    if (!permission) return true;
+    return this.permisosService.tienePermiso(permission);
+  }
+
+  isVisibleItem(item: SidebarItem): boolean {
+    if (item.children?.length) {
+      const childrenVisible = this.getVisibleChildren(item).length > 0;
+      return this.tienePermiso(item.permission) && childrenVisible;
     }
-    // Si la ruta actual no pertenece a ningún submenú, no abrimos nada.
-    // (No cerramos manualmente — respeta la preferencia del usuario)
+
+    return this.tienePermiso(item.permission);
+  }
+
+  shouldRenderAsDropdown(item: SidebarItem): boolean {
+    return this.getVisibleChildren(item).length >= 2;
+  }
+
+  shouldRenderAsDirectLink(item: SidebarItem): boolean {
+    return this.getVisibleChildren(item).length === 1;
+  }
+
+  getDirectRouteForSingleChild(item: SidebarItem): string | null {
+    return this.getSingleVisibleChild(item)?.route ?? null;
+  }
+
+  getDirectActionForSingleChild(item: SidebarItem): MenuAction | null {
+    return this.getSingleVisibleChild(item)?.action ?? null;
+  }
+
+  getItemLabel(item: SidebarItem): string {
+    if (item.action === 'toggleTheme') {
+      return `Tema: ${this.isDarkMode ? 'Oscuro' : 'Claro'}`;
+    }
+
+    return item.label;
+  }
+
+  isRouteActive(route: string, exact = false): boolean {
+    const current = this.normalizeUrl(this.currentUrl());
+    const target = this.normalizeUrl(route);
+
+    if (exact || target === '/') {
+      return current === target;
+    }
+
+    return current === target || current.startsWith(`${target}/`);
+  }
+
+  isSubmenuActive(item: SidebarItem): boolean {
+    const visibleChildren = this.getVisibleChildren(item);
+    if (visibleChildren.length === 0) {
+      return !!item.route && this.isRouteActive(item.route, item.exact ?? false);
+    }
+
+    if (visibleChildren.length === 1) {
+      const child = visibleChildren[0];
+      return !!child.route && this.isRouteActive(child.route, child.exact ?? false);
+    }
+
+    return visibleChildren.some((child) => !!child.route && this.isRouteActive(child.route, child.exact ?? false));
+  }
+
+  isMenuOpen(item: SidebarItem): boolean {
+    return this.activeMenu() === item.key || this.isSubmenuActive(item);
   }
 
   // -----------------------
@@ -162,18 +384,21 @@ export class layout implements OnInit {
     this.resetNavbarStates();
   }
 
-  toggleMenu(index: number) {
-    this.activeMenu.update((current) => (current === index ? null : index));
+  toggleMenu(key: string) {
+    this.activeMenu.update((current) => (current === key ? null : key));
   }
 
   closeAllSubmenus() {
-    // Solo cierra si la ruta actual NO pertenece a un submenú abierto.
-    // Así, si el usuario está dentro de "Reservas/...", el submenú se mantiene
-    // abierto al sacar el mouse (mejor UX).
-    const current = this.activeMenu();
-    if (current !== null && this.isSubmenuActive(current)) {
+    const currentKey = this.activeMenu();
+    if (!currentKey) {
       return;
     }
+
+    const currentItem = this.menuItems.find((item) => item.key === currentKey);
+    if (currentItem && this.isSubmenuActive(currentItem)) {
+      return;
+    }
+
     this.activeMenu.set(null);
   }
 
@@ -189,11 +414,21 @@ export class layout implements OnInit {
     const theme = this.isDarkMode ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+    this.isSidebarOpen.set(false);
   }
 
   openAppUpdates(): void {
     this.navbar.openAppUpdates();
     this.isSidebarOpen.set(false);
+  }
+
+  handleMenuAction(action: MenuAction) {
+    if (action === 'openAppUpdates') {
+      this.openAppUpdates();
+      return;
+    }
+
+    this.toggleTheme();
   }
 
   async handleLogout() {
@@ -208,6 +443,18 @@ export class layout implements OnInit {
   // -----------------------
   // Helpers
   // -----------------------
+  private syncActiveSubmenu(): void {
+    for (const item of this.getVisibleMenuItems()) {
+      if (this.shouldRenderAsDropdown(item) && this.isSubmenuActive(item)) {
+        this.activeMenu.set(item.key);
+        return;
+      }
+    }
+
+    // Si la ruta actual no pertenece a ningún submenú, no abrimos nada.
+    // (No cerramos manualmente — respeta la preferencia del usuario)
+  }
+
   private openAppUpdatesOnceForUser(): void {
     const user = this.user();
     const userKey = String(user?.id || user?.username || user?.email || '').trim();
@@ -225,17 +472,21 @@ export class layout implements OnInit {
   }
 
   private resetNavbarStates() {
-    const currentAlert = this.navbar?.alert?.();
+    const currentOverlay = this.navbar?.overlay?.();
 
-    if (!currentAlert?.loading) {
-      this.navbar?.alert?.set(null);
+    if (!currentOverlay?.loading) {
+      this.navbar?.clearOverlay?.();
     }
 
-    this.navbar?.cuposInfo?.set(null);
-    this.navbar?.Id_Reserva?.set(null);
-
-    if (this.navbar?.Id_Transfer) this.navbar.Id_Transfer.set(null);
-    if (this.navbar?.puntos) this.navbar.puntos.set(null);
+    this.navbar?.clearBaseState?.({
+      cupos: true,
+      reserva: true,
+      transfer: true,
+      puntos: true,
+      panel: false,
+      preview: false,
+      sugerencias: false,
+    });
   }
 
   private refreshAvatar(): void {
@@ -247,6 +498,11 @@ export class layout implements OnInit {
         this.avatarUrl.set(null);
       },
     });
+  }
+
+  private normalizeUrl(url: string): string {
+    const sanitized = String(url || '').split(/[?#]/)[0].replace(/\/+$/, '');
+    return sanitized || '/';
   }
 
   getUserInitials(): string {

@@ -68,6 +68,14 @@ export class VerTransfersComponent implements OnInit {
     return this.permisosService.tienePermiso('TRANSFERS.ELIMINAR');
   }
 
+  get canCreateTransfer(): boolean {
+    return this.permisosService.tienePermiso('TRANSFERS.CREAR');
+  }
+
+  get canUpdateTransfer(): boolean {
+    return this.permisosService.tienePermiso('TRANSFERS.ACTUALIZAR');
+  }
+
   fpOptionsFecha: Partial<FlatpickrOptions> = {
     dateFormat: 'Y-m-d',
     altInput: true,
@@ -216,6 +224,10 @@ export class VerTransfersComponent implements OnInit {
   }
 
   crearTransfer() {
+    if (!this.canCreateTransfer) {
+      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear transfers.');
+      return;
+    }
     this.router.navigate(['/Transfers/NuevoTransfer']);
   }
 
@@ -227,27 +239,25 @@ export class VerTransfersComponent implements OnInit {
     const id = transfer?.Id_Transfer;
     if (!id || !this.canDeleteTransfer) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar transfer',
-      message: `¿Deseas eliminar el transfer #${transfer?.Codigo_Transfer || id}? Esta acción eliminará el registro de forma permanente.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Eliminar transfer',
+      `¿Deseas eliminar el transfer #${transfer?.Codigo_Transfer || id}? Esta acción eliminará el registro de forma permanente.`,
+      [
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         },
         {
           text: 'Eliminar',
           style: 'delete',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.deleteTransfer(transfer);
           }
         }
       ]
-    });
+    );
   }
 
   private deleteTransfer(transfer: any): void {
@@ -263,7 +273,7 @@ export class VerTransfersComponent implements OnInit {
         this.navbar.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
       },
       error: (err) => {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'error',
           title: 'No se pudo eliminar',
           message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible eliminar el transfer.',
@@ -272,7 +282,7 @@ export class VerTransfersComponent implements OnInit {
             {
               text: 'Cerrar',
               style: 'secondary',
-              onClick: () => this.navbar.alert.set(null)
+              onClick: () => this.navbar.clearOverlay()
             }
           ]
         });
@@ -392,7 +402,7 @@ export class VerTransfersComponent implements OnInit {
   buscarTransfers() {
     const filtros = this.buildApiFilters();
     if (Object.keys(filtros).length === 0) {
-      this.navbar.alert.set({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
+      this.navbar.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
       this.transfers.set([]);
       return;
     }
@@ -403,7 +413,7 @@ export class VerTransfersComponent implements OnInit {
     this.dropdownOpenServicio.set(false);
     this.transferService.getTransfers(filtros).subscribe({
       next: (data) => { this.transfers.set(data || []); },
-      error: (err) => { this.navbar.alert.set({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
+      error: (err) => { this.navbar.showAlert({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
       complete: () => { this.isSearching.set(false); }
     });
   }

@@ -4,7 +4,7 @@ const controller = require('../../controllers/Confirmacion/confirmacion.controll
 const { authMiddleware } = require('../../middlewares/authMiddleware');
 const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 
-router.get('/pasajeros', authMiddleware, checkPermission('RESERVAS.LEER'), controller.getPasajeros);
-router.put('/update', authMiddleware, checkPermission('RESERVAS.ACTUALIZAR'), controller.saveConfirmacion);
+router.get('/pasajeros', authMiddleware, checkPermission('CONTROL_VIAJE.LEER'), controller.getPasajeros);
+router.put('/update', authMiddleware, checkPermission('CONTROL_VIAJE.ACTUALIZAR_ASISTENCIA'), controller.saveConfirmacion);
 
 module.exports = router;

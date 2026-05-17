@@ -132,7 +132,11 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     }
 
     private navbar(type: 'error' | 'success' | 'info' | 'warning', title: string, message: string, loading = false, autoClose = true) {
-        this.global.alert.set({ type, title, message, loading, autoClose });
+        if (loading) {
+            this.global.showLoading(title, message, { type, autoClose });
+            return;
+        }
+        this.global.showAlert({ type, title, message, autoClose });
     }
 
     private loadRoles() {
@@ -303,6 +307,10 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         };
     }
 
+    canUpdateUsers(): boolean {
+        return this.permisosService.tienePermiso('USUARIOS.ACTUALIZAR');
+    }
+
     private isPasswordStrongEnough(): boolean {
         const pass = String(this.form.value.Contrasena || '');
         if (!pass) return true; // Empty means no change, so it's valid for edit mode
@@ -366,16 +374,14 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             permisos: this.selectedPermisos
         };
 
-        this.global.alert?.set?.({
-            type: 'info',
-            title: '¿Guardar cambios?',
-            message: 'Se actualizará la información del usuario.',
-            autoClose: false,
-            buttons: [
-                { text: 'Cancelar', style: 'secondary', onClick: () => this.global.alert?.set?.(null) },
-                { text: 'Guardar', style: 'primary', onClick: () => { this.global.alert?.set?.(null); this.confirmUpdate(payload); } }
+        this.global.showConfirm(
+            '¿Guardar cambios?',
+            'Se actualizará la información del usuario.',
+            [
+                { text: 'Cancelar', style: 'secondary', onClick: () => this.global.clearOverlay() },
+                { text: 'Guardar', style: 'primary', onClick: () => { this.global.clearOverlay(); this.confirmUpdate(payload); } }
             ]
-        });
+        );
     }
 
     private confirmUpdate(payload: any) {

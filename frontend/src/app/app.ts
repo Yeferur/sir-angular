@@ -56,17 +56,17 @@ export class App implements OnInit, OnDestroy {
   }
 
   private syncShellForUrl(url: string) {
-    this.publicAuthRoute = this.isPublicAuthRoute(url);
+      this.publicAuthRoute = this.isPublicAuthRoute(url);
 
-    if (!this.loggedIn) {
-      this.navbar.mode.set(this.publicAuthRoute ? '' : 'login');
-      if (this.publicAuthRoute) {
-        const currentAlert = this.navbar.alert();
-        if (currentAlert) {
-          this.navbar.alert.set(null);
+      if (!this.loggedIn) {
+        this.navbar.mode.set(this.publicAuthRoute ? '' : 'login');
+        if (this.publicAuthRoute) {
+        const currentOverlay = this.navbar.overlay();
+        if (currentOverlay) {
+          this.navbar.clearOverlay();
+        }
         }
       }
-    }
 
     this.cdr.markForCheck();
   }
@@ -80,24 +80,20 @@ export class App implements OnInit, OnDestroy {
         if (event instanceof NavigationStart) {
           this.syncShellForUrl(event.url);
           if (!this.publicAuthRoute) {
-            this.navbar.alert.set({
-              type: 'info',
-              loading: true,
-              title: 'Cargando datos...'
-            });
+            this.navbar.showLoading('Cargando datos...', '', { source: 'navigation' });
             this.cdr.markForCheck();
           }
         } else if (
           event instanceof NavigationEnd ||
           event instanceof NavigationCancel ||
           event instanceof NavigationError
-        ) {
+          ) {
           const url = event instanceof NavigationEnd ? event.urlAfterRedirects : this.router.url;
           this.syncShellForUrl(url);
 
-          const currentAlert = this.navbar.alert();
-          if (currentAlert?.loading) {
-            this.navbar.alert.set(null);
+          const currentOverlay = this.navbar.overlay();
+          if (currentOverlay?.loading) {
+            this.navbar.clearOverlay('loading');
             this.cdr.markForCheck();
           }
         }
@@ -109,14 +105,14 @@ export class App implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg: any) => {
         if (this.isAdminForceLogoutEvent(msg)) {
-          this.navbar.alert.set({
+          this.navbar.showAlert({
             type: 'warning',
             title: 'Sesión Cerrada',
             message: 'Tu sesión fue cerrada por un administrador.',
           });
 
           setTimeout(() => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.ws.disconnect();
             this.auth.clearLocalSession();
             this.permisosService.limpiarPermisos();
@@ -128,14 +124,14 @@ export class App implements OnInit, OnDestroy {
         }
 
         if (this.isSelfLogoutAllSessionsEvent(msg)) {
-          this.navbar.alert.set({
+          this.navbar.showAlert({
             type: 'info',
             title: 'Sesión cerrada',
             message: 'Tu sesión fue cerrada en todos tus dispositivos.',
           });
 
           setTimeout(() => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.ws.disconnect();
             this.auth.clearLocalSession();
             this.permisosService.limpiarPermisos();

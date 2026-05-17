@@ -186,13 +186,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     });
 
     if (hayDuplicados) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'DNI repetido en esta reserva',
         message: 'Hay pasajeros con el mismo documento dentro de la reserva actual. Corrige los DNI antes de guardar.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -313,13 +313,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const dupCtrl = this.pasajeros.controls.find(c => c.get('DNI')?.errors?.['duplicadoEnBd']);
 
     if (dupCtrl) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'DNI con reserva existente',
         message: 'Al cambiar la fecha, uno o más pasajeros ya aparecen reservados para esa misma fecha. Revisa los campos marcados antes de guardar.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -331,7 +331,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const message = this.getFriendlyReservaErrorMessage(error);
     this.closeSummaryIfOpen();
 
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'error',
       title,
       message,
@@ -340,7 +340,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         {
           text: 'Cerrar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
     });
@@ -401,13 +401,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private mostrarAlertaIncrementoSinCupos(cupos: number): void {
-    this.navbar.alert.set({
+    this.navbar.showAlert({
       type: 'warning',
       title: 'Cupos insuficientes',
       message: 'No hay cupos suficientes para agregar más pasajeros. Puedes guardar otros cambios sin aumentar la cantidad de pasajeros.',
       autoClose: false,
       buttons: [
-        { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+        { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
       ]
     });
     this.cuposDisponiblesActuales.set(cupos);
@@ -419,13 +419,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     // verificarCuposDisponibles ya actualiza navbar.cuposInfo directamente.
 
     if (!ok && !this.puedeGuardarSinBloquearPorCupos()) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Cupos actualizados',
         message: 'La disponibilidad cambió y ahora esta reserva supera los cupos disponibles. Ajusta los pasajeros antes de guardar.',
         autoClose: false,
         buttons: [
-          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+          { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
         ]
       });
     }
@@ -627,7 +627,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private evaluarConflictoRutasEnTiempoReal(): void {
     const hayConflicto = this.tieneConflictoLogistico();
     if (hayConflicto && !this.conflictoRutasNotificado()) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Inviabilidad logística detectada',
         message: this.mensajeInviabilidadLogistica() || 'Los puntos seleccionados no cumplen la validación logística.',
@@ -851,12 +851,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.canales.set(canales || []);
       this.monedas.set(monedas || []);
     } catch {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Error cargando datos',
         message: 'No fue posible cargar Tours, Canales o Monedas.',
         autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) }],
+        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
       });
     }
 
@@ -866,7 +866,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     if (!id) {
       this.isLoading.set(false);
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'ID de reserva inválido',
         message: 'No se recibió Id_Reserva en la ruta.',
@@ -1206,7 +1206,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.puntoBusquedaResults.set(results || []);
     } catch {
       this.puntoBusquedaResults.set([]);
-      this.navbar.alert.set({ type: 'error', title: 'Error buscando puntos', message: 'No fue posible obtener los puntos de encuentro.', autoClose: true });
+      this.navbar.showAlert({ type: 'error', title: 'Error buscando puntos', message: 'No fue posible obtener los puntos de encuentro.', autoClose: true });
     }
   }
 
@@ -1264,12 +1264,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       } else {
         this.horarioSeleccionado.set(null);
         this.form.get('Id_Horario')?.setValue(null);
-        this.navbar.alert.set({ type: 'warning', title: 'Sin horario', message: 'No se encontró horario para el punto principal con el tour seleccionado.', autoClose: true });
+        this.navbar.showAlert({ type: 'warning', title: 'Sin horario', message: 'No se encontró horario para el punto principal con el tour seleccionado.', autoClose: true });
       }
     } catch {
       this.horarioSeleccionado.set(null);
       this.form.get('Id_Horario')?.setValue(null);
-      this.navbar.alert.set({ type: 'error', title: 'Error al asignar horario', message: 'No fue posible obtener el horario del punto principal.', autoClose: false });
+      this.navbar.showAlert({ type: 'error', title: 'Error al asignar horario', message: 'No fue posible obtener el horario del punto principal.', autoClose: false });
     }
   }
 
@@ -1304,7 +1304,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const teniaInfantes = this.countByTipo('INFANTE') > 0;
       if (teniaInfantes && !this.tourRules.allowsPassengerType(idTour, 'INFANTE')) {
         this.removeInfantes();
-        this.navbar.alert.set({ type: 'warning', title: 'Infantes no permitidos', message: 'En este tour no se aceptan infantes. Han sido removidos.', autoClose: true });
+        this.navbar.showAlert({ type: 'warning', title: 'Infantes no permitidos', message: 'En este tour no se aceptan infantes. Han sido removidos.', autoClose: true });
       }
 
       this.tourRules.resetSession();
@@ -1434,7 +1434,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const Id_Tour = this.form.get('SelectTour')?.value;
 
     if (!Fecha || !Id_Tour) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona tour y fecha antes de agregar pasajeros.',
@@ -1458,7 +1458,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.navbar.cuposInfo.set({ ...data });
 
       if (!disponible) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'warning',
           title: 'Cupos insuficientes',
           message: cupos <= 0
@@ -1466,7 +1466,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
             : `Solo quedan ${cupos} cupos disponibles. No puedes superar esa cantidad.`,
           autoClose: false,
           buttons: [
-            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.alert.set(null) }
+            { text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }
           ]
         });
         return false;
@@ -1488,7 +1488,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const Id_Tour = this.form.get('SelectTour')?.value;
 
     if (!Fecha || !Id_Tour) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Datos incompletos',
         message: 'Selecciona tour y fecha antes de agregar pasajeros.',
@@ -1772,14 +1772,14 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.form.get('ComprobantePago')?.setValue(null, { emitEvent: false });
 
       if (!manual) {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'info',
           title: 'Cambio a Abonos',
           message: 'El total ha cambiado. El pago completo se convirtió en abono. Puedes agregar más abonos o ajustar.',
           autoClose: true
         });
       } else {
-        this.navbar.alert.set({
+        this.navbar.showAlert({
           type: 'success',
           title: 'Conversión exitosa',
           message: 'El comprobante anterior ha sido movido a tu primer abono.',
@@ -1863,16 +1863,14 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private confirmar(titulo: string, mensaje: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
-        type: 'info',
-        title: titulo,
-        message: mensaje,
-        autoClose: false,
-        buttons: [
-          { text: 'Cancelar', style: 'secondary', onClick: () => { this.navbar.alert.set(null); resolve(false); } },
-          { text: 'Confirmar', style: 'primary', onClick: () => { this.navbar.alert.set(null); resolve(true); } },
-        ],
-      });
+      this.navbar.showConfirm(
+        titulo,
+        mensaje,
+        [
+          { text: 'Cancelar', style: 'secondary', onClick: () => { this.navbar.clearOverlay(); resolve(false); } },
+          { text: 'Confirmar', style: 'primary', onClick: () => { this.navbar.clearOverlay(); resolve(true); } },
+        ]
+      );
     });
   }
 
@@ -1883,6 +1881,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   get canDeleteReserva(): boolean {
     return this.permisosService.tienePermiso('RESERVAS.ELIMINAR');
+  }
+
+  get canUpdateReserva(): boolean {
+    return this.permisosService.tienePermiso('RESERVAS.ACTUALIZAR');
   }
 
   async cancelarReserva(): Promise<void> {
@@ -1980,7 +1982,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
             const origFechaNorm = String(origFecha || '').slice(0, 10);
 
             if (!targetFecha || targetFecha === origFechaNorm) {
-              this.navbar.alert.set({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
+              this.navbar.showAlert({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
               return;
             }
 
@@ -2000,7 +2002,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
     } catch (e) {
       console.error('Error preparando duplicación', e);
-      this.navbar.alert.set({ type: 'error', title: 'Error', message: 'No fue posible preparar la duplicación.', autoClose: false });
+      this.navbar.showAlert({ type: 'error', title: 'Error', message: 'No fue posible preparar la duplicación.', autoClose: false });
     }
   }
 
@@ -2100,7 +2102,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const nuevoId = rAny?.Id_Reserva ?? rAny?.id ?? rAny?.reservaId ?? null;
 
       if (!nuevoId) {
-        this.navbar.alert.set({ type: 'success', title: 'Reserva creada', message: 'Reserva duplicada correctamente.', autoClose: true });
+        this.navbar.showAlert({ type: 'success', title: 'Reserva creada', message: 'Reserva duplicada correctamente.', autoClose: true });
         return;
       }
 
@@ -2108,20 +2110,20 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       if (removeInfantesCount > 0) extraMsg += `\nNota: Se removieron ${removeInfantesCount} infantes no permitidos.`;
       if (adaptadosCount > 0) extraMsg += `\nNota: Se reajustaron tarifas de ${adaptadosCount} menores por política del tour.`;
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'success',
         title: 'Reserva duplicada con éxito',
         message: `ID de nueva reserva: ${nuevoId}${extraMsg}`,
         autoClose: false,
         buttons: [
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-          { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.abrirReservaEnNavbar(String(nuevoId)); } }
+          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
+          { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.clearOverlay(); this.abrirReservaEnNavbar(String(nuevoId)); } }
         ]
       });
 
     } catch (err) {
       console.error(err);
-      this.navbar.alert.set({ type: 'error', title: 'Error', message: 'No fue posible crear la reserva duplicada. Verifica tu conexión.', autoClose: false });
+      this.navbar.showAlert({ type: 'error', title: 'Error', message: 'No fue posible crear la reserva duplicada. Verifica tu conexión.', autoClose: false });
     }
   }
 
@@ -2140,7 +2142,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private abrirReservaEnNavbar(idReserva: string) {
 
-    this.navbar.alert.set(null);
+    this.navbar.clearOverlay();
     this.navbar.cuposInfo.set(null);
     this.navbar.Id_Reserva.set(idReserva);
 
@@ -2182,12 +2184,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         : 'Hay campos invalidos en el formulario.';
       this.closeSummaryIfOpen();
 
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       this.isSubmitting.set(false);
       return;
@@ -2195,12 +2197,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     if (this.tieneConflictoLogistico()) {
       this.closeSummaryIfOpen();
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Inviabilidad logística',
         message: this.mensajeInviabilidadLogistica() || 'Corrige los puntos de encuentro antes de guardar.',
         autoClose: false,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.alert.set(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
       this.isSubmitting.set(false);
       return;
@@ -2387,12 +2389,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (!input?.files?.length || !ctrl) return;
     const file = input.files[0];
     if (file.size > 5 * 1024 * 1024) {
-      this.navbar.alert.set({ type: 'warning', title: 'Archivo muy grande', message: 'El máximo permitido es 5 MB.', autoClose: true });
+      this.navbar.showAlert({ type: 'warning', title: 'Archivo muy grande', message: 'El máximo permitido es 5 MB.', autoClose: true });
       ctrl.setValue(null); input.value = ''; return;
     }
     const ok = /\.(pdf|jpe?g|png)$/i.test(file.name);
     if (!ok) {
-      this.navbar.alert.set({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
+      this.navbar.showAlert({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
       ctrl.setValue(null); input.value = ''; return;
     }
 
@@ -2404,7 +2406,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     ctrl.setValue(file);
     ctrl.markAsDirty();
     ctrl.updateValueAndValidity({ emitEvent: false });
-    this.navbar.alert.set({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el comprobante: ${file.name}`, autoClose: true });
+    this.navbar.showAlert({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el comprobante: ${file.name}`, autoClose: true });
   }
 
   onAbonoFileSelected(event: Event, index: number): void {
@@ -2413,12 +2415,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (!input?.files?.length || !abonoControl) return;
     const file = input.files[0];
     if (file.size > 5 * 1024 * 1024) {
-      this.navbar.alert.set({ type: 'warning', title: 'Archivo muy grande', message: 'El máximo permitido es 5 MB.', autoClose: true });
+      this.navbar.showAlert({ type: 'warning', title: 'Archivo muy grande', message: 'El máximo permitido es 5 MB.', autoClose: true });
       abonoControl.get('Comprobante')?.setValue(null); input.value = ''; return;
     }
     const ok = /\.(pdf|jpe?g|png)$/i.test(file.name);
     if (!ok) {
-      this.navbar.alert.set({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
+      this.navbar.showAlert({ type: 'warning', title: 'Formato no permitido', message: 'Sólo PDF, JPG o PNG.', autoClose: true });
       abonoControl.get('Comprobante')?.setValue(null); input.value = ''; return;
     }
 
@@ -2432,7 +2434,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     abonoControl.get('Comprobante')?.setValue(file);
     abonoControl.markAsDirty();
     abonoControl.updateValueAndValidity({ emitEvent: false });
-    this.navbar.alert.set({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el archivo: ${file.name}`, autoClose: true });
+    this.navbar.showAlert({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el archivo: ${file.name}`, autoClose: true });
   }
 
   // ===================== Estado sugerido (opcional) =====================
@@ -2469,7 +2471,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (!url) return;
     const href = this.resolveComprobanteUrl(url);
     if (!href) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'warning',
         title: 'Comprobante inválido',
         message: 'No se pudo resolver la URL del comprobante.',
@@ -2494,25 +2496,23 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const currentValue: any = this.form.get('ComprobantePago')?.value;
     const idPago = Number(currentValue?.Id_Pago);
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Eliminar comprobante',
-      message: 'Esta acción eliminará el comprobante actual. ¿Deseas continuar?',
-      autoClose: false,
-      buttons: [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
+    this.navbar.showConfirm(
+      'Eliminar comprobante',
+      'Esta acción eliminará el comprobante actual. ¿Deseas continuar?',
+      [
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
         {
           text: 'Eliminar',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
 
             if (Number.isFinite(idPago) && idPago > 0) {
               this.comprobantesAEliminar.push(idPago);
             }
 
             this.clearComprobanteLocalState();
-            this.navbar.alert.set({
+            this.navbar.showAlert({
               type: 'info',
               title: 'Comprobante eliminado',
               message: 'El comprobante fue removido del formulario. Guarda para persistir los cambios.',
@@ -2521,7 +2521,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
           },
         },
       ],
-    });
+      { type: 'warning' }
+    );
   }
 
   private clearComprobanteLocalState(): void {
@@ -2548,7 +2549,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
-    if (this.navbar?.alert) this.navbar.alert.set(null);
+    this.navbar?.clearOverlay?.();
   }
 
   private resolverEstadoYMotivo(

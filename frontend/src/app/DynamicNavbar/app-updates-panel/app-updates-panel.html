@@ -41,15 +41,13 @@
         <p>{{ reportInstructions }}</p>
       </article>
 
-      <!-- <article class="update-card changes-card">
+      <article class="update-card changes-card">
         <span class="card-kicker">Registro</span>
         <h3>Cambios recientes</h3>
         <ul>
-          <li>Dynamic Island con paneles globales.</li>
-          <li>Mejoras visuales en el acceso rápido del navbar.</li>
-          <li>Base lista para comunicar versiones y avisos internos.</li>
+          <li *ngFor="let change of recentChanges">{{ change }}</li>
         </ul>
-      </article> -->
+      </article>
     </div>
   </div>
 </section>

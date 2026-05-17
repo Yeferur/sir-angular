@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, SimpleChanges, OnChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
 
 
 @Component({
@@ -8,7 +8,8 @@ import { Component, EventEmitter, Input, Output, SimpleChanges, OnChanges } from
   templateUrl: './alertas.html',
   styleUrls: ['./alertas.css']
 })
-export class AlertContentComponent implements OnChanges {
+export class AlertContentComponent implements OnChanges, OnDestroy {
+  @Input() overlayId: string = '';
   @Input() type: 'success' | 'info' | 'error' | 'warning' = 'info';
   @Input() title: string = '';
   @Input() message: string = '';
@@ -21,17 +22,33 @@ export class AlertContentComponent implements OnChanges {
   private autoCloseTimeout: any;
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['autoClose'] || changes['autoCloseTime']) {
-      clearTimeout(this.autoCloseTimeout);
-      if (this.autoClose) {
-        this.autoCloseTimeout = setTimeout(() => {
-          this.onClose.emit();
-        }, this.autoCloseTime);
-      }
+    if (
+      changes['overlayId']
+      || changes['autoClose']
+      || changes['autoCloseTime']
+      || changes['title']
+      || changes['message']
+      || changes['type']
+      || changes['loading']
+    ) {
+      this.resetAutoCloseTimer();
     }
   }
 
   ngOnDestroy(): void {
     clearTimeout(this.autoCloseTimeout);
+  }
+
+  private resetAutoCloseTimer(): void {
+    clearTimeout(this.autoCloseTimeout);
+    this.autoCloseTimeout = null;
+
+    if (!this.autoClose) {
+      return;
+    }
+
+    this.autoCloseTimeout = setTimeout(() => {
+      this.onClose.emit();
+    }, this.autoCloseTime);
   }
 }

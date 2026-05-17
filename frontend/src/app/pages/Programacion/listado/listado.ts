@@ -9,6 +9,7 @@ import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { forkJoin, switchMap, of, finalize } from 'rxjs';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 
 type ViewStop = {
   key: string;
@@ -34,6 +35,7 @@ export class Listado implements OnInit {
   private inicioService = inject(InicioService);
   private cdr = inject(ChangeDetectorRef);
   private navbar = inject(DynamicIslandGlobalService);
+  private permisosService = inject(PermisosService);
 
   fechaSeleccionada: string = new Date().toISOString().split('T')[0];
   toursDelDia: TourProgramacion[] = [];
@@ -86,6 +88,14 @@ export class Listado implements OnInit {
 
   get totalPaxUnassigned(): number {
     return (this.reservasSinAsignar || []).reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
+  }
+
+  get canUpdateProgramacion(): boolean {
+    return this.permisosService.tienePermiso('PROGRAMACION.ACTUALIZAR');
+  }
+
+  get canCreateProgramacion(): boolean {
+    return this.permisosService.tienePermiso('PROGRAMACION.CREAR');
   }
 
   fpOptionsFecha: Partial<FlatpickrOptions> = {
@@ -300,17 +310,15 @@ export class Listado implements OnInit {
       return;
     }
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Cambios sin guardar',
-      message: 'Tienes cambios en el listado que aún no han sido guardados. ¿Qué deseas hacer?',
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Cambios sin guardar',
+      'Tienes cambios en el listado que aún no han sido guardados. ¿Qué deseas hacer?',
+      [
         {
           text: 'Guardar cambios',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.guardarListadoFinal();
           }
         },
@@ -318,7 +326,7 @@ export class Listado implements OnInit {
           text: 'Salir sin guardar',
           style: 'danger',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.listadoDirty = false;
             continuar();
           }
@@ -326,13 +334,18 @@ export class Listado implements OnInit {
         {
           text: 'Cancelar',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
-    });
+    );
   }
 
   generarPlan(tour: TourProgramacion): void {
+    if (!this.canCreateProgramacion) {
+      this.navbar.warningToast('Acción no permitida', 'No tienes permiso para generar programación.');
+      return;
+    }
+
     this.isPageLoading = true;
 
     this.tourSeleccionado = tour;
@@ -497,7 +510,7 @@ export class Listado implements OnInit {
     const mejorCapacidad = this.findBestCapacityForPassengers(nuevaCarga);
 
     if (!mejorCapacidad) {
-      this.navbar.alert.set({
+      this.navbar.showAlert({
         type: 'error',
         title: 'Capacidad insuficiente',
         message: 'No existe un bus con capacidad suficiente.',
@@ -531,6 +544,11 @@ export class Listado implements OnInit {
   }
 
   guardarListadoFinal(): void {
+    if (!this.canUpdateProgramacion) {
+      this.navbar.warningToast('Acción no permitida', 'No tienes permiso para guardar el listado.');
+      return;
+    }
+
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
 
     this.planSeleccionado.buses = this.planSeleccionado.buses.map((b, i) => {
@@ -545,7 +563,7 @@ export class Listado implements OnInit {
     const placas = this.planSeleccionado.buses.map(b => b.id);
     const placasUnicas = new Set(placas);
     if (placasUnicas.size !== placas.length) {
-      this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Las placas de los buses deben ser únicas.', autoClose: true, autoCloseTime: 2000 });
+      this.navbar.showAlert({ type: 'error', title: 'Error', message: 'Las placas de los buses deben ser únicas.', autoClose: true, autoCloseTime: 2000 });
       return;
     }
 
@@ -572,7 +590,7 @@ export class Listado implements OnInit {
         this.listadoDirty = false;
         this.listadoPersistido = true;
         this.listadoOrigen = 'db';
-        this.navbar.alert.set({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
+        this.navbar.showAlert({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
         this.reservasSinAsignar = [];
         this.resetEditorState();
         this.modoVista = 'dashboard';
@@ -581,7 +599,7 @@ export class Listado implements OnInit {
       error: (err) => {
         this.isPageLoading = false;
         console.error('Error al guardar', err);
-        this.navbar.alert.set({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.', autoClose: true, autoCloseTime: 4000 });
+        this.navbar.showAlert({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.', autoClose: true, autoCloseTime: 4000 });
       }
     });
   }
@@ -607,7 +625,7 @@ export class Listado implements OnInit {
       },
       error: (err) => {
         console.error('Error al exportar listado del bus', err);
-        this.navbar.alert.set({ type: 'error', title: 'Error', message: 'No se pudo exportar el listado del bus.' });
+        this.navbar.showAlert({ type: 'error', title: 'Error', message: 'No se pudo exportar el listado del bus.' });
       }
     });
   }
@@ -731,27 +749,25 @@ export class Listado implements OnInit {
   private mostrarAlertaReservasSinAsignar(tour: TourProgramacion, reservas: Reserva[]): void {
     if (!reservas?.length) return;
 
-    this.navbar.alert.set({
-      type: 'warning',
-      title: 'Reservas sin asignar',
-      message: `Se encontraron ${reservas.length} reservas nuevas sin asignar.`,
-      autoClose: false,
-      buttons: [
+    this.navbar.showConfirm(
+      'Reservas sin asignar',
+      `Se encontraron ${reservas.length} reservas nuevas sin asignar.`,
+      [
         {
           text: 'Regenerar listado',
           style: 'primary',
           onClick: () => {
-            this.navbar.alert.set(null);
+            this.navbar.clearOverlay();
             this.generarPlanDesdeCero(tour);
           }
         },
         {
           text: 'Mantener listado',
           style: 'secondary',
-          onClick: () => this.navbar.alert.set(null)
+          onClick: () => this.navbar.clearOverlay()
         }
       ]
-    });
+    );
   }
 
   crearNuevoBus(reserva: Reserva): void {

@@ -257,7 +257,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       },
       error: (error) => {
         console.error('Error al cargar historial:', error);
-        this.globalService.alert.set({
+        this.globalService.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudo cargar el historial'
@@ -328,7 +328,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
       },
       error: (error) => {
         console.error('Error al exportar:', error);
-        this.globalService.alert.set({
+        this.globalService.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudo exportar el historial'

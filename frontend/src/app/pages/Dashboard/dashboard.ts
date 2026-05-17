@@ -454,7 +454,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.cdr.detectChanges();
 
-    this.navbar.alert.set(null);
+    this.navbar.clearOverlay();
 
     forkJoin({
       stats: this.dashboardService.getStats(filters).pipe(
@@ -493,7 +493,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.isRefreshing = false;
           this.isLoading = false;
           const current = this.navbar.alert();
-          if (current?.loading) this.navbar.alert.set(null);
+          if (current?.loading) this.navbar.clearOverlay('loading');
           this.cdr.detectChanges();
         })
       )
@@ -517,7 +517,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           }
 
           if (hasPartialError) {
-            this.navbar.alert.set({
+            this.navbar.showAlert({
               title: 'Dashboard parcialmente cargado',
               message: 'Algunas métricas no pudieron cargarse.',
               type: 'warning',
@@ -538,7 +538,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.hasPassengerData = false;
           this.hasOccupancyData = false;
           this.applyChartData({ income: [], passengers: [], occupancy: [] });
-          this.navbar.alert.set({
+          this.navbar.showAlert({
             title: 'Dashboard parcialmente cargado',
             message: 'Algunas métricas no pudieron cargarse.',
             type: 'warning',

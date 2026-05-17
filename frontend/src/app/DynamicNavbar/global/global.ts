@@ -1,4 +1,4 @@
-import { Component, computed, inject, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit } from '@angular/core';
 
 import { RouterLink } from '@angular/router';
 
@@ -29,12 +29,13 @@ import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel
   templateUrl: './global.html',
   styleUrls: ['./global.css'],
 })
-export class DynamicNavbarComponent implements OnInit {
+export class DynamicNavbarComponent implements OnInit, OnDestroy {
   private global = inject(DynamicIslandGlobalService);
 
   panel = this.global.panel;
 
   mode = this.global.mode;
+  overlay = this.global.overlay;
   alert = this.global.alert;
   cuposInfo = this.global.cuposInfo;
   toasts = this.global.toasts;
@@ -46,28 +47,40 @@ export class DynamicNavbarComponent implements OnInit {
   previewTitle = this.global.previewTitle;
 
   isDarkMode = true;
+  private themeObserver?: MutationObserver;
 
-  islandState = computed(() => {
-    if (this.global.panel()) return 'panel';
+  baseState = computed(() => {
     if (this.mode() === 'login') return 'full-screen';
-    if (this.alert()?.loading) return 'loading';
-    if (this.alert()) return 'alert';
+    if (this.global.panel()) return 'panel';
     if (this.cuposInfo()) return 'cupos';
     if (this.reserva()) return 'reserva';
     if (this.transfer()) return 'transfer';
-  
     if (Array.isArray(this.mapa()) && this.mapa().length > 0) return 'mapa';
     return 'compact';
+  });
+
+  overlayState = computed(() => {
+    const overlay = this.overlay();
+    if (!overlay) return null;
+    return overlay.loading ? 'loading' : 'alert';
+  });
+
+  islandState = computed(() => {
+    return this.overlayState() ?? this.baseState();
   });
 
   ngOnInit(): void {
     const theme = document.documentElement.getAttribute('data-theme');
     this.isDarkMode = theme !== 'light';
-    const observer = new MutationObserver(() => {
+    this.themeObserver = new MutationObserver(() => {
       const updatedTheme = document.documentElement.getAttribute('data-theme');
       this.isDarkMode = updatedTheme !== 'light';
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  ngOnDestroy(): void {
+    this.themeObserver?.disconnect();
   }
 
   clearPreview() {
@@ -78,8 +91,8 @@ export class DynamicNavbarComponent implements OnInit {
     this.global.openAppUpdates();
   }
 
-  clearAlert() {
-    this.global.alert.set(null);
+  clearOverlay() {
+    this.global.clearOverlay();
   }
 
   dismissToast(id: string) {
