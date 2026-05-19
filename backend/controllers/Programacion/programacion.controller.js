@@ -129,7 +129,12 @@ exports.guardarListadoFinalController = async (req, res) => {
         return sendSuccess(res, { data: resultado, message: 'Listado final guardado correctamente' });
     } catch (error) {
         console.error('Error al guardar listado final:', error);
-        return sendError(res, { status: 500, message: 'Error interno al guardar el listado.', errorCode: 'INTERNAL_ERROR' });
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'Error interno al guardar el listado.',
+            errorCode: error.errorCode || 'INTERNAL_ERROR',
+            details: error.details || undefined
+        });
     }
 };
 

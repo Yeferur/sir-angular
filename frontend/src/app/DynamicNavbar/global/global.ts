@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, computed, inject, OnDestroy, OnInit } from '@angular/core';
 
 import { RouterLink } from '@angular/router';
 
@@ -11,6 +11,7 @@ import { ReservasDynamicComponent } from '../reserva/reserva';
 import { TransferDynamicComponent } from '../transfer/transfer';
 import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel';
+import { GlobalSearchComponent } from '../global-search/global-search';
 
 @Component({
   selector: 'app-dynamic-navbar',
@@ -24,7 +25,8 @@ import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel
     TransferDynamicComponent,
     Mapa,
     DuplicarPanelComponent,
-    AppUpdatesPanelComponent
+    AppUpdatesPanelComponent,
+    GlobalSearchComponent
 ],
   templateUrl: './global.html',
   styleUrls: ['./global.css'],
@@ -45,12 +47,14 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
   sugerencias = this.global.sugerencias
   preview = this.global.previewUrl;
   previewTitle = this.global.previewTitle;
+  globalSearchOpen = this.global.globalSearchOpen;
 
   isDarkMode = true;
   private themeObserver?: MutationObserver;
 
   baseState = computed(() => {
     if (this.mode() === 'login') return 'full-screen';
+    if (this.globalSearchOpen()) return 'global-search';
     if (this.global.panel()) return 'panel';
     if (this.cuposInfo()) return 'cupos';
     if (this.reserva()) return 'reserva';
@@ -89,6 +93,35 @@ export class DynamicNavbarComponent implements OnInit, OnDestroy {
 
   openAppUpdates() {
     this.global.openAppUpdates();
+  }
+
+  openGlobalSearch() {
+    this.global.openGlobalSearch();
+  }
+
+  closeGlobalSearch() {
+    this.global.closeGlobalSearch();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  handleGlobalShortcuts(event: KeyboardEvent) {
+    if (this.mode() === 'login') return;
+
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName?.toLowerCase() || '';
+    const editable = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.openGlobalSearch();
+      return;
+    }
+
+    if (event.key === 'Escape' && this.globalSearchOpen()) {
+      if (editable && !target?.closest('app-global-search')) return;
+      event.preventDefault();
+      this.closeGlobalSearch();
+    }
   }
 
   clearOverlay() {

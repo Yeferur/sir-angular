@@ -5,9 +5,9 @@
     </div>
 
     <div class="dynamic-island"
-         [attr.role]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'dialog' : null"
-         [attr.aria-modal]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel'].includes(islandState()) ? 'true' : null"
-         [attr.aria-label]="overlayState() === 'loading' ? 'Cargando' : overlayState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'panel' ? 'Panel' : null">
+         [attr.role]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel','global-search'].includes(islandState()) ? 'dialog' : null"
+         [attr.aria-modal]="['alert','loading','reserva','transfer','mapa','sugerencias','preview','panel','global-search'].includes(islandState()) ? 'true' : null"
+         [attr.aria-label]="overlayState() === 'loading' ? 'Cargando' : overlayState() === 'alert' ? 'Alerta' : islandState() === 'reserva' ? 'Detalle de Reserva' : islandState() === 'transfer' ? 'Detalle de Transfer' : islandState() === 'mapa' ? 'Mapa' : islandState() === 'panel' ? 'Panel' : islandState() === 'global-search' ? 'Buscador global' : null">
         <div class="island-content">
             @if (islandState() === 'compact') {
             <div class="activity-content">
@@ -61,6 +61,12 @@
             </div>
             }
 
+            @if (islandState() === 'global-search') {
+            <div class="activity-content">
+                <app-global-search></app-global-search>
+            </div>
+            }
+
             @if (panel() && panel().open) {
             <div class="activity-content">
                 @if (panel().id === 'duplicar') {
@@ -76,6 +82,7 @@
     </div>
 
     <div class="sidebar-widget right">
+        <button type="button" class="quick-button quick-search-button" (click)="openGlobalSearch()">Buscar</button>
     </div>
 
     <div class="toast-viewport" aria-live="polite" aria-atomic="true">

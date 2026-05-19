@@ -105,6 +105,14 @@
   top: 0;
 }
 
+.navbar-container[data-state="global-search"] .dynamic-island {
+  width: clamp(340px, 94vw, 980px);
+  height: min(82vh, 760px);
+  border-radius: 28px;
+  padding: 20px;
+  top: 0;
+}
+
 .navbar-container[data-state="cupos"] .dynamic-island {
   width: clamp(300px, 92vw, 360px);
   height: 128px;
@@ -277,6 +285,10 @@
   transform: scale(1.05);
   border-color: var(--separator-color);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.quick-search-button {
+  cursor: pointer;
 }
 
 .toast-viewport {

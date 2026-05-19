@@ -1,0 +1,82 @@
+<section class="global-search-shell">
+  <div class="global-search-header">
+    <div class="global-search-input-wrap">
+      <span class="global-search-icon" aria-hidden="true">⌕</span>
+      <input
+        #searchInput
+        class="global-search-input"
+        type="text"
+        [value]="query()"
+        (input)="onInput($event)"
+        placeholder="Buscar en SIR..."
+        autocomplete="off"
+        spellcheck="false">
+    </div>
+    <button type="button" class="global-search-close" (click)="close()" aria-label="Cerrar buscador">Esc</button>
+  </div>
+
+  <div class="global-search-body">
+    @if (loading()) {
+      <div class="global-search-empty">
+        <strong>Buscando...</strong>
+        <p>Consultando resultados permitidos para tu usuario.</p>
+      </div>
+    } @else if (!query().trim()) {
+      <div class="global-search-empty">
+        <strong>Busca reservas, transfers, tours, puntos o acciones rápidas.</strong>
+        <p>Atajo disponible: Ctrl+K o Cmd+K.</p>
+      </div>
+    } @else if (flatResults().length === 0) {
+      <div class="global-search-empty">
+        <strong>Sin resultados</strong>
+        <p>No encontramos coincidencias visibles para tu usuario.</p>
+      </div>
+    } @else {
+      <div class="global-search-groups">
+        @for (group of groupedResults(); track group.label; let groupIndex = $index) {
+          <section class="global-search-group">
+            <header class="global-search-group-title">{{ group.label }}</header>
+            <div class="global-search-list">
+              @for (item of group.items; track item.id; let itemIndex = $index) {
+                <div
+                  class="global-search-item"
+                  tabindex="0"
+                  [class.is-selected]="isSelected(getFlatIndex(groupIndex, itemIndex))"
+                  (mouseenter)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
+                  (focus)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
+                  (keydown.enter)="execute(item)"
+                  (keydown.space)="$event.preventDefault(); execute(item)"
+                  (click)="execute(item)">
+                  <div class="global-search-item-copy">
+                    <div class="global-search-item-head">
+                      <strong>{{ item.title }}</strong>
+                      @if (item.badge) {
+                        <span class="global-search-badge">{{ item.badge }}</span>
+                      }
+                    </div>
+                    @if (item.subtitle) {
+                      <p>{{ item.subtitle }}</p>
+                    }
+                  </div>
+
+                  @if (item.actions?.length) {
+                    <div class="global-search-actions">
+                      @for (action of item.actions; track action.label) {
+                        <button
+                          type="button"
+                          class="global-search-action"
+                          (click)="executeAction($event, action)">
+                          {{ action.label }}
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    }
+  </div>
+</section>

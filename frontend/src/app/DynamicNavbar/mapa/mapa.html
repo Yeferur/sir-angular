@@ -1,5 +1,120 @@
-<div class="mapa-header">
-  <button class="close-btn" (click)="cerrar()">✕</button>
-</div>
+<!-- Wrapper principal -->
+<div class="mapa-container">
 
-<div #mapaDiv id="map" style="width: 100%; height: 100%; min-height: 300px;"></div>
+  <!-- ── Top bar ─────────────────────────────────────────────── -->
+  <div class="mapa-topbar">
+    <div class="mapa-topbar-left">
+      <svg class="mapa-topbar-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5"/>
+      </svg>
+      <span class="mapa-topbar-title">Ruta del día</span>
+      <span class="mapa-topbar-badge">{{ agrupadosConBase.length }} paradas</span>
+    </div>
+    <button class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" width="14" height="14">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ── Cuerpo: mapa + panel ────────────────────────────────── -->
+  <div class="mapa-body">
+
+    <!-- Mapa Leaflet -->
+    <div #mapaDiv id="map" class="mapa-leaflet"></div>
+
+    <!-- Panel lateral -->
+    <div class="mapa-panel">
+
+      <!-- Stats -->
+      <div class="panel-stats">
+        <div class="stat-card">
+          <div class="stat-label">Distancia</div>
+          <div class="stat-value">
+            {{ distanciaKm }}<span class="stat-unit">km</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tiempo est.</div>
+          <div class="stat-value">
+            {{ tiempoMin }}<span class="stat-unit">min</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Paradas</div>
+          <div class="stat-value">{{ agrupadosConBase.length }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pasajeros</div>
+          <div class="stat-value">{{ totalPax }}<span class="stat-unit">pax</span></div>
+        </div>
+      </div>
+
+      <!-- Lista de paradas -->
+      <div class="panel-paradas-header">Paradas</div>
+      <div class="panel-paradas">
+        <div
+          *ngFor="let punto of agrupadosConBase; let i = index; let last = last"
+          class="parada-item"
+          [class.parada-activa]="paradaActivaIndex === i"
+          (click)="seleccionarParada(i)">
+
+          <!-- Indicador visual (dot + línea conectora) -->
+          <div class="parada-indicator">
+            <div class="parada-dot"
+              [class.dot-start]="i === 0"
+              [class.dot-end]="i === agrupadosConBase.length - 1"
+              [class.dot-mid]="i !== 0 && i !== agrupadosConBase.length - 1"
+              [class.dot-active]="paradaActivaIndex === i">
+              <span *ngIf="i === 0">S</span>
+              <span *ngIf="i === agrupadosConBase.length - 1 && i !== 0">F</span>
+              <span *ngIf="i !== 0 && i !== agrupadosConBase.length - 1">{{ i }}</span>
+            </div>
+            <div class="parada-connector" *ngIf="!last"></div>
+          </div>
+
+          <!-- Info de la parada -->
+          <div class="parada-info">
+            <div class="parada-nombre">{{ punto.NombrePunto }}</div>
+            <div class="parada-sub" *ngIf="punto.reservas.length > 0">
+              {{ punto.reservas.length }} reserva{{ punto.reservas.length !== 1 ? 's' : '' }}
+              · {{ totalPaxPunto(punto) }} pax
+            </div>
+            <div class="parada-sub muted" *ngIf="punto.reservas.length === 0">
+              Sin reservas
+            </div>
+          </div>
+
+          <!-- Badge cantidad de reservas -->
+          <span class="parada-badge" *ngIf="punto.reservas.length > 0">
+            {{ punto.reservas.length }}
+          </span>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Footer ──────────────────────────────────────────────── -->
+  <div class="mapa-footer">
+    <span class="footer-attribution">
+      © CARTO · OpenStreetMap · OpenRouteService
+    </span>
+    <div class="footer-legend">
+      <span class="legend-item">
+        <span class="legend-dot dot-green"></span>Inicio
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot dot-blue"></span>Parada
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot dot-red"></span>Final
+      </span>
+    </div>
+  </div>
+
+</div>
