@@ -7,6 +7,7 @@ const path = require('path');
 const http = require('http');
 
 const app = express();
+const aiEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.IA_ENABLED ?? process.env.AI_ENABLED ?? '').trim().toLowerCase());
 
 function parseOrigins(value) {
   return String(value || '')
@@ -108,6 +109,19 @@ function startServer(port) {
   server.listen(port, () => {
     console.log(`✅ Backend HTTP corriendo en http://localhost:${activePort}`);
     console.log(`✅ WS corriendo en ws://localhost:${activePort}/ws`);
+  });
+}
+
+// Después de las otras rutas, antes de startServer()
+if (aiEnabled) {
+  const iaRoutes = require('./routes/IA/ia.routes');
+  app.use('/api/ia', iaRoutes);
+} else {
+  app.use('/api/ia', (_req, res) => {
+    return res.status(503).json({
+      success: false,
+      message: 'La función de IA no está disponible temporalmente.',
+    });
   });
 }
 

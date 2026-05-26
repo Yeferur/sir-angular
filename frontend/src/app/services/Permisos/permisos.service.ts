@@ -147,6 +147,14 @@ export class PermisosService {
     return codigosPermisos.every(codigo => permisos.includes(codigo));
   }
 
+  getPermisosSnapshot(): string[] {
+    return [...this.permisosSubject.value];
+  }
+
+  isReady(): boolean {
+    return this.readySubject.value;
+  }
+
   // =====================================================
   // LOCALSTORAGE
   // =====================================================

@@ -410,11 +410,36 @@
             Este documento está repetido dentro de esta reserva.
           </div>
           }
-          @if (pasajero.get('DNI')?.touched && pasajero.get('DNI')?.errors?.['duplicadoEnBd']) {
+        @if (pasajero.get('DNI')?.touched && pasajero.get('DNI')?.errors?.['duplicadoEnBd']) {
           <div class="errorMessage">
             Este pasajero ya tiene una reserva para la fecha seleccionada.
           </div>
           }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">País de origen</label>
+          <div class="autocomplete-shell">
+            <input
+              type="text"
+              class="form-input"
+              formControlName="Nacionalidad"
+              maxlength="80"
+              autocomplete="off"
+              placeholder="Ej: COLOMBIA, MÉXICO, ESTADOS UNIDOS"
+              (focus)="onPaisOrigenFocus(i)"
+              (blur)="onPaisOrigenBlur()" />
+
+            @if (showPaisOrigenSuggestions(i)) {
+            <div class="autocomplete-menu">
+              @for (pais of getPaisOrigenSuggestions(i); track pais) {
+              <button type="button" class="autocomplete-option" (mousedown)="selectPaisOrigen(i, pais)">
+                {{ pais }}
+              </button>
+              }
+            </div>
+            }
+          </div>
         </div>
 
         @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {

@@ -21,6 +21,11 @@ function sanitizeQuery(query) {
   return String(query || '').trim().replace(/\s+/g, ' ');
 }
 
+function isSensitiveQuery(query) {
+  const normalized = normalizeText(query);
+  return /\b(password|contrasena|contrasenas|token|tokens|jwt|secret|secreto|hash|credencial|credenciales|clave|claves)\b/.test(normalized);
+}
+
 function isExactIdCandidate(query) {
   const value = sanitizeQuery(query);
   if (!value || value.includes(' ')) return false;
@@ -604,6 +609,13 @@ async function searchGlobal(query, permisos = []) {
     };
   }
 
+  if (isSensitiveQuery(safeQuery)) {
+    return {
+      query: safeQuery,
+      results: [],
+    };
+  }
+
   const [reservas, transfers, tours, puntos, usuarios] = await Promise.all([
     searchReservas(safeQuery, permisos),
     searchTransfers(safeQuery, permisos),
@@ -631,4 +643,5 @@ module.exports = {
   searchGlobal,
   sanitizeQuery,
   canSearchQuery,
+  isSensitiveQuery,
 };

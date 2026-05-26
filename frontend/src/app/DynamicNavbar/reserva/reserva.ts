@@ -33,6 +33,7 @@ interface Pasajero {
   NombrePasajero: string;
   TipoPasajero: TipoPasajero;
   IdPas?: string;
+  Nacionalidad?: string | null;
   TelefonoPasajero?: string;
   Precio_Pasajero?: number | string;
   Comision?: number | string;
@@ -453,6 +454,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       NombrePasajero: p.NombrePasajero ?? p.Nombre_Pasajero ?? '—',
       TipoPasajero: this.normalizarTipoPasajero(p.TipoPasajero ?? p.Tipo_Pasajero),
       IdPas: p.IdPas ?? p.DNI ?? '',
+      Nacionalidad: p.Nacionalidad ?? p.nacionalidad ?? null,
       TelefonoPasajero: p.TelefonoPasajero ?? p.Telefono_Pasajero ?? '',
       Precio_Pasajero: p.Precio_Pasajero ?? 0,
       Comision: p.Comision ?? 0,
@@ -671,6 +673,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           'Nombre',
           'Tipo',
           'DNI / Pasaporte',
+          'País de origen',
           'Teléfono',
           'Punto',
           'Hora',
@@ -682,6 +685,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
             p.NombrePasajero || '—',
             p.TipoPasajero || '—',
             p.IdPas || '—',
+            p.Nacionalidad || '—',
             p.TelefonoPasajero || '—',
             punto?.NombrePunto || p.Nombre_Punto || r?.PuntoEncuentro || '—',
             punto?.HoraSalida || p.HoraSalida || r?.HoraSalida || '—',

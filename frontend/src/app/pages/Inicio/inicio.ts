@@ -24,11 +24,14 @@ export class Inicio implements OnInit {
 
   editando: { [key: number]: boolean } = {};
   nuevoCupo: { [key: number]: string } = {};
+  vistaTabla = false;
   mostrarDetallesCombinada = false;
   isLoading = true;
   isUpdatingDate = false;
+  private savingAforo = false;
 
   canEditarAforo = signal(false);
+  selectedTourCard = signal<number | null>(null);
 
   fecha: string = (() => {
     const tomorrow = new Date();
@@ -268,6 +271,18 @@ export class Inicio implements OnInit {
           this.combinedDetails = [];
         }
 
+        const selectedId = this.selectedTourCard();
+        if (selectedId !== null) {
+          const availableIds = new Set<number>([
+            ...this.tours.map(tour => tour.Id_Tour),
+            ...(this.combinedTour ? [this.combinedTour.Id_Tour] : []),
+          ]);
+
+          if (!availableIds.has(selectedId)) {
+            this.selectedTourCard.set(null);
+          }
+        }
+
         this.cdr.markForCheck();
       },
       error: () => {
@@ -329,6 +344,35 @@ export class Inicio implements OnInit {
     return 'red';
   }
 
+  selectTourCard(tourId: number): void {
+    this.selectedTourCard.set(tourId);
+  }
+
+  isTourCardSelected(tourId: number): boolean {
+    return this.selectedTourCard() === tourId;
+  }
+
+  getAvailableSeats(tour: Tour | null): number {
+    if (!tour) return 0;
+    return Math.max((Number(tour.cupos) || 0) - (Number(tour.NumeroPasajeros) || 0), 0);
+  }
+
+  getOccupancyPercentage(tour: Tour | null): number {
+    if (!tour || !tour.cupos || tour.cupos <= 0) return 0;
+    return Math.min(((Number(tour.NumeroPasajeros) || 0) / Number(tour.cupos)) * 100, 999);
+  }
+
+  getAvailabilityTone(tour: Tour | null): 'green' | 'yellow' | 'red' {
+    if (!tour) return 'red';
+
+    const available = this.getAvailableSeats(tour);
+    const percentage = this.getOccupancyPercentage(tour);
+
+    if (available <= 0 || percentage >= 100) return 'red';
+    if (available <= 4 || percentage >= 85) return 'yellow';
+    return 'green';
+  }
+
   getCupoInputId(tourId: number): string {
     return `cupo-${tourId}`;
   }
@@ -360,11 +404,18 @@ export class Inicio implements OnInit {
 
   guardarAforo(tour: Tour) {
     if (!this.canEditarAforo()) {
-      this.global.showAlert({ type: 'error', title: 'Sin permiso', message: 'No tiene permisos para editar aforos.', autoClose: true });
+      this.global.showAlert({
+        type: 'error',
+        title: 'Sin permiso',
+        message: 'No tiene permisos para editar aforos.',
+        autoClose: true,
+      });
       return;
     }
 
-    const cupo = this.nuevoCupo[tour.Id_Tour];
+    const tourId = tour.Id_Tour;
+    const cupo = this.nuevoCupo[tourId];
+
     if (!cupo || isNaN(+cupo)) {
       this.global.showAlert({
         type: 'error',
@@ -388,49 +439,60 @@ export class Inicio implements OnInit {
           text: 'Guardar',
           style: 'primary',
           onClick: () => {
-            this.global.showLoading('Guardando aforo...', 'Por favor espera un momento.');
+            if (this.savingAforo) return;
 
-            this.inicioService.guardarCupo({
-              SelectTour: tour.Id_Tour,
-              NuevoCupo: Number(cupo),
-              Fecha: this.fecha
-            }).subscribe({
-              next: (res) => {
-                this.editando[tour.Id_Tour] = false;
+            this.savingAforo = true;
+            this.global.clearOverlay();
 
-                const successMessage =
-                  (typeof res === 'object' && res !== null && 'message' in res
-                    ? (res as { message?: string }).message
-                    : undefined) || 'Aforo actualizado exitosamente.';
+            queueMicrotask(() => {
+              this.global.showLoading('Guardando aforo...', 'Por favor espera un momento.');
 
-                this.global.showAlert({
-                  type: 'success',
-                  title: '¡Listo!',
-                  message: successMessage,
-                  autoClose: true,
-                  autoCloseTime: 3000,
-                });
+              this.inicioService.guardarCupo({
+                SelectTour: tourId,
+                NuevoCupo: Number(cupo),
+                Fecha: this.fecha,
+              }).pipe(
+                finalize(() => {
+                  this.savingAforo = false;
+                  this.cdr.markForCheck();
+                })
+              ).subscribe({
+                next: (res) => {
+                  this.editando[tourId] = false;
+                  this.global.clearOverlay('loading');
 
-                // El WS también actualiza estado, pero se recarga para asegurar consistencia.
-                queueMicrotask(() => this.loadData());
+                  const successMessage =
+                    (typeof res === 'object' && res !== null && 'message' in res
+                      ? (res as { message?: string }).message
+                      : undefined) || 'Aforo actualizado exitosamente.';
 
-                this.cdr.markForCheck();
-              },
-              error: (err) => {
-                const backendError =
-                  err?.error?.error ||
-                  err?.error?.message ||
-                  err?.message ||
-                  'No se pudo actualizar el aforo.';
+                  this.global.showAlert({
+                    type: 'success',
+                    title: '¡Listo!',
+                    message: successMessage,
+                    autoClose: true,
+                    autoCloseTime: 2500,
+                  });
 
-                this.global.showAlert({
-                  type: 'error',
-                  title: 'Error',
-                  message: backendError,
-                  autoClose: true,
-                });
-                this.cdr.markForCheck();
-              }
+                  queueMicrotask(() => this.loadData());
+                },
+                error: (err) => {
+                  this.global.clearOverlay('loading');
+
+                  const backendError =
+                    err?.error?.error ||
+                    err?.error?.message ||
+                    err?.message ||
+                    'No se pudo actualizar el aforo.';
+
+                  this.global.showAlert({
+                    type: 'error',
+                    title: 'Error',
+                    message: backendError,
+                    autoClose: true,
+                  });
+                },
+              });
             });
           },
         },

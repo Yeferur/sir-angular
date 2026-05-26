@@ -5,17 +5,53 @@
       <p class="subtitle">Control de cupos por tour para la fecha seleccionada</p>
     </div>
 
-    <div class="form-group">
-      <label class="form-label" for="fecha">Fecha</label>
-      <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha" [value]="fecha"
-        (change)="onFechaChange($event)" />
+    <div class="header-controls">
+      <div class="form-group">
+        <label class="form-label" for="fecha">Fecha</label>
+        <input id="fecha" class="form-input" type="text" appFlatpickrInput [fpOptions]="fpOptionsFecha" [value]="fecha"
+          (change)="onFechaChange($event)" />
+      </div>
+
+      <div class="view-toggle" role="group" aria-label="Modo de vista">
+        <button type="button" class="toggle-btn" [class.active]="vistaTabla"
+          (click)="vistaTabla = true" aria-label="Vista tabla" title="Vista tabla">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+          </svg>
+        </button>
+        <button type="button" class="toggle-btn" [class.active]="!vistaTabla"
+          (click)="vistaTabla = false" aria-label="Vista cards" title="Vista cards">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </header>
 
+  <!-- ==================== SKELETON ==================== -->
   @if (isLoading) {
   <section class="loading-state" aria-live="polite" aria-busy="true">
     <p class="sr-only">Cargando información de aforos</p>
 
+    @if (vistaTabla) {
+    <div class="table-wrap sk-table-wrap">
+      <div class="sk-table-head"></div>
+      @for (slot of skeletonCards; track slot) {
+      <div class="sk-table-row">
+        <div class="skeleton-shape sk-td-name"></div>
+        <div class="skeleton-shape sk-td-num"></div>
+        <div class="skeleton-shape sk-td-num"></div>
+        <div class="skeleton-shape sk-td-num"></div>
+        <div class="skeleton-shape sk-td-bar"></div>
+        <div class="skeleton-shape sk-td-pill"></div>
+      </div>
+      }
+    </div>
+    } @else {
     <div class="dashboard-grid is-loading" aria-hidden="true">
       @for (slot of skeletonCards; track slot) {
       <article class="aforo-card" [style.--animation-order]="slot">
@@ -45,7 +81,6 @@
         </footer>
       </article>
       }
-
       <article class="transfer-card transfer-card-skeleton" [style.--animation-order]="skeletonCards.length">
         <header class="aforo-header">
           <div class="tour-title-group">
@@ -64,29 +99,264 @@
         </div>
       </article>
     </div>
+    }
   </section>
+
   } @else {
 
+  <!-- ==================== PRIVADOS ==================== -->
   @if (toursConPrivados.length > 0) {
-  <section class="private-section">
-    <h2 class="section-title">Reservas Privadas del Día</h2>
-    <div class="private-card">
-      <div class="private-grid">
-        @for (tour of toursConPrivados; track tour.Id_Tour) {
-        <div class="private-tour-group">
-          <h3>{{ tour.Nombre_Tour }}</h3>
-          <ul>
-            @for (p of tour.privados; track p.Id_Reserva) {
-            <li>Reserva #{{ p.Id_Reserva }} – {{ p.NumeroPasajeros }} pasajeros</li>
-            }
-          </ul>
+  <section class="privados-section">
+    <div class="privados-header">
+      <span class="privados-label">Reservas privadas del día</span>
+      <span class="privados-count">{{ toursConPrivados.length }}</span>
+    </div>
+    <div class="privados-wrap">
+      @for (tour of toursConPrivados; track tour.Id_Tour) {
+      <div class="privado-tour-block">
+        <div class="privado-tour-head">
+          <span class="privado-tour-name">{{ tour.Nombre_Tour }}</span>
+          <span class="privado-tour-qty">
+            {{ tour.privados.length }} {{ tour.privados.length === 1 ? 'reserva' : 'reservas' }}
+            · {{ tour.totalPrivados }} pax
+          </span>
+        </div>
+        @for (p of tour.privados; track p.Id_Reserva) {
+        <div class="privado-row">
+          <span class="privado-id">Reserva #{{ p.Id_Reserva }}</span>
+          <span class="privado-pax">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            {{ p.NumeroPasajeros }} pasajeros
+          </span>
         </div>
         }
       </div>
+      }
     </div>
   </section>
   }
 
+  <!-- ==================== VISTA TABLA ==================== -->
+  @if (vistaTabla) {
+  <div [style.opacity]="isUpdatingDate ? '0.5' : '1'"
+       [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'">
+
+    <div class="table-wrap">
+      <table class="aforos-table">
+        <thead>
+          <tr>
+            <th>Tour</th>
+            <th class="col-right">Disponibles</th>
+            <th class="col-right">Ocupados</th>
+            <th class="col-right">Capacidad</th>
+            <th class="col-bar">Ocupación</th>
+            <th>Estado</th>
+            @if (canEditarAforo()) {
+            <th class="col-action"></th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- Tour combinado -->
+          @if (combinedTour) {
+          <tr [class.is-editing]="editando[5]">
+            <td>
+              <div class="td-tour-name">{{ combinedTour!.Nombre_Tour }}</div>
+              <div class="td-tour-tag">
+                <button type="button" class="details-toggle-table" [class.open]="mostrarDetallesCombinada"
+                  (click)="alternarDetallesCombinada()">
+                  {{ mostrarDetallesCombinada ? 'Ocultar detalles' : 'Ver detalles' }}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </div>
+              @if (mostrarDetallesCombinada) {
+              <div class="td-details-expanded">
+                @for (detail of combinedDetails; track detail.Id_Tour ?? detail.Nombre_Tour) {
+                <div class="td-detail-row">
+                  <span>{{ detail.Nombre_Tour }}</span>
+                  <span>{{ detail.NumeroPasajeros }} pax</span>
+                </div>
+                }
+              </div>
+              }
+            </td>
+            <td class="col-right">
+              @if (!editando[5]) {
+              <span class="td-available" [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)">
+                {{ combinedTour!.cupos - combinedTour!.NumeroPasajeros }}
+              </span>
+              }
+            </td>
+            <td class="col-right">
+              @if (!editando[5]) {
+              <span class="td-num">{{ combinedTour!.NumeroPasajeros }}</span>
+              }
+            </td>
+            <td class="col-right">
+              @if (!editando[5]) {
+              <span class="td-num">{{ combinedTour!.cupos }}</span>
+              } @else {
+              <div class="td-edit-form">
+                <label class="form-label" [for]="getCupoInputId(5)">Nuevo cupo</label>
+                <input [id]="getCupoInputId(5)" type="number" inputmode="numeric" class="form-input"
+                  [value]="nuevoCupo[5]"
+                  [attr.aria-label]="'Nuevo cupo para ' + combinedTour!.Nombre_Tour"
+                  (input)="nuevoCupo[5] = $any($event.target).value">
+                <div class="td-edit-actions">
+                  <button class="btn-secondary" (click)="editando[5] = false">Cancelar</button>
+                  <button class="btn-primary" (click)="guardarAforo(combinedTour!)">Guardar</button>
+                </div>
+              </div>
+              }
+            </td>
+            <td class="col-bar">
+              @if (!editando[5]) {
+              <div class="td-bar-track">
+                <div class="td-bar-fill" [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)"
+                  [style.width.%]="combinedTour!.cupos > 0 ? (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 : 0">
+                </div>
+              </div>
+              }
+            </td>
+            <td>
+              @if (!editando[5]) {
+              <span class="status-pill" [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)">
+                <span class="pill-dot"></span>
+                {{ (combinedTour!.cupos > 0 ? (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 : 0) | number:'1.0-0' }}% lleno
+              </span>
+              }
+            </td>
+            @if (canEditarAforo()) {
+            <td class="col-action">
+              @if (!editando[5] && !mostrarDetallesCombinada) {
+              <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false"
+                type="button" class="btn-edit-icon" aria-label="Editar cupo"
+                (click)="activarEdicion(5)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              }
+            </td>
+            }
+          </tr>
+          }
+
+          <!-- Tours normales -->
+          @for (tour of tours; track tour.Id_Tour; let i = $index) {
+          @if (tour.Id_Tour !== 1 && tour.Id_Tour !== 5) {
+          <tr [class.is-editing]="editando[tour.Id_Tour]">
+            <td>
+              <div class="td-tour-name">{{ tour.Nombre_Tour }}</div>
+            </td>
+            <td class="col-right">
+              @if (!editando[tour.Id_Tour]) {
+              <span class="td-available" [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)">
+                {{ tour.cupos - tour.NumeroPasajeros }}
+              </span>
+              }
+            </td>
+            <td class="col-right">
+              @if (!editando[tour.Id_Tour]) {
+              <span class="td-num">{{ tour.NumeroPasajeros }}</span>
+              }
+            </td>
+            <td class="col-right">
+              @if (!editando[tour.Id_Tour]) {
+              <span class="td-num">{{ tour.cupos }}</span>
+              } @else {
+              <div class="td-edit-form">
+                <label class="form-label" [for]="getCupoInputId(tour.Id_Tour)">Nuevo cupo</label>
+                <input [id]="getCupoInputId(tour.Id_Tour)" type="number" inputmode="numeric" class="form-input"
+                  [value]="nuevoCupo[tour.Id_Tour]"
+                  [attr.aria-label]="'Nuevo cupo para ' + tour.Nombre_Tour"
+                  (input)="nuevoCupo[tour.Id_Tour] = $any($event.target).value">
+                <div class="td-edit-actions">
+                  <button class="btn-secondary" (click)="editando[tour.Id_Tour] = false">Cancelar</button>
+                  <button class="btn-primary" (click)="guardarAforo(tour)">Guardar</button>
+                </div>
+              </div>
+              }
+            </td>
+            <td class="col-bar">
+              @if (!editando[tour.Id_Tour]) {
+              <div class="td-bar-track">
+                <div class="td-bar-fill" [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)"
+                  [style.width.%]="tour.cupos > 0 ? (tour.NumeroPasajeros / tour.cupos) * 100 : 0">
+                </div>
+              </div>
+              }
+            </td>
+            <td>
+              @if (!editando[tour.Id_Tour]) {
+              <span class="status-pill" [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)">
+                <span class="pill-dot"></span>
+                {{ (tour.cupos > 0 ? (tour.NumeroPasajeros / tour.cupos) * 100 : 0) | number:'1.0-0' }}% lleno
+              </span>
+              }
+            </td>
+            @if (canEditarAforo()) {
+            <td class="col-action">
+              @if (!editando[tour.Id_Tour]) {
+              <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false"
+                type="button" class="btn-edit-icon" aria-label="Editar cupo"
+                (click)="activarEdicion(tour.Id_Tour)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              }
+            </td>
+            }
+          </tr>
+          }
+          }
+
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Transfers en vista tabla -->
+    <div class="transfers-table-card">
+      <div class="transfers-table-head">
+        <div>
+          <span class="transfers-table-title">Transfers</span>
+          <span class="transfers-table-sub">Servicios del día</span>
+        </div>
+        <span class="transfer-total">{{ transfersSummary.total }}</span>
+      </div>
+      <div class="transfers-table-body">
+        <div class="transfers-table-row">
+          <span class="transfer-label">Hotel / Aeropuerto</span>
+          <strong class="transfer-value">{{ transfersSummary.hotelAeropuerto }}</strong>
+        </div>
+        <div class="transfers-table-row">
+          <span class="transfer-label">Aeropuerto / Hotel</span>
+          <strong class="transfer-value">{{ transfersSummary.aeropuertoHotel }}</strong>
+        </div>
+        <div class="transfers-table-row">
+          <span class="transfer-label">Otro</span>
+          <strong class="transfer-value">{{ transfersSummary.otros }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VISTA CARDS ==================== -->
+  } @else {
   <div class="dashboard-grid"
     [style.opacity]="isUpdatingDate ? '0.5' : '1'"
     [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'">
@@ -99,7 +369,8 @@
 
       <div class="aforo-progress-bar">
         <div class="aforo-progress-fill" [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)"
-          [style.width.%]="combinedTour!.cupos > 0 ? (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 : 0"></div>
+          [style.width.%]="combinedTour!.cupos > 0 ? (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 : 0">
+        </div>
       </div>
 
       <header class="aforo-header">
@@ -114,7 +385,6 @@
             </svg>
           </button>
         </div>
-
         @if (canEditarAforo() && !editando[5] && !mostrarDetallesCombinada) {
         <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false" type="button" class="btn-edit-icon"
           aria-label="Editar cupo" (click)="activarEdicion(5)">
@@ -144,7 +414,6 @@
             </div>
           </div>
         }
-
         @if (mostrarDetallesCombinada && !editando[5]) {
         <div class="details-view">
           @for (detail of combinedDetails; track detail.Id_Tour ?? detail.Nombre_Tour) {
@@ -155,11 +424,11 @@
           }
         </div>
         }
-
         @if (editando[5]) {
         <div class="edit-form">
           <label class="form-label" [for]="getCupoInputId(5)">Nuevo cupo</label>
-          <input [id]="getCupoInputId(5)" type="number" inputmode="numeric" class="form-input" [value]="nuevoCupo[5]"
+          <input [id]="getCupoInputId(5)" type="number" inputmode="numeric" class="form-input"
+            [value]="nuevoCupo[5]"
             [attr.aria-label]="'Nuevo cupo para ' + combinedTour!.Nombre_Tour"
             (input)="nuevoCupo[5] = $any($event.target).value">
         </div>
@@ -174,6 +443,7 @@
       } @else if (!mostrarDetallesCombinada) {
       <footer class="aforo-footer">
         <span class="status-pill" [ngClass]="getCardColor(combinedTour!.NumeroPasajeros, combinedTour!.cupos)">
+          <span class="pill-dot"></span>
           {{ (combinedTour!.cupos > 0 ? (combinedTour!.NumeroPasajeros / combinedTour!.cupos) * 100 : 0) | number:'1.0-0' }}% lleno
         </span>
       </footer>
@@ -190,14 +460,14 @@
 
       <div class="aforo-progress-bar">
         <div class="aforo-progress-fill" [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)"
-          [style.width.%]="tour.cupos > 0 ? (tour.NumeroPasajeros / tour.cupos) * 100 : 0"></div>
+          [style.width.%]="tour.cupos > 0 ? (tour.NumeroPasajeros / tour.cupos) * 100 : 0">
+        </div>
       </div>
 
       <header class="aforo-header">
         <div class="tour-title-group">
           <h2 class="tour-name" [title]="tour.Nombre_Tour">{{ tour.Nombre_Tour }}</h2>
         </div>
-
         @if (canEditarAforo() && !editando[tour.Id_Tour]) {
         <button *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false" type="button" class="btn-edit-icon"
           aria-label="Editar cupo" (click)="activarEdicion(tour.Id_Tour)">
@@ -230,7 +500,8 @@
           <div class="edit-form">
             <label class="form-label" [for]="getCupoInputId(tour.Id_Tour)">Nuevo cupo</label>
             <input [id]="getCupoInputId(tour.Id_Tour)" type="number" inputmode="numeric" class="form-input"
-              [value]="nuevoCupo[tour.Id_Tour]" [attr.aria-label]="'Nuevo cupo para ' + tour.Nombre_Tour"
+              [value]="nuevoCupo[tour.Id_Tour]"
+              [attr.aria-label]="'Nuevo cupo para ' + tour.Nombre_Tour"
               (input)="nuevoCupo[tour.Id_Tour] = $any($event.target).value">
           </div>
         }
@@ -244,6 +515,7 @@
       } @else {
       <footer class="aforo-footer">
         <span class="status-pill" [ngClass]="getCardColor(tour.NumeroPasajeros, tour.cupos)">
+          <span class="pill-dot"></span>
           {{ (tour.cupos > 0 ? (tour.NumeroPasajeros / tour.cupos) * 100 : 0) | number:'1.0-0' }}% lleno
         </span>
       </footer>
@@ -258,16 +530,15 @@
           <h2 class="tour-name">Transfers</h2>
           <span class="card-subtitle">Servicios del día</span>
         </div>
-        <span class="transfer-total" aria-label="Total transfers">{{ transfersSummary.total }}</span>
+        <span class="transfer-total">{{ transfersSummary.total }}</span>
       </header>
-
       <div class="transfer-body">
         <div class="transfer-row">
-          <span class="transfer-label">Hotel/Aeropuerto</span>
+          <span class="transfer-label">Hotel / Aeropuerto</span>
           <strong class="transfer-value">{{ transfersSummary.hotelAeropuerto }}</strong>
         </div>
         <div class="transfer-row">
-          <span class="transfer-label">Aeropuerto/Hotel</span>
+          <span class="transfer-label">Aeropuerto / Hotel</span>
           <strong class="transfer-value">{{ transfersSummary.aeropuertoHotel }}</strong>
         </div>
         <div class="transfer-row">
@@ -277,5 +548,7 @@
       </div>
     </article>
   </div>
+  }
+
   }
 </div>

@@ -157,6 +157,11 @@ function normalizarDni(dni) {
   return String(dni ?? '').trim().replace(/\s+/g, '').toUpperCase();
 }
 
+function normalizarNacionalidad(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized ? normalized.slice(0, 80) : null;
+}
+
 async function validarDnisUnicosPorFecha(connection, pasajeros, fechaTour, idReservaExcluir = null) {
   const lista = Array.isArray(pasajeros) ? pasajeros : [];
   const dnis = [...new Set(
@@ -860,6 +865,7 @@ async function obtenerReserva(Id_Reserva) {
       Id_Reserva,
       Nombre_Pasajero,
       DNI,
+      Nacionalidad,
       Telefono_Pasajero,
       Tipo_Pasajero,
       Precio_Pasajero,
@@ -911,6 +917,7 @@ async function obtenerReserva(Id_Reserva) {
       p.Tipo_Pasajero === 'NINO'   ? 'Niño'   :
       'Infante',
     IdPas: p.DNI || '',
+    Nacionalidad: p.Nacionalidad || null,
     TelefonoPasajero: p.Telefono_Pasajero || '',
     Precio_Pasajero: Number(p.Precio_Pasajero) || 0,
     Id_Punto: p.Id_Punto || null,
@@ -1167,13 +1174,14 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
         const idPuntoPasajero = Number(p.Id_Punto || r.Id_Punto || 0) || null;
         await conn.query(
           `INSERT INTO pasajeros
-           (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
+           (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
             Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             idReserva,
             p.Nombre_Pasajero || '',
             p.DNI || null,
+            normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
             p.Tipo_Pasajero,
             p.Precio_Tour || 0,
@@ -1350,6 +1358,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
       Id_Pasajero,
       Nombre_Pasajero,
       DNI,
+      Nacionalidad,
       Telefono_Pasajero,
       Tipo_Pasajero,
       Precio_Tour,
@@ -1402,6 +1411,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
     Tipo_Pasajero: r.Tipo_Pasajero,
     Nombre_Pasajero: r.Nombre_Pasajero || '',
     DNI: r.DNI || null,
+    Nacionalidad: r.Nacionalidad || null,
     Telefono_Pasajero: r.Telefono_Pasajero || null,
     Id_Punto: r.Id_Punto || cab.Id_Punto || null,
     Precio_Tour: Number(r.Precio_Tour || 0),
@@ -1524,13 +1534,14 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
         const idPuntoPasajero = Number(p.Id_Punto || r.Id_Punto || 0) || null;
         await conn.query(
           `INSERT INTO pasajeros
-           (Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Tipo_Pasajero,
+           (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
             Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             Id_Reserva,
             p.Nombre_Pasajero || '',
             p.DNI || null,
+            normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
             p.Tipo_Pasajero,
             p.Precio_Tour || 0,

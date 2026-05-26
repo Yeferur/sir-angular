@@ -16,6 +16,7 @@ import {
 import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
+import { buscarPaisesOrigen, normalizarBusquedaPais } from '../../../shared/data/paises-origen';
 
 @Component({
   selector: 'app-crear-reserva',
@@ -27,6 +28,7 @@ import { UppercaseInputDirective } from '../../../shared/directives/uppercase-in
 export class CrearReservaComponent implements OnInit, OnDestroy {
   openSummary = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+  activePaisOrigenIndex: number | null = null;
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
@@ -130,6 +132,38 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private toUpperText(value: unknown): string {
     return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+  }
+
+  private normalizarNacionalidad(value: unknown): string | null {
+    const normalized = String(value ?? '').trim();
+    return normalized ? normalized.slice(0, 80) : null;
+  }
+
+  getPaisOrigenSuggestions(index: number): string[] {
+    const raw = this.pasajeros.at(index)?.get('Nacionalidad')?.value ?? '';
+    const current = normalizarBusquedaPais(raw);
+    return buscarPaisesOrigen(raw).filter((item) => normalizarBusquedaPais(item) !== current);
+  }
+
+  showPaisOrigenSuggestions(index: number): boolean {
+    return this.activePaisOrigenIndex === index && this.getPaisOrigenSuggestions(index).length > 0;
+  }
+
+  onPaisOrigenFocus(index: number): void {
+    this.activePaisOrigenIndex = index;
+  }
+
+  onPaisOrigenBlur(): void {
+    setTimeout(() => {
+      this.activePaisOrigenIndex = null;
+      this.cdr.markForCheck();
+    }, 120);
+  }
+
+  selectPaisOrigen(index: number, value: string): void {
+    this.pasajeros.at(index)?.get('Nacionalidad')?.setValue(value);
+    this.activePaisOrigenIndex = null;
+    this.cdr.markForCheck();
   }
 
   private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
@@ -1347,6 +1381,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Tipo_Pasajero: [tipo, Validators.required],
       Nombre_Pasajero: [''],
       DNI: [''],
+      Nacionalidad: ['', [Validators.maxLength(80)]],
       Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
@@ -1797,6 +1832,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       const pax = this.pasajeros.controls.map(c => ({
         Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
+        Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: (() => {

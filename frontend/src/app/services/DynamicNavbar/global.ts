@@ -76,13 +76,9 @@ export interface GlobalSearchResult {
   actions?: GlobalSearchAction[];
 }
 
-interface GlobalSearchEnvelope {
-  success: boolean;
-  data?: {
-    query: string;
-    results: GlobalSearchResult[];
-  };
-  message?: string;
+interface GlobalSearchResponse {
+  query: string;
+  results: GlobalSearchResult[];
 }
 
 @Injectable({
@@ -171,6 +167,16 @@ export class DynamicIslandGlobalService {
     return safe.length >= 2;
   }
 
+  private shouldHonorFrontendPermissionFilter(): boolean {
+    return this.permisosService.isReady() || this.permisosService.getPermisosSnapshot().length > 0;
+  }
+
+  private canShowByFrontendPermission(permission?: string): boolean {
+    if (!permission) return true;
+    if (!this.shouldHonorFrontendPermissionFilter()) return true;
+    return this.permisosService.tienePermiso(permission);
+  }
+
   openGlobalSearch(): void {
     this.globalSearchOpen.set(true);
   }
@@ -213,15 +219,16 @@ export class DynamicIslandGlobalService {
 
     this.globalSearchDebounceTimer = setTimeout(() => {
       const params = new HttpParams().set('q', safeQuery);
-      this.http.get<GlobalSearchEnvelope>(`${this.apiUrl}/search/global`, { params }).subscribe({
+      this.http.get<GlobalSearchResponse>(`${this.apiUrl}/search/global`, { params }).subscribe({
         next: (response) => {
           if (requestId !== this.globalSearchRequestId) return;
-          const results = (response?.data?.results || []).filter((item) => {
-            return !item.permission || this.permisosService.tienePermiso(item.permission);
+          const rawResults = Array.isArray(response?.results) ? response.results : [];
+          const results = rawResults.filter((item) => {
+            return this.canShowByFrontendPermission(item.permission);
           }).map((item) => ({
             ...item,
             actions: (item.actions || []).filter((action) => {
-              return !action.permission || this.permisosService.tienePermiso(action.permission);
+              return this.canShowByFrontendPermission(action.permission);
             }),
           }));
           this.globalSearchResults.set(results);

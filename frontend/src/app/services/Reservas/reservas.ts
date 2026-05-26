@@ -55,6 +55,7 @@ export interface Pasajero {
   Tipo_Pasajero: 'ADULTO' | 'NINO' | 'INFANTE';
   Nombre_Pasajero: string;
   DNI: string | null;
+  Nacionalidad?: string | null;
   Telefono_Pasajero?: string | null;
   Id_Punto: number | null;
   Precio_Tour: number;      // precio de referencia guardado

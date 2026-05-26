@@ -1,82 +1,131 @@
-<section class="global-search-shell">
-  <div class="global-search-header">
-    <div class="global-search-input-wrap">
-      <span class="global-search-icon" aria-hidden="true">⌕</span>
+<section class="gs-shell" [class.is-closing]="isClosing()" (click)="$event.stopPropagation()">
+
+  <!-- HEADER -->
+  <div class="gs-header">
+    <div class="gs-brand">
+      <div class="gs-brand-orb" aria-hidden="true">
+        <span class="gs-brand-star">✦</span>
+      </div>
+      <div class="gs-brand-info">
+        <span class="gs-brand-name">{{ aiEnabled ? 'Maxi' : 'Buscador global' }}</span>
+        <span class="gs-brand-badge">{{ aiEnabled ? 'Beta' : 'SIR' }}</span>
+      </div>
+    </div>
+    <button type="button" class="gs-close-btn" (click)="closeFromButton($event)" aria-label="Cerrar">
+      <span aria-hidden="true">✕</span>
+    </button>
+  </div>
+
+  <!-- CONVERSATION BODY -->
+  <div class="gs-body" #conversationContainer>
+
+    <!-- Estado inicial: sin historial ni query activo -->
+    @if (showWelcome()) {
+      <div class="gs-welcome" role="region" aria-label="Bienvenida">
+        <div class="gs-welcome-orb" aria-hidden="true">✦</div>
+        <h2 class="gs-welcome-title">{{ aiEnabled ? '¿En qué te ayudo hoy?' : 'Busca en SIR' }}</h2>
+        <p class="gs-welcome-sub">
+          {{ aiEnabled ? 'Consulta reservas, cupos, transfers y operación diaria en lenguaje natural.' : 'Busca reservas, transfers, tours, puntos y accesos rápidos del sistema.' }}
+        </p>
+        <div class="gs-chips" role="list" aria-label="Sugerencias">
+          @for (s of suggestions; track s) {
+            <button type="button" class="gs-chip" role="listitem" (click)="setSuggestion(s)">{{ s }}</button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Historial de mensajes -->
+    @for (msg of conversationHistory(); track msg.id) {
+      @if (msg.role === 'user') {
+        <div class="gs-msg gs-msg--user" [attr.aria-label]="'Tu mensaje: ' + msg.content">
+          <div class="gs-bubble gs-bubble--user">{{ msg.content }}</div>
+        </div>
+      } @else {
+        <div class="gs-msg gs-msg--ia" [attr.aria-label]="aiEnabled ? 'Respuesta de Maxi' : 'Respuesta del buscador'">
+          <div class="gs-ia-avatar" aria-hidden="true">✦</div>
+          <div class="gs-ia-content">
+            <div class="gs-bubble gs-bubble--ia">{{ msg.content }}</div>
+            @if (msg.acciones && msg.acciones!.length > 1) {
+              <div class="gs-actions-row">
+                @for (a of msg.acciones!; track a.accion) {
+                  <button type="button" class="gs-action-btn" (click)="ejecutarAccionDirecta(a.accion, a.datos)">
+                    {{ a.label }}
+                  </button>
+                }
+              </div>
+            } @else if (msg.accion) {
+              <div class="gs-actions-row">
+                <button type="button" class="gs-action-btn" (click)="ejecutarAccion(msg.accion!)">
+                  @switch (msg.accion!.accion) {
+                    @case ('crear_reserva') { + Crear reserva }
+                    @case ('buscar_reservas') { {{ msg.accion!.label || 'Ver reservas' }} }
+                    @case ('ver_aforos') { Ver cupos }
+                    @case ('ver_transfers') { Ver transfers }
+                    @case ('ver_tours') { Ver tours }
+                    @case ('ver_puntos') { Ver puntos }
+                    @case ('ver_listados') { Ver listados }
+                    @default { {{ msg.accion!.label || 'Ver' }} }
+                  }
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <!-- Burbuja de "pensando..." -->
+    @if (iaLoading()) {
+      <div class="gs-msg gs-msg--ia gs-msg--thinking" role="status" aria-live="polite" aria-label="Maxi está analizando">
+        <div class="gs-ia-avatar" aria-hidden="true">✦</div>
+        <div class="gs-bubble gs-bubble--ia gs-bubble--thinking">
+          <span class="gs-thinking-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+      </div>
+    }
+
+  </div>
+
+  <!-- FOOTER: INPUT -->
+  <div class="gs-footer">
+    <div class="gs-input-wrap" [class.focused]="inputFocused()">
+      <span class="gs-input-icon" aria-hidden="true">⌕</span>
       <input
         #searchInput
-        class="global-search-input"
+        class="gs-input"
         type="text"
         [value]="query()"
         (input)="onInput($event)"
-        placeholder="Buscar en SIR..."
+        (keydown.enter)="onEnterSearch()"
+        (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); close()"
+        (focus)="inputFocused.set(true)"
+        (blur)="inputFocused.set(false)"
+        [placeholder]="aiEnabled ? 'Pregúntale a Maxi...' : 'Buscar reservas, transfers, tours o puntos'"
         autocomplete="off"
-        spellcheck="false">
-    </div>
-    <button type="button" class="global-search-close" (click)="close()" aria-label="Cerrar buscador">Esc</button>
-  </div>
-
-  <div class="global-search-body">
-    @if (loading()) {
-      <div class="global-search-empty">
-        <strong>Buscando...</strong>
-        <p>Consultando resultados permitidos para tu usuario.</p>
-      </div>
-    } @else if (!query().trim()) {
-      <div class="global-search-empty">
-        <strong>Busca reservas, transfers, tours, puntos o acciones rápidas.</strong>
-        <p>Atajo disponible: Ctrl+K o Cmd+K.</p>
-      </div>
-    } @else if (flatResults().length === 0) {
-      <div class="global-search-empty">
-        <strong>Sin resultados</strong>
-        <p>No encontramos coincidencias visibles para tu usuario.</p>
-      </div>
-    } @else {
-      <div class="global-search-groups">
-        @for (group of groupedResults(); track group.label; let groupIndex = $index) {
-          <section class="global-search-group">
-            <header class="global-search-group-title">{{ group.label }}</header>
-            <div class="global-search-list">
-              @for (item of group.items; track item.id; let itemIndex = $index) {
-                <div
-                  class="global-search-item"
-                  tabindex="0"
-                  [class.is-selected]="isSelected(getFlatIndex(groupIndex, itemIndex))"
-                  (mouseenter)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
-                  (focus)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
-                  (keydown.enter)="execute(item)"
-                  (keydown.space)="$event.preventDefault(); execute(item)"
-                  (click)="execute(item)">
-                  <div class="global-search-item-copy">
-                    <div class="global-search-item-head">
-                      <strong>{{ item.title }}</strong>
-                      @if (item.badge) {
-                        <span class="global-search-badge">{{ item.badge }}</span>
-                      }
-                    </div>
-                    @if (item.subtitle) {
-                      <p>{{ item.subtitle }}</p>
-                    }
-                  </div>
-
-                  @if (item.actions?.length) {
-                    <div class="global-search-actions">
-                      @for (action of item.actions; track action.label) {
-                        <button
-                          type="button"
-                          class="global-search-action"
-                          (click)="executeAction($event, action)">
-                          {{ action.label }}
-                        </button>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          </section>
+        spellcheck="false"
+        aria-label="Escribe tu consulta"
+      />
+      <button
+        type="button"
+        class="gs-send-btn"
+        [class.gs-send-btn--active]="query().trim().length > 0 && !iaLoading()"
+        [disabled]="!query().trim() || iaLoading()"
+        (click)="onEnterSearch()"
+        aria-label="Enviar"
+      >
+        @if (iaLoading()) {
+          <span class="gs-send-spinner" aria-hidden="true"></span>
+        } @else {
+          <span aria-hidden="true">↑</span>
         }
-      </div>
+      </button>
+    </div>
+    @if (aiEnabled) {
+    <p class="gs-disclaimer">Maxi puede cometer errores. Verifica información crítica.</p>
     }
   </div>
+
 </section>

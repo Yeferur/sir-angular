@@ -19,6 +19,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { buscarPaisesOrigen, normalizarBusquedaPais } from '../../../shared/data/paises-origen';
 
 @Component({
   selector: 'app-editar-reserva',
@@ -33,6 +34,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   openSummary = false;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
   private readonly permisosService = inject(PermisosService);
+  activePaisOrigenIndex: number | null = null;
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
@@ -136,6 +138,38 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private toUpperText(value: unknown): string {
     return String(value ?? '').trim().toLocaleUpperCase('es-CO');
+  }
+
+  private normalizarNacionalidad(value: unknown): string | null {
+    const normalized = String(value ?? '').trim();
+    return normalized ? normalized.slice(0, 80) : null;
+  }
+
+  getPaisOrigenSuggestions(index: number): string[] {
+    const raw = this.pasajeros.at(index)?.get('Nacionalidad')?.value ?? '';
+    const current = normalizarBusquedaPais(raw);
+    return buscarPaisesOrigen(raw).filter((item) => normalizarBusquedaPais(item) !== current);
+  }
+
+  showPaisOrigenSuggestions(index: number): boolean {
+    return this.activePaisOrigenIndex === index && this.getPaisOrigenSuggestions(index).length > 0;
+  }
+
+  onPaisOrigenFocus(index: number): void {
+    this.activePaisOrigenIndex = index;
+  }
+
+  onPaisOrigenBlur(): void {
+    setTimeout(() => {
+      this.activePaisOrigenIndex = null;
+      this.cdr.markForCheck();
+    }, 120);
+  }
+
+  selectPaisOrigen(index: number, value: string): void {
+    this.pasajeros.at(index)?.get('Nacionalidad')?.setValue(value);
+    this.activePaisOrigenIndex = null;
+    this.cdr.markForCheck();
   }
 
   private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
@@ -994,6 +1028,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
           Tipo_Pasajero: [p.Tipo_Pasajero ?? p.TipoPasajero ?? 'ADULTO', Validators.required],
           Nombre_Pasajero: [p.Nombre_Pasajero ?? p.NombrePasajero ?? ''],
           DNI: [p.DNI ?? p.IdPas ?? ''],
+          Nacionalidad: [p.Nacionalidad ?? p.nacionalidad ?? '', [Validators.maxLength(80)]],
           Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? '', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
           Id_Punto: [puntoPasajeroValido ?? puntoPrincipalForm ?? null],
           Confirmacion: [p.Confirmacion ?? false],
@@ -1559,6 +1594,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Tipo_Pasajero: [tipo, Validators.required],
       Nombre_Pasajero: [''],
       DNI: [''],
+      Nacionalidad: ['', [Validators.maxLength(80)]],
       Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
@@ -2013,6 +2049,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       let pax = this.pasajeros.controls.map(c => ({
         Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
+        Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
@@ -2246,6 +2283,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const pax = this.pasajeros.controls.map(c => ({
         Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
+        Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
