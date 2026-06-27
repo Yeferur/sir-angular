@@ -1,11 +1,12 @@
-:host { display: block; }
+:host {
+  display: block;
+}
 
 /* =========================================================
    PAGE CONTAINER
    ========================================================= */
 .page-container {
-  margin: 36px auto 72px;
-  padding: 0 24px;
+  margin: 0 auto 20px;
   max-width: 1350px;
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
@@ -14,9 +15,6 @@
    PAGE HEADER
    ========================================================= */
 .page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
   margin-bottom: 24px;
 }
 
@@ -24,7 +22,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -66,44 +64,45 @@
   flex-shrink: 0;
 }
 
-/* =========================================================
-   SEARCH ROW
-   ========================================================= */
-.search-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
+/* search-row eliminada — search ahora vive inline en header-top */
 
 .search {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 14px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-sm);
   padding: 9px 14px;
   width: 100%;
   max-width: 560px;
-  transition: border-color .2s, box-shadow .2s;
+  transition: border-color .18s;
 }
 
 .search:focus-within {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
+}
+
+.search-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .search input {
-  background: transparent;
+  background: none;
   border: none;
   outline: none;
   color: var(--text-primary);
-  width: 100%;
-  font-size: .95rem;
+  font-size: .9rem;
   font-family: var(--font-family);
+  width: 100%;
 }
 
-.search input::placeholder { color: var(--text-tertiary); opacity: .6; }
+.search input::placeholder {
+  color: var(--text-secondary);
+}
 
 .clear-btn {
   border: none;
@@ -120,7 +119,10 @@
   transition: background .15s, color .15s;
 }
 
-.clear-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.clear-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
 
 /* =========================================================
    BUTTONS
@@ -129,7 +131,7 @@
 .btn-secondary,
 .btn-icon-only {
   padding: 9px 15px;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 700;
   font-size: .88rem;
@@ -160,17 +162,32 @@
   border: 1.5px solid var(--separator-color);
 }
 
-.btn-primary:hover  { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(10, 132, 255, .36); }
+.btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(10, 132, 255, .36);
+}
+
 .btn-secondary:hover,
-.btn-icon-only:hover { background: var(--bg-secondary); color: var(--text-primary); transform: translateY(-1px); }
+.btn-icon-only:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
 
 .btn-secondary:disabled,
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; filter: none; box-shadow: none; }
+.btn-primary:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
 
 .btn-spinner {
   width: 13px;
   height: 13px;
-  border: 2px solid rgba(255,255,255,.3);
+  border: 2px solid rgba(255, 255, 255, .3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin .7s linear infinite;
@@ -194,7 +211,7 @@
   border: 1.5px solid var(--separator-color);
   border-radius: 16px;
   padding: 16px 18px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
   display: grid;
   grid-template-columns: 1fr auto auto;
   grid-template-rows: auto auto;
@@ -202,8 +219,8 @@
   row-gap: 12px;
   align-items: center;
   transition: transform .22s cubic-bezier(.22, 1, .36, 1),
-              box-shadow .22s ease,
-              border-color .22s ease;
+    box-shadow .22s ease,
+    border-color .22s ease;
   animation: cardEnter .4s cubic-bezier(.22, 1, .36, 1) both;
   animation-delay: calc(var(--i, 0) * 35ms);
   will-change: transform, opacity;
@@ -211,7 +228,7 @@
 
 .punto-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0,0,0,.09);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .09);
   border-color: color-mix(in oklab, var(--accent-blue) 28%, var(--separator-color));
 }
 
@@ -242,7 +259,9 @@
   font-weight: 800;
 }
 
-.punto-meta { min-width: 0; }
+.punto-meta {
+  min-width: 0;
+}
 
 .punto-name {
   font-size: 1rem;
@@ -375,10 +394,25 @@
   border-color: color-mix(in oklab, var(--accent-blue) 35%, var(--separator-color));
 }
 
-.schedule .tour  { font-weight: 700; color: var(--text-primary); }
-.schedule .dot   { color: var(--text-tertiary); opacity: .5; }
-.schedule .hora  { color: var(--text-secondary); font-weight: 600; }
-.schedule .hora--pending { color: var(--text-tertiary); font-style: italic; }
+.schedule .tour {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.schedule .dot {
+  color: var(--text-tertiary);
+  opacity: .5;
+}
+
+.schedule .hora {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.schedule .hora--pending {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
 
 .no-horarios {
   display: inline-flex;
@@ -427,8 +461,14 @@
   font-weight: 800;
 }
 
-.empty-state p { margin: 0; font-size: .9rem; }
-.empty-state .btn-primary { margin-top: 8px; }
+.empty-state p {
+  margin: 0;
+  font-size: .9rem;
+}
+
+.empty-state .btn-primary {
+  margin-top: 8px;
+}
 
 .loading-state {
   display: flex;
@@ -455,12 +495,10 @@
 .skeleton-shape {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 0%,
-    var(--bg-tertiary) 45%,
-    var(--bg-secondary) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-secondary) 0%,
+      var(--bg-tertiary) 45%,
+      var(--bg-secondary) 100%);
   background-size: 800px 100%;
   animation: sk-shimmer 1.6s ease-in-out infinite;
 }
@@ -515,8 +553,13 @@
 }
 
 @keyframes sk-shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+
+  100% {
+    background-position: 400px 0;
+  }
 }
 
 /* =========================================================
@@ -538,7 +581,10 @@
   text-align: center;
 }
 
-.page-sep { opacity: .4; margin: 0 2px; }
+.page-sep {
+  opacity: .4;
+  margin: 0 2px;
+}
 
 /* =========================================================
    DELETE ANIMATION
@@ -548,26 +594,58 @@
 }
 
 @keyframes puntoDelete {
-  0%   { opacity: 1; transform: scale(1); max-height: 200px; margin-bottom: 10px; }
-  60%  { opacity: .5; transform: scale(.99) translateY(-4px); }
-  100% { opacity: 0; transform: scale(.98); max-height: 0; margin-bottom: 0; padding: 0; }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    max-height: 200px;
+    margin-bottom: 10px;
+  }
+
+  60% {
+    opacity: .5;
+    transform: scale(.99) translateY(-4px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(.98);
+    max-height: 0;
+    margin-bottom: 0;
+    padding: 0;
+  }
 }
 
 /* =========================================================
    ANIMATIONS
    ========================================================= */
 @keyframes pageEnter {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes cardEnter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* =========================================================
@@ -578,25 +656,80 @@
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
   }
-  .punto-identity { grid-column: 1; grid-row: 1; }
-  .punto-tags     { grid-column: 1; grid-row: 2; }
-  .card-schedules { grid-column: 1; grid-row: 3; }
-  .card-actions   { grid-column: 1; grid-row: 4; justify-content: flex-end; }
 
-  .sk-title { width: 220px; }
-  .sk-address { width: 280px; }
+  .punto-identity {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .punto-tags {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .card-schedules {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .card-actions {
+    grid-column: 1;
+    grid-row: 4;
+    justify-content: flex-end;
+  }
+
+  .sk-title {
+    width: 220px;
+  }
+
+  .sk-address {
+    width: 280px;
+  }
 }
 
 @media (max-width: 640px) {
-  .header-top { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .header-actions { width: 100%; flex-wrap: wrap; }
-  .btn-primary, .btn-secondary, .btn-icon-only { flex: 1; justify-content: center; }
-  .booking-dashboard { padding: 0 16px; }
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 
-  .sk-address { width: 220px; }
-  .sk-schedule-chip { width: 110px; }
+  .search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-icon-only {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .booking-dashboard {
+    padding: 0 16px;
+  }
+
+  .sk-address {
+    width: 220px;
+  }
+
+  .sk-schedule-chip {
+    width: 110px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-container, .punto-card, .schedule { animation: none !important; transition: none !important; }
+
+  .page-container,
+  .punto-card,
+  .schedule {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -26,6 +26,7 @@ function getFriendlyErrorMessage(errorCode?: string, fallback?: string): string 
     TOUR_RULE_INFANTE_NOT_ALLOWED: 'Este tour no permite infantes. Ajusta los pasajeros para continuar.',
     TOUR_RULE_MIN_AGE: 'La edad minima para ninos en este tour no se cumple.',
     RESERVA_NOT_FOUND: 'No se encontro la reserva solicitada.',
+    PUNTO_DUPLICATE_EXACT: 'Ya existe un punto con ese nombre y esa direccion.',
     AUDIT_REQUIRED: 'No fue posible registrar la auditoria del cambio. Intenta nuevamente.',
     BAD_REQUEST: 'La solicitud tiene datos invalidos. Revisa el formulario.',
     INTERNAL_ERROR: 'Ocurrio un error del servidor. Intenta de nuevo en unos minutos.',

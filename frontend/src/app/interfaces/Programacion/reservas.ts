@@ -13,6 +13,8 @@
 export interface Reserva {
   Id_Reserva: string;
   NumeroPasajeros: number;
+  NombreContacto?: string | null;
+  Nombre?: string | null;
   Id_Punto: number | string | null;
   idPunto?: number | string | null;
   IdPunto?: number | string | null;

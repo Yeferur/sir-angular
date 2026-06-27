@@ -1,0 +1,242 @@
+<div class="page-container">
+
+  <!-- HEADER -->
+  <div class="page-header">
+
+
+    <!-- FILTERS -->
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="form-label" for="seg-fecha">Fecha del Tour</label>
+        <app-datepicker
+          [(ngModel)]="fecha"
+          placeholder="Seleccionar fecha...">
+        </app-datepicker>
+      </div>
+
+      <div class="filter-group">
+        <label class="form-label" for="seg-tour">Tour</label>
+        <select id="seg-tour" [(ngModel)]="idTour" class="form-select">
+          <option value="" disabled selected>Seleccionar tour...</option>
+          @for (t of tours; track t.Id_Tour) {
+            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+          }
+        </select>
+      </div>
+
+      <button (click)="buscar()" [disabled]="isSearching || !fecha || !idTour" class="btn-primary btn-search">
+        @if (isSearching) {
+          Buscando...
+        } @else {
+          Buscar
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  @if (isSearching) {
+    <div class="card">
+      <div class="loading-state" aria-live="polite">
+        <div class="spinner"></div>
+        <p>Cargando programación de buses...</p>
+      </div>
+    </div>
+  } @else if (!hasSearched) {
+    <div class="results-area">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <h3>Listo para buscar</h3>
+        <p>Selecciona una fecha y un tour para cargar los buses y sus asegurados.</p>
+      </div>
+    </div>
+  } @else if (buses.length === 0) {
+    <div class="results-area">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3>Sin programación</h3>
+        <p>No hay listados de bus generados para la fecha y tour seleccionados.</p>
+      </div>
+    </div>
+  } @else {
+
+    <!-- SUMMARY BAR -->
+    <div class="summary-bar">
+      <div class="summary-stat">
+        <span class="summary-number">{{ totalAsegurados }}</span>
+        <span class="summary-label">Asegurados totales</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number">{{ buses.length }}</span>
+        <span class="summary-label">Buses</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number">{{ totalPasajeros }}</span>
+        <span class="summary-label">Pasajeros</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number">{{ busesConConductor }}</span>
+        <span class="summary-label">Con conductor</span>
+      </div>
+
+      <button class="btn-export" (click)="descargarExcel()" [disabled]="isExporting">
+        @if (isExporting) {
+          <span class="btn-spinner btn-spinner--dark"></span>
+          Generando...
+        } @else {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Descargar Excel
+        }
+      </button>
+    </div>
+
+    <!-- BUS CARDS -->
+    @for (bus of buses; track bus.Id_Bus_Prog) {
+      <div class="bus-card" [class.bus-card--dirty]="isDirty(bus.Id_Bus_Prog)">
+
+        <!-- BUS HEADER -->
+        <div class="bus-header">
+          <div class="bus-header-left">
+            <span class="bus-number">Bus {{ bus.Orden_Bus }}</span>
+            <span class="bus-plate">{{ bus.Placa_Display }}</span>
+            <span class="bus-count-badge">
+              {{ bus.pasajeros.length + 2 }} asegurados
+            </span>
+          </div>
+
+          <button
+            class="btn-save-bus"
+            (click)="guardarBus(bus)"
+            [disabled]="isSavingBus(bus.Id_Bus_Prog) || !isDirty(bus.Id_Bus_Prog)"
+          >
+            @if (isSavingBus(bus.Id_Bus_Prog)) {
+              <span class="btn-spinner btn-spinner--sm"></span>
+            }
+            Guardar
+          </button>
+        </div>
+
+        <!-- STAFF FIELDS -->
+        <div class="staff-fields">
+          <div class="staff-field">
+            <span class="staff-role staff-role--guia">Guía</span>
+            <input
+              type="text"
+              class="staff-input"
+              [value]="bus.Guia || ''"
+              placeholder="Sin guía asignado"
+              disabled
+              title="El guía se asigna desde el listado de programación"
+            />
+            <input
+              type="text"
+              class="staff-input staff-input--dni"
+              [(ngModel)]="bus.DNI_Guia"
+              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
+              placeholder="Cédula guía"
+            />
+          </div>
+
+          <div class="staff-field">
+            <span class="staff-role staff-role--conductor">Conductor</span>
+            <input
+              type="text"
+              class="staff-input"
+              [(ngModel)]="bus.Conductor"
+              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
+              placeholder="Nombre del conductor..."
+            />
+            <input
+              type="text"
+              class="staff-input staff-input--dni"
+              [(ngModel)]="bus.DNI_Conductor"
+              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
+              placeholder="Cédula conductor"
+            />
+          </div>
+        </div>
+
+        <!-- PASSENGERS TABLE -->
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead class="thead">
+              <tr>
+                <th class="th">#</th>
+                <th class="th">Pasajero</th>
+                <th class="th">Tipo</th>
+                <th class="th">DNI / Pasaporte</th>
+                <th class="th">Reserva</th>
+              </tr>
+            </thead>
+            <tbody class="tbody">
+              @for (p of bus.pasajeros; track p.Id_Pasajero; let idx = $index) {
+                <tr>
+                  <td class="td td-num">{{ idx + 1 }}</td>
+                  <td class="td">
+                    <span class="passenger-name">{{ p.Nombre_Pasajero || '—' }}</span>
+                    @if (p.Nombre_Reportante) {
+                      <span class="sub-text">Rep: {{ p.Nombre_Reportante }}</span>
+                    }
+                  </td>
+                  <td class="td">
+                    <span class="badge" [ngClass]="{
+                      'badge-adulto':  p.Tipo_Pasajero === 'ADULTO',
+                      'badge-nino':    p.Tipo_Pasajero === 'NINO',
+                      'badge-infante': p.Tipo_Pasajero === 'INFANTE'
+                    }">{{ p.Tipo_Pasajero }}</span>
+                  </td>
+                  <td class="td td-mono">{{ p.DNI || '—' }}</td>
+                  <td class="td">
+                    <span class="reserva-id">#{{ p.Id_Reserva }}</span>
+                  </td>
+                </tr>
+              }
+
+              <!-- GUÍA ROW -->
+              <tr class="staff-row staff-row--guia">
+                <td class="td td-num">{{ bus.pasajeros.length + 1 }}</td>
+                <td class="td">
+                  <span class="passenger-name">{{ bus.Guia || '—' }}</span>
+                  <span class="sub-text">Guía de turismo</span>
+                </td>
+                <td class="td">
+                  <span class="badge badge-staff">GUÍA</span>
+                </td>
+                <td class="td td-mono">{{ bus.DNI_Guia || '—' }}</td>
+                <td class="td">—</td>
+              </tr>
+
+              <!-- CONDUCTOR ROW -->
+              <tr class="staff-row staff-row--conductor">
+                <td class="td td-num">{{ bus.pasajeros.length + 2 }}</td>
+                <td class="td">
+                  <span class="passenger-name">{{ bus.Conductor || 'Sin asignar' }}</span>
+                  <span class="sub-text">Conductor</span>
+                </td>
+                <td class="td">
+                  <span class="badge badge-conductor">CONDUCTOR</span>
+                </td>
+                <td class="td td-mono">{{ bus.DNI_Conductor || '—' }}</td>
+                <td class="td">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    }
+  }
+
+</div>

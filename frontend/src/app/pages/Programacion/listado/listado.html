@@ -1,22 +1,16 @@
 <div class="page-container">
   <div class="page-header">
     <div class="page-header-text">
-      <h1>Programación</h1>
       <p>Gestiona la programación, generación y revisión de listados por fecha.</p>
     </div>
 
     <div class="page-header-actions">
       <div class="form-group">
         <label for="fecha" class="form-label">Fecha de Operación</label>
-        <input
-          id="fecha"
-          class="form-input"
-          type="text"
-          appFlatpickrInput
-          [fpOptions]="fpOptionsFecha"
+        <app-datepicker
           [(ngModel)]="fechaSeleccionada"
-          (ngModelChange)="onFechaOperacionChange()"
-        />
+          (dateChange)="onFechaOperacionChange()">
+        </app-datepicker>
       </div>
     </div>
   </div>
@@ -96,9 +90,7 @@
                 <span class="skeleton-shape sk-line sk-footer-line"></span>
                 <span class="skeleton-shape sk-button"></span>
               </div>
-              <div class="bus-progress">
-                <span class="skeleton-shape sk-progress"></span>
-              </div>
+              
             </div>
             }
           </div>
@@ -352,7 +344,6 @@
               (cdkDropListDropped)="dropReserva($event)">
               <div class="bus-item-top">
                 <div class="bus-item-title">
-                  <span class="dot ok"></span>
                   <span class="bus-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
                   <span class="bus-occ-pill" [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90"
                     [class.danger]="pct >= 90">
@@ -377,10 +368,10 @@
                 </div>
               </div>
 
-              <div class="bus-progress">
+              <!-- <div class="bus-progress">
                 <span [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90" [class.danger]="pct >= 90"
                   [style.width.%]="pct"></span>
-              </div>
+              </div> -->
             </div>
             }
 
@@ -389,7 +380,6 @@
               (cdkDropListDropped)="dropReserva($event)">
               <div class="bus-item-top">
                 <div class="bus-item-title">
-                  <span class="dot"></span>
                   <span class="bus-name">Nuevo bus</span>
                 </div>
                 <div class="bus-item-right">Opcional</div>
@@ -407,8 +397,8 @@
         <section class="main-card">
           <div class="main-card-header">
             <div class="main-card-title">
-              <div class="t">Ruta del bus</div>
-              <div class="s">Orden de los puntos de encuentro</div>
+              <div class="t">Ruta · {{ activeBus?.id || ('Bus ' + (activeBusIndex + 1)) }}</div>
+              <div class="s">Arrastra para reordenar paradas</div>
             </div>
           </div>
 
@@ -433,39 +423,40 @@
         <section class="main-card">
           <div class="main-card-header">
             <div class="main-card-title">
-              <div class="t">Puntos de encuentro y reservas</div>
-              <div class="s">Arrastra una reserva y suéltala en otro bus (panel izquierdo).</div>
+              <div class="t">Reservas · {{ activeBus?.id || ('Bus ' + (activeBusIndex + 1)) }}</div>
+              <div class="s">Arrastra una reserva al sidebar para moverla a otro bus</div>
             </div>
             <div class="main-card-actions">
-              <button class="btn-secondary" (click)="prevBus()">Anterior</button>
-              <button class="btn-primary" (click)="nextBus()">Siguiente</button>
+              <span class="pill">{{ activeBus?.reservas?.length || 0 }} reservas · {{ activeBus?.ocupados || 0 }} pax</span>
             </div>
           </div>
 
           <div class="stops-grid" cdkDropList id="active-bus" [cdkDropListData]="activeBus?.reservas"
             [cdkDropListConnectedTo]="connectedDropLists" [cdkDropListSortingDisabled]="true"
             (cdkDropListDropped)="dropReserva($event)">
+
+            @if (activeBus?.reservas?.length === 0) {
+              <div class="stops-empty">Sin reservas asignadas a este bus</div>
+            }
+
             @for (stop of activeStops; track stop.key; let p = $index) {
-            <div class="stop-card">
-              <div class="stop-header">
-                <div class="stop-left">
-                  <span class="stop-index">{{ p + 1 }}</span>
-                  <div class="stop-title">
-                    <span class="stop-name">{{ stop.NombrePunto }}</span>
-                    <span class="stop-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</span>
-                  </div>
-                </div>
+            <div class="stop-group">
+              <div class="stop-group-header">
+                <span class="stop-group-index">{{ p + 1 }}</span>
+                <span class="stop-group-name">{{ stop.NombrePunto }}</span>
+                <span class="stop-group-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</span>
               </div>
 
-              <div class="stop-body">
-                @if (stop.reservas.length === 0) {
-                <div class="empty-mini">Sin reservas en esta parada</div>
-                }
-
+              <div class="stop-group-body">
                 @for (reserva of stop.reservas; track reserva.Id_Reserva) {
                 <div class="reserva-card" cdkDrag (cdkDragStarted)="onDragStarted()" (cdkDragEnded)="onDragEnded()">
-                  <div class="reserva-details">
-                    <span>#{{ reserva.Id_Reserva }}</span>
+                  <div class="reserva-drag-col">
+                    <span class="reserva-drag-handle">⋮⋮</span>
+                  </div>
+                  <div class="reserva-main-col">
+                    <span class="reserva-id">#{{ reserva.Id_Reserva }}</span>
+                  </div>
+                  <div class="reserva-pax-col">
                     <span class="reserva-pax">{{ reserva.NumeroPasajeros }} Pax</span>
                   </div>
                 </div>

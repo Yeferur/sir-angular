@@ -16,6 +16,34 @@ const CONFIG = {
     GRAFO_PATH: 'grafo_antioquia.json',
 };
 
+const RUTA_ADJACENCY = {
+    "0": new Set(["5", "2"]),
+    "1": new Set(["2", "3", "4", "5"]),
+    "2": new Set(["1", "4", "5", "3"]),
+    "3": new Set(["1", "2", "4"]),
+    "4": new Set(["2", "1", "3", "5"]),
+    "5": new Set(["2", "4", "1", "0"]),
+    "6": new Set(["7", "12", "8"]),
+    "7": new Set(["8", "12", "6"]),
+    "8": new Set(["7", "12", "10", "9"]),
+    "9": new Set(["10", "12", "8"]),
+    "10": new Set(["9", "12", "8"]),
+    "12": new Set(["7", "8", "10", "9", "6"]),
+    "13": new Set(["14", "6"]),
+    "14": new Set(["12", "13", "6"]),
+};
+
+function rutasAdyacentes(rutaA, rutaB) {
+    const a = normalizeRoute(rutaA);
+    const b = normalizeRoute(rutaB);
+
+    if (!a || !b) return true;
+    if (a === b) return true;
+
+    const vecinos = RUTA_ADJACENCY[a];
+    return vecinos ? vecinos.has(b) : false;
+}
+
 const GRAPH_STATE = {
     loaded: false,
     available: false,
@@ -35,6 +63,8 @@ const GRAPH_LIMITS = {
     MAX_STOPS_PER_BUS_FOR_GRAPH: Number(process.env.PROGRAMACION_GRAPH_MAX_STOPS_PER_BUS || 8)
 };
 
+const ESTADOS_RESERVA_ACTIVOS = ['ACTIVA', 'ACTIVO', 'PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
+
 // =================================================================
 // --- FUNCIONES DE UTILIDAD Y DATOS (Optimizadas) ---
 // =================================================================
@@ -48,6 +78,9 @@ async function obtenerReservas(fecha, idsTours) {
             r.Fecha_Tour,
             r.Estado,
             r.Tipo_Reserva,
+            r.Nombre_Reportante,
+            r.Idioma_Reserva,
+            r.Observaciones,
             p.Id_Pasajero,
             p.Id_Punto,
             pt.Nombre_Punto AS NombrePunto,
@@ -68,8 +101,8 @@ async function obtenerReservas(fecha, idsTours) {
         ) pc ON pc.Id_Reserva = r.Id_Reserva
         WHERE r.Fecha_Tour = ?
           AND h.Id_Tour IN (?)
-          AND r.Estado NOT IN ('Cancelada', 'Rechazada')
-          AND r.Tipo_Reserva = 'Grupal'
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_RESERVA_ACTIVOS.map(() => '?').join(',')})
+          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
         ORDER BY
             r.Id_Reserva ASC,
             COALESCE(CAST(pt.ruta AS UNSIGNED), 999999) ASC,
@@ -78,7 +111,7 @@ async function obtenerReservas(fecha, idsTours) {
     `;
 
     try {
-        const [rows] = await db.query(sql, [fecha, tours]);
+        const [rows] = await db.query(sql, [fecha, tours, ...ESTADOS_RESERVA_ACTIVOS]);
         return construirReservasDesdeFilasPasajeros(rows || []);
     } catch (error) {
         console.error("Error al obtener reservas:", error);
@@ -948,23 +981,22 @@ function canMixStopWithStops(stop, targetStops, { extended = false, context = nu
 
     const stopRoute = normalizeRoute(stop.ruta);
     const targetRoutes = getStopRoutes(targetStops);
-    const hasRouteContext = Boolean(stopRoute) && targetRoutes.size > 0;
 
-    if (stopRoute && targetRoutes.has(stopRoute)) return true;
+    if (!stopRoute) return true;
+    if (!targetRoutes.size) return true;
 
-    const routeDistance = Math.min(...targetStops.map(targetStop => getRouteDistanceRank(stop, targetStop)));
-    if (routeDistance <= 1) return true;
-    if (extended && routeDistance <= 3) return true;
-
-    const geoDistance = getMinGeoDistanceBetweenStops([stop], targetStops, context);
-    if (Number.isFinite(geoDistance)) {
-        if (geoDistance <= 2.5) return true;
-        if (extended && geoDistance <= 7) return true;
+    for (const targetRoute of targetRoutes) {
+        if (!rutasAdyacentes(stopRoute, targetRoute)) return false;
     }
 
-    if (!hasRouteContext && (!Number.isFinite(geoDistance) || geoDistance <= 8)) return true;
+    const geoDistance = getMinGeoDistanceBetweenStops([stop], targetStops, context);
+    if (!Number.isFinite(geoDistance)) return true;
 
-    return false;
+    const mismaRuta = targetRoutes.has(stopRoute);
+    if (mismaRuta) return geoDistance <= 4;
+
+    if (extended) return geoDistance <= 3.5;
+    return geoDistance <= 2.5;
 }
 
 function canMergeOperationalBuses(stopsA, stopsB, { extended = false, context = null } = {}) {
@@ -973,23 +1005,21 @@ function canMergeOperationalBuses(stopsA, stopsB, { extended = false, context = 
     const rutasA = getStopRoutes(stopsA);
     const rutasB = getStopRoutes(stopsB);
 
-    if (rutasA.size && rutasB.size) {
-        for (const rutaA of rutasA) {
-            for (const rutaB of rutasB) {
-                if (rutaA === rutaB) return true;
-                const distanciaRuta = getRouteDistanceRank(rutaA, rutaB);
-                if (distanciaRuta <= 1) return true;
-                if (extended && distanciaRuta <= 3) return true;
-            }
+    if (!rutasA.size || !rutasB.size) return true;
+
+    for (const rutaA of rutasA) {
+        for (const rutaB of rutasB) {
+            if (!rutasAdyacentes(rutaA, rutaB)) return false;
         }
     }
 
-    const distancia = getMinGeoDistanceBetweenStops(stopsA, stopsB, context);
-    if (!Number.isFinite(distancia)) return extended;
-    if (distancia <= 3) return true;
-    if (extended && distancia <= 7) return true;
+    if (!extended) {
+        const distancia = getMinGeoDistanceBetweenStops(stopsA, stopsB, context);
+        if (!Number.isFinite(distancia)) return true;
+        return distancia <= 3;
+    }
 
-    return false;
+    return true;
 }
 
 function normalizeBusList(buses) {
@@ -1248,7 +1278,8 @@ async function getDistanceKmBetweenStops(a, b) {
 
 async function generarPlanLogistico(fecha, idsTours) {
     try {
-        const reservas = await obtenerReservas(fecha, idsTours);
+        const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+        const reservas = await obtenerReservas(fecha, tours);
         if (reservas.length === 0) return { buses: [], reservasSinAsignar: [], alertas: [] };
 
         const maxCapacity = CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1];
@@ -1271,6 +1302,23 @@ async function generarPlanLogistico(fecha, idsTours) {
                 reservas: sortBusReservations(bus, graphContext).map(({ __ordenOriginal, ...reserva }) => reserva),
             }));
 
+        const busesResumen = busesOptimizados.map((bus, index) => ({
+            bus: bus.id || `Bus ${index + 1}`,
+            ocupados: bus.ocupados,
+            capacidad: bus.capacidad,
+            reservas: Array.isArray(bus.reservas) ? bus.reservas.length : 0,
+            paradas: Array.isArray(bus.paradas)
+                ? bus.paradas.map((parada) => ({
+                    orden: parada.orden,
+                    NombrePunto: parada.NombrePunto,
+                    ruta: parada.ruta,
+                    totalPax: parada.totalPax
+                }))
+                : []
+        }));
+
+        console.log(`[PROGRAMACION] Plan logístico generado: fecha=${fecha}, tours=${tours.join(',')}, buses=${busesOptimizados.length}, reservasSinAsignar=${reservasSinAsignar.length}, alertas=${alertas.length}, graphCalls=${graphContext.calls}, graphLookups=${graphContext.nearestLookups}, graphAstar=${graphContext.astarRuns}, graphFallbacks=${graphContext.fallbacks}, ms=${Date.now() - graphContext.startedAt}`);
+        console.log('[PROGRAMACION] Resumen de buses:', JSON.stringify(busesResumen, null, 2));
         return { buses: busesOptimizados, reservasSinAsignar, alertas };
 
     } catch (error) {
@@ -2248,4 +2296,3 @@ async function obtenerReservasConPlaca(fecha, idsTours) {
         })
     }));
 }
-

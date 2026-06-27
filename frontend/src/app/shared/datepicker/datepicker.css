@@ -1,0 +1,405 @@
+/* ============================================================
+   SIR-DATEPICKER v2 — Usa CDK Overlay
+   El trigger vive en el host (:host).
+   El panel (.sir-dp-panel) lo monta CDK en el body,
+   por eso sus estilos van en styles.scss (global) o aquí
+   con ViewEncapsulation.None.
+   ============================================================
+   IMPORTANTE: Agrega esto en tu styles.scss global:
+   @import 'src/app/components/datepicker/datepicker.css';
+   O usa  encapsulation: ViewEncapsulation.None  en el @Component.
+   ============================================================ */
+
+/* ── HOST / TRIGGER ── */
+:host {
+  display: block;
+  width: 100%;
+  font-family: var(--font-family);
+}
+
+.sir-dp-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 0 13px;
+  height: 40px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--separator-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  transition: border-color .18s, box-shadow .18s;
+  outline: none;
+}
+
+.sir-dp-field:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--separator-color) 40%, var(--accent-blue));
+}
+
+.sir-dp-field.is-open {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, .12);
+}
+
+.sir-dp-field.is-invalid {
+  border-color: var(--accent-red, #ff453a);
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, .12);
+}
+
+.sir-dp-field.is-disabled,
+.sir-dp-field:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.sir-dp-icon {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: color .18s;
+}
+.sir-dp-field.is-open .sir-dp-icon { color: var(--accent-blue); }
+
+.sir-dp-text {
+  flex: 1;
+  text-align: left;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sir-dp-text.placeholder {
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.sir-dp-caret {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: transform .28s cubic-bezier(.22,1,.36,1), color .18s;
+}
+.sir-dp-caret.rotated {
+  transform: rotate(180deg);
+  color: var(--accent-blue);
+}
+
+/* ── BACKDROP (CDK lo pone en el body) ── */
+.sir-dp-backdrop {
+  /* CDK backdrop transparente — el cierre lo maneja el click */
+  background: transparent;
+}
+
+/* ── PANEL (montado por CDK Overlay en el body) ──
+   Estos estilos DEBEN ser globales.
+   Opción A: ViewEncapsulation.None en el @Component (recomendado).
+   Opción B: Moverlos a styles.scss.
+*/
+.sir-dp-overlay-panel {
+  /* CDK aplica este panelClass al contenedor del overlay */
+}
+
+.sir-dp-panel {
+  width: 280px;
+  background: var(--bg-secondary, #1c1c1e);
+  border: 1.5px solid var(--separator-color, rgba(255,255,255,.12));
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, .55),
+    0  4px 16px rgba(0, 0, 0, .30);
+
+  /* Animación de entrada */
+  animation: sirDpPanelIn .2s cubic-bezier(.22,1,.36,1) both;
+}
+
+@keyframes sirDpPanelIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── INNER + ANIMACIÓN DE VISTA ── */
+.sir-dp-inner { padding-bottom: 4px; }
+
+.sir-dp-anim {
+  animation: sirDpViewIn .15s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes sirDpViewIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── NAV ── */
+.sir-dp-nav {
+  display: grid;
+  grid-template-columns: 34px 1fr 34px;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 10px 6px;
+}
+
+.sir-dp-nav-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family);
+  transition: background .12s, border-color .12s, color .12s;
+}
+.sir-dp-nav-btn:hover {
+  background: var(--bg-tertiary, rgba(255,255,255,.08));
+  border-color: var(--separator-color, rgba(255,255,255,.12));
+  color: var(--text-primary, #fff);
+}
+
+.sir-dp-nav-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Pills mes/año */
+.sir-dp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-tertiary, rgba(255,255,255,.08));
+  border: 1px solid var(--separator-color, rgba(255,255,255,.12));
+  color: var(--text-primary, #fff);
+  font-family: var(--font-family);
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.sir-dp-pill svg { color: var(--text-tertiary, rgba(255,255,255,.35)); }
+.sir-dp-pill:hover {
+  background: rgba(10, 132, 255, .12);
+  border-color: rgba(10, 132, 255, .35);
+  color: var(--accent-blue, #0a84ff);
+}
+
+/* ── WEEKDAYS ── */
+.sir-dp-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 2px 8px 4px;
+  border-top: 1px solid var(--separator-color, rgba(255,255,255,.08));
+  margin-top: 4px;
+}
+.sir-dp-wd {
+  text-align: center;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary, rgba(255,255,255,.35));
+  padding: 6px 0;
+}
+
+/* ── DÍAS ── */
+.sir-dp-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 0 8px;
+}
+
+.sir-dp-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: transparent;
+  font-family: var(--font-family);
+  transition: background .1s, color .1s, border-color .1s;
+}
+.sir-dp-day:hover:not(.dp-other):not(.dp-selected):not(:disabled) {
+  background: rgba(10, 132, 255, .12);
+  color: var(--accent-blue, #0a84ff);
+}
+.sir-dp-day.dp-other {
+  color: var(--text-tertiary, rgba(255,255,255,.2));
+  opacity: .3;
+  pointer-events: none;
+}
+.sir-dp-day.dp-disabled {
+  opacity: .2;
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.sir-dp-day.dp-today {
+  border-color: var(--accent-blue, #0a84ff) !important;
+  color: var(--accent-blue, #0a84ff);
+  font-weight: 700;
+}
+.sir-dp-day.dp-today:hover {
+  background: rgba(10, 132, 255, .1);
+}
+.sir-dp-day.dp-selected {
+  background: var(--accent-blue, #0a84ff) !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-color: var(--accent-blue, #0a84ff) !important;
+}
+
+/* ── FOOTER ── */
+.sir-dp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--separator-color, rgba(255,255,255,.08));
+  margin-top: 6px;
+  gap: 8px;
+}
+
+.sir-dp-btn-today {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  border: 1px solid var(--separator-color, rgba(255,255,255,.12));
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  font-family: var(--font-family);
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.sir-dp-btn-today:hover {
+  border-color: var(--accent-blue, #0a84ff);
+  color: var(--accent-blue, #0a84ff);
+  background: rgba(10, 132, 255, .07);
+}
+
+.sir-dp-btn-clear {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary, rgba(255,255,255,.35));
+  font-family: var(--font-family);
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .12s;
+}
+.sir-dp-btn-clear:hover { color: var(--accent-red, #ff453a); }
+
+/* ── SUB-HEADER (mes / año picker) ── */
+.sir-dp-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--separator-color, rgba(255,255,255,.08));
+}
+.sir-dp-sub-title {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary, rgba(255,255,255,.35));
+}
+.sir-dp-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--separator-color, rgba(255,255,255,.12));
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  font-family: var(--font-family);
+  font-size: .68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.sir-dp-back-btn:hover {
+  border-color: var(--accent-blue, #0a84ff);
+  color: var(--accent-blue, #0a84ff);
+}
+
+/* ── GRID MESES ── */
+.sir-dp-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 10px;
+}
+.sir-dp-month-item {
+  padding: 9px 4px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: transparent;
+  font-family: var(--font-family);
+  transition: background .1s, color .1s, border-color .1s;
+}
+.sir-dp-month-item:hover {
+  background: rgba(10, 132, 255, .12);
+  color: var(--accent-blue, #0a84ff);
+}
+.sir-dp-month-item.active {
+  background: var(--accent-blue, #0a84ff);
+  color: #fff;
+  border-color: var(--accent-blue, #0a84ff);
+}
+
+/* ── GRID AÑOS ── */
+.sir-dp-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  padding: 10px;
+  max-height: 190px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--separator-color, rgba(255,255,255,.12)) transparent;
+}
+.sir-dp-year-item {
+  padding: 8px 2px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: transparent;
+  font-family: var(--font-family);
+  transition: background .1s, color .1s, border-color .1s;
+}
+.sir-dp-year-item:hover {
+  background: rgba(10, 132, 255, .12);
+  color: var(--accent-blue, #0a84ff);
+}
+.sir-dp-year-item.active {
+  background: var(--accent-blue, #0a84ff);
+  color: #fff;
+  border-color: var(--accent-blue, #0a84ff);
+}

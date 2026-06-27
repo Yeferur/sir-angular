@@ -5,7 +5,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { firstValueFrom } from 'rxjs';
 
 import { puntosService, Punto, OrdenPuntoItem } from '../../../services/Puntos/puntos';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 
 @Component({
   selector: 'app-ordenar-puntos',
@@ -16,7 +16,7 @@ import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/glob
 })
 export class OrdenarPuntosComponent implements OnInit {
   private puntosSvc = inject(puntosService);
-  private navbar = inject(DynamicIslandGlobalService);
+  private alerts = inject(SirAlertService);
 
   rutas = signal<string[]>([]);
   puntos = signal<Punto[]>([]);
@@ -55,7 +55,7 @@ export class OrdenarPuntosComponent implements OnInit {
         this.puntos.set([]);
       }
     } catch (error) {
-      this.navbar.errorToast('Error', 'No fue posible cargar las rutas.');
+      this.alerts.errorToast('Error', 'No fue posible cargar las rutas.');
       this.rutas.set([]);
     } finally {
       this.isLoadingRutas.set(false);
@@ -97,7 +97,7 @@ export class OrdenarPuntosComponent implements OnInit {
       list.sort((a: Punto, b: Punto) => Number(a.posicion || 0) - Number(b.posicion || 0));
       this.puntos.set(list);
     } catch (error) {
-      this.navbar.errorToast('Error', 'No fue posible cargar los puntos de la ruta seleccionada.');
+      this.alerts.errorToast('Error', 'No fue posible cargar los puntos de la ruta seleccionada.');
       this.puntos.set([]);
     } finally {
       this.isLoadingPuntos.set(false);
@@ -118,12 +118,12 @@ export class OrdenarPuntosComponent implements OnInit {
     const puntos = this.puntos();
 
     if (!ruta) {
-      this.navbar.warningToast('Ruta requerida', 'Selecciona una ruta antes de guardar.');
+      this.alerts.warningToast('Ruta requerida', 'Selecciona una ruta antes de guardar.');
       return;
     }
 
     if (!puntos.length) {
-      this.navbar.warningToast('Sin puntos', 'No hay puntos para ordenar en esta ruta.');
+      this.alerts.warningToast('Sin puntos', 'No hay puntos para ordenar en esta ruta.');
       return;
     }
 
@@ -140,11 +140,11 @@ export class OrdenarPuntosComponent implements OnInit {
     try {
       await firstValueFrom(this.puntosSvc.updateOrdenPuntosPorRuta(ruta, orden));
       this.hasPendingOrderChanges.set(false);
-      this.navbar.successToast('Orden guardado', `Se actualizó el orden de ${orden.length} puntos.`);
+      this.alerts.successToast('Orden guardado', `Se actualizó el orden de ${orden.length} puntos.`);
       await this.loadPuntosByRuta(ruta);
     } catch (error: any) {
       const message = error?.error?.message || 'No fue posible guardar el orden.';
-      this.navbar.errorToast('Error', message);
+      this.alerts.errorToast('Error', message);
     } finally {
       this.isSaving.set(false);
     }
@@ -156,30 +156,13 @@ export class OrdenarPuntosComponent implements OnInit {
 
   private requestRouteChangeConfirmation(): Promise<boolean> {
     return new Promise((resolve) => {
-      this.navbar.alert?.set?.({
-        type: 'warning',
-        title: 'Cambios sin guardar',
-        message: this.buildRouteChangeMessage(),
-        autoClose: false,
-        buttons: [
-          {
-            text: 'Cancelar',
-            style: 'secondary',
-            onClick: () => {
-              this.navbar.alert?.set?.(null);
-              resolve(false);
-            }
-          },
-          {
-            text: 'Cambiar ruta',
-            style: 'primary',
-            onClick: () => {
-              this.navbar.alert?.set?.(null);
-              resolve(true);
-            }
-          }
-        ]
-      });
+      this.alerts.confirm(
+        'Cambios sin guardar',
+        this.buildRouteChangeMessage(),
+        () => resolve(true),
+        () => resolve(false),
+        { confirmText: 'Cambiar ruta', cancelText: 'Cancelar', type: 'warning' }
+      );
     });
   }
 
@@ -189,30 +172,13 @@ export class OrdenarPuntosComponent implements OnInit {
 
   private requestSaveOrderConfirmation(ruta: string, cantidad: number): Promise<boolean> {
     return new Promise((resolve) => {
-      this.navbar.alert?.set?.({
-        type: 'info',
-        title: '¿Guardar orden?',
-        message: this.buildSaveConfirmationMessage(ruta, cantidad),
-        autoClose: false,
-        buttons: [
-          {
-            text: 'Cancelar',
-            style: 'secondary',
-            onClick: () => {
-              this.navbar.alert?.set?.(null);
-              resolve(false);
-            }
-          },
-          {
-            text: 'Guardar Orden',
-            style: 'primary',
-            onClick: () => {
-              this.navbar.alert?.set?.(null);
-              resolve(true);
-            }
-          }
-        ]
-      });
+      this.alerts.confirm(
+        '¿Guardar orden?',
+        this.buildSaveConfirmationMessage(ruta, cantidad),
+        () => resolve(true),
+        () => resolve(false),
+        { confirmText: 'Guardar orden', cancelText: 'Cancelar', type: 'info' }
+      );
     });
   }
 

@@ -1,5 +1,5 @@
 @if (isLoading()) {
-<div class="booking-dashboard skeleton-page">
+<div class="skeleton-page">
 
   <div class="page-header">
     <div class="page-header-text">
@@ -115,23 +115,7 @@
 } @else {
 <div class="booking-dashboard">
 
-  <!-- PAGE HEADER -->
-  <div class="page-header">
-    <div class="page-header-text">
-      <h1>Crear Tour</h1>
-      <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
-    </div>
-    <div class="page-header-actions">
-      <button class="btn-submit" type="submit" form="tourForm" [disabled]="isSubmitting()">
-        @if (isSubmitting()) {
-        <span class="btn-spinner"></span>
-        Guardando...
-        } @else {
-        Crear Tour
-        }
-      </button>
-    </div>
-  </div>
+  <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
 
   <form id="tourForm" [formGroup]="form" (ngSubmit)="submitCreateTour()">
     <div class="main-content">
@@ -146,9 +130,10 @@
           </div>
         </div>
 
-        <div class="form-grid">
+        <div class="form-grid form-grid-3">
 
-          <div class="form-group full-width">
+          <!-- Nombre (full width) -->
+          <div class="form-group">
             <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
             <input formControlName="Nombre_Tour" type="text" class="form-input" maxlength="255"
               placeholder="Ej: Guatapé"
@@ -158,6 +143,7 @@
             }
           </div>
 
+          <!-- Fila 2: Abreviación + Cupo + Coordenadas en 3 columnas -->
           <div class="form-group">
             <label class="form-label">Abreviación <span class="required-star">*</span></label>
             <input formControlName="Abreviacion" type="text" class="form-input" maxlength="50" placeholder="Ej: TG"
@@ -176,29 +162,49 @@
             }
           </div>
 
+          <div class="form-group">
+            <label class="form-label">Coordenadas <span class="label-optional">(Opcional)</span></label>
+            <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
+              [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
+            @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
+            @if (form.get('Coordenadas')?.errors?.['coordenadasInvalidas']) {
+            <div class="errorMessage">Formato inválido. Usa: lat, lng</div>
+            } @else if (form.get('Coordenadas')?.errors?.['latitudInvalida']) {
+            <div class="errorMessage">Latitud fuera de rango.</div>
+            } @else if (form.get('Coordenadas')?.errors?.['longitudInvalida']) {
+            <div class="errorMessage">Longitud fuera de rango.</div>
+            }
+            }
+            <p class="form-hint">Busca el tour en Google Maps -> click derecho -> "Copiar coordenadas" y pégalas aquí.</p>
+          </div>
+
+          <!-- Puntos de encuentro: toggle sí/no → chips de tours -->
           <div class="form-group full-width">
-            <label class="form-label">Copiar Horarios de Tour Existente <span
-                class="label-optional">(Opcional)</span></label>
-            <select formControlName="Id_Tour_Origen" class="form-select">
-              <option [ngValue]="null">Sin copiar — todos en Pendiente</option>
+            <label class="form-label">Puntos de encuentro <span class="label-optional">(Opcional)</span></label>
+            <p class="form-hint">¿Copiar los puntos de encuentro de un tour existente?</p>
+            <div class="origen-toggle-row">
+              <button type="button" class="origen-toggle-btn"
+                [class.active]="form.get('Id_Tour_Origen')?.value === null"
+                (click)="form.get('Id_Tour_Origen')?.setValue(null)">
+                No, configurar después
+              </button>
+              <button type="button" class="origen-toggle-btn"
+                [class.active]="form.get('Id_Tour_Origen')?.value !== null"
+                (click)="form.get('Id_Tour_Origen')?.value === null && form.get('Id_Tour_Origen')?.setValue(toursExistentes[0]?.Id_Tour ?? null)">
+                Sí, copiar de otro tour
+              </button>
+            </div>
+            @if (form.get('Id_Tour_Origen')?.value !== null) {
+            <div class="origen-chips">
               @for (tour of toursExistentes; track tour.Id_Tour) {
-              <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+              <button type="button" class="origen-chip"
+                [class.active]="form.get('Id_Tour_Origen')?.value === tour.Id_Tour"
+                (click)="form.get('Id_Tour_Origen')?.setValue(tour.Id_Tour)">
+                {{ tour.Nombre_Tour }}
+              </button>
               }
-            </select>
-            <p class="form-hint">Si seleccionas un tour, se copiarán sus horarios de punto de encuentro.</p>
-          </div>
-
-          <!-- COORDS -->
-          <div class="form-group">
-            <label class="form-label">Latitud <span class="required-star">*</span></label>
-            <input formControlName="Latitud" type="number" class="form-input" step="any" placeholder="6.244747"
-              [class.errorInput]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Longitud <span class="required-star">*</span></label>
-            <input formControlName="Longitud" type="number" class="form-input" step="any" placeholder="-75.574756"
-              [class.errorInput]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid" />
+            </div>
+            }
           </div>
 
           <!-- DIVIDER -->
@@ -207,19 +213,25 @@
           </div>
 
           <!-- COMISIONES -->
-          <div class="form-group">
-            <label class="form-label">Comisión Hotel <span class="label-optional">(%)</span></label>
-            <input formControlName="Comision_Hotel" type="number" class="form-input" min="0" placeholder="0" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Comisión Agencia <span class="label-optional">(%)</span></label>
-            <input formControlName="Comision_Agencia" type="number" class="form-input" min="0" placeholder="0" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Comisión Freelance <span class="label-optional">(%)</span></label>
-            <input formControlName="Comision_Freelance" type="number" class="form-input" min="0" placeholder="0" />
+          <div class="form-group full-width">
+            <label class="form-label">Comisiones por canal <span class="label-optional">(opcional)</span></label>
+            <p class="form-hint">Activa los canales que aplican comisión para este tour.</p>
+            <div class="canales-list">
+              @for (canal of canalesComisiones; track canal.Id_Canal; let ci = $index) {
+              <div class="canal-row" [class.canal-active]="canal.activo">
+                <button type="button" class="canal-toggle" [class.active]="canal.activo" (click)="toggleCanal(ci)">
+                  <span class="canal-nombre">{{ canal.Nombre_Canal }}</span>
+                </button>
+                @if (canal.activo) {
+                <div class="canal-valor-wrap">
+                  <input type="number" class="form-input canal-valor-input" min="0" placeholder="0"
+                    [(ngModel)]="canal.valor" [ngModelOptions]="{standalone: true}" />
+                  <span class="canal-valor-suffix">COP</span>
+                </div>
+                }
+              </div>
+              }
+            </div>
           </div>
 
         </div>
@@ -236,12 +248,7 @@
               <p class="card-subtitle">Configura precios por plan y moneda.</p>
             </div>
           </div>
-          <button type="button" class="btn-secondary" (click)="addNewPlan()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
+          <button type="button" class="btn-secondary btn-sm" (click)="addNewPlan()">
             Agregar plan
           </button>
         </div>
@@ -274,6 +281,38 @@
               </button>
               }
             </div>
+            <!-- Vigencia del plan -->
+            <div class="plan-vigencia-section">
+              <div class="plan-vigencia-label">Vigencia del plan</div>
+              <div class="plan-vigencia">
+                <button type="button" class="perm-btn" [class.active]="planCtrl.get('esPermanente')?.value"
+                  (click)="planCtrl.get('esPermanente')?.setValue(true); planCtrl.get('Fecha_Inicio')?.setValue(null); planCtrl.get('Fecha_Fin')?.setValue(null)">
+                  <span class="perm-codigo">Permanente</span>
+                  <span class="perm-desc">Sin fecha de vencimiento</span>
+                </button>
+                <button type="button" class="perm-btn" [class.active]="!planCtrl.get('esPermanente')?.value"
+                  (click)="planCtrl.get('esPermanente')?.setValue(false)">
+                  <span class="perm-codigo">Con fechas</span>
+                  <span class="perm-desc">Plan válido por temporada</span>
+                </button>
+              </div>
+              @if (!planCtrl.get('esPermanente')?.value) {
+              <div class="plan-fechas-grid">
+                <div class="form-group">
+                  <label class="form-label">Inicio vigencia <span class="required-star">*</span></label>
+                  <app-datepicker formControlName="Fecha_Inicio" placeholder="Inicio vigencia"
+                    [invalid]="!!(planCtrl.get('Fecha_Inicio')?.touched && planCtrl.get('Fecha_Inicio')?.invalid)">
+                  </app-datepicker>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Fin vigencia <span class="required-star">*</span></label>
+                  <app-datepicker formControlName="Fecha_Fin" placeholder="Fin vigencia"
+                    [invalid]="!!(planCtrl.get('Fecha_Fin')?.touched && planCtrl.get('Fecha_Fin')?.invalid)">
+                  </app-datepicker>
+                </div>
+              </div>
+              }
+            </div><!-- /plan-vigencia-section -->
 
             <!-- Passenger type toggles -->
             <div class="plan-controls">
@@ -303,7 +342,7 @@
                     <label class="form-label">
                       Adulto @if (isAdultRequired(i, mi)) { <span class="required-star">*</span> }
                     </label>
-                    <input type="number" class="form-input" formControlName="ADULTO" min="0" placeholder="0"
+                    <input type="number" class="form-input precio-input" formControlName="ADULTO" min="0" placeholder="0"
                       [class.errorInput]="monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid" />
                     @if (monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid) {
                     <div class="errorMessage">{{ getAdultErrorMessage(i, mi) }}</div>
@@ -312,7 +351,7 @@
 
                   <div class="form-group">
                     <label class="form-label">Niño</label>
-                    <input type="number" class="form-input" formControlName="NINO" min="0" placeholder="0"
+                    <input type="number" class="form-input precio-input" formControlName="NINO" min="0" placeholder="0"
                       [class.errorInput]="monCtrl.get('NINO')?.touched && monCtrl.get('NINO')?.invalid" />
                     @if (planCtrl.get('AllowNino')?.value && monCtrl.get('NINO')?.touched &&
                     monCtrl.get('NINO')?.invalid) {
@@ -322,7 +361,7 @@
 
                   <div class="form-group">
                     <label class="form-label">Infante</label>
-                    <input type="number" class="form-input" formControlName="INFANTE" min="0" placeholder="0"
+                    <input type="number" class="form-input precio-input" formControlName="INFANTE" min="0" placeholder="0"
                       [class.errorInput]="monCtrl.get('INFANTE')?.touched && monCtrl.get('INFANTE')?.invalid" />
                     @if (planCtrl.get('AllowInfante')?.value && monCtrl.get('INFANTE')?.touched &&
                     monCtrl.get('INFANTE')?.invalid) {
@@ -391,11 +430,6 @@
           <div class="section-header-row">
             <span class="form-label">Temporadas</span>
             <button type="button" class="btn-secondary btn-sm" (click)="addTemporada()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
               Agregar temporada
             </button>
           </div>
@@ -434,18 +468,18 @@
               <div class="temp-grid">
                 <div class="form-group">
                   <label class="form-label">Fecha inicio <span class="required-star">*</span></label>
-                  <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-                    formControlName="Fecha_Inicio"
-                    [class.errorInput]="tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid" />
+                  <app-datepicker formControlName="Fecha_Inicio" placeholder="Fecha inicio"
+                    [invalid]="!!(tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid)">
+                  </app-datepicker>
                   @if (tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid) {
                   <div class="errorMessage">Obligatoria.</div>
                   }
                 </div>
                 <div class="form-group">
                   <label class="form-label">Fecha fin <span class="required-star">*</span></label>
-                  <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-                    formControlName="Fecha_Fin"
-                    [class.errorInput]="tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid" />
+                  <app-datepicker formControlName="Fecha_Fin" placeholder="Fecha fin"
+                    [invalid]="!!(tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid)">
+                  </app-datepicker>
                   @if (tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid) {
                   <div class="errorMessage">Obligatoria.</div>
                   }
@@ -488,6 +522,19 @@
 
       </div>
     </div>
+
+    
   </form>
+</div>
+<!-- FLOATING SAVE BUTTON -->
+<div class="floating-save-bar">
+  <button class="btn-submit btn-submit-floating" type="submit" form="tourForm" [disabled]="isSubmitting()">
+    @if (isSubmitting()) {
+    <span class="btn-spinner"></span>
+    Guardando...
+    } @else {
+    Crear Tour
+    }
+  </button>
 </div>
 }

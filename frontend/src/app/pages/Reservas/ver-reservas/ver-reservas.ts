@@ -1,19 +1,21 @@
 import { ChangeDetectorRef, Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { finalize, forkJoin, firstValueFrom } from 'rxjs';
 // Importa tus servicios
 import { Reservas } from '../../../services/Reservas/reservas';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { UiStateService } from '../../../services/ui-state.service';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [CommonModule, DatePipe, FlatpickrInputDirective, UppercaseInputDirective],
+  imports: [CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent],
   templateUrl: './ver-reservas.html',
   styleUrls: ['./ver-reservas.css']
 })
@@ -129,11 +131,13 @@ seleccionarPuntoAutocomplete(p: any) {
       .join(', ');
   }
 
-  private navbar = inject(DynamicIslandGlobalService);
+  private uiState = inject(UiStateService);
   private router = inject(Router);
   private reservasService = inject(Reservas);
   private cdr = inject(ChangeDetectorRef);
   private permisosService = inject(PermisosService);
+  private drawer = inject(SirDrawerService);
+  private alertService = inject(SirAlertService);
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
@@ -149,8 +153,6 @@ seleccionarPuntoAutocomplete(p: any) {
   dropdownOpenTour = signal(false);
   dropdownOpenEstado = signal(false);
 
-  @ViewChild('fechaReservaFp') fechaReservaFp?: FlatpickrInputDirective;
-  @ViewChild('fechaRegistroFp') fechaRegistroFp?: FlatpickrInputDirective;
 
   filters = signal({
     FechaReserva: '',
@@ -166,10 +168,10 @@ seleccionarPuntoAutocomplete(p: any) {
   });
 
   private readonly refreshEffect = effect(() => {
-    const entity = this.navbar.needsRefresh();
+    const entity = this.uiState.needsRefresh();
     if (entity === 'reservas') {
       this.listar();
-      this.navbar.needsRefresh.set('');
+      this.uiState.needsRefresh.set('');
     }
   });
 
@@ -185,143 +187,11 @@ seleccionarPuntoAutocomplete(p: any) {
     return this.permisosService.tienePermiso('RESERVAS.ACTUALIZAR');
   }
 
-fpOptionsFecha: Partial<FlatpickrOptions> = {
-  dateFormat: 'Y-m-d',
-  altInput: true,
-  altFormat: 'd/m/Y',
-  allowInput: false,
-  disableMobile: true,
-  monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-  
-  altInputClass: 'form-input flatpickr-input flatpickr-alt',
-
-  onReady: (_sel, _str, inst: any) => {
-    // ✅ SSR guard ANTES DE TODO
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-    const cal: HTMLElement = inst?.calendarContainer;
-    if (!cal) return;
-
-    cal.classList.add('sir-flatpickr');
-
-    // util: clamp día al máximo del mes
-    const clampDay = (y: number, m: number, d: number) => {
-      const last = new Date(y, m + 1, 0).getDate(); // último día del mes
-      return Math.min(Math.max(d, 1), last);
-    };
-
-    // --- Inyectar select en el header estable (flatpickr-month) ---
-    let yearDiv: HTMLDivElement | null = null;
-    let yearSelect: HTMLSelectElement | null = null;
-
-    const ensureYearSelect = () => {
-      // contenedor header
-      const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-      if (!monthWrap) return null;
-
-      // elimina el input numérico (cuando exista)
-      const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-      if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
-
-      // preferimos insertar dentro del pill .flatpickr-current-month
-      const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-      const container = curMonth ?? monthWrap;
-
-      // evita duplicados
-      yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-      if (yearSelect) return yearSelect;
-
-      // elimina cualquier wrapper previo para mantener DOM limpio
-      const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-      if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
-
-      yearSelect = document.createElement('select');
-      yearSelect.className = 'sir-year-select';
-      yearSelect.setAttribute('aria-label', 'Seleccionar año');
-
-      try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-      return yearSelect;
-    };
-
-    const buildYears = (centerYear: number) => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const start = centerYear - 20;
-      const end = centerYear + 20;
-
-      sel.innerHTML = '';
-      for (let y = end; y >= start; y--) {
-        const opt = document.createElement('option');
-        opt.value = String(y);
-        opt.textContent = String(y);
-        sel.appendChild(opt);
-      }
-      sel.value = String(centerYear);
-    };
-
-    const syncSelectValue = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const y = inst.currentYear ?? new Date().getFullYear();
-      const exists = !!sel.querySelector(`option[value="${y}"]`);
-      if (!exists) buildYears(y);
-      sel.value = String(y);
-    };
-
-    const getSafeDay = () => {
-      const d: Date | undefined = inst.selectedDates?.[0];
-      return d ? d.getDate() : 1;
-    };
-
-    const onChange = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const y = Number(sel.value);
-      const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-      const day = clampDay(y, m, getSafeDay());
-
-      const newDate = new Date(y, m, day);
-
-      // siempre mueve la vista
-      if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-      // solo setea si ya había selección
-      if (inst.selectedDates?.length) {
-        inst.setDate(newDate, true); // true => triggerChange para reactive forms
-      }
-    };
-
-    // init
-    buildYears(inst.currentYear ?? new Date().getFullYear());
-    syncSelectValue();
-
-    // listeners
-    const sel0 = ensureYearSelect();
-    sel0?.addEventListener('change', onChange);
-
-    // hook sin pisar otros callbacks
-    const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-      const prev = inst.config[key];
-      const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-      inst.config[key] = [...arr, fn];
-    };
-
-    // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
-    wrap('onMonthChange', () => syncSelectValue());
-    wrap('onYearChange', () => syncSelectValue());
-
-    // cleanup
-    const prevOnDestroy = inst.config.onDestroy;
-    const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-    inst.config.onDestroy = [
-      ...destroyArr,
-      () => sel0?.removeEventListener('change', onChange)
-    ];
+  canCancelReserva(reserva: any): boolean {
+    const estado = String(reserva?.Estado || '').toLowerCase();
+    return !!reserva?.Id_Reserva && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
-};
+
 
   ngOnInit(): void {
     this.loadInitialData();
@@ -335,7 +205,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   crearReserva() {
     if (!this.canCreateReserva) {
-      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear reservas.');
+      this.alertService.errorToast('Acceso denegado', 'No tienes permiso para crear reservas.');
       return;
     }
     this.router.navigate(['/Reservas/NuevaReserva']);
@@ -345,29 +215,65 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.router.navigate(['/Reservas/EditarReserva', Id_Reserva]);
   }
 
+  confirmCancelarReserva(reserva: any): void {
+    const id = reserva?.Id_Reserva;
+    if (!id || !this.canCancelReserva(reserva)) return;
+
+    this.alertService.showConfirm(
+      'Cancelar reserva',
+      `¿Deseas cancelar la reserva #${id}? La información se conservará para consulta futura.`,
+      [
+        { text: 'Mantener', style: 'secondary', onClick: () => this.alertService.closeModal() },
+        {
+          text: 'Cancelar reserva',
+          style: 'primary',
+          onClick: () => {
+            this.alertService.closeModal();
+            this.cancelReserva(reserva);
+          }
+        }
+      ],
+      { type: 'warning' }
+    );
+  }
+
   confirmEliminarReserva(reserva: any): void {
     const id = reserva?.Id_Reserva;
     if (!id || !this.canDeleteReserva) return;
 
-    this.navbar.showConfirm(
+    this.alertService.confirmDelete(
       'Eliminar reserva',
       `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        },
-        {
-          text: 'Eliminar',
-          style: 'delete',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.deleteReserva(reserva);
-          }
-        }
-      ]
+      () => this.deleteReserva(reserva),
+      undefined,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar' }
     );
+  }
+
+  private cancelReserva(reserva: any): void {
+    const id = reserva?.Id_Reserva;
+    if (!id) return;
+
+    this.reservasService.cancelarReserva(id).subscribe({
+      next: () => {
+        this.reservas.update((items) =>
+          items.map((item) =>
+            String(item?.Id_Reserva) === String(id)
+              ? { ...item, Estado: 'Cancelada' }
+              : item
+          )
+        );
+        this.alertService.successToast('Reserva cancelada', `La reserva #${id} quedó en estado Cancelada.`);
+      },
+      error: (error) => {
+        this.alertService.showAlert({
+          type: 'error',
+          title: 'No se pudo cancelar',
+          message: this.getApiErrorMessage(error, 'No fue posible cancelar la reserva.'),
+          autoClose: false
+        });
+      }
+    });
   }
 
   private deleteReserva(reserva: any): void {
@@ -377,24 +283,17 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     this.reservasService.deleteReserva(id).subscribe({
       next: () => {
         this.reservas.update((items) => items.filter((item) => String(item?.Id_Reserva) !== String(id)));
-        if (String(this.navbar.Id_Reserva() || '') === String(id)) {
-          this.navbar.Id_Reserva.set(null);
+        if (String(this.uiState.reservaId() || '') === String(id)) {
+          this.uiState.reservaId.set(null);
         }
-        this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
+        this.alertService.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
       },
       error: (error) => {
-        this.navbar.showAlert({
+        this.alertService.showAlert({
           type: 'error',
           title: 'No se pudo eliminar',
           message: this.getApiErrorMessage(error, 'No fue posible eliminar la reserva.'),
-          autoClose: false,
-          buttons: [
-            {
-              text: 'Cerrar',
-              style: 'secondary',
-              onClick: () => this.navbar.clearOverlay()
-            }
-          ]
+          autoClose: false
         });
       }
     });
@@ -402,13 +301,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
   clearFechaReserva(): void {
     this.updateFilter('FechaReserva', '');
-    this.fechaReservaFp?.instance?.clear();
     this.cdr.markForCheck();
   }
 
   clearFechaRegistro(): void {
     this.updateFilter('FechaRegistro', '');
-    this.fechaRegistroFp?.instance?.clear();
     this.cdr.markForCheck();
   }
 
@@ -553,7 +450,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     const filtros = this.buildApiFilters();
     // Si el filtro es por punto, solo buscar si el punto fue seleccionado del autocompletar
     if (filtros.Punto && !this.puntoSeleccionado) {
-      this.navbar.showAlert({
+      this.alertService.showAlert({
         type: 'info',
         title: 'Selecciona un punto',
         message: 'Debes seleccionar un punto de encuentro del autocompletar.',
@@ -566,7 +463,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     // Si no hay ningún filtro relevante, no buscar
     if (Object.keys(filtros).length === 0 ||
       (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal)) {
-      this.navbar.showAlert({
+      this.alertService.showAlert({
         type: 'info',
         title: 'Sin filtros',
         message: 'Debes aplicar al menos un filtro para buscar.',
@@ -591,7 +488,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
         this.reservas.set(data);
         this.cdr.markForCheck();
         if (data.length === 0) {
-          this.navbar.showAlert({
+          this.alertService.showAlert({
             type: 'info',
             title: 'Sin resultados',
             message: 'No se encontraron reservas con los filtros actuales.',
@@ -599,11 +496,11 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
             autoCloseTime: 3000
           });
         } else {
-          this.navbar.successToast('Reservas encontradas', `Se encontraron ${data.length} reservas.`);
+          this.alertService.successToast('Reservas encontradas', `Se encontraron ${data.length} reservas.`);
         }
       },
       error: (error) => {
-        this.navbar.showAlert({
+        this.alertService.showAlert({
           type: 'error',
           title: 'Error en la búsqueda',
           message: error.message,
@@ -616,7 +513,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   }
 
   verReserva(Id_Reserva: string) {
-    this.navbar.Id_Reserva.set(Id_Reserva);
+    this.drawer.openReserva(Id_Reserva);
   }
 
   private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {

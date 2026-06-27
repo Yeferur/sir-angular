@@ -187,7 +187,12 @@ exports.createPunto = async (req, res) => {
     return sendSuccess(res, { data: { insertId }, message: 'Punto creado correctamente', status: 201 });
   } catch (error) {
     console.error('Error al crear punto:', error);
-    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, {
+      status: error?.statusCode || 500,
+      message: error?.message || 'Error interno del servidor',
+      errorCode: error?.errorCode || 'INTERNAL_ERROR',
+      details: error?.details || null
+    });
   }
 };
 

@@ -1,24 +1,27 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { RouterOutlet, Router, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
-import { layout } from './layout/layout';
-import { DynamicNavbarComponent } from './DynamicNavbar/global/global';
-import { DynamicIslandGlobalService } from './services/DynamicNavbar/global';
+import { LoginContentComponent } from './components/login/login';
+import { SirAlertsHostComponent } from './components/alerts/alerts-host';
+import {SirDrawerHostComponent} from "./components/drawer/drawer-host";
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/Login/login-service';
 import { WebSocketService } from './services/WebSocket/web-socket';
 import { PermisosService } from './services/Permisos/permisos.service';
 import { Subject, takeUntil, distinctUntilChanged } from 'rxjs';
+import { LayoutComponent } from './layout/layout';
+import { SirAlertService } from './services/Alertas/alert.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, layout, DynamicNavbarComponent, CommonModule],
+  imports: [RouterOutlet, LayoutComponent, LoginContentComponent, SirAlertsHostComponent, SirDrawerHostComponent, CommonModule],
   templateUrl: './app.html',
   styleUrls: ['./app.css']
 })
 export class App implements OnInit, OnDestroy {
   loggedIn = false;
   publicAuthRoute = false;
+  routeTransitioning = false;
 
   private destroy$ = new Subject<void>();
   private wsStarted = false;
@@ -42,12 +45,12 @@ export class App implements OnInit, OnDestroy {
   }
 
   constructor(
-    public navbar: DynamicIslandGlobalService,
     public auth: AuthService,
     private ws: WebSocketService,
     private permisosService: PermisosService,
     private cdr: ChangeDetectorRef,
-    private router: Router
+    private router: Router,
+    private alerts: SirAlertService
   ) {}
 
   private isPublicAuthRoute(url: string): boolean {
@@ -56,17 +59,11 @@ export class App implements OnInit, OnDestroy {
   }
 
   private syncShellForUrl(url: string) {
-      this.publicAuthRoute = this.isPublicAuthRoute(url);
+    this.publicAuthRoute = this.isPublicAuthRoute(url);
 
-      if (!this.loggedIn) {
-        this.navbar.mode.set(this.publicAuthRoute ? '' : 'login');
-        if (this.publicAuthRoute) {
-        const currentOverlay = this.navbar.overlay();
-        if (currentOverlay) {
-          this.navbar.clearOverlay();
-        }
-        }
-      }
+    if (!this.loggedIn && this.publicAuthRoute) {
+      this.alerts.closeModal();
+    }
 
     this.cdr.markForCheck();
   }
@@ -78,24 +75,23 @@ export class App implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((event: RouterEvent) => {
         if (event instanceof NavigationStart) {
+          this.routeTransitioning = true;
           this.syncShellForUrl(event.url);
-          if (!this.publicAuthRoute) {
-            this.navbar.showLoading('Cargando datos...', '', { source: 'navigation' });
+          if (this.loggedIn && !this.publicAuthRoute) {
+            this.alerts.showLoading('Cargando datos...');
             this.cdr.markForCheck();
           }
         } else if (
           event instanceof NavigationEnd ||
           event instanceof NavigationCancel ||
           event instanceof NavigationError
-          ) {
+        ) {
           const url = event instanceof NavigationEnd ? event.urlAfterRedirects : this.router.url;
+          this.routeTransitioning = false;
           this.syncShellForUrl(url);
 
-          const currentOverlay = this.navbar.overlay();
-          if (currentOverlay?.loading) {
-            this.navbar.clearOverlay('loading');
-            this.cdr.markForCheck();
-          }
+          this.alerts.closeModal();
+          this.cdr.markForCheck();
         }
       });
 
@@ -105,14 +101,14 @@ export class App implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg: any) => {
         if (this.isAdminForceLogoutEvent(msg)) {
-          this.navbar.showAlert({
+          this.alerts.showAlert({
             type: 'warning',
             title: 'Sesión Cerrada',
             message: 'Tu sesión fue cerrada por un administrador.',
           });
 
           setTimeout(() => {
-            this.navbar.clearOverlay();
+            this.alerts.closeModal();
             this.ws.disconnect();
             this.auth.clearLocalSession();
             this.permisosService.limpiarPermisos();
@@ -124,14 +120,14 @@ export class App implements OnInit, OnDestroy {
         }
 
         if (this.isSelfLogoutAllSessionsEvent(msg)) {
-          this.navbar.showAlert({
+          this.alerts.showAlert({
             type: 'info',
             title: 'Sesión cerrada',
             message: 'Tu sesión fue cerrada en todos tus dispositivos.',
           });
 
           setTimeout(() => {
-            this.navbar.clearOverlay();
+            this.alerts.closeModal();
             this.ws.disconnect();
             this.auth.clearLocalSession();
             this.permisosService.limpiarPermisos();
@@ -156,7 +152,6 @@ export class App implements OnInit, OnDestroy {
       .pipe(distinctUntilChanged(), takeUntil(this.destroy$))
       .subscribe((logged) => {
         this.loggedIn = logged;
-        this.navbar.mode.set(logged ? '' : (this.publicAuthRoute ? '' : 'login'));
         this.cdr.markForCheck();
 
         if (logged) {
@@ -179,9 +174,5 @@ export class App implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     this.ws.disconnect();
-  }
-
-  get mode() {
-    return this.navbar.mode();
   }
 }

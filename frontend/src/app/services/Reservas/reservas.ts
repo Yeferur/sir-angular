@@ -17,7 +17,7 @@ export type Tour = {
   Latitud?: number | null;
   Longitud?: number | null;
 };
-export type Canal = { Id_Canal: number; Nombre_Canal: string; };
+export type Canal = { Id_Canal: number; Nombre_Canal: string; Tiene_Comision?: boolean | number; };
 export type Moneda = { Id_Moneda: number; Codigo: string; Nombre_Moneda: string; };
 export type Plan = { Id_Plan: number; Id_Tour: number; Nombre_Plan: string; };
 export type Horario = { Id_Horario: number; HoraSalida: string };
@@ -128,11 +128,17 @@ export class Reservas {
   }
 
   getCanales()  { return this.http.get<Canal[]>( `${this.apiUrl}/canales` ); }
-  getTours()    { return this.http.get<Tour[]>(  `${this.apiUrl}/tours`   ); }
+  getTours(includeTourId?: number | null) {
+    let params = new HttpParams();
+    if (includeTourId != null) params = params.set('includeTourId', String(includeTourId));
+    return this.http.get<Tour[]>(`${this.apiUrl}/reservas/tours`, { params });
+  }
   getMonedas()  { return this.http.get<Moneda[]>(`${this.apiUrl}/monedas` ); }
 
-  getPlanesByTour(idTour: number) {
-    return this.http.get<Plan[]>(`${this.apiUrl}/tours/${idTour}/planes`);
+  getPlanesByTour(idTour: number, fecha?: string) {
+    let params = new HttpParams();
+    if (fecha) params = params.set('fecha', fecha);
+    return this.http.get<Plan[]>(`${this.apiUrl}/reservas/tours/${idTour}/planes`, { params });
   }
 
   getDisponibilidadTour(idTour: number) {
@@ -140,11 +146,12 @@ export class Reservas {
   }
 
   /** ===== Precios ===== */
-  getPrecios(params: { Id_Tour: number; Id_Plan?: number | null; Id_Moneda: number }) {
+  getPrecios(params: { Id_Tour: number; Id_Plan?: number | null; Id_Moneda: number; fecha?: string }) {
     let p = new HttpParams()
       .set('Id_Tour', String(params.Id_Tour))
       .set('Id_Moneda', String(params.Id_Moneda));
     if (params.Id_Plan) p = p.set('Id_Plan', String(params.Id_Plan));
+    if (params.fecha) p = p.set('fecha', params.fecha);
     return this.http.get<PrecioMap>(`${this.apiUrl}/precios`, { params: p });
   }
 
@@ -225,7 +232,7 @@ export class Reservas {
     const params = new HttpParams()
       .set('Id_Tour', String(idTour))
       .set('Id_Canal', String(idCanal));
-    return this.http.get<{ ADULTO: number; NINO: number }>(`${this.apiUrl}/tours/comisiones`, { params });
+    return this.http.get<{ ADULTO: number; NINO: number }>(`${this.apiUrl}/reservas/tours/comisiones`, { params });
   }
 
   /* =============================================================================

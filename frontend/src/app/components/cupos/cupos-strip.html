@@ -1,0 +1,32 @@
+@if (vm(); as c) {
+  <div class="cupos-strip" [attr.data-estado]="c.estado"
+       role="status"
+       [attr.aria-label]="'Cupos ' + c.tour + ': ' + c.disponibles + ' disponibles de ' + c.total">
+
+    <!-- Columna 1: Tour -->
+    <div class="strip-tour-group">
+      <span class="strip-tour">{{ c.tour }}</span>
+    </div>
+
+    <!-- Columna 2: Número grande + barra de progreso + mini-stats -->
+    <div class="strip-progress-wrap">
+      <div class="strip-progress-row">
+        <span class="strip-num-big" [attr.data-estado]="c.estado">{{ c.disponibles }}</span>
+        <div class="strip-num-meta">
+          <span class="strip-num-lbl">Cupos disponibles</span>
+        </div>
+      </div>
+      <div class="strip-bar">
+        <div class="strip-bar-fill"
+             [attr.data-estado]="c.estado"
+             [style.width.%]="c.pct">
+        </div>
+      </div>
+      <div class="strip-mini-stats">
+        <span><b>{{ c.ocupados }}</b> ocupados</span>
+        <span><b>{{ c.pct | number:'1.0-0' }}%</b> lleno</span>
+      </div>
+    </div>
+
+  </div>
+}

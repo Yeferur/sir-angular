@@ -1,21 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../services/Login/login-service';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 
 @Component({
   selector: 'app-forgot-password-page',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './forgot-password.html',
-  styleUrl: './forgot-password.css'
+  styleUrl: '../auth-shared.css'
 })
-export class ForgotPasswordPageComponent implements OnInit {
+export class ForgotPasswordPageComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
-  private navbar = inject(DynamicIslandGlobalService);
 
   submitting = false;
   message = '';
@@ -24,10 +22,6 @@ export class ForgotPasswordPageComponent implements OnInit {
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]]
   });
-
-  ngOnInit(): void {
-    this.navbar.mode.set('');
-  }
 
   submit(): void {
     this.message = '';

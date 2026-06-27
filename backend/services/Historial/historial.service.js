@@ -102,25 +102,24 @@ async function getHistorial(filters = {}) {
     });
   }
 
-  const buildDescripcion = (accion, tabla, detalleList) => {
+  // Descripcion se deja vacía: el frontend renderiza Detalles como chips estructurados.
+  // Mantener solo como fallback cuando no hay detalles y se necesita texto plano (ej. export CSV).
+  const buildDescripcionCSV = (accion, tabla, detalleList) => {
     if (!Array.isArray(detalleList) || detalleList.length === 0) {
-      return `${accion} sobre ${tabla}`;
+      return `${accion} en ${tabla}`;
     }
-
-    const partes = detalleList.slice(0, 4).map((d) => {
-      const anterior = d.anterior == null || d.anterior === '' ? '—' : String(d.anterior);
-      const nuevo = d.nuevo == null || d.nuevo === '' ? '—' : String(d.nuevo);
-      return `${d.columna}: ${anterior} → ${nuevo}`;
-    });
-
-    return partes.join(' · ');
+    return detalleList.map((d) => {
+      const ant = d.anterior == null || d.anterior === '' ? 'vacío' : String(d.anterior);
+      const nvo = d.nuevo == null || d.nuevo === '' ? 'vacío' : String(d.nuevo);
+      return `${d.columna}: ${ant} → ${nvo}`;
+    }).join(', ');
   };
 
   const rowsWithDetails = rows.map((row) => {
     const detalleList = detalleMap.get(Number(row.Id_Historial)) || [];
     return {
       ...row,
-      Descripcion: buildDescripcion(row.Tipo_Accion, row.Tabla_Afectada, detalleList),
+      Descripcion: buildDescripcionCSV(row.Tipo_Accion, row.Tabla_Afectada, detalleList),
       Detalles: detalleList,
     };
   });

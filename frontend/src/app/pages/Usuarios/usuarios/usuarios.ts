@@ -3,9 +3,9 @@ import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import type { Usuario } from '../../../services/Usuarios/usuarios';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { AuthService } from '../../../services/Login/login-service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 
 @Component({
   selector: 'app-usuarios',
@@ -54,9 +54,9 @@ export class Usuarios implements OnInit {
 
   constructor(
     private usuariosService: UsuariosService,
-    private navbar: DynamicIslandGlobalService,
     private auth: AuthService,
-    private permisosService: PermisosService
+    private permisosService: PermisosService,
+    private alerts: SirAlertService
   ) {
     this.usuarios = this.usuariosService.getUsuariosSignal();
     this.estados = this.usuariosService.getEstadosSignal();
@@ -95,68 +95,46 @@ export class Usuarios implements OnInit {
       return;
     }
 
-    this.navbar.showConfirm(
+    this.alerts.confirm(
       'Cierre de Sesión',
       'Estás a punto de cerrar la sesión de este usuario.',
-      [
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        },
-        {
-          text: 'Cerrar Sesión',
-          style: 'primary',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.performLogout(userId);
-          }
-        }
-      ]
+      () => this.performLogout(userId),
+      undefined,
+      { confirmText: 'Cerrar sesión', cancelText: 'Cancelar', type: 'warning' }
     );
   }
 
   private performLogout(userId: string) {
     this.usuariosService.forzarCierreSesion(userId).subscribe({
       next: () => {
-        this.navbar.successToast('Sesion cerrada', 'La sesión del usuario fue cerrada exitosamente.');
+        this.alerts.successToast('Sesion cerrada', 'La sesión del usuario fue cerrada exitosamente.');
       },
       error: (err) => {
         console.error('❌ Error cerrando sesión:', err);
-        this.navbar.errorToast('Error', 'Ocurrió un error cerrando la sesión.');
+        this.alerts.errorToast('Error', 'Ocurrió un error cerrando la sesión.');
       }
     });
   }
 
   cerrarMisSesiones() {
-    this.navbar.showConfirm(
+    this.alerts.confirm(
       'Cerrar sesión en todos mis dispositivos',
       'Esta acción cerrará tu sesión en todos los navegadores y dispositivos.',
-      [
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        },
-        {
-          text: 'Cerrar sesiones',
-          style: 'primary',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.auth.logoutAllSessions().subscribe({
-              next: () => {
-                this.auth.clearLocalSession();
-                this.navbar.successToast('Sesión cerrada', 'Cerraste sesión en todos tus dispositivos.');
-              },
-              error: (err) => {
-                console.error('❌ Error cerrando sesiones en todos los dispositivos:', err);
-                this.auth.clearLocalSession();
-                this.navbar.warningToast('Sesión cerrada', 'No pudimos confirmar el cierre remoto, pero tu sesión local fue cerrada.');
-              }
-            });
+      () => {
+        this.auth.logoutAllSessions().subscribe({
+          next: () => {
+            this.auth.clearLocalSession();
+            this.alerts.successToast('Sesión cerrada', 'Cerraste sesión en todos tus dispositivos.');
+          },
+          error: (err) => {
+            console.error('❌ Error cerrando sesiones en todos los dispositivos:', err);
+            this.auth.clearLocalSession();
+            this.alerts.warningToast('Sesión cerrada', 'No pudimos confirmar el cierre remoto, pero tu sesión local fue cerrada.');
           }
-        }
-      ]
+        });
+      },
+      undefined,
+      { confirmText: 'Cerrar sesiones', cancelText: 'Cancelar', type: 'warning' }
     );
   }
 
@@ -166,42 +144,36 @@ export class Usuarios implements OnInit {
     }
 
     if (this.isCurrentUser(userId)) {
-      this.navbar.warningToast('Acción no permitida', 'No puedes eliminar tu propio usuario desde tu sesión activa.');
+      this.alerts.warningToast('Acción no permitida', 'No puedes eliminar tu propio usuario desde tu sesión activa.');
       return;
     }
 
-    this.navbar.showConfirm(
+    this.alerts.confirm(
       '¿Eliminar Usuario?',
       'Esta acción desactivará al usuario, cerrará sus sesiones activas y lo ocultará del listado. El historial seguirá conservando la relación con su Id_Usuario.',
-      [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
-        {
-          text: 'Eliminar', style: 'primary', onClick: () => {
-            this.navbar.clearOverlay();
-            this.confirmEliminar(userId);
-          }
-        }
-      ]
+      () => this.confirmEliminar(userId),
+      undefined,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar', type: 'warning' }
     );
   }
 
   private confirmEliminar(userId: string) {
     const removed = this.usuariosService.removeUsuarioFromSignal(userId);
     if (!removed.user) {
-      this.navbar.warningToast('Sin cambios', 'No se encontro el usuario seleccionado.');
+      this.alerts.warningToast('Sin cambios', 'No se encontro el usuario seleccionado.');
       return;
     }
 
-    this.navbar.infoToast('Eliminando usuario', 'Actualizando listado...', 1800);
+    this.alerts.infoToast('Eliminando usuario', 'Actualizando listado...', 1800);
 
     this.usuariosService.eliminarUsuario(userId).subscribe({
       next: () => {
-        this.navbar.successToast('Usuario desactivado', 'El usuario fue desactivado y sus sesiones quedaron cerradas.');
+        this.alerts.successToast('Usuario desactivado', 'El usuario fue desactivado y sus sesiones quedaron cerradas.');
       },
       error: (err) => {
         this.usuariosService.restoreUsuarioInSignal(removed.user!, removed.estado, removed.index);
         const msg = err?.error?.error || 'Error al eliminar usuario.';
-        this.navbar.errorToast('Error', msg);
+        this.alerts.errorToast('Error', msg);
       }
     });
   }

@@ -1,8 +1,9 @@
 @if (loggedIn) {
   <div class="app-shell app-shell--private">
-    <app-sidebar></app-sidebar>
+    <app-sir-alerts></app-sir-alerts>
+    <app-sir-drawer></app-sir-drawer>
+    <app-layout></app-layout>
     <div class="main-shell">
-      <app-dynamic-navbar></app-dynamic-navbar>
       <main class="content">
         <router-outlet></router-outlet>
       </main>
@@ -10,12 +11,15 @@
   </div>
 } @else if (publicAuthRoute) {
   <main class="auth-public-shell">
-    <router-outlet></router-outlet>
+    @if (!routeTransitioning) {
+      <router-outlet></router-outlet>
+    }
   </main>
 } @else {
-  <div class="app-shell app-shell--login">
-    <div class="main-shell main-shell--login">
-      <app-dynamic-navbar></app-dynamic-navbar>
-    </div>
-  </div>
+  <main class="auth-public-shell">
+    @if (!routeTransitioning) {
+      <app-login></app-login>
+    }
+  </main>
 }
+

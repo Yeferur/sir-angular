@@ -1,93 +1,92 @@
-import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
-import { Reservas, Tour } from '../../../services/Reservas/reservas';
-import { Tours } from '../../../services/Tours/tours';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { Tour, Tours } from '../../../services/Tours/tours';
 import { Router } from '@angular/router';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { UiStateService } from '../../../services/ui-state.service';
 
 @Component({
     selector: 'app-ver-tours',
     standalone: true,
-    imports: [],
+    imports: [FormsModule],
     templateUrl: './ver-tours.html',
     styleUrls: ['./ver-tours.css']
 })
 export class VerToursComponent implements OnInit {
-    private reservasService = inject(Reservas);
-    private toursService = inject(Tours);
-    private navbar = inject(DynamicIslandGlobalService);
-    private router = inject(Router);
-    private permisosService = inject(PermisosService);
+    private toursService     = inject(Tours);
+    private uiState          = inject(UiStateService);
+    private router           = inject(Router);
+    private permisosService  = inject(PermisosService);
+    private alerts           = inject(SirAlertService);
 
-    tours = signal<Tour[]>([]);
+    tours     = signal<Tour[]>([]);
     isLoading = signal(true);
-    skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
+    busqueda  = signal('');
 
-    private refreshToursEffect = effect(() => {
-        const entity = this.navbar.needsRefresh();
+    skeletonRows = [0, 1, 2, 3, 4, 5];
+
+    private refreshEffect = effect(() => {
+        const entity = this.uiState.needsRefresh();
         if (entity === 'tours') {
-            this.listar();
-            this.navbar.needsRefresh.set('');
+            this.loadTours();
+            this.uiState.needsRefresh.set('');
         }
     });
 
-    // filtro simple - por ahora devuelve todos, expón como función para template
-    toursFiltrados = () => this.tours();
+    toursFiltrados = computed(() => {
+        const q = this.busqueda().toLowerCase().trim();
+        if (!q) return this.tours();
+        return this.tours().filter(t =>
+            t.Nombre_Tour?.toLowerCase().includes(q) ||
+            t.Abreviacion?.toLowerCase().includes(q)
+        );
+    });
 
-    get canDeleteTour(): boolean {
-        return this.permisosService.tienePermiso('TOURS.ELIMINAR');
-    }
-
-    get canCreateTour(): boolean {
-        return this.permisosService.tienePermiso('TOURS.CREAR');
-    }
-
-    get canUpdateTour(): boolean {
-        return this.permisosService.tienePermiso('TOURS.ACTUALIZAR');
-    }
+    get canDeleteTour(): boolean { return this.permisosService.tienePermiso('TOURS.ELIMINAR'); }
+    get canCreateTour(): boolean { return this.permisosService.tienePermiso('TOURS.CREAR'); }
+    get canUpdateTour(): boolean { return this.permisosService.tienePermiso('TOURS.ACTUALIZAR'); }
 
     ngOnInit(): void {
-        this.listar();
-    }
-
-    listar() {
         this.loadTours();
     }
 
     loadTours() {
         this.isLoading.set(true);
-        this.reservasService.getTours().pipe(
-            finalize(() => {
-                this.isLoading.set(false);
-            })
+        this.toursService.getTours().pipe(
+            finalize(() => this.isLoading.set(false))
         ).subscribe({
-            next: (data) => {
-                queueMicrotask(() => this.tours.set(data || []));
-            },
-            error: (err) => {
-                this.navbar.showAlert({
-                    type: 'error',
-                    title: 'Error al cargar tours',
-                    message: err?.error?.message || 'Ha ocurrido un error inesperado.',
-                    autoClose: true,
-                });
-            },
-            complete: () => {
-                queueMicrotask(() => {
-                    this.navbar.clearOverlay();
-                });
-            }
+            next: (data) => queueMicrotask(() => this.tours.set(data || [])),
+            error: (err) => this.alerts.showAlert({
+                type: 'error',
+                title: 'Error al cargar tours',
+                message: err?.error?.message || 'Ha ocurrido un error inesperado.',
+                autoClose: true,
+            })
         });
     }
 
-    // Helper para mostrar un valor numérico o fallback
-    showNumber(v: any) { return (v === null || v === undefined) ? '—' : v; }
+    formatValor(v: number | null | undefined): string {
+        if (v === null || v === undefined) return '—';
+        return '$' + Number(v).toLocaleString('es-CO');
+    }
+
+    showNumber(v: any): string {
+        return (v === null || v === undefined) ? '—' : String(v);
+    }
+
+    tourComisiones(tour: Tour): Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }> {
+        if (Array.isArray(tour.Comisiones)) return tour.Comisiones;
+        if (Array.isArray(tour.comisiones)) return tour.comisiones;
+        console.log(`comisiones no encontradas para el tour ${tour.Id_Tour}:`, tour);
+        return [];
+    }
 
     crearTour() {
         if (!this.canCreateTour) {
-            this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear tours.');
+            this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear tours.');
             return;
         }
         this.router.navigate(['/Tours/NuevoTour']);
@@ -97,49 +96,33 @@ export class VerToursComponent implements OnInit {
         this.router.navigate([`/Tours/Editar/${tour.Id_Tour}`]);
     }
 
-    verProgramacion(tour: Tour) {
-        this.navbar.showAlert({ type: 'info', title: 'Ver Programación', message: `Abrir programación para ${tour.Nombre_Tour}`, autoClose: true });
-    }
-
     eliminarTour(tour: Tour) {
-        this.navbar.showConfirm(
+        this.alerts.confirm(
             '¿Eliminar tour?',
             `¿Estás seguro de que deseas eliminar el tour "${tour.Nombre_Tour}"? Esta acción no se puede deshacer.`,
-            [
-                { text: 'Cancelar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
-                {
-                    text: 'Eliminar',
-                    style: 'primary',
-                    onClick: () => {
-                        this.navbar.clearOverlay();
-                        this.confirmarEliminacion(tour);
-                    }
-                }
-            ]
+            () => this.confirmarEliminacion(tour),
+            undefined,
+            { confirmText: 'Eliminar', cancelText: 'Cancelar', type: 'warning' }
         );
     }
 
     private confirmarEliminacion(tour: Tour) {
         this.toursService.deleteTour(tour.Id_Tour!).subscribe({
             next: () => {
-                this.navbar.showAlert({
+                this.alerts.showAlert({
                     type: 'success',
                     title: 'Tour eliminado',
                     message: `El tour "${tour.Nombre_Tour}" ha sido eliminado exitosamente.`,
                     autoClose: true
                 });
-                // Recargar la lista de tours
                 this.loadTours();
             },
-            error: (err) => {
-                this.navbar.showAlert({
-                    type: 'error',
-                    title: 'Error al eliminar',
-                    message: err?.error?.error || 'No se pudo eliminar el tour.',
-                    autoClose: false,
-                    buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }]
-                });
-            }
+            error: (err) => this.alerts.showAlert({
+                type: 'error',
+                title: 'Error al eliminar',
+                message: err?.error?.message || 'No se pudo eliminar el tour.',
+                autoClose: false
+            })
         });
     }
 }

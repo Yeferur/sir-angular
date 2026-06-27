@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { DynamicIslandGlobalService } from '../DynamicNavbar/global';
+import { SirAlertService } from '../Alertas/alert.service';
 
 export enum TourId {
   RIO_CLARO = 1,
@@ -46,7 +46,7 @@ const TOUR_POLICIES: Record<number, TourPolicy> = {
 
 @Injectable({ providedIn: 'root' })
 export class TourRulesService {
-  private navbar = inject(DynamicIslandGlobalService);
+  private alerts = inject(SirAlertService);
   private alertasMostradas = new Set<string>();
 
   allowsPassengerType(tourId: number, tipo: TipoPasajero): boolean {
@@ -73,7 +73,7 @@ export class TourRulesService {
     if (alertConfig) {
       if (!this.alertasMostradas.has(alertConfig.key)) {
         this.alertasMostradas.add(alertConfig.key);
-        this.navbar.showAlert({
+        this.alerts.showAlert({
           type: alertConfig.type,
           title: alertConfig.title,
           message: alertConfig.message,

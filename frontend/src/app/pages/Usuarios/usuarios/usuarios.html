@@ -2,12 +2,8 @@
   <!-- ENCABEZADO Y KPI CARDS -->
   <div class="dashboard-header">
     <div class="header-top">
-      <h1>Administrar Usuarios</h1>
       @if (canCreateUsers()) {
         <a class="btn-primary-create" routerLink="/Usuarios/NuevoUsuario">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"></path>
-          </svg>
           <span>Nuevo Usuario</span>
         </a>
       }

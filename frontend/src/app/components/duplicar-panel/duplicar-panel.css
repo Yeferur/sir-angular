@@ -1,0 +1,210 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.duplicar-panel {
+  padding: var(--panel-padding, 24px 28px);
+  max-width: var(--panel-max-width, 520px);
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  color: var(--text-primary, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ANIMACIONES DE ENTRADA */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.duplicar-panel h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.duplicar-panel p {
+  margin: 0 0 16px 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation-delay: 0.05s;
+}
+
+.duplicate-notice {
+  margin: 4px 0 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(10, 132, 255, 0.28);
+  background: rgba(10, 132, 255, 0.12);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* CAMPOS DEL FORMULARIO */
+.field {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Staggering para los inputs */
+.field:nth-of-type(1) { animation-delay: 0.1s; }
+.field:nth-of-type(2) { animation-delay: 0.15s; }
+.field:nth-of-type(3) { animation-delay: 0.2s; }
+
+.field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+.field select,
+.field input.form-input,
+.field textarea {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  appearance: none; /* Reset nativo para selects */
+}
+
+.field app-datepicker {
+  display: block;
+  width: 100%;
+}
+
+.field select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 15px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 44px;
+}
+
+.field textarea {
+  min-height: 104px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.72;
+}
+
+/* Estados de foco premium (Glow) */
+.field select:focus,
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.error-message {
+  margin-top: 2px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 69, 58, 0.32);
+  border-radius: 12px;
+  background: rgba(255, 69, 58, 0.12);
+  color: #ffb4ad;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation-delay: 0.22s;
+}
+
+/* BOTONES */
+.actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation-delay: 0.25s;
+}
+
+.btn-primary, .btn-secondary {
+  flex-grow: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.2s;
+}
+
+.btn-primary {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.btn-primary:active, .btn-secondary:active {
+  transform: scale(0.97);
+}
+
+.btn-primary:hover, .btn-secondary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: none;
+  transform: none;
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+  .duplicar-panel {
+    padding: 20px;
+    max-width: 95vw;
+  }
+  .actions {
+    flex-direction: column-reverse;
+  }
+  .btn-primary, .btn-secondary {
+    width: 100%;
+  }
+}

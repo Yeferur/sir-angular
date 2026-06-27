@@ -1,0 +1,430 @@
+<div class="page-container">
+
+  <!-- HEADER / FILTROS -->
+  <div class="page-header">
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="form-label">Fecha del Tour</label>
+        <div class="date-picker-wrap">
+          <app-datepicker [(ngModel)]="fecha" placeholder="Seleccionar fecha"></app-datepicker>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="form-label">Tour</label>
+        <select class="form-select" [(ngModel)]="idTour">
+          <option value="">Todos los tours</option>
+          @for (t of tours; track t.Id_Tour) {
+            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="form-label">Canal</label>
+        <select class="form-select" [(ngModel)]="idCanal">
+          <option value="">Todos los canales</option>
+          @for (canal of canalesDisponibles; track canal.Id_Canal) {
+            <option [value]="canal.Id_Canal">{{ canal.Nombre_Canal }}</option>
+          }
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="form-label">Estado</label>
+        <select class="form-select" [(ngModel)]="filtroEstado">
+          <option value="">Todos</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="PAGADO">Pagado</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="form-label">Reportante</label>
+        <input type="text" class="form-input" [(ngModel)]="filtroReportante" placeholder="Buscar reportante..." />
+      </div>
+      <button class="btn-primary" (click)="buscar()" [disabled]="isSearching">
+        @if (isSearching) { Buscando... } @else { Buscar }
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENIDO -->
+  @if (isSearching) {
+    <div class="card">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando comisiones...</p>
+      </div>
+    </div>
+
+  } @else if (!hasSearched) {
+    <div class="results-area">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <h3>Listo para buscar</h3>
+        <p>Aplica los filtros y presiona "Buscar" para cargar las comisiones.</p>
+      </div>
+    </div>
+
+  } @else if (canales.length === 0) {
+    <div class="results-area">
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3>Sin comisiones</h3>
+        <p>No hay reservas con comisión para los filtros seleccionados.</p>
+      </div>
+    </div>
+
+  } @else {
+
+    <!-- SUMMARY BAR -->
+    <div class="summary-bar">
+      <div class="summary-stat">
+        <span class="summary-number">{{ totalReservas }}</span>
+        <span class="summary-label">Reservas</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number">{{ canales.length }}</span>
+        <span class="summary-label">Canales</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number summary-number--total">{{ formatCOP(totalGlobal) }}</span>
+        <span class="summary-label">Total comisiones</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number summary-number--pending">{{ formatCOP(totalPendiente) }}</span>
+        <span class="summary-label">Pendiente</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-number summary-number--paid">{{ formatCOP(totalPagado) }}</span>
+        <span class="summary-label">Pagado</span>
+      </div>
+
+      <div class="summary-actions">
+        <!-- Pagar todo global -->
+        @if (totalPendientesGlobal > 0) {
+          <button class="btn-pagar-global" (click)="pagarTodoGlobal()" [disabled]="isSavingGlobal">
+            @if (isSavingGlobal) {
+              <span class="btn-spinner btn-spinner--dark"></span>
+              Pagando...
+            } @else {
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Pagar todo ({{ totalPendientesGlobal }})
+            }
+          </button>
+        }
+
+        <!-- Exportar Excel -->
+        <button class="btn-export" (click)="descargarExcel()" [disabled]="isExporting">
+          @if (isExporting) {
+            <span class="btn-spinner btn-spinner--dark"></span>
+            Generando...
+          } @else {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Exportar Excel
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- CANAL CARDS -->
+    @for (canal of canales; track canal.Id_Canal) {
+      <div class="canal-card">
+
+        <button class="canal-header" (click)="toggleCanal(canal.Id_Canal)">
+          <div class="canal-header-left">
+            <span class="canal-badge">{{ canal.Nombre_Canal }}</span>
+            <span class="canal-reservas-count">{{ canal.reportantes.length }} reportante(s)</span>
+          </div>
+          <div class="canal-header-right">
+            <div class="canal-totales">
+              <span class="canal-total-item canal-total-item--pending">
+                <span class="dot dot--pending"></span>
+                Pendiente: <strong>{{ formatCOP(canal.Pendiente_Canal) }}</strong>
+              </span>
+              <span class="canal-total-item canal-total-item--paid">
+                <span class="dot dot--paid"></span>
+                Pagado: <strong>{{ formatCOP(canal.Pagado_Canal) }}</strong>
+              </span>
+              <span class="canal-total-item canal-total-item--total">
+                Total: <strong>{{ formatCOP(canal.Total_Canal) }}</strong>
+              </span>
+            </div>
+            <svg class="chevron" [class.chevron--open]="!isCollapsed(canal.Id_Canal)"
+              width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+        </button>
+
+        @if (!isCollapsed(canal.Id_Canal)) {
+          <div class="canal-body">
+            @for (rep of canal.reportantes; track rep.Nombre_Reportante) {
+              <div class="reportante-block">
+
+                <!-- REPORTANTE HEADER -->
+                <div class="reportante-header">
+                  <div class="reportante-header-left">
+                    <span class="reportante-name">{{ rep.Nombre_Reportante }}</span>
+                    <span class="rep-badge">{{ rep.reservas.length }} reserva(s)</span>
+                    <span class="rep-total">{{ formatCOP(rep.Total_Reportante) }}</span>
+                    @if (isDirtyReportante(rep.Nombre_Reportante)) {
+                      <span class="rep-dirty-badge">Pago sin guardar</span>
+                    }
+                  </div>
+                  <div class="reportante-header-right">
+                    <!-- Pagar todas (2+ reservas con pendientes) -->
+                    @if (mostrarBotonPagarReportante(rep)) {
+                      <button class="btn-pagar-bloque"
+                        (click)="abrirModalPagarReportante(rep)"
+                        [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal">
+                        @if (isSavingReportante(rep.Nombre_Reportante)) {
+                          <span class="btn-spinner"></span>
+                        } @else {
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        }
+                        Pagar todas ({{ cantidadPendientes(rep) }})
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <!-- FORMA DE PAGO -->
+                <div class="pago-config">
+                  <div class="pago-config-group">
+                    <label class="form-label">Forma de pago</label>
+                    <select class="form-select form-select--sm"
+                      [(ngModel)]="rep.Forma_Pago"
+                      [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal"
+                      (ngModelChange)="onFormaPagoChange(rep)">
+                      <option value="BANCOLOMBIA">Bancolombia</option>
+                      <option value="NEQUI">Nequi</option>
+                      <option value="EFECTIVO">Efectivo</option>
+                    </select>
+                  </div>
+                  @if (requiereCuenta(rep)) {
+                    <div class="pago-config-group">
+                      <label class="form-label">{{ pagoLabel(rep) }}</label>
+                      <input type="text" class="form-input form-input--sm"
+                        [class.form-input--invalid]="mostrarErrorPago(rep)"
+                        [(ngModel)]="rep.Cuenta_Bancaria"
+                        [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal"
+                        (ngModelChange)="onCuentaChange(rep)"
+                        [placeholder]="cuentaPlaceholder(rep)" />
+                    </div>
+                  }
+                </div>
+                @if (mostrarErrorPago(rep)) {
+                  <div class="pago-error">{{ pagoError(rep) }}</div>
+                }
+
+                <!-- TABLA -->
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead class="thead">
+                      <tr>
+                        <th class="th">Reserva</th>
+                        <th class="th">Tour</th>
+                        <th class="th th-center">Pasajeros</th>
+                        <th class="th th-right">Com. unitaria</th>
+                        <th class="th th-right">Total comisión</th>
+                        <th class="th th-center">Estado</th>
+                        <th class="th th-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody class="tbody">
+                      @for (r of rep.reservas; track r.Id_Reserva) {
+                        <tr [class.row--paid]="r.Estado_Liquidacion === 'PAGADO'"
+                            [class.row--saving]="isSavingReportante(rep.Nombre_Reportante)">
+                          <td class="td">
+                            <span class="reserva-id">#{{ r.Id_Reserva }}</span>
+                          </td>
+                          <td class="td">{{ r.Nombre_Tour }}</td>
+                          <td class="td td-center">
+                            <span class="count-pill">{{ r.Num_Pasajeros }}</span>
+                          </td>
+                          <td class="td td-right">
+                            <span class="amount">{{ formatCOP(r.Comision_Unitaria) }}</span>
+                          </td>
+                          <td class="td td-right">
+                            <span class="amount amount--commission">{{ formatCOP(r.Total_Comision) }}</span>
+                          </td>
+                          <td class="td td-center">
+                            <!-- Badge de estado (solo visual, no clickeable) -->
+                            <span class="estado-badge"
+                              [class.estado-badge--paid]="r.Estado_Liquidacion === 'PAGADO'"
+                              [class.estado-badge--pending]="r.Estado_Liquidacion !== 'PAGADO'">
+                              @if (r.Estado_Liquidacion === 'PAGADO') {
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              }
+                              {{ r.Estado_Liquidacion === 'PAGADO' ? 'Pagado' : 'Pendiente' }}
+                            </span>
+                          </td>
+                          <td class="td td-center">
+                            @if (isSavingReportante(rep.Nombre_Reportante)) {
+                              <span class="btn-spinner btn-spinner--inline"></span>
+                            } @else if (r.Estado_Liquidacion !== 'PAGADO') {
+                              <!-- Botón Pagar (reserva pendiente) -->
+                              <button class="btn-pagar-reserva"
+                                (click)="abrirModalPagarReserva(r, rep)"
+                                [disabled]="isSavingGlobal">
+                                Pagar
+                              </button>
+                            } @else {
+                              <!-- Botón Revertir (reserva ya pagada) -->
+                              <button class="btn-revertir"
+                                (click)="revertirReserva(r, rep)"
+                                [disabled]="isSavingGlobal">
+                                Revertir
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                    @if (rep.reservas.length >= 2) {
+                      <tfoot>
+                        <tr class="tfoot-row">
+                          <td class="td-foot" colspan="4">
+                            <span class="tfoot-label">Subtotal {{ rep.Nombre_Reportante }}</span>
+                          </td>
+                          <td class="td-foot td-right">
+                            <span class="amount amount--commission">{{ formatCOP(rep.Total_Reportante) }}</span>
+                          </td>
+                          <td class="td-foot" colspan="2"></td>
+                        </tr>
+                      </tfoot>
+                    }
+                  </table>
+                </div>
+
+              </div>
+            }
+          </div>
+        }
+
+      </div>
+    }
+
+  }
+
+</div>
+
+<!-- FLOATING SAVE BUTTON — solo para datos de pago sin guardar (reportantes en PENDIENTE) -->
+@if (hasDirty) {
+  <button class="floating-save-btn" (click)="guardarCambios()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Guardar datos de pago ({{ dirtyCount }})
+  </button>
+}
+
+<!-- MODAL DE CONFIRMACIÓN DE PAGO -->
+@if (modal.visible) {
+  <div class="modal-backdrop" (click)="cerrarModal()"></div>
+  <div class="modal-pago" role="dialog" aria-modal="true">
+
+    <div class="modal-header">
+      <h2 class="modal-title">{{ modalTitulo }}</h2>
+      <button class="modal-close" (click)="cerrarModal()" [disabled]="modal.saving">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Resumen de lo que se va a pagar -->
+      <div class="modal-resumen">
+        <div class="modal-resumen-row">
+          <span class="modal-resumen-label">Reportante</span>
+          <span class="modal-resumen-value">{{ modal.reportante?.Nombre_Reportante }}</span>
+        </div>
+        <div class="modal-resumen-row">
+          <span class="modal-resumen-label">
+            {{ modal.reservas.length === 1 ? 'Reserva' : 'Reservas' }}
+          </span>
+          <span class="modal-resumen-value">
+            @if (modal.reservas.length === 1) {
+              #{{ modal.reservas[0].Id_Reserva }}
+            } @else {
+              {{ modal.reservas.length }} reservas
+            }
+          </span>
+        </div>
+        <div class="modal-resumen-row modal-resumen-row--total">
+          <span class="modal-resumen-label">Total a pagar</span>
+          <span class="modal-resumen-value modal-resumen-total">{{ modalTotalLabel }}</span>
+        </div>
+      </div>
+
+      <!-- Forma de pago -->
+      <div class="modal-field">
+        <label class="form-label">Forma de pago</label>
+        <select class="form-select"
+          [(ngModel)]="modal.Forma_Pago"
+          [disabled]="modal.saving"
+          (ngModelChange)="onModalFormaPagoChange()">
+          <option value="BANCOLOMBIA">Bancolombia</option>
+          <option value="NEQUI">Nequi</option>
+          <option value="EFECTIVO">Efectivo</option>
+        </select>
+      </div>
+
+      @if (modalRequiereCuenta) {
+        <div class="modal-field">
+          <label class="form-label">{{ modalCuentaLabel }}</label>
+          <input type="text" class="form-input"
+            [class.form-input--invalid]="modal.Cuenta_Bancaria && modalError"
+            [(ngModel)]="modal.Cuenta_Bancaria"
+            [disabled]="modal.saving"
+            [placeholder]="modalCuentaPlaceholder" />
+          @if (modal.Cuenta_Bancaria && modalError) {
+            <span class="pago-error">{{ modalError }}</span>
+          }
+        </div>
+      }
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="cerrarModal()" [disabled]="modal.saving">
+        Cancelar
+      </button>
+      <button class="btn-confirmar-pago" (click)="confirmarPago()"
+        [disabled]="!modalEsValido || modal.saving">
+        @if (modal.saving) {
+          <span class="btn-spinner"></span>
+          Registrando...
+        } @else {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Confirmar pago
+        }
+      </button>
+    </div>
+
+  </div>
+}

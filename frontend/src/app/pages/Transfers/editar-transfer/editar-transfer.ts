@@ -1,28 +1,47 @@
-import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef } from '@angular/core';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { UiStateService } from '../../../services/ui-state.service';
+
+interface WizardStep {
+  id: string;
+  label: string;
+}
 
 @Component({
   selector: 'app-editar-transfer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, FlatpickrInputDirective, UppercaseInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent],
   templateUrl: './editar-transfer.html',
   styleUrls: ['./editar-transfer.css']
 })
 export class EditarTransferComponent implements OnInit, OnDestroy {
+  private alerts = inject(SirAlertService);
+  private uiState = inject(UiStateService);
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
   private originalTransfer: any = null;
+
+  readonly wizardSteps: WizardStep[] = [
+    { id: 'servicio', label: 'Servicio' },
+    { id: 'responsable', label: 'Responsable' },
+    { id: 'pago', label: 'Pago' },
+    { id: 'resumen', label: 'Resumen' }
+  ];
+
+  currentStep = 0;
+  goingBack = false;
+  maxReachedStep = 0;
+  panelAnimating = false;
 
   private toUpperText(value: unknown): string {
     return String(value ?? '').trim().toLocaleUpperCase('es-CO');
@@ -35,6 +54,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
+  readonly todayYmd = this.getTodayYmd();
 
   private normalizeYmd(value: unknown): string | null {
     const raw = String(value ?? '').trim();
@@ -66,6 +86,30 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     return `${yearPart}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
+  private normalizeIncomingDate(value: unknown): string {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+
+    const direct = this.normalizeYmd(raw);
+    if (direct) return direct;
+
+    const isoCandidate = raw.includes('T') ? raw.split('T')[0] : raw.split(' ')[0];
+    const normalizedIsoCandidate = this.normalizeYmd(isoCandidate);
+    if (normalizedIsoCandidate) return normalizedIsoCandidate;
+
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const [, dayPart, monthPart, yearPart] = slashMatch;
+      const reordered = `${yearPart}-${monthPart.padStart(2, '0')}-${dayPart.padStart(2, '0')}`;
+      return this.normalizeYmd(reordered) || '';
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '';
+
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
   private fechaNoPasadaValidator(): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       const normalized = this.normalizeYmd(control.value);
@@ -92,6 +136,169 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  private triggerPanelAnimation(back: boolean): void {
+    this.goingBack = back;
+    this.panelAnimating = false;
+    this.cdr.markForCheck();
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
+      this.cdr.markForCheck();
+      setTimeout(() => {
+        this.panelAnimating = false;
+        this.goingBack = false;
+        this.cdr.markForCheck();
+      }, 380);
+    });
+  }
+
+  canNavigateToStep(index: number): boolean {
+    return index <= this.maxReachedStep || index <= this.currentStep;
+  }
+
+  goToStep(index: number): void {
+    if (!this.canNavigateToStep(index) || index === this.currentStep) return;
+    const back = index < this.currentStep;
+    this.currentStep = index;
+    this.triggerPanelAnimation(back);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (!this.canAdvanceFromStep(this.currentStep)) {
+      this.markCurrentStepTouched();
+      return;
+    }
+
+    if (this.currentStep < this.wizardSteps.length - 1) {
+      this.currentStep++;
+      this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+      this.triggerPanelAnimation(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  prevStep(): void {
+    if (this.currentStep <= 0) return;
+    this.currentStep--;
+    this.triggerPanelAnimation(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    switch (step) {
+      case 0:
+        return this.isServicioStepValid();
+      case 1:
+        return this.isResponsableStepValid();
+      case 2:
+        return this.isPagoStepValid();
+      case 3:
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  private isServicioStepValid(): boolean {
+    const controls = ['Titular', 'Cantidad_Personas', 'TipoServicio', 'Salida', 'Llegada', 'Fecha'];
+    if (controls.some((name) => this.form?.get(name)?.invalid)) return false;
+    if (this.showFlightFields && (this.form.get('Vuelo')?.invalid || this.form.get('TipoVuelo')?.invalid)) return false;
+
+    const cantidad = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+    if (cantidad !== null && !this.selectedRango) return false;
+
+    return true;
+  }
+
+  private isResponsableStepValid(): boolean {
+    return !!(
+      this.form?.get('Reporta')?.valid &&
+      this.form?.get('TelefonoReserva')?.valid
+    );
+  }
+
+  private isPagoStepValid(): boolean {
+    if (!this.abonosValidos) return false;
+    if (this.form?.get('TipoPago')?.value === 'Abonos') return this.abonos.controls.every((control) => control.valid);
+    return true;
+  }
+
+  private markCurrentStepTouched(): void {
+    switch (this.currentStep) {
+      case 0: {
+        ['Titular', 'Cantidad_Personas', 'TipoServicio', 'Salida', 'Llegada', 'Fecha', 'Vuelo', 'TipoVuelo']
+          .forEach((name) => this.form.get(name)?.markAsTouched());
+
+        const cantidad = this.normalizarCantidadPersonas(this.form.get('Cantidad_Personas')?.value);
+        const message = cantidad !== null && !this.selectedRango
+          ? 'No existe un rango configurado para la cantidad de personas indicada.'
+          : 'Completa los datos obligatorios del servicio antes de continuar.';
+
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Paso incompleto',
+          message,
+          autoClose: true,
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
+        });
+        break;
+      }
+      case 1:
+        this.form.get('Reporta')?.markAsTouched();
+        this.form.get('TelefonoReserva')?.markAsTouched();
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Paso incompleto',
+          message: 'Completa los datos del responsable antes de continuar.',
+          autoClose: true,
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
+        });
+        break;
+      case 2:
+        this.abonos.controls.forEach((control) => control.markAllAsTouched());
+        this.form.get('ComprobantePago')?.markAsTouched();
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Pago incompleto',
+          message: !this.abonosValidos
+            ? 'Los abonos no pueden superar el valor del transfer.'
+            : 'Revisa la información de pago antes de continuar.',
+          autoClose: true,
+          buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
+        });
+        break;
+    }
+  }
+
+  stepHasError(step: number): boolean {
+    if (step > this.currentStep) return false;
+
+    switch (step) {
+      case 0: {
+        const requiredTouchedInvalid = ['Titular', 'Cantidad_Personas', 'TipoServicio', 'Salida', 'Llegada', 'Fecha']
+          .some((name) => {
+            const control = this.form?.get(name);
+            return !!(control?.touched && control.invalid);
+          });
+        const flightInvalid = this.showFlightFields && ['Vuelo', 'TipoVuelo'].some((name) => {
+          const control = this.form?.get(name);
+          return !!(control?.touched && control.invalid);
+        });
+        const cantidad = this.normalizarCantidadPersonas(this.form?.get('Cantidad_Personas')?.value);
+        return requiredTouchedInvalid || !!flightInvalid || (cantidad !== null && !this.selectedRango);
+      }
+      case 1:
+        return ['Reporta', 'TelefonoReserva'].some((name) => {
+          const control = this.form?.get(name);
+          return !!(control?.touched && control.invalid);
+        });
+      case 2:
+        return !this.abonosValidos;
+      default:
+        return false;
+    }
+  }
+
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
@@ -114,116 +321,35 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   abonoFiles: Map<number, File> = new Map();
   abonoFileNames: Map<number, string> = new Map();
 
-  fpOptionsFecha: Partial<FlatpickrOptions> = {
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    allowInput: false,
-    disableMobile: true,
-    minDate: this.getTodayYmd(),
-    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-    altInputClass: 'form-input flatpickr-input flatpickr-alt',
-    onReady: (_sel, _str, inst: any) => {
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-      const cal: HTMLElement = inst?.calendarContainer;
-      if (!cal) return;
-      cal.classList.add('sir-flatpickr');
+  private get navbar() {
+    const mapButtons = (buttons: Array<{ text: string; style: string; onClick: () => void }>): AlertButton[] =>
+      buttons.map((button) => ({
+        text: button.text,
+        style: button.style === 'secondary' ? 'secondary' : button.style === 'delete' ? 'danger' : 'primary',
+        onClick: button.onClick,
+      }));
 
-      const clampDay = (y: number, m: number, d: number) => {
-        const last = new Date(y, m + 1, 0).getDate();
-        return Math.min(Math.max(d, 1), last);
-      };
-
-      let yearDiv: HTMLDivElement | null = null;
-      let yearSelect: HTMLSelectElement | null = null;
-
-      const ensureYearSelect = () => {
-        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-        if (!monthWrap) return null;
-        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-        if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
-        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-        const container = curMonth ?? monthWrap;
-        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-        if (yearSelect) return yearSelect;
-        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-        if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
-        yearSelect = document.createElement('select');
-        yearSelect.className = 'sir-year-select';
-        yearSelect.setAttribute('aria-label', 'Seleccionar año');
-        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-        return yearSelect;
-      };
-
-      const buildYears = (centerYear: number) => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-        const start = centerYear - 20;
-        const end = centerYear + 20;
-        sel.innerHTML = '';
-        for (let y = end; y >= start; y--) {
-          const opt = document.createElement('option');
-          opt.value = String(y);
-          opt.textContent = String(y);
-          sel.appendChild(opt);
-        }
-        sel.value = String(centerYear);
-      };
-
-      const syncSelectValue = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-        const y = inst.currentYear ?? new Date().getFullYear();
-        const exists = !!sel.querySelector(`option[value="${y}"]`);
-        if (!exists) buildYears(y);
-        sel.value = String(y);
-      };
-
-      const getSafeDay = () => {
-        const d: Date | undefined = inst.selectedDates?.[0];
-        return d ? d.getDate() : 1;
-      };
-
-      const onChange = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-        const y = Number(sel.value);
-        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-        const day = clampDay(y, m, getSafeDay());
-        const newDate = new Date(y, m, day);
-        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-        if (inst.selectedDates?.length) {
-          inst.setDate(newDate, true);
-        }
-      };
-
-      buildYears(inst.currentYear ?? new Date().getFullYear());
-      syncSelectValue();
-
-      const sel0 = ensureYearSelect();
-      sel0?.addEventListener('change', onChange);
-
-      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-        const prev = inst.config[key];
-        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-        inst.config[key] = [...arr, fn];
-      };
-
-      wrap('onMonthChange', () => syncSelectValue());
-      wrap('onYearChange', () => syncSelectValue());
-
-      const prevOnDestroy = inst.config.onDestroy;
-      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-      inst.config.onDestroy = [
-        ...destroyArr,
-        () => sel0?.removeEventListener('change', onChange)
-      ];
-    }
-  };
+    return {
+      showAlert: (alert: Parameters<SirAlertService['showAlert']>[0]) => this.alerts.showAlert({
+        ...alert,
+        buttons: alert.buttons ? mapButtons(alert.buttons as any[]) : alert.buttons,
+      }),
+      showConfirm: (title: string, message: string, buttons: Array<{ text: string; style: string; onClick: () => void }>) =>
+        this.alerts.showConfirm(title, message, mapButtons(buttons)),
+      confirmDelete: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) =>
+        this.alerts.confirmDelete(title, message, onConfirm, onCancel),
+      successToast: (title: string, message = '') => this.alerts.successToast(title, message),
+      errorToast: (title: string, message = '') => this.alerts.errorToast(title, message),
+      warningToast: (title: string, message = '') => this.alerts.warningToast(title, message),
+      clearOverlay: () => this.alerts.closeModal(),
+      needsRefresh: this.uiState.needsRefresh,
+      cuposInfo: this.uiState.cuposInfo,
+      Id_Transfer: this.uiState.transferId,
+    };
+  }
 
   constructor(
     private fb: FormBuilder,
-    private navbar: DynamicIslandGlobalService,
     private transferSvc: TransferService,
     private cdr: ChangeDetectorRef,
     private router: Router,
@@ -350,6 +476,20 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     const id = this.form?.get('TipoServicio')?.value;
     const servicio = this.resultsServicioTransfer.find(s => String(s.Id_Servicio ?? s.id) === String(id));
     return servicio ? servicio.Servicio : '—';
+  }
+
+  getResumenRuta(): string {
+    const salida = String(this.form?.get('Salida')?.value || '').trim() || '—';
+    const llegada = String(this.form?.get('Llegada')?.value || '').trim() || '—';
+    return `${salida} → ${llegada}`;
+  }
+
+  getResumenTipoPago(): string {
+    switch (this.form?.get('TipoPago')?.value) {
+      case 'Completo': return 'Ya pagó';
+      case 'Abonos': return `Abonos (${this.abonos.length})`;
+      default: return 'Paga en el punto';
+    }
   }
 
   get transferHeaderCode(): string {
@@ -527,6 +667,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
       this.route.snapshot.paramMap.get('Id_Transfer') ||
       this.route.snapshot.queryParamMap.get('id') ||
       this.route.snapshot.queryParamMap.get('Id_Transfer') ||
+      this.route.snapshot.url.map((segment) => segment.path).filter(Boolean).at(-1) ||
       this.navbar.Id_Transfer();
 
     const normalizedId = String(routeId ?? '').trim();
@@ -545,8 +686,12 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
   }
 
   private unwrapTransferDetalle(response: any): any | null {
+    if (!response) return null;
+    if (response?.data?.data?.transfer) return response.data.data;
     if (response?.data?.transfer) return response.data;
+    if (response?.data?.Id_Transfer) return response.data;
     if (response?.transfer) return response;
+    if (response?.Id_Transfer) return response;
     return null;
   }
 
@@ -662,7 +807,13 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
         const detalle = this.unwrapTransferDetalle(transfer);
         if (!detalle) {
-          this.navbar.errorToast('Error', 'Transfer no encontrado.');
+          const backendMessage =
+            transfer?.message ||
+            transfer?.error?.message ||
+            transfer?.error?.error ||
+            null;
+
+          this.navbar.errorToast('Error', backendMessage || 'No se pudo cargar el detalle del transfer.');
           this.router.navigate(['/Transfers/VerTransfers']);
           return;
         }
@@ -698,7 +849,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         TipoServicio: transfer.Id_Servicio || 'Seleccionar',
         Salida: transfer.Punto_Salida || '',
         Llegada: transfer.Punto_Destino || '',
-        Fecha: transfer.Fecha_Transfer || '',
+        Fecha: this.normalizeIncomingDate(transfer.Fecha_Transfer),
         Hora: transfer.Hora_Recogida || '',
         TipoVuelo: transfer.TipoVuelo || '',
         Reporta: transfer.Nombre_Reportante || '',
@@ -850,8 +1001,19 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     });
   }
 
+  private getTransferEstadoActual(): string {
+    return String(
+      this.originalTransfer?.Estado ??
+      this.originalTransfer?.Estado_Transfer ??
+      this.originalTransfer?.estado ??
+      this.originalTransfer?.Cabecera?.Estado ??
+      this.originalTransfer?.transfer?.Estado ??
+      ''
+    ).trim().toLowerCase();
+  }
+
   get puedeCancelarTransfer(): boolean {
-    const estado = String(this.originalTransfer?.Estado ?? '').trim().toLowerCase();
+    const estado = this.getTransferEstadoActual();
     return !!this.getTransferIdFromRoute() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
@@ -908,6 +1070,28 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     if (!id || !this.canDeleteTransfer) return;
 
     this.closeSummaryIfOpen();
+
+    this.alerts.confirmDelete(
+      'Eliminar transfer',
+      `¿Deseas eliminar el transfer #${id}? Esta acción eliminará el registro de forma permanente.`,
+      () => {
+        this.isSubmitting.set(true);
+        this.transferSvc.deleteTransfer(id).subscribe({
+          next: () => {
+            this.navbar.needsRefresh.set('transfers');
+            this.navbar.successToast('Transfer eliminado', `El transfer #${id} fue eliminado correctamente.`);
+            this.isSubmitting.set(false);
+            this.router.navigate(['/Transfers/VerTransfers']);
+          },
+          error: (err) => {
+            const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo eliminar el transfer.';
+            this.navbar.errorToast('No se pudo eliminar', message);
+            this.isSubmitting.set(false);
+          }
+        });
+      }
+    );
+    return;
 
     this.navbar.showConfirm(
       'Eliminar transfer',

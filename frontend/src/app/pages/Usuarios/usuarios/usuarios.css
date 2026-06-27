@@ -4,10 +4,8 @@
 }
 
 .page-container {
-  max-width: 1200px;
+  max-width: 1350px;
   margin: auto;
-  padding-top: 30px;
-  padding-bottom: 50px;
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 

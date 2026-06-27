@@ -103,17 +103,20 @@ exports.getMonedas = asyncHandler(async (_req, res) => {
   return sendSuccess(res, { data: await obtenerMonedas(), message: 'Monedas obtenidas correctamente' });
 });
 
-exports.getTours = asyncHandler(async (_req, res) => {
-  return sendSuccess(res, { data: await obtenerTours(), message: 'Tours obtenidos correctamente' });
+exports.getTours = asyncHandler(async (req, res) => {
+  return sendSuccess(res, {
+    data: await obtenerTours(req.query?.includeTourId),
+    message: 'Tours obtenidos correctamente'
+  });
 });
 
 exports.getPlanesByTour = asyncHandler(async (req, res) => {
-  return sendSuccess(res, { data: await obtenerPlanesByTour(req.params.id), message: 'Planes obtenidos correctamente' });
+  return sendSuccess(res, { data: await obtenerPlanesByTour(req.params.id, req.query?.fecha), message: 'Planes obtenidos correctamente' });
 });
 
 exports.getPrecios = asyncHandler(async (req, res) => {
-  const { Id_Tour, Id_Plan, Id_Moneda } = req.query;
-  return sendSuccess(res, { data: await obtenerPreciosPorFiltro(Id_Tour, Id_Plan, Id_Moneda), message: 'Precios obtenidos correctamente' });
+  const { Id_Tour, Id_Plan, Id_Moneda, fecha } = req.query;
+  return sendSuccess(res, { data: await obtenerPreciosPorFiltro(Id_Tour, Id_Plan, Id_Moneda, fecha), message: 'Precios obtenidos correctamente' });
 });
 
 exports.getHorarios = asyncHandler(async (req, res) => {

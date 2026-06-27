@@ -1,7 +1,7 @@
 const db = require('../database/db');
 
-// Estados admitidos (normalizamos con UPPER para tolerar mayúsc/minúsc)
-const ESTADOS_VALIDOS = ['PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
+// Estados admitidos (normalizamos con UPPER/TRIM para tolerar mayúsculas, minúsculas y espacios)
+const ESTADOS_VALIDOS = ['ACTIVA', 'ACTIVO', 'PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
 
 async function obtenerDatosInicio(fecha) {
   // TOURS: cupo del día (aforos) con fallback a Cupo_Base,
@@ -27,8 +27,8 @@ async function obtenerDatosInicio(fecha) {
           JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
           WHERE h.Id_Tour = t.Id_Tour AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
             AND r.Fecha_Tour = ?
-            AND UPPER(r.Tipo_Reserva) = 'GRUPAL'
-            AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+            AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+            AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
           GROUP BY r.Id_Reserva
         ) x
       ), 0) AS NumeroPasajeros,
@@ -38,8 +38,8 @@ async function obtenerDatosInicio(fecha) {
         JOIN horarios h ON h.Id_Horario = r.Id_Horario
         WHERE h.Id_Tour = t.Id_Tour
           AND r.Fecha_Tour = ?
-          AND UPPER(r.Tipo_Reserva) = 'GRUPAL'
-          AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
       ), 0) AS totalReservas,
       COALESCE((
         SELECT COUNT(*)
@@ -47,10 +47,11 @@ async function obtenerDatosInicio(fecha) {
         JOIN horarios h ON h.Id_Horario = r.Id_Horario
         WHERE h.Id_Tour = t.Id_Tour
           AND r.Fecha_Tour = ?
-          AND UPPER(r.Tipo_Reserva) = 'PRIVADA'
-          AND UPPER(r.Estado) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
       ), 0) AS totalPrivados
     FROM tours t
+    WHERE t.Activo = 1
   `;
 
   // TRANSFERS: total por servicio en la fecha, excluyendo estados anulados/cancelados
@@ -71,6 +72,38 @@ async function obtenerDatosInicio(fecha) {
     ORDER BY st.Id_Servicio
   `;
 
+  // PLANES: solo devolvemos desglose cuando el tour tiene mas de un plan configurado.
+  // El conteo real se obtiene desde pasajeros.Id_Plan.
+  const planesQuery = `
+    SELECT
+      pt.Id_Tour               AS Id_Tour,
+      pt.Id_Plan               AS Id_Plan,
+      pt.Nombre_Plan           AS Nombre_Plan,
+      COALESCE(pc.NumeroPasajeros, 0) AS NumeroPasajeros
+    FROM planes_tours pt
+    JOIN (
+      SELECT Id_Tour
+      FROM planes_tours
+      GROUP BY Id_Tour
+      HAVING COUNT(*) > 1
+    ) tours_multiples ON tours_multiples.Id_Tour = pt.Id_Tour
+    LEFT JOIN (
+      SELECT
+        h.Id_Tour,
+        p.Id_Plan,
+        COUNT(p.Id_Pasajero) AS NumeroPasajeros
+      FROM reservas r
+      JOIN horarios h ON h.Id_Horario = r.Id_Horario
+      JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+      WHERE r.Fecha_Tour = ?
+        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+        AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
+        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+      GROUP BY h.Id_Tour, p.Id_Plan
+    ) pc ON pc.Id_Tour = pt.Id_Tour AND pc.Id_Plan = pt.Id_Plan
+    ORDER BY pt.Id_Tour, pt.Id_Plan
+  `;
+
   // PRIVADOS: lista por tour (Id_Reserva + #pasajeros de esa reserva)
   const privadosQuery = `
     SELECT 
@@ -84,8 +117,8 @@ async function obtenerDatosInicio(fecha) {
     FROM reservas r
     JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE r.Fecha_Tour = ?
-      AND UPPER(r.Tipo_Reserva) = 'PRIVADA'
-      AND UPPER(r.Estado) IN ('PENDIENTE','CONFIRMADA','COMPLETADA','PENDIENTEDATOS')
+      AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+      AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
     ORDER BY r.Id_Reserva
   `;
 
@@ -114,7 +147,20 @@ async function obtenerDatosInicio(fecha) {
       transfer.totalTransfers = Number(transfer.totalTransfers) || 0;
     }
 
-    const [privadosRaw] = await db.query(privadosQuery, [fecha]);
+    const [planesRaw] = await db.query(planesQuery, [fecha, ...estadosParams]);
+
+    // Agrupar planes por tour
+    const planesMap = {};
+    for (const row of planesRaw) {
+      if (!planesMap[row.Id_Tour]) planesMap[row.Id_Tour] = [];
+      planesMap[row.Id_Tour].push({
+        Id_Plan: row.Id_Plan,
+        Nombre_Plan: row.Nombre_Plan,
+        NumeroPasajeros: Number(row.NumeroPasajeros) || 0,
+      });
+    }
+
+    const [privadosRaw] = await db.query(privadosQuery, [fecha, ...estadosParams]);
 
     // map privados por tour
     const privadosMap = {};
@@ -126,11 +172,14 @@ async function obtenerDatosInicio(fecha) {
       });
     }
 
-    // anexar lista de privados a cada tour
+    // Anexar planes y privados a cada tour.
+    // planes solo se incluye si hay datos — el frontend usa su presencia para mostrar el toggle.
     for (const t of tours) {
       t.privados = privadosMap[t.Id_Tour] || [];
+      const planes = planesMap[t.Id_Tour];
+      if (planes && planes.length > 0) t.planes = planes;
     }
-
+console.log('Datos de inicio obtenidos para fecha', fecha, { tours, transfers });
     return { tours, transfers };
   } catch (error) {
     throw error;
@@ -150,8 +199,8 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
       JOIN horarios h ON h.Id_Horario = r.Id_Horario
       JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
       WHERE h.Id_Tour = ? AND r.Fecha_Tour = ? AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
-        AND UPPER(r.Tipo_Reserva) = 'GRUPAL'
-        AND UPPER(r.Estado) IN ('PENDIENTE','PENDIENTEDATOS','CONFIRMADA','COMPLETADA')
+        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN ('ACTIVA','ACTIVO','PENDIENTE','PENDIENTEDATOS','CONFIRMADA','COMPLETADA')
     `;
     const [[{ totalPasajeros }]] = await conn.query(pasajerosQuery, [Id_Tour, Fecha]);
 

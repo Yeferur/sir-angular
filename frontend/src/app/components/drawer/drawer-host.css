@@ -1,0 +1,92 @@
+/*
+  SIR DRAWER HOST
+  Panel lateral que desliza desde la derecha.
+  Contiene: reserva, transfer, mapa.
+*/
+
+/* ── Backdrop ───────────────────────────────────────────────── */
+.sir-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  animation: drawerFadeIn 0.25s ease forwards;
+}
+
+@keyframes drawerFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Panel ──────────────────────────────────────────────────── */
+.sir-drawer-panel {
+  position: fixed;
+  top: calc(10px + 48px + 10px); /* debajo del topbar */
+  right: 12px;
+  bottom: 12px;
+  z-index: 801;
+
+  width: clamp(340px, 46vw, 980px);
+  max-width: calc(100vw - 24px);
+
+  background: var(--bg-secondary, #1c1c1e);
+  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
+  border-radius: 20px;
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.3), 0 8px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+
+  animation: drawerSlideIn 0.38s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  transform-origin: right center;
+}
+
+@keyframes drawerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(32px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* El contenido ocupa todo el panel */
+.sir-drawer-panel app-reserva,
+.sir-drawer-panel app-transfer-dynamic,
+.sir-drawer-panel app-mapa,
+.sir-drawer-panel app-duplicar-panel,
+.sir-drawer-panel app-updates-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Mapa: ancho más generoso ───────────────────────────────── */
+.sir-drawer-panel:has(app-mapa) {
+  width: clamp(520px, 60vw, 1100px);
+}
+
+/* ── Móvil: pantalla casi completa ─────────────────────────── */
+@media (max-width: 766px) {
+  .sir-drawer-panel {
+    top: calc(10px + 48px + 8px);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    animation: drawerSlideUp 0.38s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+
+  @keyframes drawerSlideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}

@@ -1,172 +1,290 @@
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
 
-/* ===========================
- * LISTAR SEGUROS
- * =========================== */
+/* ===================================================================
+ * LISTAR SEGUROS (desde programacion_buses)
+ * Devuelve un array de buses, cada uno con guía, conductor y pasajeros
+ * confirmados asignados a ese bus.
+ * =================================================================== */
 async function listarSeguros(filtros) {
     const { Id_Tour, Fecha } = filtros;
 
-    const conditions = [];
-    const params = [];
-
-    if (Fecha) {
-        conditions.push('R.Fecha_Tour = ?');
-        params.push(Fecha);
+    if (!Fecha || !Id_Tour) {
+        return [];
     }
 
-    if (Id_Tour) {
-        const tourArray = Array.isArray(Id_Tour) ? Id_Tour : [Id_Tour];
-        if (tourArray.length > 0 && tourArray[0] !== '') {
-            conditions.push(`H.Id_Tour IN (${tourArray.map(() => '?').join(',')})`);
-            params.push(...tourArray);
+    // 1. Buscar la programación activa para ese tour y fecha
+    const [progRows] = await db.query(
+        `SELECT Id_Programacion FROM programaciones
+         WHERE Fecha_Tour = ? AND Id_Tour = ? AND Estado = 'activa'
+         LIMIT 1`,
+        [Fecha, Id_Tour]
+    );
+
+    if (!progRows.length) return [];
+    const Id_Programacion = progRows[0].Id_Programacion;
+
+    // 2. Obtener los buses de esa programación
+    const [buses] = await db.query(
+        `SELECT
+            pb.Id_Bus_Prog,
+            pb.Placa_Display,
+            pb.Guia,
+            pb.Conductor,
+            pb.DNI_Guia,
+            pb.DNI_Conductor,
+            pb.Pasajeros_Total,
+            pb.Orden_Bus
+         FROM programacion_buses pb
+         WHERE pb.Id_Programacion = ?
+         ORDER BY pb.Orden_Bus ASC`,
+        [Id_Programacion]
+    );
+
+    if (!buses.length) return [];
+
+    const busIds = buses.map(b => b.Id_Bus_Prog);
+
+    // 3. Obtener reservas asignadas a esos buses con pasajeros confirmados
+    const [pasajeros] = await db.query(
+        `SELECT
+            pr.Id_Bus_Prog,
+            pr.Id_Reserva,
+            pr.Nombre_Reportante_Snap AS Nombre_Reportante,
+            p.Id_Pasajero,
+            p.Nombre_Pasajero,
+            p.DNI,
+            p.Tipo_Pasajero,
+            p.Confirmacion
+         FROM programacion_reservas pr
+         INNER JOIN pasajeros p ON p.Id_Reserva = pr.Id_Reserva
+         WHERE pr.Id_Bus_Prog IN (?)
+           AND p.Confirmacion = 1
+         ORDER BY pr.Id_Bus_Prog ASC, pr.Id_Reserva ASC, p.Id_Pasajero ASC`,
+        [busIds]
+    );
+
+    // 4. Agrupar pasajeros por bus
+    const pasajerosPorBus = new Map();
+    for (const p of pasajeros) {
+        if (!pasajerosPorBus.has(p.Id_Bus_Prog)) {
+            pasajerosPorBus.set(p.Id_Bus_Prog, []);
+        }
+        pasajerosPorBus.get(p.Id_Bus_Prog).push(p);
+    }
+
+    // 5. Armar respuesta
+    return buses.map(bus => ({
+        Id_Bus_Prog:    bus.Id_Bus_Prog,
+        Placa_Display:  bus.Placa_Display,
+        Orden_Bus:      bus.Orden_Bus,
+        Guia:           bus.Guia || null,
+        DNI_Guia:       bus.DNI_Guia || null,
+        Conductor:      bus.Conductor || null,
+        DNI_Conductor:  bus.DNI_Conductor || null,
+        pasajeros:      pasajerosPorBus.get(bus.Id_Bus_Prog) || []
+    }));
+}
+
+/* ===================================================================
+ * ACTUALIZAR CONDUCTOR / DNI de un bus (PATCH)
+ * Solo toca los campos de personal del bus, no afecta pasajeros.
+ * =================================================================== */
+async function actualizarPersonalBus(Id_Bus_Prog, campos) {
+    const permitidos = ['Conductor', 'DNI_Conductor', 'DNI_Guia'];
+    const sets = [];
+    const params = [];
+
+    for (const key of permitidos) {
+        if (Object.prototype.hasOwnProperty.call(campos, key)) {
+            sets.push(`\`${key}\` = ?`);
+            params.push(campos[key] ?? null);
         }
     }
 
-    conditions.push('P.Confirmacion = 1');
-    conditions.push('(R.Estado = "Completada" OR R.Estado = "Activa" OR R.Estado = "Confirmada")');
+    if (!sets.length) return { affected: 0 };
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    params.push(Id_Bus_Prog);
+    const [result] = await db.query(
+        `UPDATE programacion_buses SET ${sets.join(', ')} WHERE Id_Bus_Prog = ?`,
+        params
+    );
 
-    const sql = `
-    SELECT 
-      R.Id_Reserva,
-      R.Fecha_Tour,
-      T.Nombre_Tour,
-      P.Nombre_Pasajero,
-      P.DNI AS IdPas,
-      P.Confirmacion
-    FROM reservas R
-    JOIN horarios H ON R.Id_Horario = H.Id_Horario
-    JOIN tours T ON H.Id_Tour = T.Id_Tour
-    JOIN pasajeros P ON R.Id_Reserva = P.Id_Reserva
-    ${whereClause}
-    ORDER BY R.Fecha_Tour DESC, R.Id_Reserva DESC
-  `;
-
-    const [rows] = await db.query(sql, params);
-    return rows;
+    return { affected: result.affectedRows };
 }
 
-/* ===========================
+/* ===================================================================
  * EXPORTAR EXCEL SEGUROS
- * =========================== */
+ * Una hoja por bus: encabezado con datos del bus, luego pasajeros,
+ * luego fila de guía y fila de conductor.
+ * =================================================================== */
 async function generarExcelSeguros(filtros, res) {
     const { Id_Tour, Fecha } = filtros;
 
-    const conditions = [];
-    const params = [];
-
-    if (Fecha) {
-        conditions.push('R.Fecha_Tour = ?');
-        params.push(Fecha);
+    if (!Fecha || !Id_Tour) {
+        throw new Error('Faltan parámetros obligatorios: Fecha e Id_Tour');
     }
 
-    if (Id_Tour) {
-        const tourArray = Array.isArray(Id_Tour) ? Id_Tour : [Id_Tour];
-        if (tourArray.length > 0 && tourArray[0] !== '') {
-            conditions.push(`H.Id_Tour IN (${tourArray.map(() => '?').join(',')})`);
-            params.push(...tourArray);
-        }
+    const buses = await listarSeguros(filtros);
+    if (!buses.length) {
+        throw new Error('No hay datos de programación para exportar');
     }
 
-    conditions.push('P.Confirmacion = 1');
-    conditions.push('(R.Estado = "Completada" OR R.Estado = "Activa" OR R.Estado = "Confirmada")');
+    // Nombre del tour
+    const [[tourRow]] = await db.query(
+        `SELECT Nombre_Tour FROM tours WHERE Id_Tour = ? LIMIT 1`,
+        [Id_Tour]
+    );
+    const nombreTour = tourRow?.Nombre_Tour || 'Tour';
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-    // Query adapted to schema: R -> H -> T
-    const query = `
-    SELECT 
-        R.Id_Reserva,
-        T.Nombre_Tour,
-        P.Nombre_Pasajero,
-        P.DNI AS IdPas,
-        P.Confirmacion
-    FROM reservas AS R
-    INNER JOIN pasajeros AS P ON R.Id_Reserva = P.Id_Reserva
-    LEFT JOIN horarios H ON R.Id_Horario = H.Id_Horario
-    LEFT JOIN tours T ON H.Id_Tour = T.Id_Tour
-    ${whereClause}
-    ORDER BY R.Id_Reserva, P.Id_Pasajero
-  `;
-
-    const [data] = await db.query(query, params);
-
-    // Create workbook
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Seguros');
 
-    // Columns
-    worksheet.columns = [
-        { header: 'ID RESERVA', key: 'Id_Reserva', width: 20 },
-        { header: 'TOUR', key: 'Nombre_Tour', width: 30 },
-        { header: 'NOMBRE PASAJERO', key: 'Nombre_Pasajero', width: 30 },
-        { header: 'DNI/PASAPORTE', key: 'IdPas', width: 20 },
-    ];
-
-    // Styles
-    const borderStyleThin = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
+    const borderThin = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
     };
 
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    headerRow.eachCell((cell) => {
-        cell.border = borderStyleThin;
-    });
+    const fillTitle   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+    const fillHeader  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+    const fillSection = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
+    const fillAlt     = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
 
-    // Grouping for merge
-    let currentRowIndex = 2;
-    const groupedData = data.reduce((acc, row) => {
-        if (!acc[row.Id_Reserva]) acc[row.Id_Reserva] = [];
-        acc[row.Id_Reserva].push(row);
-        return acc;
-    }, {});
+    const fontHeader = { bold: true, color: { argb: 'FF111827' }, size: 11 };
+    const fontSection = { bold: true, color: { argb: 'FF111827' }, size: 10 };
 
-    for (const idReserva in groupedData) {
-        const rows = groupedData[idReserva];
-        const startRow = currentRowIndex;
+    const cols = [
+        { header: 'N°',              key: 'num',    width: 6  },
+        { header: 'TIPO',            key: 'tipo',   width: 14 },
+        { header: 'NOMBRE',          key: 'nombre', width: 36 },
+        { header: 'DNI / PASAPORTE', key: 'dni',    width: 22 },
+        { header: 'ID RESERVA',      key: 'reserva',width: 16 },
+    ];
 
-        rows.forEach((row, index) => {
-            const rowData = {
-                Id_Reserva: index === 0 ? row.Id_Reserva : '',
-                Nombre_Tour: index === 0 ? row.Nombre_Tour : '',
-                Nombre_Pasajero: row.Nombre_Pasajero || '',
-                IdPas: row.IdPas || ''
-            };
+    for (const [busIndex, bus] of buses.entries()) {
+        const sheetName = `Bus ${bus.Orden_Bus} - ${bus.Placa_Display}`.substring(0, 31);
+        const ws = workbook.addWorksheet(sheetName);
+        ws.columns = cols;
 
-            const newRow = worksheet.addRow(rowData);
-            newRow.eachCell({ includeEmpty: true }, (cell) => {
-                cell.border = borderStyleThin;
+        // --- Fila título ---
+        ws.mergeCells('A1:E1');
+        const titleCell = ws.getCell('A1');
+        titleCell.value = `${nombreTour} — ${Fecha} — Bus ${bus.Orden_Bus} (${bus.Placa_Display})`;
+        titleCell.font = { bold: true, size: 13, color: { argb: 'FF111827' } };
+        titleCell.fill = fillTitle;
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        titleCell.border = borderThin;
+        ws.getRow(1).height = 24;
+
+        // --- Fila encabezados de columna ---
+        const headerRow = ws.getRow(2);
+        headerRow.values = cols.map(c => c.header);
+        headerRow.eachCell(cell => {
+            cell.font = fontHeader;
+            cell.fill = fillHeader;
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = borderThin;
+        });
+        headerRow.height = 20;
+
+        // --- Filas de pasajeros ---
+        let rowNum = 3;
+        const pasajeros = bus.pasajeros;
+
+        pasajeros.forEach((p, idx) => {
+            const row = ws.getRow(rowNum);
+            row.values = [
+                idx + 1,
+                p.Tipo_Pasajero || 'ADULTO',
+                p.Nombre_Pasajero || '',
+                p.DNI || '',
+                p.Id_Reserva || ''
+            ];
+
+            if (idx % 2 === 1) {
+                row.eachCell({ includeEmpty: true }, cell => {
+                    cell.fill = fillAlt;
+                });
+            }
+
+            row.eachCell({ includeEmpty: true }, cell => {
+                cell.border = borderThin;
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
             });
-            currentRowIndex++;
+
+            // Nombre alineado a la izquierda
+            row.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+            rowNum++;
         });
 
-        const endRow = currentRowIndex - 1;
+        // --- Separador ---
+        ws.mergeCells(`A${rowNum}:E${rowNum}`);
+        const sepCell = ws.getCell(`A${rowNum}`);
+        sepCell.value = 'PERSONAL DEL BUS';
+        sepCell.font = fontSection;
+        sepCell.fill = fillSection;
+        sepCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        sepCell.border = borderThin;
+        ws.getRow(rowNum).height = 18;
+        rowNum++;
 
-        if (startRow !== endRow) {
-            worksheet.mergeCells(`A${startRow}:A${endRow}`); // ID RESERVA
-            worksheet.mergeCells(`B${startRow}:B${endRow}`); // TOUR
+        // --- Fila Guía ---
+        const guiaRow = ws.getRow(rowNum);
+        guiaRow.values = [
+            pasajeros.length + 1,
+            'GUÍA',
+            bus.Guia || '—',
+            bus.DNI_Guia || '—',
+            ''
+        ];
+        guiaRow.eachCell({ includeEmpty: true }, cell => {
+            cell.border = borderThin;
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.fill = fillAlt;
+        });
+        guiaRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+        rowNum++;
+
+        // --- Fila Conductor ---
+        const conductorRow = ws.getRow(rowNum);
+        conductorRow.values = [
+            pasajeros.length + 2,
+            'CONDUCTOR',
+            bus.Conductor || '—',
+            bus.DNI_Conductor || '—',
+            ''
+        ];
+        conductorRow.eachCell({ includeEmpty: true }, cell => {
+            cell.border = borderThin;
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.fill = fillAlt;
+        });
+        conductorRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+        rowNum++;
+
+        // --- Total ---
+        ws.mergeCells(`A${rowNum}:B${rowNum}`);
+        ws.getCell(`A${rowNum}`).value = 'Total asegurados';
+        ws.getCell(`A${rowNum}`).font = { bold: true };
+        ws.getCell(`A${rowNum}`).border = borderThin;
+        ws.getCell(`C${rowNum}`).value = pasajeros.length + 2; // pasajeros + guía + conductor
+        ws.getCell(`C${rowNum}`).font = { bold: true };
+        ws.getCell(`C${rowNum}`).border = borderThin;
+        ws.getCell(`C${rowNum}`).alignment = { horizontal: 'center' };
+
+        // Ajuste de alto de filas de datos
+        for (let r = 3; r < rowNum; r++) {
+            ws.getRow(r).height = 18;
         }
     }
 
-    worksheet.eachRow((row) => {
-        row.alignment = { vertical: 'middle', horizontal: 'center' };
-    });
-
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="Seguros_Reporte.xlsx"');
-
+    res.setHeader('Content-Disposition', `attachment; filename="Seguros_${Fecha}_Tour${Id_Tour}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
 }
 
 module.exports = {
     listarSeguros,
+    actualizarPersonalBus,
     generarExcelSeguros
 };

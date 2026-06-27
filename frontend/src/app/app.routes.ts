@@ -7,28 +7,28 @@ export const routes: Routes = [
   {
     path: 'forgot-password',
     loadComponent: () => import('./pages/Auth/forgot-password/forgot-password').then((m) => m.ForgotPasswordPageComponent),
-    title: 'SIR · Recuperar contraseña',
+    title: 'Recuperar contraseña',
   },
   {
     path: 'reset-password',
     loadComponent: () => import('./pages/Auth/reset-password/reset-password').then((m) => m.ResetPasswordPageComponent),
-    title: 'SIR · Restablecer contraseña',
+    title: 'Restablecer contraseña',
   },
   {
     path: '',
     loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
     data: { preload: true },
-    title: 'SIR · Inicio',
+    title: 'Aforos',
   },
   {
     path: 'Dashboard',
     loadComponent: () => import('./pages/Dashboard/dashboard').then((m) => m.DashboardComponent),
-    title: 'SIR · Dashboard',
+    title: 'Dashboard',
   },
   {
     path: 'Historial',
-    loadComponent: () => import('./pages/Historial/ver-historial/ver-historial').then((m) => m.VerHistorialComponent),
-    title: 'SIR · Historial',
+    loadComponent: () => import('./pages/Historial/ver-historial').then((m) => m.VerHistorialComponent),
+    title: 'Historial',
   },
 
   {
@@ -37,13 +37,13 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'RESERVAS.CREAR', redirectTo: '/Reservas/VerReservas' },
-    title: 'SIR · Nueva Reserva',
+    title: 'Nueva Reserva',
   },
   {
     path: 'Reservas/VerReservas',
     loadComponent: () => import('./pages/Reservas/ver-reservas/ver-reservas').then((m) => m.VerReservasComponent),
     data: { preload: true },
-    title: 'SIR · Ver Reservas',
+    title: 'Ver Reservas',
   },
   {
     path: 'Reservas/EditarReserva/:id',
@@ -51,7 +51,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'RESERVAS.ACTUALIZAR', redirectTo: '/Reservas/VerReservas' },
-    title: 'SIR · Editar Reserva',
+    title: 'Editar Reserva',
   },
 
   {
@@ -60,7 +60,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'TRANSFERS.CREAR', redirectTo: '/Transfers/VerTransfers' },
-    title: 'SIR · Nuevo Transfer',
+    title: 'Nuevo Transfer',
   },
   {
     path: 'Transfers/EditarTransfer/:id',
@@ -68,19 +68,19 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'TRANSFERS.ACTUALIZAR', redirectTo: '/Transfers/VerTransfers' },
-    title: 'SIR · Editar Transfer',
+    title: 'Editar Transfer',
   },
   {
     path: 'Transfers/VerTransfers',
     loadComponent: () => import('./pages/Transfers/ver-transfers/ver-transfers').then((m) => m.VerTransfersComponent),
     data: { preload: true },
-    title: 'SIR · Ver Transfers',
+    title: 'Ver Transfers',
   },
 
   {
     path: 'Puntos/VerPuntos',
     loadComponent: () => import('./pages/Puntos/ver-puntos/ver-puntos').then((m) => m.VerPuntos),
-    title: 'SIR · Ver Puntos',
+    title: 'Puntos de Encuentro',
   },
   {
     path: 'Puntos/NuevoPunto',
@@ -88,7 +88,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'PUNTOS.CREAR', redirectTo: '/Puntos/VerPuntos' },
-    title: 'SIR · Nuevo Punto',
+    title: 'Nuevo Punto',
   },
   {
     path: 'Puntos/Editar/:id',
@@ -96,46 +96,46 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'PUNTOS.ACTUALIZAR', redirectTo: '/Puntos/VerPuntos' },
-    title: 'SIR · Editar Punto',
+    title: 'Editar Punto',
   },
   {
     path: 'Puntos/OrdenarPuntos',
     loadComponent: () => import('./pages/Puntos/ordenar-puntos/ordenar-puntos').then((m) => m.OrdenarPuntosComponent),
     canActivate: [authGuard, permisoGuard],
     data: { permiso: 'PUNTOS.ORDENAR', redirectTo: '/Puntos/VerPuntos' },
-    title: 'SIR · Ordenar Puntos',
+    title: 'Ordenar Puntos',
   },
 
   {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
     data: { preload: true },
-    title: 'SIR · Programación',
+    title: 'Programación',
   },
 
   {
     path: 'Reservas/Confirmacion',
-    loadComponent: () => import('./pages/Confirmacion/confirmacion/confirmacion').then((m) => m.ConfirmacionComponent),
+    loadComponent: () => import('./pages/Confirmacion/confirmacion').then((m) => m.ConfirmacionComponent),
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'CONTROL_VIAJE.LEER', redirectTo: '/Reservas/VerReservas' },
-    title: 'SIR · Control de Viaje',
+    title: 'Control de Viaje',
   },
   {
     path: 'Comisiones',
-    loadComponent: () => import('./pages/Comisiones/comisiones/comisiones').then((m) => m.ComisionesComponent),
-    title: 'SIR · Comisiones',
+    loadComponent: () => import('./pages/Comisiones/comisiones').then((m) => m.ComisionesComponent),
+    title: 'Comisiones',
   },
   {
     path: 'Seguros',
-    loadComponent: () => import('./pages/Seguros/seguros/seguros').then((m) => m.SegurosComponent),
-    title: 'SIR · Seguros',
+    loadComponent: () => import('./pages/Seguros/seguros').then((m) => m.SegurosComponent),
+    title: 'Seguros',
   },
 
   {
     path: 'Usuarios',
     loadComponent: () => import('./pages/Usuarios/usuarios/usuarios').then((m) => m.Usuarios),
-    title: 'SIR · Usuarios',
+    title: 'Usuarios',
   },
   {
     path: 'Usuarios/NuevoUsuario',
@@ -143,7 +143,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'USUARIOS.CREAR', redirectTo: '/Usuarios' },
-    title: 'SIR · Nuevo Usuario',
+    title: 'Nuevo Usuario',
   },
   {
     path: 'Usuarios/Editar/:id',
@@ -151,20 +151,20 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'USUARIOS.ACTUALIZAR', redirectTo: '/Usuarios' },
-    title: 'SIR · Editar Usuario',
+    title: 'Editar Usuario',
   },
   {
     path: 'Perfil/Editar',
     loadComponent: () => import('./pages/Perfil/editar-perfil/editar-perfil').then((m) => m.EditarPerfilComponent),
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
-    title: 'SIR · Editar Perfil',
+    title: 'Editar Perfil',
   },
   {
     path: 'Ayuda',
     loadComponent: () => import('./pages/ayuda/ayuda').then((m) => m.AyudaComponent),
     canActivate: [authGuard],
-    title: 'SIR · Ayuda',
+    title: 'Ayuda',
   },
 
   {
@@ -173,13 +173,13 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'TOURS.CREAR', redirectTo: '/Tours/VerTours' },
-    title: 'SIR · Nuevo Tour',
+    title: 'Nuevo Tour',
   },
   {
     path: 'Tours/VerTours',
     loadComponent: () => import('./pages/Tours/ver-tours/ver-tours').then((m) => m.VerToursComponent),
     data: { preload: true },
-    title: 'SIR · Ver Tours',
+    title: 'Ver Tours',
   },
   {
     path: 'Tours/Editar/:id',
@@ -187,7 +187,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'TOURS.ACTUALIZAR', redirectTo: '/Tours/VerTours' },
-    title: 'SIR · Editar Tour',
+    title: 'Editar Tour',
   },
   
 

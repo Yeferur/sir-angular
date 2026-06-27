@@ -1,0 +1,44 @@
+@if (drawer()) {
+  <!-- Backdrop -->
+  <div class="sir-drawer-backdrop" (click)="close()" aria-hidden="true"></div>
+
+  <!-- Panel -->
+  <div class="sir-drawer-panel"
+       role="dialog"
+       aria-modal="true"
+       [attr.aria-label]="drawer()!.type === 'reserva' ? 'Detalle de reserva' :
+                          drawer()!.type === 'transfer' ? 'Detalle de transfer' :
+                          drawer()!.type === 'mapa' ? 'Mapa de ruta' :
+                          drawer()!.type === 'duplicar' ? 'Duplicar reserva' : 'Novedades de la app'">
+
+    @if (drawer()!.type === 'reserva') {
+      <app-reserva
+        [Id_Reserva]="drawer()!.id!"
+        (onClose)="close()"
+      />
+    }
+
+    @if (drawer()!.type === 'transfer') {
+      <app-transfer-dynamic
+        [Id_Transfer]="drawer()!.id!"
+        (onClose)="close()"
+      />
+    }
+
+    @if (drawer()!.type === 'mapa') {
+      <app-mapa
+        [puntos]="drawer()!.puntos!"
+        (onClose)="close()"
+      />
+    }
+
+    @if (drawer()!.type === 'duplicar') {
+      <app-duplicar-panel />
+    }
+
+    @if (drawer()!.type === 'app-updates') {
+      <app-updates-panel />
+    }
+
+  </div>
+}

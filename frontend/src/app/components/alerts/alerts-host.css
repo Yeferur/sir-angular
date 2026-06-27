@@ -1,0 +1,374 @@
+/*
+  SIR ALERTS HOST
+  Nivel 1: Píldora animada (Samsung-style)
+  Nivel 2: Modal flotante
+  Nivel 3: Modal crítico bloqueante
+*/
+
+/* ═══════════════════════════════════════════════
+   NIVEL 1 — PÍLDORA ANIMADA
+   Posicionada bajo el topbar, centrada respecto
+   al área de contenido (desplazada por sidebar)
+═══════════════════════════════════════════════ */
+.sir-pill-area {
+  position: fixed;
+  top: calc(15px + 48px + 10px);
+  left: calc(15px + 52px + 14px);
+
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1600;
+  pointer-events: none;
+}
+
+@media (max-width: 766px) {
+  .sir-pill-area { left: 0; }
+}
+
+.sir-pill {
+  position: relative;
+  height: 44px;
+  width: 44px;
+  border-radius: 22px;
+  background: var(--bg-secondary, rgba(28,28,30,0.97));
+  border: 1px solid var(--separator-translucent, rgba(255,255,255,0.12));
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+
+  /* Estado inicial: arriba oculto */
+  opacity: 0;
+  transform: translateY(-16px) scale(0.82);
+}
+
+/* ── Fases de animación con data-phase ── */
+
+/* drop: baja y aparece como círculo */
+.sir-pill[data-phase="drop"] {
+  animation: pillDrop 260ms cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes pillDrop {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* expand: se ensancha desde el centro y crece en alto si el mensaje
+   necesita 2 líneas (ya no se corta el contenido) */
+.sir-pill[data-phase="expand"],
+.sir-pill[data-phase="live"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  width: min(var(--pill-w, 280px), calc(100vw - 32px));
+  height: auto;
+  min-height: 44px;
+  padding: 7px 0;
+  transition: width 360ms cubic-bezier(0.23,1,0.32,1),
+              height 280ms cubic-bezier(0.23,1,0.32,1),
+              border-radius 360ms ease;
+  border-radius: 20px;
+}
+
+/* collapse: vuelve a círculo */
+.sir-pill[data-phase="collapse"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  width: 44px;
+  height: 44px;
+  transition: width 300ms cubic-bezier(0.23,1,0.32,1),
+              height 300ms cubic-bezier(0.23,1,0.32,1),
+              border-radius 300ms ease;
+}
+
+/* fade: sube y desaparece */
+.sir-pill[data-phase="fade"] {
+  width: 44px;
+  animation: pillFade 220ms ease forwards;
+}
+@keyframes pillFade {
+  to { opacity: 0; transform: translateY(-12px) scale(0.85); }
+}
+
+/* ── Ícono ── */
+.sir-pill-icon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  z-index: 2;
+  transition: left 360ms cubic-bezier(0.23,1,0.32,1),
+              transform 360ms cubic-bezier(0.23,1,0.32,1);
+}
+
+.sir-pill-icon svg { width: 14px; height: 14px; }
+
+/* cuando expande, el ícono se mueve a la izquierda */
+.sir-pill[data-phase="expand"] .sir-pill-icon,
+.sir-pill[data-phase="live"]   .sir-pill-icon {
+  left: 8px;
+  transform: translateX(0);
+}
+
+.sir-pill[data-phase="collapse"] .sir-pill-icon {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ── Texto (lado derecho) ── */
+.sir-pill-left {
+  width: 44px; /* espacio del ícono */
+  flex-shrink: 0;
+}
+
+.sir-pill-text {
+  display: flex; flex-direction: column; justify-content: center;
+  overflow: hidden;
+  opacity: 0;
+  max-width: 0;
+  padding-right: 0;
+  transition: max-width 300ms cubic-bezier(0.23,1,0.32,1) 80ms,
+              opacity    220ms ease 120ms,
+              padding    300ms ease 80ms;
+}
+
+.sir-pill[data-phase="expand"] .sir-pill-text,
+.sir-pill[data-phase="live"]   .sir-pill-text {
+  opacity: 1;
+  max-width: calc(min(var(--pill-w, 280px), calc(100vw - 32px)) - 60px);
+  padding-right: 16px;
+}
+
+.sir-pill[data-phase="collapse"] .sir-pill-text {
+  opacity: 0;
+  max-width: 0;
+  padding-right: 0;
+  transition: max-width 180ms cubic-bezier(0.23,1,0.32,1),
+              opacity    140ms ease,
+              padding    180ms ease;
+}
+
+.sir-pill-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.sir-pill-msg {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+  line-height: 1.3;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════════
+   NIVEL 2 — MODAL FLOTANTE
+═══════════════════════════════════════════════ */
+.sir-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1550;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: calc(10px + 48px + 12px);
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(3px);
+  animation: sirFadeIn 0.2s ease forwards;
+}
+
+.sir-modal {
+  pointer-events: all;
+  background: var(--bg-secondary, rgba(28,28,30,0.98));
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--separator-translucent, rgba(255,255,255,0.12));
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  padding: 24px 24px 20px;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  animation: sirModalDrop 0.35s cubic-bezier(0.23,1,0.32,1) forwards;
+  transform-origin: top center;
+}
+
+@keyframes sirModalDrop {
+  from { opacity:0; transform: translateY(-14px) scale(0.97); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+
+.sir-modal-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  animation: sirIconPop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+.sir-modal-icon svg { width: 22px; height: 22px; }
+
+.sir-modal-icon[data-type="success"] { background: rgba(48,209,88,0.15);  color: var(--accent-green,  #30d158); }
+.sir-modal-icon[data-type="info"]    { background: rgba(10,132,255,0.15); color: var(--accent-blue,   #0a84ff); }
+.sir-modal-icon[data-type="warning"] { background: rgba(255,214,10,0.15); color: var(--accent-yellow, #ffd60a); }
+.sir-modal-icon[data-type="error"]   { background: rgba(255,69,58,0.15);  color: var(--accent-red,    #ff453a); }
+
+.sir-modal-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255,255,255,0.16);
+  border-top-color: currentColor;
+  animation: sirSpin 0.9s linear infinite;
+}
+
+.sir-modal-body { display:flex; flex-direction:column; gap:6px; max-width:340px; }
+
+.sir-modal-title {
+  margin:0; font-size:1.05rem; font-weight:700;
+  color: var(--text-primary); line-height:1.25;
+}
+
+.sir-modal-msg {
+  margin:0; font-size:0.88rem;
+  color: var(--text-secondary); line-height:1.5;
+}
+
+.sir-modal-actions {
+  display:flex; gap:10px; width:100%; margin-top:4px;
+}
+
+/* ═══════════════════════════════════════════════
+   NIVEL 3 — MODAL CRÍTICO
+   Distinto visualmente desde el primer frame:
+   overlay más oscuro, panel más centrado,
+   cancelar arriba / destructivo abajo (separados)
+═══════════════════════════════════════════════ */
+.sir-critical-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(8px);
+  animation: sirFadeIn 0.25s ease forwards;
+}
+
+.sir-critical-panel {
+  background: var(--bg-secondary, #1c1c1e);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 26px;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.6);
+  padding: 36px 28px 24px;
+  width: min(360px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  animation: sirCriticalEnter 0.4s cubic-bezier(0.23,1,0.32,1) forwards;
+}
+
+@keyframes sirCriticalEnter {
+  from { opacity:0; transform: scale(0.91) translateY(16px); }
+  to   { opacity:1; transform: scale(1) translateY(0); }
+}
+
+.sir-critical-icon {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+  animation: sirIconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+.sir-critical-icon svg { width: 28px; height: 28px; }
+
+.sir-critical-icon[data-type="success"] { background: rgba(48,209,88,0.15);  color: var(--accent-green,  #30d158); }
+.sir-critical-icon[data-type="info"]    { background: rgba(10,132,255,0.15); color: var(--accent-blue,   #0a84ff); }
+.sir-critical-icon[data-type="warning"] { background: rgba(255,214,10,0.15); color: var(--accent-yellow, #ffd60a); }
+.sir-critical-icon[data-type="error"]   { background: rgba(255,69,58,0.18);  color: var(--accent-red,    #ff453a); }
+
+.sir-critical-title {
+  margin:0; font-size:1.25rem; font-weight:700;
+  color: var(--text-primary); line-height:1.2;
+}
+
+.sir-critical-msg {
+  margin: 6px 0 0;
+  font-size:0.88rem; color: var(--text-secondary);
+  line-height:1.55; max-width:290px;
+}
+
+/* Cancelar y destructivo separados verticalmente */
+.sir-critical-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+/* ═══════════════════════════════════════════════
+   BOTONES COMPARTIDOS
+═══════════════════════════════════════════════ */
+.sir-btn {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 13px;
+  font-size: 0.93rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 0.15s ease, transform 0.1s ease;
+  line-height: 1;
+}
+.sir-btn:active { transform: scale(0.97); }
+
+.sir-btn.primary   { background: var(--accent-blue, #0a84ff); color:#fff; }
+.sir-btn.secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--separator-color);
+  font-weight: 500;
+}
+.sir-btn.danger {
+  background: var(--accent-red, #ff453a);
+  color: #fff;
+  font-size: 1rem; /* un poco más grande para el nivel 3 */
+}
+
+.sir-btn.primary:hover,
+.sir-btn.danger:hover   { filter: brightness(1.08); }
+.sir-btn.secondary:hover { filter: brightness(1.05); }
+
+/* ─── Animaciones compartidas ─── */
+@keyframes sirFadeIn {
+  from { opacity:0; } to { opacity:1; }
+}
+@keyframes sirIconPop {
+  from { opacity:0; transform: scale(0.5); }
+  to   { opacity:1; transform: scale(1); }
+}
+@keyframes sirSpin {
+  to { transform: rotate(360deg); }
+}

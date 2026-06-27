@@ -1,0 +1,351 @@
+<div class="page-container">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="search-row">
+      <div class="search-container">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        @if (isInitialLoading()) {
+          <div class="skeleton-shape sk-search"></div>
+        } @else {
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Buscar por usuario, descripción, tabla..."
+            [value]="filters().searchText"
+            (input)="updateFilter('searchText', $any($event.target).value)"
+            (keyup.enter)="buscar()"
+            autocomplete="off" />
+        }
+      </div>
+
+      @if (isInitialLoading()) {
+        <div class="skeleton-shape sk-button"></div>
+        <div class="skeleton-shape sk-button"></div>
+        <div class="skeleton-shape sk-button"></div>
+        <div class="skeleton-shape sk-button"></div>
+      } @else {
+        <button class="btn-filter" [class.btn-filter--active]="advancedFiltersVisible()" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
+          <i class="bx bx-filter-alt"></i>
+          Filtros
+        </button>
+        <button class="btn-filter btn-export" (click)="exportarHistorial()">
+          <i class="bx bx-download"></i>
+          Exportar
+        </button>
+        <button class="btn-filter" (click)="limpiarFiltros()">
+          <i class="bx bx-refresh"></i>
+          Limpiar
+        </button>
+        <button class="btn-primary" (click)="buscar()" [disabled]="isTableRefreshing()">
+          Buscar
+        </button>
+      }
+    </div>
+
+    <!-- FILTER TOKENS -->
+    @if (!isInitialLoading() && (filters().Usuario || filters().Tipo_Accion || filters().Tabla_Afectada || filters().FechaInicio || filters().FechaFin)) {
+      <div class="active-filters">
+        @if (filters().Usuario) {
+          <div class="filter-token">
+            <span>{{ filters().Usuario }}</span>
+            <button class="remove-token-btn" (click)="updateFilter('Usuario', '')" aria-label="Remover filtro">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().Tipo_Accion) {
+          <div class="filter-token">
+            <span>{{ getAccionLabel(filters().Tipo_Accion) }}</span>
+            <button class="remove-token-btn" (click)="updateFilter('Tipo_Accion', '')" aria-label="Remover filtro">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().Tabla_Afectada) {
+          <div class="filter-token">
+            <span>{{ filters().Tabla_Afectada }}</span>
+            <button class="remove-token-btn" (click)="updateFilter('Tabla_Afectada', '')" aria-label="Remover filtro">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().FechaInicio) {
+          <div class="filter-token">
+            <span>Desde: {{ filters().FechaInicio | date:'d MMM yyyy':'':'es-CO' }}</span>
+            <button class="remove-token-btn" (click)="updateFilter('FechaInicio', '')" aria-label="Remover filtro">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().FechaFin) {
+          <div class="filter-token">
+            <span>Hasta: {{ filters().FechaFin | date:'d MMM yyyy':'':'es-CO' }}</span>
+            <button class="remove-token-btn" (click)="updateFilter('FechaFin', '')" aria-label="Remover filtro">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- SKELETON -->
+  @if (isInitialLoading()) {
+    <div class="table-card skeleton-card">
+      <table class="historial-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Tabla</th>
+            <th>ID Registro</th>
+            <th>Descripción</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of skeletonRows; track row) {
+            <tr class="skeleton-table-row">
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td><div class="skeleton-shape sk-cell"></div></td>
+              <td></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+  } @else {
+
+    <!-- FILTROS AVANZADOS -->
+    @if (advancedFiltersVisible()) {
+      <div class="advanced-filters-panel">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Usuario</label>
+            <input
+              type="text"
+              class="form-input"
+              placeholder="Nombre del usuario"
+              [value]="filters().Usuario"
+              (change)="updateFilter('Usuario', $any($event.target).value)" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de Acción</label>
+            <select
+              class="form-select"
+              [value]="filters().Tipo_Accion"
+              (change)="updateFilter('Tipo_Accion', $any($event.target).value)">
+              <option value="">Todas</option>
+              @for (tipo of tiposAccion(); track tipo) {
+                <option [value]="tipo">{{ getAccionLabel(tipo) }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tabla Afectada</label>
+            <select
+              class="form-select"
+              [value]="filters().Tabla_Afectada"
+              (change)="updateFilter('Tabla_Afectada', $any($event.target).value)">
+              <option value="">Todas</option>
+              @for (tabla of tablasAfectadas(); track tabla) {
+                <option [value]="tabla">{{ tabla }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Desde</label>
+            <app-datepicker [ngModel]="filters().FechaInicio" (dateChange)="updateFilter('FechaInicio', $event)"></app-datepicker>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hasta</label>
+            <app-datepicker [ngModel]="filters().FechaFin" (dateChange)="updateFilter('FechaFin', $event)"></app-datepicker>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- KPI CHIPS -->
+    <div class="kpi-row">
+      <div class="kpi-chip">
+        <span class="kpi-label">Total registros</span>
+        <strong>{{ totalRecords() }}</strong>
+      </div>
+      <div class="kpi-chip">
+        <span class="kpi-label">Página</span>
+        <strong>{{ currentPage() }} / {{ totalPages() }}</strong>
+      </div>
+      @if (kpiConteos()['create']) {
+        <div class="kpi-chip kpi-chip--create">
+          <i class="bx bx-plus-circle kpi-icon"></i>
+          <span class="kpi-label">Creaciones</span>
+          <strong>{{ kpiConteos()['create'] }}</strong>
+        </div>
+      }
+      @if (kpiConteos()['update']) {
+        <div class="kpi-chip kpi-chip--update">
+          <i class="bx bx-pencil kpi-icon"></i>
+          <span class="kpi-label">Actualizaciones</span>
+          <strong>{{ kpiConteos()['update'] }}</strong>
+        </div>
+      }
+      @if (kpiConteos()['delete']) {
+        <div class="kpi-chip kpi-chip--delete">
+          <i class="bx bx-x-circle kpi-icon"></i>
+          <span class="kpi-label">Eliminaciones</span>
+          <strong>{{ kpiConteos()['delete'] }}</strong>
+        </div>
+      }
+      @if (kpiConteos()['export']) {
+        <div class="kpi-chip kpi-chip--export">
+          <i class="bx bx-export kpi-icon"></i>
+          <span class="kpi-label">Exportaciones</span>
+          <strong>{{ kpiConteos()['export'] }}</strong>
+        </div>
+      }
+      @if (kpiConteos()['login']) {
+        <div class="kpi-chip kpi-chip--login">
+          <i class="bx bx-log-in-circle kpi-icon"></i>
+          <span class="kpi-label">Logins</span>
+          <strong>{{ kpiConteos()['login'] }}</strong>
+        </div>
+      }
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-card" [class.table-refreshing]="isTableRefreshing()">
+      @if (isTableRefreshing()) {
+        <div class="table-refresh-overlay">
+          <span class="refresh-pulse"></span>
+          <span>Actualizando...</span>
+        </div>
+      }
+
+      @if (historialList().length === 0) {
+        <div class="empty-state">
+          <h3>No hay registros para mostrar</h3>
+          <p>Ajusta los filtros o intenta una nueva búsqueda.</p>
+        </div>
+      } @else {
+        <div class="table-scroll">
+          <table class="historial-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Tabla</th>
+                <th>ID</th>
+                <th>Descripción</th>
+                <th class="th-expand"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (record of historialList(); track record.Id_Historial) {
+                <!-- FILA PRINCIPAL -->
+                <tr
+                  class="data-row"
+                  [class.row-expanded]="expandedId() === record.Id_Historial"
+                  (click)="toggleRow(record.Id_Historial)">
+                  <td class="date-cell">{{ record.Fecha_Accion | date:'dd/MM/yy HH:mm' }}</td>
+                  <td><span class="user-badge">{{ record.Usuario_Nombre }}</span></td>
+                  <td>
+                    <span class="accion-badge" [ngClass]="getAccionClass(record.Tipo_Accion!)">
+                      <i class="bx" [ngClass]="getAccionIcon(record.Tipo_Accion!)" aria-hidden="true"></i>
+                      {{ getAccionLabel(record.Tipo_Accion!) }}
+                    </span>
+                  </td>
+                  <td><span class="table-badge">{{ record.Tabla_Afectada }}</span></td>
+                  <td class="id-cell">{{ record.Id_Registro || '—' }}</td>
+                  <td class="descripcion-cell">
+                    @if (record.Detalles && record.Detalles.length) {
+                      <div class="detalle-chips-inline">
+                        @for (d of record.Detalles.slice(0, 2); track d.columna) {
+                          <span class="detalle-chip-inline">
+                            <span class="chip-col">{{ d.columna }}</span>
+                          </span>
+                        }
+                        @if (record.Detalles.length > 2) {
+                          <span class="detalle-more">+{{ record.Detalles.length - 2 }}</span>
+                        }
+                      </div>
+                    } @else if (record.Descripcion) {
+                      <span class="text-truncate" [attr.title]="record.Descripcion">{{ record.Descripcion }}</span>
+                    } @else {
+                      <span class="text-muted-dash">—</span>
+                    }
+                  </td>
+                  <td class="td-expand">
+                    <i class="bx bx-chevron-down expand-chevron" [class.rotated]="expandedId() === record.Id_Historial" aria-hidden="true"></i>
+                  </td>
+                </tr>
+
+                <!-- PANEL DE DETALLE -->
+                @if (expandedId() === record.Id_Historial) {
+                  <tr class="detail-row">
+                    <td colspan="7">
+                      <div class="detail-panel">
+                        @if (record.Detalles && record.Detalles.length) {
+                          <div class="detail-cambios-grid">
+                            @for (d of record.Detalles; track d.columna) {
+                              <div class="detalle-cambio-card">
+                                <span class="detalle-columna">{{ d.columna }}</span>
+                                <div class="detalle-valores">
+                                  <span class="detalle-val detalle-val--ant">{{ d.anterior || '—' }}</span>
+                                  <i class="bx bx-right-arrow-alt detalle-arrow" aria-hidden="true"></i>
+                                  <span class="detalle-val detalle-val--nvo">{{ d.nuevo || '—' }}</span>
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <p class="detail-empty">Sin cambios de campo registrados para esta acción.</p>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- PAGINACIÓN -->
+  @if (totalPages() > 1) {
+    <div class="pagination-container">
+      <button
+        class="btn-pagination"
+        (click)="previousPage()"
+        [disabled]="currentPage() === 1 || isTableRefreshing()"
+        aria-label="Página anterior">
+        <i class="bx bx-chevron-left"></i>
+        <span>Anterior</span>
+      </button>
+      <div class="page-info">
+        Página <strong>{{ currentPage() }}</strong> de <strong>{{ totalPages() }}</strong>
+        <span class="total-records">({{ totalRecords() }} registros)</span>
+      </div>
+      <button
+        class="btn-pagination"
+        (click)="nextPage()"
+        [disabled]="currentPage() === totalPages() || isTableRefreshing()"
+        aria-label="Siguiente página">
+        <span>Siguiente</span>
+        <i class="bx bx-chevron-right"></i>
+      </button>
+    </div>
+  }
+
+</div>

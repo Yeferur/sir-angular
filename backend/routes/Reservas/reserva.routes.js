@@ -13,11 +13,11 @@ router.get('/reservas/verificar-cupos', authMiddleware, checkPermission('RESERVA
 // Catálogos
 router.get('/canales', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getCanales);
 router.get('/monedas', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getMonedas);
-router.get('/tours', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getTours);
-router.get('/tours/:id/planes', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getPlanesByTour);
+router.get('/reservas/tours', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getTours);
+router.get('/reservas/tours/:id/planes', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getPlanesByTour);
 router.get('/precios', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getPrecios);
 router.get('/horarios', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getHorarios);
-router.get('/tours/comisiones', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getComisiones);
+router.get('/reservas/tours/comisiones', authMiddleware, checkPermission('RESERVAS.LEER'), reservasController.getComisiones);
 
 // Creación
 router.post('/reservas', authMiddleware, checkPermission('RESERVAS.CREAR'), reservasController.saveReserva);

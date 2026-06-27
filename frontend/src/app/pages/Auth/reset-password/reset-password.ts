@@ -3,7 +3,6 @@ import { Component, inject, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../services/Login/login-service';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const password = group.get('password')?.value;
@@ -21,12 +20,11 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './reset-password.html',
-  styleUrl: './reset-password.css'
+  styleUrl: '../auth-shared.css'
 })
 export class ResetPasswordPageComponent implements OnInit {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
-  private navbar = inject(DynamicIslandGlobalService);
   private route = inject(ActivatedRoute);
 
   submitting = false;
@@ -40,7 +38,6 @@ export class ResetPasswordPageComponent implements OnInit {
   }, { validators: passwordMatchValidator });
 
   ngOnInit(): void {
-    this.navbar.mode.set('');
     this.token = String(this.route.snapshot.queryParamMap.get('token') || '').trim();
 
     if (!this.token) {

@@ -448,8 +448,8 @@
 .bus-item {
   border: 1.5px solid var(--separator-color);
   background: var(--bg-tertiary);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
   cursor: pointer;
   transition: filter .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
@@ -514,6 +514,16 @@
   margin-top: 8px;
 }
 
+/* Ocultar mid/bottom por defecto; solo visible en bus activo */
+.bus-item:not(.active) .bus-item-mid,
+.bus-item:not(.active) .bus-item-bottom {
+  display: none;
+}
+
+.bus-item:not(.active) .bus-progress {
+  margin-top: 6px;
+}
+
 .form-input.small {
   padding: 6px 8px;
   font-size: 0.85rem;
@@ -532,8 +542,8 @@
 }
 
 .bus-progress {
-  margin-top: 10px;
-  height: 4px;
+  margin-top: 8px;
+  height: 2px;
   border-radius: 99px;
   background: var(--bg-tertiary);
   overflow: hidden;
@@ -621,19 +631,105 @@
   white-space: nowrap;
 }
 
-/* Route order list */
+/* Route chips — línea horizontal de paradas */
+.route-chips {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.route-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 5px;
+  border-radius: 999px;
+  border: 1.5px solid var(--separator-color);
+  background: var(--bg-tertiary);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: grab;
+  transition: border-color .15s, filter .15s;
+}
+
+.route-chip:hover {
+  border-color: rgba(10, 132, 255, .5);
+  filter: brightness(1.08);
+}
+
+.route-chip:active {
+  cursor: grabbing;
+}
+
+.route-chip .chip-n {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chip-arr {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* Ocultar sección route-list original */
 .route-list {
-  padding: 16px;
+  display: none;
+}
+
+.route-name {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.route-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.route-handle {
+  color: var(--text-tertiary);
+  font-weight: 900;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.route-item:hover .route-handle {
+  background: rgba(255, 255, 255, .06);
+  color: var(--text-primary);
+}
+
+/* Route order list — restaurada */
+.route-list {
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .route-item {
   border: 1.5px solid var(--separator-color);
   background: var(--bg-tertiary);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -671,128 +767,146 @@
   min-width: 0;
 }
 
-.route-name {
-  font-weight: 800;
-  font-size: 13px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.route-meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-.route-handle {
-  color: var(--text-tertiary);
-  font-weight: 900;
-  padding: 6px 10px;
-  border-radius: 10px;
-}
-
-.route-item:hover .route-handle {
-  background: rgba(255, 255, 255, .06);
-  color: var(--text-primary);
-}
-
-/* Stops grid */
+/* Stops — grupos por parada */
 .stops-grid {
-  padding: 16px;
+  padding: 12px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
-@media (max-width: 1200px) {
-  .stops-grid {
-    grid-template-columns: repeat(2, minmax(240px, 1fr));
-  }
+.stops-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  grid-column: 1 / -1;
 }
 
-@media (max-width: 780px) {
-  .stops-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.stop-card {
+.stop-group {
   border: 1.5px solid var(--separator-color);
-  background: var(--bg-tertiary);
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 220px;
+  background: var(--bg-tertiary);
 }
 
-.stop-header {
-  padding: 12px;
+.stop-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--separator-color);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  background: rgba(255,255,255,0.02);
 }
 
-.stop-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.stop-index {
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
+.stop-group-index {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   background: var(--accent-blue);
   color: #fff;
+  font-size: 11px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 900;
-  flex: 0 0 auto;
+  flex-shrink: 0;
 }
 
-.stop-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.stop-name {
-  font-weight: 900;
+.stop-group-name {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text-primary);
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.stop-meta {
-  font-size: 12px;
+.stop-group-meta {
+  font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.stop-body {
-  padding: 10px;
+.stop-group-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow: auto;
-  scrollbar-width: none;
+  gap: 8px;
+  padding: 10px;
 }
 
-.empty-mini {
+/* Reserva card dentro del grupo */
+.reserva-card {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--separator-color);
+  background: var(--bg-secondary);
+  cursor: grab;
+  transition: filter .15s ease, background .15s ease;
+}
+
+.reserva-card:last-child {
+  border-bottom: none;
+}
+
+.reserva-card:hover {
+  filter: brightness(1.06);
+  border-left: 2px solid rgba(10, 132, 255, .5);
+  padding-left: 10px;
+}
+
+.reserva-drag-col {
+  flex-shrink: 0;
+  padding-right: 10px;
+}
+
+.reserva-drag-handle {
   color: var(--text-tertiary);
+  font-weight: 900;
+  font-size: 13px;
+  cursor: grab;
+}
+
+.reserva-main-col {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reserva-id {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.reserva-punto {
   font-size: 12px;
-  padding: 10px;
-  border: 1px dashed var(--separator-color);
-  border-radius: 12px;
-  text-align: center;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reserva-pax-col {
+  flex-shrink: 0;
+}
+
+.reserva-pax {
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, .06);
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .reserva-card {
@@ -801,6 +915,7 @@
   border-radius: 12px;
   padding: 10px 12px;
   cursor: grab;
+  min-width: 0;
   transition: border-color .15s ease, transform .15s ease, filter .15s ease;
 }
 
@@ -816,6 +931,12 @@
   justify-content: space-between;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+@media (min-width: 900px) {
+  .stops-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .reserva-pax {

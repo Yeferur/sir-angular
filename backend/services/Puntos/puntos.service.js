@@ -9,6 +9,30 @@ function normalizarRuta(r) {
   return s;
 }
 
+function normalizeComparable(value) {
+  if (!value) return '';
+  return value
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function createDuplicatePointError(existingPoint) {
+  const error = new Error('Ya existe un punto con ese nombre y esa dirección.');
+  error.statusCode = 409;
+  error.errorCode = 'PUNTO_DUPLICATE_EXACT';
+  error.details = existingPoint ? {
+    Id_Punto: existingPoint.Id_Punto,
+    Nombre_Punto: existingPoint.Nombre_Punto,
+    Direccion: existingPoint.Direccion
+  } : null;
+  return error;
+}
+
 async function lockRuta(conn, ruta) {
   await conn.query(`SELECT Id_Punto FROM puntos WHERE ruta = ? FOR UPDATE`, [ruta]);
 }
@@ -435,6 +459,25 @@ async function crearPunto(punto, userId = null) {
     await conn.beginTransaction();
 
     const ruta = normalizarRuta(punto.ruta);
+    const normalizedName = normalizeComparable(punto.Nombre_Punto || punto.NombrePunto || '');
+    const normalizedAddress = normalizeComparable(punto.Direccion || '');
+
+    if (normalizedName && normalizedAddress) {
+      const [candidateRows] = await conn.query(
+        `SELECT Id_Punto, Nombre_Punto, Direccion
+         FROM puntos
+         FOR UPDATE`
+      );
+
+      const exactDuplicate = candidateRows.find((row) => (
+        normalizeComparable(row?.Nombre_Punto || '') === normalizedName
+        && normalizeComparable(row?.Direccion || '') === normalizedAddress
+      ));
+
+      if (exactDuplicate) {
+        throw createDuplicatePointError(exactDuplicate);
+      }
+    }
 
     await lockRuta(conn, ruta);
     const [[mx]] = await conn.query(

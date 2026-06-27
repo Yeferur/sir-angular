@@ -1,5 +1,5 @@
 // backend/controllers/Tours/tours.controller.js
-const { crearTour, obtenerPreciosTour, upsertPreciosTour, crearPlanTour, obtenerTours, obtenerTourPorId, actualizarTour, eliminarTour, obtenerDisponibilidadTour } = require('../../services/Tours/tours.service');
+const { crearTour, obtenerPreciosTour, upsertPreciosTour, crearPlanTour, obtenerTours, obtenerTourPorId, actualizarTour, eliminarTour, obtenerDisponibilidadTour, obtenerCanalesComision } = require('../../services/Tours/tours.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 exports.crearTour = async (req, res) => {
@@ -47,12 +47,28 @@ exports.updatePrecios = async (req, res) => {
 };
 
 exports.getTours = async (req, res) => {
+  console.log('=== CONTROLLER TOURS NUEVO EJECUTADO ===', {
+    url: req.originalUrl,
+    baseUrl: req.baseUrl,
+    fecha: new Date().toISOString()
+  });
+
   try {
     const tours = await obtenerTours();
-    return sendSuccess(res, { data: tours, message: 'Tours obtenidos correctamente' });
+
+    console.log('=== PRIMER TOUR ENVIADO ===', tours[0]);
+
+    return sendSuccess(res, {
+      data: tours,
+      message: 'Tours obtenidos correctamente'
+    });
   } catch (e) {
     console.error(e);
-    return sendError(res, { status: 500, message: 'Error al obtener tours', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, {
+      status: 500,
+      message: 'Error al obtener tours',
+      errorCode: 'INTERNAL_ERROR'
+    });
   }
 };
 
@@ -98,9 +114,19 @@ exports.deleteTour = async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.id || null;
     const data = await eliminarTour(id, userId);
-    return sendSuccess(res, { data, message: 'Tour desactivado correctamente' });
+    return sendSuccess(res, { data, message: 'Tour eliminado correctamente' });
   } catch (e) {
     console.error('Error al eliminar tour:', e);
     return sendError(res, { status: 400, message: e.message || 'Error al eliminar tour', errorCode: 'BAD_REQUEST' });
+  }
+};
+
+exports.getCanalesComision = async (req, res) => {
+  try {
+    const canales = await obtenerCanalesComision();
+    return sendSuccess(res, { data: canales, message: 'Canales con comisión obtenidos correctamente' });
+  } catch (e) {
+    console.error(e);
+    return sendError(res, { status: 500, message: 'Error al obtener canales con comisión', errorCode: 'INTERNAL_ERROR' });
   }
 };

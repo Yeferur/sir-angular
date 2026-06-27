@@ -1,638 +1,590 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule }         from '@angular/common';
 import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule }          from '@angular/forms';
 import { forkJoin, finalize, catchError, of } from 'rxjs';
-import { FlatpickrInputDirective } from '../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 
-import { DashboardService } from '../../services/dashboard.service';
-import { DynamicIslandGlobalService } from '../../services/DynamicNavbar/global';
+import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
+import { SirAlertService }      from '../../services/Alertas/alert.service';
 
 import {
-  NgApexchartsModule,
-  ChartComponent,
-  ApexAxisChartSeries,
-  ApexChart,
-  ApexXAxis,
-  ApexTitleSubtitle,
-  ApexStroke,
-  ApexFill,
-  ApexTooltip,
-  ApexDataLabels,
-  ApexYAxis,
-  ApexGrid,
-  ApexLegend,
-  ApexPlotOptions
+  NgApexchartsModule, ChartComponent,
+  ApexAxisChartSeries, ApexChart, ApexXAxis, ApexTitleSubtitle,
+  ApexStroke, ApexFill, ApexTooltip, ApexDataLabels,
+  ApexYAxis, ApexGrid, ApexLegend, ApexPlotOptions
 } from 'ng-apexcharts';
 
+// ─── Tipo de tour para el selector ───────────────────────────────────────────
+export interface TourOption { Id_Tour: number; Nombre_Tour: string; }
+
 export type ChartOptions = {
-  series: ApexAxisChartSeries | any;
-  chart: ApexChart;
-  xaxis: ApexXAxis;
-  title?: ApexTitleSubtitle;
-  stroke: ApexStroke;
-  fill: ApexFill;
-  tooltip: ApexTooltip;
-  dataLabels: ApexDataLabels;
-  yaxis: ApexYAxis;
-  grid: ApexGrid;
-  legend?: ApexLegend;
+  series:       ApexAxisChartSeries | any;
+  chart:        ApexChart;
+  xaxis:        ApexXAxis;
+  title?:       ApexTitleSubtitle;
+  stroke:       ApexStroke;
+  fill:         ApexFill;
+  tooltip:      ApexTooltip;
+  dataLabels:   ApexDataLabels;
+  yaxis:        ApexYAxis;
+  grid:         ApexGrid;
+  legend?:      ApexLegend;
   plotOptions?: ApexPlotOptions;
-  labels?: string[];
-  colors?: string[];
+  labels?:      string[];
+  colors?:      string[];
+  markers?:     any;
 };
 
+// ─── Tokens de diseño ─────────────────────────────────────────────────────────
+const FONT  = 'Inter, sans-serif';
+const BG    = 'transparent';
+const AXIS  = '#6b7280';
+const GRID  = '#1f2937';
+
+const C_GOLD   = '#ffd700';
+const C_GREEN  = '#34c759';
+const C_BLUE   = '#0a84ff';
+const C_PURPLE = '#9d86e8';
+const C_TEAL   = '#2dd4bf';
+const C_ORANGE = '#fb923c';
+const C_PINK   = '#f472b6';
+const C_LIME   = '#a3e635';
+const C_RED    = '#f87171';
+
+const DIST_PALETTE = [C_BLUE, C_GREEN, C_TEAL, C_ORANGE, C_PURPLE, C_PINK, C_LIME, C_GOLD, '#60a5fa', C_RED];
+
+const COP = (v: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
+
+const COP_COMPACT = (v: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: 'compact', maximumFractionDigits: 1 }).format(v);
+
+function grid(showX = false, showY = true): any {
+  return { borderColor: GRID, strokeDashArray: 4, xaxis: { lines: { show: showX } }, yaxis: { lines: { show: showY } } };
+}
+
+function axisStyle(): any {
+  return { style: { colors: AXIS, fontSize: '11px', fontFamily: FONT } };
+}
+
+// ─── Componente ───────────────────────────────────────────────────────────────
 @Component({
-  selector: 'app-dashboard',
-  standalone: true,
-  imports: [CommonModule, NgApexchartsModule, FormsModule, FlatpickrInputDirective],
+  selector:    'app-dashboard',
+  standalone:  true,
+  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent],
   templateUrl: './dashboard.html',
-  styleUrls: ['./dashboard.css']
+  styleUrls:   ['./dashboard.css']
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
-  private dashboardService = inject(DashboardService);
-  private navbar = inject(DynamicIslandGlobalService);
-  private cdr = inject(ChangeDetectorRef);
 
-  // STATS
-  totalReservas = 0;
-  totalPasajeros = 0;
-  totalIngresos = 0;
-  totalTransfers = 0;
+  private svc   = inject(DashboardService);
+  private alert = inject(SirAlertService);
+  private cdr   = inject(ChangeDetectorRef);
 
-  // FILTERS
-  startDate = '';
-  endDate = '';
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  totalReservas       = 0;
+  totalPasajeros      = 0;
+  totalIngresos       = 0;    // bruto
+  totalIngresosNetos  = 0;    // neto
+  totalTransfers      = 0;
 
-  // CHART VIEWCHILD
-  @ViewChild('chartIncome') chartIncome?: ChartComponent;
-  @ViewChild('chartPassengers') chartPassengers?: ChartComponent;
+  // ── Filtros ───────────────────────────────────────────────────────────────
+  startDate  = '';
+  endDate    = '';
+  tours:      TourOption[] = [];
+  selectedTourId: number | null = null;
+
+  get tourLabel(): string {
+    if (!this.selectedTourId) return 'Todos los tours';
+    return this.tours.find(t => t.Id_Tour === this.selectedTourId)?.Nombre_Tour ?? 'Tour seleccionado';
+  }
+
+  // ── ViewChild refs ────────────────────────────────────────────────────────
+  @ViewChild('chartIncome')    chartIncome?:    ChartComponent;
+  @ViewChild('chartNetIncome') chartNetIncome?: ChartComponent;
+  @ViewChild('chartDaily')     chartDaily?:     ChartComponent;
+  @ViewChild('chartPax')       chartPax?:       ChartComponent;
+  @ViewChild('chartChannel')   chartChannel?:   ChartComponent;
   @ViewChild('chartOccupancy') chartOccupancy?: ChartComponent;
-  @ViewChild('startDateFp') startDateFp?: FlatpickrInputDirective;
-  @ViewChild('endDateFp') endDateFp?: FlatpickrInputDirective;
 
-  // OPTIONS
-  public incomeChartOptions: Partial<ChartOptions> | any;
-  public passengerChartOptions: Partial<ChartOptions> | any;
-  public occupancyChartOptions: Partial<ChartOptions> | any;
+  // ── Chart options ─────────────────────────────────────────────────────────
+  incomeChartOptions:    Partial<ChartOptions> | any = {};
+  netIncomeChartOptions: Partial<ChartOptions> | any = {};
+  dailyChartOptions:     Partial<ChartOptions> | any = {};
+  paxChartOptions:       Partial<ChartOptions> | any = {};
+  channelChartOptions:   Partial<ChartOptions> | any = {};
+  occupancyChartOptions: Partial<ChartOptions> | any = {};
 
-  // FLAGS / CACHE
+  // ── Flags ─────────────────────────────────────────────────────────────────
   isInitialLoading = true;
-  isRefreshing = false;
-  isLoading = true;
-  hasIncomeData = false;
-  hasPassengerData = false;
+  isRefreshing     = false;
+  hasIncomeData    = false;
+  hasNetIncomeData = false;
+  hasDailyData     = false;
+  hasPaxData       = false;
+  hasChannelData   = false;
   hasOccupancyData = false;
-  private viewReady = false;
-  private lastResponse: any = null;
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  private dashboardRequestId = 0;
 
-  fpOptionsFecha: Partial<FlatpickrOptions> = {
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    allowInput: false,
-    disableMobile: true,
-    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-    altInputClass: 'form-input flatpickr-input flatpickr-alt',
+  private viewReady          = false;
+  private lastResponse: any  = null;
+  private refreshTimer:   ReturnType<typeof setTimeout> | null = null;
+  private reqId              = 0;
 
-    onReady: (_sel, _str, inst: any) => {
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-      const cal: HTMLElement = inst?.calendarContainer;
-      if (!cal) return;
-
-      cal.classList.add('sir-flatpickr');
-
-      const clampDay = (y: number, m: number, d: number) => {
-        const last = new Date(y, m + 1, 0).getDate();
-        return Math.min(Math.max(d, 1), last);
-      };
-
-      let yearSelect: HTMLSelectElement | null = null;
-
-      const ensureYearSelect = () => {
-        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-        if (!monthWrap) return null;
-
-        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-        if (numWrap) {
-          try { numWrap.remove(); } catch { /* ignore */ }
-        }
-
-        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-        const container = curMonth ?? monthWrap;
-
-        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-        if (yearSelect) return yearSelect;
-
-        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-        if (oldDiv) {
-          try { oldDiv.remove(); } catch { /* ignore */ }
-        }
-
-        yearSelect = document.createElement('select');
-        yearSelect.className = 'sir-year-select';
-        yearSelect.setAttribute('aria-label', 'Seleccionar año');
-
-        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-        return yearSelect;
-      };
-
-      const buildYears = (centerYear: number) => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const start = centerYear - 20;
-        const end = centerYear + 20;
-
-        sel.innerHTML = '';
-        for (let y = end; y >= start; y--) {
-          const opt = document.createElement('option');
-          opt.value = String(y);
-          opt.textContent = String(y);
-          sel.appendChild(opt);
-        }
-        sel.value = String(centerYear);
-      };
-
-      const syncSelectValue = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = inst.currentYear ?? new Date().getFullYear();
-        const exists = !!sel.querySelector(`option[value="${y}"]`);
-        if (!exists) buildYears(y);
-        sel.value = String(y);
-      };
-
-      const getSafeDay = () => {
-        const d: Date | undefined = inst.selectedDates?.[0];
-        return d ? d.getDate() : 1;
-      };
-
-      const onChange = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = Number(sel.value);
-        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-        const day = clampDay(y, m, getSafeDay());
-
-        const newDate = new Date(y, m, day);
-
-        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-        if (inst.selectedDates?.length) {
-          inst.setDate(newDate, true);
-        }
-      };
-
-      buildYears(inst.currentYear ?? new Date().getFullYear());
-      syncSelectValue();
-
-      const sel0 = ensureYearSelect();
-      sel0?.addEventListener('change', onChange);
-
-      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-        const prev = inst.config[key];
-        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-        inst.config[key] = [...arr, fn];
-      };
-
-      wrap('onMonthChange', () => syncSelectValue());
-      wrap('onYearChange', () => syncSelectValue());
-
-      const prevOnDestroy = inst.config.onDestroy;
-      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-      inst.config.onDestroy = [
-        ...destroyArr,
-        () => sel0?.removeEventListener('change', onChange)
-      ];
-    }
-  };
-
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
-    const tomorrow = this.getTomorrowDateValue();
+    const tomorrow = this.tomorrowValue();
     this.startDate = tomorrow;
-    this.endDate = tomorrow;
+    this.endDate   = tomorrow;
     this.initCharts();
+    this.loadTours();
     this.loadData(true);
   }
 
   ngAfterViewInit() {
     this.viewReady = true;
-    this.syncDatePickers();
-
-    // Si la data llegó antes del view, la aplicamos acá
-    if (this.lastResponse) {
-      this.applyChartData(this.lastResponse);
-      this.forceChartsReflow();
-    }
+    this.syncPickers();
+    if (this.lastResponse) { this.applyAll(this.lastResponse); this.reflow(); }
   }
 
-  ngOnDestroy(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+  ngOnDestroy() { if (this.refreshTimer) clearTimeout(this.refreshTimer); }
+
+  // ── Tours ─────────────────────────────────────────────────────────────────
+  private loadTours() {
+    // Ajusta la ruta según tu ToursService real
+    (this.svc as any).getTours?.().pipe(catchError(() => of([]))).subscribe((list: TourOption[]) => {
+      this.tours = list;
+      this.cdr.detectChanges();
+    });
   }
 
+  onTourChange(tourId: number | null) {
+    this.selectedTourId = tourId;
+    this.scheduleRefresh();
+  }
+
+  // ── Init charts ───────────────────────────────────────────────────────────
   private initCharts() {
+
+    // ── 1. Ingresos Totales (bruto) — área anual ─────────────────────────
     this.incomeChartOptions = {
-      series: [{ name: 'Ingresos', data: [] }],
+      series: [{ name: 'Ingresos brutos', data: Array(12).fill(0) }],
       chart: {
-        id: 'income-chart',
-        type: 'area',
-        height: 350,
-        toolbar: { show: false },
-        fontFamily: 'Inter, sans-serif',
-        background: 'transparent',
-        animations: { enabled: true },
-        redrawOnParentResize: true,
-        redrawOnWindowResize: true
+        id: 'income-bruto', type: 'area', height: 300, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        redrawOnParentResize: true, redrawOnWindowResize: true,
+        dropShadow: { enabled: true, color: C_GOLD, top: 8, blur: 14, opacity: 0.1 }
       },
       dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 3 },
+      stroke: { curve: 'smooth', width: 2.5, colors: [C_GOLD] },
       xaxis: {
-        categories: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-        labels: { style: { colors: '#a3a3a3' } },
-        axisBorder: { show: false },
-        axisTicks: { show: false }
+        categories: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false },
+        crosshairs: { stroke: { color: C_GOLD, width: 1, dashArray: 3 } }
       },
-      yaxis: {
-        labels: {
-          style: { colors: '#a3a3a3' },
-          formatter: (value: number) =>
-            new Intl.NumberFormat('es-CO', {
-              style: 'currency',
-              currency: 'COP',
-              maximumSignificantDigits: 3
-            }).format(value)
-        }
-      },
+      yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
       fill: {
         type: 'gradient',
-        gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.1, stops: [0, 90, 100] }
+        gradient: { colorStops: [
+          { offset: 0, color: C_GOLD, opacity: 0.28 },
+          { offset: 65, color: C_GOLD, opacity: 0.05 },
+          { offset: 100, color: C_GOLD, opacity: 0 }
+        ]}
       },
-      colors: ['#ffd700'],
-      grid: {
-        borderColor: '#333',
-        strokeDashArray: 4,
-        yaxis: { lines: { show: true } },
-        xaxis: { lines: { show: false } }
-      },
-      tooltip: { theme: 'dark' }
+      colors: [C_GOLD],
+      grid: grid(),
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: COP } },
+      markers: { size: 0, hover: { size: 5 } }
     };
 
-    this.passengerChartOptions = {
+    // ── 2. Ingresos Netos — área anual, verde ────────────────────────────
+    this.netIncomeChartOptions = {
+      series: [{ name: 'Ingresos netos', data: Array(12).fill(0) }],
+      chart: {
+        id: 'income-neto', type: 'area', height: 300, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        redrawOnParentResize: true, redrawOnWindowResize: true,
+        dropShadow: { enabled: true, color: C_GREEN, top: 8, blur: 14, opacity: 0.1 }
+      },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2.5, colors: [C_GREEN] },
+      xaxis: {
+        categories: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false },
+        crosshairs: { stroke: { color: C_GREEN, width: 1, dashArray: 3 } }
+      },
+      yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
+      fill: {
+        type: 'gradient',
+        gradient: { colorStops: [
+          { offset: 0, color: C_GREEN, opacity: 0.28 },
+          { offset: 65, color: C_GREEN, opacity: 0.05 },
+          { offset: 100, color: C_GREEN, opacity: 0 }
+        ]}
+      },
+      colors: [C_GREEN],
+      grid: grid(),
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: COP } },
+      markers: { size: 0, hover: { size: 5 } }
+    };
+
+    // ── 3. Ingresos bruto vs neto por día (rango) — columnas agrupadas ───
+    this.dailyChartOptions = {
+      series: [
+        { name: 'Bruto', data: [] },
+        { name: 'Neto',  data: [] }
+      ],
+      chart: {
+        id: 'daily-income', type: 'bar', height: 280, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 500 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
+      },
+      plotOptions: {
+        bar: { horizontal: false, borderRadius: 4, borderRadiusApplication: 'end', columnWidth: '55%', grouped: true }
+      },
+      colors: [C_GOLD, C_GREEN],
+      dataLabels: { enabled: false },
+      stroke: { show: true, width: 2, colors: ['transparent'] },
+      xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
+      fill: { opacity: 0.88 },
+      grid: grid(),
+      legend: {
+        position: 'top', horizontalAlign: 'right',
+        labels: { colors: '#9ca3af' }, fontSize: '12px', fontFamily: FONT,
+        markers: { size: 7 }
+      },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false,
+        y: { formatter: COP } }
+    };
+
+    // ── 4. Pasajeros totales por día — barras simples ─────────────────────
+    this.paxChartOptions = {
+      series: [{ name: 'Pasajeros', data: [] }],
+      chart: {
+        id: 'daily-pax', type: 'bar', height: 280, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 500 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
+      },
+      plotOptions: {
+        bar: { horizontal: false, borderRadius: 4, borderRadiusApplication: 'end', columnWidth: '48%' }
+      },
+      colors: [C_BLUE],
+      dataLabels: {
+        enabled: true,
+        style: { fontSize: '11px', fontFamily: FONT, colors: ['#fff'] },
+        formatter: (v: number) => v > 0 ? String(v) : ''
+      },
+      xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { ...axisStyle(), formatter: (v: number) => Math.round(v).toString() } },
+      fill: {
+        type: 'gradient',
+        gradient: { colorStops: [
+          { offset: 0,   color: C_BLUE, opacity: 0.95 },
+          { offset: 100, color: C_BLUE, opacity: 0.55 }
+        ]}
+      },
+      grid: grid(),
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pax` } }
+    };
+
+    // ── 5. Pasajeros por canal — donut ────────────────────────────────────
+    this.channelChartOptions = {
       series: [],
       chart: {
-        id: 'passengers-chart',
-        type: 'donut',
-        height: 350,
-        fontFamily: 'Inter, sans-serif',
-        background: 'transparent',
-        animations: { enabled: true },
-        redrawOnParentResize: true,
-        redrawOnWindowResize: true
+        id: 'channel-pax', type: 'donut', height: 310,
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
       },
       labels: [],
-      colors: ['#00E396', '#FEB019', '#FF4560'],
-      legend: { position: 'bottom', labels: { colors: '#fff' } },
-      dataLabels: { enabled: true },
+      colors: DIST_PALETTE,
+      legend: {
+        position: 'bottom', labels: { colors: '#9ca3af' },
+        fontSize: '12px', fontFamily: FONT, itemMargin: { horizontal: 8 }
+      },
+      dataLabels: {
+        enabled: true,
+        style: { fontSize: '12px', fontFamily: FONT, fontWeight: 600, colors: ['#fff'] },
+        dropShadow: { enabled: true, blur: 4, opacity: 0.4 }
+      },
       plotOptions: {
         pie: {
           donut: {
-            size: '65%',
+            size: '68%',
             labels: {
               show: true,
-              total: { show: true, label: 'Total', color: '#fff', fontSize: '20px', fontWeight: 600 },
-              value: { color: '#fff' }
+              name:  { show: true, color: '#9ca3af', fontSize: '13px' },
+              value: { show: true, color: '#fff', fontSize: '22px', fontWeight: 700,
+                       formatter: (v: string) => v },
+              total: {
+                show: true, label: 'Total pax', color: '#9ca3af', fontSize: '13px', fontWeight: 600,
+                formatter: (w: any) => w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0)
+              }
             }
           }
         }
       },
       stroke: { show: false },
-      tooltip: { theme: 'dark' }
+      tooltip: { theme: 'dark', style: { fontFamily: FONT } }
     };
 
+    // ── 6. Top destinos — barras horizontales ─────────────────────────────
     this.occupancyChartOptions = {
       series: [{ name: 'Pasajeros', data: [] }],
       chart: {
-        id: 'occupancy-chart',
-        type: 'bar',
-        height: 350,
-        toolbar: { show: false },
-        fontFamily: 'Inter, sans-serif',
-        background: 'transparent',
-        animations: { enabled: true },
-        redrawOnParentResize: true,
-        redrawOnWindowResize: true
+        id: 'occupancy', type: 'bar', height: 310, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
-        bar: { horizontal: true, borderRadius: 4, barHeight: '70%', distributed: true }
+        bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '62%', distributed: true }
       },
-      colors: ['#33b2df', '#546E7A', '#d4526e', '#13d8aa', '#A5978B', '#2b908f', '#f9a3a4', '#90ee7e', '#f48024', '#69d2e7'],
-      dataLabels: { enabled: true, textAnchor: 'start', style: { colors: ['#fff'] }, offsetX: 0 },
-      xaxis: { categories: [], labels: { style: { colors: '#a3a3a3' } } },
-      yaxis: { labels: { style: { colors: '#fff' } } },
-      grid: {
-        borderColor: '#333',
-        strokeDashArray: 4,
-        xaxis: { lines: { show: true } },
-        yaxis: { lines: { show: false } }
+      colors: DIST_PALETTE,
+      dataLabels: {
+        enabled: true, textAnchor: 'start', offsetX: 4,
+        style: { fontSize: '11px', fontFamily: FONT, fontWeight: 600, colors: ['#fff'] }
       },
+      xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { style: { colors: '#d1d5db', fontSize: '12px', fontFamily: FONT }, maxWidth: 160 } },
+      grid: grid(true, false),
       legend: { show: false },
-      tooltip: { theme: 'dark' }
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pax` } }
     };
   }
 
-  private toDateInputValue(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  private getTomorrowDateValue(): string {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return this.toDateInputValue(tomorrow);
-  }
-
-  private syncDatePickers(): void {
-    this.startDateFp?.instance?.setDate(this.startDate, false);
-    this.endDateFp?.instance?.setDate(this.endDate, false);
-  }
-
-  private applyChartData(res: any) {
-    // Income
-    const incomeData = Array.isArray(res?.income) ? res.income.map((v: any) => Number(v) || 0) : [];
-    this.hasIncomeData = incomeData.some((value: number) => value > 0);
-    const incomeSeries = [{ name: 'Ingresos', data: incomeData.length ? incomeData : [0] }];
-    this.incomeChartOptions = {
-      ...this.incomeChartOptions,
-      series: incomeSeries
-    };
-
-    if (this.chartIncome) {
-      this.chartIncome.updateOptions({ series: incomeSeries }, true, true);
-      this.chartIncome.updateSeries(incomeSeries, true);
-    }
-
-    // Passengers
-    const passengerData = Array.isArray(res?.passengers) ? res.passengers : [];
-    const labels = passengerData.map((d: any) => d.estado);
-    const passengerSeries = passengerData.map((d: any) => Number(d.cantidad) || 0);
-    const passengerTotal = passengerSeries.reduce((acc: number, curr: number) => acc + curr, 0);
-    this.hasPassengerData = passengerTotal > 0;
-    this.passengerChartOptions = {
-      ...this.passengerChartOptions,
-      labels,
-      series: this.hasPassengerData ? passengerSeries : []
-    };
-
-    if (this.chartPassengers) {
-      this.chartPassengers.updateOptions({ labels, series: this.hasPassengerData ? passengerSeries : [] }, true, true);
-      this.chartPassengers.updateSeries(this.hasPassengerData ? passengerSeries : [], true);
-    }
-
-    // Occupancy
-    const occupancyData = Array.isArray(res?.occupancy) ? res.occupancy : [];
-    const categories = occupancyData.map((d: any) => d.Nombre_Tour);
-    const occupancySeriesData = occupancyData.map((d: any) => Number(d.pasajeros) || 0);
-    this.hasOccupancyData = occupancySeriesData.some((value: number) => value > 0);
-    const occupancySeries = [{ name: 'Pasajeros', data: this.hasOccupancyData ? occupancySeriesData : [0] }];
-    this.occupancyChartOptions = {
-      ...this.occupancyChartOptions,
-      xaxis: {
-        ...this.occupancyChartOptions.xaxis,
-        categories: this.hasOccupancyData ? categories : []
-      },
-      series: occupancySeries
-    };
-
-    if (this.chartOccupancy) {
-      this.chartOccupancy.updateOptions({
-        xaxis: {
-          ...this.occupancyChartOptions.xaxis,
-          categories: this.hasOccupancyData ? categories : []
-        },
-        series: occupancySeries
-      }, true, true);
-      this.chartOccupancy.updateSeries(occupancySeries, true);
-    }
-
-    this.cdr.detectChanges();
-  }
-
-  private forceChartsReflow() {
-    // 2 frames + timeout corto para cuando hay animaciones/layout/fonts
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-      });
-    });
-
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 180);
+  // ── Load data ─────────────────────────────────────────────────────────────
+  private get filters(): DashboardFilters {
+    const f: DashboardFilters = {};
+    if (this.startDate) f.startDate = this.startDate;
+    if (this.endDate)   f.endDate   = this.endDate;
+    if (this.selectedTourId) f.tourId = this.selectedTourId;
+    return f;
   }
 
   loadData(initial = false) {
-    const requestId = ++this.dashboardRequestId;
-    const filters = {
-      startDate: this.startDate || undefined,
-      endDate: this.endDate || undefined
-    };
-    let hasPartialError = false;
+    const id = ++this.reqId;
+    let partial = false;
+    const f = this.filters;
 
-    if (initial) {
-      this.isInitialLoading = true;
-      this.isLoading = true;
-    } else {
-      this.isRefreshing = true;
-    }
+    if (initial) { this.isInitialLoading = true; }
+    else         { this.isRefreshing     = true; }
     this.cdr.detectChanges();
 
-    this.navbar.clearOverlay();
-
     forkJoin({
-      stats: this.dashboardService.getStats(filters).pipe(
-        catchError((err) => {
-          console.error('Dashboard stats error:', err);
-          hasPartialError = true;
-          return of(null);
-        })
-      ),
-      income: this.dashboardService.getIncomeHistory(new Date().getFullYear()).pipe(
-        catchError((err) => {
-          console.error('Dashboard income error:', err);
-          hasPartialError = true;
-          return of([]);
-        })
-      ),
-      passengers: this.dashboardService.getPassengerDistribution(filters).pipe(
-        catchError((err) => {
-          console.error('Dashboard passengers error:', err);
-          hasPartialError = true;
-          return of([]);
-        })
-      ),
-      occupancy: this.dashboardService.getTourOccupancy(filters).pipe(
-        catchError((err) => {
-          console.error('Dashboard occupancy error:', err);
-          hasPartialError = true;
-          return of([]);
-        })
-      )
+      stats:    this.svc.getStats(f).pipe(catchError(e => { console.error(e); partial = true; return of(null); })),
+      income:   this.svc.getIncomeHistory(new Date().getFullYear(), f).pipe(catchError(() => { partial = true; return of({ bruto: Array(12).fill(0), neto: Array(12).fill(0) }); })),
+      daily:    this.svc.getDailyIncome(f).pipe(catchError(() => { partial = true; return of([]); })),
+      dailyPax: this.svc.getDailyPassengers(f).pipe(catchError(() => { partial = true; return of([]); })),
+      channels: this.svc.getPassengersByChannel(f).pipe(catchError(() => { partial = true; return of([]); })),
+      occupancy:this.svc.getTourOccupancy(f).pipe(catchError(() => { partial = true; return of([]); }))
     })
-      .pipe(
-        finalize(() => {
-          if (requestId !== this.dashboardRequestId) return;
-          this.isInitialLoading = false;
-          this.isRefreshing = false;
-          this.isLoading = false;
-          const current = this.navbar.alert();
-          if (current?.loading) this.navbar.clearOverlay('loading');
-          this.cdr.detectChanges();
-        })
-      )
-      .subscribe({
-        next: (res) => {
-          if (requestId !== this.dashboardRequestId) return;
-          this.lastResponse = res;
+    .pipe(finalize(() => {
+      if (id !== this.reqId) return;
+      this.isInitialLoading = false;
+      this.isRefreshing     = false;
+      this.cdr.detectChanges();
+    }))
+    .subscribe({
+      next: res => {
+        if (id !== this.reqId) return;
+        this.lastResponse = res;
 
-          this.totalReservas = Number(res?.stats?.totalReservas || 0);
-          this.totalPasajeros = Number(res?.stats?.totalPasajeros || 0);
-          this.totalIngresos = Number(res?.stats?.totalIngresos || 0);
-          this.totalTransfers = Number(res?.stats?.totalTransfers || 0);
+        this.totalReservas      = Number(res.stats?.totalReservas      || 0);
+        this.totalPasajeros     = Number(res.stats?.totalPasajeros     || 0);
+        this.totalIngresos      = Number(res.stats?.totalIngresos      || 0);
+        this.totalIngresosNetos = Number(res.stats?.totalIngresosNetos || 0);
+        this.totalTransfers     = Number(res.stats?.totalTransfers     || 0);
 
-          if (this.viewReady) {
-            this.applyChartData({
-              income: Array.isArray(res?.income) ? res.income : [],
-              passengers: Array.isArray(res?.passengers) ? res.passengers : [],
-              occupancy: Array.isArray(res?.occupancy) ? res.occupancy : []
-            });
-            this.forceChartsReflow();
-          }
+        if (this.viewReady) { this.applyAll(res); this.reflow(); }
 
-          if (hasPartialError) {
-            this.navbar.showAlert({
-              title: 'Dashboard parcialmente cargado',
-              message: 'Algunas métricas no pudieron cargarse.',
-              type: 'warning',
-              autoClose: true
-            });
-          }
+        if (partial) this.alert.showModal({
+          type: 'warning', title: 'Dashboard parcialmente cargado',
+          message: 'Algunas métricas no pudieron obtenerse.'
+        });
 
-          this.cdr.detectChanges();
-        },
-        error: (err) => {
-          if (requestId !== this.dashboardRequestId) return;
-          console.error('Dashboard Error:', err);
-          this.totalReservas = 0;
-          this.totalPasajeros = 0;
-          this.totalIngresos = 0;
-          this.totalTransfers = 0;
-          this.hasIncomeData = false;
-          this.hasPassengerData = false;
-          this.hasOccupancyData = false;
-          this.applyChartData({ income: [], passengers: [], occupancy: [] });
-          this.navbar.showAlert({
-            title: 'Dashboard parcialmente cargado',
-            message: 'Algunas métricas no pudieron cargarse.',
-            type: 'warning',
-            autoClose: true,
-          });
-          this.cdr.detectChanges();
-        }
-      });
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        if (id !== this.reqId) return;
+        console.error(err);
+        this.totalReservas = this.totalPasajeros = this.totalIngresos =
+          this.totalIngresosNetos = this.totalTransfers = 0;
+        this.hasIncomeData = this.hasNetIncomeData = this.hasDailyData =
+          this.hasPaxData = this.hasChannelData = this.hasOccupancyData = false;
+        this.alert.showModal({ type: 'error', title: 'Error al cargar el dashboard',
+          message: 'No se pudo obtener la información.' });
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  // ── Apply chart data ──────────────────────────────────────────────────────
+  private applyAll(res: any) {
+
+    // 1 + 2. Ingresos bruto / neto mensual
+    const brutoArr = Array.isArray(res.income?.bruto) ? res.income.bruto : Array(12).fill(0);
+    const netoArr  = Array.isArray(res.income?.neto)  ? res.income.neto  : Array(12).fill(0);
+    this.hasIncomeData    = brutoArr.some((v: number) => v > 0);
+    this.hasNetIncomeData = netoArr.some( (v: number) => v > 0);
+
+    const bSeries = [{ name: 'Ingresos brutos', data: brutoArr }];
+    const nSeries = [{ name: 'Ingresos netos',  data: netoArr  }];
+    this.incomeChartOptions    = { ...this.incomeChartOptions,    series: bSeries };
+    this.netIncomeChartOptions = { ...this.netIncomeChartOptions, series: nSeries };
+    this.chartIncome?.updateSeries(bSeries, true);
+    this.chartNetIncome?.updateSeries(nSeries, true);
+
+    // 3. Ingresos diarios bruto + neto
+    const daily = Array.isArray(res.daily) ? res.daily : [];
+    const dailyLabels = daily.map((d: any) => this.fmtDate(d.fecha));
+    const dailyBruto  = daily.map((d: any) => Number(d.bruto || 0));
+    const dailyNeto   = daily.map((d: any) => Number(d.neto  || 0));
+    this.hasDailyData = dailyBruto.some((v: number) => v > 0) || dailyNeto.some((v: number) => v > 0);
+
+    const dSeries = [{ name: 'Bruto', data: dailyBruto }, { name: 'Neto', data: dailyNeto }];
+    this.dailyChartOptions = {
+      ...this.dailyChartOptions,
+      xaxis: { ...this.dailyChartOptions.xaxis, categories: dailyLabels },
+      series: dSeries
+    };
+    this.chartDaily?.updateOptions({ xaxis: { ...this.dailyChartOptions.xaxis, categories: dailyLabels } }, false, false);
+    this.chartDaily?.updateSeries(dSeries, true);
+
+    // 4. Pasajeros por día
+    const dp = Array.isArray(res.dailyPax) ? res.dailyPax : [];
+    const dpLabels = dp.map((d: any) => this.fmtDate(d.fecha));
+    const dpData   = dp.map((d: any) => Number(d.pasajeros || 0));
+    this.hasPaxData = dpData.some((v: number) => v > 0);
+
+    const pSeries = [{ name: 'Pasajeros', data: dpData }];
+    this.paxChartOptions = {
+      ...this.paxChartOptions,
+      xaxis: { ...this.paxChartOptions.xaxis, categories: dpLabels },
+      series: pSeries
+    };
+    this.chartPax?.updateOptions({ xaxis: { ...this.paxChartOptions.xaxis, categories: dpLabels } }, false, false);
+    this.chartPax?.updateSeries(pSeries, true);
+
+    // 5. Pasajeros por canal (donut)
+    const ch = Array.isArray(res.channels) ? res.channels : [];
+    const chLabels = ch.map((d: any) => d.canal);
+    const chData   = ch.map((d: any) => Number(d.cantidad || 0));
+    this.hasChannelData = chData.some((v: number) => v > 0);
+
+    this.channelChartOptions = { ...this.channelChartOptions, labels: chLabels, series: this.hasChannelData ? chData : [] };
+    if (this.chartChannel) {
+      this.chartChannel.updateOptions({ labels: chLabels }, false, false);
+      this.chartChannel.updateSeries(this.hasChannelData ? chData : [], true);
+    }
+
+    // 6. Top destinos
+    const occ = Array.isArray(res.occupancy) ? res.occupancy : [];
+    const occCats = occ.map((d: any) => d.Nombre_Tour);
+    const occData = occ.map((d: any) => Number(d.pasajeros || 0));
+    this.hasOccupancyData = occData.some((v: number) => v > 0);
+
+    const oSeries = [{ name: 'Pasajeros', data: this.hasOccupancyData ? occData : [] }];
+    this.occupancyChartOptions = {
+      ...this.occupancyChartOptions,
+      xaxis: { ...this.occupancyChartOptions.xaxis, categories: occCats },
+      series: oSeries
+    };
+    this.chartOccupancy?.updateOptions({ xaxis: { ...this.occupancyChartOptions.xaxis, categories: occCats } }, false, false);
+    this.chartOccupancy?.updateSeries(oSeries, true);
+
+    this.cdr.detectChanges();
+  }
+
+  private fmtDate(raw: any): string {
+    if (!raw) return '';
+    const s = typeof raw === 'string' ? raw.slice(0, 10) : new Date(raw).toISOString().slice(0, 10);
+    const [, m, d] = s.split('-');
+    const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${Number(d)} ${meses[Number(m) - 1]}`;
+  }
+
+  private reflow() {
+    requestAnimationFrame(() => requestAnimationFrame(() => window.dispatchEvent(new Event('resize'))));
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+  }
+
+  // ── Date helpers ──────────────────────────────────────────────────────────
+  private toDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  private tomorrowValue(): string {
+    const t = new Date(); t.setDate(t.getDate() + 1); return this.toDateStr(t);
+  }
+
+  private syncPickers() {
+    this.cdr.markForCheck();
   }
 
   onDateRangeChange(field: 'startDate' | 'endDate', value: string): void {
     if (!value) return;
-
     this[field] = value;
-
     if (this.startDate && this.endDate && this.startDate > this.endDate) {
-      if (field === 'startDate') {
-        this.endDate = this.startDate;
-      } else {
-        this.startDate = this.endDate;
-      }
+      if (field === 'startDate') this.endDate = this.startDate;
+      else                       this.startDate = this.endDate;
     }
-
-    this.syncDatePickers();
+    this.syncPickers();
     this.scheduleRefresh();
   }
 
-  private scheduleRefresh(): void {
+  private scheduleRefresh() {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
-
-    this.refreshTimer = setTimeout(() => {
-      this.loadData(false);
-    }, 180);
-  }
-
-  setTomorrowRange() {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    const tomorrow = this.getTomorrowDateValue();
-    this.startDate = tomorrow;
-    this.endDate = tomorrow;
-    this.syncDatePickers();
-    this.loadData(false);
+    this.refreshTimer = setTimeout(() => this.loadData(false), 180);
   }
 
   setTodayRange() {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    const today = this.toDateInputValue(new Date());
-    this.startDate = today;
-    this.endDate = today;
-    this.syncDatePickers();
-    this.loadData(false);
+    const t = this.toDateStr(new Date());
+    this.startDate = t; this.endDate = t;
+    this.syncPickers(); this.loadData(false);
   }
 
-  get activeRangeLabel(): string {
-    if (!this.startDate || !this.endDate) return 'Sin rango definido';
-    if (this.startDate === this.endDate) return `Operación: ${this.startDate}`;
-    return `Rango: ${this.startDate} — ${this.endDate}`;
+  setTomorrowRange() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    const t = this.tomorrowValue();
+    this.startDate = t; this.endDate = t;
+    this.syncPickers(); this.loadData(false);
   }
 
-  isTodayRange(): boolean {
-    const today = this.toDateInputValue(new Date());
-    return this.startDate === today && this.endDate === today;
-  }
-
-  isTomorrowRange(): boolean {
-    const tomorrow = this.getTomorrowDateValue();
-    return this.startDate === tomorrow && this.endDate === tomorrow;
-  }
-
-  hasAnyActivity(): boolean {
-    return this.totalReservas > 0 || this.totalPasajeros > 0 || this.totalIngresos > 0 || this.totalTransfers > 0;
-  }
+  // ── Computed ──────────────────────────────────────────────────────────────
+  isTodayRange(): boolean    { const t = this.toDateStr(new Date()); return this.startDate === t && this.endDate === t; }
+  isTomorrowRange(): boolean { const t = this.tomorrowValue(); return this.startDate === t && this.endDate === t; }
+  hasAnyActivity(): boolean  { return this.totalReservas > 0 || this.totalPasajeros > 0 || this.totalIngresos > 0; }
 
   getOperationVolumeLabel(): string {
     if (this.totalPasajeros >= 100) return 'Alto';
-    if (this.totalPasajeros >= 30) return 'Medio';
-    if (this.totalPasajeros > 0) return 'Bajo';
+    if (this.totalPasajeros >= 30)  return 'Medio';
+    if (this.totalPasajeros > 0)    return 'Bajo';
     return 'Sin operación';
   }
 
   getOperationVolumeClass(): string {
     if (this.totalPasajeros >= 100) return 'high';
-    if (this.totalPasajeros >= 30) return 'medium';
-    if (this.totalPasajeros > 0) return 'low';
+    if (this.totalPasajeros >= 30)  return 'medium';
+    if (this.totalPasajeros > 0)    return 'low';
     return 'none';
   }
 
-  get averagePassengersPerBooking(): number | null {
-    if (!this.totalReservas) return null;
-    return this.totalPasajeros / this.totalReservas;
+  get avgPaxPerBooking(): number | null {
+    return this.totalReservas ? this.totalPasajeros / this.totalReservas : null;
   }
 
-  get averageIncomePerBooking(): number | null {
-    if (!this.totalReservas) return null;
-    return this.totalIngresos / this.totalReservas;
+  get avgIncomePerBooking(): number | null {
+    return this.totalReservas ? this.totalIngresos / this.totalReservas : null;
+  }
+
+  get marginPct(): number | null {
+    if (!this.totalIngresos) return null;
+    return ((this.totalIngresosNetos / this.totalIngresos) * 100);
   }
 }

@@ -1,164 +1,137 @@
 @if (isInitialLoading) {
+<!-- ════════════════════════════════════════ SKELETON ════════════════════════ -->
 <div class="skeleton-page dashboard-page">
-  <div class="page-header">
-    <div>
-      <div class="sk-line sk-title"></div>
-      <div class="sk-line sk-subtitle"></div>
-    </div>
-    <div class="sk-line sk-range-chip"></div>
-  </div>
-
   <div class="main-content">
     <div class="card sk-card">
       <div class="sk-toolbar-grid">
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="sk-toolbar-actions">
-          <div class="sk-field sk-btn-quick"></div>
-          <div class="sk-field sk-btn-quick"></div>
-        </div>
+        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
+        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
+        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
+        <div class="sk-toolbar-actions"><div class="sk-field sk-btn-quick"></div><div class="sk-field sk-btn-quick"></div></div>
       </div>
     </div>
-
     <div class="kpi-grid">
-      @for (_ of [1,2,3,4]; track $index) {
+      @for (_ of [1,2,3,4,5]; track $index) {
       <div class="card sk-card sk-kpi">
         <div class="sk-icon-box"></div>
         <div class="sk-kpi-info">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-line sk-kpi-value"></div>
-          <div class="sk-line sk-kpi-sub"></div>
+          <div class="sk-line sk-label"></div><div class="sk-line sk-kpi-value"></div><div class="sk-line sk-kpi-sub"></div>
         </div>
       </div>
       }
     </div>
-
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-        <div class="sk-line sk-subtitle"></div>
-      </div>
-      <div class="summary-grid">
-        @for (_ of [1,2,3,4]; track $index) {
-        <div class="sk-summary-item">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-line sk-summary-value"></div>
-        </div>
-        }
-      </div>
-    </div>
-
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-        <div class="sk-line sk-subtitle"></div>
-      </div>
-      <div class="sk-field sk-chart-wide"></div>
-    </div>
-
-    <div class="charts-grid">
+    <div class="charts-grid-2">
       @for (_ of [1,2]; track $index) {
-      <div class="card sk-card">
-        <div class="card-header">
-          <div class="sk-line sk-heading"></div>
-          <div class="sk-line sk-subtitle"></div>
-        </div>
-        <div class="sk-field sk-chart"></div>
-      </div>
+      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
       }
     </div>
-
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-        <div class="sk-line sk-subtitle"></div>
-      </div>
-      <div class="admin-preview-grid">
-        @for (_ of [1,2,3,4]; track $index) {
-        <div class="sk-admin-item">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-line sk-kpi-sub"></div>
-        </div>
-        }
-      </div>
+    <div class="charts-grid-2">
+      @for (_ of [1,2]; track $index) {
+      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
+      }
+    </div>
+    <div class="charts-grid-2">
+      @for (_ of [1,2]; track $index) {
+      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
+      }
     </div>
   </div>
 </div>
-} @else {
-<div class="dashboard-page">
-  <header class="page-header">
-    <div>
-      <h1>Panel de Control</h1>
-      <p class="subtitle">Centro operativo de SIR para reservas, pasajeros, ingresos, transfers y actividad diaria.</p>
-    </div>
 
+} @else {
+<!-- ═══════════════════════════════════════ DASHBOARD ═════════════════════════ -->
+<div class="dashboard-page">
+
+  <header class="page-header">
     <div class="range-chip">
       @if (startDate && endDate && startDate === endDate) {
-      Operación: {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
+        Operación: {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
       } @else {
-      Rango: {{ startDate | date:'d MMM yyyy':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
+        {{ startDate | date:'d MMM':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
       }
+      @if (selectedTourId) { &nbsp;·&nbsp; {{ tourLabel }} }
     </div>
   </header>
 
   <div class="main-content">
+
+    <!-- ── Toolbar ──────────────────────────────────────────────────────────── -->
     <section class="card dashboard-toolbar">
-      <div class="form-grid toolbar-grid">
+      <div class="toolbar-grid">
+
+        <!-- Desde -->
         <div class="form-group">
           <label class="form-label">Desde</label>
-          <input
-            type="text"
-            class="form-input"
-            appFlatpickrInput
-            #startDateFp="fp"
-            [fpOptions]="fpOptionsFecha"
-            [value]="startDate"
-            (change)="onDateRangeChange('startDate', $any($event.target).value)" />
+          <app-datepicker
+            [ngModel]="startDate"
+            (dateChange)="onDateRangeChange('startDate', $event || '')">
+          </app-datepicker>
         </div>
+
+        <!-- Hasta -->
         <div class="form-group">
           <label class="form-label">Hasta</label>
-          <input
-            type="text"
-            class="form-input"
-            appFlatpickrInput
-            #endDateFp="fp"
-            [fpOptions]="fpOptionsFecha"
-            [value]="endDate"
-            (change)="onDateRangeChange('endDate', $any($event.target).value)" />
+          <app-datepicker
+            [ngModel]="endDate"
+            (dateChange)="onDateRangeChange('endDate', $event || '')">
+          </app-datepicker>
         </div>
+
+        <!-- Tour -->
+        <div class="form-group">
+          <label class="form-label">Tour</label>
+          <select class="form-input form-select" [ngModel]="selectedTourId"
+            (ngModelChange)="onTourChange($event)">
+            <option [ngValue]="null">Todos los tours</option>
+            @for (tour of tours; track tour.Id_Tour) {
+              <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Acciones rápidas -->
         <div class="form-group toolbar-actions">
-          <label class="form-label">Acciones</label>
+          <label class="form-label">Accesos rápidos</label>
           <div class="quick-actions">
-            <button class="btn-add" [class.active]="isTodayRange()" (click)="setTodayRange()" [disabled]="isRefreshing">Hoy</button>
-            <button class="btn-add" [class.active]="isTomorrowRange()" (click)="setTomorrowRange()"
-              [disabled]="isRefreshing">Mañana</button>
+            <button class="btn-quick" [class.active]="isTodayRange()"    (click)="setTodayRange()"    [disabled]="isRefreshing">Hoy</button>
+            <button class="btn-quick" [class.active]="isTomorrowRange()" (click)="setTomorrowRange()" [disabled]="isRefreshing">Mañana</button>
           </div>
         </div>
+
       </div>
-      <p class="toolbar-note">Los datos se actualizan automáticamente al cambiar las fechas.</p>
+      <p class="toolbar-note">Los datos se actualizan automáticamente al cambiar fechas o tour.</p>
     </section>
 
+    <!-- ── Zona de datos (se opaca al refrescar) ────────────────────────────── -->
     <div class="dashboard-content" [class.dashboard-refreshing]="isRefreshing">
+
       @if (isRefreshing) {
       <div class="refresh-indicator">
-        <span class="refresh-pulse"></span>
-        Actualizando datos…
+        <span class="refresh-pulse"></span>Actualizando datos…
       </div>
       }
 
+      <!-- ── KPIs ─────────────────────────────────────────────────────────── -->
       <section class="kpi-grid">
+
         <div class="card kpi-card income">
           <div class="icon-box"><i class="bx bx-dollar-circle"></i></div>
           <div class="kpi-info">
-            <span class="form-label">Ingresos Totales</span>
+            <span class="form-label">Ingresos Brutos</span>
             <span class="kpi-value">{{ totalIngresos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
-            <span class="kpi-sub">Ingresos registrados en el rango</span>
+            <span class="kpi-sub">Precio cobrado al cliente</span>
+          </div>
+        </div>
+
+        <div class="card kpi-card net-income">
+          <div class="icon-box"><i class="bx bx-trending-up"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Ingresos Netos</span>
+            <span class="kpi-value">{{ totalIngresosNetos | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
+            <span class="kpi-sub">
+              @if (marginPct !== null) { Margen: {{ marginPct | number:'1.1-1' }}% }
+              @else { Bruto − comisión }
+            </span>
           </div>
         </div>
 
@@ -167,7 +140,7 @@
           <div class="kpi-info">
             <span class="form-label">Reservas Activas</span>
             <span class="kpi-value">{{ totalReservas }}</span>
-            <span class="kpi-sub">Reservas no canceladas</span>
+            <span class="kpi-sub">No canceladas</span>
           </div>
         </div>
 
@@ -176,7 +149,10 @@
           <div class="kpi-info">
             <span class="form-label">Pasajeros</span>
             <span class="kpi-value">{{ totalPasajeros }}</span>
-            <span class="kpi-sub">Pasajeros del rango seleccionado</span>
+            <span class="kpi-sub">
+              @if (avgPaxPerBooking !== null) { {{ avgPaxPerBooking | number:'1.1-1' }} pax/reserva }
+              @else { En el rango seleccionado }
+            </span>
           </div>
         </div>
 
@@ -185,172 +161,202 @@
           <div class="kpi-info">
             <span class="form-label">Transfers</span>
             <span class="kpi-value">{{ totalTransfers }}</span>
-            <span class="kpi-sub">Transfers registrados</span>
+            <span class="kpi-sub">Registrados en el rango</span>
           </div>
         </div>
-      </section>
 
-      <section class="card operational-summary-card">
-        <div class="card-header">
-          <h2>Resumen operativo</h2>
-          <span class="card-subtitle">Indicadores rápidos del rango seleccionado.</span>
-        </div>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <span class="form-label">Pasajeros por reserva</span>
-            <strong class="summary-value">{{ averagePassengersPerBooking === null ? '—' : (averagePassengersPerBooking |
-              number:'1.1-2') }}</strong>
-          </div>
-          <div class="summary-item">
-            <span class="form-label">Ingreso promedio por reserva</span>
-            <strong class="summary-value">{{ averageIncomePerBooking === null ? '—' : (averageIncomePerBooking |
-              currency:'COP':'symbol-narrow':'1.0-0') }}</strong>
-          </div>
-          <div class="summary-item">
-            <span class="form-label">Estado del rango</span>
-            <strong class="summary-value">{{ hasAnyActivity() ? 'Con actividad' : 'Sin actividad' }}</strong>
-          </div>
-          <div class="summary-item">
-            <span class="form-label">Fecha operativa</span>
-            <strong class="summary-value">
-              @if (startDate === endDate) {
-              {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
-              } @else {
-              {{ startDate | date:'d MMM yyyy':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
-              }
-            </strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="card quick-read-card">
-        <div class="card-header">
-          <h2>Lectura rápida</h2>
-          <span class="card-subtitle">Interpretación automática del rango seleccionado.</span>
-        </div>
-        <div class="quick-read-grid">
-          <div class="quick-read-item">
-            <span class="form-label">Estado general</span>
-            <strong>{{ hasAnyActivity() ? 'Con actividad' : 'Sin actividad' }}</strong>
-          </div>
-          <div class="quick-read-item">
-            <span class="form-label">Volumen</span>
-            <strong class="volume-pill" [ngClass]="getOperationVolumeClass()">{{ getOperationVolumeLabel() }}</strong>
-          </div>
-          <div class="quick-read-item">
-            <span class="form-label">Dependencia de reservas</span>
-            <strong>{{ averagePassengersPerBooking === null ? '—' : (averagePassengersPerBooking | number:'1.1-2') }} pax/reserva</strong>
-          </div>
-          <div class="quick-read-item">
-            <span class="form-label">Servicios</span>
-            <strong>{{ totalTransfers }} transfers registrados</strong>
-          </div>
-        </div>
       </section>
 
       @if (!hasAnyActivity()) {
       <section class="card no-activity-card">
-        <strong>No hay actividad para este rango</strong>
-        <span>Puedes cambiar la fecha o revisar la operación de mañana.</span>
+        <i class="bx bx-calendar-x no-activity-icon"></i>
+        <div>
+          <strong>Sin actividad en este rango</strong>
+          <span>Cambia la fecha o revisa la operación de mañana.</span>
+        </div>
       </section>
       }
 
-      <section class="card chart-card wide">
-        <div class="card-header">
-          <h2>Tendencia de Ingresos</h2>
-          <span class="card-subtitle">Evolución del ingreso en el periodo consultado.</span>
-        </div>
-        <div class="chart-body">
-          @if (hasIncomeData) {
-          <apx-chart #chartIncome [series]="incomeChartOptions.series" [chart]="incomeChartOptions.chart"
-            [xaxis]="incomeChartOptions.xaxis" [stroke]="incomeChartOptions.stroke"
-            [tooltip]="incomeChartOptions.tooltip" [dataLabels]="incomeChartOptions.dataLabels"
-            [fill]="incomeChartOptions.fill" [colors]="incomeChartOptions.colors" [grid]="incomeChartOptions.grid"
-            [yaxis]="incomeChartOptions.yaxis">
-          </apx-chart>
-          } @else {
-          <div class="chart-empty">
-            <h4>Sin ingresos registrados</h4>
-            <p>No hay ingresos para el rango seleccionado.</p>
-          </div>
-          }
-        </div>
-      </section>
+      <!-- ── ROW 1: Ingresos Brutos + Ingresos Netos (área anual) ─────────── -->
+      <div class="charts-grid-2">
 
-      <section class="charts-grid">
-        <div class="card chart-card">
+        <section class="card chart-card">
+          <div class="card-header">
+            <h2>Ingresos Brutos <span class="chart-badge badge-gold">Año {{ startDate | date:'yyyy' }}</span></h2>
+            <span class="card-subtitle">Precio cobrado al cliente, por mes.</span>
+          </div>
+          <div class="chart-body">
+            @if (hasIncomeData) {
+              <apx-chart #chartIncome
+                [series]="incomeChartOptions.series"     [chart]="incomeChartOptions.chart"
+                [xaxis]="incomeChartOptions.xaxis"       [yaxis]="incomeChartOptions.yaxis"
+                [stroke]="incomeChartOptions.stroke"     [fill]="incomeChartOptions.fill"
+                [colors]="incomeChartOptions.colors"     [grid]="incomeChartOptions.grid"
+                [dataLabels]="incomeChartOptions.dataLabels"
+                [tooltip]="incomeChartOptions.tooltip"   [markers]="incomeChartOptions.markers">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-line-chart chart-empty-icon"></i>
+                <h4>Sin ingresos brutos</h4>
+                <p>No hay datos para el año actual{{ selectedTourId ? ' y el tour seleccionado' : '' }}.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card chart-card">
+          <div class="card-header">
+            <h2>Ingresos Netos <span class="chart-badge badge-green">Año {{ startDate | date:'yyyy' }}</span></h2>
+            <span class="card-subtitle">Ingreso tras descontar comisión, por mes.</span>
+          </div>
+          <div class="chart-body">
+            @if (hasNetIncomeData) {
+              <apx-chart #chartNetIncome
+                [series]="netIncomeChartOptions.series"     [chart]="netIncomeChartOptions.chart"
+                [xaxis]="netIncomeChartOptions.xaxis"       [yaxis]="netIncomeChartOptions.yaxis"
+                [stroke]="netIncomeChartOptions.stroke"     [fill]="netIncomeChartOptions.fill"
+                [colors]="netIncomeChartOptions.colors"     [grid]="netIncomeChartOptions.grid"
+                [dataLabels]="netIncomeChartOptions.dataLabels"
+                [tooltip]="netIncomeChartOptions.tooltip"   [markers]="netIncomeChartOptions.markers">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-trending-up chart-empty-icon"></i>
+                <h4>Sin ingresos netos</h4>
+                <p>Verifica que los pasajeros tengan comisión registrada.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ── ROW 2: Ingresos diarios Bruto vs Neto + Pasajeros por día ────── -->
+      <div class="charts-grid-2">
+
+        <section class="card chart-card">
+          <div class="card-header">
+            <h2>Ingresos por día <span class="chart-badge">Rango seleccionado</span></h2>
+            <span class="card-subtitle">Bruto vs. Neto diario en el periodo consultado.</span>
+          </div>
+          <div class="chart-body chart-body--sm">
+            @if (hasDailyData) {
+              <apx-chart #chartDaily
+                [series]="dailyChartOptions.series"       [chart]="dailyChartOptions.chart"
+                [plotOptions]="dailyChartOptions.plotOptions"
+                [xaxis]="dailyChartOptions.xaxis"         [yaxis]="dailyChartOptions.yaxis"
+                [colors]="dailyChartOptions.colors"       [dataLabels]="dailyChartOptions.dataLabels"
+                [stroke]="dailyChartOptions.stroke"       [fill]="dailyChartOptions.fill"
+                [grid]="dailyChartOptions.grid"           [legend]="dailyChartOptions.legend"
+                [tooltip]="dailyChartOptions.tooltip">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-bar-chart-alt-2 chart-empty-icon"></i>
+                <h4>Sin ingresos en el rango</h4>
+                <p>Amplía el periodo o selecciona otro tour.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card chart-card">
+          <div class="card-header">
+            <h2>Pasajeros totales <span class="chart-badge badge-blue">Por día</span></h2>
+            <span class="card-subtitle">Volumen de pasajeros diario en el rango.</span>
+          </div>
+          <div class="chart-body chart-body--sm">
+            @if (hasPaxData) {
+              <apx-chart #chartPax
+                [series]="paxChartOptions.series"         [chart]="paxChartOptions.chart"
+                [plotOptions]="paxChartOptions.plotOptions"
+                [xaxis]="paxChartOptions.xaxis"           [yaxis]="paxChartOptions.yaxis"
+                [colors]="paxChartOptions.colors"         [dataLabels]="paxChartOptions.dataLabels"
+                [fill]="paxChartOptions.fill"             [grid]="paxChartOptions.grid"
+                [tooltip]="paxChartOptions.tooltip">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-group chart-empty-icon"></i>
+                <h4>Sin pasajeros en el rango</h4>
+                <p>No hay pasajeros registrados para este periodo.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ── ROW 3: Pasajeros por canal + Top destinos ─────────────────────── -->
+      <div class="charts-grid-2">
+
+        <section class="card chart-card">
+          <div class="card-header">
+            <h2>Pasajeros por canal <span class="chart-badge">Rango seleccionado</span></h2>
+            <span class="card-subtitle">Distribución de pasajeros según canal de venta.</span>
+          </div>
+          <div class="chart-body donut-container">
+            @if (hasChannelData) {
+              <apx-chart #chartChannel
+                [series]="channelChartOptions.series"     [chart]="channelChartOptions.chart"
+                [labels]="channelChartOptions.labels"     [colors]="channelChartOptions.colors"
+                [legend]="channelChartOptions.legend"     [plotOptions]="channelChartOptions.plotOptions"
+                [dataLabels]="channelChartOptions.dataLabels"
+                [stroke]="channelChartOptions.stroke"     [tooltip]="channelChartOptions.tooltip">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-pie-chart-alt-2 chart-empty-icon"></i>
+                <h4>Sin datos de canal</h4>
+                <p>Verifica que las reservas tengan canal de venta asignado.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card chart-card">
           <div class="card-header">
             <h2>Top Destinos</h2>
             <span class="card-subtitle">Pasajeros por tour en el rango seleccionado.</span>
           </div>
           <div class="chart-body">
             @if (hasOccupancyData) {
-            <apx-chart #chartOccupancy [series]="occupancyChartOptions.series" [chart]="occupancyChartOptions.chart"
-              [plotOptions]="occupancyChartOptions.plotOptions" [xaxis]="occupancyChartOptions.xaxis"
-              [colors]="occupancyChartOptions.colors" [dataLabels]="occupancyChartOptions.dataLabels"
-              [grid]="occupancyChartOptions.grid" [yaxis]="occupancyChartOptions.yaxis"
-              [tooltip]="occupancyChartOptions.tooltip">
-            </apx-chart>
+              <apx-chart #chartOccupancy
+                [series]="occupancyChartOptions.series"     [chart]="occupancyChartOptions.chart"
+                [plotOptions]="occupancyChartOptions.plotOptions"
+                [xaxis]="occupancyChartOptions.xaxis"       [yaxis]="occupancyChartOptions.yaxis"
+                [colors]="occupancyChartOptions.colors"     [dataLabels]="occupancyChartOptions.dataLabels"
+                [grid]="occupancyChartOptions.grid"         [legend]="occupancyChartOptions.legend"
+                [tooltip]="occupancyChartOptions.tooltip">
+              </apx-chart>
             } @else {
-            <div class="chart-empty">
-              <h4>Sin pasajeros por tour</h4>
-              <p>No hay reservas activas para comparar destinos.</p>
-            </div>
+              <div class="chart-empty">
+                <i class="bx bx-map-alt chart-empty-icon"></i>
+                <h4>Sin destinos en el rango</h4>
+                <p>No hay reservas activas para comparar tours.</p>
+              </div>
             }
           </div>
-        </div>
+        </section>
 
-        <div class="card chart-card">
-          <div class="card-header">
-            <h2>Estado Pasajeros</h2>
-            <span class="card-subtitle">Distribución de pasajeros por estado operativo.</span>
-          </div>
-          <div class="chart-body donut-container">
-            @if (hasPassengerData) {
-            <apx-chart #chartPassengers [series]="passengerChartOptions.series" [chart]="passengerChartOptions.chart"
-              [labels]="passengerChartOptions.labels" [colors]="passengerChartOptions.colors"
-              [legend]="passengerChartOptions.legend" [plotOptions]="passengerChartOptions.plotOptions"
-              [dataLabels]="passengerChartOptions.dataLabels" [tooltip]="passengerChartOptions.tooltip">
-            </apx-chart>
-            } @else {
-            <div class="chart-empty">
-              <h4>Sin distribución disponible</h4>
-              <p>No hay pasajeros registrados para este rango.</p>
-            </div>
-            }
-          </div>
-        </div>
-      </section>
+      </div>
 
+      <!-- ── Gestión operativa ─────────────────────────────────────────────── -->
       <section class="card admin-preview-card">
         <div class="card-header">
           <h2>Gestión operativa</h2>
           <span class="card-subtitle">Accesos administrativos que se integrarán progresivamente.</span>
         </div>
         <div class="admin-preview-grid">
-          <div class="admin-preview-item">
-            <strong>Monedas</strong>
-            <span>Crear, editar y eliminar monedas.</span>
-            <em>Próximamente</em>
-          </div>
-          <div class="admin-preview-item">
-            <strong>Canales</strong>
-            <span>Administrar canales de venta.</span>
-            <em>Próximamente</em>
-          </div>
-          <div class="admin-preview-item">
-            <strong>Rangos de transfer</strong>
-            <span>Configurar rangos y precios.</span>
-            <em>Próximamente</em>
-          </div>
-          <div class="admin-preview-item">
-            <strong>Catálogos</strong>
-            <span>Centralizar datos operativos.</span>
-            <em>Próximamente</em>
-          </div>
+          <div class="admin-preview-item"><strong>Monedas</strong><span>Crear, editar y eliminar.</span><em>Próximamente</em></div>
+          <div class="admin-preview-item"><strong>Canales</strong><span>Administrar canales de venta.</span><em>Próximamente</em></div>
+          <div class="admin-preview-item"><strong>Rangos de transfer</strong><span>Configurar rangos y precios.</span><em>Próximamente</em></div>
+          <div class="admin-preview-item"><strong>Catálogos</strong><span>Centralizar datos operativos.</span><em>Próximamente</em></div>
         </div>
       </section>
-    </div>
-  </div>
-</div>
+
+    </div><!-- /dashboard-content -->
+  </div><!-- /main-content -->
+</div><!-- /dashboard-page -->
 }

@@ -7,6 +7,7 @@ const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 
 router.get('/', authMiddleware, checkPermission('TOURS.LEER'), toursController.getTours);
 router.post('/', authMiddleware, checkPermission('TOURS.CREAR'), toursController.crearTour);
+router.get('/canales-comision', authMiddleware, checkPermission('TOURS.LEER'), toursController.getCanalesComision);
 router.get('/:id', authMiddleware, checkPermission('TOURS.LEER'), toursController.getTourById);
 router.get('/:id/disponibilidad', authMiddleware, checkPermission('TOURS.LEER'), toursController.getDisponibilidad);
 router.put('/:id', authMiddleware, checkPermission('TOURS.ACTUALIZAR'), toursController.updateTour);

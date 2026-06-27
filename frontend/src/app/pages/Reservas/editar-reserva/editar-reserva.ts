@@ -1,6 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -11,8 +10,6 @@ import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import {
   Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto, ReservaHistorialCambio,
 } from '../../../services/Reservas/reservas';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
-import { DuplicarPanelComponent } from '../../../DynamicNavbar/duplicar-panel/duplicar-panel';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -20,11 +17,59 @@ import { DestroyRef } from '@angular/core';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { buscarPaisesOrigen, normalizarBusquedaPais } from '../../../shared/data/paises-origen';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
+import { UiStateService } from '../../../services/ui-state.service';
+import { CuposStripComponent } from '../../../components/cupos/cupos-strip';
+import type { CuposStripInfo } from '../../../components/cupos/cupos-strip';
+import type { WritableSignal } from '@angular/core';
+import {
+  getReservaPassengerInsertIndex,
+  normalizeReservaPassengerType,
+  reservaPassengerTypeLabel,
+  sortReservaPassengerControls,
+  type ReservaPassengerType,
+} from '../reserva-passengers.utils';
+
+interface WizardStep {
+  id: string;
+  label: string;
+}
+
+interface SubmitValidationIssue {
+  message: string;
+  step: number;
+  focusId?: string;
+}
+
+type LegacyButton = { text: string; style: string; onClick: () => void };
+
+interface LegacyNavbarFacade {
+  showAlert: (opts: Omit<SirModalAlert, 'id'> & { buttons?: LegacyButton[] }) => string;
+  showConfirm: (
+    title: string,
+    message: string,
+    buttons: LegacyButton[],
+    opts?: Partial<Omit<SirModalAlert, 'id' | 'title' | 'message' | 'buttons'>>
+  ) => string;
+  successToast: (title: string, message?: string, durationMs?: number) => string;
+  warningToast: (title: string, message?: string, durationMs?: number) => string;
+  errorToast: (title: string, message?: string, durationMs?: number) => string;
+  infoToast: (title: string, message?: string, durationMs?: number) => string;
+  clearOverlay: () => void;
+  closePanel: () => void;
+  alert: {
+    set: (value: (Omit<SirModalAlert, 'id'> & { buttons?: LegacyButton[] }) | null) => void;
+  };
+  cuposInfo: WritableSignal<any>;
+  Id_Reserva: WritableSignal<string | null>;
+  needsRefresh: WritableSignal<string>;
+}
 
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, FlatpickrInputDirective, UppercaseInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent],
   templateUrl: './editar-reserva.html',
   styleUrls: ['./editar-reserva.css'],
 })
@@ -35,6 +80,22 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
   private readonly permisosService = inject(PermisosService);
   activePaisOrigenIndex: number | null = null;
+  readonly wizardSteps: WizardStep[] = [
+    { id: 'viaje', label: 'Viaje' },
+    { id: 'responsable', label: 'Responsable' },
+    { id: 'configuracion', label: 'Configuración' },
+    { id: 'pasajeros', label: 'Pasajeros' },
+    { id: 'pago', label: 'Pago' },
+    { id: 'resumen', label: 'Resumen' },
+  ];
+  currentStep = 0;
+  goingBack = false;
+  maxReachedStep = 0;
+
+  modoNacionalidad: 'global' | 'individual' = 'global';
+  modoPrecio: 'global' | 'individual' = 'global';
+  modoComision: 'global' | 'individual' = 'global';
+  modoPlan: 'global' | 'individual' = 'global';
 
   toggleSummary(force?: boolean) {
     this.openSummary = typeof force === 'boolean' ? force : !this.openSummary;
@@ -170,6 +231,188 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.pasajeros.at(index)?.get('Nacionalidad')?.setValue(value);
     this.activePaisOrigenIndex = null;
     this.cdr.markForCheck();
+  }
+
+  getPaisOrigenSuggestionsGlobal(): string[] {
+    const raw = this.form?.get('NacionalidadGlobal')?.value ?? '';
+    const current = normalizarBusquedaPais(raw);
+    return buscarPaisesOrigen(raw).filter((item) => normalizarBusquedaPais(item) !== current);
+  }
+
+  selectPaisOrigenGlobal(value: string): void {
+    this.form.get('NacionalidadGlobal')?.setValue(value);
+    this.activePaisOrigenIndex = null;
+    if (this.modoNacionalidad === 'global') this.aplicarNacionalidadGlobal();
+    this.cdr.markForCheck();
+  }
+
+  setModoNacionalidad(modo: 'global' | 'individual'): void {
+    this.modoNacionalidad = modo;
+    if (modo === 'global') this.aplicarNacionalidadGlobal();
+  }
+
+  setModoPrecio(modo: 'global' | 'individual'): void {
+    this.modoPrecio = modo;
+    if (modo === 'global') this.aplicarPreciosGlobales();
+  }
+
+  setModoComision(modo: 'global' | 'individual'): void {
+    this.modoComision = modo;
+    if (modo === 'global') this.aplicarComisionesGlobales();
+  }
+
+  setModoPlan(modo: 'global' | 'individual'): void {
+    this.modoPlan = modo;
+    if (modo === 'global') this.aplicarPlanGlobal();
+  }
+
+  private aplicarPlanGlobal(): void {
+    const idPlan = this.form.get('Id_Plan')?.value ?? null;
+    for (const ctrl of this.pasajeros.controls) {
+      ctrl.get('Id_Plan')?.setValue(idPlan, { emitEvent: false });
+    }
+    this.cdr.markForCheck();
+  }
+
+  private aplicarPreciosGlobales(): void {
+    this.actualizarPrecioGlobalPorTipo('ADULTO');
+    this.actualizarPrecioGlobalPorTipo('NINO');
+    this.actualizarPrecioGlobalPorTipo('INFANTE');
+  }
+
+  private aplicarComisionesGlobales(): void {
+    this.actualizarComisionGlobalPorTipo('ADULTO');
+    this.actualizarComisionGlobalPorTipo('NINO');
+    this.actualizarComisionGlobalPorTipo('INFANTE');
+  }
+
+  private aplicarNacionalidadGlobal(): void {
+    const nacionalidad = String(this.form.get('NacionalidadGlobal')?.value ?? '').trim() || null;
+    for (const ctrl of this.pasajeros.controls) {
+      ctrl.get('Nacionalidad')?.setValue(nacionalidad, { emitEvent: false });
+    }
+    this.cdr.markForCheck();
+  }
+
+  private aplicarConfiguracionGlobal(): void {
+    if (this.modoNacionalidad === 'global') this.aplicarNacionalidadGlobal();
+    if (this.modoPlan === 'global') this.aplicarPlanGlobal();
+    this.sincronizarPuntosPasajeros();
+    if (this.modoPrecio === 'global') this.aplicarPreciosGlobales();
+    if (this.modoComision === 'global') this.aplicarComisionesGlobales();
+  }
+
+  private triggerPanelAnimation(back: boolean): void {
+    this.goingBack = back;
+    this.cdr.markForCheck();
+    setTimeout(() => {
+      this.goingBack = false;
+      this.cdr.markForCheck();
+    }, 380);
+  }
+
+  canNavigateToStep(index: number): boolean {
+    return index >= 0 && index < this.wizardSteps.length;
+  }
+
+  goToStep(index: number): void {
+    if (!this.canNavigateToStep(index) || index === this.currentStep) return;
+    const back = index < this.currentStep;
+    this.currentStep = index;
+    this.triggerPanelAnimation(back);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (this.currentStep === 2) this.aplicarConfiguracionGlobal();
+
+    if (this.currentStep < this.wizardSteps.length - 1) {
+      this.currentStep++;
+      this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+      this.triggerPanelAnimation(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  prevStep(): void {
+    if (this.currentStep > 0) {
+      this.currentStep--;
+      this.triggerPanelAnimation(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    return step >= 0 && step < this.wizardSteps.length;
+  }
+
+  private markCurrentStepTouched(): void {
+    switch (this.currentStep) {
+      case 0:
+        this.form.get('SelectTour')?.markAsTouched();
+        this.form.get('Fecha_Tour')?.markAsTouched();
+        break;
+      case 1:
+        this.form.get('Nombre_Reportante')?.markAsTouched();
+        this.form.get('Telefono_Reportante')?.markAsTouched();
+        break;
+      case 2:
+        this.form.get('Id_Plan')?.markAsTouched();
+        this.form.get('Id_Punto')?.markAsTouched();
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Paso incompleto',
+          message: this.planes().length > 1 && !this.form.get('Id_Plan')?.value
+            ? 'Selecciona un plan antes de continuar.'
+            : this.puntosSeleccionados().length === 0
+            ? 'Selecciona al menos un punto de encuentro antes de continuar.'
+            : 'Corrige la inviabilidad logística antes de continuar.',
+          autoClose: false,
+          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
+        });
+        break;
+      case 3:
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Sin pasajeros',
+          message: 'Agrega al menos un pasajero antes de continuar.',
+          autoClose: false,
+          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
+        });
+        break;
+      case 4:
+        this.navbar.showAlert({
+          type: 'warning',
+          title: 'Abonos inválidos',
+          message: 'Los abonos no pueden superar el total a pagar.',
+          autoClose: false,
+          buttons: [{ text: 'Entendido', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
+        });
+        break;
+    }
+  }
+
+  stepHasError(step: number): boolean {
+    if (step > this.currentStep) return false;
+
+    switch (step) {
+      case 0:
+        return !!(
+          (this.form?.get('SelectTour')?.touched && this.form?.get('SelectTour')?.invalid) ||
+          (this.form?.get('Fecha_Tour')?.touched && this.form?.get('Fecha_Tour')?.invalid)
+        );
+      case 1:
+        return !!(
+          (this.form?.get('Nombre_Reportante')?.touched && this.form?.get('Nombre_Reportante')?.invalid) ||
+          (this.form?.get('Telefono_Reportante')?.touched && this.form?.get('Telefono_Reportante')?.invalid)
+        );
+      case 2:
+        return this.tieneConflictoLogisticoActual();
+      case 4:
+        return !this.abonosValidos;
+      default:
+        return false;
+    }
   }
 
   private limpiarErrorDni(pasajeroCtrl: AbstractControl, key: string): void {
@@ -471,13 +714,63 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
   private reservasSvc = inject(Reservas);
-  private navbar = inject(DynamicIslandGlobalService);
+  private drawer = inject(SirDrawerService);
+  private alerts = inject(SirAlertService);
+  private uiState = inject(UiStateService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
   private injector = inject(Injector);
   private destroyRef = inject(DestroyRef);
   public tourRules = inject(TourRulesService);
+
+  private mapAlertButtons(buttons?: LegacyButton[]): AlertButton[] | undefined {
+    if (!buttons?.length) return undefined;
+    return buttons.map((button) => ({
+      text: button.text,
+      style: button.style === 'delete' ? 'danger' : button.style === 'secondary' ? 'secondary' : 'primary',
+      onClick: button.onClick,
+    }));
+  }
+
+  private navbar: LegacyNavbarFacade = {
+    showAlert: (opts) =>
+      this.alerts.showAlert({
+        ...opts,
+        buttons: this.mapAlertButtons(opts.buttons),
+      }),
+    showConfirm: (
+      title: string,
+      message: string,
+      buttons: LegacyButton[],
+      opts?: Partial<Omit<SirModalAlert, 'id' | 'title' | 'message' | 'buttons'>>
+    ) => this.alerts.showConfirm(title, message, this.mapAlertButtons(buttons) || [], opts),
+    successToast: (title: string, message = '', durationMs = 3000) =>
+      this.alerts.successToast(title, message, durationMs),
+    warningToast: (title: string, message = '', durationMs = 3500) =>
+      this.alerts.warningToast(title, message, durationMs),
+    errorToast: (title: string, message = '', durationMs = 4500) =>
+      this.alerts.errorToast(title, message, durationMs),
+    infoToast: (title: string, message = '', durationMs = 3000) =>
+      this.alerts.infoToast(title, message, durationMs),
+    clearOverlay: () => this.alerts.closeModal(),
+    closePanel: () => this.drawer.close(),
+    alert: {
+      set: (value) => {
+        if (!value) {
+          this.alerts.closeModal();
+          return;
+        }
+        this.alerts.showAlert({
+          ...value,
+          buttons: this.mapAlertButtons(value.buttons),
+        });
+      },
+    },
+    cuposInfo: this.uiState.cuposInfo,
+    Id_Reserva: this.uiState.reservaId,
+    needsRefresh: this.uiState.needsRefresh,
+  };
 
   // Estado
   isLoading = signal<boolean>(true);
@@ -514,6 +807,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const m = this.monedas().find(x => x.Id_Moneda === Number(id));
     return m?.Codigo || 'COP';
   });
+  cuposStripInfo = computed<CuposStripInfo | null>(() => this.navbar.cuposInfo());
 
   private getDefaultCanalId(): number {
     const canales = this.canales();
@@ -538,6 +832,34 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const defaultCanalId = this.getDefaultCanalId();
     ctrl?.setValue(defaultCanalId, { emitEvent: false });
     return defaultCanalId;
+  }
+
+  private getSelectedCanalId(): number {
+    return Number(this.form.get('Id_Canal')?.value || 0);
+  }
+
+  private canalSeleccionadoTieneComision(): boolean {
+    const idCanal = this.getSelectedCanalId();
+    if (!idCanal) return false;
+    const canal = this.canales().find((item) => Number(item.Id_Canal) === idCanal);
+    return Boolean(Number(canal?.Tiene_Comision || 0));
+  }
+
+  private aplicarComisionesCanalSeleccionado(comisiones?: Partial<Record<'ADULTO' | 'NINO' | 'INFANTE', number>>): void {
+    const adulto = Math.floor(Number(comisiones?.ADULTO || 0));
+    const nino = Math.floor(Number(comisiones?.NINO || 0));
+
+    this.form.patchValue({
+      ComisionAdulto: adulto,
+      ComisionNino: nino,
+      ComisionInfante: 0,
+    }, { emitEvent: false });
+
+    for (const ctrl of this.pasajeros.controls) {
+      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+      const comision = tipo === 'ADULTO' ? adulto : tipo === 'NINO' ? nino : 0;
+      ctrl.get('Comision')?.setValue(comision, { emitEvent: false });
+    }
   }
 
   isRioClaroTour(): boolean {
@@ -680,143 +1002,6 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     )
   );
 
-  fpOptionsFecha: Partial<FlatpickrOptions> = {
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    allowInput: false,
-    disableMobile: true,
-    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-
-    altInputClass: 'form-input flatpickr-input flatpickr-alt',
-
-    onReady: (_sel, _str, inst: any) => {
-      // ✅ SSR guard ANTES DE TODO
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-      const cal: HTMLElement = inst?.calendarContainer;
-      if (!cal) return;
-
-      cal.classList.add('sir-flatpickr');
-
-      // util: clamp día al máximo del mes
-      const clampDay = (y: number, m: number, d: number) => {
-        const last = new Date(y, m + 1, 0).getDate(); // último día del mes
-        return Math.min(Math.max(d, 1), last);
-      };
-
-      // --- Inyectar select en el header estable (flatpickr-month) ---
-      let yearDiv: HTMLDivElement | null = null;
-      let yearSelect: HTMLSelectElement | null = null;
-
-      const ensureYearSelect = () => {
-        // contenedor header
-        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-        if (!monthWrap) return null;
-
-        // elimina el input numérico (cuando exista)
-        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-        if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
-
-        // preferimos insertar dentro del pill .flatpickr-current-month
-        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-        const container = curMonth ?? monthWrap;
-
-        // evita duplicados
-        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-        if (yearSelect) return yearSelect;
-
-        // elimina cualquier wrapper previo para mantener DOM limpio
-        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-        if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
-
-        yearSelect = document.createElement('select');
-        yearSelect.className = 'sir-year-select';
-        yearSelect.setAttribute('aria-label', 'Seleccionar año');
-
-        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-        return yearSelect;
-      };
-
-      const buildYears = (centerYear: number) => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const start = centerYear - 20;
-        const end = centerYear + 20;
-
-        sel.innerHTML = '';
-        for (let y = end; y >= start; y--) {
-          const opt = document.createElement('option');
-          opt.value = String(y);
-          opt.textContent = String(y);
-          sel.appendChild(opt);
-        }
-        sel.value = String(centerYear);
-      };
-
-      const syncSelectValue = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = inst.currentYear ?? new Date().getFullYear();
-        const exists = !!sel.querySelector(`option[value="${y}"]`);
-        if (!exists) buildYears(y);
-        sel.value = String(y);
-      };
-
-      const getSafeDay = () => {
-        const d: Date | undefined = inst.selectedDates?.[0];
-        return d ? d.getDate() : 1;
-      };
-
-      const onChange = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = Number(sel.value);
-        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-        const day = clampDay(y, m, getSafeDay());
-
-        const newDate = new Date(y, m, day);
-
-        // siempre mueve la vista
-        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-        // solo setea si ya había selección
-        if (inst.selectedDates?.length) {
-          inst.setDate(newDate, true); // true => triggerChange para reactive forms
-        }
-      };
-
-      // init
-      buildYears(inst.currentYear ?? new Date().getFullYear());
-      syncSelectValue();
-
-      // listeners
-      const sel0 = ensureYearSelect();
-      sel0?.addEventListener('change', onChange);
-
-      // hook sin pisar otros callbacks
-      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-        const prev = inst.config[key];
-        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-        inst.config[key] = [...arr, fn];
-      };
-
-      // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
-      wrap('onMonthChange', () => syncSelectValue());
-      wrap('onYearChange', () => syncSelectValue());
-
-      // cleanup
-      const prevOnDestroy = inst.config.onDestroy;
-      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-      inst.config.onDestroy = [
-        ...destroyArr,
-        () => sel0?.removeEventListener('change', onChange)
-      ];
-    }
-  };
 
   // Snapshot original (útil si necesitas comparar cambios o saldo histórico)
   private originalReserva: any = null;
@@ -835,7 +1020,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Id_Moneda: [{ value: 1, disabled: false }, Validators.required],
 
       // Responsable
-      Id_Canal: [1, Validators.required],
+      Id_Canal: [null, Validators.required],
       Nombre_Reportante: ['', Validators.required],
       Telefono_Reportante: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
@@ -857,6 +1042,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       ComisionAdulto: [0],
       ComisionNino: [0],
       ComisionInfante: [0],
+      NacionalidadGlobal: [''],
 
       // Punto principal
       Id_Punto: [null, Validators.required],
@@ -990,7 +1176,17 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       }, { emitEvent: false });
       if (!Number(idCanalReserva || 0)) this.ensureDefaultCanal();
 
-      const listaPax = data?.Pasajeros ?? data?.Detalle?.Pasajeros ?? [];
+      await this.asegurarTourActualVisible(
+        Number(data?.Cabecera?.Id_Tour ?? data?.Id_Tour ?? 0)
+      );
+
+      const listaPax = [...(data?.Pasajeros ?? data?.Detalle?.Pasajeros ?? [])].sort((a: any, b: any) => {
+        const tipoA = normalizeReservaPassengerType(a?.Tipo_Pasajero ?? a?.TipoPasajero);
+        const tipoB = normalizeReservaPassengerType(b?.Tipo_Pasajero ?? b?.TipoPasajero);
+        const orderA = tipoA === 'ADULTO' ? 0 : tipoA === 'NINO' ? 1 : 2;
+        const orderB = tipoB === 'ADULTO' ? 0 : tipoB === 'NINO' ? 1 : 2;
+        return orderA - orderB;
+      });
       const puntoPrincipalCabecera = this.parsePuntoId(data?.Cabecera?.Id_Punto ?? data?.Id_Punto ?? null);
 
 
@@ -1029,7 +1225,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
           Nombre_Pasajero: [p.Nombre_Pasajero ?? p.NombrePasajero ?? ''],
           DNI: [p.DNI ?? p.IdPas ?? ''],
           Nacionalidad: [p.Nacionalidad ?? p.nacionalidad ?? '', [Validators.maxLength(80)]],
-          Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? '', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
+          Telefono_Pasajero: [p.Telefono_Pasajero ?? p.TelefonoPasajero ?? ''],
+          Id_Plan: [p.Id_Plan ?? data?.Cabecera?.Id_Plan ?? data?.Id_Plan ?? this.form.get('Id_Plan')?.value ?? null],
           Id_Punto: [puntoPasajeroValido ?? puntoPrincipalForm ?? null],
           Confirmacion: [p.Confirmacion ?? false],
           PrecioRef: [p.Precio_Tour ?? p.PrecioRef ?? 0],
@@ -1039,8 +1236,11 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         // evita que autollenarPrecios reescriba lo traído de DB
         fg.get('Precio_Pasajero')?.markAsDirty();
         fg.get('Comision')?.markAsDirty();
-        this.pasajeros.push(fg);
+        this.syncPassengerPhoneValidator(fg);
+        const insertIndex = getReservaPassengerInsertIndex(this.pasajeros.controls, fg.get('Tipo_Pasajero')?.value);
+        this.pasajeros.insert(insertIndex, fg);
       }
+      this.reorderPassengerFormArray();
       this.sincronizarPuntosPasajeros();
 
       this.syncCantidadInputsFromFormArray();
@@ -1069,6 +1269,11 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         this.form.get('PrecioInfante')?.setValue(infante.get('Precio_Pasajero')?.value ?? 0, { emitEvent: false });
         this.form.get('ComisionInfante')?.setValue(infante.get('Comision')?.value ?? 0, { emitEvent: false });
       }
+      const primeraNacionalidad = this.pasajeros.controls
+        .map((ctrl) => String(ctrl.get('Nacionalidad')?.value ?? '').trim())
+        .find(Boolean) || '';
+      this.form.get('NacionalidadGlobal')?.setValue(primeraNacionalidad, { emitEvent: false });
+      this.inferirModosDesdePasajeros();
 
       // Pagos: hidratar tipo de pago y comprobantes
       this.abonos.clear();
@@ -1385,12 +1590,16 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   tipoIndex(i: number): number {
     const ctrl = this.pasajeros.at(i);
     if (!ctrl) return i + 1;
-    const tipo = ctrl.get('Tipo_Pasajero')?.value;
-    const mismos = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo);
+    const tipo = normalizeReservaPassengerType(ctrl.get('Tipo_Pasajero')?.value);
+    const mismos = this.pasajeros.controls.filter(
+      c => normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value) === tipo
+    );
     return mismos.indexOf(ctrl) + 1;
   }
-  private countByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
-    return this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === tipo).length;
+  private countByTipo(tipo: ReservaPassengerType): number {
+    return this.pasajeros.controls.filter(
+      c => normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value) === tipo
+    ).length;
   }
   private precioControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
     switch (tipo) {
@@ -1430,9 +1639,65 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.infantesCantidadInput.set(this.countByTipo('INFANTE'));
   }
 
-  private findLastPassengerIndexByTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+  private reorderPassengerFormArray(): void {
+    const ordered = sortReservaPassengerControls(this.pasajeros.controls);
+    const isAlreadySorted = ordered.every((ctrl, index) => this.pasajeros.at(index) === ctrl);
+    if (isAlreadySorted) return;
+
+    this.pasajeros.clear();
+    for (const ctrl of ordered) this.pasajeros.push(ctrl);
+    this.syncCantidadInputsFromFormArray();
+  }
+
+  private inferirModosDesdePasajeros(): void {
+    const pasajeros = this.pasajeros.controls;
+    if (!pasajeros.length) {
+      this.modoNacionalidad = 'global';
+      this.modoPrecio = 'global';
+      this.modoComision = 'global';
+      this.modoPlan = 'global';
+      return;
+    }
+
+    const nacionalidades = new Set(
+      pasajeros
+        .map((ctrl) => String(ctrl.get('Nacionalidad')?.value ?? '').trim())
+        .filter(Boolean)
+    );
+    this.modoNacionalidad = nacionalidades.size > 1 ? 'individual' : 'global';
+
+    const planes = new Set(
+      pasajeros
+        .map((ctrl) => ctrl.get('Id_Plan')?.value)
+        .filter((value) => value !== null && value !== undefined && value !== '')
+    );
+    this.modoPlan = planes.size > 1 ? 'individual' : 'global';
+
+    const tipos: Array<'ADULTO' | 'NINO' | 'INFANTE'> = ['ADULTO', 'NINO', 'INFANTE'];
+    const precioIndividual = tipos.some((tipo) => {
+      const valores = new Set(
+        pasajeros
+          .filter((ctrl) => ctrl.get('Tipo_Pasajero')?.value === tipo)
+          .map((ctrl) => Number(ctrl.get('Precio_Pasajero')?.value ?? 0))
+      );
+      return valores.size > 1;
+    });
+    this.modoPrecio = precioIndividual ? 'individual' : 'global';
+
+    const comisionIndividual = tipos.some((tipo) => {
+      const valores = new Set(
+        pasajeros
+          .filter((ctrl) => ctrl.get('Tipo_Pasajero')?.value === tipo)
+          .map((ctrl) => Number(ctrl.get('Comision')?.value ?? 0))
+      );
+      return valores.size > 1;
+    });
+    this.modoComision = comisionIndividual ? 'individual' : 'global';
+  }
+
+  private findLastPassengerIndexByTipo(tipo: ReservaPassengerType): number {
     for (let i = this.pasajeros.length - 1; i >= 0; i--) {
-      if (this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value === tipo) return i;
+      if (normalizeReservaPassengerType(this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value) === tipo) return i;
     }
     return -1;
   }
@@ -1462,7 +1727,31 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  private async puedeAgregarPasajero(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): Promise<boolean> {
+  actualizarPrecioGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
+    const precio = this.precioGlobalPorTipo(tipo);
+    for (const ctrl of this.pasajeros.controls) {
+      if (ctrl.get('Tipo_Pasajero')?.value === tipo) {
+        ctrl.get('Precio_Pasajero')?.setValue(precio, { emitEvent: false });
+        ctrl.get('Precio_Pasajero')?.markAsDirty();
+      }
+    }
+    this.recalcularTotales();
+    this.cdr.markForCheck();
+  }
+
+  actualizarComisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
+    const comision = this.comisionGlobalPorTipo(tipo);
+    for (const ctrl of this.pasajeros.controls) {
+      if (ctrl.get('Tipo_Pasajero')?.value === tipo) {
+        ctrl.get('Comision')?.setValue(comision, { emitEvent: false });
+        ctrl.get('Comision')?.markAsDirty();
+      }
+    }
+    this.recalcularTotales();
+    this.cdr.markForCheck();
+  }
+
+  private async puedeAgregarPasajero(tipo: ReservaPassengerType): Promise<boolean> {
     if (!this.tipoOcupaAsiento(tipo)) return true;
 
     const Fecha = this.form.get('Fecha_Tour')?.value;
@@ -1516,7 +1805,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async puedeAjustarCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', target: number): Promise<boolean> {
+  private async puedeAjustarCantidadPasajeros(tipo: ReservaPassengerType, target: number): Promise<boolean> {
     if (!this.tipoOcupaAsiento(tipo)) return true;
 
     const Fecha = this.form.get('Fecha_Tour')?.value;
@@ -1533,7 +1822,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
 
     const otrosConAsiento = this.pasajeros.controls.filter(c => {
-      const t = c.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+      const t = normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value);
       return t !== tipo && this.tipoOcupaAsiento(t);
     }).length;
 
@@ -1574,7 +1863,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   async agregarPasajero(
-    tipo: 'ADULTO' | 'NINO' | 'INFANTE',
+    tipo: ReservaPassengerType,
     omitirCalculos = false,
     options?: { skipCuposCheck?: boolean }
   ): Promise<boolean> {
@@ -1595,7 +1884,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Nombre_Pasajero: [''],
       DNI: [''],
       Nacionalidad: ['', [Validators.maxLength(80)]],
-      Telefono_Pasajero: ['', [Validators.pattern(/^(\+[1-9]\d{10,12})?$/)]],
+      Telefono_Pasajero: [''],
+      Id_Plan: [this.form.get('Id_Plan')?.value ?? null],
       Id_Punto: [principalPunto],
       Confirmacion: [false],
       PrecioRef: [this.preciosRef()[tipo] ?? 0],
@@ -1604,9 +1894,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     });
 
     this.conectarValidacionDniPasajero(fg);
+    this.syncPassengerPhoneValidator(fg);
 
-    this.pasajeros.push(fg);
+    const insertIndex = getReservaPassengerInsertIndex(this.pasajeros.controls, tipo);
+    this.pasajeros.insert(insertIndex, fg);
     this.sincronizarPuntosPasajeros();
+    this.reorderPassengerFormArray();
     this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
 
     if (!omitirCalculos) {
@@ -1620,12 +1913,16 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   eliminarPasajero(i: number) {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
-    const tipo = this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value;
+    const tipo = normalizeReservaPassengerType(this.pasajeros.at(i)?.get('Tipo_Pasajero')?.value);
     this.pasajeros.removeAt(i);
     this.recalcularTotales();
     this.syncCantidadInputsFromFormArray();
     this.validarDnisDuplicadosEnFormulario();
     if (tipo === 'NINO') this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
+  }
+
+  onFechaTourChange(): void {
+    this.onTourChange();
   }
 
   adultosInputValue(): number { return this.adultosCantidadInput(); }
@@ -1638,7 +1935,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.getCantidadInputSignal(tipo).set(safe);
   }
 
-  async commitCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): Promise<void> {
+  async commitCantidadPasajeros(tipo: ReservaPassengerType): Promise<void> {
     const target = this.getCantidadInputSignal(tipo)();
     await this.setCantidadPasajeros(tipo, target);
     this.syncCantidadInputsFromFormArray();
@@ -1646,7 +1943,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  async setCantidadPasajeros(tipo: 'ADULTO' | 'NINO' | 'INFANTE', val: any): Promise<void> {
+  async setCantidadPasajeros(tipo: ReservaPassengerType, val: any): Promise<void> {
     const currentTourId = Number(this.form.get('SelectTour')?.value);
     if (!this.tourRules.allowsPassengerType(currentTourId, tipo)) return;
 
@@ -1678,6 +1975,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       }
 
       this.recalcularTotales();
+      this.reorderPassengerFormArray();
       this.syncCantidadInputsFromFormArray();
       this.validarDnisDuplicadosEnFormulario();
       if (tipo === 'NINO') this.tourRules.evaluateAlertsForPassenger(currentTourId, tipo);
@@ -1690,66 +1988,76 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   async autollenarPrecios() {
     const idTour = Number(this.form.get('SelectTour')?.value);
-    const idCanal = this.ensureDefaultCanal();
-    if (!idTour || !idCanal) {
+    const idCanal = this.getSelectedCanalId();
+    if (!idTour) {
       for (const ctrl of this.pasajeros.controls) {
         ctrl.get('Comision')?.setValue(0, { emitEvent: false });
         if (!ctrl.get('Precio_Pasajero')?.dirty) ctrl.get('Precio_Pasajero')?.setValue(0, { emitEvent: false });
         ctrl.get('PrecioRef')?.setValue(0, { emitEvent: false });
       }
+      this.aplicarComisionesCanalSeleccionado();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const ref = this.preciosRef();
+    this.form.patchValue({
+      PrecioAdulto: Number(ref.ADULTO || 0),
+      PrecioNino: Number(ref.NINO || 0),
+      PrecioInfante: Number(ref.INFANTE || 0),
+    }, { emitEvent: false });
+
+    for (const ctrl of this.pasajeros.controls) {
+      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+
+      ctrl.get('PrecioRef')?.setValue(Number(ref[tipo] || 0), { emitEvent: false });
+      ctrl.get('Precio_Pasajero')?.setValue(this.precioGlobalPorTipo(tipo), { emitEvent: false });
+    }
+
+    if (!idCanal || !this.canalSeleccionadoTieneComision()) {
+      this.aplicarComisionesCanalSeleccionado();
       this.cdr.markForCheck();
       return;
     }
 
     try {
       const comisiones = await firstValueFrom(this.reservasSvc.getComisiones(idTour, idCanal));
-      const ref = this.preciosRef();
-
-      this.form.patchValue({
-        PrecioAdulto: Number(ref.ADULTO || 0),
-        PrecioNino: Number(ref.NINO || 0),
-        PrecioInfante: Number(ref.INFANTE || 0),
-        ComisionAdulto: Number(comisiones.ADULTO || 0),
-        ComisionNino: Number(comisiones.NINO || 0),
-        ComisionInfante: 0,
-      }, { emitEvent: false });
-
-      for (const ctrl of this.pasajeros.controls) {
-        const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
-
-        ctrl.get('PrecioRef')?.setValue(Number(ref[tipo] || 0), { emitEvent: false });
-        ctrl.get('Precio_Pasajero')?.setValue(this.precioGlobalPorTipo(tipo), { emitEvent: false });
-        ctrl.get('Comision')?.setValue(this.comisionGlobalPorTipo(tipo), { emitEvent: false });
-      }
-
+      this.aplicarComisionesCanalSeleccionado(comisiones);
     } catch {
-      for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
+      this.aplicarComisionesCanalSeleccionado();
     }
     this.cdr.markForCheck();
   }
 
+  private async asegurarTourActualVisible(idTour: number): Promise<void> {
+    if (!idTour || this.tours().some((tour) => Number(tour.Id_Tour) === idTour)) return;
+
+    try {
+      const tours = await firstValueFrom(this.reservasSvc.getTours(idTour));
+      this.tours.set(tours || []);
+    } catch (error) {
+      console.warn('No fue posible incluir el tour inactivo asociado a la reserva.', error);
+    }
+  }
+
   pasajerosConAsiento(): number {
     return this.pasajeros.controls.filter(c => {
-      const t = c.get('Tipo_Pasajero')?.value; return t === 'ADULTO' || t === 'NINO';
+      const t = normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value); return t === 'ADULTO' || t === 'NINO';
     }).length;
   }
 
   async recalcularComisionesPorCanal() {
     const idTour = Number(this.form.get('SelectTour')?.value);
-    const idCanal = this.ensureDefaultCanal();
-    if (!idTour || !idCanal) {
-      for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
+    const idCanal = this.getSelectedCanalId();
+    if (!idTour || !idCanal || !this.canalSeleccionadoTieneComision()) {
+      this.aplicarComisionesCanalSeleccionado();
       this.cdr.markForCheck(); return;
     }
     try {
       const comisiones = await firstValueFrom(this.reservasSvc.getComisiones(idTour, idCanal));
-      for (const ctrl of this.pasajeros.controls) {
-        const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
-        const comision = tipo === 'INFANTE' ? 0 : (comisiones[tipo] || 0);
-        ctrl.get('Comision')?.setValue(Math.floor(comision), { emitEvent: false });
-      }
+      this.aplicarComisionesCanalSeleccionado(comisiones);
     } catch {
-      for (const ctrl of this.pasajeros.controls) ctrl.get('Comision')?.setValue(0, { emitEvent: false });
+      this.aplicarComisionesCanalSeleccionado();
     }
     this.cdr.markForCheck();
   }
@@ -1768,6 +2076,36 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     for (const c of this.pasajeros.controls) sum += Number(c.get('Comision')?.value || 0);
     return sum;
   }
+
+  nombreTourSeleccionado(): string {
+    const id = Number(this.form?.get('SelectTour')?.value);
+    return this.tours().find((tour) => tour.Id_Tour === id)?.Nombre_Tour ?? '—';
+  }
+
+  nombrePlanSeleccionado(): string {
+    const id = this.form?.get('Id_Plan')?.value;
+    return this.planes().find((plan) => plan.Id_Plan === id)?.Nombre_Plan ?? '—';
+  }
+
+  nombreCanalSeleccionado(): string {
+    const id = Number(this.form?.get('Id_Canal')?.value);
+    return this.canales().find((canal) => canal.Id_Canal === id)?.Nombre_Canal ?? '—';
+  }
+
+  nombrePuntoPorId(id: any): string {
+    const punto = this.puntosSeleccionados().find((item) => Number(item.Id_Punto) === Number(id));
+    return punto?.NombrePunto ?? '—';
+  }
+
+  formaPagoLabel(): string {
+    switch (this.form?.get('FormaPago')?.value) {
+      case 'Directo': return 'Pago en el punto';
+      case 'Completo': return 'Ya pagó (pago completo)';
+      case 'Abono': return `Abonos (${this.abonos.length} registrado(s))`;
+      default: return '—';
+    }
+  }
+
   pendientePorPagar(): number {
     const forma = this.form.get('FormaPago')?.value;
     const total = this.totalNeto() + Number(this.form.get('ComisionInternacional')?.value || 0);
@@ -1910,6 +2248,35 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     });
   }
 
+  tieneConflictoLogisticoActual(): boolean {
+    return this.tieneConflictoLogistico();
+  }
+
+  calcCuposEstado(info: CuposStripInfo): 'green' | 'yellow' | 'red' {
+    const total = Math.max(0, Number(info.cupoTotal ?? 0));
+    const ocupados = Math.max(0, Number(info.ocupados ?? 0));
+    const disponibles = Math.max(0, Number(info.cuposDisponibles ?? (total - ocupados)));
+    const pct = total > 0 ? Math.min(100, (ocupados / total) * 100) : 0;
+    if (disponibles === 0 || pct >= 100) return 'red';
+    if (disponibles <= 4 || pct >= 85) return 'yellow';
+    return 'green';
+  }
+
+  calcCuposDisp(info: CuposStripInfo): number {
+    const total = Math.max(0, Number(info.cupoTotal ?? 0));
+    const ocupados = Math.max(0, Number(info.ocupados ?? 0));
+    return Math.max(0, Number(info.cuposDisponibles ?? (total - ocupados)));
+  }
+
+  calcCuposOcupacion(info: CuposStripInfo): number {
+    const total = Math.max(0, Number(info.cupoTotal ?? 0));
+    const ocupados = Math.max(0, Number(info.ocupados ?? 0));
+    return total > 0 ? Math.min(100, (ocupados / total) * 100) : 0;
+  }
+
+  submitActionLabel(): string { return 'Actualizar Reserva'; }
+  submitActionProgressLabel(): string { return 'Actualizando...'; }
+
   get puedeCancelarReserva(): boolean {
     const estado = String(this.originalReserva?.Cabecera?.Estado ?? this.originalReserva?.Estado ?? '').trim().toLowerCase();
     return !!this.reservaId() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
@@ -1921,6 +2288,48 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   get canUpdateReserva(): boolean {
     return this.permisosService.tienePermiso('RESERVAS.ACTUALIZAR');
+  }
+
+  private getEstadoOriginalReserva(): string {
+    return String(this.originalReserva?.Cabecera?.Estado ?? this.originalReserva?.Estado ?? '').trim();
+  }
+
+  private isReservaOriginalCancelada(): boolean {
+    const estado = this.getEstadoOriginalReserva().toLowerCase();
+    return estado === 'cancelada' || estado === 'cancelado';
+  }
+
+  private normalizarFechaComparacion(raw: unknown): string | null {
+    const text = String(raw ?? '').trim();
+    if (!text) return null;
+    const ymd = text.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+  }
+
+  private isFechaReservaVigenteParaReactivar(raw: unknown): boolean {
+    const fechaReserva = this.normalizarFechaComparacion(raw);
+    const hoy = this.normalizarFechaComparacion(new Date().toISOString());
+    if (!fechaReserva || !hoy) return false;
+    return fechaReserva >= hoy;
+  }
+
+  private getEstadoActualizacionReservaCancelada(
+    estadoCalculado: 'Confirmada' | 'Pendiente',
+    subestadoCalculado: 'de datos' | 'de pago' | null
+  ): { estado: string; subestado: 'de datos' | 'de pago' | null; reactivada: boolean } {
+    if (this.isReservaOriginalCancelada() && this.isFechaReservaVigenteParaReactivar(this.form.get('Fecha_Tour')?.value)) {
+      return {
+        estado: estadoCalculado,
+        subestado: subestadoCalculado,
+        reactivada: true,
+      };
+    }
+
+    return {
+      estado: this.isReservaOriginalCancelada() ? this.getEstadoOriginalReserva() || 'Cancelada' : estadoCalculado,
+      subestado: this.isReservaOriginalCancelada() ? null : subestadoCalculado,
+      reactivada: false,
+    };
   }
 
   async cancelarReserva(): Promise<void> {
@@ -1954,6 +2363,29 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     this.closeSummaryIfOpen();
 
+    const confirmDeleteOk = await new Promise<boolean>((resolve) => {
+      this.alerts.confirmDelete(
+        'Eliminar reserva',
+        `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
+        () => resolve(true),
+        () => resolve(false),
+        { confirmText: 'Eliminar', cancelText: 'Cancelar' }
+      );
+    });
+    if (!confirmDeleteOk) return;
+    this.isSubmitting.set(true);
+    try {
+      await firstValueFrom(this.reservasSvc.deleteReserva(id));
+      this.navbar.needsRefresh.set('reservas');
+      this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
+      this.router.navigate(['/Reservas/VerReservas']);
+    } catch (err) {
+      this.showApiError(err, 'No se pudo eliminar la reserva');
+    } finally {
+      this.isSubmitting.set(false);
+    }
+    return;
+
     const ok = await this.confirmar(
       'Eliminar reserva',
       `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`
@@ -1974,15 +2406,28 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   // Mostrar diálogo con opciones (retorna la key del botón pulsado)
-  private confirmarOpciones(titulo: string, mensaje: string, opciones: Array<{ key: string; text: string; style?: string }>): Promise<string | null> {
+  private confirmarOpciones(
+    titulo: string,
+    mensaje: string,
+    opciones: Array<{ key: string; text: string; style?: 'primary' | 'secondary' | 'delete' | 'danger' }>
+  ): Promise<string | null> {
     return new Promise<string | null>((resolve) => {
       this.closeSummaryIfOpen();
+      const buttons: AlertButton[] = opciones.map(o => {
+        const style: AlertButton['style'] =
+          o.style === 'secondary' ? 'secondary' : o.style === 'delete' || o.style === 'danger' ? 'danger' : 'primary';
+        return {
+        text: o.text,
+        style,
+        onClick: () => { this.navbar.alert.set(null); resolve(o.key); }
+      };
+      }).concat([{ text: 'Cerrar', style: 'secondary', onClick: () => { this.navbar.alert.set(null); resolve(null); } }]);
       this.navbar.alert.set({
         type: 'warning',
         title: titulo,
         message: mensaje,
         autoClose: false,
-        buttons: opciones.map(o => ({ text: o.text, style: o.style || 'primary', onClick: () => { this.navbar.alert.set(null); resolve(o.key); } })).concat([{ text: 'Cerrar', style: 'secondary', onClick: () => { this.navbar.alert.set(null); resolve(null); } }])
+        buttons
       });
     });
   }
@@ -1998,39 +2443,34 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const principal = this.puntosSeleccionados()[0] ?? null;
       this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
 
-      this.navbar.openPanel({
-        id: 'duplicar',
-        title: 'Duplicar reserva',
-        component: DuplicarPanelComponent,
-        props: {
-          tours: this.tours(),
-          Id_Tour: Number(this.form.get('SelectTour')?.value) || null,
-          Fecha_Tour: this.form.get('Fecha_Tour')?.value || null,
+      this.drawer.openDuplicar({
+        tours: this.tours(),
+        Id_Tour: Number(this.form.get('SelectTour')?.value) || null,
+        Fecha_Tour: this.form.get('Fecha_Tour')?.value || null,
 
-          onConfirm: async ({ Id_Tour, Fecha_Tour, Observaciones }: any) => {
-            const targetTourId = Number(Id_Tour);
-            const targetFecha = String(Fecha_Tour || '').slice(0, 10);
+        onConfirm: async ({ Id_Tour, Fecha_Tour, Observaciones }: any) => {
+          const targetTourId = Number(Id_Tour);
+          const targetFecha = String(Fecha_Tour || '').slice(0, 10);
 
-            this.navbar.closePanel();
-            await Promise.resolve();
+          this.drawer.close();
+          await Promise.resolve();
 
-            const origFecha = this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva ?? this.form.get('Fecha_Tour')?.value;
-            const origFechaNorm = String(origFecha || '').slice(0, 10);
+          const origFecha = this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva ?? this.form.get('Fecha_Tour')?.value;
+          const origFechaNorm = String(origFecha || '').slice(0, 10);
 
-            if (!targetFecha || targetFecha === origFechaNorm) {
-              this.navbar.showAlert({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
-              return;
-            }
-
-            const okRestricciones = await this.confirmarRestriccionesAntesDeDuplicar(targetTourId);
-            if (!okRestricciones) return;
-
-            await this.crearReservaDuplicada({
-              Id_Tour: targetTourId,
-              Fecha_Tour: targetFecha,
-              Observaciones: typeof Observaciones === 'string' ? this.toUpperText(Observaciones) : null
-            });
+          if (!targetFecha || targetFecha === origFechaNorm) {
+            this.navbar.showAlert({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
+            return;
           }
+
+          const okRestricciones = await this.confirmarRestriccionesAntesDeDuplicar(targetTourId);
+          if (!okRestricciones) return;
+
+          await this.crearReservaDuplicada({
+            Id_Tour: targetTourId,
+            Fecha_Tour: targetFecha,
+            Observaciones: typeof Observaciones === 'string' ? this.toUpperText(Observaciones) : null
+          });
         }
       });
 
@@ -2052,6 +2492,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
         Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
+        Id_Plan: c.get('Id_Plan')?.value ?? this.form.get('Id_Plan')?.value ?? null,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
         Confirmacion: false,
         Precio_Tour: 0,
@@ -2087,10 +2528,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         preciosNuevos = await firstValueFrom(this.reservasSvc.getPrecios({ Id_Tour: targetTourId, Id_Plan: null, Id_Moneda: idMoneda })) || {};
       }
 
-      const idCanal = this.ensureDefaultCanal();
+      const idCanal = this.getSelectedCanalId() || this.ensureDefaultCanal();
       let comisionesGlobal = {};
       try {
-        comisionesGlobal = await firstValueFrom(this.reservasSvc.getComisiones(targetTourId, idCanal)) || {};
+        if (this.canalSeleccionadoTieneComision()) {
+          comisionesGlobal = await firstValueFrom(this.reservasSvc.getComisiones(targetTourId, idCanal)) || {};
+        }
       } catch { }
 
       pax.forEach((p: any) => {
@@ -2192,42 +2635,185 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     return [originalObs, extraObs, duplicateNote].filter(Boolean).join('\n');
   }
 
+  private syncPrincipalPointControl(): void {
+    const puntos = this.puntosSeleccionados();
+    const ctrl = this.form.get('Id_Punto');
+    if (!ctrl) return;
+
+    if (!puntos.length) {
+      ctrl.setValue(null, { emitEvent: false });
+      return;
+    }
+
+    const actual = this.parsePuntoId(ctrl.value);
+    const sigueVisible = puntos.some((p) => Number(p.Id_Punto) === actual);
+    if (!sigueVisible) {
+      ctrl.setValue(puntos[0]?.Id_Punto ?? null, { emitEvent: false });
+    }
+  }
+
+  private syncPassengerPhoneValidator(ctrl: AbstractControl | null): void {
+    const tipo = normalizeReservaPassengerType(ctrl?.get('Tipo_Pasajero')?.value);
+    const telefonoCtrl = ctrl?.get('Telefono_Pasajero');
+    if (!telefonoCtrl) return;
+
+    if (tipo === 'ADULTO') {
+      telefonoCtrl.setValidators([Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]);
+    } else {
+      telefonoCtrl.clearValidators();
+    }
+
+    telefonoCtrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private syncPassengerPhoneValidators(): void {
+    for (const passengerCtrl of this.pasajeros.controls) {
+      this.syncPassengerPhoneValidator(passengerCtrl);
+    }
+  }
+
+  private focusValidationTarget(step: number, focusId?: string): void {
+    this.closeSummaryIfOpen();
+
+    if (this.currentStep !== step) {
+      this.currentStep = step;
+      this.maxReachedStep = Math.max(this.maxReachedStep, step);
+      this.triggerPanelAnimation(false);
+      this.cdr.markForCheck();
+    }
+
+    setTimeout(() => {
+      const element = focusId ? document.getElementById(focusId) : null;
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if ('focus' in element) (element as HTMLElement).focus();
+        return;
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 80);
+  }
+
+  private getPassengerValidationIssue(): SubmitValidationIssue | null {
+    if (!this.form.get('Pasajeros')?.invalid) return null;
+
+    const counters: Record<ReservaPassengerType, number> = {
+      ADULTO: 0,
+      NINO: 0,
+      INFANTE: 0,
+    };
+
+    for (let i = 0; i < this.pasajeros.length; i++) {
+      const ctrl = this.pasajeros.at(i);
+      const tipo = normalizeReservaPassengerType(ctrl.get('Tipo_Pasajero')?.value);
+      counters[tipo] += 1;
+      const prefix = `${reservaPassengerTypeLabel(tipo)} ${counters[tipo]}`;
+
+      if (ctrl.get('Tipo_Pasajero')?.hasError('required')) {
+        return { message: `${prefix}: falta tipo de pasajero`, step: 3, focusId: `editar-pasajero-${i}-nombre` };
+      }
+
+      if (ctrl.get('DNI')?.errors?.['duplicadoEnFormulario']) {
+        return { message: `${prefix}: documento repetido en esta reserva`, step: 3, focusId: `editar-pasajero-${i}-dni` };
+      }
+
+      if (ctrl.get('DNI')?.errors?.['duplicadoEnBd']) {
+        return { message: `${prefix}: ese DNI o pasaporte ya tiene reserva para esta fecha`, step: 3, focusId: `editar-pasajero-${i}-dni` };
+      }
+
+      if (tipo === 'ADULTO') {
+        const telefonoCtrl = ctrl.get('Telefono_Pasajero');
+        const telefono = String(telefonoCtrl?.value ?? '').trim();
+        if (telefonoCtrl?.hasError('required')) {
+          return { message: `${prefix}: el teléfono es obligatorio`, step: 3, focusId: `editar-pasajero-${i}-telefono` };
+        }
+        if (telefonoCtrl?.hasError('pattern') && telefono) {
+          return { message: `${prefix}: el teléfono debe tener formato +573001234567`, step: 3, focusId: `editar-pasajero-${i}-telefono` };
+        }
+      }
+
+      if (ctrl.get('Nacionalidad')?.errors?.['required']) {
+        return { message: `${prefix}: falta país de origen`, step: 3, focusId: `editar-pasajero-${i}-nacionalidad` };
+      }
+
+      if (ctrl.get('Nacionalidad')?.errors?.['maxlength']) {
+        return { message: `${prefix}: el país de origen supera la longitud permitida`, step: 3, focusId: `editar-pasajero-${i}-nacionalidad` };
+      }
+
+      if (ctrl.get('Precio_Pasajero')?.errors?.['min']) {
+        return { message: `${prefix}: el precio no puede ser negativo`, step: 3, focusId: `editar-pasajero-${i}-precio` };
+      }
+    }
+
+    return { message: 'Revisa los datos de los pasajeros.', step: 3, focusId: 'editar-pasajero-card-0' };
+  }
+
+  private getSubmitValidationIssue(): SubmitValidationIssue | null {
+    this.syncPrincipalPointControl();
+    this.sincronizarPuntosPasajeros();
+    this.reorderPassengerFormArray();
+    this.syncPassengerPhoneValidators();
+    this.form.updateValueAndValidity({ emitEvent: false });
+
+    const puntoPrincipal = this.parsePuntoId(this.form.get('Id_Punto')?.value);
+    const puntos = this.puntosSeleccionados();
+    const principalValido = puntoPrincipal !== null && puntos.some((p) => Number(p.Id_Punto) === puntoPrincipal);
+    if (!principalValido) {
+      this.form.get('Id_Punto')?.markAsTouched();
+      return {
+        message: 'Selecciona un punto principal de encuentro',
+        step: 2,
+        focusId: 'editar-punto-busqueda',
+      };
+    }
+
+    const passengerIssue = this.getPassengerValidationIssue();
+    if (passengerIssue) return passengerIssue;
+
+    if (!this.form.invalid) return null;
+
+    const invalid = Object.keys(this.form.controls).filter(
+      (key) => key !== 'Pasajeros' && this.form.get(key)?.invalid
+    );
+
+    const friendly: Record<string, string> = {
+      SelectTour: 'Tour',
+      Fecha_Tour: 'Fecha del Tour',
+      Id_Horario: 'Horario',
+      Id_Moneda: 'Moneda',
+      Id_Canal: 'Canal',
+      Nombre_Reportante: 'Nombre del reportante',
+      Telefono_Reportante: 'Teléfono del reportante (indicativo + 10 dígitos, ej: +573001234567)',
+      Tipo_Reserva: 'Tipo de reserva',
+      Id_Punto: 'Selecciona un punto principal de encuentro',
+    };
+
+    if (!invalid.length) return null;
+
+    const first = invalid[0];
+    return {
+      message: friendly[first] || `Revisa el campo ${first}`,
+      step: first === 'SelectTour' || first === 'Fecha_Tour' ? 0 : first === 'Nombre_Reportante' || first === 'Telefono_Reportante' ? 1 : 2,
+    };
+  }
+
   async onSubmit(): Promise<void> {
     if (this.isSubmitting()) return;
     this.closeSummaryIfOpen();
     this.isSubmitting.set(true);
 
-    // ===== Validación del formulario ANTES de confirmar =====
-    this.form.updateValueAndValidity({ emitEvent: false });
-    if (this.form.invalid) {
+    const validationIssue = this.getSubmitValidationIssue();
+    if (validationIssue) {
       this.form.markAllAsTouched();
-
-      const invalid = Object.keys(this.form.controls).filter(k => this.form.get(k)?.invalid);
-      const friendly: Record<string, string> = {
-        SelectTour: 'Tour',
-        Fecha_Tour: 'Fecha del Tour',
-        Id_Horario: 'Horario',
-        Id_Moneda: 'Moneda',
-        Id_Canal: 'Canal',
-        Nombre_Reportante: 'Nombre del Reportante',
-        Telefono_Reportante: 'Teléfono del Reportante (indicativo + 10 dígitos, ej: +573001234567)',
-        Tipo_Reserva: 'Tipo de Reserva',
-        Id_Punto: 'Punto de Encuentro'
-      };
-
-      const fields = invalid.map(f => friendly[f] || f);
-      const msg = fields.length
-        ? `Revisa los siguientes campos: ${fields.join(', ')}`
-        : 'Hay campos invalidos en el formulario.';
       this.closeSummaryIfOpen();
 
       this.navbar.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
-        message: msg,
+        message: validationIssue.message,
         autoClose: true,
         buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
       });
+      this.focusValidationTarget(validationIssue.step, validationIssue.focusId);
       this.isSubmitting.set(false);
       return;
     }
@@ -2258,12 +2844,41 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const ni = this.countByTipo('NINO');
     const infa = this.countByTipo('INFANTE');
     const totalNeto = this.totalNeto();
+    const paxPreview = this.pasajeros.controls.map(c => ({
+      Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
+      DNI: this.normalizarDni(c.get('DNI')?.value) || null,
+      Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
+      Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
+      Tipo_Pasajero: normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value),
+    }));
+    const formaPreview = this.form.get('FormaPago')?.value as 'Directo' | 'Completo' | 'Abono';
+    const comprobantePreview = this.form.get('ComprobantePago')?.value;
+    const tieneComprobanteOUrlPreview = formaPreview === 'Directo'
+      ? false
+      : formaPreview === 'Completo'
+        ? !!(comprobantePreview instanceof File || comprobantePreview?.SoporteUrl)
+        : this.abonos.controls.some((g) => {
+            const monto = Number(g.get('Monto')?.value || 0);
+            if (monto <= 0) return false;
+            const cmpVal = g.get('Comprobante')?.value;
+            const soporteUrl = g.get('SoporteUrl')?.value;
+            return cmpVal instanceof File || !!(cmpVal?.SoporteUrl || soporteUrl);
+          });
+    const estadoPreviewBase = this.resolverEstadoYMotivo(paxPreview, formaPreview, tieneComprobanteOUrlPreview);
+    const estadoPreview = this.getEstadoActualizacionReservaCancelada(
+      estadoPreviewBase.estado,
+      estadoPreviewBase.subestado
+    );
+    const estadoPreviewTexto = estadoPreview.subestado ? `${estadoPreview.estado} ${estadoPreview.subestado}` : estadoPreview.estado;
+    const advertenciaReactivacion = estadoPreview.reactivada
+      ? `\nEsta reserva está cancelada y su fecha aún no ha pasado. Si continúas, volverá a estado ${estadoPreviewTexto}.`
+      : '';
 
     const ok = await this.confirmar(
       '¿Actualizar reserva?',
       `Vas a actualizar la reserva #${this.reservaId() ?? '—'}: ${tourNombre} • ${fecha}.
       Pasajeros: Adultos ${ad} • Niños ${ni} • Infantes ${infa}.
-      Total neto: ${this.monedaCodigo()} ${totalNeto}.
+      Total neto: ${this.monedaCodigo()} ${totalNeto}.${advertenciaReactivacion}
       ¿Deseas continuar?`
     );
     if (!ok) {
@@ -2278,6 +2893,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
 
     try {
+      this.reorderPassengerFormArray();
+      this.syncPrincipalPointControl();
       this.sincronizarPuntosPasajeros();
       // Pasajeros payload
       const pax = this.pasajeros.controls.map(c => ({
@@ -2285,7 +2902,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),
         Telefono_Pasajero: c.get('Telefono_Pasajero')?.value || null,
-        Tipo_Pasajero: c.get('Tipo_Pasajero')?.value,
+        Tipo_Pasajero: normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value),
+        Id_Plan: c.get('Id_Plan')?.value ?? this.form.get('Id_Plan')?.value ?? null,
         Id_Punto: c.get('Id_Punto')?.value || this.form.get('Id_Punto')?.value || null,
         Confirmacion: !!c.get('Confirmacion')?.value,
         Precio_Tour: Number(c.get('PrecioRef')?.value || 0),
@@ -2307,7 +2925,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       } else if (forma === 'Completo') {
         const cmpVal = this.form.get('ComprobantePago')?.value;
         const pagoCompleto: any = { Monto: totalNeto, Tipo: 'Pago Completo' };
-        pagoCompleto.Observaciones = this.form.get('PagoObservaciones')?.value || null;
+        pagoCompleto.Observaciones = this.toUpperText(this.form.get('PagoObservaciones')?.value) || null;
 
         if (cmpVal instanceof File) {
           pagoCompleto.fileField = 'comprobante_pago';
@@ -2330,7 +2948,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
               Tipo: 'Abono',
               Fecha: g.get('Fecha_Pago')?.value || null,
               Fecha_Pago: g.get('Fecha_Pago')?.value || null,
-              Observaciones: g.get('Observaciones')?.value || null
+              Observaciones: this.toUpperText(g.get('Observaciones')?.value) || null
             };
             if (cmpVal instanceof File) {
               pagoAbono.fileField = `abono_${i}`;
@@ -2349,7 +2967,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       }
 
       // Estado sugerido (opcional)
-      const { estado, subestado } = this.resolverEstadoYMotivo(pax, forma, tieneComprobanteOUrl);
+      const estadoBase = this.resolverEstadoYMotivo(pax, forma, tieneComprobanteOUrl);
+      const estadoFinal = this.getEstadoActualizacionReservaCancelada(
+        estadoBase.estado,
+        estadoBase.subestado
+      );
+      const estado = estadoFinal.estado;
+      const subestado = estadoFinal.subestado;
 
       // Cabecera
       const cab = {
@@ -2612,4 +3236,3 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
   }
 }
-

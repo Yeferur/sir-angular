@@ -1,15 +1,15 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
 import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { forkJoin, switchMap, of, finalize } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
 
 type ViewStop = {
   key: string;
@@ -23,10 +23,19 @@ type ViewStop = {
   Longitud?: number | string | null;
 };
 
+type LegacyButton = { text: string; style: string; onClick: () => void };
+
+interface LegacyNavbarFacade {
+  showAlert: (opts: Omit<SirModalAlert, 'id'>) => string;
+  showConfirm: (title: string, message: string, buttons: LegacyButton[]) => string;
+  warningToast: (title: string, message?: string, durationMs?: number) => string;
+  clearOverlay: () => void;
+}
+
 @Component({
   selector: 'app-programacion-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, FlatpickrInputDirective],
+  imports: [CommonModule, FormsModule, DragDropModule, DatepickerComponent],
   templateUrl: './listado.html',
   styleUrls: ['./listado.css']
 })
@@ -34,8 +43,30 @@ export class Listado implements OnInit {
   private programacionService = inject(ProgramacionDashboardService);
   private inicioService = inject(InicioService);
   private cdr = inject(ChangeDetectorRef);
-  private navbar = inject(DynamicIslandGlobalService);
   private permisosService = inject(PermisosService);
+  private drawerService = inject(SirDrawerService);
+  private alerts = inject(SirAlertService);
+
+  private mapAlertButtons(buttons?: LegacyButton[]): AlertButton[] | undefined {
+    if (!buttons?.length) return undefined;
+    return buttons.map((button) => ({
+      text: button.text,
+      style: button.style === 'delete' || button.style === 'danger' ? 'danger' : button.style === 'secondary' ? 'secondary' : 'primary',
+      onClick: button.onClick,
+    }));
+  }
+
+  private navbar: LegacyNavbarFacade = {
+    showAlert: (opts) => this.alerts.showAlert({
+      ...opts,
+      buttons: this.mapAlertButtons(opts.buttons as LegacyButton[] | undefined),
+    }),
+    showConfirm: (title, message, buttons) =>
+      this.alerts.showConfirm(title, message, this.mapAlertButtons(buttons) || []),
+    warningToast: (title, message = '', durationMs = 3500) =>
+      this.alerts.warningToast(title, message, durationMs),
+    clearOverlay: () => this.alerts.closeModal(),
+  };
 
   fechaSeleccionada: string = new Date().toISOString().split('T')[0];
   toursDelDia: TourProgramacion[] = [];
@@ -83,9 +114,6 @@ export class Listado implements OnInit {
     return '';
   }
 
-
-
-
   get totalPaxUnassigned(): number {
     return (this.reservasSinAsignar || []).reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
   }
@@ -97,22 +125,6 @@ export class Listado implements OnInit {
   get canCreateProgramacion(): boolean {
     return this.permisosService.tienePermiso('PROGRAMACION.CREAR');
   }
-
-  fpOptionsFecha: Partial<FlatpickrOptions> = {
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    allowInput: false,
-    disableMobile: true,
-    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-    altInputClass: 'form-input flatpickr-input flatpickr-alt',
-    onReady: (_sel, _str, inst: any) => {
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-      const cal: HTMLElement = inst?.calendarContainer;
-      if (!cal) return;
-      cal.classList.add('sir-flatpickr');
-    }
-  };
 
   cargarToursDelDia(): void {
     const isInitialLoad = this.toursDelDia.length === 0;
@@ -302,6 +314,23 @@ export class Listado implements OnInit {
 
   markDirty(): void {
     this.listadoDirty = true;
+  }
+
+  private isGenericBusId(value: string | null | undefined): boolean {
+    const normalized = String(value || '').trim();
+    return !normalized || /^Bus\s+\d+$/i.test(normalized);
+  }
+
+  private renumerarBusesGenericos(buses: Bus[] | null | undefined): void {
+    if (!Array.isArray(buses) || !buses.length) return;
+
+    let genericIndex = 1;
+    for (const bus of buses) {
+      if (this.isGenericBusId(bus.id)) {
+        bus.id = `Bus ${genericIndex}`;
+        genericIndex += 1;
+      }
+    }
   }
 
   private confirmarPerdidaCambios(continuar: () => void): void {
@@ -540,7 +569,7 @@ export class Listado implements OnInit {
     const reservasOrdenadas = order
       ? this.groupStops(reservas, order).flatMap(stop => stop.reservas)
       : reservas;
-    this.navbar.puntos.set(reservasOrdenadas);
+    this.drawerService.openMapa(reservasOrdenadas);
   }
 
   guardarListadoFinal(): void {
@@ -680,6 +709,7 @@ export class Listado implements OnInit {
 
           this.reservasSinAsignar = reservasSinAsignar;
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
+          this.renumerarBusesGenericos(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
         } else {
           tour.planGenerado = plan;
@@ -688,6 +718,7 @@ export class Listado implements OnInit {
 
           this.reservasSinAsignar = [];
           this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
+          this.renumerarBusesGenericos(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
         }
 
@@ -736,6 +767,7 @@ export class Listado implements OnInit {
     tour.totalReservas = totalReservas;
 
     this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
+    this.renumerarBusesGenericos(this.planSeleccionado?.buses);
     this.reservasSinAsignar = reservasSinAsignar || [];
     this.modoVista = 'editor';
 
@@ -783,6 +815,7 @@ export class Listado implements OnInit {
     };
 
     this.planSeleccionado.buses.push(nuevoBus);
+    this.renumerarBusesGenericos(this.planSeleccionado.buses);
     this.markDirty();
   }
 
@@ -793,6 +826,7 @@ export class Listado implements OnInit {
     const busesFiltrados = this.planSeleccionado.buses.filter(bus => bus.reservas && bus.reservas.length > 0);
 
     this.planSeleccionado.buses = busesFiltrados;
+    this.renumerarBusesGenericos(this.planSeleccionado.buses);
 
     const nuevaMapa = new Map<number, string[]>();
     busesFiltrados.forEach((bus, newIndex) => {
@@ -949,8 +983,9 @@ export class Listado implements OnInit {
   }
 
   private updateOpenMapForActiveBus(): void {
-    if (!this.navbar.puntos()) return;
-    this.navbar.puntos.set(this.getReservasOrdenadasDelBusActivo());
+    if (this.drawerService.drawer()?.type !== 'mapa') return;
+    const reservas = this.getReservasOrdenadasDelBusActivo();
+    this.drawerService.openMapa(reservas);
   }
 
 }

@@ -2,7 +2,6 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, from, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { DynamicIslandGlobalService } from '../DynamicNavbar/global';
 import { jwtDecode } from 'jwt-decode';
 import { PermisosService, MenuItem } from '../Permisos/permisos.service';
 
@@ -36,7 +35,6 @@ export class AuthService {
 
   constructor(
     private http: HttpClient,
-    private navbar: DynamicIslandGlobalService,
     private permisosService: PermisosService
   ) {
     this.initSessionFromStorage();
@@ -161,7 +159,6 @@ private setSession(token: string) {
 
     this.loggedIn$.next(false);
     this.sessionBootstrapping$.next(false);
-    this.navbar.mode.set('login');
 
     if (this.logoutTimer) clearTimeout(this.logoutTimer);
   }

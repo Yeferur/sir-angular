@@ -1,24 +1,28 @@
 import { Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TransferService } from '../../../services/Transfers/transfers';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { UiStateService } from '../../../services/ui-state.service';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 
 @Component({
   selector: 'app-ver-transfers',
   standalone: true,
-  imports: [CommonModule, DatePipe, FlatpickrInputDirective],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent],
   templateUrl: './ver-transfers.html',
   styleUrls: ['./ver-transfers.css']
 })
 export class VerTransfersComponent implements OnInit {
-  private navbar = inject(DynamicIslandGlobalService);
+  private uiState = inject(UiStateService);
   private router = inject(Router);
   private transferService = inject(TransferService);
   private permisosService = inject(PermisosService);
+  private alerts = inject(SirAlertService);
+  private drawer = inject(SirDrawerService);
 
   readonly estadoOptions = ['Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completado', 'Cancelado'];
 
@@ -31,9 +35,6 @@ export class VerTransfersComponent implements OnInit {
 
   dropdownOpenEstado = signal(false);
   dropdownOpenServicio = signal(false);
-
-  @ViewChild('fechaTransferFp') fechaTransferFp?: FlatpickrInputDirective;
-  @ViewChild('fechaRegistroFp') fechaRegistroFp?: FlatpickrInputDirective;
 
   filters = signal({
     Fecha_Transfer: '',
@@ -51,12 +52,12 @@ export class VerTransfersComponent implements OnInit {
   });
 
   private readonly refreshEffect = effect(() => {
-    const entity = this.navbar.needsRefresh();
+    const entity = this.uiState.needsRefresh();
     if (entity === 'transfers') {
       if (this.hasSearched()) {
         this.buscarTransfers();
       }
-      this.navbar.needsRefresh.set('');
+      this.uiState.needsRefresh.set('');
     }
   });
 
@@ -76,143 +77,10 @@ export class VerTransfersComponent implements OnInit {
     return this.permisosService.tienePermiso('TRANSFERS.ACTUALIZAR');
   }
 
-  fpOptionsFecha: Partial<FlatpickrOptions> = {
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'd/m/Y',
-    allowInput: false,
-    disableMobile: true,
-    monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-
-    altInputClass: 'form-input flatpickr-input flatpickr-alt',
-
-    onReady: (_sel, _str, inst: any) => {
-      // ✅ SSR guard ANTES DE TODO
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-      const cal: HTMLElement = inst?.calendarContainer;
-      if (!cal) return;
-
-      cal.classList.add('sir-flatpickr');
-
-      // util: clamp día al máximo del mes
-      const clampDay = (y: number, m: number, d: number) => {
-        const last = new Date(y, m + 1, 0).getDate(); // último día del mes
-        return Math.min(Math.max(d, 1), last);
-      };
-
-      // --- Inyectar select en el header estable (flatpickr-month) ---
-      let yearDiv: HTMLDivElement | null = null;
-      let yearSelect: HTMLSelectElement | null = null;
-
-      const ensureYearSelect = () => {
-        // contenedor header
-        const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-        if (!monthWrap) return null;
-
-        // elimina el input numérico (cuando exista)
-        const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-        if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
-
-        // preferimos insertar dentro del pill .flatpickr-current-month
-        const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-        const container = curMonth ?? monthWrap;
-
-        // evita duplicados
-        yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-        if (yearSelect) return yearSelect;
-
-        // elimina cualquier wrapper previo para mantener DOM limpio
-        const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-        if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
-
-        yearSelect = document.createElement('select');
-        yearSelect.className = 'sir-year-select';
-        yearSelect.setAttribute('aria-label', 'Seleccionar año');
-
-        try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-        return yearSelect;
-      };
-
-      const buildYears = (centerYear: number) => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const start = centerYear - 20;
-        const end = centerYear + 20;
-
-        sel.innerHTML = '';
-        for (let y = end; y >= start; y--) {
-          const opt = document.createElement('option');
-          opt.value = String(y);
-          opt.textContent = String(y);
-          sel.appendChild(opt);
-        }
-        sel.value = String(centerYear);
-      };
-
-      const syncSelectValue = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = inst.currentYear ?? new Date().getFullYear();
-        const exists = !!sel.querySelector(`option[value="${y}"]`);
-        if (!exists) buildYears(y);
-        sel.value = String(y);
-      };
-
-      const getSafeDay = () => {
-        const d: Date | undefined = inst.selectedDates?.[0];
-        return d ? d.getDate() : 1;
-      };
-
-      const onChange = () => {
-        const sel = ensureYearSelect();
-        if (!sel) return;
-
-        const y = Number(sel.value);
-        const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-        const day = clampDay(y, m, getSafeDay());
-
-        const newDate = new Date(y, m, day);
-
-        // siempre mueve la vista
-        if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-        // solo setea si ya había selección
-        if (inst.selectedDates?.length) {
-          inst.setDate(newDate, true); // true => triggerChange para reactive forms
-        }
-      };
-
-      // init
-      buildYears(inst.currentYear ?? new Date().getFullYear());
-      syncSelectValue();
-
-      // listeners
-      const sel0 = ensureYearSelect();
-      sel0?.addEventListener('change', onChange);
-
-      // hook sin pisar otros callbacks
-      const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-        const prev = inst.config[key];
-        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-        inst.config[key] = [...arr, fn];
-      };
-
-      // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
-      wrap('onMonthChange', () => syncSelectValue());
-      wrap('onYearChange', () => syncSelectValue());
-
-      // cleanup
-      const prevOnDestroy = inst.config.onDestroy;
-      const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-      inst.config.onDestroy = [
-        ...destroyArr,
-        () => sel0?.removeEventListener('change', onChange)
-      ];
-    }
-  };
+  canCancelTransfer(transfer: any): boolean {
+    const estado = String(transfer?.Estado ?? transfer?.Estado_Transfer ?? '').toLowerCase();
+    return !!transfer?.Id_Transfer && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+  }
 
   loadInitialData() {
     this.isPageLoading.set(true);
@@ -225,7 +93,7 @@ export class VerTransfersComponent implements OnInit {
 
   crearTransfer() {
     if (!this.canCreateTransfer) {
-      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear transfers.');
+      this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear transfers.');
       return;
     }
     this.router.navigate(['/Transfers/NuevoTransfer']);
@@ -235,29 +103,65 @@ export class VerTransfersComponent implements OnInit {
     this.router.navigate(['/Transfers/EditarTransfer', Id_Transfer]);
   }
 
+  confirmCancelarTransfer(transfer: any): void {
+    const id = transfer?.Id_Transfer;
+    if (!id || !this.canCancelTransfer(transfer)) return;
+
+    this.alerts.showConfirm(
+      'Cancelar transfer',
+      `¿Deseas cancelar el transfer #${transfer?.Codigo_Transfer || id}? La información se conservará para consulta futura.`,
+      [
+        { text: 'Mantener', style: 'secondary', onClick: () => this.alerts.closeModal() },
+        {
+          text: 'Cancelar transfer',
+          style: 'primary',
+          onClick: () => {
+            this.alerts.closeModal();
+            this.cancelTransfer(transfer);
+          }
+        }
+      ],
+      { type: 'warning' }
+    );
+  }
+
   confirmEliminarTransfer(transfer: any): void {
     const id = transfer?.Id_Transfer;
     if (!id || !this.canDeleteTransfer) return;
 
-    this.navbar.showConfirm(
+    this.alerts.confirmDelete(
       'Eliminar transfer',
       `¿Deseas eliminar el transfer #${transfer?.Codigo_Transfer || id}? Esta acción eliminará el registro de forma permanente.`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        },
-        {
-          text: 'Eliminar',
-          style: 'delete',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.deleteTransfer(transfer);
-          }
-        }
-      ]
+      () => this.deleteTransfer(transfer),
+      undefined,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar' }
     );
+  }
+
+  private cancelTransfer(transfer: any): void {
+    const id = transfer?.Id_Transfer;
+    if (!id) return;
+
+    this.transferService.cancelarTransfer(id).subscribe({
+      next: () => {
+        this.transfers.update((items) =>
+          items.map((item) =>
+            String(item?.Id_Transfer) === String(id)
+              ? { ...item, Estado: 'Cancelado', Estado_Transfer: 'Cancelado' }
+              : item
+          )
+        );
+        this.alerts.successToast('Transfer cancelado', `El transfer #${transfer?.Codigo_Transfer || id} quedó en estado Cancelado.`);
+      },
+      error: (err) => {
+        this.alerts.showAlert({
+          type: 'error',
+          title: 'No se pudo cancelar',
+          message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible cancelar el transfer.',
+          autoClose: false
+        });
+      }
+    });
   }
 
   private deleteTransfer(transfer: any): void {
@@ -267,24 +171,17 @@ export class VerTransfersComponent implements OnInit {
     this.transferService.deleteTransfer(id).subscribe({
       next: () => {
         this.transfers.update((items) => items.filter((item) => String(item?.Id_Transfer) !== String(id)));
-        if (String(this.navbar.Id_Transfer() || '') === String(id)) {
-          this.navbar.Id_Transfer.set(null);
+        if (String(this.uiState.transferId() || '') === String(id)) {
+          this.uiState.transferId.set(null);
         }
-        this.navbar.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
+        this.alerts.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
       },
       error: (err) => {
-        this.navbar.showAlert({
+        this.alerts.showAlert({
           type: 'error',
           title: 'No se pudo eliminar',
           message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible eliminar el transfer.',
-          autoClose: false,
-          buttons: [
-            {
-              text: 'Cerrar',
-              style: 'secondary',
-              onClick: () => this.navbar.clearOverlay()
-            }
-          ]
+          autoClose: false
         });
       }
     });
@@ -374,12 +271,10 @@ export class VerTransfersComponent implements OnInit {
 
   clearFechaTransfer(): void {
     this.updateFilter('Fecha_Transfer', '');
-    this.fechaTransferFp?.instance?.clear();
   }
 
   clearFechaRegistro(): void {
     this.updateFilter('Fecha_Registro', '');
-    this.fechaRegistroFp?.instance?.clear();
   }
 
   private buildApiFilters() {
@@ -402,7 +297,7 @@ export class VerTransfersComponent implements OnInit {
   buscarTransfers() {
     const filtros = this.buildApiFilters();
     if (Object.keys(filtros).length === 0) {
-      this.navbar.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
+      this.alerts.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
       this.transfers.set([]);
       return;
     }
@@ -413,13 +308,13 @@ export class VerTransfersComponent implements OnInit {
     this.dropdownOpenServicio.set(false);
     this.transferService.getTransfers(filtros).subscribe({
       next: (data) => { this.transfers.set(data || []); },
-      error: (err) => { this.navbar.showAlert({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
+      error: (err) => { this.alerts.showAlert({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
       complete: () => { this.isSearching.set(false); }
     });
   }
 
   verTransfer(Id_Transfer: string) {
-    this.navbar.Id_Transfer();
-    this.navbar.Id_Transfer?.set ? this.navbar.Id_Transfer.set(Id_Transfer) : null;
+    this.uiState.transferId.set(Id_Transfer);
+    this.drawer.openTransfer(Id_Transfer);
   }
 }

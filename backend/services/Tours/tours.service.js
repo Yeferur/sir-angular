@@ -41,6 +41,90 @@ function assertRangoFechas(inicio, fin) {
   if (fin < inicio) throw new Error('La fecha fin no puede ser menor que la fecha inicio');
 }
 
+function normalizarComisionesEntrada(comisiones) {
+  if (!Array.isArray(comisiones)) return [];
+
+  const normalizadas = [];
+  const seen = new Set();
+
+  for (const item of comisiones) {
+    const Id_Canal = Number(item?.Id_Canal);
+    if (!Id_Canal || Number.isNaN(Id_Canal) || seen.has(Id_Canal)) continue;
+    seen.add(Id_Canal);
+    normalizadas.push({
+      Id_Canal,
+      Valor: Number(item?.Valor) || 0
+    });
+  }
+
+  return normalizadas;
+}
+
+function normalizarFechaPlan(value, fieldName) {
+  if (value == null || value === '') return null;
+  return assertFechaISO(value, fieldName);
+}
+
+async function guardarComisionesTour(conn, Id_Tour, comisiones) {
+  const lista = normalizarComisionesEntrada(comisiones);
+  if (!lista.length) return;
+
+  for (const item of lista) {
+    await conn.query(
+      `INSERT INTO tour_comisiones (Id_Tour, Id_Canal, Valor)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE Valor = VALUES(Valor)`,
+      [Id_Tour, item.Id_Canal, item.Valor]
+    );
+  }
+}
+
+async function obtenerCanalesComision() {
+  const [rows] = await db.query(
+    `SELECT Id_Canal, Nombre_Canal
+     FROM canales_reservas
+     WHERE Tiene_Comision = 1
+     ORDER BY Nombre_Canal ASC`
+  );
+
+  return rows.map((row) => ({
+    Id_Canal: Number(row.Id_Canal),
+    Nombre_Canal: row.Nombre_Canal
+  }));
+}
+
+async function obtenerComisionesToursMap(idsTour) {
+  const ids = [...new Set((idsTour || []).map((id) => Number(id)).filter((id) => id > 0))];
+  const map = new Map();
+
+  if (!ids.length) return map;
+
+  const [rows] = await db.query(
+    `SELECT
+       tc.Id_Tour,
+       tc.Id_Canal,
+       COALESCE(cr.Nombre_Canal, CONCAT('CANAL ', tc.Id_Canal)) AS Nombre_Canal,
+       tc.Valor
+     FROM tour_comisiones tc
+     LEFT JOIN canales_reservas cr ON cr.Id_Canal = tc.Id_Canal
+     WHERE tc.Id_Tour IN (${ids.map(() => '?').join(',')})
+     ORDER BY tc.Id_Tour ASC, tc.Id_Canal ASC`,
+    ids
+  );
+
+  for (const row of rows) {
+    const idTour = Number(row.Id_Tour);
+    if (!map.has(idTour)) map.set(idTour, []);
+    map.get(idTour).push({
+      Id_Canal: Number(row.Id_Canal),
+      Nombre_Canal: row.Nombre_Canal,
+      Valor: Number(row.Valor || 0)
+    });
+  }
+
+  return map;
+}
+
 async function guardarDisponibilidadYTemporadas(conn, Id_Tour, data) {
   const dispo = data?.Disponibilidad || data || {};
   const temporadas = Array.isArray(dispo?.Temporadas)
@@ -132,9 +216,8 @@ async function crearTour(data, userId = null) {
   const {
     Nombre_Tour,
     Abreviacion,
-    Comision_Hotel = 0,
-    Comision_Agencia = 0,
-    Comision_Freelance = 0,
+    Comisiones,
+    comisiones,
     Cupo_Base = 0,
     Latitud = null,
     Longitud = null,
@@ -152,14 +235,11 @@ async function crearTour(data, userId = null) {
     // 1) Crear el tour
     const [result] = await conn.query(
       `INSERT INTO tours
-        (Nombre_Tour, Abreviacion, Comision_Hotel, Comision_Agencia, Comision_Freelance, Cupo_Base, Latitud, Longitud, Activo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        (Nombre_Tour, Abreviacion, Cupo_Base, Latitud, Longitud, Activo)
+       VALUES (?, ?, ?, ?, ?, 1)`,
       [
         Nombre_Tour,
         Abreviacion || null,
-        Number(Comision_Hotel) || 0,
-        Number(Comision_Agencia) || 0,
-        Number(Comision_Freelance) || 0,
         Number(Cupo_Base) || 0,
         Latitud,
         Longitud
@@ -167,6 +247,8 @@ async function crearTour(data, userId = null) {
     );
 
     const nuevoIdTour = result.insertId;
+
+    await guardarComisionesTour(conn, nuevoIdTour, Comisiones ?? comisiones);
 
     // 2) Horarios
     const [puntos] = await conn.query('SELECT Id_Punto FROM puntos ORDER BY Id_Punto');
@@ -201,8 +283,13 @@ async function crearTour(data, userId = null) {
     const planes = Array.isArray(data?.Planes) ? data.Planes : [];
     for (let pi = 0; pi < planes.length; pi++) {
       const p = planes[pi] || {};
+      const Fecha_Inicio = normalizarFechaPlan(p.Fecha_Inicio, 'Fecha_Inicio');
+      const Fecha_Fin = normalizarFechaPlan(p.Fecha_Fin, 'Fecha_Fin');
       // Crear registro en planes_tours para TODOS los planes (incluido el básico)
-      const [insPlan] = await conn.query('INSERT INTO planes_tours (Id_Tour, Nombre_Plan) VALUES (?, ?)', [nuevoIdTour, p.Nombre_Plan || null]);
+      const [insPlan] = await conn.query(
+        'INSERT INTO planes_tours (Id_Tour, Nombre_Plan, Fecha_Inicio, Fecha_Fin) VALUES (?, ?, ?, ?)',
+        [nuevoIdTour, p.Nombre_Plan || null, Fecha_Inicio, Fecha_Fin]
+      );
       const Id_Plan = insPlan.insertId;
 
       const monedas = Array.isArray(p.Monedas) ? p.Monedas : [];
@@ -326,14 +413,23 @@ async function crearPlanTour(Id_Tour, Nombre_Plan) {
 }
 
 async function obtenerTours() {
-  const [rows] = await db.query('SELECT Id_Tour, Nombre_Tour, Abreviacion FROM tours WHERE Activo = 1 ORDER BY Nombre_Tour');
-  return rows;
+  const [rows] = await db.query(
+    'SELECT Id_Tour, Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Activo = 1 ORDER BY Nombre_Tour'
+  );
+  const comisionesMap = await obtenerComisionesToursMap(rows.map((row) => row.Id_Tour));
+  console.log('Tours obtenidos:', rows.length, 'comisionesMap keys:', [...comisionesMap.keys()]);
+  return rows.map((row) => ({
+    ...row,
+    Comisiones: comisionesMap.get(Number(row.Id_Tour)) || [],
+    comisiones: comisionesMap.get(Number(row.Id_Tour)) || []
+  }));
 }
 
 async function obtenerTourPorId(Id_Tour) {
   const [rows] = await db.query('SELECT * FROM tours WHERE Id_Tour = ? AND Activo = 1 LIMIT 1', [Id_Tour]);
   if (!rows.length) return null;
   const tour = rows[0];
+  const comisionesMap = await obtenerComisionesToursMap([Id_Tour]);
 
   const Disponibilidad = await obtenerDisponibilidadTour(Id_Tour);
 
@@ -347,7 +443,14 @@ async function obtenerTourPorId(Id_Tour) {
   }));
 
   const [planesRows] = await db.query(
-    'SELECT Id_Plan, Nombre_Plan FROM planes_tours WHERE Id_Tour = ? ORDER BY Id_Plan ASC',
+    `SELECT
+       Id_Plan,
+       Nombre_Plan,
+       DATE_FORMAT(Fecha_Inicio, '%Y-%m-%d') AS Fecha_Inicio,
+       DATE_FORMAT(Fecha_Fin, '%Y-%m-%d') AS Fecha_Fin
+     FROM planes_tours
+     WHERE Id_Tour = ?
+     ORDER BY Id_Plan ASC`,
     [Id_Tour]
   );
 
@@ -428,6 +531,8 @@ async function obtenerTourPorId(Id_Tour) {
       return {
         Id_Plan: planId,
         Nombre_Plan: p.Nombre_Plan || (idx === 0 ? 'Plan básico' : 'Plan'),
+        Fecha_Inicio: p.Fecha_Inicio,
+        Fecha_Fin: p.Fecha_Fin,
         AllowNino,
         AllowInfante,
         Monedas,
@@ -441,14 +546,17 @@ async function obtenerTourPorId(Id_Tour) {
     Planes = [{
       Id_Plan: null,
       Nombre_Plan: 'Plan básico',
+      Fecha_Inicio: null,
+      Fecha_Fin: null,
       AllowNino,
       AllowInfante,
       Monedas,
     }];
   }
-console.log('Obtained tour planes:', Planes);
   return {
     ...tour,
+    Comisiones: comisionesMap.get(Number(Id_Tour)) || [],
+    comisiones: comisionesMap.get(Number(Id_Tour)) || [],
     Disponibilidad: Disponibilidad || { Modo: 'TODO_EL_AÑO', Dias_Base: [], Temporadas: [] },
     Planes,
   };
@@ -459,9 +567,8 @@ async function actualizarTour(Id_Tour, data, userId = null) {
   const {
     Nombre_Tour,
     Abreviacion,
-    Comision_Hotel = 0,
-    Comision_Agencia = 0,
-    Comision_Freelance = 0,
+    Comisiones,
+    comisiones,
     Cupo_Base = 0,
     Latitud = null,
     Longitud = null
@@ -474,16 +581,16 @@ async function actualizarTour(Id_Tour, data, userId = null) {
     await conn.beginTransaction();
 
     // fetch previous tour snapshot
-    const [prevRows] = await conn.query('SELECT Nombre_Tour, Abreviacion, Comision_Hotel, Comision_Agencia, Comision_Freelance, Cupo_Base FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]);
+    const [prevRows] = await conn.query(
+      'SELECT Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Id_Tour = ? LIMIT 1',
+      [Id_Tour]
+    );
     const prev = prevRows && prevRows[0] ? prevRows[0] : null;
 
     const [result] = await conn.query(
       `UPDATE tours
        SET Nombre_Tour = ?,
            Abreviacion = ?,
-           Comision_Hotel = ?,
-           Comision_Agencia = ?,
-           Comision_Freelance = ?,
            Cupo_Base = ?,
            Latitud = ?,
            Longitud = ?
@@ -491,15 +598,15 @@ async function actualizarTour(Id_Tour, data, userId = null) {
       [
         Nombre_Tour,
         Abreviacion || null,
-        Number(Comision_Hotel) || 0,
-        Number(Comision_Agencia) || 0,
-        Number(Comision_Freelance) || 0,
         Number(Cupo_Base) || 0,
         Latitud,
         Longitud,
         Id_Tour
       ]
     );
+
+    await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
+    await guardarComisionesTour(conn, Id_Tour, Comisiones ?? comisiones);
 
     // Opcional: actualizar disponibilidad/temporadas
     if (
@@ -521,7 +628,12 @@ async function actualizarTour(Id_Tour, data, userId = null) {
 
       const planes = data.Planes;
       for (const p of planes) {
-        const [insPlan] = await conn.query('INSERT INTO planes_tours (Id_Tour, Nombre_Plan) VALUES (?, ?)', [Id_Tour, p.Nombre_Plan || null]);
+        const Fecha_Inicio = normalizarFechaPlan(p.Fecha_Inicio, 'Fecha_Inicio');
+        const Fecha_Fin = normalizarFechaPlan(p.Fecha_Fin, 'Fecha_Fin');
+        const [insPlan] = await conn.query(
+          'INSERT INTO planes_tours (Id_Tour, Nombre_Plan, Fecha_Inicio, Fecha_Fin) VALUES (?, ?, ?, ?)',
+          [Id_Tour, p.Nombre_Plan || null, Fecha_Inicio, Fecha_Fin]
+        );
         const Id_Plan = insPlan.insertId;
 
         const monedas = Array.isArray(p.Monedas) ? p.Monedas : [];
@@ -571,14 +683,57 @@ async function eliminarTour(Id_Tour, userId = null) {
       throw new Error('Tour no encontrado.');
     }
 
-    if (Number(prev.Activo) === 0) {
+    const [[programacionActiva]] = await conn.query(
+      'SELECT COUNT(*) AS total FROM programaciones WHERE Id_Tour = ?',
+      [Id_Tour]
+    );
+    if (Number(programacionActiva?.total || 0) > 0) {
       await conn.rollback();
-      throw new Error('El tour ya se encuentra inactivo.');
+      throw new Error('No se puede eliminar el tour porque tiene programaciones asociadas.');
     }
 
-    const [result] = await conn.query('UPDATE tours SET Activo = 0 WHERE Id_Tour = ?', [Id_Tour]);
+    const [[programacionRelacionada]] = await conn.query(
+      'SELECT COUNT(*) AS total FROM programacion_tours WHERE Id_Tour = ?',
+      [Id_Tour]
+    );
+    if (Number(programacionRelacionada?.total || 0) > 0) {
+      await conn.rollback();
+      throw new Error('No se puede eliminar el tour porque está vinculado a una programación guardada.');
+    }
 
-    await recordHistorial({ conexion: conn, tabla: 'tours', id_registro: Id_Tour, accion: 'DESACTIVAR_TOUR', id_usuario: userId, detalles: [ { columna: 'Activo', anterior: 1, nuevo: 0 }, { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null } ] });
+    const [tempsExist] = await conn.query(
+      'SELECT Id_Temporada FROM tours_temporadas WHERE Id_Tour = ?',
+      [Id_Tour]
+    );
+    if (tempsExist.length) {
+      const ids = tempsExist.map((x) => x.Id_Temporada);
+      await conn.query(
+        `DELETE FROM tours_temporada_dias WHERE Id_Temporada IN (${ids.map(() => '?').join(',')})`,
+        ids
+      );
+    }
+
+    await conn.query('DELETE FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
+    await conn.query('DELETE FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
+    await conn.query('DELETE FROM horarios WHERE Id_Tour = ?', [Id_Tour]);
+    await conn.query('DELETE FROM tour_precios WHERE Id_Tour = ?', [Id_Tour]);
+    await conn.query('DELETE FROM planes_tours WHERE Id_Tour = ?', [Id_Tour]);
+    await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
+
+    const [result] = await conn.query('DELETE FROM tours WHERE Id_Tour = ?', [Id_Tour]);
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'tours',
+      id_registro: Id_Tour,
+      accion: 'ELIMINAR_TOUR',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: null },
+        { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: null },
+        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: null }
+      ]
+    });
     await conn.commit();
     return { success: true, affectedRows: result.affectedRows };
   } catch (e) {
@@ -595,6 +750,7 @@ module.exports = {
   obtenerPreciosTour,
   upsertPreciosTour,
   crearPlanTour,
+  obtenerCanalesComision,
   obtenerTours,
   obtenerTourPorId,
   actualizarTour,

@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
@@ -70,7 +70,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     private usuariosService: UsuariosService,
     private router: Router,
     private cdr: ChangeDetectorRef,
-    private global: DynamicIslandGlobalService
+    private alerts: SirAlertService
   ) {
     this.form = this.fb.group({
       Id_Usuario: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(30)]],
@@ -119,10 +119,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   private navbar(title: string, message: string, loading = false, autoClose = true) {
     if (loading) {
-      this.global.showLoading(title, message, { autoClose });
+      this.alerts.showLoading(title, message, { autoClose });
       return;
     }
-    this.global.showAlert({ title, message, autoClose });
+    this.alerts.warningToast(title, message);
   }
 
   private loadRoles() {
@@ -200,6 +200,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     }
 
     this.cdr.markForCheck();
+  }
+
+  canCreateUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.CREAR');
   }
 
   openPasswordStrength() {
@@ -286,12 +290,12 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       const fields = invalid.map((f) => friendly[f] || f);
       const msg = fields.length ? `Revisa los siguientes campos: ${fields.join(', ')}` : 'Hay campos inválidos en el formulario.';
 
-      this.global.alert?.set?.({
+      this.alerts.showAlert({
         type: 'error',
         title: 'Campos requeridos incompletos',
         message: msg,
         autoClose: true,
-        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.global.alert?.set?.(null) }]
+        buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.alerts.closeModal() }]
       });
 
       this.cdr.markForCheck();
@@ -318,12 +322,12 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     };
 
     // Show confirmation using global navbar alert with action buttons
-    this.global.showConfirm(
+    this.alerts.showConfirm(
       '¿Crear usuario?',
       'Se creará el usuario con los datos ingresados. ¿Deseas continuar?',
       [
-        { text: 'Cancelar', style: 'secondary', onClick: () => this.global.clearOverlay() },
-        { text: 'Crear', style: 'primary', onClick: () => { this.global.clearOverlay(); this.confirmCreateUser(payload); } }
+        { text: 'Cancelar', style: 'secondary', onClick: () => this.alerts.closeModal() },
+        { text: 'Crear', style: 'primary', onClick: () => { this.alerts.closeModal(); this.confirmCreateUser(payload); } }
       ]
     );
   }
@@ -337,14 +341,14 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       next: () => {
         this.form.markAsPristine();
         this.isSubmitting.set(false);
-        this.global.successToast('Usuario creado', 'El usuario se creó correctamente.');
+        this.alerts.successToast('Usuario creado', 'El usuario se creó correctamente.');
         this.cdr.markForCheck();
         this.router.navigate(['/Usuarios']);
       },
       error: (err: any) => {
         this.isSubmitting.set(false);
         this.errorMsg = err?.error?.error || 'Error creando usuario';
-        this.global.errorToast('Error', this.errorMsg);
+        this.alerts.errorToast('Error', this.errorMsg);
         this.cdr.markForCheck();
       }
     });

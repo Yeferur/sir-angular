@@ -72,22 +72,6 @@
 
   <!-- HEADER -->
   <div class="page-header">
-    <div class="header-top">
-      <div class="header-text">
-        <h1>Ver Transfers</h1>
-        <p class="subtitle">Busca por ID, titular, DNI, teléfono o punto de salida/destino.</p>
-      </div>
-      <div class="header-actions">
-        @if (canCreateTransfer) {
-          <button class="btn-primary" (click)="crearTransfer()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Crear Transfer
-          </button>
-        }
-      </div>
-    </div>
 
     <!-- SEARCH ROW -->
     <div class="search-row">
@@ -172,12 +156,20 @@
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Fecha del transfer</label>
-          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha" [value]="filters().Fecha_Transfer" placeholder="Selecciona una fecha" (change)="updateFilter('Fecha_Transfer', $any($event.target).value)" #fechaTransferFp="fp" />
+          <app-datepicker
+            [ngModel]="filters().Fecha_Transfer"
+            placeholder="Selecciona una fecha"
+            (dateChange)="updateFilter('Fecha_Transfer', $event)">
+          </app-datepicker>
         </div>
 
         <div class="form-group">
           <label class="form-label">Fecha de registro</label>
-          <input type="text" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha" [value]="filters().Fecha_Registro" placeholder="Selecciona una fecha" (change)="updateFilter('Fecha_Registro', $any($event.target).value)" #fechaRegistroFp="fp" />
+          <app-datepicker
+            [ngModel]="filters().Fecha_Registro"
+            placeholder="Selecciona una fecha"
+            (dateChange)="updateFilter('Fecha_Registro', $event)">
+          </app-datepicker>
         </div>
 
         <div class="form-group">
@@ -311,6 +303,20 @@
                   Editar
                 </button>
               }
+              @if (canCancelTransfer(t)) {
+                <button
+                  type="button"
+                  class="btn-edit-row btn-cancel-row"
+                  (click)="$event.stopPropagation(); confirmCancelarTransfer(t)"
+                  [attr.aria-label]="'Cancelar transfer ' + (t.Codigo_Transfer || t.Id_Transfer)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"/>
+                    <path d="m6 6 12 12"/>
+                  </svg>
+                  Cancelar
+                </button>
+              }
               @if (canDeleteTransfer) {
                 <button
                   type="button"
@@ -356,7 +362,7 @@
           </svg>
         </div>
         <h3>Listo para buscar</h3>
-        <p>Selecciona tus filtros y presiona "Buscar" para ver los transfers.</p>
+        <p>Aplica los filtros y presiona "Buscar" para cargar los transfers.</p>
       </div>
     }
   </div>

@@ -1,40 +1,38 @@
-/* styles.css global (o donde manejes el layout) */
-.app-shell--login {
-  min-height: 100svh;
-  background: var(--bg-primary);
-}
-
-.app-shell {
-  display: grid;
-  grid-template-columns: auto 1fr; /* el sidebar define su ancho */
-  min-height: 100svh;
-}
-
 .app-shell--private {
-  min-height: 100svh;
-}
-
-.main-shell {
   display: flex;
-  flex-direction: column;
-  min-height: 100svh;
 }
-
-.main-shell--login {
-  min-height: 100svh;
-}
-
-.content {
+ 
+.main-shell {
   flex: 1;
-  overflow: auto;
+  min-width: 0;
+  /* Espacio para el topbar: 10px padding-top + 48px barra + 14px gap */
+  padding-top: calc(10px + 48px + 14px);
+  /* Espacio para el sidebar colapsado: 15px left + 52px width + 14px gap */
+  padding-left: calc(15px + 52px + 14px);
+  min-height: 100vh;
+  box-sizing: border-box;
 }
+ 
+.main-shell .content {
+  padding: 20px 24px;
+  padding-left: 0;
+}
+ 
+/* Móvil: sin offset de sidebar */
+@media (max-width: 766px) {
+  .main-shell {
+    padding-left: 0;
+  }
+  .main-shell .content {
+  padding: 20px 24px;
+}
+}
+ 
 
 .auth-public-shell {
-  min-height: 100svh;
+  min-height: 100vh;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at top, rgba(10, 132, 255, 0.12), transparent 34%),
-    linear-gradient(180deg, var(--bg-primary), color-mix(in srgb, var(--bg-primary) 85%, black 15%));
+  background-color: var(--bg-primary);
 }

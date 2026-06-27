@@ -4,8 +4,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import {
@@ -35,9 +35,9 @@ type VM = {
 export class VerPuntos implements OnInit {
 
   private puntosSvc = inject(puntosService);
-  private navbar = inject(DynamicIslandGlobalService);
   private router = inject(Router);
   private permisosService = inject(PermisosService);
+  private alerts = inject(SirAlertService);
 
   // ui
   searchTerm = '';
@@ -114,7 +114,7 @@ export class VerPuntos implements OnInit {
      =============================== */
   crearPunto() {
     if (!this.canCreatePunto) {
-      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para crear puntos.');
+      this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear puntos.');
       return;
     }
     this.router.navigate(['/Puntos/NuevoPunto']);
@@ -122,7 +122,7 @@ export class VerPuntos implements OnInit {
 
   irAOrdenarPuntos() {
     if (!this.canSortPuntos) {
-      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para ordenar puntos.');
+      this.alerts.errorToast('Acceso denegado', 'No tienes permiso para ordenar puntos.');
       return;
     }
     this.router.navigate(['/Puntos/OrdenarPuntos']);
@@ -142,24 +142,12 @@ export class VerPuntos implements OnInit {
     const id = Number((p as any).Id_Punto || (p as any).IdPunto);
     if (isNaN(id)) return;
 
-    this.navbar.showConfirm(
+    this.alerts.confirm(
       'Eliminar punto',
       '¿Deseas eliminar este punto? Esta acción no se puede deshacer.',
-      [
-        {
-          text: 'Eliminar',
-          style: 'delete',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.deletePunto(p);
-          }
-        },
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        }
-      ]
+      () => this.deletePunto(p),
+      undefined,
+      { confirmText: 'Eliminar', cancelText: 'Cancelar', type: 'warning' }
     );
   }
 
@@ -175,7 +163,7 @@ export class VerPuntos implements OnInit {
         setTimeout(() => {
           // recargar lista
           this.page$.next(this.page);
-          this.navbar.showAlert({
+          this.alerts.showAlert({
             type: 'success',
             title: 'Eliminado',
             message: 'Punto eliminado correctamente',
@@ -185,7 +173,7 @@ export class VerPuntos implements OnInit {
       },
       error: err => {
         console.error('Error eliminando punto', err);
-        this.navbar.showAlert({
+        this.alerts.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudo eliminar el punto',
@@ -234,7 +222,7 @@ export class VerPuntos implements OnInit {
 
   descargarExcel() {
     if (!this.canExportPuntos) {
-      this.navbar.errorToast('Acceso denegado', 'No tienes permiso para exportar puntos.');
+      this.alerts.errorToast('Acceso denegado', 'No tienes permiso para exportar puntos.');
       return;
     }
 
@@ -251,7 +239,7 @@ export class VerPuntos implements OnInit {
       },
       error: (err: any) => {
         console.error('Error al exportar puntos al Excel', err);
-        this.navbar.showAlert({
+        this.alerts.showAlert({
           type: 'error',
           title: 'Error',
           message: 'No se pudieron exportar los puntos desde el servidor.',

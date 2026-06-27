@@ -9,6 +9,13 @@ export interface Privado {
   NumeroPasajeros: number;
 }
 
+/** Desglose por plan solo cuando el tour tiene multiples planes configurados. */
+export interface PlanSummary {
+  Id_Plan: number;
+  Nombre_Plan: string;
+  NumeroPasajeros: number;
+}
+
 export interface Tour {
   Id_Tour: number;
   Nombre_Tour: string;
@@ -16,6 +23,8 @@ export interface Tour {
   NumeroPasajeros: number;
   totalPrivados: number;
   privados: Privado[];
+  /** Presente solo cuando el tour tiene multiples planes y el backend los incluye */
+  planes?: PlanSummary[];
 }
 
 export interface Transfer {

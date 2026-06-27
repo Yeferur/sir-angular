@@ -45,7 +45,7 @@ function validarFechaTourBogota(fechaTourIso) {
   const fechaRecibidaStr = String(fechaTourIso).split('T')[0];
   const fechaRecibidaDate = new Date(`${fechaRecibidaStr}T00:00:00`);
   
-  if (fechaRecibidaDate > hoyBogotaDate) {
+  if (fechaRecibidaDate < hoyBogotaDate) {
     const err = new Error(`La fecha reservada (${fechaRecibidaStr}) no puede ser pasada respecto a la fecha actual en America/Bogota.`);
     err.status = 400;
     throw err;
@@ -273,8 +273,12 @@ function construirImpactoCuposReserva({
 }
 
 function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null }) {
-  if (estadoActual === 'Cancelada' || estadoActual === 'Completada') {
+  if (estadoActual === 'Completada') {
     return estadoActual;
+  }
+
+  if (estadoActual === 'Cancelada' && fechaEsPasadaBogota(fechaTour)) {
+    return 'Cancelada';
   }
 
   const pasajerosArray = Array.isArray(pasajeros) ? pasajeros : [];
@@ -966,8 +970,19 @@ async function obtenerReserva(Id_Reserva) {
  * CATÁLOGOS
  * =========================== */
 async function obtenerCanales() {
-  const [rows] = await db.query('SELECT * FROM canales_reservas');
-  return rows;
+  const [rows] = await db.query(
+    `SELECT
+       Id_Canal,
+       Nombre_Canal,
+       Tiene_Comision
+     FROM canales_reservas
+     ORDER BY Nombre_Canal ASC`
+  );
+  return rows.map((row) => ({
+    Id_Canal: Number(row.Id_Canal),
+    Nombre_Canal: row.Nombre_Canal,
+    Tiene_Comision: Number(row.Tiene_Comision || 0),
+  }));
 }
 
 async function obtenerMonedas() {
@@ -975,32 +990,67 @@ async function obtenerMonedas() {
   return rows;
 }
 
-async function obtenerTours() {
-  const [rows] = await db.query('SELECT * FROM tours WHERE Activo = 1');
+async function obtenerTours(includeTourId = null) {
+  const includeId = Number(includeTourId);
+  const hasIncludeId = Number.isFinite(includeId) && includeId > 0;
+
+  const sql = hasIncludeId
+    ? `SELECT *
+       FROM tours
+       WHERE Activo = 1 OR Id_Tour = ?
+       ORDER BY Nombre_Tour`
+    : `SELECT *
+       FROM tours
+       WHERE Activo = 1
+       ORDER BY Nombre_Tour`;
+
+  const [rows] = hasIncludeId
+    ? await db.query(sql, [includeId])
+    : await db.query(sql);
+
   return rows;
 }
 
-async function obtenerPlanesByTour(idTour) {
-  const [rows] = await db.query(
-    'SELECT * FROM planes_tours WHERE Id_Tour = ?',
-    [idTour]
-  );
+async function obtenerPlanesByTour(idTour, fecha) {
+  const fechaFiltro = String(fecha || '').trim();
+  const sql = fechaFiltro
+    ? `SELECT *
+       FROM planes_tours
+       WHERE Id_Tour = ?
+         AND (
+           Fecha_Inicio IS NULL
+           OR (Fecha_Inicio <= ? AND Fecha_Fin >= ?)
+         )`
+    : 'SELECT * FROM planes_tours WHERE Id_Tour = ?';
+
+  const params = fechaFiltro ? [idTour, fechaFiltro, fechaFiltro] : [idTour];
+  const [rows] = await db.query(sql, params);
   return rows;
 }
 
-async function obtenerPreciosPorFiltro(Id_Tour, Id_Plan, Id_Moneda) {
+async function obtenerPreciosPorFiltro(Id_Tour, Id_Plan, Id_Moneda, fecha) {
+  const fechaFiltro = String(fecha || '').trim();
   const sql = `
-    SELECT Tipo_Pasajero, Precio
-    FROM tour_precios
-    WHERE Id_Tour = ?
-      AND (Id_Plan = ? OR ? IS NULL)
-      AND (Id_Moneda = ? OR ? IS NULL)
+    SELECT tp.Tipo_Pasajero, tp.Precio
+    FROM tour_precios tp
+    ${fechaFiltro ? 'INNER JOIN planes_tours pt ON pt.Id_Plan = tp.Id_Plan' : ''}
+    WHERE tp.Id_Tour = ?
+      AND (tp.Id_Plan = ? OR ? IS NULL)
+      AND (tp.Id_Moneda = ? OR ? IS NULL)
+      ${fechaFiltro ? `
+      AND (
+        pt.Fecha_Inicio IS NULL
+        OR (pt.Fecha_Inicio <= ? AND pt.Fecha_Fin >= ?)
+      )` : ''}
   `;
-  const [rows] = await db.query(sql, [
+  const params = [
     Id_Tour,
     Id_Plan || null, Id_Plan || null,
     Id_Moneda || null, Id_Moneda || null
-  ]);
+  ];
+  if (fechaFiltro) params.push(fechaFiltro, fechaFiltro);
+
+  const [rows] = await db.query(sql, params);
   const map = {};
   for (const r of rows) map[r.Tipo_Pasajero] = Number(r.Precio);
   return map;
@@ -1175,8 +1225,8 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
-            Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            Id_Plan, Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             idReserva,
             p.Nombre_Pasajero || '',
@@ -1184,6 +1234,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
             normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
             p.Tipo_Pasajero,
+            p.Id_Plan ?? null,
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
             p.Comision ?? 0,
@@ -1289,27 +1340,19 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
 async function obtenerComisiones(Id_Tour, Id_Canal) {
   const sql = `
     SELECT
-      CASE WHEN c.Id_Canal = 1 THEN t.Comision_Hotel
-           WHEN c.Id_Canal = 2 THEN t.Comision_Agencia
-           WHEN c.Id_Canal = 4 THEN t.Comision_Freelance
-           ELSE 0 END AS Comision,
+      COALESCE(tc.Valor, 0) AS Comision,
       'ADULTO' AS Tipo_Pasajero
-    FROM tours t
-    JOIN canales_reservas c ON c.Id_Canal = ?
-    WHERE t.Id_Tour = ?
+    FROM tour_comisiones tc
+    WHERE tc.Id_Tour = ? AND tc.Id_Canal = ?
     UNION ALL
     SELECT
-      CASE WHEN c.Id_Canal = 1 THEN t.Comision_Hotel
-           WHEN c.Id_Canal = 2 THEN t.Comision_Agencia
-           WHEN c.Id_Canal = 4 THEN t.Comision_Freelance
-           ELSE 0 END AS Comision,
+      COALESCE(tc.Valor, 0) AS Comision,
       'NINO' AS Tipo_Pasajero
-    FROM tours t
-    JOIN canales_reservas c ON c.Id_Canal = ?
-    WHERE t.Id_Tour = ?
+    FROM tour_comisiones tc
+    WHERE tc.Id_Tour = ? AND tc.Id_Canal = ?
   `;
-  const [rows] = await db.query(sql, [Id_Canal, Id_Tour, Id_Canal, Id_Tour]);
-  const result = {};
+  const [rows] = await db.query(sql, [Id_Tour, Id_Canal, Id_Tour, Id_Canal]);
+  const result = { ADULTO: 0, NINO: 0 };
   for (const row of rows) result[row.Tipo_Pasajero] = row.Comision;
   return result;
 }
@@ -1535,8 +1578,8 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
         await conn.query(
           `INSERT INTO pasajeros
            (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
-            Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            Id_Plan, Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             Id_Reserva,
             p.Nombre_Pasajero || '',
@@ -1544,6 +1587,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
             normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
             p.Tipo_Pasajero,
+            p.Id_Plan ?? null,
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
             p.Comision ?? 0,

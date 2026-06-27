@@ -5,10 +5,6 @@
       <div class="sk-line sk-title"></div>
       <div class="sk-line sk-subtitle"></div>
     </div>
-    <div class="page-header-actions">
-      <div class="sk-button"></div>
-      <div class="sk-button"></div>
-    </div>
   </div>
 
   <div class="main-content">
@@ -21,7 +17,11 @@
       </div>
 
       <div class="form-grid">
-        <div class="form-group full-width">
+        <div class="form-group">
+          <div class="sk-line sk-label"></div>
+          <div class="sk-field"></div>
+        </div>
+        <div class="form-group">
           <div class="sk-line sk-label"></div>
           <div class="sk-field"></div>
         </div>
@@ -31,19 +31,8 @@
         </div>
         <div class="form-group full-width">
           <div class="sk-line sk-label"></div>
-          <div class="sk-field sk-field-textarea"></div>
+          <div class="sk-field"></div>
         </div>
-        <div class="coords-row">
-          <div class="form-group">
-            <div class="sk-line sk-label"></div>
-            <div class="sk-field"></div>
-          </div>
-          <div class="form-group">
-            <div class="sk-line sk-label"></div>
-            <div class="sk-field"></div>
-          </div>
-        </div>
-        <div class="sk-hint"></div>
       </div>
     </div>
 
@@ -71,21 +60,14 @@
 </div>
 } @else {
 <div class="booking-dashboard">
-  <form [formGroup]="form" (ngSubmit)="onSubmitCrearPunto()">
-    <div class="page-header">
-      <div class="page-header-text">
-        <h1>Crear Punto de Encuentro</h1>
-        <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
-      </div>
+  <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
 
-      <div class="page-header-actions">
-        <button class="btn-primary" type="submit" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Guardando...' : 'Guardar Punto' }}
-        </button>
-      </div>
-    </div>
-
+  <form id="puntoForm" [formGroup]="form" (ngSubmit)="onSubmitCrearPunto()">
     <div class="main-content">
+
+      <!-- =============================================
+           CARD 1: DATOS DEL PUNTO
+           ============================================= -->
       <div class="card">
         <div class="card-header">
           <div>
@@ -95,102 +77,83 @@
         </div>
 
         <div class="form-grid">
-          <div class="form-group full-width">
+
+          <!-- Nombre del Punto -->
+          <div class="form-group">
             <label class="form-label">Nombre del Punto <span class="required-star">*</span></label>
-            <input
-              formControlName="NombrePunto"
-              type="text"
-              class="form-input"
-              maxlength="255"
-              placeholder="Ej: Parque Central"
-              [class.errorInput]="form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid"
-            />
+            <input formControlName="NombrePunto" (input)="onNombrePuntoInput()" type="text" class="form-input"
+              maxlength="255" placeholder="Ej: Parque Central"
+              [class.errorInput]="form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid" />
             @if (form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid) {
             <div class="errorMessage">Ingresa un nombre válido.</div>
             }
           </div>
 
-          <div class="form-group full-width">
+          <!-- Sector -->
+          <div class="form-group">
             <label class="form-label">Sector <span class="required-star">*</span></label>
-            <input
-              formControlName="Sector"
-              type="text"
-              class="form-input"
-              placeholder="Ej: Poblado"
-              [class.errorInput]="form.get('Sector')?.touched && form.get('Sector')?.invalid"
-            />
+            <input formControlName="Sector" type="text" class="form-input" placeholder="Ej: Poblado"
+              [class.errorInput]="form.get('Sector')?.touched && form.get('Sector')?.invalid" />
             @if (form.get('Sector')?.touched && form.get('Sector')?.invalid) {
             <div class="errorMessage">Ingresa un sector válido.</div>
             }
           </div>
 
-          <div class="form-group full-width">
+          <!-- Dirección -->
+          <div class="form-group">
             <label class="form-label">Dirección <span class="required-star">*</span></label>
-            <input
-              formControlName="Direccion"
-              (input)="onDireccionInput($any($event.target).value)"
-              type="text"
-              class="form-input"
-              placeholder="Ej: Calle 1 #2-34"
-              [class.errorInput]="(form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) || form.get('Direccion')?.hasError('duplicate')"
-            />
+            <input formControlName="Direccion" (input)="onDireccionInput($any($event.target).value)" type="text"
+              class="form-input" placeholder="Ej: Calle 1 #2-34"
+              [class.errorInput]="(form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) || similarityState === 'exact'"
+              [class.warnInput]="similarityState === 'similar'" />
             @if (form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) {
             <div class="errorMessage">La dirección es obligatoria.</div>
             }
-            @if (form.get('Direccion')?.hasError('duplicate')) {
-            <div class="errorMessage">Ya existe un punto con esta dirección.</div>
+            @if (similarityState === 'exact') {
+            <div class="errorMessage">Ya existe un punto con este nombre y esta dirección.</div>
+            }
+            @if (similarityState === 'similar') {
+            <div class="warnMessage">
+              Existe un punto similar: {{ duplicatePoint?.Nombre_Punto || duplicatePoint?.NombrePunto || 'Punto' }}
+              ({{ duplicatePoint?.Direccion || 'sin dirección registrada' }}). Puedes crearlo, pero se pedirá
+              confirmación.
+            </div>
             }
           </div>
 
-          <div class="coords-row">
-            <div class="form-group">
-              <label class="form-label">Latitud <span class="required-star">*</span></label>
-              <input
-                formControlName="Latitud"
-                type="number"
-                step="any"
-                class="form-input"
-                placeholder="6.244747"
-                [class.errorInput]="form.get('Latitud')?.touched && form.get('Latitud')?.invalid"
-              />
-              @if (form.get('Latitud')?.touched && form.get('Latitud')?.hasError('required')) {
-              <div class="errorMessage">La latitud es obligatoria.</div>
-              }
-              @if (form.get('Latitud')?.touched && (form.get('Latitud')?.hasError('min') || form.get('Latitud')?.hasError('max'))) {
-              <div class="errorMessage">Debe estar entre -90 y 90.</div>
-              }
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Longitud <span class="required-star">*</span></label>
-              <input
-                formControlName="Longitud"
-                type="number"
-                step="any"
-                class="form-input"
-                placeholder="-75.574756"
-                [class.errorInput]="form.get('Longitud')?.touched && form.get('Longitud')?.invalid"
-              />
-              @if (form.get('Longitud')?.touched && form.get('Longitud')?.hasError('required')) {
-              <div class="errorMessage">La longitud es obligatoria.</div>
-              }
-              @if (form.get('Longitud')?.touched && (form.get('Longitud')?.hasError('min') || form.get('Longitud')?.hasError('max'))) {
-              <div class="errorMessage">Debe estar entre -180 y 180.</div>
-              }
-            </div>
+          <!-- Coordenadas (campo único) -->
+          <div class="form-group">
+            <label class="form-label">
+              Coordenadas <span class="required-star">*</span>
+            </label>
+            <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
+              [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
+            @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
+            @if (form.get('Coordenadas')?.errors?.['required']) {
+            <div class="errorMessage">Las coordenadas son obligatorias.</div>
+            } @else if (form.get('Coordenadas')?.errors?.['coordenadasInvalidas']) {
+            <div class="errorMessage">Formato inválido. Usa: lat, lng — Ej: 6.244747, -75.574756</div>
+            } @else if (form.get('Coordenadas')?.errors?.['latitudInvalida']) {
+            <div class="errorMessage">Latitud fuera de rango (debe estar entre -90 y 90).</div>
+            } @else if (form.get('Coordenadas')?.errors?.['longitudInvalida']) {
+            <div class="errorMessage">Longitud fuera de rango (debe estar entre -180 y 180).</div>
+            }
+            }
+            <p class="form-hint">Busca el punto en Google Maps -> click derecho -> "Copiar coordenadas" y pégalas aquí.
+            </p>
           </div>
 
-          <div class="coords-hint">
-            Puedes obtener coordenadas desde Google Maps haciendo clic derecho en el mapa.
-          </div>
         </div>
       </div>
 
+      <!-- =============================================
+           CARD 2: HORARIOS POR TOUR
+           ============================================= -->
       <div class="card">
         <div class="card-header">
           <div>
             <h2>Horarios por Tour</h2>
-            <p class="card-subtitle">Vacío = Pendiente. Puedes editarlos después.</p>
+            <p class="card-subtitle">Si no ingresas horarios, quedarán pendientes. Puedes editarlos después.</p>
           </div>
         </div>
 
@@ -206,19 +169,29 @@
               <span class="tour-name">{{ t.Nombre_Tour || t.NombreTour || ('Tour ' + t.Id_Tour) }}</span>
             </div>
             <div class="tour-time">
-              <input
-                class="form-input time-input"
-                [(ngModel)]="horariosMap[t.Id_Tour]"
-                [ngModelOptions]="{ standalone: true }"
-                placeholder="Pendiente"
-              />
+              <input class="form-input time-input" [(ngModel)]="horariosMap[t.Id_Tour]"
+                [ngModelOptions]="{ standalone: true }" placeholder="Pendiente" />
             </div>
           </div>
           }
         </div>
         }
       </div>
+
     </div>
   </form>
+</div>
+
+<!-- FLOATING SAVE BUTTON -->
+<div class="floating-save-bar">
+  <button class="btn-submit btn-submit-floating" type="submit" form="puntoForm"
+    [disabled]="isSubmitting() || similarityState === 'exact'">
+    @if (isSubmitting()) {
+    <span class="btn-spinner"></span>
+    Guardando...
+    } @else {
+    Guardar Punto
+    }
+  </button>
 </div>
 }

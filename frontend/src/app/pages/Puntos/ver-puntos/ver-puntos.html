@@ -4,50 +4,46 @@
   <!-- HEADER -->
   <div class="page-header">
     <div class="header-top">
-      <div class="header-text">
-        <h1>Puntos de Encuentro</h1>
-        <p class="subtitle">
-          @if (vm.hasLoadedOnce) {
-            <span class="count-badge">{{ vm.total ?? vm.puntos.length }}</span> puntos registrados
-          } @else {
-            Cargando...
-          }
-        </p>
+      <p class="subtitle">
+        @if (vm.hasLoadedOnce) {
+        <span class="count-badge">{{ vm.total ?? vm.puntos.length }}</span> puntos registrados
+        } @else {
+        Cargando...
+        }
+      </p>
+
+      <div class="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input type="text" [ngModel]="searchTerm" (ngModelChange)="onSearchInput($event)"
+          placeholder="Buscar por nombre, sector o dirección..." />
+        @if (searchTerm?.length) {
+        <button type="button" class="clear-btn" (click)="clearSearch()" aria-label="Limpiar búsqueda">×</button>
+        }
       </div>
+
       <div class="header-actions">
         @if (canSortPuntos) {
-          <button class="btn-icon-only" type="button" (click)="irAOrdenarPuntos()" title="Ordenar puntos">
-            Ordenar
-          </button>
+        <button class="btn-icon-only" type="button" (click)="irAOrdenarPuntos()" title="Ordenar puntos">
+          Ordenar
+        </button>
         }
         @if (canExportPuntos) {
-          <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
-            @if (descargandoExcel) {
-              <span class="btn-spinner"></span> Exportando...
-            } @else {
-              Exportar
-            }
-          </button>
+        <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
+          @if (descargandoExcel) {
+          <span class="btn-spinner"></span> Exportando...
+          } @else {
+          Exportar
+          }
+        </button>
         }
         @if (canCreatePunto) {
-          <button class="btn-primary" type="button" (click)="crearPunto()">
-            Crear Punto
-          </button>
-        }
-      </div>
-    </div>
-
-    <!-- SEARCH -->
-    <div class="search-row">
-      <div class="search">
-        <input
-          type="text"
-          [ngModel]="searchTerm"
-          (ngModelChange)="onSearchInput($event)"
-          placeholder="Buscar por nombre, sector o dirección..."
-        />
-        @if (searchTerm?.length) {
-          <button type="button" class="clear-btn" (click)="clearSearch()" aria-label="Limpiar búsqueda">×</button>
+        <button class="btn-primary" type="button" (click)="crearPunto()">
+          Crear Punto
+        </button>
         }
       </div>
     </div>
@@ -55,105 +51,102 @@
 
   <!-- CONTENT -->
   @if (!vm.hasLoadedOnce) {
-    <div class="puntos-list skeleton-list" aria-live="polite" aria-busy="true">
-      @for (slot of skeletonRows; track slot) {
-        <div class="punto-card skeleton-card" [style.--i]="slot">
-          <div class="sk-main">
-            <div class="sk-title skeleton-shape"></div>
-            <div class="sk-address skeleton-shape"></div>
-          </div>
-          <div class="sk-chip skeleton-shape"></div>
-          <div class="sk-schedule">
-            <span class="skeleton-shape sk-schedule-chip"></span>
-            <span class="skeleton-shape sk-schedule-chip"></span>
-            <span class="skeleton-shape sk-schedule-chip"></span>
-          </div>
-          <div class="sk-actions">
-            <span class="sk-button skeleton-shape"></span>
-            <span class="sk-button skeleton-shape"></span>
-          </div>
-        </div>
-      }
-    </div>
-  } @else if (vm.puntos.length === 0) {
-    <div class="empty-state">
-      <div class="empty-icon">•</div>
-      <h3>Sin resultados</h3>
-      <p>{{ searchTerm?.length ? 'Prueba con otro término de búsqueda.' : 'Aún no hay puntos creados.' }}</p>
-      @if (!searchTerm?.length && canCreatePunto) {
-        <button class="btn-primary" type="button" (click)="crearPunto()">Crear primer punto</button>
-      }
-    </div>
-  } @else {
-    <div class="puntos-list">
-      @for (p of vm.puntos; track trackById($index, p)) {
-        <div class="punto-card" [style.--i]="$index" [class.deleting]="p._deleting">
-
-          <!-- TOP ROW -->
-          <div class="card-main">
-            <div class="punto-identity">
-              <div class="punto-meta">
-                <div class="punto-name">{{ p.NombrePunto || p.Nombre_Punto }}</div>
-                <div class="punto-address">{{ p.Direccion || 'Sin dirección' }}</div>
-              </div>
-            </div>
-
-            <div class="punto-tags">
-              @if (p.Sector) {
-                <span class="chip chip--sector">{{ p.Sector }}</span>
-              }
-            </div>
-          </div>
-
-          <!-- HORARIOS -->
-          <div class="card-schedules">
-            @if (!p.horarios?.length) {
-              <div class="no-horarios">
-                Sin horarios asignados
-              </div>
-            } @else {
-              <div class="schedule-list">
-                @for (h of p.horarios; track h.Id_Tour) {
-                  <span class="schedule">
-                    <span class="tour">{{ h.NombreTour || ('Tour ' + h.Id_Tour) }}</span>
-                    <span class="dot">·</span>
-                    <span class="hora" [class.hora--pending]="!h.HoraSalida">{{ h.HoraSalida || 'Pendiente' }}</span>
-                  </span>
-                }
-              </div>
-            }
-          </div>
-
-          <!-- ACTIONS -->
-          <div class="card-actions">
-            @if (canUpdatePunto) {
-              <button type="button" class="btn-action btn-action--edit" (click)="editarPunto(p)">
-                Editar
-              </button>
-            }
-            @if (canDeletePunto) {
-              <button type="button" class="btn-action btn-action--delete" (click)="confirmEliminarPunto(p)">
-                Eliminar
-              </button>
-            }
-          </div>
-
-        </div>
-      }
-    </div>
-
-    <!-- PAGINATION -->
-    @if (vm.totalPages > 1) {
-      <div class="pagination">
-        <button class="btn-secondary" (click)="prevPage()" [disabled]="page <= 1">
-          Anterior
-        </button>
-        <span class="page-indicator">{{ vm.page }} <span class="page-sep">/</span> {{ vm.totalPages }}</span>
-        <button class="btn-secondary" (click)="nextPage(vm.totalPages)" [disabled]="page >= vm.totalPages">
-          Siguiente
-        </button>
+  <div class="puntos-list skeleton-list" aria-live="polite" aria-busy="true">
+    @for (slot of skeletonRows; track slot) {
+    <div class="punto-card skeleton-card" [style.--i]="slot">
+      <div class="sk-main">
+        <div class="sk-title skeleton-shape"></div>
+        <div class="sk-address skeleton-shape"></div>
       </div>
+      <div class="sk-chip skeleton-shape"></div>
+      <div class="sk-schedule">
+        <span class="skeleton-shape sk-schedule-chip"></span>
+        <span class="skeleton-shape sk-schedule-chip"></span>
+        <span class="skeleton-shape sk-schedule-chip"></span>
+      </div>
+      <div class="sk-actions">
+        <span class="sk-button skeleton-shape"></span>
+        <span class="sk-button skeleton-shape"></span>
+      </div>
+    </div>
     }
+  </div>
+  } @else if (vm.puntos.length === 0) {
+  <div class="empty-state">
+    <div class="empty-icon">•</div>
+    <h3>Sin resultados</h3>
+    <p>{{ searchTerm?.length ? 'Prueba con otro término de búsqueda.' : 'Aún no hay puntos creados.' }}</p>
+    @if (!searchTerm?.length && canCreatePunto) {
+    <button class="btn-primary" type="button" (click)="crearPunto()">Crear primer punto</button>
+    }
+  </div>
+  } @else {
+  <div class="puntos-list">
+    @for (p of vm.puntos; track trackById($index, p)) {
+    <div class="punto-card" [style.--i]="$index" [class.deleting]="p._deleting">
+
+      <!-- TOP ROW -->
+      <div class="card-main">
+        <div class="punto-identity">
+          <div class="punto-meta">
+            <div class="punto-name">{{ p.NombrePunto || p.Nombre_Punto }}</div>
+            <div class="punto-address">{{ p.Direccion || 'Sin dirección' }}</div>
+          </div>
+        </div>
+
+        <div class="punto-tags">
+          @if (p.Sector) {
+          <span class="chip chip--sector">{{ p.Sector }}</span>
+          }
+        </div>
+      </div>
+
+      <!-- HORARIOS -->
+      <div class="card-schedules">
+        @if (!p.horarios?.length) {
+        <div class="no-horarios">
+          Sin horarios asignados
+        </div>
+        } @else {
+        <div class="schedule-list">
+          @for (h of p.horarios; track h.Id_Tour) {
+          <span class="schedule">
+            <span class="tour">{{ h.NombreTour || ('Tour ' + h.Id_Tour) }}</span>
+            <span class="dot">·</span>
+            <span class="hora" [class.hora--pending]="!h.HoraSalida">{{ h.HoraSalida || 'Pendiente' }}</span>
+          </span>
+          }
+        </div>
+        }
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="card-actions">
+        @if (canUpdatePunto) {
+        <button type="button" class="btn-row-edit" (click)="editarPunto(p)">Editar</button>
+
+        }
+        @if (canDeletePunto) {
+        <button type="button" class="btn-row-delete" (click)="confirmEliminarPunto(p)">Eliminar</button>
+        }
+      </div>
+
+    </div>
+    }
+  </div>
+
+  <!-- PAGINATION -->
+  @if (vm.totalPages > 1) {
+  <div class="pagination">
+    <button class="btn-secondary" (click)="prevPage()" [disabled]="page <= 1">
+      Anterior
+    </button>
+    <span class="page-indicator">{{ vm.page }} <span class="page-sep">/</span> {{ vm.totalPages }}</span>
+    <button class="btn-secondary" (click)="nextPage(vm.totalPages)" [disabled]="page >= vm.totalPages">
+      Siguiente
+    </button>
+  </div>
+  }
   }
   }
 </div>

@@ -7,13 +7,20 @@ export interface Tour {
   Id_Tour?: number;
   Nombre_Tour: string;
   Abreviacion?: string;
-  Comision_Hotel?: number;
-  Comision_Agencia?: number;
-  Comision_Freelance?: number;
   Cupo_Base?: number;
   Latitud?: number;
   Longitud?: number;
-  Id_Tour_Origen?: number; // Tour del cual copiar horarios
+  Id_Tour_Origen?: number;
+  Comision_Hotel?: number;
+  Comision_Agencia?: number;
+  Comision_Freelance?: number;
+  Comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
+  comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
+}
+
+export interface CanalComision {
+  Id_Canal: number;
+  Nombre_Canal: string;
 }
 
 export interface PreciosMap {
@@ -57,5 +64,9 @@ export class Tours {
   
   updatePrecios(Id_Tour: number | string, payload: { Id_Plan?: number | null; Id_Moneda?: number | null; precios: PreciosMap }): Observable<any> {
     return this.http.put(`${this.apiUrl}/tours/${Id_Tour}/precios`, payload);
+  }
+
+  getCanalesComision(): Observable<CanalComision[]> {
+    return this.http.get<CanalComision[]>(`${this.apiUrl}/tours/canales-comision`);
   }
 }

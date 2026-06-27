@@ -7,8 +7,7 @@
    ========================================================= */
 .booking-dashboard {
   max-width: 1350px;
-  margin: 28px auto 64px;
-  padding: 0 24px;
+  margin: 0 auto 100px;
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
@@ -43,13 +42,6 @@
   font-size: .875rem;
   color: var(--text-secondary);
   margin: 5px 0 0;
-}
-
-.page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
 }
 
 /* =========================================================
@@ -93,7 +85,7 @@
    ========================================================= */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
 
@@ -113,6 +105,10 @@
   color: var(--text-secondary);
   letter-spacing: .04em;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
 }
 
 .required-star {
@@ -120,82 +116,56 @@
   font-weight: 900;
 }
 
-.form-input,
-.form-select {
-  background-color: var(--bg-tertiary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  padding: 10px 13px;
-  font-size: .95rem;
-  font-family: var(--font-family);
-  color: var(--text-primary);
-  outline: none;
-  width: 100%;
-  box-sizing: border-box;
-  transition: border-color .18s, background-color .18s, box-shadow .18s;
-}
-
-.form-input:focus,
-.form-select:focus {
-  border-color: var(--accent-blue);
-  background-color: var(--bg-secondary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
-}
-
-.form-input::placeholder {
+.label-optional {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--text-tertiary);
-  opacity: .5;
-}
-
-.coords-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.coords-hint {
-  display: flex;
-  align-items: flex-start;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1.5px solid var(--separator-color);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: .8rem;
-  line-height: 1.45;
-}
-
-.errorInput {
-  border-color: var(--accent-red) !important;
-  box-shadow: 0 0 0 3px rgba(255, 59, 48, .1) !important;
-}
-
-.errorMessage {
   font-size: .78rem;
-  color: var(--accent-red);
-  font-weight: 600;
-  margin-top: 1px;
 }
 
-.empty-state {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1.5px dashed var(--separator-color);
-  background: rgba(255, 255, 255, .02);
+.form-hint {
+  font-size: 12px;
+  color: var(--text-tertiary, #8e8e93);
+  margin: 2px 0 0;
+}
+
+
+/* =========================================================
+   COORDS BADGE
+   ========================================================= */
+.coords-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+  padding: 4px 10px;
+  background: rgba(10, 132, 255, 0.07);
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-radius: 8px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
   color: var(--text-secondary);
-  font-size: .88rem;
+  width: fit-content;
 }
 
-/* Quitar spinners number */
-input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+.coords-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-input[type=number] {
-  -moz-appearance: textfield;
-  appearance: textfield;
+.coords-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+.coords-badge-sep {
+  color: var(--separator-color);
+  font-size: 13px;
 }
 
 /* =========================================================
@@ -259,6 +229,79 @@ input[type=number] {
   background-color: var(--bg-tertiary);
 }
 
+/* ── Floating save ── */
+.btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: var(--accent-blue);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  font-size: .9rem;
+  font-family: var(--font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(10, 132, 255, .28);
+  transition: filter .18s, transform .12s, box-shadow .18s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(10, 132, 255, .36);
+}
+
+.btn-submit:disabled {
+  background: var(--separator-color);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   FLOATING SAVE BAR
+   ========================================================= */
+.floating-save-bar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.btn-submit-floating {
+  pointer-events: all;
+  padding: 13px 36px;
+  font-size: 1rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(10, 132, 255, .38), 0 2px 8px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-submit-floating:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(10, 132, 255, .46), 0 4px 12px rgba(0, 0, 0, .28);
+}
+
 /* =========================================================
    TOURS
    ========================================================= */
@@ -300,6 +343,7 @@ input[type=number] {
 .time-input {
   text-align: center;
   font-size: .92rem;
+  background: var(--bg-secondary);
 }
 
 /* =========================================================
@@ -325,39 +369,12 @@ input[type=number] {
   animation: sk-shimmer 1.6s ease-in-out infinite;
 }
 
-.sk-line {
-  display: block;
-  height: 14px;
-  border-radius: 8px;
-}
-
-.sk-title {
-  width: 260px;
-  height: 30px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-}
-
-.sk-subtitle {
-  width: 360px;
-  height: 14px;
-}
-
-.sk-subtitle-small {
-  width: 220px;
-  margin-top: 8px;
-}
-
-.sk-heading {
-  width: 190px;
-  height: 18px;
-}
-
-.sk-label {
-  width: 82px;
-  height: 11px;
-  border-radius: 6px;
-}
+.sk-line { display: block; height: 14px; border-radius: 8px; }
+.sk-title { width: 260px; height: 30px; border-radius: 10px; margin-bottom: 10px; }
+.sk-subtitle { width: 360px; height: 14px; }
+.sk-subtitle-small { width: 220px; margin-top: 8px; }
+.sk-heading { width: 190px; height: 18px; }
+.sk-label { width: 82px; height: 11px; border-radius: 6px; }
 
 .sk-field {
   height: 42px;
@@ -365,64 +382,27 @@ input[type=number] {
   border: 1.5px solid var(--separator-color);
 }
 
-.sk-field.sk-field-textarea {
-  height: 86px;
-}
-
-.sk-button {
-  width: 132px;
-  height: 40px;
-  border-radius: 12px;
-}
-
-.sk-row {
-  align-items: center;
-}
-
-.sk-pill {
-  width: 120px;
-  height: 18px;
-  border-radius: 999px;
-}
-
-.sk-tour-name {
-  width: 220px;
-  height: 14px;
-}
-
-.sk-tour-time {
-  height: 42px;
-  border-radius: 12px;
-}
-
-.sk-hint {
-  height: 54px;
-  border-radius: 12px;
-  border: 1.5px solid var(--separator-color);
-}
+.sk-button { width: 132px; height: 40px; border-radius: 12px; }
+.sk-row { align-items: center; }
+.sk-pill { width: 120px; height: 18px; border-radius: 999px; }
+.sk-tour-name { width: 220px; height: 14px; }
+.sk-tour-time { height: 42px; border-radius: 12px; }
 
 @keyframes sk-shimmer {
-  0% {
-    background-position: -400px 0;
-  }
-  100% {
-    background-position: 400px 0;
-  }
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 }
 
 /* =========================================================
    ANIMATIONS
    ========================================================= */
 @keyframes pageEnter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* =========================================================
@@ -434,48 +414,22 @@ input[type=number] {
     align-items: flex-start;
   }
 
-  .page-header-actions {
-    width: 100%;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    flex: 1;
-  }
-
-  .coords-row {
-    grid-template-columns: 1fr;
-  }
-
   .tour-row {
     grid-template-columns: 1fr;
     gap: 10px;
   }
 
-  .sk-subtitle {
-    width: 260px;
-  }
+  .sk-subtitle { width: 260px; }
 }
 
 @media (max-width: 560px) {
-  .booking-dashboard {
-    padding: 0 16px;
-  }
-
-  .card {
-    padding: 16px;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-  }
+  .booking-dashboard { padding: 0 16px; }
+  .card { padding: 16px; }
+  .form-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .booking-dashboard {
-    animation: none !important;
-  }
+  .booking-dashboard { animation: none !important; }
 
   .sk-line,
   .sk-field,
@@ -484,4 +438,6 @@ input[type=number] {
   .sk-hint {
     animation: none !important;
   }
+
+  .btn-spinner { animation: none !important; }
 }

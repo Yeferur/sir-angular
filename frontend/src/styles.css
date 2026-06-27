@@ -1,22 +1,32 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap");
-@import "flatpickr/dist/flatpickr.min.css";
 
 /*========== VARIABLES CSS ==========*/
 :root {
   /* DARK THEME (por defecto) */
-  --primary-bg: #1b1b1b; /* DEPRECATED – usar --bg-primary */
-  --secondary-bg: #141414; /* DEPRECATED – usar --bg-secondary */
-  --hover-bg: #5ec6e9; /* DEPRECATED – usar --accent-blue */
-  --card-bg: rgba(27, 27, 27, 0.9); /* DEPRECATED – usar --bg-secondary */
-  --border-color: rgba(255, 255, 255, 0.1); /* DEPRECATED – usar --separator-color */
-  --input-bg: rgb(42, 42, 42); /* DEPRECATED – usar --bg-tertiary */
+  --primary-bg: #1b1b1b;
+  /* DEPRECATED – usar --bg-primary */
+  --secondary-bg: #141414;
+  /* DEPRECATED – usar --bg-secondary */
+  --hover-bg: #5ec6e9;
+  /* DEPRECATED – usar --accent-blue */
+  --card-bg: rgba(27, 27, 27, 0.9);
+  /* DEPRECATED – usar --bg-secondary */
+  --border-color: rgba(255, 255, 255, 0.1);
+  /* DEPRECATED – usar --separator-color */
+  --input-bg: rgb(42, 42, 42);
+  /* DEPRECATED – usar --bg-tertiary */
 
-  --text-color: #eaeaea; /* DEPRECATED – usar --text-primary */
-  --font-color: #e0e0e0; /* DEPRECATED */
-  --font-color-hover: #ff6666; /* DEPRECATED */
-  --accent: #5ec6e9; /* DEPRECATED – usar --accent-blue */
-  --label-color: #b0b0b0; /* DEPRECATED – usar --text-secondary */
+  --text-color: #eaeaea;
+  /* DEPRECATED – usar --text-primary */
+  --font-color: #e0e0e0;
+  /* DEPRECATED */
+  --font-color-hover: #ff6666;
+  /* DEPRECATED */
+  --accent: #5ec6e9;
+  /* DEPRECATED – usar --accent-blue */
+  --label-color: #b0b0b0;
+  /* DEPRECATED – usar --text-secondary */
 
   --button-bg: #2e3032;
   --button-text: #ffffff;
@@ -77,11 +87,16 @@
   --shadow-color: rgba(0, 0, 0, 0.2);
 
   /* Escala de Radios */
-  --radius-sm: 8px;     /* Botones pequeños, tags */
-  --radius-md: 12px;    /* Inputs, botones principales, tarjetas pequeñas */
-  --radius-lg: 16px;    /* Tarjetas medianas, modales */
-  --radius-xl: 20px;    /* Tarjetas principales (cards de layout) */
-  --radius-pill: 999px; /* Badges, pastillas */
+  --radius-sm: 8px;
+  /* Botones pequeños, tags */
+  --radius-md: 12px;
+  /* Inputs, botones principales, tarjetas pequeñas */
+  --radius-lg: 16px;
+  /* Tarjetas medianas, modales */
+  --radius-xl: 20px;
+  /* Tarjetas principales (cards de layout) */
+  --radius-pill: 999px;
+  /* Badges, pastillas */
 
   /* Escala de Z-Index */
   --z-dropdown: 100;
@@ -95,10 +110,10 @@
   --z-datepicker: 8000;
 
 
-    --sidebar-bg: rgba(28, 28, 30, 0.78);
+  --sidebar-bg: rgba(28, 28, 30, 0.78);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-shadow: 0 12px 40px rgba(0, 0, 0, 0.45),
-                    0 2px 6px rgba(0, 0, 0, 0.25);
+    0 2px 6px rgba(0, 0, 0, 0.25);
   --sidebar-hover-bg: rgba(255, 255, 255, 0.06);
   --sidebar-active-bg: rgba(10, 132, 255, 0.14);
   --sidebar-submenu-line: rgba(255, 255, 255, 0.08);
@@ -177,10 +192,10 @@
   /* Sombra suave para las tarjetas */
 
 
-    --sidebar-bg: rgba(255, 255, 255, 0.78);
+  --sidebar-bg: rgba(255, 255, 255, 0.78);
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-shadow: 0 12px 40px rgba(0, 0, 0, 0.10),
-                    0 2px 6px rgba(0, 0, 0, 0.04);
+    0 2px 6px rgba(0, 0, 0, 0.04);
   --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
   --sidebar-active-bg: rgba(0, 122, 255, 0.10);
   --sidebar-submenu-line: rgba(0, 0, 0, 0.10);
@@ -204,10 +219,6 @@ body {
 
 .content {
   width: 100%;
-  height: 100vh;
-  padding: 20px 20px 20px 120px;
-  padding-top: 70px;
-  overflow-y: auto;
 }
 
 @keyframes fadeIn {
@@ -295,6 +306,12 @@ body {
   /* p-4 */
 }
 
+.hint {
+  font-size: .8rem;
+  color: var(--text-secondary);
+  margin: 4px 28px 4px;
+}
+
 .title {
   display: flex;
   justify-content: center;
@@ -340,14 +357,25 @@ body {
 .form-select {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--separator-color);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 0 14px;
   font-size: 1rem;
   font-family: var(--font-family);
   width: 100%;
   box-sizing: border-box;
   color: var(--text-primary);
   transition: border-color .2s, background-color .2s;
+}
+
+.form-input,
+.form-select {
+  height: 40px;
+}
+
+.form-input:hover,
+.form-select:hover,
+textarea.form-input:hover {
+  border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color));
 }
 
 .form-input:focus,
@@ -360,8 +388,20 @@ body {
 textarea.form-input {
   resize: vertical;
   min-height: 80px;
+  padding-top: 14px;
 }
 
+/* Quitar spinners number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 
 .errorInput {
   border: 1px solid #e57373 !important;
@@ -624,7 +664,9 @@ textarea.form-input {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Listas */
@@ -714,7 +756,54 @@ textarea.form-input {
   height: 100%;
 }
 
+/* ===== Botones de fila (acción sobre entidad) ===== */
+.btn-row-edit {
+ display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--separator-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 7px 12px;
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
 
+.btn-row-edit:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(10, 132, 255, .06);
+  box-shadow: 0 4px 12px rgba(10, 132, 255, .12);
+  transform: translateY(-1px);
+}
+
+.btn-row-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--separator-color);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  border-color: transparent;
+  color: #fff;
+  background: var(--accent-red);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, .24);
+}
+
+.btn-row-delete:hover {
+    background: color-mix(in srgb, var(--accent-red) 92%, white);
+    box-shadow: 0 6px 16px rgba(255, 59, 48, 0.32);
+    transform: translateY(-1px);
+}
 
 /* Responsive */
 @media screen and (max-width: 768px) {
@@ -723,9 +812,7 @@ textarea.form-input {
   }
 
   .content {
-    padding: 10px;
-    padding-left: 10px;
-    padding-top: 70px;
+    padding: 86px 12px 16px;
   }
 }
 
@@ -746,433 +833,4 @@ input[type=number]::-webkit-outer-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
   appearance: textfield;
-}
-
-
-
-
-/* =========================================================
-   SIR DATEPICKER (Flatpickr) — limpio, alineado al sistema
-   =========================================================
-   Convención:
-   - !important solo donde Flatpickr inyecta inline-styles o
-     define reglas más específicas que no se pueden superar.
-   - Variables del sistema: --bg-secondary/tertiary,
-     --separator-color, --text-primary/secondary,
-     --accent-blue, --radius-*, --font-family.
-   ========================================================= */
-
-
-/* =========================================================
-   1. INPUT (con icono opcional)
-   ========================================================= */
-input.form-input.flatpickr-input,
-input.form-input.flatpickr-input[readonly] {
-  background-color: var(--bg-tertiary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  padding: 10px 13px;
-  font-size: 1rem;
-  font-family: var(--font-family);
-  width: 100%;
-  box-sizing: border-box;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color .2s, background-color .2s, box-shadow .2s;
-}
-
-/* Icono de calendario embebido vía background (no requiere markup extra) */
-input.form-input.flatpickr-input.flatpickr-alt,
-input.form-input.flatpickr-input {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 16px 16px;
-  padding-right: 38px;
-}
-
-input.form-input.flatpickr-input:hover {
-  border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color));
-}
-
-input.form-input.flatpickr-input:focus,
-input.form-input.flatpickr-input.active {
-  outline: none;
-  border-color: var(--accent-blue);
-  background-color: var(--bg-secondary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .12);
-}
-
-input.form-input.flatpickr-input::placeholder {
-  color: var(--text-secondary);
-  opacity: .8;
-}
-
-input.form-input.flatpickr-input:disabled {
-  opacity: .55;
-  cursor: not-allowed;
-}
-
-
-/* =========================================================
-   2. POPUP / CONTAINER
-   ========================================================= */
-.sir-flatpickr.flatpickr-calendar {
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 16px;
-  box-shadow:
-    0 8px 16px rgba(0, 0, 0, .18),
-    0 24px 48px rgba(0, 0, 0, .28);
-  padding: 14px;
-  font-family: var(--font-family);
-  color: var(--text-primary);
-  width: min(340px, calc(100vw - 24px));
-  max-width: 340px;
-  overflow: visible;
-  z-index: var(--z-datepicker, 9999);
-
-  /* Animación sutil de entrada */
-  animation: sir-fp-in .18s ease-out;
-}
-
-.sir-flatpickr.flatpickr-calendar.arrowTop:before,
-.sir-flatpickr.flatpickr-calendar.arrowTop:after,
-.sir-flatpickr.flatpickr-calendar.arrowBottom:before,
-.sir-flatpickr.flatpickr-calendar.arrowBottom:after {
-  display: none;
-}
-
-@keyframes sir-fp-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-
-/* =========================================================
-   3. HEADER (prev | mes + año | next)
-   ========================================================= */
-.sir-flatpickr .flatpickr-months {
-  display: grid !important;
-  grid-template-columns: 36px 1fr 36px;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 2px 12px;
-  border-bottom: 1px solid var(--separator-color);
-  margin-bottom: 10px;
-}
-
-/* Botones prev / next */
-.sir-flatpickr .flatpickr-prev-month,
-.sir-flatpickr .flatpickr-next-month {
-  position: static !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  margin: 0 !important;
-
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: grid !important;
-  place-items: center;
-
-  border-radius: 8px;
-  border: 1px solid var(--separator-color);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background .2s ease, color .2s ease, border-color .2s ease;
-}
-
-.sir-flatpickr .flatpickr-prev-month { grid-column: 1; justify-self: start; }
-.sir-flatpickr .flatpickr-next-month { grid-column: 3; justify-self: end; }
-
-.sir-flatpickr .flatpickr-prev-month:hover,
-.sir-flatpickr .flatpickr-next-month:hover {
-  background: rgba(10, 132, 255, .1);
-  border-color: rgba(10, 132, 255, .35);
-  color: var(--accent-blue);
-}
-
-.sir-flatpickr .flatpickr-prev-month svg,
-.sir-flatpickr .flatpickr-next-month svg {
-  width: 12px;
-  height: 12px;
-  fill: currentColor;
-}
-
-/* Centro: pill con [Mes ▾] [Año ▾] */
-.sir-flatpickr .flatpickr-month {
-  grid-column: 2;
-  width: auto !important;
-  height: auto !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  background: transparent !important;
-  color: inherit !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-}
-
-.sir-flatpickr .flatpickr-current-month {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-
-  position: static !important;
-  height: auto !important;
-  width: auto !important;
-  padding: 0 !important;
-  font-size: .92rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-/* Mata el numInputWrapper nativo del año por si Flatpickr lo recrea */
-.sir-flatpickr .flatpickr-current-month .numInputWrapper {
-  display: none !important;
-}
-
-
-/* =========================================================
-   4. SELECTS (mes nativo + año custom inyectado por TS)
-   Estilo visual idéntico para ambos.
-   ========================================================= */
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months,
-.sir-flatpickr .sir-year-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--separator-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-family: var(--font-family);
-  font-size: .88rem;
-  font-weight: 600;
-  line-height: 1;
-  height: 32px;
-
-  /* Espacio para el caret custom */
-  padding: 0 26px 0 10px;
-  cursor: pointer;
-  transition: border-color .2s, background-color .2s;
-
-  /* Caret custom (chevron) */
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 10px 10px;
-
-  /* Sin scrollbar visible en el menú nativo */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months::-webkit-scrollbar,
-.sir-flatpickr .sir-year-select::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months:hover,
-.sir-flatpickr .sir-year-select:hover {
-  border-color: rgba(10, 132, 255, .35);
-}
-
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months:focus,
-.sir-flatpickr .sir-year-select:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(10, 132, 255, .15);
-}
-
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months option,
-.sir-flatpickr .sir-year-select option {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-/* Anchos diferenciados (mes ~110px, año ~85px) */
-.sir-flatpickr .flatpickr-current-month .flatpickr-monthDropdown-months {
-  min-width: 105px;
-  max-width: 130px;
-}
-
-.sir-flatpickr .sir-year-select {
-  min-width: 78px;
-}
-
-/* Si por alguna razón el TS deja el div viejo, que no se vea como recuadro */
-.sir-flatpickr .sir-year-div {
-  display: contents !important;
-  background: transparent !important;
-  border: 0 !important;
-  padding: 0 !important;
-}
-
-
-/* =========================================================
-   5. WEEKDAYS
-   ========================================================= */
-.sir-flatpickr .flatpickr-weekdays {
-  background: transparent !important;
-  padding: 0 !important;
-  margin-bottom: 4px;
-  height: auto !important;
-}
-
-.sir-flatpickr .flatpickr-weekdaycontainer {
-  display: grid !important;
-  grid-template-columns: repeat(7, 1fr);
-  width: 100%;
-  gap: 2px;
-}
-
-.sir-flatpickr span.flatpickr-weekday {
-  background: transparent !important;
-  color: var(--text-secondary) !important;
-  font-weight: 600;
-  font-size: .7rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  opacity: .7;
-  height: 28px;
-  line-height: 28px;
-  text-align: center;
-  width: auto !important;
-  flex: none !important;
-}
-
-
-/* =========================================================
-   6. GRID DE DÍAS
-   ========================================================= */
-.sir-flatpickr .flatpickr-innerContainer,
-.sir-flatpickr .flatpickr-rContainer {
-  padding: 0 !important;
-  width: 100% !important;
-  background: transparent !important;
-  border: 0 !important;
-}
-
-.sir-flatpickr .flatpickr-days {
-  padding: 0 !important;
-  width: 100% !important;
-}
-
-.sir-flatpickr .dayContainer {
-  display: grid !important;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  padding: 0 !important;
-}
-
-/* Día individual */
-.sir-flatpickr .flatpickr-day {
-  margin: 0 !important;
-  width: 100% !important;
-  max-width: none !important;
-  flex: none !important;
-  height: 36px;
-  line-height: 36px;
-  border-radius: 10px;
-  font-size: .88rem;
-  font-weight: 500;
-  color: var(--text-primary);
-
-  border: 1px solid transparent !important;
-  background: transparent;
-  transition:
-    background-color .15s ease,
-    color .15s ease,
-    border-color .15s ease;
-}
-
-.sir-flatpickr .flatpickr-day:hover {
-  background: rgba(10, 132, 255, .1);
-  color: var(--accent-blue);
-  border-color: transparent !important;
-}
-
-/* Hoy */
-.sir-flatpickr .flatpickr-day.today {
-  border-color: var(--accent-blue) !important;
-  background: transparent;
-  color: var(--accent-blue);
-  font-weight: 700;
-}
-
-.sir-flatpickr .flatpickr-day.today:hover {
-  background: rgba(10, 132, 255, .12);
-}
-
-/* Seleccionado: sólido limpio, sin gradiente ni sombras grandes */
-.sir-flatpickr .flatpickr-day.selected,
-.sir-flatpickr .flatpickr-day.selected:hover,
-.sir-flatpickr .flatpickr-day.startRange,
-.sir-flatpickr .flatpickr-day.endRange {
-  background: var(--accent-blue) !important;
-  border-color: var(--accent-blue) !important;
-  color: #fff !important;
-  font-weight: 700;
-}
-
-/* Range middle */
-.sir-flatpickr .flatpickr-day.inRange,
-.sir-flatpickr .flatpickr-day.inRange:hover {
-  background: rgba(10, 132, 255, .15);
-  color: var(--text-primary);
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-/* Días de mes anterior/siguiente */
-.sir-flatpickr .flatpickr-day.prevMonthDay,
-.sir-flatpickr .flatpickr-day.nextMonthDay {
-  color: var(--text-secondary);
-  opacity: .35;
-}
-
-.sir-flatpickr .flatpickr-day.prevMonthDay:hover,
-.sir-flatpickr .flatpickr-day.nextMonthDay:hover {
-  opacity: .7;
-}
-
-/* Deshabilitados */
-.sir-flatpickr .flatpickr-day.disabled,
-.sir-flatpickr .flatpickr-day.disabled:hover,
-.sir-flatpickr .flatpickr-day.notAllowed,
-.sir-flatpickr .flatpickr-day.flatpickr-disabled {
-  opacity: .25;
-  color: var(--text-secondary);
-  cursor: not-allowed !important;
-  background: transparent !important;
-  border-color: transparent !important;
-}
-
-
-/* =========================================================
-   7. MOBILE
-   ========================================================= */
-@media (max-width: 480px) {
-  .sir-flatpickr.flatpickr-calendar {
-    width: calc(100vw - 20px);
-    max-width: calc(100vw - 20px);
-    padding: 12px;
-  }
-
-  .sir-flatpickr .flatpickr-day {
-    height: 38px;
-    line-height: 38px;
-  }
 }

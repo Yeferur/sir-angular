@@ -1,5 +1,5 @@
 @if (isLoading()) {
-<div class="skeleton-page booking-dashboard">
+<div class="skeleton-page ">
 
   <div class="page-header">
     <div>
@@ -54,7 +54,6 @@
       </div>
     </div>
 
-    <!-- Card: Responsable skeleton -->
     <div class="card sk-card">
       <div class="card-header">
         <div class="sk-line sk-heading"></div>
@@ -71,7 +70,6 @@
       </div>
     </div>
 
-    <!-- Card: Valor skeleton -->
     <div class="card sk-card">
       <div class="card-header">
         <div class="sk-line sk-heading"></div>
@@ -90,7 +88,6 @@
   </div>
 
 </div>
-<!-- Floating summary skeleton -->
 <div class="floating-summary" data-state="compact" style="pointer-events:none">
   <div class="summary-collapsed">
     <div class="summary-left">
@@ -100,27 +97,134 @@
   </div>
 </div>
 } @else {
-<div class="booking-dashboard" [formGroup]="form">
-  <div class="page-header">
-    <div>
-      <h1>Editar Transfer {{ transferHeaderCode }}</h1>
-      <p class="subtitle">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
-    </div>
-  </div>
-  <div class="main-content">
+<div class="wizard-shell" [formGroup]="form">
 
-    <!-- DETALLES DEL SERVICIO -->
+  <div class="wizard-stepper">
+    @for (step of wizardSteps; let i = $index; track step.id) {
+    @if (i > 0) {
+    <div class="step-connector" [class.filled]="currentStep > i"></div>
+    }
+    <div class="step-item" [class.is-active]="currentStep === i" [class.is-done]="currentStep > i"
+      [class.has-error]="stepHasError(i)" [class.is-locked]="!canNavigateToStep(i)" (click)="goToStep(i)">
+      <div class="step-bubble">
+        @if (currentStep > i && !stepHasError(i)) {
+        <svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+          <polyline points="2,7 6,11 12,3" />
+        </svg>
+        } @else if (stepHasError(i)) {
+        <svg class="icon-error" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+          <line x1="7" y1="2" x2="7" y2="8" />
+          <circle cx="7" cy="11.5" r=".8" fill="currentColor" stroke="none" />
+        </svg>
+        } @else {
+        {{ i + 1 }}
+        }
+      </div>
+      <span class="step-label">{{ step.label }}</span>
+    </div>
+    }
+  </div>
+
+  @if (puedeCancelarTransfer || canDeleteTransfer) {
+  <div class="editar-action-bar">
+    @if (puedeCancelarTransfer) {
+    <button type="button" class="btn-editar-action btn-editar-cancel"
+      (click)="cancelarTransfer()" [disabled]="isSubmitting()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="5.5" y1="5.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      Cancelar transfer
+    </button>
+    }
+    @if (canDeleteTransfer) {
+    <button type="button" class="btn-editar-action btn-editar-delete"
+      (click)="eliminarTransfer()" [disabled]="isSubmitting()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <path d="M3 4.5h10M6 4.5V3h4v1.5M5.5 4.5l.5 8h4l.5-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Eliminar transfer
+    </button>
+    }
+  </div>
+  }
+ <p class="card-header-hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
+  @if (currentStep === 0) {
+  <div class="wizard-step-panel" [class.going-back]="goingBack" [class.is-entering]="panelAnimating">
     <div class="card">
       <div class="card-header">
-        <h2>Detalles del Transfer</h2>
+        <div>
+          <h2>Detalles del Transfer</h2>
+          <p class="card-header-hint">Define la ruta, la fecha y las condiciones del servicio.</p>
+        </div>
+        @if (transferHeaderCode) {
+        <span class="badge">Transfer {{ transferHeaderCode }}</span>
+        }
       </div>
 
       <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Tipo de servicio <span class="required-star">*</span></label>
+          <select formControlName="TipoServicio" class="form-select"
+            [ngClass]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'errorInput' : ''">
+            <option value="Seleccionar" disabled>SELECCIONAR</option>
+            @for (servicio of resultsServicioTransfer; track servicio.Id_Servicio ?? servicio.id) {
+            <option [value]="servicio.Id_Servicio ?? servicio.id">{{ servicio.Servicio }}</option>
+            }
+          </select>
+          @if (form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid) {
+          <div class="errorMessage">Tipo de servicio es requerido.</div>
+          }
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha del servicio <span class="required-star">*</span></label>
+          <app-datepicker formControlName="Fecha" placeholder="Selecciona una fecha" [minDate]="todayYmd"
+            [invalid]="!!(form.get('Fecha')?.touched && form.get('Fecha')?.invalid)">
+          </app-datepicker>
+          @if (form.get('Fecha')?.touched && form.get('Fecha')?.invalid) {
+          <div class="errorMessage">Fecha es requerida.</div>
+          }
+        </div>
 
         <div class="form-group">
-          <label class="form-label">
-            Titular del servicio <span class="required-star">*</span>
-          </label>
+          <label class="form-label">Hora de salida</label>
+          <input type="text" formControlName="Hora" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cantidad de personas <span class="required-star">*</span></label>
+          <input type="number" min="1" step="1" formControlName="Cantidad_Personas" class="form-input"
+            [ngClass]="form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.invalid ? 'errorInput' : ''"
+            placeholder="Ej: 5" />
+          @if (form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.hasError('required')) {
+          <div class="errorMessage">Cantidad de personas es requerida.</div>
+          } @else if (form.get('Cantidad_Personas')?.touched &&
+          form.get('Cantidad_Personas')?.hasError('cantidadInvalida')) {
+          <div class="errorMessage">Ingresa una cantidad válida mayor o igual a 1.</div>
+          } @else if (form.get('Cantidad_Personas')?.touched && !selectedRango) {
+          <div class="errorMessage">No existe un rango configurado para esta cantidad.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Punto de salida <span class="required-star">*</span></label>
+          <input type="text" formControlName="Salida" class="form-input"
+            [ngClass]="form.get('Salida')?.touched && form.get('Salida')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Salida')?.touched && form.get('Salida')?.invalid) {
+          <div class="errorMessage">Punto de salida es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Punto de llegada <span class="required-star">*</span></label>
+          <input type="text" formControlName="Llegada" class="form-input"
+            [ngClass]="form.get('Llegada')?.touched && form.get('Llegada')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Llegada')?.touched && form.get('Llegada')?.invalid) {
+          <div class="errorMessage">Punto de llegada es requerido.</div>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Titular del servicio <span class="required-star">*</span></label>
           <input type="text" formControlName="Titular" class="form-input"
             [ngClass]="form.get('Titular')?.touched && form.get('Titular')?.invalid ? 'errorInput' : ''" />
           @if (form.get('Titular')?.touched && form.get('Titular')?.invalid) {
@@ -143,71 +247,7 @@
           <input type="text" formControlName="DNI" class="form-input" />
         </div>
 
-        <div class="form-group">
-          <label class="form-label">
-            Cantidad de personas <span class="required-star">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            formControlName="Cantidad_Personas"
-            class="form-input"
-            [ngClass]="form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.invalid ? 'errorInput' : ''"
-            placeholder="Ej: 5"
-          />
-          @if (form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.hasError('required')) {
-          <div class="errorMessage">Cantidad de personas es requerida.</div>
-          } @else if (form.get('Cantidad_Personas')?.touched && form.get('Cantidad_Personas')?.hasError('cantidadInvalida')) {
-          <div class="errorMessage">Ingresa una cantidad válida mayor o igual a 1.</div>
-          }
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">
-            Tipo de servicio <span class="required-star">*</span>
-          </label>
-          <select formControlName="TipoServicio" class="form-select"
-            [ngClass]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'errorInput' : ''">
-            <option value="Seleccionar" disabled>SELECCIONAR</option>
-            @for (servicio of resultsServicioTransfer; track servicio.Id_Servicio ?? servicio.id) {
-            <option [value]="servicio.Id_Servicio ?? servicio.id">{{ servicio.Servicio }}</option>
-            }
-          </select>
-          @if (form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid) {
-          <div class="errorMessage">Tipo de servicio es requerido.</div>
-          }
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Punto de salida <span class="required-star">*</span></label>
-          <input type="text" formControlName="Salida" class="form-input"
-            [ngClass]="form.get('Salida')?.touched && form.get('Salida')?.invalid ? 'errorInput' : ''" />
-          @if (form.get('Salida')?.touched && form.get('Salida')?.invalid) {
-          <div class="errorMessage">Punto de salida es requerido.</div>
-          }
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Punto de llegada <span class="required-star">*</span></label>
-          <input type="text" formControlName="Llegada" class="form-input"
-            [ngClass]="form.get('Llegada')?.touched && form.get('Llegada')?.invalid ? 'errorInput' : ''" />
-          @if (form.get('Llegada')?.touched && form.get('Llegada')?.invalid) {
-          <div class="errorMessage">Punto de llegada es requerido.</div>
-          }
-        </div>
-
-        <!-- Campos adicionales para transfers Hotel->Aeropuerto -->
         @if (showFlightFields) {
-        <div class="form-group">
-          <label class="form-label"># Vuelo <span class="required-star">*</span></label>
-          <input type="text" formControlName="Vuelo" class="form-input"
-            [ngClass]="form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid ? 'errorInput' : ''" />
-          @if (form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid) {
-          <div class="errorMessage">Número de vuelo es requerido.</div>
-          }
-        </div>
-
         <div class="form-group">
           <label class="form-label">Tipo de vuelo <span class="required-star">*</span></label>
           <select formControlName="TipoVuelo" class="form-select"
@@ -220,45 +260,35 @@
           <div class="errorMessage">Tipo de vuelo es requerido.</div>
           }
         </div>
-        }
-
         <div class="form-group">
-          <label class="form-label">
-            Fecha del servicio <span class="required-star">*</span>
-          </label>
-          <input type="text" formControlName="Fecha" class="form-input" appFlatpickrInput [fpOptions]="fpOptionsFecha"
-            placeholder="Selecciona una fecha"
-            [ngClass]="form.get('Fecha')?.touched && form.get('Fecha')?.invalid ? 'errorInput' : ''" />
-
-          @if (form.get('Fecha')?.touched && form.get('Fecha')?.invalid) {
-          <div class="errorMessage">Fecha es requerida.</div>
+          <label class="form-label"># Vuelo <span class="required-star">*</span></label>
+          <input type="text" formControlName="Vuelo" class="form-input"
+            [ngClass]="form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid ? 'errorInput' : ''" />
+          @if (form.get('Vuelo')?.touched && form.get('Vuelo')?.invalid) {
+          <div class="errorMessage">Número de vuelo es requerido.</div>
           }
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Hora de salida</label>
-          <input type="text" formControlName="Hora" class="form-input" />
-        </div>
 
-        <div class="form-group full-width">
-          <label class="form-label">Observaciones</label>
-          <textarea formControlName="Observaciones" class="form-input" rows="3"></textarea>
-        </div>
-
+        }
       </div>
     </div>
+  </div>
+  }
 
-    <!-- RESPONSABLE -->
+  @if (currentStep === 1) {
+  <div class="wizard-step-panel" [class.going-back]="goingBack" [class.is-entering]="panelAnimating">
     <div class="card">
       <div class="card-header">
-        <h2>Responsable</h2>
+        <div>
+          <h2>Responsable</h2>
+          <p class="card-header-hint">Registra quién reporta y el teléfono principal de la reserva.</p>
+        </div>
       </div>
 
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">
-            ¿Quién reporta? <span class="required-star">*</span>
-          </label>
+          <label class="form-label">¿Quién reporta? <span class="required-star">*</span></label>
           <input type="text" formControlName="Reporta" class="form-input"
             [ngClass]="form.get('Reporta')?.touched && form.get('Reporta')?.invalid ? 'errorInput' : ''" />
           @if (form.get('Reporta')?.touched && form.get('Reporta')?.invalid) {
@@ -267,9 +297,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">
-            Teléfono Reserva <span class="required-star">*</span>
-          </label>
+          <label class="form-label">Teléfono Reserva <span class="required-star">*</span></label>
           <input type="tel" class="form-input"
             [ngClass]="form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid ? 'errorInput' : ''"
             formControlName="TelefonoReserva" placeholder="+573001234567" />
@@ -277,23 +305,29 @@
           <div class="errorMessage">{{ getPhoneError('TelefonoReserva') }}</div>
           }
         </div>
+        <div class="form-group full-width">
+          <label class="form-label">Observaciones</label>
+          <textarea formControlName="Observaciones" class="form-input" rows="3"></textarea>
+        </div>
       </div>
     </div>
+  </div>
+  }
 
-    <!-- PAGOS -->
+  @if (currentStep === 2) {
+  <div class="wizard-step-panel" [class.going-back]="goingBack" [class.is-entering]="panelAnimating">
     <div class="card">
       <div class="card-header">
-        <h2>Pagos</h2>
+        <div>
+          <h2>Pagos</h2>
+          <p class="card-header-hint">Configura el valor del servicio y la forma de pago.</p>
+        </div>
       </div>
 
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Valor del servicio</label>
-          <input
-            type="number"
-            formControlName="Valor"
-            class="form-input"
-          />
+          <input type="number" formControlName="Valor" class="form-input" />
         </div>
         <div class="form-group">
           <label class="form-label">Moneda</label>
@@ -317,210 +351,210 @@
         </div>
 
         <div class="form-group full-width payments-right">
-        @if (form.get('TipoPago')?.value === 'Completo') {
-        <div class="payments-panel pago-completo">
-          <div class="payments-panel-head">
-            <div class="payments-title">
-              <h3>Comprobante de Pago</h3>
-              <span class="payments-sub">Sube o reemplaza el soporte del pago completo (máx. 5MB).</span>
-            </div>
-          </div>
-
-          <div class="payment-file-row">
-            <div class="payment-file-status">
-              @if (form.get('ComprobantePago')?.value; as f) {
-                @if (f?.SoporteUrl) {
-                  <span class="payment-chip saved">Guardado</span>
-                  <span class="file-name">Comprobante guardado</span>
-                } @else {
-                  <span class="payment-chip loaded">Cargado</span>
-                  <span class="file-name">{{ f?.name }}</span>
-                }
-              } @else {
-                <span class="file-name text-muted">Sin archivo</span>
-              }
+          @if (form.get('TipoPago')?.value === 'Completo') {
+          <div class="payments-panel pago-completo">
+            <div class="payments-panel-head">
+              <div class="payments-title">
+                <h3>Comprobante de Pago</h3>
+                <span class="payments-sub">Sube el soporte del pago completo (máx. 5MB).</span>
+              </div>
             </div>
 
-            <div class="payment-actions">
-              <input type="file" id="ComprobantePagoReemplazar" accept=".pdf,.jpg,.jpeg,.png"
-                (change)="onFileSelected($event)" style="display:none" />
-
-              @if (!form.get('ComprobantePago')?.value) {
-                <label class="btn-payment-action primary" for="ComprobantePagoReemplazar">Subir comprobante</label>
-              } @else {
-                @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
-                  <button type="button" class="btn-payment-action secondary"
-                    (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
-                }
-                <label class="btn-payment-action secondary" for="ComprobantePagoReemplazar">Reemplazar</label>
-                <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
-              }
-            </div>
-          </div>
-
-          <div class="payment-notes">
-            <label class="form-label">Observaciones del pago</label>
-            <textarea formControlName="PagoObservaciones" class="form-input" rows="2"
-              placeholder="Método, referencia o nota del pago"></textarea>
-          </div>
-        </div>
-        }
-
-        @if (form.get('TipoPago')?.value === 'Abonos') {
-        <div class="payments-panel" formArrayName="Abonos">
-          <div class="payments-panel-head">
-            <div class="payments-title">
-              <h3>Abonos</h3>
-              <span class="payments-sub">
-                Moneda: <strong>{{ form.get('Moneda')?.value || 'COP' }}</strong> · {{ abonos.length }} registrado(s)
-              </span>
-            </div>
-
-            <button type="button" (click)="addAbono()" class="btn-add-abono">
-              + Agregar Abono
-            </button>
-          </div>
-
-          <div class="abonos-grid">
-            @for (abono of abonos.controls; let i = $index; track i) {
-            <div class="payment-file-row transfer-abono-row" [formGroupName]="i">
-              <div class="abono-index">
-                <span class="abono-number">Abono {{ i + 1 }}</span>
-              </div>
-
-              <div class="abono-monto">
-                <input type="number" formControlName="Monto" placeholder="0" class="form-input"
-                  (change)="recalcularTotales()" />
-              </div>
-
-              <div class="abono-extra">
-                <input type="date" formControlName="Fecha_Pago" class="form-input" />
-              </div>
-
-              <div class="abono-extra">
-                <input type="text" formControlName="Observaciones" placeholder="Observaciones" class="form-input" />
-              </div>
-
+            <div class="payment-file-row">
               <div class="payment-file-status">
-                @if (abonos.controls[i].get('Comprobante')?.value) {
-                  <span class="payment-chip loaded">Cargado</span>
-                  <span class="file-name">{{ getAbonoFileName(i) }}</span>
-                } @else if (abonos.controls[i].get('SoporteUrl')?.value) {
-                  <span class="payment-chip saved">Guardado</span>
-                  <span class="file-name">Comprobante guardado</span>
+                @if (form.get('ComprobantePago')?.value; as f) {
+                @if (f?.SoporteUrl) {
+                <span class="payment-chip saved">Guardado</span>
+                <span class="file-name">Comprobante guardado</span>
                 } @else {
-                  <span class="file-name text-muted">Sin archivo</span>
+                <span class="payment-chip loaded">Cargado</span>
+                <span class="file-name">{{ f?.name }}</span>
+                }
+                } @else {
+                <span class="file-name text-muted">Sin archivo</span>
                 }
               </div>
 
               <div class="payment-actions">
-                <input type="file" [id]="'ComprobanteAbono' + i" accept=".pdf,.jpg,.jpeg,.png"
-                  (change)="onAbonoFileSelected($event, i)" style="display:none" />
+                <input type="file" id="ComprobantePagoReemplazar" accept=".pdf,.jpg,.jpeg,.png"
+                  (change)="onFileSelected($event)" style="display:none" />
 
-                @if (!abonos.controls[i].get('Comprobante')?.value && !abonos.controls[i].get('SoporteUrl')?.value) {
-                  <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+                @if (!form.get('ComprobantePago')?.value) {
+                <label class="btn-payment-action primary" for="ComprobantePagoReemplazar">Subir comprobante</label>
                 } @else {
-                  @if (abonos.controls[i].get('SoporteUrl')?.value && !abonos.controls[i].get('Comprobante')?.value) {
-                    <button type="button" class="btn-payment-action secondary"
-                      (click)="viewComprobante(abonos.controls[i].get('SoporteUrl')?.value)">Ver</button>
-                  }
-                  <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
-                  <button type="button" class="btn-payment-action danger" (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+                @if (form.get('ComprobantePago')?.value?.SoporteUrl) {
+                <button type="button" class="btn-payment-action secondary"
+                  (click)="viewComprobante(form.get('ComprobantePago')?.value.SoporteUrl)">Ver</button>
                 }
-
-                @if (abonos.length > 1) {
-                  <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
-                    (click)="removeAbono(i)">✕</button>
+                <label class="btn-payment-action secondary" for="ComprobantePagoReemplazar">Reemplazar</label>
+                <button type="button" class="btn-payment-action danger" (click)="deleteComprobante()">Eliminar</button>
                 }
               </div>
             </div>
-            }
-          </div>
 
-          @if (!abonosValidos) {
-          <div class="errorMessage">Los abonos no pueden superar el valor del transfer.</div>
+            @if (form.get('ComprobantePago')?.touched && form.get('ComprobantePago')?.hasError('required')) {
+            <div class="errorMessage">El comprobante es obligatorio para registrar un pago completo.</div>
+            }
+
+            <div class="payment-notes">
+              <label class="form-label">Observaciones del pago</label>
+              <textarea formControlName="PagoObservaciones" class="form-input" rows="2"
+                placeholder="Método, referencia o nota del pago"></textarea>
+            </div>
+          </div>
           }
 
-          <div class="payments-foot">
-            <span class="hint">Registra cada abono con su comprobante para auditoría.</span>
-          </div>
-        </div>
-        }
+          @if (form.get('TipoPago')?.value === 'Abonos') {
+          <div class="payments-panel" formArrayName="Abonos">
+            <div class="payments-panel-head">
+              <div class="payments-title">
+                <h3>Abonos</h3>
+                <span class="payments-sub">Moneda: <strong>{{ form.get('Moneda')?.value || 'COP' }}</strong> · {{
+                  abonos.length }} registrado(s)</span>
+              </div>
 
-        @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
-        <div class="payments-panel payments-panel-muted">
-          <h3>Pago en el punto</h3>
-          <p class="hint">No se requiere comprobante. El cobro queda pendiente para registrarse por fuera del sistema.</p>
-        </div>
-        }
+              <button type="button" (click)="addAbono()" class="btn-add-abono">+ Agregar Abono</button>
+            </div>
+
+            <div class="abonos-grid">
+              @for (abono of abonos.controls; let i = $index; track i) {
+              <div class="payment-file-row transfer-abono-row" [formGroupName]="i">
+                <div class="abono-index">
+                  <span class="abono-number">Abono {{ i + 1 }}</span>
+                </div>
+
+                <div class="abono-monto">
+                  <input type="number" formControlName="Monto" placeholder="0" class="form-input"
+                    (change)="recalcularTotales()" />
+                </div>
+
+                <div class="abono-extra">
+                  <app-datepicker formControlName="Fecha_Pago" placeholder="Fecha de pago"></app-datepicker>
+                </div>
+
+                <div class="abono-extra">
+                  <input type="text" formControlName="Observaciones" placeholder="Observaciones" class="form-input" />
+                </div>
+
+                <div class="payment-file-status">
+                  @if (abonos.controls[i].get('Comprobante')?.value) {
+                  <span class="payment-chip loaded">Cargado</span>
+                  <span class="file-name">{{ getAbonoFileName(i) }}</span>
+                  } @else if (abonos.controls[i].get('SoporteUrl')?.value) {
+                  <span class="payment-chip saved">Guardado</span>
+                  <span class="file-name">Comprobante guardado</span>
+                  } @else {
+                  <span class="file-name text-muted">Sin archivo</span>
+                  }
+                </div>
+
+                <div class="payment-actions">
+                  <input type="file" [id]="'ComprobanteAbono' + i" accept=".pdf,.jpg,.jpeg,.png"
+                    (change)="onAbonoFileSelected($event, i)" style="display:none" />
+
+                  @if (!abonos.controls[i].get('Comprobante')?.value && !abonos.controls[i].get('SoporteUrl')?.value) {
+                  <label class="btn-payment-action primary" [for]="'ComprobanteAbono' + i">Subir comprobante</label>
+                  } @else {
+                  @if (abonos.controls[i].get('SoporteUrl')?.value && !abonos.controls[i].get('Comprobante')?.value) {
+                  <button type="button" class="btn-payment-action secondary"
+                    (click)="viewComprobante(abonos.controls[i].get('SoporteUrl')?.value)">Ver</button>
+                  }
+                  <label class="btn-payment-action secondary" [for]="'ComprobanteAbono' + i">Reemplazar</label>
+                  <button type="button" class="btn-payment-action danger"
+                    (click)="eliminarComprobanteAbono(i)">Eliminar</button>
+                  }
+
+                  @if (abonos.length > 1) {
+                  <button type="button" class="btn-payment-action danger icon" aria-label="Eliminar abono"
+                    (click)="removeAbono(i)">✕</button>
+                  }
+                </div>
+
+                @if (abonos.controls[i].get('Comprobante')?.touched &&
+                abonos.controls[i].get('Comprobante')?.hasError('required')) {
+                <div class="errorMessage full-width">El comprobante es obligatorio para este abono.</div>
+                }
+              </div>
+              }
+            </div>
+
+            @if (!abonosValidos) {
+            <div class="errorMessage">Los abonos no pueden superar el valor del transfer.</div>
+            }
+
+            <div class="payments-foot">
+              <span class="hint">Registra cada abono con su comprobante para auditoría.</span>
+            </div>
+          </div>
+          }
+
+          @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
+          <div class="payments-panel payments-panel-muted">
+            <h3>Pago en el punto</h3>
+            <p class="hint">No se requiere comprobante. El cobro queda pendiente para registrarse por fuera del sistema.
+            </p>
+          </div>
+          }
         </div>
       </div>
     </div>
-
   </div>
-</div>
+  }
 
-<!-- SIDEBAR / RESUMEN FLOTANTE -->
-<div class="floating-summary" [attr.data-state]="openSummary ? 'expanded' : 'compact'">
+  @if (currentStep === 3) {
+  <div class="wizard-step-panel" [class.going-back]="goingBack" [class.is-entering]="panelAnimating">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Resumen del Transfer</h2>
+          <p class="card-header-hint">Revisa la información antes de crear el servicio.</p>
+        </div>
+      </div>
 
-  <!-- COMPACTO -->
-  <div class="summary-collapsed" (click)="toggleSummary()">
-    <div class="summary-left">
-      <span class="badge">
-        {{ getNombreServicio() || 'Transfer' }}
-      </span>
-
-      <span class="meta">
-        {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
-      </span>
-    </div>
-
-    <button class="expand-btn" type="button" aria-label="Ver resumen completo">
-      <span class="expand-icon">▲</span>
-    </button>
-  </div>
-
-  <!-- EXPANDIDO -->
-  <div class="summary-expanded">
-    <div class="summary-expanded-header">
-      <h2>Resumen</h2>
-      <button class="btn-icon-delete" type="button" aria-label="Cerrar resumen" (click)="toggleSummary(false)">
-        ✕
-      </button>
-    </div>
-
-    <div class="summary-content">
-      <div class="summary-totals">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <label class="form-label">Servicio</label>
+          <span class="summary-value">{{ getNombreServicio() || '—' }}</span>
+        </div>
         <div class="summary-item">
           <label class="form-label">Titular</label>
           <span class="summary-value">{{ form.get('Titular')?.value || '—' }}</span>
         </div>
-
         <div class="summary-item">
-          <label class="form-label">Cantidad de Personas</label>
+          <label class="form-label">Pasajeros</label>
           <span class="summary-value">{{ form.get('Cantidad_Personas')?.value || '—' }}</span>
         </div>
-
         <div class="summary-item">
-          <label class="form-label">Hora Salida</label>
-          <span class="summary-value">
-            {{ form.get('Hora')?.value || '—' }}
-          </span>
+          <label class="form-label">Ruta</label>
+          <span class="summary-value">{{ getResumenRuta() }}</span>
         </div>
-
         <div class="summary-item">
-          <label class="form-label">Punto de salida</label>
-          <span class="summary-value">{{ form.get('Salida')?.value || '—' }}</span>
+          <label class="form-label">Fecha</label>
+          <span class="summary-value">{{ form.get('Fecha')?.value || '—' }}</span>
         </div>
-
         <div class="summary-item">
-          <label class="form-label">Punto de llegada</label>
-          <span class="summary-value">{{ form.get('Llegada')?.value || '—' }}</span>
+          <label class="form-label">Hora</label>
+          <span class="summary-value">{{ form.get('Hora')?.value || '—' }}</span>
         </div>
-
+        <div class="summary-item">
+          <label class="form-label">Reporta</label>
+          <span class="summary-value">{{ form.get('Reporta')?.value || '—' }}</span>
+        </div>
+        <div class="summary-item">
+          <label class="form-label">Teléfono reserva</label>
+          <span class="summary-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span>
+        </div>
+        <div class="summary-item">
+          <label class="form-label">Rango detectado</label>
+          <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
+        </div>
+        <div class="summary-item">
+          <label class="form-label">Tipo de pago</label>
+          <span class="summary-value">{{ getResumenTipoPago() }}</span>
+        </div>
         @if (form.get('TipoPago')?.value === 'Abonos') {
         <div class="summary-item">
-          <label class="form-label">Total Abonado</label>
+          <label class="form-label">Total abonado</label>
           <span class="summary-value">{{ getTotalAbonado() | number:'1.2-2' }}</span>
         </div>
         <div class="summary-item">
@@ -528,35 +562,46 @@
           <span class="summary-value">{{ getPendiente() | number:'1.2-2' }}</span>
         </div>
         }
-
         <div class="summary-item total-row">
           <label class="form-label">Valor</label>
-          <span class="summary-value summary-total">
-            {{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}
-          </span>
+          <span class="summary-value summary-total">{{ form.get('Moneda')?.value || 'COP' }} {{
+            (form.get('Valor')?.value || 0) | number:'1.0-0' }}</span>
         </div>
+      </div>
+
+    </div>
+  </div>
+  }
+</div>
+
+<div class="wizard-nav">
+  <div class="wizard-nav-row">
+    <div class="wizard-nav-left">
+      @if (currentStep > 0) {
+      <button type="button" class="btn-wizard-back" (click)="prevStep()">Atrás</button>
+      }
+    </div>
+
+    <div class="wizard-nav-center">
+      <div class="wizard-nav-summary">
+        <span class="wizard-nav-tour">{{ getNombreServicio() || 'Transfer' }}</span>
+        <span class="wizard-nav-item">{{ form.get('Cantidad_Personas')?.value || 0 }} pax</span>
+        <span class="wizard-nav-item">{{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) |
+          number:'1.0-0' }}</span>
       </div>
     </div>
 
-    <div class="summary-actions" [class.two-actions]="puedeCancelarTransfer || canDeleteTransfer" [class.three-actions]="puedeCancelarTransfer && canDeleteTransfer">
-      @if (puedeCancelarTransfer) {
-        <button type="button" class="btn-cancel-summary" (click)="cancelarTransfer()" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Procesando...' : 'Cancelar transfer' }}
+    <div class="wizard-nav-right">
+      @if (currentStep < wizardSteps.length - 1) { <button type="button" class="btn-wizard-next" (click)="nextStep()"
+        [disabled]="!canAdvanceFromStep(currentStep)">
+        Siguiente
         </button>
-      }
-
-      @if (canDeleteTransfer) {
-        <button type="button" class="btn-delete-summary" (click)="eliminarTransfer()" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Procesando...' : 'Eliminar transfer' }}
-        </button>
-      }
-
-      @if (canUpdateTransfer) {
-        <button type="button" class="btn-save-summary" (click)="onSubmit()" [disabled]="isSubmitting()">
+        } @else if (canUpdateTransfer) {
+        <button type="button" class="btn-wizard-submit" (click)="onSubmit()" [disabled]="isSubmitting()">
           {{ isSubmitting() ? 'Guardando...' : 'Guardar Cambios' }}
         </button>
-      }
+        }
+    </div>
   </div>
-</div>
 </div>
 }

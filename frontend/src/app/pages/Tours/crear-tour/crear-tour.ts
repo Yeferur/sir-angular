@@ -1,12 +1,12 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { FlatpickrInputDirective } from '../../../shared/directives/flatpickr-input';
-import type { Options as FlatpickrOptions } from 'flatpickr/dist/types/options';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Tours, Tour } from '../../../services/Tours/tours';
+import { Tours, Tour, CanalComision } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
+import { UiStateService } from '../../../services/ui-state.service';
 
 type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
 
@@ -16,8 +16,17 @@ type MonedaVM = {
   Nombre_Moneda: string;
 };
 
+type CanalComisionVM = {
+  Id_Canal: number;
+  Nombre_Canal: string;
+  activo: boolean;
+  valor: number;
+};
+
 type PlanPayload = {
   Nombre_Plan: string;
+  Fecha_Inicio: string | null;
+  Fecha_Fin: string | null;
   AllowNino: boolean;
   AllowInfante: boolean;
   Monedas: Array<{
@@ -27,15 +36,18 @@ type PlanPayload = {
   }>;
 };
 
+type ComisionPayload = {
+  Id_Canal: number;
+  Valor: number;
+};
+
 type CrearTourFullPayload = {
   Nombre_Tour: string;
   Abreviacion: string;
-  Comision_Hotel: number;
-  Comision_Agencia: number;
-  Comision_Freelance: number;
+  Comisiones: ComisionPayload[];
   Cupo_Base: number;
-  Latitud: number;
-  Longitud: number;
+  Latitud: number | null;
+  Longitud: number | null;
   Id_Tour_Origen: number | null;
   Planes: PlanPayload[];
   Disponibilidad?: any;
@@ -68,152 +80,21 @@ type DisponibilidadPayload = {
   templateUrl: './crear-tour.html',
   styleUrls: ['./crear-tour.css'],
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FlatpickrInputDirective],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent],
 })
 export class CrearTourComponent implements OnInit {
+  private alerts = inject(SirAlertService);
+  private uiState = inject(UiStateService);
   isLoading = signal<boolean>(true);
   isSubmitting = signal(false);
   private toursLoaded = false;
   private currenciesLoaded = false;
+  private canalesLoaded = false;
   private readonly dayKeys: DiaSemana[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
-fpOptionsFecha: Partial<FlatpickrOptions> = {
-  dateFormat: 'Y-m-d',
-  altInput: true,
-  altFormat: 'd/m/Y',
-  allowInput: false,
-  disableMobile: true,
-  monthSelectorType: 'dropdown' as FlatpickrOptions['monthSelectorType'],
-  
-  altInputClass: 'form-input flatpickr-input flatpickr-alt',
+  // Canales disponibles con comisión
+  canalesComisiones: CanalComisionVM[] = [];
 
-  onReady: (_sel, _str, inst: any) => {
-    // ✅ SSR guard ANTES DE TODO
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-    const cal: HTMLElement = inst?.calendarContainer;
-    if (!cal) return;
-
-    cal.classList.add('sir-flatpickr');
-
-    // util: clamp día al máximo del mes
-    const clampDay = (y: number, m: number, d: number) => {
-      const last = new Date(y, m + 1, 0).getDate(); // último día del mes
-      return Math.min(Math.max(d, 1), last);
-    };
-
-    // --- Inyectar select en el header estable (flatpickr-month) ---
-    let yearDiv: HTMLDivElement | null = null;
-    let yearSelect: HTMLSelectElement | null = null;
-
-    const ensureYearSelect = () => {
-      // contenedor header
-      const monthWrap = cal.querySelector('.flatpickr-month') as HTMLElement | null;
-      if (!monthWrap) return null;
-
-      // elimina el input numérico (cuando exista)
-      const numWrap = monthWrap.querySelector('.numInputWrapper') as HTMLElement | null;
-      if (numWrap) { try { numWrap.remove(); } catch (e) { /* ignore */ } }
-
-      // preferimos insertar dentro del pill .flatpickr-current-month
-      const curMonth = monthWrap.querySelector('.flatpickr-current-month') as HTMLElement | null;
-      const container = curMonth ?? monthWrap;
-
-      // evita duplicados
-      yearSelect = container.querySelector('.sir-year-select') as HTMLSelectElement | null;
-      if (yearSelect) return yearSelect;
-
-      // elimina cualquier wrapper previo para mantener DOM limpio
-      const oldDiv = monthWrap.querySelector('.sir-year-div') as HTMLElement | null;
-      if (oldDiv) { try { oldDiv.remove(); } catch { /* ignore */ } }
-
-      yearSelect = document.createElement('select');
-      yearSelect.className = 'sir-year-select';
-      yearSelect.setAttribute('aria-label', 'Seleccionar año');
-
-      try { container.appendChild(yearSelect); } catch { monthWrap.appendChild(yearSelect); }
-      return yearSelect;
-    };
-
-    const buildYears = (centerYear: number) => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const start = centerYear - 20;
-      const end = centerYear + 20;
-
-      sel.innerHTML = '';
-      for (let y = end; y >= start; y--) {
-        const opt = document.createElement('option');
-        opt.value = String(y);
-        opt.textContent = String(y);
-        sel.appendChild(opt);
-      }
-      sel.value = String(centerYear);
-    };
-
-    const syncSelectValue = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const y = inst.currentYear ?? new Date().getFullYear();
-      const exists = !!sel.querySelector(`option[value="${y}"]`);
-      if (!exists) buildYears(y);
-      sel.value = String(y);
-    };
-
-    const getSafeDay = () => {
-      const d: Date | undefined = inst.selectedDates?.[0];
-      return d ? d.getDate() : 1;
-    };
-
-    const onChange = () => {
-      const sel = ensureYearSelect();
-      if (!sel) return;
-
-      const y = Number(sel.value);
-      const m = typeof inst.currentMonth === 'number' ? inst.currentMonth : new Date().getMonth();
-      const day = clampDay(y, m, getSafeDay());
-
-      const newDate = new Date(y, m, day);
-
-      // siempre mueve la vista
-      if (typeof inst.jumpToDate === 'function') inst.jumpToDate(newDate);
-
-      // solo setea si ya había selección
-      if (inst.selectedDates?.length) {
-        inst.setDate(newDate, true); // true => triggerChange para reactive forms
-      }
-    };
-
-    // init
-    buildYears(inst.currentYear ?? new Date().getFullYear());
-    syncSelectValue();
-
-    // listeners
-    const sel0 = ensureYearSelect();
-    sel0?.addEventListener('change', onChange);
-
-    // hook sin pisar otros callbacks
-    const wrap = (key: 'onMonthChange' | 'onYearChange', fn: any) => {
-      const prev = inst.config[key];
-      const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
-      inst.config[key] = [...arr, fn];
-    };
-
-    // ✅ cuando cambias mes/año, flatpickr puede re-renderizar header → reinyecta/sincroniza
-    wrap('onMonthChange', () => syncSelectValue());
-    wrap('onYearChange', () => syncSelectValue());
-
-    // cleanup
-    const prevOnDestroy = inst.config.onDestroy;
-    const destroyArr = Array.isArray(prevOnDestroy) ? prevOnDestroy : prevOnDestroy ? [prevOnDestroy] : [];
-    inst.config.onDestroy = [
-      ...destroyArr,
-      () => sel0?.removeEventListener('change', onChange)
-    ];
-  }
-};
 
   toursExistentes: Tour[] = [];
   monedas: MonedaVM[] = [];
@@ -231,22 +112,31 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   ];
 
 
+  private get navbar() {
+    return {
+      alert: {
+        set: (alert: Parameters<SirAlertService['showModal']>[0] | null) => {
+          if (alert) this.alerts.showModal(alert);
+          else this.alerts.closeModal();
+        }
+      },
+      successToast: (title: string, message = '') => this.alerts.successToast(title, message),
+      errorToast: (title: string, message = '') => this.alerts.errorToast(title, message),
+      needsRefresh: this.uiState.needsRefresh,
+    };
+  }
+
   constructor(
     private fb: FormBuilder,
     private tours: Tours,
     private reservas: Reservas,
-    private router: Router,
-    private navbar: DynamicIslandGlobalService
+    private router: Router
   ) {
     this.form = this.fb.group({
       Nombre_Tour: ['', [Validators.required, Validators.maxLength(255)]],
       Abreviacion: ['', [Validators.required, Validators.maxLength(50)]],
-      Comision_Hotel: [0, [Validators.min(0)]],
-      Comision_Agencia: [0, [Validators.min(0)]],
-      Comision_Freelance: [0, [Validators.min(0)]],
       Cupo_Base: [null, [Validators.required, Validators.min(0)]],
-      Latitud: [null, [Validators.required, Validators.min(-90), Validators.max(90)]],
-      Longitud: [null, [Validators.required, Validators.min(-180), Validators.max(180)]],
+      Coordenadas: ['', [this.coordenadasValidator()]],
       Id_Tour_Origen: [null],
       planes: this.fb.array([]),
       Modo_Disponibilidad: ['TODO_EL_ANO', [Validators.required]],
@@ -267,6 +157,7 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
   ngOnInit(): void {
     this.loadExistingTours();
     this.loadCurrenciesAndInitPlans();
+    this.loadCanales();
     this.listenModoDisponibilidad();
   }
 
@@ -324,11 +215,38 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
     });
   }
 
-  private markInitialLoadStep(step: 'tours' | 'currencies'): void {
+  // Canales con comisión: por ahora mock local hasta que el back esté listo
+  // TODO: reemplazar por this.tours.getCanales().subscribe(...)
+  private loadCanales(): void {
+    this.tours.getCanalesComision().subscribe({
+      next: (canales) => {
+        this.canalesComisiones = canales.map((c) => ({
+          Id_Canal: c.Id_Canal,
+          Nombre_Canal: c.Nombre_Canal,
+          activo: false,
+          valor: 0,
+        }));
+        this.markInitialLoadStep('canales');
+      },
+      error: () => {
+        this.canalesComisiones = [];
+        this.markInitialLoadStep('canales');
+      },
+    });
+  }
+
+  toggleCanal(idx: number): void {
+    const canal = this.canalesComisiones[idx];
+    canal.activo = !canal.activo;
+    if (!canal.activo) canal.valor = 0;
+  }
+
+  private markInitialLoadStep(step: 'tours' | 'currencies' | 'canales'): void {
     if (step === 'tours') this.toursLoaded = true;
     if (step === 'currencies') this.currenciesLoaded = true;
+    if (step === 'canales') this.canalesLoaded = true;
 
-    if (this.toursLoaded && this.currenciesLoaded) {
+    if (this.toursLoaded && this.currenciesLoaded && this.canalesLoaded) {
       this.isLoading.set(false);
     }
   }
@@ -352,6 +270,9 @@ fpOptionsFecha: Partial<FlatpickrOptions> = {
 
     return this.fb.group({
       Nombre_Plan: [{ value: planName, disabled: isBase }, [Validators.required, Validators.maxLength(255)]],
+      esPermanente: [true],
+      Fecha_Inicio: [null],
+      Fecha_Fin: [null],
       AllowNino: [true],
       AllowInfante: [true],
       monedas: currenciesFA,
@@ -774,6 +695,7 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
     const planes: PlanPayload[] = (raw.planes || []).map((p: any) => {
       const allowNino = !!p.AllowNino;
       const allowInf = !!p.AllowInfante;
+      const esPermanente = p.esPermanente !== false;
 
       const monedas = (p.monedas || []).map((m: any) => ({
         Id_Moneda: Number(m.Id_Moneda),
@@ -787,22 +709,29 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
 
       return {
         Nombre_Plan: String(p.Nombre_Plan || '').trim(),
+        Fecha_Inicio: esPermanente ? null : (p.Fecha_Inicio || null),
+        Fecha_Fin: esPermanente ? null : (p.Fecha_Fin || null),
         AllowNino: allowNino,
         AllowInfante: allowInf,
         Monedas: monedas,
       };
     });
-const disponibilidad = this.buildDisponibilidadPayload();
+
+    const comisiones: ComisionPayload[] = this.canalesComisiones
+      .filter((c) => c.activo && c.valor > 0)
+      .map((c) => ({ Id_Canal: c.Id_Canal, Valor: c.valor }));
+
+    const disponibilidad = this.buildDisponibilidadPayload();
+
+    const coords = this.parseCoordenadas(raw.Coordenadas || '');
 
     return {
       Nombre_Tour: String(raw.Nombre_Tour || '').trim(),
       Abreviacion: String(raw.Abreviacion || '').trim(),
-      Comision_Hotel: Number(raw.Comision_Hotel || 0),
-      Comision_Agencia: Number(raw.Comision_Agencia || 0),
-      Comision_Freelance: Number(raw.Comision_Freelance || 0),
+      Comisiones: comisiones,
       Cupo_Base: Number(raw.Cupo_Base || 0),
-      Latitud: Number(raw.Latitud),
-      Longitud: Number(raw.Longitud),
+      Latitud: coords?.lat ?? null,
+      Longitud: coords?.lng ?? null,
       Id_Tour_Origen: raw.Id_Tour_Origen ?? null,
       Planes: planes,
       Disponibilidad: disponibilidad,
@@ -843,10 +772,8 @@ const disponibilidad = this.buildDisponibilidadPayload();
         Nombre_Tour: 'Nombre del Tour',
         Abreviacion: 'Abreviación',
         Cupo_Base: 'Cupo Base',
-        Latitud: 'Latitud',
-        Longitud: 'Longitud',
         planes: 'Planes y precios',
-        Id_Tour_Origen: 'Copiar horarios (origen)'
+        Id_Tour_Origen: 'Usar puntos de encuentro de (origen)'
       };
 
       const fields = invalid.map((f) => friendly[f] || f);
@@ -958,6 +885,7 @@ const disponibilidad = this.buildDisponibilidadPayload();
       },
       error: (err) => {
         console.error('Error al crear tour:', err);
+        this.isSubmitting.set(false);
         this.navbar.errorToast('Error al crear tour', err?.error?.error || err?.error?.message || 'Error al crear el tour');
       },
       complete: () => this.isSubmitting.set(false),
@@ -966,5 +894,28 @@ const disponibilidad = this.buildDisponibilidadPayload();
 
   hasUnsavedChanges(): boolean {
     return this.form?.dirty && !this.isSubmitting();
+  }
+
+  // ── Coordenadas ──────────────────────────────────────────────────────────────
+
+  parseCoordenadas(val: string): { lat: number; lng: number } | null {
+    const parts = String(val || '').trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length !== 2) return null;
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+    if (isNaN(lat) || isNaN(lng)) return null;
+    return { lat, lng };
+  }
+
+  private coordenadasValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const val = String(control.value || '').trim();
+      if (!val) return null;
+      const parsed = this.parseCoordenadas(val);
+      if (!parsed) return { coordenadasInvalidas: true };
+      if (parsed.lat < -90 || parsed.lat > 90) return { latitudInvalida: true };
+      if (parsed.lng < -180 || parsed.lng > 180) return { longitudInvalida: true };
+      return null;
+    };
   }
 }

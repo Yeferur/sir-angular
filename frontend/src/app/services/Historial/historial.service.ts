@@ -3,6 +3,12 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+export interface HistorialDetalle {
+  columna: string;
+  anterior: string | null;
+  nuevo: string | null;
+}
+
 export interface Historial {
   Id_Historial?: number;
   Id_Usuario?: number;
@@ -14,6 +20,7 @@ export interface Historial {
   Fecha_Accion?: string;
   IP_Address?: string;
   User_Agent?: string;
+  Detalles?: HistorialDetalle[];
 }
 
 export interface HistorialResponse {

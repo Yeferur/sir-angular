@@ -1,91 +1,136 @@
 <div class="page-container">
 
-    <div class="page-header">
+  <div class="page-header">
+
       <div>
-        <h1>Tours</h1>
+        <p class="subtitle"><span class="count-badge">{{ toursFiltrados().length }}</span> tour{{ toursFiltrados().length !== 1 ? 's' : '' }} registrado{{ toursFiltrados().length !== 1 ? 's' : '' }}</p>
       </div>
-
-      <div class="header-actions">
-        @if (canCreateTour) {
-          <button class="btn-primary" (click)="crearTour()">+ Nuevo Tour</button>
-        }
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input
+          type="text"
+          placeholder="Buscar tour o abreviación…"
+          [ngModel]="busqueda()"
+          (ngModelChange)="busqueda.set($event)"
+        />
       </div>
-    </div>
-
-    @if (isLoading()) {
-      <section class="dashboard-grid is-loading" aria-live="polite" aria-busy="true">
-        @for (slot of skeletonCards; track slot) {
-          <article class="tour-card skeleton-card" [style.--animation-order]="slot">
-            <div class="skeleton-shape skeleton-title"></div>
-            <div class="skeleton-shape skeleton-pill"></div>
-            <div class="skeleton-metrics">
-              <div class="skeleton-metric"></div>
-              <div class="skeleton-metric"></div>
-              <div class="skeleton-metric"></div>
-              <div class="skeleton-metric"></div>
-            </div>
-            <div class="skeleton-actions">
-              <div class="skeleton-shape skeleton-button"></div>
-              <div class="skeleton-shape skeleton-button skeleton-button-danger"></div>
-            </div>
-          </article>
-        }
-      </section>
-    } @else if (toursFiltrados().length === 0) {
-      <section class="empty-state" aria-live="polite">
-        <div class="empty-state-icon">✦</div>
-        <h2>No hay tours registrados</h2>
-        <p>Crea tu primer tour para empezar a configurar cupos, comisiones y programación.</p>
-        @if (canCreateTour) {
-          <button class="btn-primary" type="button" (click)="crearTour()">+ Nuevo Tour</button>
-        }
-      </section>
-    } @else {
-    <div class="dashboard-grid">
-      @for (tour of toursFiltrados(); track $index) {
-        <div class="tour-card">
-
-          <div class="card-header">
-            <h2 class="tour-name" [title]="tour.Nombre_Tour">{{ tour.Nombre_Tour }}</h2>
-            @if (tour.Abreviacion) {
-              <span class="pill">{{ tour.Abreviacion }}</span>
-            }
-          </div>
-
-          <div class="metrics-row">
-            <div class="metric-cell">
-              <span class="metric-value">{{ showNumber(tour.Cupo_Base) }}</span>
-              <span class="metric-label">cupo base</span>
-            </div>
-            <div class="metric-divider"></div>
-            <div class="metric-cell">
-              <span class="metric-value">{{ showNumber(tour.Comision_Hotel) }}</span>
-              <span class="metric-label">hotel</span>
-            </div>
-            <div class="metric-divider"></div>
-            <div class="metric-cell">
-              <span class="metric-value">{{ showNumber(tour.Comision_Agencia) }}</span>
-              <span class="metric-label">agencia</span>
-            </div>
-            <div class="metric-divider"></div>
-            <div class="metric-cell">
-              <span class="metric-value">{{ showNumber(tour.Comision_Freelance) }}</span>
-              <span class="metric-label">freelance</span>
-            </div>
-          </div>
-
-          <div class="card-footer">
-            @if (canUpdateTour) {
-              <button class="btn-secondary" (click)="editarTour(tour)">Editar</button>
-            }
-            @if (canDeleteTour) {
-              <button class="btn-danger" (click)="eliminarTour(tour)">Eliminar</button>
-            }
-          </div>
-
-        </div>
+      @if (canCreateTour) {
+        <button class="btn-primary" (click)="crearTour()">Nuevo Tour</button>
       }
+ 
+  </div>
+
+  @if (isLoading()) {
+    <div class="table-wrap" aria-busy="true" aria-live="polite">
+      <table class="tours-table">
+        <thead>
+          <tr>
+            <th class="col-nombre">Tour</th>
+            <th class="col-abrev">Abreviación</th>
+            <th class="col-cupo">Cupo base</th>
+            <th class="col-comisiones">Comisiones</th>
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of skeletonRows; track s) {
+            <tr class="skeleton-row">
+              <td><div class="sk sk-nombre"></div></td>
+              <td><div class="sk sk-pill"></div></td>
+              <td><div class="sk sk-cupo"></div></td>
+              <td>
+                <div class="sk-chips">
+                  <div class="sk sk-chip"></div>
+                  <div class="sk sk-chip"></div>
+                  <div class="sk sk-chip"></div>
+                </div>
+              </td>
+              <td>
+                <div class="sk-actions">
+                  <div class="sk sk-btn"></div>
+                  <div class="sk sk-btn"></div>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </div>
-    }
+
+  } @else if (toursFiltrados().length === 0) {
+    <section class="empty-state" aria-live="polite">
+      <div class="empty-state-icon">✦</div>
+      <h2>{{ busqueda() ? 'Sin resultados' : 'No hay tours registrados' }}</h2>
+      <p>{{ busqueda() ? 'Intenta con otro nombre o abreviación.' : 'Crea tu primer tour para empezar a configurar cupos, comisiones y programación.' }}</p>
+      @if (!busqueda() && canCreateTour) {
+        <button class="btn-primary" type="button" (click)="crearTour()">Nuevo Tour</button>
+      }
+    </section>
+
+  } @else {
+    <div class="table-wrap">
+      <table class="tours-table">
+        <thead>
+          <tr>
+            <th class="col-nombre">Tour</th>
+            <th class="col-abrev">Abreviación</th>
+            <th class="col-cupo">Cupo base</th>
+            <th class="col-comisiones">Comisiones por canal</th>
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (tour of toursFiltrados(); track tour.Id_Tour) {
+            <tr class="tour-row">
+
+              <td class="col-nombre">
+                <span class="tour-name" [title]="tour.Nombre_Tour">{{ tour.Nombre_Tour }}</span>
+              </td>
+
+              <td class="col-abrev">
+                @if (tour.Abreviacion) {
+                  <span class="pill">{{ tour.Abreviacion }}</span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+
+              <td class="col-cupo">
+                <span class="cupo-value">{{ showNumber(tour.Cupo_Base) }}</span>
+              </td>
+
+              <td class="col-comisiones">
+                @if (tourComisiones(tour).length > 0) {
+                  <div class="chips-row">
+                    @for (c of tourComisiones(tour); track c.Id_Canal) {
+                      <span class="commission-chip" [class.chip-active]="c.Valor > 0">
+                        <span class="chip-canal">{{ c.Nombre_Canal }}</span>
+                        <span class="chip-sep"></span>
+                        <span class="chip-valor">{{ formatValor(c.Valor) }}</span>
+                      </span>
+                    }
+                  </div>
+                } @else {
+                  <span class="muted">Sin comisiones</span>
+                }
+              </td>
+
+              <td class="col-actions">
+                <div class="row-actions">
+                  @if (canUpdateTour) {
+                    <button class="btn-row-edit"   (click)="editarTour(tour)">Editar</button>
+                  }
+                  @if (canDeleteTour) {
+                  <button class="btn-row-delete" (click)="eliminarTour(tour)">Eliminar</button>
+                  }
+                </div>
+              </td>
+
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 
 </div>

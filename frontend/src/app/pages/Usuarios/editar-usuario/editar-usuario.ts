@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
-import { DynamicIslandGlobalService } from '../../../services/DynamicNavbar/global';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
@@ -73,7 +73,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         private router: Router,
         private route: ActivatedRoute,
         private cdr: ChangeDetectorRef,
-        private global: DynamicIslandGlobalService
+        private alerts: SirAlertService
     ) {
         this.form = this.fb.group({
             Id_Usuario: [{ value: '', disabled: true }, [Validators.required]],
@@ -133,10 +133,17 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
     private navbar(type: 'error' | 'success' | 'info' | 'warning', title: string, message: string, loading = false, autoClose = true) {
         if (loading) {
-            this.global.showLoading(title, message, { type, autoClose });
+            this.alerts.showLoading(title, message, { type, autoClose });
             return;
         }
-        this.global.showAlert({ type, title, message, autoClose });
+        const toastByType = {
+            error: () => this.alerts.errorToast(title, message),
+            success: () => this.alerts.successToast(title, message),
+            info: () => this.alerts.infoToast(title, message),
+            warning: () => this.alerts.warningToast(title, message),
+        } as const;
+
+        toastByType[type]();
     }
 
     private loadRoles() {
@@ -347,12 +354,12 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
                 ? `Revisa los siguientes campos: ${fields.join(', ')}`
                 : 'Hay campos inválidos en el formulario.';
 
-            this.global.alert?.set?.({
+            this.alerts.showAlert({
                 type: 'error',
                 title: 'Campos requeridos incompletos',
                 message: msg,
                 autoClose: true,
-                buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.global.alert?.set?.(null) }]
+                buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.alerts.closeModal() }]
             });
             return;
         }
@@ -374,12 +381,12 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             permisos: this.selectedPermisos
         };
 
-        this.global.showConfirm(
+        this.alerts.showConfirm(
             '¿Guardar cambios?',
             'Se actualizará la información del usuario.',
             [
-                { text: 'Cancelar', style: 'secondary', onClick: () => this.global.clearOverlay() },
-                { text: 'Guardar', style: 'primary', onClick: () => { this.global.clearOverlay(); this.confirmUpdate(payload); } }
+                { text: 'Cancelar', style: 'secondary', onClick: () => this.alerts.closeModal() },
+                { text: 'Guardar', style: 'primary', onClick: () => { this.alerts.closeModal(); this.confirmUpdate(payload); } }
             ]
         );
     }
@@ -393,14 +400,14 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             next: () => {
                 this.form.markAsPristine();
                 this.isSubmitting.set(false);
-                this.global.successToast('Actualizado', 'Usuario actualizado correctamente');
+                this.alerts.successToast('Actualizado', 'Usuario actualizado correctamente');
                 this.cdr.markForCheck();
                 this.router.navigate(['/Usuarios']);
             },
             error: (err: any) => {
                 this.isSubmitting.set(false);
                 this.errorMsg = err?.error?.error || 'Error actualizando usuario';
-                this.global.errorToast('Error', this.errorMsg);
+                this.alerts.errorToast('Error', this.errorMsg);
                 this.cdr.markForCheck();
             }
         });
