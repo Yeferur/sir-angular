@@ -261,6 +261,54 @@
         </div>
       </div>
       }
+
+      <!-- ═══════════════════════════════════════════════════
+           CARD PRIVADOS
+           Card especial al final del dashboard. Solo visible
+           cuando hay reservas privadas en el día.
+           ═══════════════════════════════════════════════════ -->
+      @if (totalReservasPrivadas > 0) {
+      <div class="capacity-card privados-card"
+        role="button" tabindex="0"
+        (click)="abrirVistaPrivados()"
+        (keydown.enter)="abrirVistaPrivados()"
+        [attr.aria-label]="'Ver reservas privadas del día'">
+
+        <div class="card-content">
+          <div class="stats-container">
+            <div class="card-header">
+              <h2 class="tour-name">Privados del día</h2>
+              <span class="badge privados">{{ totalBusesPrivados }} buses</span>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric-cell">
+                <span class="metric-value">{{ totalReservasPrivadas }}</span>
+                <span class="metric-label">reservas</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ totalPaxPrivados }}</span>
+                <span class="metric-label">pasajeros</span>
+              </div>
+              <div class="metric-divider"></div>
+              <div class="metric-cell">
+                <span class="metric-value">{{ totalBusesPrivados }}</span>
+                <span class="metric-label">buses</span>
+              </div>
+            </div>
+
+            <div class="progress-track">
+              <div class="progress-fill blue" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <span>Clic para asignar placa y guía a cada bus</span>
+        </div>
+      </div>
+      }
     </div>
     }
   </section>
@@ -290,6 +338,92 @@
     </div>
   </section>
   }
+  }
+
+  <!-- ═══════════════════════════════════════════════════
+       VISTA PRIVADOS
+       Carril separado para reservas de tipo Privada.
+       Sin drag-and-drop. Solo placa y guía por bus.
+       ═══════════════════════════════════════════════════ -->
+  @if (!isPageLoading && modoVista === 'privados') {
+  <section class="editor-section privados-section">
+    <div class="editor-header">
+      <div class="editor-title">
+        <h3>Buses Privados</h3>
+        <p>{{ fechaSeleccionada }} · {{ totalReservasPrivadas }} reservas · {{ totalBusesPrivados }} buses</p>
+        @if (listadoPersistido && !listadoDirty) {
+          <span class="editor-pill persisted">Guardado</span>
+        } @else if (listadoDirty) {
+          <span class="editor-pill dirty">Cambios sin guardar</span>
+        }
+      </div>
+      <div class="editor-actions">
+        <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
+        @if (canUpdateProgramacion) {
+          <button class="btn-primary" (click)="guardarListadoFinal()">Guardar</button>
+        }
+        <button class="btn-primary" (click)="descargarTodosLosPrivadosExcel()">Descargar privados (Excel)</button>
+      </div>
+    </div>
+
+    <!-- Listado de reservas privadas, cada una con sus buses -->
+    <div class="privados-list">
+      @for (grupo of gruposPrivados; track grupo.Id_Reserva) {
+      <div class="privado-grupo">
+
+        <!-- Cabecera de la reserva -->
+        <div class="privado-grupo-header">
+          <div class="privado-grupo-left">
+            <span class="privado-reserva-id">#{{ grupo.Id_Reserva }}</span>
+            <div class="privado-grupo-info">
+              <span class="privado-nombre">{{ grupo.Nombre_Reportante || 'Sin responsable' }}</span>
+              <span class="privado-meta">{{ grupo.Nombre_Tour }} · {{ grupo.totalPax }} pax</span>
+            </div>
+          </div>
+          <div class="bus-actions">
+            @if (grupo.totalBuses > 1) {
+            <span class="privado-multibus-badge">{{ grupo.totalBuses }} buses</span>
+            }
+            <button class="btn-primary" (click)="descargarReservaPrivadaExcel(grupo)">Descargar Excel</button>
+          </div>
+        </div>
+
+        <!-- Buses de esta reserva -->
+        <div class="privado-buses">
+          @for (bus of grupo.buses; track bus.id) {
+          <div class="privado-bus-row">
+            <div class="privado-bus-label">
+              Bus {{ bus.indice }}/{{ bus.totalBuses }}
+              <span class="privado-pax-pill">{{ bus.ocupados }} pax</span>
+            </div>
+            <div class="privado-bus-fields">
+              <input
+                class="form-input small"
+                placeholder="Placa (ej: ABC-123)"
+                [(ngModel)]="bus.id"
+                (ngModelChange)="markDirty()"
+              />
+              <input
+                class="form-input small"
+                placeholder="Guía (opcional)"
+                [(ngModel)]="bus.guia"
+                (ngModelChange)="markDirty()"
+              />
+            </div>
+          </div>
+          }
+        </div>
+
+      </div>
+      }
+
+      @if (gruposPrivados.length === 0) {
+      <div class="stops-empty" style="padding: 48px; text-align: center;">
+        No hay reservas privadas para este día.
+      </div>
+      }
+    </div>
+  </section>
   }
 
   @if (!isPageLoading && modoVista === 'editor' && planSeleccionado) {
@@ -455,9 +589,21 @@
                   </div>
                   <div class="reserva-main-col">
                     <span class="reserva-id">#{{ reserva.Id_Reserva }}</span>
+                    @if (reserva.NumeroPasajeros > (reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros)) {
+                    <span class="reserva-multipunto-hint" title="Esta reserva tiene pasajeros en otros puntos de esta misma ruta">
+                      multipunto
+                    </span>
+                    }
                   </div>
                   <div class="reserva-pax-col">
-                    <span class="reserva-pax">{{ reserva.NumeroPasajeros }} Pax</span>
+                    <!-- Si la reserva tiene pasajeros en múltiples puntos, mostrar los de ESTE punto
+                         en lugar del total. El total sigue visible en el tooltip. -->
+                    <span class="reserva-pax"
+                      [title]="reserva.NumeroPasajeros !== (reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros)
+                        ? 'Total reserva: ' + reserva.NumeroPasajeros + ' pax'
+                        : ''">
+                      {{ reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros }} Pax
+                    </span>
                   </div>
                 </div>
                 }

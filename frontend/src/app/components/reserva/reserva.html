@@ -12,7 +12,12 @@
           <div class="header-title-row">
             <h1 class="reserva-title">{{ reserva.Id_Reserva }}</h1>
             <span class="status-tag" [ngClass]="'status-' + estadoNormalizado">
-              {{ reserva.Estado || 'Pendiente' }}
+              {{ estadoMostrado }}
+            </span>
+            <span
+              class="booking-type-tag"
+              [class.booking-type-tag--privada]="tipoReservaMostrada === 'Privada'">
+              {{ tipoReservaMostrada }}
             </span>
           </div>
         </div>
@@ -73,6 +78,10 @@
             <div class="info-row">
               <span class="info-label">Tour</span>
               <span class="info-value">{{ reserva.TourReserva || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Tipo de reserva</span>
+              <span class="info-value">{{ tipoReservaMostrada }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Fecha</span>

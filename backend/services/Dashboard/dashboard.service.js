@@ -254,19 +254,91 @@ async function getPassengerDistributionSvc(filters = {}) {
 
 // ─── 7. Top destinos por pasajeros ────────────────────────────────────────────
 async function getTourOccupancySvc(filters = {}) {
+  if (filters.tourId) {
+    const [planRows] = await db.query(
+      `SELECT Id_Plan, Nombre_Plan
+       FROM planes_tours
+       WHERE Id_Tour = ?
+       ORDER BY Id_Plan ASC`,
+      [filters.tourId]
+    );
+
+    if ((planRows || []).length <= 1) {
+      return [];
+    }
+
+    const rangeParams = [];
+    const rangeConds = [];
+
+    if (filters.startDate) { rangeConds.push('r.Fecha_Tour >= ?'); rangeParams.push(filters.startDate); }
+    if (filters.endDate) { rangeConds.push('r.Fecha_Tour <= ?'); rangeParams.push(filters.endDate); }
+
+    const andRangeConds = rangeConds.length ? `AND ${rangeConds.join(' AND ')}` : '';
+
+    const sqlByPlan = `
+      SELECT
+        pt.Id_Plan,
+        pt.Nombre_Plan AS nombre,
+        COALESCE(px.pasajeros, 0) AS pasajeros
+      FROM planes_tours pt
+      LEFT JOIN (
+        SELECT
+          base.plan_resuelto AS Id_Plan,
+          COUNT(base.Id_Pasajero) AS pasajeros
+        FROM (
+          SELECT
+            p.Id_Pasajero,
+            COALESCE(
+              pt_direct.Id_Plan,
+              (
+                SELECT pt2.Id_Plan
+                FROM planes_tours pt2
+                WHERE pt2.Id_Tour = h.Id_Tour
+                  AND (
+                    pt2.Fecha_Inicio IS NULL
+                    OR (pt2.Fecha_Inicio <= DATE(r.Fecha_Tour) AND pt2.Fecha_Fin >= DATE(r.Fecha_Tour))
+                  )
+                ORDER BY
+                  CASE WHEN pt2.Fecha_Inicio IS NULL THEN 1 ELSE 0 END,
+                  pt2.Fecha_Inicio DESC,
+                  pt2.Id_Plan ASC
+                LIMIT 1
+              )
+            ) AS plan_resuelto
+          FROM pasajeros p
+          JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+          JOIN horarios h ON r.Id_Horario = h.Id_Horario
+          LEFT JOIN planes_tours pt_direct
+            ON pt_direct.Id_Plan = p.Id_Plan
+           AND pt_direct.Id_Tour = h.Id_Tour
+          WHERE h.Id_Tour = ?
+            AND (r.Estado IS NULL OR r.Estado != 'Cancelada')
+            ${andRangeConds}
+        ) base
+        WHERE base.plan_resuelto IS NOT NULL
+        GROUP BY base.plan_resuelto
+      ) px ON px.Id_Plan = pt.Id_Plan
+      WHERE pt.Id_Tour = ?
+      ORDER BY pt.Id_Plan ASC
+    `;
+
+    const [rows] = await db.query(sqlByPlan, [filters.tourId, ...rangeParams, filters.tourId]);
+    return rows.map((row) => ({
+      nombre: row.nombre,
+      pasajeros: Number(row.pasajeros || 0)
+    }));
+  }
+
   const { conds, params } = buildFilters(filters);
-  const needsTourJoin = !!filters.tourId;
-  const tourJoin = needsTourJoin ? 'JOIN horarios h ON r.Id_Horario = h.Id_Horario' : '';
   const andConds = conds.length ? `AND ${conds.join(' AND ')}` : '';
 
   const sql = `
     SELECT
-      t.Nombre_Tour,
+      t.Nombre_Tour AS nombre,
       COUNT(p.Id_Pasajero) AS pasajeros
     FROM pasajeros p
     JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
-    ${needsTourJoin ? '' : 'JOIN horarios h ON r.Id_Horario = h.Id_Horario'}
-    ${tourJoin}
+    JOIN horarios h ON r.Id_Horario = h.Id_Horario
     JOIN tours t ON h.Id_Tour = t.Id_Tour
     WHERE (r.Estado IS NULL OR r.Estado != 'Cancelada')
     ${andConds}
@@ -276,7 +348,10 @@ async function getTourOccupancySvc(filters = {}) {
   `;
 
   const [rows] = await db.query(sql, params);
-  return rows;
+  return rows.map((row) => ({
+    nombre: row.nombre,
+    pasajeros: Number(row.pasajeros || 0)
+  }));
 }
 
 module.exports = {

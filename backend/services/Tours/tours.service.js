@@ -414,10 +414,9 @@ async function crearPlanTour(Id_Tour, Nombre_Plan) {
 
 async function obtenerTours() {
   const [rows] = await db.query(
-    'SELECT Id_Tour, Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Activo = 1 ORDER BY Nombre_Tour'
+    'SELECT Id_Tour, Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Activo = 1'
   );
   const comisionesMap = await obtenerComisionesToursMap(rows.map((row) => row.Id_Tour));
-  console.log('Tours obtenidos:', rows.length, 'comisionesMap keys:', [...comisionesMap.keys()]);
   return rows.map((row) => ({
     ...row,
     Comisiones: comisionesMap.get(Number(row.Id_Tour)) || [],

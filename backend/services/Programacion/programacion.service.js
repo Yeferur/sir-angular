@@ -281,7 +281,7 @@ function getCoordLon(item) {
     return Number(item?.Longitud ?? item?.lon ?? item?.lng ?? item?.longitude);
 }
 
-function createGraphUsageContext() {
+function createGraphUsageContext(tourDestinos = {}) {
     const disabled = String(process.env.PROGRAMACION_GRAPH_DISTANCE || '').trim() === '0';
     return {
         enabled: !disabled,
@@ -293,7 +293,12 @@ function createGraphUsageContext() {
         astarRuns: 0,
         fallbacks: 0,
         graphLoaded: false,
-        disabledByBudget: false
+        disabledByBudget: false,
+        // Mapa de Id_Tour → { Latitud, Longitud } para orientar el orden de recogida.
+        // Solo se puebla cuando el tour tiene coordenadas definidas en la DB.
+        // Si un tour no tiene coordenadas, su Id_Tour no estará en este mapa
+        // y el algoritmo de ordenamiento se comporta igual que antes.
+        tourDestinos: tourDestinos || {}
     };
 }
 
@@ -679,31 +684,51 @@ function groupReservationsByPoint(reservas) {
 
     for (let index = 0; index < reservas.length; index++) {
         const reserva = reservas[index];
-        const key = getPointKey(reserva);
-        if (!stopsMap.has(key)) {
-            stopsMap.set(key, {
-                key,
+
+        // Si la reserva tiene múltiples puntos (puntosReserva), expandirla en una entrada por punto.
+        // Esto ocurre cuando distintos pasajeros de la misma reserva tienen distintos Id_Punto
+        // pero todos comparten la misma ruta de puntos (restricción de negocio).
+        // La reserva sigue siendo la unidad de asignación de bus; aquí solo separamos las PARADAS.
+        const puntos = reserva.puntosReserva && reserva.puntosReserva.length
+            ? reserva.puntosReserva
+            : [{
                 Id_Punto: reserva.Id_Punto || reserva.idPunto || reserva.IdPunto || null,
                 NombrePunto: reserva.NombrePunto || reserva.PuntoEncuentro || 'SIN_PUNTO',
-                ruta: normalizeRoute(reserva.ruta ?? reserva.Ruta),
-                ordenRuta: getRouteOrder(reserva),
                 Latitud: reserva.Latitud !== null && reserva.Latitud !== undefined ? Number(reserva.Latitud) : null,
                 Longitud: reserva.Longitud !== null && reserva.Longitud !== undefined ? Number(reserva.Longitud) : null,
-                reservas: [],
-                totalPax: 0,
-                originalIndex: index
-            });
-        }
+                ruta: reserva.ruta ?? reserva.Ruta ?? null,
+                ordenRuta: getRouteOrder(reserva),
+                Posicion: reserva.Posicion ?? null,
+                pasajeros: getReservationPax(reserva)
+            }];
 
-        const stop = stopsMap.get(key);
-        stop.reservas.push({ ...reserva, __ordenOriginal: index });
-        stop.totalPax += getReservationPax(reserva);
+        for (const punto of puntos) {
+            const key = punto.Id_Punto
+                ? `punto-${punto.Id_Punto}`
+                : `nombre-${String(punto.NombrePunto || 'SIN_PUNTO').trim().toUpperCase()}`;
 
-        if (!stop.ruta) stop.ruta = normalizeRoute(reserva.ruta ?? reserva.Ruta);
-        if (stop.ordenRuta === null) stop.ordenRuta = getRouteOrder(reserva);
-        if (!hasValidCoords(stop) && hasValidCoords(reserva)) {
-            stop.Latitud = Number(reserva.Latitud);
-            stop.Longitud = Number(reserva.Longitud);
+            if (!stopsMap.has(key)) {
+                stopsMap.set(key, {
+                    key,
+                    Id_Punto: punto.Id_Punto || null,
+                    NombrePunto: punto.NombrePunto || 'SIN_PUNTO',
+                    ruta: normalizeRoute(punto.ruta),
+                    ordenRuta: punto.ordenRuta !== null && punto.ordenRuta !== undefined
+                        ? Number(punto.ordenRuta)
+                        : (punto.Posicion !== null && punto.Posicion !== undefined ? Number(punto.Posicion) : null),
+                    Latitud: punto.Latitud !== null && punto.Latitud !== undefined ? Number(punto.Latitud) : null,
+                    Longitud: punto.Longitud !== null && punto.Longitud !== undefined ? Number(punto.Longitud) : null,
+                    reservas: [],
+                    totalPax: 0,
+                    originalIndex: index
+                });
+            }
+
+            const stop = stopsMap.get(key);
+            // __paxEnEstePunto: pasajeros de ESTA reserva que suben en ESTE punto específico.
+            // Usado en buildBusFromStops para el campo reservasEnEstePunto de cada parada.
+            stop.reservas.push({ ...reserva, __ordenOriginal: index, __paxEnEstePunto: Number(punto.pasajeros || 0) });
+            stop.totalPax += Number(punto.pasajeros || 0);
         }
     }
 
@@ -727,10 +752,15 @@ function stableStopCompare(a, b) {
     return (a.originalIndex || 0) - (b.originalIndex || 0);
 }
 
-function nearestNeighborOrder(stops, context = null) {
+function nearestNeighborOrder(stops, context = null, tourDestino = null) {
     const pendientes = [...stops].sort(stableStopCompare);
     const ordenadas = [];
     let actual = pendientes.shift();
+
+    // tourDestino válido: objeto con Latitud y Longitud numéricos.
+    // Si el tour no tiene coordenadas en la DB, tourDestino llega null
+    // y progresoScore = 0 para todos los candidatos → sin cambio de comportamiento.
+    const destinoValido = tourDestino && hasValidCoords(tourDestino) ? tourDestino : null;
 
     while (actual) {
         ordenadas.push(actual);
@@ -746,11 +776,26 @@ function nearestNeighborOrder(stops, context = null) {
             const ordenActual = getRouteOrder(actual);
             const ordenCandidato = getRouteOrder(candidata);
             const continuidad = ordenActual !== null && ordenCandidato !== null ? Math.abs(ordenCandidato - ordenActual) : 99;
+
+            // Progreso hacia el destino del tour.
+            // Si la parada candidata nos acerca al tour → score negativo (bueno).
+            // Si nos aleja → score positivo (malo).
+            // El peso 1.2 es intencionalmente menor que la bonificación de mismaRuta (8)
+            // para no romper la lógica de rutas operativas existente.
+            let progresoScore = 0;
+            if (destinoValido && hasValidCoords(actual) && hasValidCoords(candidata)) {
+                const distActualATour = haversineKm(actual, destinoValido);
+                const distCandidataATour = haversineKm(candidata, destinoValido);
+                progresoScore = (distCandidataATour - distActualATour) * 1.2;
+            }
+
             const score =
                 (Number.isFinite(distancia) ? distancia : 20) -
                 (mismaRuta ? 8 : 0) +
                 Math.min(distanciaRuta, 10) * 0.75 +
-                Math.min(continuidad, 10) * 0.2;
+                Math.min(continuidad, 10) * 0.2 +
+                progresoScore;
+
             if (score < mejorScore) {
                 mejorScore = score;
                 mejorIdx = i;
@@ -763,8 +808,22 @@ function nearestNeighborOrder(stops, context = null) {
     return ordenadas;
 }
 
-function sortStopsByRouteThenGeo(stops, context = null) {
+function sortStopsByRouteThenGeo(stops, context = null, tourDestino = null) {
     if (!Array.isArray(stops) || stops.length <= 1) return stops || [];
+
+    // Resolver tourDestino desde el contexto si no se pasa directamente.
+    // Se usa el Id_Tour de la primera parada con tour asignado para buscar
+    // las coordenadas destino en context.tourDestinos.
+    let destino = tourDestino;
+    if (!destino && context && context.tourDestinos) {
+        for (const stop of stops) {
+            const idTour = stop.Id_Tour || (stop.reservas && stop.reservas[0] && stop.reservas[0].Id_Tour);
+            if (idTour && context.tourDestinos[String(idTour)]) {
+                destino = context.tourDestinos[String(idTour)];
+                break;
+            }
+        }
+    }
 
     const conRutaOrden = [];
     const conRutaSinOrden = [];
@@ -794,16 +853,27 @@ function sortStopsByRouteThenGeo(stops, context = null) {
 
     const bloquesSinOrden = Array.from(pendientesPorRuta.keys())
         .sort((a, b) => getRouteRank(a) - getRouteRank(b))
-        .flatMap(ruta => nearestNeighborOrder(pendientesPorRuta.get(ruta), context));
+        .flatMap(ruta => nearestNeighborOrder(pendientesPorRuta.get(ruta), context, destino));
 
     return ordenadasConRuta
         .concat(bloquesSinOrden)
-        .concat(nearestNeighborOrder(sinRuta, context));
+        .concat(nearestNeighborOrder(sinRuta, context, destino));
 }
 
 function sortBusReservations(bus, context = null) {
     const stops = sortStopsByRouteThenGeo(groupReservationsByPoint(bus.reservas || []), context);
-    return stops.flatMap(stop => stop.reservas.sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0)));
+    // Deduplicar: una reserva multi-punto aparece en varias paradas; solo se incluye una vez.
+    const seen = new Set();
+    const result = [];
+    for (const stop of stops) {
+        for (const r of stop.reservas.sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0))) {
+            if (!seen.has(r.Id_Reserva)) {
+                seen.add(r.Id_Reserva);
+                result.push(r);
+            }
+        }
+    }
+    return result;
 }
 
 function estimateRouteKm(stops, context = null) {
@@ -891,7 +961,12 @@ function splitOversizedStops(stops, maxCapacity, reservasSinAsignar) {
         let chunkIndex = 1;
 
         for (const reserva of stop.reservas) {
-            const pax = getReservationPax(reserva);
+            // Para reservas multi-punto, el pax relevante en ESTA parada es __paxEnEstePunto,
+            // no NumeroPasajeros total (que incluiría pax de otras paradas).
+            const pax = reserva.__paxEnEstePunto !== undefined
+                ? Number(reserva.__paxEnEstePunto)
+                : getReservationPax(reserva);
+
             if (pax > maxCapacity) {
                 reservasSinAsignar.push({
                     ...reserva,
@@ -918,13 +993,30 @@ function splitOversizedStops(stops, maxCapacity, reservasSinAsignar) {
 
 function buildBusFromStops(stops, contadorBus, context = null) {
     const ordenadas = sortStopsByRouteThenGeo(stops, context);
-    const reservas = ordenadas.flatMap(stop => stop.reservas.sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0)));
+
+    // Deduplicar reservas: una reserva multi-punto aparece en varias paradas de `ordenadas`
+    // pero debe contarse UNA SOLA VEZ en bus.reservas (la unidad de asignación es la reserva completa).
+    const reservasVistas = new Set();
+    const reservas = [];
+    for (const stop of ordenadas) {
+        const enOrden = stop.reservas.slice().sort((a, b) => (a.__ordenOriginal || 0) - (b.__ordenOriginal || 0));
+        for (const r of enOrden) {
+            if (!reservasVistas.has(r.Id_Reserva)) {
+                reservasVistas.add(r.Id_Reserva);
+                const { __ordenOriginal, __paxEnEstePunto, ...reservaLimpia } = r;
+                reservas.push(reservaLimpia);
+            }
+        }
+    }
+
+    // ocupados se calcula desde NumeroPasajeros total de cada reserva única (sin doble-conteo).
     const ocupados = reservas.reduce((sum, r) => sum + getReservationPax(r), 0);
+
     return {
         id: `Bus ${contadorBus}`,
         capacidad: CAPACIDAD_BUS_GENERACION,
         ocupados,
-        reservas: reservas.map(({ __ordenOriginal, ...reserva }) => reserva),
+        reservas,
         recorridoKm: estimateRouteKm(ordenadas, context),
         guia: '',
         paradas: ordenadas.map((stop, index) => ({
@@ -935,10 +1027,65 @@ function buildBusFromStops(stops, contadorBus, context = null) {
             Longitud: stop.Longitud !== null && stop.Longitud !== undefined ? Number(stop.Longitud) : null,
             ruta: normalizeRoute(stop.ruta) || null,
             ordenRuta: getRouteOrder(stop),
-            totalPax: Number(stop.totalPax || 0)
+            totalPax: Number(stop.totalPax || 0),
+            // Sub-conteo por reserva en esta parada: útil para el frontend y el Excel.
+            // Una reserva con 10 pax repartidos 5+5 en dos puntos aparece aquí con pax=5 en cada parada.
+            reservasEnEstePunto: stop.reservas.map(r => ({
+                Id_Reserva: r.Id_Reserva,
+                pax: r.__paxEnEstePunto !== undefined ? Number(r.__paxEnEstePunto) : getReservationPax(r)
+            }))
         })),
         __stops: ordenadas
     };
+}
+
+function generarBusesPrivados(reservas) {
+    if (!Array.isArray(reservas) || reservas.length === 0) return [];
+
+    const buses = [];
+    let consecutivoGlobal = 1;
+
+    for (const reserva of reservas) {
+        const totalPax = Math.max(0, Number(reserva?.NumeroPasajeros || 0));
+        const totalBuses = Math.max(1, Math.ceil(totalPax / CAPACIDAD_BUS_GENERACION));
+        let paxPendientes = totalPax;
+
+        for (let indice = 1; indice <= totalBuses; indice++) {
+            const ocupados = totalPax > 0
+                ? Math.min(CAPACIDAD_BUS_GENERACION, paxPendientes)
+                : 0;
+
+            buses.push({
+                id: `Bus ${consecutivoGlobal++}`,
+                capacidad: CAPACIDAD_BUS_GENERACION,
+                ocupados,
+                guia: '',
+                indice,
+                totalBuses,
+                Id_Reserva_Privada: reserva.Id_Reserva,
+                Id_Reserva: reserva.Id_Reserva,
+                Id_Tour: reserva.Id_Tour,
+                Nombre_Tour: reserva.Nombre_Tour || '',
+                Nombre_Reportante: reserva.Nombre_Reportante || '',
+                Idioma_Reserva: reserva.Idioma_Reserva || '',
+                Observaciones: reserva.Observaciones || '',
+                NumeroPasajeros: totalPax,
+                reservas: [{
+                    Id_Reserva: reserva.Id_Reserva,
+                    Id_Tour: reserva.Id_Tour,
+                    Nombre_Tour: reserva.Nombre_Tour || '',
+                    Nombre_Reportante: reserva.Nombre_Reportante || '',
+                    Idioma_Reserva: reserva.Idioma_Reserva || '',
+                    Observaciones: reserva.Observaciones || '',
+                    NumeroPasajeros: ocupados
+                }]
+            });
+
+            paxPendientes = Math.max(0, paxPendientes - ocupados);
+        }
+    }
+
+    return buses;
 }
 
 
@@ -1276,6 +1423,32 @@ async function getDistanceKmBetweenStops(a, b) {
     return haversineKm(a, b);
 }
 
+async function obtenerCoordenadasTours(tours) {
+    // Consulta las coordenadas de destino por tour.
+    // Devuelve { "Id_Tour": { Latitud, Longitud } } solo para tours con coordenadas válidas.
+    // Tours sin coordenadas (ej: Tour de Compras, Tour de Luces) no aparecen en el mapa
+    // y el algoritmo de ordenamiento se comporta igual que antes para ellos.
+    try {
+        const [rows] = await db.query(
+            'SELECT Id_Tour, Latitud, Longitud FROM tours WHERE Id_Tour IN (?) AND Latitud IS NOT NULL AND Longitud IS NOT NULL',
+            [tours]
+        );
+        const mapa = {};
+        for (const row of rows || []) {
+            const lat = Number(row.Latitud);
+            const lon = Number(row.Longitud);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                mapa[String(row.Id_Tour)] = { Latitud: lat, Longitud: lon };
+            }
+        }
+        return mapa;
+    } catch (err) {
+        // No es crítico: si falla, el algoritmo funciona igual que antes sin attraction point.
+        console.warn('[PROGRAMACION] No se pudieron obtener coordenadas de tours para orientación de ruta:', err.message);
+        return {};
+    }
+}
+
 async function generarPlanLogistico(fecha, idsTours) {
     try {
         const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
@@ -1292,14 +1465,22 @@ async function generarPlanLogistico(fecha, idsTours) {
                 mensaje: reserva.motivoRevision || 'Reserva con puntos de recogida que requieren revisión.'
             }));
 
-        const graphContext = createGraphUsageContext();
+        // Cargar coordenadas de destino por tour para orientar el orden de recogida.
+        // Solo afecta tours con Latitud/Longitud definidas en la tabla tours.
+        const tourDestinos = await obtenerCoordenadasTours(tours);
+        const toursConDestino = Object.keys(tourDestinos);
+        if (toursConDestino.length > 0) {
+            console.log(`[PROGRAMACION] Attraction points cargados para tours: ${toursConDestino.join(', ')}`);
+        }
+
+        const graphContext = createGraphUsageContext(tourDestinos);
         const stopsIniciales = groupReservationsByPoint(reservas);
         const stops = sortStopsByRouteThenGeo(splitOversizedStops(stopsIniciales, maxCapacity, reservasSinAsignar), graphContext);
         const busesConDistancias = updateBusesWithControlledGraphKm(optimizeBusesCapacity(stops, maxCapacity, graphContext), graphContext);
         const busesOptimizados = busesConDistancias
             .map(({ __stops, ...bus }) => ({
                 ...bus,
-                reservas: sortBusReservations(bus, graphContext).map(({ __ordenOriginal, ...reserva }) => reserva),
+                reservas: sortBusReservations(bus, graphContext).map(({ __ordenOriginal, __paxEnEstePunto, ...reserva }) => reserva),
             }));
 
         const busesResumen = busesOptimizados.map((bus, index) => ({
@@ -1841,9 +2022,26 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
 
     const buses = (busesRows || []).map((bus, index) => {
         const placa = bus.Placa_Display ? String(bus.Placa_Display).trim() : `Bus ${index + 1}`;
+        const paradasBus = paradasPorBus.get(bus.Id_Bus_Prog) || [];
         const reservas = (reservasPorBus.get(bus.Id_Bus_Prog) || []).map(reserva => ({
             ...reserva,
-            Placa_Bus: placa
+            Placa_Bus: placa,
+            // Reconstruir puntosReserva desde el snapshot de paradas.
+            // El snapshot guarda el puntoPrincipal en la reserva, no los puntos individuales.
+            // Al cargar, propagamos ese punto como el único punto conocido de la reserva
+            // para que el frontend pueda agrupar correctamente en la vista de paradas.
+            puntosReserva: reserva.Id_Punto
+                ? [{
+                    Id_Punto: reserva.Id_Punto,
+                    NombrePunto: reserva.NombrePunto || 'SIN_PUNTO',
+                    Latitud: reserva.Latitud,
+                    Longitud: reserva.Longitud,
+                    ruta: reserva.ruta || null,
+                    ordenRuta: reserva.ordenRuta,
+                    Posicion: reserva.Posicion,
+                    pasajeros: reserva.NumeroPasajeros
+                }]
+                : []
         }));
 
         return {
@@ -1853,7 +2051,7 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
             reservas,
             recorridoKm: bus.Recorrido_Km !== null && bus.Recorrido_Km !== undefined ? Number(bus.Recorrido_Km) : estimateRouteKm(groupReservationsByPoint(reservas)),
             guia: bus.Guia || '',
-            paradas: paradasPorBus.get(bus.Id_Bus_Prog) || []
+            paradas: paradasBus
         };
     });
 
@@ -1884,70 +2082,6 @@ async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
         const validacion = await validarIntegridadBuses(conn, { fecha, tours, buses });
         const busesValidados = validacion.buses;
 
-        await conn.query(
-            `
-            UPDATE reservas r
-            JOIN horarios h ON h.Id_Horario = r.Id_Horario
-            SET r.Placa_Bus = NULL, r.Orden_Ruta = NULL
-            WHERE r.Fecha_Tour = ? AND h.Id_Tour IN (?)
-            `,
-            [fecha, tours]
-        );
-
-        await conn.query(
-            `
-            DELETE FROM asignacion_buses
-            WHERE Id_Tour IN (?) AND DATE(Fecha_Creacion) = DATE(?)
-            `,
-            [tours, fecha]
-        );
-
-        const fechaCreacion = `${fecha} 00:00:00`;
-        const updatesMasivos = [];
-
-        for (let i = 0; i < busesValidados.length; i++) {
-            const bus = busesValidados[i];
-
-            await conn.query(
-                `
-                INSERT INTO asignacion_buses
-                (Placa_Bus, Capacidad, Cantidad_Pasajeros, Guia, Id_Tour, Fecha_Creacion)
-                VALUES (?, ?, ?, ?, ?, ?)
-                `,
-                [bus.placa, bus.capacidad, bus.ocupados, bus.guia || null, primaryTourId, fechaCreacion]
-            );
-
-            for (const reserva of bus.reservas) {
-                updatesMasivos.push([bus.placa, reserva.orden, reserva.idReserva]);
-            }
-        }
-
-        let reservasActualizadas = 0;
-
-        for (const [placa, orden, idReserva] of updatesMasivos) {
-            const [result] = await conn.query(
-                `
-                UPDATE reservas r
-                JOIN horarios h ON h.Id_Horario = r.Id_Horario
-                SET r.Placa_Bus = ?, r.Orden_Ruta = ?
-                WHERE r.Id_Reserva = ?
-                  AND r.Fecha_Tour = ?
-                  AND h.Id_Tour IN (?)
-                  AND r.Estado NOT IN ('Cancelada', 'Rechazada')
-                  AND r.Tipo_Reserva = 'Grupal'
-                `,
-                [placa, orden, idReserva, fecha, tours]
-            );
-
-            if (result.affectedRows !== 1) {
-                throw createValidationError('No se pudo actualizar una reserva del listado.', [
-                    `La reserva ${idReserva} no fue actualizada. Puede haber cambiado de estado, fecha o tour.`
-                ]);
-            }
-
-            reservasActualizadas += 1;
-        }
-
         const idProgramacion = await guardarSnapshotProgramacion(conn, {
             fecha,
             tours,
@@ -1966,13 +2100,13 @@ async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
                 { columna: 'Fecha', anterior: null, nuevo: fecha },
                 { columna: 'Tours', anterior: null, nuevo: tours.join(',') },
                 { columna: 'Buses', anterior: null, nuevo: String(busesValidados.length) },
-                { columna: 'Reservas_Actualizadas', anterior: null, nuevo: String(reservasActualizadas) },
+                { columna: 'Reservas_Actualizadas', anterior: null, nuevo: String(validacion.totalReservas || 0) },
                 { columna: 'Id_Programacion', anterior: null, nuevo: String(idProgramacion) }
             ]
         });
 
         await conn.commit();
-        return { ok: true, buses: busesValidados.length, reservas: reservasActualizadas, idProgramacion };
+        return { ok: true, buses: busesValidados.length, reservas: validacion.totalReservas || 0, idProgramacion };
     } catch (error) {
         await conn.rollback();
         throw error;
@@ -1991,77 +2125,265 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
 
     const snapshot = await obtenerListadoSnapshot({ fecha, idsTours: tours });
     if (snapshot) return snapshot;
+    return { exists: false, buses: [], reservasSinAsignar: [] };
+}
 
-    const [busesRows] = await db.query(
-        `
-        SELECT Id_Asignacion, Placa_Bus, Capacidad, Cantidad_Pasajeros, Guia
-        FROM asignacion_buses
-        WHERE Id_Tour IN (?) AND DATE(Fecha_Creacion) = DATE(?)
-        ORDER BY Id_Asignacion ASC
-        `,
-        [tours, fecha]
-    );
 
-    if (!busesRows.length) {
-        return { exists: false, buses: [], reservasSinAsignar: [] };
-    }
+async function resumenPrivadosDia(fecha, idsTours) {
+    // Devuelve un resumen ligero de las reservas privadas del día:
+    // cuántas reservas, cuántos buses necesarios y cuántos pax totales.
+    // Se llama desde el dashboard al cargar la fecha, sin necesidad de
+    // abrir ningún tour grupal primero.
+    const tours = Array.isArray(idsTours) ? idsTours : (idsTours ? [idsTours] : null);
 
-    const reservas = await obtenerReservasConPlaca(fecha, tours);
-    const placasSet = new Set(
-        busesRows
-            .map(b => (b.Placa_Bus ? String(b.Placa_Bus).trim() : ''))
-            .filter(Boolean)
-    );
-
-    const reservasPorPlaca = new Map();
-    const reservasSinAsignar = [];
-
-    for (const r of reservas) {
-        const placa = r.Placa_Bus ? String(r.Placa_Bus).trim() : '';
-        if (!placa || !placasSet.has(placa)) {
-            reservasSinAsignar.push(r);
-            continue;
+    try {
+        const params = [fecha];
+        let tourFilter = '';
+        if (tours && tours.length > 0) {
+            tourFilter = 'AND h.Id_Tour IN (?) ';
+            params.push(tours);
         }
-        if (!reservasPorPlaca.has(placa)) reservasPorPlaca.set(placa, []);
-        reservasPorPlaca.get(placa).push(r);
-    }
 
-    const buses = busesRows.map((row, index) => {
-        const placa = row.Placa_Bus ? String(row.Placa_Bus).trim() : `Bus ${index + 1}`;
-        const reservasBus = reservasPorPlaca.get(placa) || [];
-        reservasBus.sort((a, b) => {
-            const ordenA = a.Orden_Ruta !== null && a.Orden_Ruta !== undefined ? Number(a.Orden_Ruta) : Number.MAX_SAFE_INTEGER;
-            const ordenB = b.Orden_Ruta !== null && b.Orden_Ruta !== undefined ? Number(b.Orden_Ruta) : Number.MAX_SAFE_INTEGER;
-            if (ordenA !== ordenB) return ordenA - ordenB;
-            return 0;
-        });
-        const stopsBus = groupReservationsByPoint(reservasBus);
+        const sql = `
+            SELECT
+                r.Id_Reserva,
+                h.Id_Tour,
+                t.Nombre_Tour,
+                r.Nombre_Reportante,
+                r.Idioma_Reserva,
+                r.Observaciones,
+                COUNT(p.Id_Pasajero) AS NumeroPasajeros
+            FROM reservas r
+            INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+            INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
+            LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+            WHERE r.Fecha_Tour = ?
+              ${tourFilter}
+              AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+              AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_RESERVA_ACTIVOS.map(() => '?').join(',')})
+            GROUP BY r.Id_Reserva, h.Id_Tour, t.Nombre_Tour,
+                     r.Nombre_Reportante, r.Idioma_Reserva, r.Observaciones
+            ORDER BY h.Id_Tour ASC, r.Id_Reserva ASC
+        `;
+        params.push(...ESTADOS_RESERVA_ACTIVOS);
 
-        const ocupados = reservasBus.reduce((sum, r) => sum + (r.NumeroPasajeros || 0), 0);
+        const [rows] = await db.query(sql, params);
+        const reservas = rows || [];
+
+        // Generar los buses (misma lógica que generarBusesPrivados)
+        // para tener la lista completa disponible en el dashboard.
+        const buses = generarBusesPrivados(reservas);
 
         return {
-            id: placa,
-            capacidad: Number(row.Capacidad || 0),
-            ocupados,
-            reservas: reservasBus,
-            recorridoKm: estimateRouteKm(stopsBus),
-            guia: row.Guia || ''
+            totalReservas: reservas.length,
+            totalBuses: buses.length,
+            totalPax: buses.reduce((s, b) => s + (b.ocupados || 0), 0),
+            privados: buses
         };
-    });
-
-    return {
-        exists: true,
-        buses,
-        reservasSinAsignar
-    };
+    } catch (error) {
+        console.error('Error en resumenPrivadosDia:', error);
+        // No es crítico para el dashboard: devolver vacío en vez de romper la carga
+        return { totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] };
+    }
 }
 
 module.exports = {
     generarPlanLogistico,
+    resumenPrivadosDia,
+    generarExcelReservaPrivada,
     generarExcelListadoBus,
     guardarListadoFinal,
     obtenerListadoFinal
 };
+
+async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {
+    if (!idReserva) {
+        throw new Error('Se requiere el Id_Reserva para exportar la reserva privada.');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const resumen = workbook.addWorksheet('Resumen');
+    const detalle = workbook.addWorksheet('Pasajeros');
+    const borderThin = { style: 'thin' };
+
+    let reservaRow = null;
+    let pasajerosRows = [];
+
+    try {
+        const [reservasRows] = await db.query(
+            `
+            SELECT
+                r.Id_Reserva,
+                r.Fecha_Tour,
+                r.Estado,
+                r.Tipo_Reserva,
+                r.Idioma_Reserva,
+                r.Nombre_Reportante AS NombreReporta,
+                r.Telefono_Reportante,
+                r.Observaciones,
+                h.Id_Tour,
+                t.Nombre_Tour,
+                COUNT(p.Id_Pasajero) AS NumeroPasajeros
+            FROM reservas r
+            LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+            LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
+            LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+            WHERE r.Id_Reserva = ?
+              AND r.Fecha_Tour = ?
+            GROUP BY
+                r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Tipo_Reserva, r.Idioma_Reserva,
+                r.Nombre_Reportante, r.Telefono_Reportante, r.Observaciones, h.Id_Tour, t.Nombre_Tour
+            LIMIT 1
+            `,
+            [idReserva, fecha]
+        );
+
+        reservaRow = reservasRows?.[0] || null;
+
+        const [pasRows] = await db.query(
+            `
+            SELECT
+                p.Id_Pasajero,
+                p.Nombre_Pasajero,
+                p.DNI,
+                p.Telefono_Pasajero,
+                p.Tipo_Pasajero,
+                pt.Nombre_Punto AS PuntoEncuentro
+            FROM pasajeros p
+            LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+            WHERE p.Id_Reserva = ?
+            ORDER BY p.Id_Pasajero ASC
+            `,
+            [idReserva]
+        );
+
+        pasajerosRows = pasRows || [];
+    } catch (error) {
+        console.error('Error DB al preparar exportación privada:', error);
+        throw new Error('Fallo al obtener los datos de la reserva privada.');
+    }
+
+    const tourLabel = reservaRow?.Nombre_Tour || nombreTour || 'Privado';
+    const reportanteLabel = reservaRow?.NombreReporta || nombreReportante || 'Sin responsable';
+    const paxTotal = Number(reservaRow?.NumeroPasajeros || pasajerosRows.length || 0);
+
+    resumen.columns = [
+        { header: 'BUS', key: 'Bus', width: 14 },
+        { header: 'PLACA', key: 'Placa', width: 18 },
+        { header: 'GUIA', key: 'Guia', width: 24 },
+        { header: 'PAX', key: 'Pax', width: 10 },
+        { header: 'CAPACIDAD', key: 'Capacidad', width: 12 },
+    ];
+
+    resumen.getCell(1, 1).value = `Reserva: ${idReserva}`;
+    resumen.getCell(1, 2).value = `Fecha: ${fecha}`;
+    resumen.getCell(2, 1).value = `Tour: ${tourLabel}`;
+    resumen.getCell(2, 2).value = `Responsable: ${reportanteLabel}`;
+    resumen.getCell(3, 1).value = `Total Pax: ${paxTotal}`;
+    resumen.getCell(3, 2).value = `Total Buses: ${Array.isArray(buses) ? buses.length : 0}`;
+
+    for (let row = 1; row <= 3; row++) {
+        for (let col = 1; col <= 2; col++) {
+            const cell = resumen.getCell(row, col);
+            cell.font = { bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+            cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+        }
+    }
+
+    const resumenHeaderRow = resumen.getRow(5);
+    resumenHeaderRow.values = resumen.columns.map(col => col.header);
+    resumenHeaderRow.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+        cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    });
+
+    (buses || []).forEach((bus, index) => {
+        const row = resumen.addRow({
+            Bus: `Bus ${Number(bus?.indice || index + 1)}/${Number(bus?.totalBuses || buses.length || 1)}`,
+            Placa: String(bus?.id || '').trim() || `Bus ${index + 1}`,
+            Guia: String(bus?.guia || '').trim(),
+            Pax: Number(bus?.ocupados || 0),
+            Capacidad: Number(bus?.capacidad || 0),
+        });
+        row.eachCell(cell => {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+        });
+    });
+
+    detalle.columns = [
+        { header: 'NOMBRE DEL PASAJERO', key: 'NombrePasajero', width: 36 },
+        { header: 'DNI/PASAPORTE', key: 'Dni', width: 18 },
+        { header: 'TELEFONO', key: 'Telefono', width: 18 },
+        { header: 'TIPO', key: 'TipoPasajero', width: 12 },
+        { header: 'PUNTO DE ENCUENTRO', key: 'PuntoEncuentro', width: 26 },
+        { header: 'RESERVA', key: 'Reserva', width: 16 },
+        { header: 'TOUR', key: 'Tour', width: 28 },
+        { header: 'RESPONSABLE', key: 'Responsable', width: 28 },
+        { header: 'OBSERVACIONES', key: 'Observaciones', width: 34 },
+    ];
+
+    detalle.getCell(1, 1).value = `Reserva privada ${idReserva}`;
+    detalle.mergeCells(1, 1, 1, detalle.columns.length);
+    detalle.getCell(1, 1).font = { bold: true };
+    detalle.getCell(1, 1).alignment = { vertical: 'middle', horizontal: 'center' };
+    detalle.getCell(1, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+    detalle.getCell(1, 1).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+
+    const detalleHeaderRow = detalle.getRow(2);
+    detalleHeaderRow.values = detalle.columns.map(col => col.header);
+    detalleHeaderRow.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+        cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    });
+
+    for (const pasajero of pasajerosRows) {
+        const row = detalle.addRow({
+            NombrePasajero: pasajero.Nombre_Pasajero || '',
+            Dni: pasajero.DNI || '',
+            Telefono: pasajero.Telefono_Pasajero || '',
+            TipoPasajero: pasajero.Tipo_Pasajero || '',
+            PuntoEncuentro: pasajero.PuntoEncuentro || '',
+            Reserva: String(idReserva),
+            Tour: tourLabel,
+            Responsable: reportanteLabel,
+            Observaciones: reservaRow?.Observaciones || '',
+        });
+        row.eachCell(cell => {
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+        });
+    }
+
+    if (pasajerosRows.length === 0) {
+        const row = detalle.addRow({
+            NombrePasajero: 'Sin pasajeros asociados',
+            Reserva: String(idReserva),
+            Tour: tourLabel,
+            Responsable: reportanteLabel,
+            Observaciones: reservaRow?.Observaciones || '',
+        });
+        row.eachCell(cell => {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+        });
+    }
+
+    if (idTour || reservaRow?.Id_Tour) {
+        resumen.getCell(3, 3).value = `Id Tour: ${idTour || reservaRow?.Id_Tour}`;
+        const cell = resumen.getCell(3, 3);
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+        cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    }
+
+    return workbook.xlsx.writeBuffer();
+}
 
 /**
  * Genera un archivo Excel para un listado de un bus específico.
@@ -2262,37 +2584,3 @@ function aplicarBordesBloque(worksheet, startRow, endRow, startColumn, endColumn
     }
 }
 
-async function obtenerReservasConPlaca(fecha, idsTours) {
-    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
-
-    const reservas = await obtenerReservas(fecha, tours);
-    if (!reservas.length) return [];
-
-    const reservaIds = reservas.map(r => r.Id_Reserva);
-    const [rows] = await db.query(
-        `
-        SELECT Id_Reserva, Placa_Bus, Orden_Ruta
-        FROM reservas
-        WHERE Id_Reserva IN (?)
-        `,
-        [reservaIds]
-    );
-
-    const asignacionPorReserva = new Map(
-        (rows || []).map(row => [
-            String(row.Id_Reserva),
-            {
-                Placa_Bus: row.Placa_Bus ? String(row.Placa_Bus).trim() : null,
-                Orden_Ruta: row.Orden_Ruta !== null && row.Orden_Ruta !== undefined ? Number(row.Orden_Ruta) : null
-            }
-        ])
-    );
-
-    return reservas.map(reserva => ({
-        ...reserva,
-        ...(asignacionPorReserva.get(String(reserva.Id_Reserva)) || {
-            Placa_Bus: null,
-            Orden_Ruta: null
-        })
-    }));
-}

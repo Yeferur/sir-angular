@@ -5,6 +5,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import {
   ReactiveFormsModule, FormBuilder, FormGroup, Validators,
   FormArray, AbstractControl
@@ -56,6 +57,8 @@ interface SubmitValidationIssue {
   styleUrls: ['./crear-reserva.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
+  private readonly router = inject(Router);
+  private readonly drawer = inject(SirDrawerService);
 
   // ═══════════════════════════════════════════════════════════════════
   // WIZARD STATE
@@ -714,7 +717,6 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
   private reservasSvc = inject(Reservas);
-  private drawer = inject(SirDrawerService);
   private alertService = inject(SirAlertService);
   private uiState = inject(UiStateService);
   private zone = inject(NgZone);
@@ -2013,8 +2015,22 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
           title: 'Reserva creada',
           message: `La reserva ${res.Id_Reserva} fue generada correctamente. Estado: ${estadoTexto}.`,
           buttons: [
-            { text: 'Cerrar', style: 'secondary', onClick: () => this.alertService.closeModal() },
-            { text: 'Ver Reserva', style: 'primary', onClick: () => { this.alertService.closeModal(); this.cuposStripInfo.set(null); this.drawer.openReserva(res.Id_Reserva); } },
+            {
+              text: 'Cerrar',
+              style: 'secondary',
+              onClick: () => {
+                this.alertService.closeModal();
+                this.goToVerReservas();
+              }
+            },
+            {
+              text: 'Ver Reserva',
+              style: 'primary',
+              onClick: () => {
+                this.alertService.closeModal();
+                this.goToVerReservas(res.Id_Reserva, true);
+              }
+            },
           ],
         });
 
@@ -2255,12 +2271,22 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         ? { estado: 'Confirmada', subestado: null, motivo: 'Pago completo con comprobante y datos completos.' }
         : { estado: 'Pendiente', subestado: 'de pago', motivo: 'Falta el comprobante del pago completo.' };
     }
-    return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
+    return { estado: 'Confirmada', subestado: 'de pago', motivo: 'Se registró un abono. La reserva queda confirmada con saldo pendiente.' };
   }
 
   // ── Compat (referenciados desde navbar / editar-reserva compartido) ──
   private verReservaDuplicada(idReserva: string) { this.uiState.reservaId.set(idReserva); }
   duplicarReserva() { console.warn('duplicarReserva no está implementado en CrearReservaComponent'); }
+
+  private goToVerReservas(idReserva?: string | null, openDrawer = false): void {
+    this.uiState.needsRefresh.set('reservas');
+    this.cuposStripInfo.set(null);
+    const reserva = idReserva ? String(idReserva) : '';
+    if (openDrawer && reserva) {
+      this.drawer.openReserva(reserva);
+    }
+    void this.router.navigate(['/Reservas/VerReservas']);
+  }
 
   ngOnDestroy(): void {
     this.cuposStripInfo.set(null);

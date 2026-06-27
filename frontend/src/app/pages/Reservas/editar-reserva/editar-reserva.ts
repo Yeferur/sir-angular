@@ -1007,6 +1007,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   private originalReserva: any = null;
   // Modo creado desde duplicado
   private isDuplicateMode = false;
+  private duplicateDrawerAutoOpenedForId: string | null = null;
 
   async ngOnInit(): Promise<void> {
     // Estructura del form (idéntica a crear, pero la usaremos solo para editar)
@@ -1098,6 +1099,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.reservaId.set(id);
     await this.cargarReservaExistente(id);
     await this.cargarHistorialActividad(id);
+    await this.handleAutoOpenDuplicateDrawer();
 
     // Además, escuchar cambios en los parámetros de la ruta si Angular reutiliza el componente
     this.route.paramMap
@@ -1109,8 +1111,22 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
           Promise.all([
             this.cargarReservaExistente(newId),
             this.cargarHistorialActividad(newId),
-          ]).then(() => this.cdr.markForCheck());
+          ]).then(async () => {
+            this.duplicateDrawerAutoOpenedForId = null;
+            await this.handleAutoOpenDuplicateDrawer();
+            this.cdr.markForCheck();
+          });
         }
+      });
+
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(async (qp) => {
+        if (qp.get('duplicar') !== '1') {
+          this.duplicateDrawerAutoOpenedForId = null;
+          return;
+        }
+        await this.handleAutoOpenDuplicateDrawer();
       });
 
     // Escuchar cambios en FormaPago para conversión manual
@@ -2436,43 +2452,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   async duplicarReserva(): Promise<void> {
     this.openSummary = false;
     try {
-      this.abonos.clear();
-      this.form.get('ComprobantePago')?.setValue(null);
-      for (const fg of this.pasajeros.controls) fg.get('Confirmacion')?.setValue(false);
-
-      const principal = this.puntosSeleccionados()[0] ?? null;
-      this.form.get('Id_Punto')?.setValue(principal?.Id_Punto ?? null);
-
-      this.drawer.openDuplicar({
-        tours: this.tours(),
-        Id_Tour: Number(this.form.get('SelectTour')?.value) || null,
-        Fecha_Tour: this.form.get('Fecha_Tour')?.value || null,
-
-        onConfirm: async ({ Id_Tour, Fecha_Tour, Observaciones }: any) => {
-          const targetTourId = Number(Id_Tour);
-          const targetFecha = String(Fecha_Tour || '').slice(0, 10);
-
-          this.drawer.close();
-          await Promise.resolve();
-
-          const origFecha = this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva ?? this.form.get('Fecha_Tour')?.value;
-          const origFechaNorm = String(origFecha || '').slice(0, 10);
-
-          if (!targetFecha || targetFecha === origFechaNorm) {
-            this.navbar.showAlert({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
-            return;
-          }
-
-          const okRestricciones = await this.confirmarRestriccionesAntesDeDuplicar(targetTourId);
-          if (!okRestricciones) return;
-
-          await this.crearReservaDuplicada({
-            Id_Tour: targetTourId,
-            Fecha_Tour: targetFecha,
-            Observaciones: typeof Observaciones === 'string' ? this.toUpperText(Observaciones) : null
-          });
-        }
-      });
+      await this.openDuplicateDrawer();
 
       this.CuposDisponiblesNavbar();
       this.cdr.markForCheck();
@@ -2582,24 +2562,21 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const nuevoId = rAny?.Id_Reserva ?? rAny?.id ?? rAny?.reservaId ?? null;
 
       if (!nuevoId) {
-        this.navbar.showAlert({ type: 'success', title: 'Reserva creada', message: 'Reserva duplicada correctamente.', autoClose: true });
+        this.navbar.successToast('Reserva creada', 'La reserva duplicada se creó correctamente.');
+        this.abrirReservaEnNavbar('');
         return;
       }
 
-      let extraMsg = '';
-      if (removeInfantesCount > 0) extraMsg += `\nNota: Se removieron ${removeInfantesCount} infantes no permitidos.`;
-      if (adaptadosCount > 0) extraMsg += `\nNota: Se reajustaron tarifas de ${adaptadosCount} menores por política del tour.`;
+      const notas: string[] = [];
+      if (removeInfantesCount > 0) notas.push(`Se removieron ${removeInfantesCount} infantes no permitidos.`);
+      if (adaptadosCount > 0) notas.push(`Se reajustaron ${adaptadosCount} tarifas por política del tour.`);
 
-      this.navbar.showAlert({
-        type: 'success',
-        title: 'Reserva duplicada con éxito',
-        message: `ID de nueva reserva: ${nuevoId}${extraMsg}`,
-        autoClose: false,
-        buttons: [
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() },
-          { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.clearOverlay(); this.abrirReservaEnNavbar(String(nuevoId)); } }
-        ]
-      });
+      this.navbar.successToast(
+        'Reserva duplicada con éxito',
+        `Nueva reserva #${nuevoId}.${notas.length ? ` ${notas.join(' ')}` : ''}`,
+        5000
+      );
+      this.abrirReservaEnNavbar(String(nuevoId));
 
     } catch (err) {
       console.error(err);
@@ -2621,11 +2598,65 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private abrirReservaEnNavbar(idReserva: string) {
-
+    const reserva = String(idReserva || '').trim();
     this.navbar.clearOverlay();
     this.navbar.cuposInfo.set(null);
-    this.navbar.Id_Reserva.set(idReserva);
+    this.navbar.needsRefresh.set('reservas');
+    this.uiState.needsRefresh.set('reservas');
+    if (reserva) {
+      this.drawer.openReserva(reserva);
+    }
+    void this.router.navigate(['/Reservas/VerReservas']);
+  }
 
+  private async handleAutoOpenDuplicateDrawer(): Promise<void> {
+    const wantsDuplicate = this.route.snapshot.queryParamMap.get('duplicar') === '1';
+    const currentId = String(this.reservaId() || '').trim();
+    if (!wantsDuplicate || !currentId || this.duplicateDrawerAutoOpenedForId === currentId) return;
+
+    this.duplicateDrawerAutoOpenedForId = currentId;
+    await this.openDuplicateDrawer();
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { duplicar: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private async openDuplicateDrawer(): Promise<void> {
+    this.drawer.openDuplicar({
+      tours: this.tours(),
+      Id_Tour: Number(this.form.get('SelectTour')?.value) || null,
+      Fecha_Tour: this.form.get('Fecha_Tour')?.value || null,
+      Observaciones: this.originalReserva?.Cabecera?.Observaciones ?? this.originalReserva?.Observaciones ?? this.form.get('Observaciones')?.value ?? null,
+
+      onConfirm: async ({ Id_Tour, Fecha_Tour, Observaciones }: any) => {
+        const targetTourId = Number(Id_Tour);
+        const targetFecha = String(Fecha_Tour || '').slice(0, 10);
+
+        this.drawer.close();
+        await Promise.resolve();
+
+        const origFecha = this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva ?? this.form.get('Fecha_Tour')?.value;
+        const origFechaNorm = String(origFecha || '').slice(0, 10);
+
+        if (!targetFecha || targetFecha === origFechaNorm) {
+          this.navbar.showAlert({ type: 'warning', title: 'Fecha inválida', message: 'La fecha debe ser distinta a la original.', autoClose: true });
+          return;
+        }
+
+        const okRestricciones = await this.confirmarRestriccionesAntesDeDuplicar(targetTourId);
+        if (!okRestricciones) return;
+
+        await this.crearReservaDuplicada({
+          Id_Tour: targetTourId,
+          Fecha_Tour: targetFecha,
+          Observaciones: typeof Observaciones === 'string' ? this.toUpperText(Observaciones) : null
+        });
+      }
+    });
   }
 
   private buildDuplicatedObservaciones(observacionExtra?: string | null): string {
@@ -3019,8 +3050,22 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         message: `La reserva ${reservaActual} ha sido actualizada correctamente. Estado: ${estadoTexto}.`,
         autoClose: false,
         buttons: [
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert.set(null) },
-          { text: 'Ver Reserva', style: 'primary', onClick: () => { this.navbar.alert.set(null); this.navbar.cuposInfo.set(null); this.navbar.Id_Reserva.set(String(reservaActual)); } },
+          {
+            text: 'Cerrar',
+            style: 'secondary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              this.abrirReservaEnNavbar('');
+            }
+          },
+          {
+            text: 'Ver Reserva',
+            style: 'primary',
+            onClick: () => {
+              this.navbar.alert.set(null);
+              this.abrirReservaEnNavbar(String(reservaActual));
+            }
+          },
         ],
       });
 
@@ -3233,6 +3278,6 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       if (tieneComprobanteCompleto) return { estado: 'Confirmada', subestado: null, motivo: 'Pago completo con comprobante y datos completos.' };
       return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Falta el comprobante del pago completo.' };
     }
-    return { estado: 'Pendiente', subestado: 'de pago', motivo: 'Se registró un abono. Falta completar el pago.' };
+    return { estado: 'Confirmada', subestado: 'de pago', motivo: 'Se registró un abono. La reserva queda confirmada con saldo pendiente.' };
   }
 }

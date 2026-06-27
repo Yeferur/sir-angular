@@ -91,6 +91,12 @@
   background: rgba(10, 132, 255, .08);
 }
 
+.date-hoy-btn.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue);
+  color: #fff;
+}
+
 /* ── GRID ─────────────────────────────────────────────────── */
 .tours-grid {
   display: grid;

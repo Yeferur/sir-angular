@@ -19,7 +19,7 @@
         <div class="header-title-row">
           <h1 class="transfer-title">{{ transferCodigo }}</h1>
           <span class="status-tag" [ngClass]="'status-' + estadoClase">
-            {{ transfer.Estado || 'Pendiente' }}
+            {{ estadoMostrado }}
           </span>
         </div>
       </div>

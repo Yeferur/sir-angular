@@ -461,6 +461,28 @@
   text-overflow: ellipsis;
 }
 
+.tipo-reserva-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 132, 255, .18);
+  background: rgba(10, 132, 255, .08);
+  color: var(--accent-blue);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.tipo-reserva-badge--privada {
+  border-color: rgba(255, 159, 10, .22);
+  background: rgba(255, 159, 10, .1);
+  color: var(--accent-yellow, #ff9f0a);
+}
+
 .item-meta {
   font-size: .82rem;
   color: var(--text-secondary);

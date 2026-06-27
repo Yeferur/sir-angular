@@ -70,12 +70,15 @@ interface ComprobanteReserva {
 interface Reserva {
   Id_Reserva: string;
   Id_Tour?: number | string;
+  Tipo_Reserva?: string;
   Estado?: string;
   NumeroPasajeros?: number;
   TotalNeto?: number;
   Pendiente?: number;
   TourReserva?: string;
   PuntoEncuentro?: string;
+  Direccion?: string;
+  Referencia?: string;
   FechaReserva?: string | null;
   HoraSalida?: string;
   IdiomaReserva?: string;
@@ -147,6 +150,26 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return String(this.reserva?.Estado || 'pendiente').toLowerCase();
   }
 
+  get estadoMostrado(): string {
+    const estadoBase = String(this.reserva?.Estado || 'Pendiente').trim();
+    if (estadoBase !== 'Confirmada') return estadoBase || 'Pendiente';
+
+    if (this.hasDirectPayment()) return 'Confirmada - Pago en punto';
+    if (this.hasPartialPaymentPending()) return 'Confirmada - Pendiente de pago';
+    return 'Confirmada';
+  }
+
+  get tipoReservaMostrada(): string {
+    const tipo = String(
+      this.reserva?.Tipo_Reserva ??
+      (this.reserva as any)?.TipoReserva ??
+      (this.reserva as any)?.tipo_reserva ??
+      (this.reserva as any)?.tipoReserva ??
+      'Grupal'
+    ).trim().toLowerCase();
+    return tipo === 'privada' ? 'Privada' : 'Grupal';
+  }
+
   editarReserva() {
     const id = this.reserva?.Id_Reserva;
     if (!id || !this.canUpdateReserva) return;
@@ -162,19 +185,19 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     if (!reserva?.Id_Reserva) return;
 
     try {
-      const tours = await firstValueFrom(this.api.getTours());
-      this.drawer.openDuplicar({
-        tours,
-        Id_Tour: reserva.Id_Tour ?? null,
-        Fecha_Tour: reserva.FechaReserva ?? null,
-        Observaciones: reserva.Observaciones ?? null,
-      });
+      this.uiState.reservaId.set(String(reserva.Id_Reserva));
+      this.drawer.close();
+      try { this.onClose.emit(); } catch {}
+      await this.router.navigate(
+        ['/Reservas/EditarReserva', reserva.Id_Reserva],
+        { queryParams: { duplicar: 1 } }
+      );
     } catch (error) {
-      console.error('No se pudo abrir el panel de duplicado:', error);
+      console.error('No se pudo redirigir a duplicar la reserva:', error);
       this.alerts.showModal({
         type: 'error',
         title: 'No se pudo abrir duplicar',
-        message: 'No fue posible cargar los tours disponibles. Intenta nuevamente.',
+        message: 'No fue posible abrir la reserva en edición para duplicarla. Intenta nuevamente.',
       });
     }
   }
@@ -317,7 +340,27 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return '';
   }
 
+  private pickText(...values: any[]): string {
+    for (const value of values) {
+      const text = String(value ?? '').trim();
+      if (text) return text;
+    }
+    return '';
+  }
+
   private normalizePuntosReserva(base: any): PuntoReservaPdf[] {
+    const fallbackDireccion = this.pickText(
+      base?.Direccion,
+      base?.direccion,
+      base?.DireccionPuntoEncuentro,
+      base?.Direccion_Punto
+    );
+    const fallbackReferencia = this.pickText(
+      base?.Referencia,
+      base?.referencia,
+      base?.Sector,
+      base?.sector
+    );
     const raw =
       base?.Puntos ||
       base?.puntos ||
@@ -330,8 +373,21 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         Id_Punto: p.Id_Punto ?? p.id ?? p.IdPunto,
         NombrePunto: p.NombrePunto ?? p.PuntoEncuentro ?? p.Nombre_Punto ?? p.nombre ?? '—',
         HoraSalida: p.HoraSalida ?? p.Hora_Salida ?? p.hora ?? '—',
-        Direccion: p.Direccion ?? p.direccion ?? '',
-        Referencia: p.Referencia ?? p.referencia ?? '',
+        Direccion: this.pickText(
+          p.Direccion,
+          p.direccion,
+          p.DireccionPuntoEncuentro,
+          p.Direccion_Punto,
+          p.Sector,
+          fallbackDireccion
+        ),
+        Referencia: this.pickText(
+          p.Referencia,
+          p.referencia,
+          p.Sector,
+          p.sector,
+          fallbackReferencia
+        ),
         Ruta: p.ruta ?? p.Ruta ?? '',
       }));
     }
@@ -351,8 +407,21 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           Id_Punto: idPunto ?? undefined,
           NombrePunto: nombre || '—',
           HoraSalida: hora || '—',
-          Direccion: p?.Direccion ?? '',
-          Referencia: p?.Referencia ?? '',
+          Direccion: this.pickText(
+            p?.Direccion,
+            p?.direccion,
+            p?.DireccionPuntoEncuentro,
+            p?.Direccion_Punto,
+            p?.Sector,
+            fallbackDireccion
+          ),
+          Referencia: this.pickText(
+            p?.Referencia,
+            p?.referencia,
+            p?.Sector,
+            p?.sector,
+            fallbackReferencia
+          ),
           Ruta: p?.Ruta ?? p?.ruta ?? '',
         });
       }
@@ -366,8 +435,8 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       Id_Punto: base?.Id_Punto ?? base?.IdPunto ?? null,
       NombrePunto: base?.PuntoEncuentro ?? base?.Nombre_Punto ?? '—',
       HoraSalida: base?.HoraSalida ?? '—',
-      Direccion: base?.Direccion ?? '',
-      Referencia: base?.Referencia ?? '',
+      Direccion: fallbackDireccion,
+      Referencia: fallbackReferencia,
       Ruta: base?.Ruta ?? base?.ruta ?? '',
     }];
   }
@@ -407,6 +476,95 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     return comprobantes;
   }
 
+  private hasValidComprobante(pago: any): boolean {
+    const tipo = String(pago?.Tipo || pago?.TipoPago || pago?.FormaPago || pago?.tipo || '')
+      .trim()
+      .toLowerCase();
+
+    if (tipo === 'pago directo') return false;
+
+    const rawPath =
+      pago?.Ruta_Comprobante ||
+      pago?.SoporteUrl ||
+      pago?.Comprobante ||
+      pago?.ComprobantePago ||
+      pago?.UrlComprobante ||
+      pago?.url ||
+      pago?.Archivo ||
+      pago?.archivo;
+
+    const value = String(rawPath || '').trim();
+    return !!value && value.toUpperCase() !== 'N/A';
+  }
+
+  private isDirectPayment(pago: any): boolean {
+    const tipo = String(pago?.Tipo || pago?.TipoPago || pago?.FormaPago || pago?.tipo || '')
+      .trim()
+      .toLowerCase();
+
+    return tipo === 'pago directo' || tipo === 'directo' || tipo === 'paga en punto';
+  }
+
+  private getPdfPagos(): any[] {
+    return (this.reserva?.Pagos || []).filter((pago: any) => !this.isDirectPayment(pago));
+  }
+
+  private hasDirectPayment(): boolean {
+    return (this.reserva?.Pagos || []).some((pago: any) => this.isDirectPayment(pago));
+  }
+
+  private hasPartialPaymentPending(): boolean {
+    const pendiente = Number(this.reserva?.Pendiente ?? 0);
+    const pagos = this.getPdfPagos();
+    if (pendiente <= 0 || !pagos.length) return false;
+
+    const tieneAbonos = pagos.some((pago: any) => {
+      const tipo = String(pago?.Tipo || pago?.TipoPago || pago?.FormaPago || pago?.tipo || '')
+        .trim()
+        .toLowerCase();
+      return tipo === 'abono';
+    });
+
+    return tieneAbonos;
+  }
+
+  private getReservaPointAssignments(): PuntoReservaPdf[] {
+    const points = this.reserva?.Puntos || [];
+    const unique = new Map<string, PuntoReservaPdf>();
+
+    for (const point of points) {
+      const nombre = this.pickText(point?.NombrePunto, this.reserva?.PuntoEncuentro) || '—';
+      const direccion = this.pickText(point?.Direccion, this.reserva?.Direccion);
+      const referencia = this.pickText(point?.Referencia, this.reserva?.Referencia);
+      const hora = this.pickText(point?.HoraSalida, this.reserva?.HoraSalida) || '—';
+      const keyBase = this.pickText(point?.Id_Punto, nombre).toUpperCase();
+      const key = `${keyBase}|${hora.toUpperCase()}`;
+      const existing = unique.get(key);
+
+      if (!existing) {
+        unique.set(key, {
+          ...point,
+          NombrePunto: nombre,
+          Direccion: direccion,
+          Referencia: referencia,
+          HoraSalida: hora,
+        });
+        continue;
+      }
+
+      unique.set(key, {
+        ...existing,
+        ...point,
+        NombrePunto: this.pickText(existing.NombrePunto, nombre) || '—',
+        Direccion: this.pickText(existing.Direccion, direccion),
+        Referencia: this.pickText(existing.Referencia, referencia),
+        HoraSalida: this.pickText(existing.HoraSalida, hora) || '—',
+      });
+    }
+
+    return [...unique.values()];
+  }
+
   private normalizeApi(data: any) {
     const payload = data?.data ?? data?.reserva ?? data;
     const base = payload?.Id_Reserva
@@ -441,12 +599,21 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     const r: Reserva = {
       Id_Reserva: String(base.Id_Reserva ?? ''),
       Id_Tour: base.Id_Tour ?? base.idTour ?? null,
+      Tipo_Reserva:
+        base.Tipo_Reserva ??
+        base.TipoReserva ??
+        base.tipo_reserva ??
+        base.tipoReserva ??
+        base.Cabecera?.Tipo_Reserva ??
+        'Grupal',
       Estado: base.Estado ?? 'Pendiente',
       NumeroPasajeros: pasajeros.length,
       TotalNeto: totalNeto,
       Pendiente: pendiente,
       TourReserva: base.TourReserva ?? base.Nombre_Tour ?? '—',
       PuntoEncuentro: base.PuntoEncuentro ?? base.Nombre_Punto ?? puntos[0]?.NombrePunto ?? '—',
+      Direccion: base.Direccion ?? base.DireccionPuntoEncuentro ?? puntos[0]?.Direccion ?? '',
+      Referencia: base.Referencia ?? base.Sector ?? puntos[0]?.Referencia ?? '',
       FechaReserva: base.FechaReserva ?? base.Fecha_Tour ?? null,
       HoraSalida: base.HoraSalida ?? puntos[0]?.HoraSalida ?? '—',
       IdiomaReserva: base.IdiomaReserva ?? base.Idioma_Reserva ?? '—',
@@ -571,6 +738,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       head: [['Campo', 'Detalle']],
       body: [
         ['Reserva', r?.Id_Reserva || '—'],
+        ['Estado', this.estadoMostrado],
         ['Tour', r?.TourReserva || '—'],
         ['Fecha del tour', this.formatDate(r?.FechaReserva)],
         ['Idioma', r?.IdiomaReserva || '—'],
@@ -581,7 +749,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
 
     y = (doc.lastAutoTable?.finalY ?? y) + 8;
 
-    const puntos = this.reserva?.Puntos || [];
+    const puntos = this.getReservaPointAssignments();
     if (puntos.length) {
       y = this.ensurePdfSpace(doc, y, 40);
       doc.setFontSize(12);
@@ -597,15 +765,13 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
         head: [[
           'Punto de encuentro',
-          'Hora de salida',
           'Dirección / referencia',
-          'Ruta',
+          'Hora de salida',
         ]],
         body: puntos.map((pto) => [
           pto.NombrePunto || '—',
-          pto.HoraSalida || '—',
           [pto.Direccion, pto.Referencia].filter(Boolean).join(' · ') || '—',
-          pto.Ruta || '—',
+          pto.HoraSalida || '—',
         ]),
       });
 
@@ -617,6 +783,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       ...this.pasajeros.ninos,
       ...this.pasajeros.infantes,
     ];
+    const shouldShowPassengerPointColumns = puntos.length > 1;
 
     if (todos.length) {
       y = this.ensurePdfSpace(doc, y, 48);
@@ -637,44 +804,41 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           'DNI / Pasaporte',
           'País de origen',
           'Teléfono',
-          'Punto',
-          'Hora',
           'Precio',
+          ...(shouldShowPassengerPointColumns ? ['Punto', 'Hora'] : []),
         ]],
         body: todos.map((p) => {
           const punto = this.getPassengerPointInfo(p);
-          return [
+          const row = [
             p.NombrePasajero || '—',
             p.TipoPasajero || '—',
             p.IdPas || '—',
             p.Nacionalidad || '—',
             p.TelefonoPasajero || '—',
-            punto?.NombrePunto || p.Nombre_Punto || r?.PuntoEncuentro || '—',
-            punto?.HoraSalida || p.HoraSalida || r?.HoraSalida || '—',
             this.formatCurrency(p.Precio_Pasajero),
           ];
+          if (shouldShowPassengerPointColumns) {
+            row.push(
+              punto?.NombrePunto || p.Nombre_Punto || r?.PuntoEncuentro || '—',
+              punto?.HoraSalida || p.HoraSalida || r?.HoraSalida || '—',
+            );
+          }
+          return row;
         }),
       });
 
       y = (doc.lastAutoTable?.finalY ?? y) + 8;
     }
 
-    y = this.ensurePdfSpace(doc, y, 40);
+    y = this.ensurePdfSpace(doc, y, 36);
     doc.setFontSize(12);
     doc.setTextColor(35, 35, 35);
-    doc.text('Estado de pago', 10, y);
+    doc.text('Resumen de pago', 10, y);
     y += 3;
 
     const totalNeto = Number(r?.TotalNeto ?? 0);
     const pendiente = Number(r?.Pendiente ?? 0);
     const pagado = Math.max(0, totalNeto - pendiente);
-    const estadoPago = pendiente <= 0 && totalNeto > 0
-      ? 'Pagado'
-      : pagado > 0 && pendiente > 0
-        ? 'Parcial'
-        : totalNeto > 0
-          ? 'Pendiente'
-          : '—';
 
     autoTable(doc, {
       startY: y + 2,
@@ -687,13 +851,12 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         ['Total', this.formatCurrency(totalNeto)],
         ['Pagado', this.formatCurrency(pagado)],
         ['Pendiente', this.formatCurrency(pendiente)],
-        ['Estado de pago', estadoPago],
       ],
     });
 
     y = (doc.lastAutoTable?.finalY ?? y) + 8;
 
-    const pagos = this.reserva?.Pagos || [];
+    const pagos = this.getPdfPagos();
     if (pagos.length) {
       y = this.ensurePdfSpace(doc, y, 36);
       doc.setFontSize(12);
@@ -717,7 +880,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
           this.formatDate(p.Fecha_Pago || p.Fecha || p.fecha),
           p.Tipo || p.TipoPago || p.FormaPago || '—',
           this.formatCurrency(p.Monto ?? p.monto ?? 0),
-          p.Ruta_Comprobante || p.SoporteUrl ? 'Sí' : 'No',
+          this.hasValidComprobante(p) ? 'Sí' : 'No',
         ]),
       });
 

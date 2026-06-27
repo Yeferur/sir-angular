@@ -78,6 +78,32 @@ export class ProgramacionDashboardService {
   /**
    * Exporta un listado (bus) a Excel y devuelve un Blob para descarga.
    */
+  /**
+   * Consulta el resumen de reservas privadas para una fecha dada.
+   * Se llama desde el dashboard al cargar, sin necesidad de abrir un tour.
+   */
+  resumenPrivadosDia(fecha: string, idsTours?: number[]): Observable<{
+    totalReservas: number;
+    totalBuses: number;
+    totalPax: number;
+    privados: any[];
+  }> {
+    const payload: any = { fecha };
+    if (idsTours && idsTours.length > 0) payload.idsTours = idsTours;
+    return this.http.post<any>(`${this.apiUrl}/privados-del-dia`, payload);
+  }
+
+  exportarReservaPrivada(payload: {
+    fecha: string;
+    idReserva: string | number;
+    idTour?: number;
+    nombreTour?: string;
+    nombreReportante?: string;
+    buses: any[];
+  }): Observable<Blob> {
+    return this.http.post(`${this.apiUrl}/exportar-reserva-privada`, payload, { responseType: 'blob' });
+  }
+
   exportarListadoBus(payload: { fecha: string; idTour: number; bus: any; nombreTour?: string }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-listado-bus`, payload, { responseType: 'blob' });
   }

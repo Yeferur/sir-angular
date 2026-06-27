@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { UiStateService } from '../../../services/ui-state.service';
@@ -32,6 +33,7 @@ interface WizardStep {
 export class CrearTransferComponent implements OnInit, OnDestroy {
   private alerts = inject(SirAlertService);
   private uiState = inject(UiStateService);
+  private drawer = inject(SirDrawerService);
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
 
@@ -592,7 +594,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
       Valor: Number(this.form.value.Valor || 0),
       Moneda: this.form.value.Moneda,
       Observaciones: this.toUpperText(this.form.value.Observaciones) || null,
-      Estado: 'Pendiente',
+      Estado: null,
       Pago: {
         Tipo: tipoPago,
         Observaciones: tipoPago === 'Completo' ? this.toUpperText(this.form.value.PagoObservaciones) || null : null,
@@ -989,10 +991,31 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
 
     this.transferSvc.crearTransfer(formData).subscribe({
       next: (data) => {
-        this.navbar.successToast('Transfer creado', data?.message || 'Transfer creado correctamente.');
-        this.resetForm();
+        const transferId = String(data?.data?.Id_Transfer || data?.Id_Transfer || '').trim();
         this.isSubmitting.set(false);
-        this.router.navigate(['/Transfers/VerTransfers']);
+        this.alerts.showModal({
+          type: 'success',
+          title: 'Transfer creado',
+          message: data?.message || 'Transfer creado correctamente.',
+          buttons: [
+            {
+              text: 'Cerrar',
+              style: 'secondary',
+              onClick: () => {
+                this.alerts.closeModal();
+                this.goToVerTransfers();
+              }
+            },
+            {
+              text: 'Ver Transfer',
+              style: 'primary',
+              onClick: () => {
+                this.alerts.closeModal();
+                this.goToVerTransfers(transferId, true);
+              }
+            },
+          ],
+        });
       },
       error: () => {
         this.navbar.errorToast('Error', 'Hubo un error al crear el transfer.');
@@ -1029,6 +1052,16 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     this.goingBack = false;
     this.panelAnimating = false;
     this.syncPaymentFileValidators();
+  }
+
+  private goToVerTransfers(idTransfer?: string | null, openDrawer = false): void {
+    this.uiState.needsRefresh.set('transfers');
+    this.uiState.cuposInfo.set(null);
+    const transferId = idTransfer ? String(idTransfer) : '';
+    if (openDrawer && transferId) {
+      this.drawer.openTransfer(transferId);
+    }
+    void this.router.navigate(['/Transfers/VerTransfers']);
   }
 
   ngOnDestroy(): void {

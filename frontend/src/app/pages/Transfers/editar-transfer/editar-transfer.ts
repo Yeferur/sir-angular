@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
@@ -27,6 +28,7 @@ interface WizardStep {
 export class EditarTransferComponent implements OnInit, OnDestroy {
   private alerts = inject(SirAlertService);
   private uiState = inject(UiStateService);
+  private drawer = inject(SirDrawerService);
   form!: FormGroup;
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
   private originalTransfer: any = null;
@@ -1248,10 +1250,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     Promise.all(uploads)
       .then(() => this.finishSubmitSuccess('Transfer y comprobantes actualizados correctamente.'))
       .catch(() => {
-        this.navbar.warningToast('Advertencia', 'Transfer actualizado pero hubo problemas al guardar algunos comprobantes.');
-        this.form.markAsPristine();
-        this.isSubmitting.set(false);
-        this.router.navigate(['/Transfers/VerTransfers']);
+        this.finishSubmitSuccess('Transfer actualizado pero hubo problemas al guardar algunos comprobantes.');
       });
   }
 
@@ -1262,10 +1261,42 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
   }
 
   private finishSubmitSuccess(message: string): void {
-    this.navbar.successToast('Transfer actualizado', message);
     this.form.markAsPristine();
     this.isSubmitting.set(false);
-    this.router.navigate(['/Transfers/VerTransfers']);
+    const transferId = String(this.getTransferIdFromRoute() || '').trim();
+    this.alerts.showModal({
+      type: 'success',
+      title: 'Transfer actualizado',
+      message,
+      buttons: [
+        {
+          text: 'Cerrar',
+          style: 'secondary',
+          onClick: () => {
+            this.alerts.closeModal();
+            this.goToVerTransfers();
+          }
+        },
+        {
+          text: 'Ver Transfer',
+          style: 'primary',
+          onClick: () => {
+            this.alerts.closeModal();
+            this.goToVerTransfers(transferId, true);
+          }
+        },
+      ],
+    });
+  }
+
+  private goToVerTransfers(idTransfer?: string | null, openDrawer = false): void {
+    this.uiState.needsRefresh.set('transfers');
+    this.uiState.cuposInfo.set(null);
+    const transferId = idTransfer ? String(idTransfer) : '';
+    if (openDrawer && transferId) {
+      this.drawer.openTransfer(transferId);
+    }
+    void this.router.navigate(['/Transfers/VerTransfers']);
   }
 
   ngOnDestroy(): void {

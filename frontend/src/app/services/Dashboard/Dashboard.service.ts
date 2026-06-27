@@ -46,8 +46,8 @@ export interface PassengerDistribution {
 }
 
 export interface TourOccupancy {
-  Nombre_Tour: string;
-  pasajeros:   number;
+  nombre: string;
+  pasajeros: number;
 }
 
 // ─── Helper ──────────────────────────────────────────────────────────────────

@@ -5,7 +5,8 @@ async function getDashboardStats(req, res) {
     try {
         const filters = {
             startDate: req.query.startDate,
-            endDate: req.query.endDate
+            endDate: req.query.endDate,
+            tourId: req.query.tourId
         };
         const stats = await dashboardService.getDashboardStatsSvc(filters);
         return sendSuccess(res, { data: stats, message: 'Dashboard obtenido correctamente' });

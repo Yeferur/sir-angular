@@ -9,8 +9,10 @@ const {
     generarPlanLogisticoController,
     generarPlanAsistidoController,
     exportarListadoBusController,
+    exportarReservaPrivadaController,
     guardarListadoFinalController,
-    obtenerListadoFinalController
+    obtenerListadoFinalController,
+    resumenPrivadosDiaController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -57,6 +59,13 @@ router.post(
     exportarListadoBusController
 );
 
+router.post(
+    '/exportar-reserva-privada',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    exportarReservaPrivadaController
+);
+
 /**
  * @route   POST /api/programacion/guardar-listado
  * @desc    Guarda el listado final confirmado
@@ -92,5 +101,18 @@ router.post(
 // router.get('/listado-buses', authMiddleware, obtenerListadoBusesPorTour);
 // router.get('/listado-buses/manual', authMiddleware, obtenerListadoBusesPorTourManual);
 
+
+/**
+ * @route   POST /api/programacion/privados-del-dia
+ * @desc    Resumen de reservas privadas del día para el dashboard
+ * @access  Private
+ * @body    { "fecha": "YYYY-MM-DD", "idsTours": [1, 2, ...] }
+ */
+router.post(
+    '/privados-del-dia',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    resumenPrivadosDiaController
+);
 
 module.exports = router;

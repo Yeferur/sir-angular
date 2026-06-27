@@ -92,6 +92,48 @@ exports.exportarListadoBusController = async (req, res) => {
 };
 
 /**
+ * Exporta una reserva privada en formato Excel.
+ * Body: { fecha: 'YYYY-MM-DD', idReserva: string, buses: [...], nombreTour?: string, nombreReportante?: string }
+ */
+exports.exportarReservaPrivadaController = async (req, res) => {
+    const { fecha, idReserva, buses, nombreTour, nombreReportante, idTour } = req.body || {};
+
+    if (!fecha || !idReserva || !Array.isArray(buses) || buses.length === 0) {
+        return sendError(res, { status: 400, message: 'Se requiere fecha, idReserva y buses en el cuerpo.', errorCode: 'MISSING_PARAMS' });
+    }
+
+    try {
+        const buffer = await cerebro.generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour });
+        const reservaId = String(idReserva).replace(/\s+/g, '_');
+        const tourName = nombreTour ? String(nombreTour).replace(/\s+/g, '_') : 'Privado';
+        const fileName = `${fecha}_${tourName}_${reservaId}.xlsx`;
+
+        try {
+            await recordHistorial({
+                tabla: 'programacion',
+                id_registro: `${fecha}|${idReserva}`,
+                accion: 'EXPORTAR_EXCEL_PRIVADO',
+                id_usuario: req.user?.id || null,
+                detalles: [
+                    { columna: 'Fecha', anterior: null, nuevo: fecha },
+                    { columna: 'Id_Reserva', anterior: null, nuevo: String(idReserva) },
+                    { columna: 'Buses', anterior: null, nuevo: String(buses.length) }
+                ]
+            });
+        } catch (historialError) {
+            console.error('No se pudo registrar historial de exportación privada:', historialError);
+        }
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Error al exportar reserva privada:', error);
+        return sendError(res, { status: 500, message: 'Error al generar el archivo de la reserva privada.', errorCode: 'EXPORT_PRIVATE_FAILED' });
+    }
+};
+
+/**
  * Consulta listado guardado y reservas sin asignar.
  * Body: { fecha: 'YYYY-MM-DD', idTour: number }
  */
@@ -117,7 +159,7 @@ exports.obtenerListadoFinalController = async (req, res) => {
  * Body: { fecha: 'YYYY-MM-DD', idTour: number, buses: [...] }
  */
 exports.guardarListadoFinalController = async (req, res) => {
-    const { fecha, idTour, idsTours, buses } = req.body || {};
+    const { fecha, idTour, idsTours, buses, busesPrivados } = req.body || {};
     const tours = idsTours || idTour;
 
     if (!fecha || !tours || !Array.isArray(buses)) {
@@ -125,7 +167,13 @@ exports.guardarListadoFinalController = async (req, res) => {
     }
 
     try {
-        const resultado = await cerebro.guardarListadoFinal({ fecha, idsTours: tours, buses, userId: req.user?.id || null });
+        const resultado = await cerebro.guardarListadoFinal({
+            fecha,
+            idsTours: tours,
+            buses,
+            busesPrivados: Array.isArray(busesPrivados) ? busesPrivados : [],
+            userId: req.user?.id || null
+        });
         return sendSuccess(res, { data: resultado, message: 'Listado final guardado correctamente' });
     } catch (error) {
         console.error('Error al guardar listado final:', error);
@@ -183,3 +231,23 @@ exports.generarPlanAsistidoController = async (req, res) => {
     }
 };
 
+/**
+ * Devuelve el resumen de reservas privadas del día (para la card del dashboard).
+ * Body: { fecha: 'YYYY-MM-DD', idsTours?: number[] }
+ */
+exports.resumenPrivadosDiaController = async (req, res) => {
+    const { fecha, idsTours, idTour } = req.body || {};
+    const tours = idsTours || (idTour ? [idTour] : null);
+
+    if (!fecha) {
+        return sendError(res, { status: 400, message: 'Se requiere fecha.', errorCode: 'MISSING_PARAMS' });
+    }
+
+    try {
+        const resultado = await cerebro.resumenPrivadosDia(fecha, tours);
+        return sendSuccess(res, { data: resultado, message: 'Resumen de privados obtenido correctamente' });
+    } catch (error) {
+        console.error('Error en resumenPrivadosDiaController:', error);
+        return sendError(res, { status: 500, message: 'Error interno al consultar privados.', errorCode: 'INTERNAL_ERROR' });
+    }
+};

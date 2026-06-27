@@ -331,6 +331,11 @@
             <div class="item-main-info">
               <span class="item-id">#{{ r.Id_Reserva }}</span>
               <span class="item-tour">{{ r.Nombre_Tour }}</span>
+              <span
+                class="tipo-reserva-badge"
+                [class.tipo-reserva-badge--privada]="getTipoReservaLabel(r) === 'Privada'">
+                {{ getTipoReservaLabel(r) }}
+              </span>
               <span class="item-meta">
                 {{ r.Fecha_Tour | date:'d MMM yyyy':'':'es-CO' }}
                 <span class="sep">·</span>

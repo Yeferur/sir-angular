@@ -58,6 +58,7 @@ export class DuplicarPanelComponent implements OnInit {
 
   private disponibilidadActual: any = null;
   minFecha = toDateOnly(new Date()) || '';
+  dateFilterFn: ((date: Date) => boolean) | null = (date: Date) => this.isDateSelectable(date);
 
   // Validación
   isValid = computed(() => !!this.Id_Tour() && !!this.Fecha_Tour());
@@ -130,7 +131,9 @@ export class DuplicarPanelComponent implements OnInit {
         // await this.api.duplicarReserva(payload).toPromise();
       }
 
-      this.drawer.close();
+      if (this.drawer.drawer()?.type === 'duplicar') {
+        this.drawer.close();
+      }
     } catch (err: any) {
       console.error(err);
       this.errorMsg.set(
@@ -149,6 +152,7 @@ export class DuplicarPanelComponent implements OnInit {
 
     if (!idTour) {
       this.disponibilidadActual = null;
+      this.dateFilterFn = (date: Date) => this.isDateSelectable(date);
       this.clearInvalidSelectedDate();
       this.isLoadingDisponibilidad.set(false);
       return;
@@ -160,8 +164,12 @@ export class DuplicarPanelComponent implements OnInit {
     } catch {
       this.disponibilidadActual = null;
     } finally {
+      // Forzamos nueva referencia para que el datepicker reconstruya
+      // los días habilitados cuando cambia la disponibilidad del tour.
+      this.dateFilterFn = (date: Date) => this.isDateSelectable(date);
       this.clearInvalidSelectedDate();
       this.isLoadingDisponibilidad.set(false);
+      this.cdr.markForCheck();
     }
   }
 
@@ -172,55 +180,7 @@ export class DuplicarPanelComponent implements OnInit {
     const dispo = this.disponibilidadActual;
     if (!dispo) return true;
 
-    const normalizeDiaToWeekday = (d: string) => {
-      if (!d) return null;
-      const s = String(d).trim().toLowerCase();
-      switch (s) {
-        case 'lunes': return 1;
-        case 'martes': return 2;
-        case 'miercoles':
-        case 'miércoles': return 3;
-        case 'jueves': return 4;
-        case 'viernes': return 5;
-        case 'sabado':
-        case 'sábado': return 6;
-        case 'domingo': return 0;
-        default: return null;
-      }
-    };
-
-    const modoRaw = (dispo.Modo || 'TODO_EL_AÑO').toString().toUpperCase();
-    const modoNorm = modoRaw
-      .replace(/Ñ/g, 'N')
-      .replace(/Á/g, 'A')
-      .replace(/É/g, 'E')
-      .replace(/Í/g, 'I')
-      .replace(/Ó/g, 'O')
-      .replace(/Ú/g, 'U');
-
-    const diasBaseSet = new Set<number>(
-      (dispo.Dias_Base || [])
-        .map((d: string) => normalizeDiaToWeekday(d))
-        .filter((x: any) => x !== null)
-    );
-
-    const temporadas = Array.isArray(dispo.Temporadas)
-      ? dispo.Temporadas.map((t: any) => ({
-        inicio: toDateOnly(t.Fecha_Inicio),
-        fin: toDateOnly(t.Fecha_Fin),
-        dias: (t.Dias || [])
-          .map((d: string) => normalizeDiaToWeekday(d))
-          .filter((x: any) => x !== null) as number[],
-      }))
-      : [];
-
-    const tour = {
-      Modo: modoNorm,
-      Dias_Base: Array.from(diasBaseSet),
-      Temporadas: temporadas,
-    };
-
-    return isTourDateAvailable(ymd, tour);
+    return isTourDateAvailable(ymd, dispo);
   };
 
   private clearInvalidSelectedDate(): void {

@@ -47,16 +47,9 @@ exports.updatePrecios = async (req, res) => {
 };
 
 exports.getTours = async (req, res) => {
-  console.log('=== CONTROLLER TOURS NUEVO EJECUTADO ===', {
-    url: req.originalUrl,
-    baseUrl: req.baseUrl,
-    fecha: new Date().toISOString()
-  });
 
   try {
     const tours = await obtenerTours();
-
-    console.log('=== PRIMER TOUR ENVIADO ===', tours[0]);
 
     return sendSuccess(res, {
       data: tours,

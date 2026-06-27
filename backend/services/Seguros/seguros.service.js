@@ -1,11 +1,5 @@
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
-
-/* ===================================================================
- * LISTAR SEGUROS (desde programacion_buses)
- * Devuelve un array de buses, cada uno con guía, conductor y pasajeros
- * confirmados asignados a ese bus.
- * =================================================================== */
 async function listarSeguros(filtros) {
     const { Id_Tour, Fecha } = filtros;
 
@@ -34,7 +28,9 @@ async function listarSeguros(filtros) {
             pb.DNI_Guia,
             pb.DNI_Conductor,
             pb.Pasajeros_Total,
-            pb.Orden_Bus
+            pb.Orden_Bus,
+            COALESCE(pb.Tipo_Bus, 'grupal') AS Tipo_Bus,
+            pb.Id_Reserva_Privada
          FROM programacion_buses pb
          WHERE pb.Id_Programacion = ?
          ORDER BY pb.Orden_Bus ASC`,
@@ -75,14 +71,18 @@ async function listarSeguros(filtros) {
 
     // 5. Armar respuesta
     return buses.map(bus => ({
-        Id_Bus_Prog:    bus.Id_Bus_Prog,
-        Placa_Display:  bus.Placa_Display,
-        Orden_Bus:      bus.Orden_Bus,
-        Guia:           bus.Guia || null,
-        DNI_Guia:       bus.DNI_Guia || null,
-        Conductor:      bus.Conductor || null,
-        DNI_Conductor:  bus.DNI_Conductor || null,
-        pasajeros:      pasajerosPorBus.get(bus.Id_Bus_Prog) || []
+        Id_Bus_Prog:        bus.Id_Bus_Prog,
+        Placa_Display:      bus.Placa_Display,
+        Orden_Bus:          bus.Orden_Bus,
+        Tipo_Bus:           bus.Tipo_Bus || 'grupal',
+        Id_Reserva_Privada: bus.Id_Reserva_Privada || null,
+        Guia:               bus.Guia || null,
+        DNI_Guia:           bus.DNI_Guia || null,
+        Conductor:          bus.Conductor || null,
+        DNI_Conductor:      bus.DNI_Conductor || null,
+        // Buses privados no tienen pasajeros en programacion_reservas;
+        // se muestran igual para capturar conductor y DNI.
+        pasajeros:          bus.Tipo_Bus === 'privado' ? [] : (pasajerosPorBus.get(bus.Id_Bus_Prog) || [])
     }));
 }
 

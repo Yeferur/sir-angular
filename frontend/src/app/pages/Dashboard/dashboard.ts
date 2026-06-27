@@ -6,6 +6,7 @@ import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 
 import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
+import { Tours } from '../../services/Tours/tours';
 
 import {
   NgApexchartsModule, ChartComponent,
@@ -78,6 +79,7 @@ function axisStyle(): any {
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private svc   = inject(DashboardService);
+  private toursSvc = inject(Tours);
   private alert = inject(SirAlertService);
   private cdr   = inject(ChangeDetectorRef);
 
@@ -93,6 +95,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   endDate    = '';
   tours:      TourOption[] = [];
   selectedTourId: number | null = null;
+  selectedTourPlanCount = 0;
 
   get tourLabel(): string {
     if (!this.selectedTourId) return 'Todos los tours';
@@ -129,6 +132,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastResponse: any  = null;
   private refreshTimer:   ReturnType<typeof setTimeout> | null = null;
   private reqId              = 0;
+  private tourMetaReqId      = 0;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
@@ -150,16 +154,53 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Tours ─────────────────────────────────────────────────────────────────
   private loadTours() {
-    // Ajusta la ruta según tu ToursService real
-    (this.svc as any).getTours?.().pipe(catchError(() => of([]))).subscribe((list: TourOption[]) => {
-      this.tours = list;
+    this.toursSvc.getTours().pipe(catchError(() => of([]))).subscribe((list) => {
+      this.tours = (list || [])
+        .filter((tour): tour is TourOption => typeof tour?.Id_Tour === 'number' && typeof tour?.Nombre_Tour === 'string');
       this.cdr.detectChanges();
     });
   }
 
   onTourChange(tourId: number | null) {
     this.selectedTourId = tourId;
-    this.scheduleRefresh();
+    this.loadSelectedTourMeta();
+  }
+
+  get shouldShowOccupancyCard(): boolean {
+    return !this.selectedTourId || this.selectedTourPlanCount > 1;
+  }
+
+  get occupancyTitle(): string {
+    return this.selectedTourId && this.selectedTourPlanCount > 1
+      ? 'Pasajeros por plan'
+      : 'Top Destinos';
+  }
+
+  get occupancySubtitle(): string {
+    return this.selectedTourId && this.selectedTourPlanCount > 1
+      ? 'Cantidad de pasajeros por plan del tour seleccionado.'
+      : 'Pasajeros por tour en el rango seleccionado.';
+  }
+
+  private loadSelectedTourMeta(): void {
+    const requestId = ++this.tourMetaReqId;
+
+    if (!this.selectedTourId) {
+      this.selectedTourPlanCount = 0;
+      this.scheduleRefresh();
+      return;
+    }
+
+    this.toursSvc.getTourById(this.selectedTourId).pipe(
+      catchError((error) => {
+        console.error('Error fetching selected tour metadata:', error);
+        return of(null);
+      })
+    ).subscribe((tour: any) => {
+      if (requestId !== this.tourMetaReqId) return;
+      this.selectedTourPlanCount = Array.isArray(tour?.Planes) ? tour.Planes.length : 0;
+      this.scheduleRefresh();
+    });
   }
 
   // ── Init charts ───────────────────────────────────────────────────────────
@@ -484,7 +525,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // 6. Top destinos
     const occ = Array.isArray(res.occupancy) ? res.occupancy : [];
-    const occCats = occ.map((d: any) => d.Nombre_Tour);
+    const occCats = occ.map((d: any) => d.nombre);
     const occData = occ.map((d: any) => Number(d.pasajeros || 0));
     this.hasOccupancyData = occData.some((v: number) => v > 0);
 

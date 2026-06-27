@@ -1,9 +1,8 @@
 :host { display: block; }
 
 .booking-dashboard {
-  max-width: 900px;
-  margin: 36px auto 64px;
-  padding: 0 24px;
+  max-width: 1350px;
+  margin: auto;
   display: flex;
   flex-direction: column;
   gap: 20px;

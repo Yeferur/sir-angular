@@ -18,7 +18,7 @@
       [ngModel]="Fecha_Tour()"
       (ngModelChange)="Fecha_Tour.set($event)"
       [minDate]="minFecha"
-      [dateFilter]="isDateSelectable"
+      [dateFilter]="dateFilterFn"
       placeholder="Seleccione una fecha"
     ></app-datepicker>
   </div>

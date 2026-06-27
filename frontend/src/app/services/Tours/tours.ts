@@ -14,6 +14,7 @@ export interface Tour {
   Comision_Hotel?: number;
   Comision_Agencia?: number;
   Comision_Freelance?: number;
+  Planes?: Array<{ Id_Plan?: number | null; Nombre_Plan?: string }>;
   Comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
   comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
 }

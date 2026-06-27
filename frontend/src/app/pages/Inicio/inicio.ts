@@ -36,7 +36,7 @@ export class Inicio implements OnInit {
   private loading = false;
   private savingAforo = false;
 
-  fecha: string = this.getTodayIso();
+  fecha: string = this.getTomorrowIso();
 
   tours: Tour[] = [];
   transfers: Transfer[] = [];
@@ -112,6 +112,18 @@ export class Inicio implements OnInit {
 
     this.fecha = hoy;
     this.loadData();
+  }
+
+  irManana(): void {
+    const manana = this.getTomorrowIso();
+    if (manana === this.fecha) return;
+
+    this.fecha = manana;
+    this.loadData();
+  }
+
+  isTomorrowSelected(): boolean {
+    return this.fecha === this.getTomorrowIso();
   }
 
   loadData(): void {
@@ -419,6 +431,10 @@ export class Inicio implements OnInit {
     return local.toISOString().slice(0, 10);
   }
 
+  getTomorrowIso(): string {
+    return this.shiftDate(this.getTodayIso(), 1);
+  }
+
   private shiftDate(isoDate: string, days: number): string {
     const [year, month, day] = isoDate.split('-').map(Number);
     const date = new Date(year, month - 1, day);
@@ -452,8 +468,21 @@ export class Inicio implements OnInit {
     let otros = 0;
 
     for (const item of raw as Array<Record<string, unknown>>) {
-      const label = String(item['tipo'] || item['Tipo_Transfer'] || item['nombre'] || '').toLowerCase();
-      const cantidad = Number(item['cantidad'] || item['total'] || item['Total'] || 0);
+      const label = String(
+        item['Servicio'] ||
+        item['tipo'] ||
+        item['Tipo_Transfer'] ||
+        item['nombre'] ||
+        item['Nombre'] ||
+        '',
+      ).toLowerCase().trim();
+      const cantidad = Number(
+        item['totalTransfers'] ||
+        item['cantidad'] ||
+        item['total'] ||
+        item['Total'] ||
+        0,
+      );
 
       const hotelAntesDeAeropuerto =
         label.includes('hotel') &&

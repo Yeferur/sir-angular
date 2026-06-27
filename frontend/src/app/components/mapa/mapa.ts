@@ -28,6 +28,10 @@ interface PuntoAgrupado {
   lng: number;
   reservas: any[];
   NombrePunto?: string;
+  // Suma de __paxEnEstePunto de las reservas en este punto.
+  // Puede diferir del total de NumeroPasajeros cuando una reserva
+  // tiene pasajeros repartidos en múltiples puntos de la misma ruta.
+  totalPaxEnEstePunto: number;
 }
 
 @Component({
@@ -93,6 +97,9 @@ export class Mapa implements OnInit, OnDestroy {
   }
 
   totalPaxPunto(punto: PuntoAgrupado): number {
+    // Usar el pre-calculado si existe (más eficiente y correcto para multi-punto).
+    if (typeof punto.totalPaxEnEstePunto === 'number') return punto.totalPaxEnEstePunto;
+    // Fallback: sumar NumeroPasajeros total (reservas de un solo punto).
     return punto.reservas.reduce((sum, r) => sum + (Number(r.NumeroPasajeros) || 0), 0);
   }
 
@@ -107,12 +114,55 @@ export class Mapa implements OnInit, OnDestroy {
 
     if (!Array.isArray(this.puntos) || this.puntos.length === 0) return;
 
+    // ── Expandir reservas multi-punto ─────────────────────────
+    // Una reserva con puntosReserva[] (ej: 5 pax en Punto A y 5 en Punto B)
+    // debe generar UNA entrada por punto en el mapa, no una sola por reserva.
+    // Generamos entradas "planas" para que la agrupación por coordenada funcione.
+    interface EntradaMapa {
+      Id_Reserva: any;
+      NumeroPasajeros: number;
+      __paxEnEstePunto: number;
+      Id_Punto: any;
+      NombrePunto: string;
+      Latitud: number | null;
+      Longitud: number | null;
+    }
+
+    const entradasMapa: EntradaMapa[] = [];
+    for (const r of this.puntos) {
+      if (Array.isArray(r.puntosReserva) && r.puntosReserva.length > 0) {
+        // Reserva multi-punto: generar una entrada por cada sub-punto
+        for (const punto of r.puntosReserva) {
+          entradasMapa.push({
+            Id_Reserva: r.Id_Reserva,
+            NumeroPasajeros: r.NumeroPasajeros,
+            __paxEnEstePunto: Number(punto.pasajeros ?? 0),
+            Id_Punto: punto.Id_Punto,
+            NombrePunto: punto.NombrePunto ?? r.NombrePunto ?? '',
+            Latitud: punto.Latitud !== undefined ? Number(punto.Latitud) : null,
+            Longitud: punto.Longitud !== undefined ? Number(punto.Longitud) : null,
+          });
+        }
+      } else {
+        // Reserva de un solo punto: entrada directa
+        entradasMapa.push({
+          Id_Reserva: r.Id_Reserva,
+          NumeroPasajeros: r.NumeroPasajeros,
+          __paxEnEstePunto: r.__paxEnEstePunto ?? r.NumeroPasajeros,
+          Id_Punto: r.Id_Punto,
+          NombrePunto: r.NombrePunto ?? '',
+          Latitud: r.Latitud !== undefined ? Number(r.Latitud) : null,
+          Longitud: r.Longitud !== undefined ? Number(r.Longitud) : null,
+        });
+      }
+    }
+
     // ── Agrupar por coordenada ─────────────────────────────────
     const puntosAgrupados = new Map<string, PuntoAgrupado>();
 
-    for (const r of this.puntos) {
-      const lat = this.toNumber(r.lat ?? r.Latitud);
-      const lng = this.toNumber(r.lng ?? r.Longitud ?? r.Lng);
+    for (const r of entradasMapa) {
+      const lat = this.toNumber(r.Latitud);
+      const lng = this.toNumber(r.Longitud);
 
       if (
         lat === null || lng === null ||
@@ -125,11 +175,14 @@ export class Mapa implements OnInit, OnDestroy {
         puntosAgrupados.set(key, {
           lat,
           lng,
-          NombrePunto: r.NombrePunto ?? `Punto ${r.Id_Punto ?? ''}`,
-          reservas: []
+          NombrePunto: r.NombrePunto || `Punto ${r.Id_Punto ?? ''}`,
+          reservas: [],
+          totalPaxEnEstePunto: 0
         });
       }
-      puntosAgrupados.get(key)!.reservas.push(r);
+      const grupo = puntosAgrupados.get(key)!;
+      grupo.reservas.push(r);
+      grupo.totalPaxEnEstePunto += r.__paxEnEstePunto;
     }
 
     const agrupados = Array.from(puntosAgrupados.values());
@@ -142,7 +195,7 @@ export class Mapa implements OnInit, OnDestroy {
       `${p.lat.toFixed(5)},${p.lng.toFixed(5)}` !== baseKey
     );
     this.agrupadosConBase = [
-      { lat: baseLat, lng: baseLng, NombrePunto: 'Estación Poblado', reservas: [] },
+      { lat: baseLat, lng: baseLng, NombrePunto: 'Estación Poblado', reservas: [], totalPaxEnEstePunto: 0 },
       ...agrupadosSinBase
     ];
 
@@ -210,11 +263,21 @@ export class Mapa implements OnInit, OnDestroy {
 
         // Popup estilizado dark
         const reservasHtml = punto?.reservas?.length
-          ? punto.reservas.map(r => `
-              <div class="mapa-popup-reserva">
-                <span class="mapa-popup-id">#${r.Id_Reserva}</span>
-                <span class="mapa-popup-pax">${r.NumeroPasajeros} pax</span>
-              </div>`).join('')
+          ? punto.reservas.map(r => {
+              // Pax en este punto específico (sub-conteo para reservas multi-punto)
+              const paxAqui = r.__paxEnEstePunto !== undefined ? r.__paxEnEstePunto : r.NumeroPasajeros;
+              // Si hay sub-conteo distinto al total, la reserva es multi-punto
+              const esMultipunto = r.__paxEnEstePunto !== undefined && r.__paxEnEstePunto !== r.NumeroPasajeros;
+              const multipuntoHtml = esMultipunto
+                ? `<span class="mapa-popup-multipunto" title="Total reserva: ${r.NumeroPasajeros} pax">multipunto</span>`
+                : '';
+              return `
+                <div class="mapa-popup-reserva">
+                  <span class="mapa-popup-id">#${r.Id_Reserva}</span>
+                  ${multipuntoHtml}
+                  <span class="mapa-popup-pax">${paxAqui} pax</span>
+                </div>`;
+            }).join('')
           : '<div class="mapa-popup-empty">Sin reservas</div>';
 
         const badgeClass = isStart ? 'badge-start' : isEnd ? 'badge-end' : 'badge-mid';

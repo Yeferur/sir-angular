@@ -140,9 +140,35 @@ function tieneTexto(value) {
   return String(value ?? '').trim().length > 0;
 }
 
+function normalizarEstadoTransferLegacy(estado) {
+  const value = String(estado || '').trim().toLowerCase();
+  if (!value) return '';
+  if (value === 'activo' || value === 'activa' || value === 'confirmada') return 'Confirmado';
+  if (value === 'completada') return 'Completado';
+  if (value === 'cancelada') return 'Cancelado';
+  if (value === 'confirmado') return 'Confirmado';
+  if (value === 'completado') return 'Completado';
+  if (value === 'cancelado') return 'Cancelado';
+  if (value === 'pendiente') return 'Pendiente';
+  if (value === 'pendiente de datos') return 'Pendiente de datos';
+  if (value === 'pendiente de pago') return 'Pendiente de pago';
+  return String(estado || '').trim();
+}
+
+function expandirEstadoTransferFiltro(estado) {
+  const normalized = normalizarEstadoTransferLegacy(estado);
+  const lower = normalized.toLowerCase();
+  if (lower === 'confirmado') return ['Confirmado', 'Confirmada', 'Activo', 'Activa'];
+  if (lower === 'completado') return ['Completado', 'Completada'];
+  if (lower === 'cancelado') return ['Cancelado', 'Cancelada'];
+  return normalized ? [normalized] : [];
+}
+
 function resolverEstadoTransfer(payload = {}, estadoActual = null) {
-  if (estadoActual === 'Cancelado' || estadoActual === 'Completado') {
-    return estadoActual;
+  const estadoBase = normalizarEstadoTransferLegacy(estadoActual);
+
+  if (estadoBase === 'Cancelado' || estadoBase === 'Completado') {
+    return estadoBase;
   }
 
   if (payload.ModoDuplicado) {
@@ -153,8 +179,11 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
   const pago = payload.Pago || {};
   const abonos = Array.isArray(pago.Abonos) ? pago.Abonos : [];
   const totalAbonado = abonos.reduce((sum, abono) => sum + Number(abono?.Monto || 0), 0);
+  const tienePagoEnPunto = String(pago.Tipo || '').trim() === 'PagaEnPunto';
+  const tieneAbonos = abonos.some((abono) => Number(abono?.Monto || 0) > 0);
   const pagoOk = pago.Tipo === 'Completo'
     || (valorServicio > 0 && totalAbonado >= valorServicio);
+  const tieneCompromisoConfirmado = tienePagoEnPunto || pago.Tipo === 'Completo' || tieneAbonos;
 
   const vueloParcial = tieneTexto(payload.Vuelo) || tieneTexto(payload.TipoVuelo);
   const datosOk = [
@@ -173,8 +202,8 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
   ].every(tieneTexto) && (!vueloParcial || (tieneTexto(payload.Vuelo) && tieneTexto(payload.TipoVuelo)));
 
   let estado = 'Pendiente';
-  if (datosOk && pagoOk) estado = 'Confirmado';
-  else if (!datosOk && pagoOk) estado = 'Pendiente de datos';
+  if (datosOk && (pagoOk || tieneCompromisoConfirmado)) estado = 'Confirmado';
+  else if (!datosOk && (pagoOk || tieneCompromisoConfirmado)) estado = 'Pendiente de datos';
   else if (datosOk && !pagoOk) estado = 'Pendiente de pago';
 
   if (fechaTransferEsPasadaBogota(payload.FechaTransfer)) {
@@ -194,10 +223,10 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     const estado = String(estadoActual || '').trim();
     const vencida = fechaTransferEsPasadaBogota(fechaTransfer);
 
-    if ((estado === 'Activo' || estado === 'Confirmada') && vencida) {
+    if ((estado === 'Activo' || estado === 'Activa' || estado === 'Confirmada') && vencida) {
       return { nuevoEstado: 'Completado', motivo: 'VENCIMIENTO_AUTOMATICO' };
     }
-    if (estado === 'Activo' || estado === 'Confirmada') {
+    if (estado === 'Activo' || estado === 'Activa' || estado === 'Confirmada') {
       return { nuevoEstado: 'Confirmado', motivo: 'NORMALIZACION_LEGACY' };
     }
     if (estado === 'Completada') {
@@ -221,7 +250,7 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     const [candidatos] = await conn.query(
       `SELECT Id_Transfer, Estado, Fecha_Transfer
          FROM transfers
-        WHERE Estado IN ('Activo', 'Confirmada', 'Completada', 'Cancelada')
+        WHERE Estado IN ('Activo', 'Activa', 'Confirmada', 'Completada', 'Cancelada')
            OR (
              Fecha_Transfer < ?
              AND Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
@@ -635,10 +664,19 @@ async function filtrarTransfersSvc(q) {
   if (Id_Rango) conds.push(`tr.Id_Rango = ${db.escape(Id_Rango)}`);
   if (Estado) {
     if (Array.isArray(Estado)) {
-      const estados = Estado.map(e => db.escape(e)).join(',');
-      conds.push(`tr.Estado IN (${estados})`);
+      const expanded = [...new Set(Estado.flatMap((item) => expandirEstadoTransferFiltro(item)))];
+      if (expanded.length) {
+        const estados = expanded.map(e => db.escape(e)).join(',');
+        conds.push(`tr.Estado IN (${estados})`);
+      }
     } else {
-      conds.push(`tr.Estado = ${db.escape(Estado)}`);
+      const expanded = expandirEstadoTransferFiltro(Estado);
+      if (expanded.length === 1) {
+        conds.push(`tr.Estado = ${db.escape(expanded[0])}`);
+      } else if (expanded.length > 1) {
+        const estados = expanded.map(e => db.escape(e)).join(',');
+        conds.push(`tr.Estado IN (${estados})`);
+      }
     }
   }
   const idTransferFiltro = normalizarIdTransferInput(Id_Transfer);
@@ -682,7 +720,11 @@ async function filtrarTransfersSvc(q) {
   `;
 
   const [rows] = await db.query(sql);
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    Estado: normalizarEstadoTransferLegacy(row?.Estado),
+    Estado_Transfer: normalizarEstadoTransferLegacy(row?.Estado_Transfer || row?.Estado),
+  }));
 }
 
 async function getRangosSvc() {
@@ -752,6 +794,7 @@ async function getDetalleTransferSvc(Id_Transfer) {
   }
 
   const transfer = transferData[0];
+  transfer.Estado = normalizarEstadoTransferLegacy(transfer.Estado);
 
   // Obtener pagos del transfer
   const [pagos] = await db.query(`
@@ -785,6 +828,102 @@ async function getDetalleTransferSvc(Id_Transfer) {
     pagos: pagos || [],
     comprobantes
   };
+}
+
+async function normalizarEstadosTransfersExistentes(conexion = db) {
+  const [transferRows] = await conexion.query(
+    `SELECT
+        Id_Transfer,
+        Fecha_Transfer,
+        Estado,
+        Nombre_Titular,
+        DNI,
+        Telefono_Titular,
+        Cantidad_Personas,
+        Id_Rango,
+        Id_Servicio,
+        Punto_Salida,
+        Punto_Destino,
+        Hora_Recogida,
+        Nombre_Reportante,
+        Telefono_Reportante,
+        Valor,
+        Vuelo,
+        TipoVuelo
+       FROM transfers`
+  );
+
+  if (!transferRows?.length) return { evaluados: 0, actualizados: 0 };
+
+  const ids = transferRows.map((row) => row.Id_Transfer).filter(Boolean);
+  const placeholders = ids.map(() => '?').join(',');
+
+  const [pagosRows] = await conexion.query(
+    `SELECT Id_Transfer, Monto, Metodo
+       FROM pagos_transfers
+      WHERE Id_Transfer IN (${placeholders})`,
+    ids
+  );
+
+  const pagosMap = new Map();
+  for (const pago of pagosRows || []) {
+    const key = String(pago.Id_Transfer);
+    if (!pagosMap.has(key)) pagosMap.set(key, []);
+    pagosMap.get(key).push(pago);
+  }
+
+  let actualizados = 0;
+  for (const transfer of transferRows) {
+    const idTransfer = String(transfer.Id_Transfer);
+    const estadoActual = normalizarEstadoTransferLegacy(transfer.Estado);
+    const pagos = pagosMap.get(idTransfer) || [];
+
+    let tipoPago = '';
+    let abonos = [];
+    if (pagos.some((pago) => String(pago?.Metodo || '').trim() === 'Completo')) {
+      tipoPago = 'Completo';
+    } else if (pagos.some((pago) => String(pago?.Metodo || '').trim() === 'Abono')) {
+      tipoPago = 'Abonos';
+      abonos = pagos
+        .filter((pago) => String(pago?.Metodo || '').trim() === 'Abono')
+        .map((pago) => ({ Monto: Number(pago?.Monto || 0) }));
+    } else {
+      tipoPago = 'PagaEnPunto';
+    }
+
+    let nuevoEstado = estadoActual;
+    if (!['Cancelado', 'Completado'].includes(estadoActual)) {
+      nuevoEstado = resolverEstadoTransfer({
+        FechaTransfer: transfer.Fecha_Transfer,
+        Pago: { Tipo: tipoPago, Abonos: abonos },
+        Titular: transfer.Nombre_Titular,
+        DNI: transfer.DNI,
+        Tel_Contacto: transfer.Telefono_Titular,
+        Id_Rango: transfer.Id_Rango,
+        Servicio: transfer.Id_Servicio,
+        Salida: transfer.Punto_Salida,
+        Llegada: transfer.Punto_Destino,
+        HoraRecogida: transfer.Hora_Recogida,
+        NombreReporta: transfer.Nombre_Reportante,
+        TelefonoTransfer: transfer.Telefono_Reportante,
+        ValorServicio: transfer.Valor,
+        Vuelo: transfer.Vuelo,
+        TipoVuelo: transfer.TipoVuelo,
+      }, estadoActual || null);
+    }
+
+    if (nuevoEstado !== transfer.Estado) {
+      await conexion.query(
+        `UPDATE transfers
+            SET Estado = ?
+          WHERE Id_Transfer = ?`,
+        [nuevoEstado, idTransfer]
+      );
+      actualizados += 1;
+    }
+  }
+
+  return { evaluados: transferRows.length, actualizados };
 }
 
 // FUNCIONES PARA COMPROBANTES TRANSFERS
@@ -1267,4 +1406,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos };
+module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos, normalizarEstadosTransfersExistentes };

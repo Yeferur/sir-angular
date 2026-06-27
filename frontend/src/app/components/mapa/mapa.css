@@ -475,6 +475,21 @@
   color: #93c5fd;
 }
 
+:host ::ng-deep .mapa-popup-multipunto {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 1px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: default;
+}
+
 :host ::ng-deep .mapa-popup-pax {
   font-size: 11px;
   color: #6b7280;

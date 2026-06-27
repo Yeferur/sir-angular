@@ -315,10 +315,11 @@
           </div>
         </section>
 
+        @if (shouldShowOccupancyCard) {
         <section class="card chart-card">
           <div class="card-header">
-            <h2>Top Destinos</h2>
-            <span class="card-subtitle">Pasajeros por tour en el rango seleccionado.</span>
+            <h2>{{ occupancyTitle }}</h2>
+            <span class="card-subtitle">{{ occupancySubtitle }}</span>
           </div>
           <div class="chart-body">
             @if (hasOccupancyData) {
@@ -333,12 +334,13 @@
             } @else {
               <div class="chart-empty">
                 <i class="bx bx-map-alt chart-empty-icon"></i>
-                <h4>Sin destinos en el rango</h4>
-                <p>No hay reservas activas para comparar tours.</p>
+                <h4>{{ selectedTourId ? 'Sin pasajeros por plan' : 'Sin destinos en el rango' }}</h4>
+                <p>{{ selectedTourId ? 'No hay pasajeros registrados en los planes de este tour para el rango seleccionado.' : 'No hay reservas activas para comparar tours.' }}</p>
               </div>
             }
           </div>
         </section>
+        }
 
       </div>
 

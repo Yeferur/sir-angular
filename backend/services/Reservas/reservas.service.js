@@ -241,6 +241,42 @@ function tieneTexto(value) {
   return String(value ?? '').trim().length > 0;
 }
 
+function esPagoDirectoReserva(tipo) {
+  return String(tipo || '').trim().toLowerCase() === 'pago directo';
+}
+
+function esPagoCompletoReserva(tipo) {
+  return String(tipo || '').trim().toLowerCase() === 'pago completo';
+}
+
+function esAbonoReserva(tipo) {
+  return String(tipo || '').trim().toLowerCase() === 'abono';
+}
+
+function normalizarEstadoReservaLegacy(estado) {
+  const value = String(estado || '').trim().toLowerCase();
+  if (!value) return '';
+  if (value === 'activa' || value === 'activo' || value === 'confirmado') return 'Confirmada';
+  if (value === 'completado') return 'Completada';
+  if (value === 'cancelado') return 'Cancelada';
+  if (value === 'confirmada') return 'Confirmada';
+  if (value === 'completada') return 'Completada';
+  if (value === 'cancelada') return 'Cancelada';
+  if (value === 'pendiente') return 'Pendiente';
+  if (value === 'pendiente de datos') return 'Pendiente de datos';
+  if (value === 'pendiente de pago') return 'Pendiente de pago';
+  return String(estado || '').trim();
+}
+
+function expandirEstadoReservaFiltro(estado) {
+  const normalized = normalizarEstadoReservaLegacy(estado);
+  const lower = normalized.toLowerCase();
+  if (lower === 'confirmada') return ['Confirmada', 'Confirmado', 'Activo', 'Activa'];
+  if (lower === 'completada') return ['Completada', 'Completado'];
+  if (lower === 'cancelada') return ['Cancelada', 'Cancelado'];
+  return normalized ? [normalized] : [];
+}
+
 function reservaOcupaCupos({ tipoReserva, estado, idTour, fechaTour, cantidad }) {
   return String(tipoReserva || '').trim().toLowerCase() === 'grupal'
     && Number(cantidad || 0) > 0
@@ -273,11 +309,13 @@ function construirImpactoCuposReserva({
 }
 
 function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null }) {
-  if (estadoActual === 'Completada') {
-    return estadoActual;
+  const estadoBase = normalizarEstadoReservaLegacy(estadoActual);
+
+  if (estadoBase === 'Completada') {
+    return estadoBase;
   }
 
-  if (estadoActual === 'Cancelada' && fechaEsPasadaBogota(fechaTour)) {
+  if (estadoBase === 'Cancelada' && fechaEsPasadaBogota(fechaTour)) {
     return 'Cancelada';
   }
 
@@ -289,15 +327,20 @@ function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoAc
     && pasajerosArray.some((p) => tieneTexto(p?.Telefono_Pasajero));
 
   const totalVenta = pasajerosArray.reduce((sum, p) => sum + Number(p?.Precio_Pasajero || 0), 0);
-  const totalAbonado = pagosArray.reduce((sum, pago) => sum + Number(pago?.Monto || 0), 0);
-  const tienePagoCompletoOPunto = pagosArray.some((pago) =>
-    pago?.Tipo === 'Pago Directo' || pago?.Tipo === 'Pago Completo'
+  const totalAbonado = pagosArray.reduce((sum, pago) => (
+    esPagoDirectoReserva(pago?.Tipo) ? sum : sum + Number(pago?.Monto || 0)
+  ), 0);
+  const tienePagoCompleto = pagosArray.some((pago) =>
+    esPagoCompletoReserva(pago?.Tipo)
   );
-  const pagoOk = tienePagoCompletoOPunto || (totalVenta > 0 && totalAbonado >= totalVenta);
+  const tienePagoEnPunto = pagosArray.some((pago) => esPagoDirectoReserva(pago?.Tipo));
+  const tieneAbonos = pagosArray.some((pago) => esAbonoReserva(pago?.Tipo) && Number(pago?.Monto || 0) > 0);
+  const pagoOk = tienePagoCompleto || (totalVenta > 0 && totalAbonado >= totalVenta);
+  const tieneCompromisoConfirmado = tienePagoEnPunto || tienePagoCompleto || tieneAbonos;
 
   let estado = 'Pendiente';
-  if (datosOk && pagoOk) estado = 'Confirmada';
-  else if (!datosOk && pagoOk) estado = 'Pendiente de datos';
+  if (datosOk && (pagoOk || tieneCompromisoConfirmado)) estado = 'Confirmada';
+  else if (!datosOk && (pagoOk || tieneCompromisoConfirmado)) estado = 'Pendiente de datos';
   else if (datosOk && !pagoOk) estado = 'Pendiente de pago';
 
   if (fechaEsPasadaBogota(fechaTour)) {
@@ -317,10 +360,10 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     const estado = String(estadoActual || '').trim();
     const vencida = fechaEsPasadaBogota(fechaTour);
 
-    if ((estado === 'Activo' || estado === 'Confirmado') && vencida) {
+    if ((estado === 'Activo' || estado === 'Activa' || estado === 'Confirmado') && vencida) {
       return { nuevoEstado: 'Completada', motivo: 'VENCIMIENTO_AUTOMATICO' };
     }
-    if (estado === 'Activo' || estado === 'Confirmado') {
+    if (estado === 'Activo' || estado === 'Activa' || estado === 'Confirmado') {
       return { nuevoEstado: 'Confirmada', motivo: 'NORMALIZACION_LEGACY' };
     }
     if (estado === 'Completado') {
@@ -344,7 +387,7 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     const [candidatos] = await conn.query(
       `SELECT Id_Reserva, Estado, Fecha_Tour
          FROM reservas
-        WHERE Estado IN ('Activo', 'Confirmado', 'Completado', 'Cancelado')
+        WHERE Estado IN ('Activo', 'Activa', 'Confirmado', 'Completado', 'Cancelado')
            OR (
              Fecha_Tour < ?
              AND Estado IN ('Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
@@ -737,9 +780,21 @@ async function filtrarReservas(q) {
 
   if (Estado) {
     if (Array.isArray(Estado)) {
-      conds.push(`r.Estado IN (${Estado.map(() => '?').join(',')})`);
-      values.push(...Estado);
-    } else { conds.push(`r.Estado = ?`); values.push(Estado); }
+      const expanded = [...new Set(Estado.flatMap((item) => expandirEstadoReservaFiltro(item)))];
+      if (expanded.length) {
+        conds.push(`r.Estado IN (${expanded.map(() => '?').join(',')})`);
+        values.push(...expanded);
+      }
+    } else {
+      const expanded = expandirEstadoReservaFiltro(Estado);
+      if (expanded.length === 1) {
+        conds.push(`r.Estado = ?`);
+        values.push(expanded[0]);
+      } else if (expanded.length > 1) {
+        conds.push(`r.Estado IN (${expanded.map(() => '?').join(',')})`);
+        values.push(...expanded);
+      }
+    }
   }
 
   if (Id_Reserva) { conds.push(`r.Id_Reserva = ?`); values.push(Id_Reserva); }
@@ -794,6 +849,7 @@ async function filtrarReservas(q) {
   const sql = `
     SELECT
       r.Id_Reserva, r.Fecha_Tour, h.Id_Tour, t.Nombre_Tour,
+      r.Tipo_Reserva,
       r.Estado, r.Idioma_Reserva, r.Telefono_Reportante, r.Nombre_Reportante,
       COUNT(p.Id_Pasajero) AS Pasajeros
     FROM reservas r
@@ -807,8 +863,10 @@ async function filtrarReservas(q) {
   `;
 
   const [rows] = await db.query(sql, values);
-  console.log('filtrarReservas - SQL:', rows);
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    Estado: normalizarEstadoReservaLegacy(row?.Estado),
+  }));
 }
 
 
@@ -841,13 +899,15 @@ async function obtenerReserva(Id_Reserva) {
           SELECT SUM(pr.Monto)
           FROM pagos_reservas pr
           WHERE pr.Id_Reserva = r.Id_Reserva
+            AND COALESCE(pr.Tipo, '') <> 'Pago Directo'
         ), 0)
       ) AS Pendiente,
       t.Nombre_Tour,
       h.Id_Tour,
       c.Nombre_Canal,
       h.Hora_Salida,
-      pto.Nombre_Punto AS PuntoEncuentro
+      pto.Nombre_Punto AS PuntoEncuentro,
+      pto.Direccion AS DireccionPuntoEncuentro
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
@@ -880,6 +940,12 @@ async function obtenerReserva(Id_Reserva) {
         WHERE pt.Id_Punto = p.Id_Punto
         LIMIT 1
       ) AS Nombre_Punto,
+      (
+        SELECT Direccion
+        FROM puntos pt
+        WHERE pt.Id_Punto = p.Id_Punto
+        LIMIT 1
+      ) AS Direccion,
       (
         SELECT h2.Hora_Salida
         FROM horarios h2
@@ -926,6 +992,7 @@ async function obtenerReserva(Id_Reserva) {
     Precio_Pasajero: Number(p.Precio_Pasajero) || 0,
     Id_Punto: p.Id_Punto || null,
     Nombre_Punto: p.Nombre_Punto || '',
+    Direccion: p.Direccion || '',
     HoraSalida: p.Hora_Salida || '',
     Precio: '',
     Comision: '',
@@ -942,14 +1009,47 @@ async function obtenerReserva(Id_Reserva) {
     Ruta_Comprobante: pg.Ruta_Comprobante
   }));
 
+  const puntosMap = new Map();
+  for (const p of paxRows) {
+    const nombre = String(p.Nombre_Punto || '').trim();
+    const direccion = String(p.Direccion || '').trim();
+    const hora = String(p.Hora_Salida || '').trim();
+    const idPunto = p.Id_Punto || null;
+
+    if (!nombre && !idPunto) continue;
+
+    const key = `${idPunto || nombre}|${hora || cab.Hora_Salida || ''}`;
+    if (!puntosMap.has(key)) {
+      puntosMap.set(key, {
+        Id_Punto: idPunto,
+        NombrePunto: nombre || cab.PuntoEncuentro || '',
+        Direccion: direccion || cab.DireccionPuntoEncuentro || '',
+        HoraSalida: hora || cab.Hora_Salida || '',
+      });
+    }
+  }
+
+  if (!puntosMap.size && (cab.PuntoEncuentro || cab.DireccionPuntoEncuentro || cab.Hora_Salida)) {
+    puntosMap.set(`cabecera|${cab.Hora_Salida || ''}`, {
+      Id_Punto: cab.Id_Punto || null,
+      NombrePunto: cab.PuntoEncuentro || '',
+      Direccion: cab.DireccionPuntoEncuentro || '',
+      HoraSalida: cab.Hora_Salida || '',
+    });
+  }
+
+  const Puntos = Array.from(puntosMap.values());
+
   const data = {
     Id_Reserva: cab.Id_Reserva,
-    Estado: cab.Estado || 'Pendiente',
+    Tipo_Reserva: cab.Tipo_Reserva || 'Grupal',
+    Estado: normalizarEstadoReservaLegacy(cab.Estado || 'Pendiente'),
     NumeroPasajeros: Pasajeros.length,
     TotalNeto: Number(cab.TotalNeto || 0),
     Pendiente: Number(cab.Pendiente || 0),
     TourReserva: cab.Nombre_Tour || '',
     PuntoEncuentro: cab.PuntoEncuentro || '',
+    Direccion: cab.DireccionPuntoEncuentro || '',
     FechaReserva: cab.Fecha_Tour,
     HoraSalida: cab.Hora_Salida || '',
     IdiomaReserva: cab.Idioma_Reserva || '',
@@ -959,11 +1059,80 @@ async function obtenerReserva(Id_Reserva) {
       Nombre: cab.Nombre_Reportante || '',
       Telefono: cab.Telefono_Reportante || ''
     },
+    Puntos,
     Pasajeros,
     Pagos
   };
 
   return data;
+}
+
+async function normalizarEstadosReservasExistentes(conexion = db) {
+  const [reservasRows] = await conexion.query(
+    `SELECT Id_Reserva, Fecha_Tour, Estado
+       FROM reservas`
+  );
+
+  if (!reservasRows?.length) return { evaluadas: 0, actualizadas: 0 };
+
+  const ids = reservasRows.map((row) => row.Id_Reserva).filter(Boolean);
+  const placeholders = ids.map(() => '?').join(',');
+
+  const [pasajerosRows] = await conexion.query(
+    `SELECT Id_Reserva, Nombre_Pasajero, DNI, Telefono_Pasajero, Precio_Pasajero
+       FROM pasajeros
+      WHERE Id_Reserva IN (${placeholders})`,
+    ids
+  );
+
+  const [pagosRows] = await conexion.query(
+    `SELECT Id_Reserva, Monto, Tipo
+       FROM pagos_reservas
+      WHERE Id_Reserva IN (${placeholders})`,
+    ids
+  );
+
+  const pasajerosMap = new Map();
+  for (const pasajero of pasajerosRows || []) {
+    const key = String(pasajero.Id_Reserva);
+    if (!pasajerosMap.has(key)) pasajerosMap.set(key, []);
+    pasajerosMap.get(key).push(pasajero);
+  }
+
+  const pagosMap = new Map();
+  for (const pago of pagosRows || []) {
+    const key = String(pago.Id_Reserva);
+    if (!pagosMap.has(key)) pagosMap.set(key, []);
+    pagosMap.get(key).push(pago);
+  }
+
+  let actualizadas = 0;
+  for (const reserva of reservasRows) {
+    const idReserva = String(reserva.Id_Reserva);
+    const estadoActual = normalizarEstadoReservaLegacy(reserva.Estado);
+
+    let nuevoEstado = estadoActual;
+    if (!['Cancelada', 'Completada'].includes(estadoActual)) {
+      nuevoEstado = resolverEstadoReserva({
+        fechaTour: reserva.Fecha_Tour,
+        pasajeros: pasajerosMap.get(idReserva) || [],
+        pagos: pagosMap.get(idReserva) || [],
+        estadoActual: estadoActual || null,
+      });
+    }
+
+    if (nuevoEstado !== reserva.Estado) {
+      await conexion.query(
+        `UPDATE reservas
+            SET Estado = ?
+          WHERE Id_Reserva = ?`,
+        [nuevoEstado, idReserva]
+      );
+      actualizadas += 1;
+    }
+  }
+
+  return { evaluadas: reservasRows.length, actualizadas };
 }
 
 /* ===========================
@@ -997,12 +1166,10 @@ async function obtenerTours(includeTourId = null) {
   const sql = hasIncludeId
     ? `SELECT *
        FROM tours
-       WHERE Activo = 1 OR Id_Tour = ?
-       ORDER BY Nombre_Tour`
+       WHERE Activo = 1 OR Id_Tour = ?`
     : `SELECT *
        FROM tours
-       WHERE Activo = 1
-       ORDER BY Nombre_Tour`;
+       WHERE Activo = 1`;
 
   const [rows] = hasIncludeId
     ? await db.query(sql, [includeId])
@@ -1440,7 +1607,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
     Fecha_Tour: cab.Fecha_Tour.toISOString().slice(0, 10),
     Id_Canal: cab.Id_Canal,
     Idioma_Reserva: cab.Idioma_Reserva,
-    Estado: cab.Estado || 'Pendiente',
+    Estado: normalizarEstadoReservaLegacy(cab.Estado || 'Pendiente'),
     Observaciones: cab.Observaciones || null,
     Tipo_Reserva: cab.Tipo_Reserva || 'Grupal',
     Nombre_Reportante: cab.Nombre_Reportante || '',
@@ -2062,4 +2229,5 @@ module.exports = {
   verificarDniDuplicado,
   obtenerHistorialCambiosReserva,
   actualizarEstadosReservasVencidas,
+  normalizarEstadosReservasExistentes,
 };

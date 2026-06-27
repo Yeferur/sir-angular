@@ -525,4 +525,15 @@ seleccionarPuntoAutocomplete(p: any) {
       fallback
     );
   }
+
+  getTipoReservaLabel(reserva: any): string {
+    const tipo = String(
+      reserva?.Tipo_Reserva ??
+      reserva?.TipoReserva ??
+      reserva?.tipo_reserva ??
+      reserva?.tipoReserva ??
+      'Grupal'
+    ).trim().toLowerCase();
+    return tipo === 'privada' ? 'Privada' : 'Grupal';
+  }
 }

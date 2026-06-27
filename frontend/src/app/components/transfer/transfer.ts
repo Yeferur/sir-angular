@@ -259,9 +259,21 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     return Number(this.transfer.Valor || 0);
   }
 
+  private isDirectPayment(pago: Pago | any): boolean {
+    const metodo = String(pago?.Metodo || pago?.Tipo || pago?.FormaPago || '')
+      .trim()
+      .toLowerCase();
+
+    return metodo === 'paga en punto' || metodo === 'pago directo' || metodo === 'directo';
+  }
+
+  get pagosEfectivos(): Pago[] {
+    return this.pagos.filter((pago) => !this.isDirectPayment(pago));
+  }
+
   get totalPagado(): number {
-    return this.pagos
-      .filter(p => p.Estado === 'Pagado' && !(p.Metodo === 'Paga en punto' && Number(p.Monto) === 0))
+    return this.pagosEfectivos
+      .filter(p => p.Estado === 'Pagado')
       .reduce((sum, p) => sum + Number(p.Monto || 0), 0);
   }
 
@@ -275,6 +287,17 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
 
   get estadoNormalizado(): string {
     return (this.transfer.Estado || 'Pendiente').toLowerCase();
+  }
+
+  get estadoMostrado(): string {
+    const estadoBase = String(this.transfer.Estado || 'Pendiente').trim();
+    if (estadoBase !== 'Confirmado') return estadoBase || 'Pendiente';
+
+    if (this.pagos.some((pago) => this.isDirectPayment(pago))) return 'Confirmado - Pago en punto';
+    if (this.saldoPendiente > 0 && this.pagosEfectivos.some((pago) => String(pago?.Metodo || '').trim() === 'Abono')) {
+      return 'Confirmado - Pendiente de pago';
+    }
+    return 'Confirmado';
   }
 
   get estadoClase(): string {
@@ -343,6 +366,8 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   }
 
   private normalizeComprobanteFromPago(pago: any, index: number): ComprobanteTransfer | null {
+    if (this.isDirectPayment(pago)) return null;
+
     const url = pago?.Pago_Comprobante || pago?.Ruta_Comprobante || pago?.SoporteUrl || pago?.Comprobante || pago?.UrlComprobante || pago?.Archivo;
     if (!url) return null;
 
@@ -368,12 +393,34 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
         url: c?.url || c?.Pago_Comprobante || c?.Ruta_Comprobante || c?.SoporteUrl || c?.Comprobante || c?.UrlComprobante || c?.Archivo || '',
         tipo: c?.tipo || c?.Metodo || c?.FormaPago || 'Comprobante',
         fecha: c?.fecha || c?.Fecha_Pago || ''
-      })).filter(c => Boolean(c.url));
+      })).filter(c => Boolean(c.url) && !this.isDirectPayment(c));
     }
 
-    return this.pagos
+    return this.pagosEfectivos
       .map((pago, index) => this.normalizeComprobanteFromPago(pago, index))
       .filter((item): item is ComprobanteTransfer => Boolean(item?.url));
+  }
+
+  private renderPdfFooter(doc: jsPDF & { lastAutoTable?: any }): void {
+    const totalPages = doc.getNumberOfPages();
+    const fechaGeneracion = new Date().toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Este documento confirma los datos registrados del transfer. Ante cualquier duda, comunícate con Maxitours.', 10, pageHeight - 10, { maxWidth: pageWidth - 20 });
+      doc.text(`Generado por SIR | ${fechaGeneracion}`, 10, pageHeight - 5);
+      doc.text(`Página ${i} de ${totalPages}`, pageWidth - 10, pageHeight - 5, { align: 'right' });
+    }
   }
 
   private buildTransferPdfDoc(): jsPDF & { lastAutoTable?: any } {
@@ -381,147 +428,144 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     const doc = new jsPDF() as jsPDF & { lastAutoTable?: any };
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
 
-    doc.addImage(logoBase64, 'PNG', 10, 10, 40, 15);
+    // ── Encabezado ──────────────────────────────────────────────────────────
+    doc.addImage(logoBase64, 'PNG', 10, 10, 36, 14);
     doc.setFontSize(18);
-    doc.setTextColor(30, 41, 59);
-    doc.text('Confirmacion de Transfer', 58, 18);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Confirmación de Transfer', 50, 18);
     doc.setFontSize(11);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Transfer ${this.transferCodigo}`, 58, 25);
-    doc.text(`Generado: ${this.formatDate(new Date())}`, 58, 31);
-    doc.line(10, 37, pageWidth - 10, 37);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Transfer ${this.transferCodigo}`, 50, 25);
+    doc.text(`Generada: ${this.formatDate(new Date())}`, 50, 31);
+    doc.line(10, 36, pageWidth - 10, 36);
 
     let currentY = 42;
 
-    const infoRows = [
-      ['Transfer', this.transferCodigo],
-      ['Tour', t.Nombre_Servicio || '—'],
-      ['Fecha del servicio', this.formatDate(t.Fecha_Transfer)],
-      ['Idioma', (t as any).Idioma || '—'],
-      ['Titular', t.Nombre_Titular || '—'],
-      ['Teléfono de contacto', t.Telefono_Titular || '—']
-    ];
+    // ── Información del transfer ─────────────────────────────────────────────
+    currentY = this.ensurePdfSpace(doc, currentY, 36);
+    doc.setFontSize(12);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Información del transfer', 10, currentY);
+    currentY += 3;
 
-    currentY = this.ensurePdfSpace(doc, currentY, 50);
     autoTable(doc, {
       head: [['Campo', 'Detalle']],
-      body: infoRows,
-      startY: currentY,
+      body: [
+        ['Transfer', this.transferCodigo],
+        ['Estado', this.estadoMostrado],
+        ['Servicio', t.Nombre_Servicio || '—'],
+        ['Fecha del servicio', this.formatDate(t.Fecha_Transfer)],
+        ['Hora de recogida', t.Hora_Recogida || '—'],
+        ['Origen', t.Punto_Salida || '—'],
+        ['Destino', t.Punto_Destino || '—'],
+        ['Titular', t.Nombre_Titular || '—'],
+        ['Teléfono de contacto', t.Telefono_Titular || '—'],
+        ...(t.Vuelo ? [['Vuelo', `${t.TipoVuelo || ''} ${t.Vuelo}`.trim()]] : []),
+        ['Personas', String(t.Cantidad_Personas ?? '—')],
+      ],
+      startY: currentY + 2,
       theme: 'grid',
-      styles: { fontSize: 9.5, cellPadding: 2 },
+      styles: { fontSize: 9, cellPadding: 2, valign: 'top' },
       headStyles: { fillColor: [22, 160, 133], textColor: 255, fontStyle: 'bold' },
       margin: { left: 10, right: 10 }
     });
 
     currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
 
-    const pagosRows = [
-      ['Valor total', this.formatCurrency(t.Valor || 0)],
-      ['Pagado', this.formatCurrency(this.totalPagado)],
-      ['Pendiente', this.formatCurrency(this.saldoPendiente)],
-      ['Tipo de pago', this.pagos.length === 0
-        ? 'Paga en punto'
-        : this.pagos.length === 1 && this.pagos[0].Metodo === 'Completo'
-          ? 'Ya pagó'
-          : 'Abonos']
-    ];
+    // ── Resumen de pago ──────────────────────────────────────────────────────
+    currentY = this.ensurePdfSpace(doc, currentY, 32);
+    doc.setFontSize(12);
+    doc.setTextColor(35, 35, 35);
+    doc.text('Resumen de pago', 10, currentY);
+    currentY += 3;
 
-    currentY = this.ensurePdfSpace(doc, currentY, 36);
     autoTable(doc, {
-      head: [['Campo', 'Detalle']],
-      body: pagosRows,
-      startY: currentY,
+      head: [['Concepto', 'Valor']],
+      body: [
+        ['Total', this.formatCurrency(this.valorTotal)],
+        ['Pagado', this.formatCurrency(this.totalPagado)],
+        ['Pendiente', this.formatCurrency(this.saldoPendiente)],
+      ],
+      startY: currentY + 2,
       theme: 'grid',
-      styles: { fontSize: 9.5, cellPadding: 2 },
-      headStyles: { fillColor: [155, 89, 182], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [22, 160, 133], textColor: 255, fontStyle: 'bold' },
       margin: { left: 10, right: 10 }
     });
 
     currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
 
-    if (this.pagos.length > 0) {
-      const pagosBody = this.pagos.map((p) => [
-        p.Metodo || '—',
-        this.formatCurrency(p.Monto),
-        this.formatDate(p.Fecha_Pago),
-        p.Estado || '—',
-        p.Observaciones || '—',
-        p.Pago_Comprobante ? 'Sí' : 'No'
-      ]);
-
+    // ── Abonos ───────────────────────────────────────────────────────────────
+    if (this.pagosEfectivos.length > 0) {
       currentY = this.ensurePdfSpace(doc, currentY, 40);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Abonos y comprobantes', 10, currentY);
+      currentY += 3;
+
       autoTable(doc, {
-        head: [['Tipo', 'Monto', 'Fecha', 'Estado', 'Observaciones', 'Comprobante']],
-        body: pagosBody,
-        startY: currentY,
+        head: [['Fecha', 'Método / tipo', 'Valor', 'Comprobante']],
+        body: this.pagosEfectivos.map((p) => [
+          this.formatDate(p.Fecha_Pago),
+          p.Metodo || '—',
+          this.formatCurrency(p.Monto),
+          p.Pago_Comprobante ? 'Sí' : 'No',
+        ]),
+        startY: currentY + 2,
+        theme: 'grid',
+        styles: { fontSize: 8.4, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
+        margin: { left: 10, right: 10 }
+      });
+
+      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
+    }
+
+    // ── Pasajeros ────────────────────────────────────────────────────────────
+    const pasajeros = this.pasajeros;
+    if (pasajeros.length > 0) {
+      currentY = this.ensurePdfSpace(doc, currentY, 48);
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Pasajeros', 10, currentY);
+      currentY += 3;
+
+      autoTable(doc, {
+        head: [['Nombre', 'Tipo', 'DNI / Pasaporte', 'Teléfono', 'Precio']],
+        body: pasajeros.map((p) => [
+          p.NombrePasajero || '—',
+          p.TipoPasajero || '—',
+          p.DNI || '—',
+          p.TelefonoPasajero || '—',
+          this.formatCurrency(p.Precio_Pasajero),
+        ]),
+        startY: currentY + 2,
         theme: 'striped',
         styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
-        headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 26 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 50 },
-          5: { cellWidth: 18 }
-        },
+        headStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' },
         margin: { left: 10, right: 10 }
       });
 
       currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
     }
 
-    const comprobantes = this.comprobantesDisponibles;
-    if (comprobantes.length > 0) {
-      currentY = this.ensurePdfSpace(doc, currentY, 32);
-      autoTable(doc, {
-        head: [['Comprobante', 'Fecha', 'Estado']],
-        body: comprobantes.map((c) => [
-          c.tipo || 'Comprobante',
-          this.formatDate(c.fecha),
-          'Disponible'
-        ]),
-        startY: currentY,
-        theme: 'grid',
-        styles: { fontSize: 8.8, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 80 },
-          1: { cellWidth: 55 },
-          2: { cellWidth: 35 }
-        },
-        margin: { left: 10, right: 10 }
-      });
-      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
-    }
-
+    // ── Observaciones ────────────────────────────────────────────────────────
     if (t.Observaciones) {
       currentY = this.ensurePdfSpace(doc, currentY, 28);
-      autoTable(doc, {
-        head: [['Observaciones']],
-        body: [[t.Observaciones]],
-        startY: currentY,
-        theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
-        headStyles: { fillColor: [189, 195, 199], textColor: 15, fontStyle: 'bold' },
-        margin: { left: 10, right: 10 }
-      });
-      currentY = (doc.lastAutoTable?.finalY ?? currentY) + 8;
+      doc.setFontSize(12);
+      doc.setTextColor(35, 35, 35);
+      doc.text('Observaciones', 10, currentY);
+      currentY += 4;
+
+      doc.setFontSize(9.5);
+      doc.setTextColor(60, 60, 60);
+      const lines = doc.splitTextToSize(String(t.Observaciones), pageWidth - 20);
+      doc.text(lines, 10, currentY);
+      currentY += lines.length * 4 + 4;
     }
 
-    if (currentY + 12 > pageHeight - 15) {
-      doc.addPage();
-      currentY = 18;
-    }
-
-    const footerText = 'Este documento confirma los datos registrados del transfer. Ante cualquier duda, comunicate con Maxitours.';
-    doc.setFontSize(8.5);
-    doc.setTextColor(107, 114, 128);
-    const footerLines = doc.splitTextToSize(footerText, pageWidth - 20);
-    doc.text(footerLines, 10, Math.min(pageHeight - 14, currentY + 10));
-    doc.text(`SIR - Sistema Integrado de Transfers | ${this.formatDate(new Date())}`, 10, pageHeight - 8);
+    this.renderPdfFooter(doc);
 
     return doc;
   }
@@ -577,6 +621,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   }
 
   tieneComprobante(pago: Pago): boolean {
+    if (this.isDirectPayment(pago)) return false;
     return Boolean(pago.Pago_Comprobante);
   }
 

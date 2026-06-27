@@ -179,7 +179,6 @@ async function obtenerDatosInicio(fecha) {
       const planes = planesMap[t.Id_Tour];
       if (planes && planes.length > 0) t.planes = planes;
     }
-console.log('Datos de inicio obtenidos para fecha', fecha, { tours, transfers });
     return { tours, transfers };
   } catch (error) {
     throw error;
