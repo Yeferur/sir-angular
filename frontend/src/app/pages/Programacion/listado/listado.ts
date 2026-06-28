@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
 import { InicioService } from '../../../services/inicio';
-import { Sugerencia, TourProgramacion, Bus, Reserva } from '../../../interfaces/Programacion/reservas';
+import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { forkJoin, switchMap, of, finalize } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
@@ -88,6 +88,7 @@ export class Listado implements OnInit {
 
   reservasSinAsignar: Reserva[] = [];
   busesPrivados: any[] = [];  // buses para reservas privadas del día
+  destinoTourActual: DestinoTourProgramacion | null = null;
 
   // Buses privados agrupados por reserva para la vista de privados
   get gruposPrivados(): any[] {
@@ -359,6 +360,7 @@ export class Listado implements OnInit {
     this.listadoPersistido = false;
     this.listadoOrigen = null;
     this.busesPrivados = [];
+    this.destinoTourActual = null;
   }
 
   markDirty(): void {
@@ -443,7 +445,7 @@ export class Listado implements OnInit {
       next: (data) => {
         if (data?.exists) {
           const sugerencia = this.construirSugerenciaDesdeListado(data);
-          this.aplicarPlan(tour, sugerencia, data.reservasSinAsignar || [], data.privados || []);
+          this.aplicarPlan(tour, sugerencia, data.reservasSinAsignar || [], data.privados || [], data.destinoTour || null);
           this.mostrarAlertaReservasSinAsignar(tour, data.reservasSinAsignar || []);
           this.isPageLoading = false;
           return;
@@ -664,7 +666,7 @@ export class Listado implements OnInit {
       reservasOrdenadas = reservas;
     }
 
-    this.drawerService.openMapa(reservasOrdenadas);
+    this.drawerService.openMapa(reservasOrdenadas, this.getTourMapDestination());
   }
 
   guardarListadoFinal(): void {
@@ -824,6 +826,7 @@ export class Listado implements OnInit {
         if (esFormatoNuevo) {
           const busesGenerados = Array.isArray(plan) ? plan : (plan?.buses || []);
           const reservasSinAsignar = Array.isArray(plan) ? [] : (plan?.reservasSinAsignar || []);
+          const destinoTour = Array.isArray(plan) ? null : (plan?.destinoTour || null);
           this.busesPrivados = plan?.privados || [];
           const sugerencia = this.construirSugerenciaDesdeListado({ buses: busesGenerados, reservasSinAsignar });
           const totalPasajeros = sugerencia.buses.reduce((sum, b) => sum + (b.ocupados || 0), 0)
@@ -845,6 +848,7 @@ export class Listado implements OnInit {
           tour.totalReservas = totalReservas;
 
           this.reservasSinAsignar = reservasSinAsignar;
+          this.destinoTourActual = destinoTour;
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
           this.renumerarBusesGenericos(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
@@ -854,6 +858,7 @@ export class Listado implements OnInit {
           tour.totalReservas = plan?.analisis?.totalReservas || 0;
 
           this.reservasSinAsignar = [];
+          this.destinoTourActual = plan?.destinoTour || null;
           this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
           this.renumerarBusesGenericos(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
@@ -890,7 +895,7 @@ export class Listado implements OnInit {
     };
   }
 
-  private aplicarPlan(tour: TourProgramacion, sugerencia: Sugerencia, reservasSinAsignar: Reserva[], privados: any[] = []): void {
+  private aplicarPlan(tour: TourProgramacion, sugerencia: Sugerencia, reservasSinAsignar: Reserva[], privados: any[] = [], destinoTour: DestinoTourProgramacion | null = null): void {
     this.listadoPersistido = true;
     this.listadoDirty = false;
     this.listadoOrigen = 'db';
@@ -907,6 +912,7 @@ export class Listado implements OnInit {
     this.renumerarBusesGenericos(this.planSeleccionado?.buses);
     this.reservasSinAsignar = reservasSinAsignar || [];
     this.busesPrivados = privados || [];
+    this.destinoTourActual = destinoTour;
     this.modoVista = 'editor';
 
     this.activeBusIndex = 0;
@@ -1151,7 +1157,28 @@ export class Listado implements OnInit {
   private updateOpenMapForActiveBus(): void {
     if (this.drawerService.drawer()?.type !== 'mapa') return;
     const reservas = this.getReservasOrdenadasDelBusActivo();
-    this.drawerService.openMapa(reservas);
+    this.drawerService.openMapa(reservas, this.getTourMapDestination());
+  }
+
+  private getTourMapDestination(): { lat: number; lng: number; nombre?: string } | null {
+    const lat = this.parseCoordinate(this.destinoTourActual?.lat);
+    const lng = this.parseCoordinate(this.destinoTourActual?.lng);
+
+    if (lat === null || lng === null) return null;
+
+    return {
+      lat,
+      lng,
+      nombre: this.destinoTourActual?.nombre || this.tourSeleccionado?.NombreTour || 'Destino del tour'
+    };
+  }
+
+  private parseCoordinate(value: unknown): number | null {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'string') return null;
+
+    const parsed = Number(value.replace(',', '.').trim());
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
 }

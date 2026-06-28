@@ -28,6 +28,7 @@
     @if (drawer()!.type === 'mapa') {
       <app-mapa
         [puntos]="drawer()!.puntos!"
+        [destino]="drawer()!.destino ?? null"
         (onClose)="close()"
       />
     }

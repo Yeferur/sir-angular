@@ -18,21 +18,23 @@
   <div class="updates-scroll">
     <article class="hero-card">
       <span class="status-pill">{{ status }}</span>
-      <h3>Validación activa en producción</h3>
+      <h3>SIR sigue en fase beta</h3>
       <p>{{ mainNotice }}</p>
     </article>
 
     <div class="updates-grid">
       <article class="update-card warning-card">
         <span class="card-kicker">Aviso importante</span>
-        <h3>App en fase de pruebas</h3>
-        <p>Estamos observando el comportamiento real de la plataforma para estabilizar cada flujo crítico.</p>
+        <h3>Posibles errores o inconsistencias</h3>
+        <p>Esta versión aún está en validación. Si notas comportamientos inesperados en cualquier módulo, es importante reportarlos.</p>
       </article>
 
       <article class="update-card">
-        <span class="card-kicker">Versión beta</span>
-        <h3>Nuevo SIR</h3>
-        <p>La app ya opera con una experiencia renovada, más rápida y preparada para seguir creciendo.</p>
+        <span class="card-kicker">Resumen</span>
+        <h3>Principales cambios</h3>
+        <ul>
+          <li *ngFor="let highlight of keyHighlights">{{ highlight }}</li>
+        </ul>
       </article>
 
       <article class="update-card report-card">
@@ -42,11 +44,16 @@
       </article>
 
       <article class="update-card changes-card">
-        <span class="card-kicker">Registro</span>
-        <h3>Cambios recientes</h3>
-        <ul>
-          <li *ngFor="let change of recentChanges">{{ change }}</li>
-        </ul>
+        <span class="card-kicker">Detalle</span>
+        <h3>Novedades de SIR</h3>
+        <div class="sections-list">
+          <section class="section-block" *ngFor="let section of sections">
+            <h4>{{ section.title }}</h4>
+            <ul>
+              <li *ngFor="let item of section.items">{{ item }}</li>
+            </ul>
+          </section>
+        </div>
       </article>
     </div>
   </div>

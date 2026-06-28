@@ -116,7 +116,8 @@
 
 .hero-card p,
 .update-card p,
-.update-card li {
+.update-card li,
+.section-block li {
   color: var(--text-secondary);
   font-size: 0.92rem;
   line-height: 1.55;
@@ -163,7 +164,33 @@
   padding-left: 18px;
 }
 
+.update-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .changes-card li + li {
+  margin-top: 6px;
+}
+
+.sections-list {
+  display: grid;
+  gap: 18px;
+}
+
+.section-block h4 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 0.96rem;
+  line-height: 1.3;
+}
+
+.section-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.section-block li + li {
   margin-top: 6px;
 }
 

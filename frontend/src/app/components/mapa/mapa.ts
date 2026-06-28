@@ -28,10 +28,17 @@ interface PuntoAgrupado {
   lng: number;
   reservas: any[];
   NombrePunto?: string;
+  esDestinoTour?: boolean;
   // Suma de __paxEnEstePunto de las reservas en este punto.
   // Puede diferir del total de NumeroPasajeros cuando una reserva
   // tiene pasajeros repartidos en múltiples puntos de la misma ruta.
   totalPaxEnEstePunto: number;
+}
+
+interface DestinoTourMapa {
+  lat: number;
+  lng: number;
+  nombre?: string | null;
 }
 
 @Component({
@@ -43,6 +50,7 @@ interface PuntoAgrupado {
 })
 export class Mapa implements OnInit, OnDestroy {
   @Input() puntos: any[] = [];
+  @Input() destino: DestinoTourMapa | null = null;
   @Output() onClose = new EventEmitter<void>();
   @ViewChild('mapaDiv') mapContainer!: ElementRef<HTMLDivElement>;
 
@@ -199,6 +207,25 @@ export class Mapa implements OnInit, OnDestroy {
       ...agrupadosSinBase
     ];
 
+    const destinoTour = this.normalizarDestinoTour();
+    if (destinoTour) {
+      const destinoKey = `${destinoTour.lat.toFixed(5)},${destinoTour.lng.toFixed(5)}`;
+      const yaExiste = this.agrupadosConBase.some(
+        p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}` === destinoKey
+      );
+
+      if (!yaExiste) {
+        this.agrupadosConBase.push({
+          lat: destinoTour.lat,
+          lng: destinoTour.lng,
+          NombrePunto: destinoTour.nombre || 'Destino del tour',
+          reservas: [],
+          totalPaxEnEstePunto: 0,
+          esDestinoTour: true
+        });
+      }
+    }
+
     // Calcular total de pasajeros para el panel
     this.totalPax = this.agrupadosConBase.reduce(
       (sum, p) => sum + this.totalPaxPunto(p), 0
@@ -256,6 +283,7 @@ export class Mapa implements OnInit, OnDestroy {
         const punto = this.agrupadosConBase[i];
         const isStart = i === 0;
         const isEnd   = i === n - 1;
+        const esDestinoTour = !!punto?.esDestinoTour;
 
         const marker = L.marker(wp.latLng, {
           icon: this.crearIconoSvg(i, n, punto?.NombrePunto ?? '')
@@ -281,7 +309,7 @@ export class Mapa implements OnInit, OnDestroy {
           : '<div class="mapa-popup-empty">Sin reservas</div>';
 
         const badgeClass = isStart ? 'badge-start' : isEnd ? 'badge-end' : 'badge-mid';
-        const badgeText  = isStart ? 'INICIO' : isEnd ? 'FINAL' : `Parada ${i + 1}`;
+        const badgeText  = isStart ? 'INICIO' : isEnd ? (esDestinoTour ? 'TOUR' : 'FINAL') : `Parada ${i + 1}`;
         const numPaxTotal = this.totalPaxPunto(punto ?? { reservas: [] } as any);
 
         marker.bindPopup(`
@@ -405,6 +433,25 @@ export class Mapa implements OnInit, OnDestroy {
     if (typeof v !== 'string') return null;
     const n = parseFloat(v.replace(',', '.').trim());
     return isNaN(n) ? null : n;
+  }
+
+  private normalizarDestinoTour(): DestinoTourMapa | null {
+    const lat = this.toNumber(this.destino?.lat);
+    const lng = this.toNumber(this.destino?.lng);
+
+    if (
+      lat === null || lng === null ||
+      Math.abs(lat) < 1e-4 || Math.abs(lng) < 1e-4 ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180
+    ) {
+      return null;
+    }
+
+    return {
+      lat,
+      lng,
+      nombre: String(this.destino?.nombre || '').trim() || 'Destino del tour'
+    };
   }
 
   private orsRouter(apiKey: string) {

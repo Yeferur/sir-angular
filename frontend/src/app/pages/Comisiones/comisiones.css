@@ -5,8 +5,7 @@
    ========================================================= */
 .page-container {
   max-width: 1360px;
-  margin: 36px auto 110px;
-  padding: 0 24px;
+  margin: auto;
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
   display: flex;
   flex-direction: column;
@@ -597,9 +596,6 @@
 /* =========================================================
    RESULTS
    ========================================================= */
-.results-area {
-  margin-top: 10px;
-}
 
 /* =========================================================
    EMPTY / LOADING

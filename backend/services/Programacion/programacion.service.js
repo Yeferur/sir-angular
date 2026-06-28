@@ -1430,7 +1430,7 @@ async function obtenerCoordenadasTours(tours) {
     // y el algoritmo de ordenamiento se comporta igual que antes para ellos.
     try {
         const [rows] = await db.query(
-            'SELECT Id_Tour, Latitud, Longitud FROM tours WHERE Id_Tour IN (?) AND Latitud IS NOT NULL AND Longitud IS NOT NULL',
+            'SELECT Id_Tour, Nombre_Tour, Latitud, Longitud FROM tours WHERE Id_Tour IN (?) AND Latitud IS NOT NULL AND Longitud IS NOT NULL',
             [tours]
         );
         const mapa = {};
@@ -1438,7 +1438,12 @@ async function obtenerCoordenadasTours(tours) {
             const lat = Number(row.Latitud);
             const lon = Number(row.Longitud);
             if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                mapa[String(row.Id_Tour)] = { Latitud: lat, Longitud: lon };
+                mapa[String(row.Id_Tour)] = {
+                    Id_Tour: Number(row.Id_Tour),
+                    Nombre_Tour: row.Nombre_Tour || null,
+                    Latitud: lat,
+                    Longitud: lon
+                };
             }
         }
         return mapa;
@@ -1449,11 +1454,33 @@ async function obtenerCoordenadasTours(tours) {
     }
 }
 
+function resolverDestinoTour(tours, tourDestinos = {}) {
+    const ids = Array.isArray(tours) ? tours.map((id) => Number(id)).filter((id) => id > 0) : [Number(tours)].filter((id) => id > 0);
+    if (!ids.length) return null;
+
+    const primaryTourId = ids.includes(5) ? 5 : ids[0];
+    const destino = tourDestinos[String(primaryTourId)] || tourDestinos[String(ids[0])];
+    if (!destino) return null;
+
+    const lat = Number(destino.Latitud);
+    const lng = Number(destino.Longitud);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+    return {
+        idTour: Number(destino.Id_Tour || primaryTourId),
+        lat,
+        lng,
+        nombre: destino.Nombre_Tour || `Tour ${primaryTourId}`
+    };
+}
+
 async function generarPlanLogistico(fecha, idsTours) {
     try {
         const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
         const reservas = await obtenerReservas(fecha, tours);
-        if (reservas.length === 0) return { buses: [], reservasSinAsignar: [], alertas: [] };
+        const tourDestinos = await obtenerCoordenadasTours(tours);
+        const destinoTour = resolverDestinoTour(tours, tourDestinos);
+        if (reservas.length === 0) return { buses: [], reservasSinAsignar: [], alertas: [], destinoTour };
 
         const maxCapacity = CONFIG.CAPACIDADES_BUSES[CONFIG.CAPACIDADES_BUSES.length - 1];
         const reservasSinAsignar = [];
@@ -1467,7 +1494,6 @@ async function generarPlanLogistico(fecha, idsTours) {
 
         // Cargar coordenadas de destino por tour para orientar el orden de recogida.
         // Solo afecta tours con Latitud/Longitud definidas en la tabla tours.
-        const tourDestinos = await obtenerCoordenadasTours(tours);
         const toursConDestino = Object.keys(tourDestinos);
         if (toursConDestino.length > 0) {
             console.log(`[PROGRAMACION] Attraction points cargados para tours: ${toursConDestino.join(', ')}`);
@@ -1500,7 +1526,7 @@ async function generarPlanLogistico(fecha, idsTours) {
 
         console.log(`[PROGRAMACION] Plan logístico generado: fecha=${fecha}, tours=${tours.join(',')}, buses=${busesOptimizados.length}, reservasSinAsignar=${reservasSinAsignar.length}, alertas=${alertas.length}, graphCalls=${graphContext.calls}, graphLookups=${graphContext.nearestLookups}, graphAstar=${graphContext.astarRuns}, graphFallbacks=${graphContext.fallbacks}, ms=${Date.now() - graphContext.startedAt}`);
         console.log('[PROGRAMACION] Resumen de buses:', JSON.stringify(busesResumen, null, 2));
-        return { buses: busesOptimizados, reservasSinAsignar, alertas };
+        return { buses: busesOptimizados, reservasSinAsignar, alertas, destinoTour };
 
     } catch (error) {
         console.error("Fallo crítico en la generación del plan logístico:", error);
@@ -2122,10 +2148,12 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
     }
 
     const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+    const tourDestinos = await obtenerCoordenadasTours(tours);
+    const destinoTour = resolverDestinoTour(tours, tourDestinos);
 
     const snapshot = await obtenerListadoSnapshot({ fecha, idsTours: tours });
-    if (snapshot) return snapshot;
-    return { exists: false, buses: [], reservasSinAsignar: [] };
+    if (snapshot) return { ...snapshot, destinoTour };
+    return { exists: false, buses: [], reservasSinAsignar: [], destinoTour };
 }
 
 

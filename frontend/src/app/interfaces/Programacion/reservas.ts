@@ -29,6 +29,13 @@ export interface Reserva {
   ruta?: string | null;
 }
 
+export interface DestinoTourProgramacion {
+  idTour?: number | null;
+  lat: number;
+  lng: number;
+  nombre?: string | null;
+}
+
 /**
  * Representa un bus virtual dentro de una simulación o plan.
  */
@@ -72,6 +79,10 @@ export interface PlanLogistico {
   sugerencias: Sugerencia[];
   mensaje: string;
   plan?: Sugerencia; // Se usa en la respuesta del modo asistido
+  buses?: Bus[];
+  reservasSinAsignar?: Reserva[];
+  alertas?: any[];
+  destinoTour?: DestinoTourProgramacion | null;
 }
 
 /**
@@ -80,6 +91,8 @@ export interface PlanLogistico {
 export interface TourProgramacion {
   Id_Tour: number;
   NombreTour: string;
+  Latitud?: number | string | null;
+  Longitud?: number | string | null;
   // Propiedades adicionales para el estado del UI
   estado: 'Pendiente' | 'Generado' | 'Confirmado' | 'Error';
   planGenerado: PlanLogistico | null;

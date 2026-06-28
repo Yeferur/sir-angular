@@ -630,7 +630,6 @@ input[type=number] {
   border: 2px dashed var(--separator-color);
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
-  margin: 20px 0;
 }
 
 .empty-state h3 {

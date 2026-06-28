@@ -3,13 +3,24 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { PlanLogistico, PlanAsistidoPayload } from '../../interfaces/Programacion/reservas';
+import { PlanLogistico, PlanAsistidoPayload, DestinoTourProgramacion } from '../../interfaces/Programacion/reservas';
 
 interface ListadoPayload {
   fecha: string;
   idTour?: number;
   idsTours?: number[];
   buses?: any[];
+}
+
+export interface ListadoProgramacionResponse {
+  exists: boolean;
+  fromSnapshot?: boolean;
+  idProgramacion?: number;
+  confirmadoEn?: string;
+  buses: any[];
+  reservasSinAsignar: any[];
+  privados?: any[];
+  destinoTour?: DestinoTourProgramacion | null;
 }
 
 @Injectable({
@@ -71,8 +82,8 @@ export class ProgramacionDashboardService {
   /**
    * Consulta si existe un listado guardado para fecha/tour.
    */
-  obtenerListadoFinal(payload: ListadoPayload): Observable<any> {
-    return this.http.post(`${this.apiUrl}/listado-existente`, payload);
+  obtenerListadoFinal(payload: ListadoPayload): Observable<ListadoProgramacionResponse> {
+    return this.http.post<ListadoProgramacionResponse>(`${this.apiUrl}/listado-existente`, payload);
   }
 
   /**
