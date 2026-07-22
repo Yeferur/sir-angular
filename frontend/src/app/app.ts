@@ -90,8 +90,6 @@ export class App implements OnInit, OnDestroy {
       return;
     }
 
-    if (!target) return;
-
     this.pendingViewSyncTimer = setTimeout(() => {
       this.viewLoggedIn.set(target);
       this.cdr.markForCheck();
@@ -225,6 +223,9 @@ export class App implements OnInit, OnDestroy {
           }
           this.permisosService.cargarPermisosDesdeLocalStorage();
         } else {
+          if (this.transition.phase() === 'app') {
+            this.transition.markLoginReady();
+          }
           this.ws.disconnect();
           this.permisosService.limpiarPermisos();
           this.wsStarted = false;

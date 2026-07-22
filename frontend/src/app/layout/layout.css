@@ -25,14 +25,16 @@
 ═══════════════════════════════════════════════ */
 .topbar-row {
   width: calc(100% - 24px);
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  column-gap: 12px;
   pointer-events: none;
 }
 
 .topbar-quick-actions {
+  grid-column: 1;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -54,8 +56,11 @@
    ISLA — barra principal
 ═══════════════════════════════════════════════ */
 .topbar-bar {
+  grid-column: 2;
+  justify-self: center;
   pointer-events: all;
   overflow: visible;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -66,7 +71,7 @@
   max-width: calc(100vw - 30px);
   transition: width 0.4s var(--ease-panel);
 
-  background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.85));
+  background: var(--bg-secondary, #1c1c1e);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
@@ -87,36 +92,37 @@
   min-width: 0;
 }
 
-/* ─── Expansión a fullscreen (logout) ───────────────────────────
-   La clase solo habilita el contexto (position:fixed, overflow,
-   centrado) y el fade del contenido interno. Los valores de
-   width/height/top/left/border-radius/transition van 100% por
-   inline style desde layout.ts — un inline style siempre le gana
-   a una regla de hoja de estilos, así que si esos valores vivieran
-   acá pelearían con el JS y la transición nunca dispararía
-   (transitionend jamás se dispara si el valor nunca cambia de
-   verdad). Ver TopbarTransitionService / handleLogout(). */
-.topbar-bar.is-expanding {
+/* ─── Transición isla ↔ fullscreen ──────────────────────────────
+   is-transitioning fija la caja en la geometría real de la isla.
+   is-wide completa primero el ancho; is-fullscreen completa después
+   la altura. El orden inverso se usa al iniciar sesión. */
+.topbar-bar.is-transitioning {
   position: fixed;
   z-index: 950;
   overflow: hidden;
   max-width: none;
+  min-height: 0;
+  padding: 0;
   top: var(--logout-start-top, 10px);
-  left: var(--logout-start-left, 50%);
-  width: var(--logout-start-width, auto);
+  left: var(--logout-start-left, calc(50vw - 310px));
+  width: var(--logout-start-width, min(620px, calc(100vw - 30px)));
   height: var(--logout-start-height, 56px);
   border-radius: 16px;
   transition:
-    width 0.36s var(--ease-panel),
-    left 0.36s var(--ease-panel),
-    height 0.36s var(--ease-panel) 0.36s,
-    top 0.36s var(--ease-panel) 0.36s,
-    border-radius 0.36s var(--ease-panel) 0.36s;
+    width 0.42s var(--ease-panel),
+    left 0.42s var(--ease-panel),
+    height 0.42s var(--ease-panel),
+    top 0.42s var(--ease-panel),
+    border-radius 0.42s var(--ease-panel),
+    background-color 0.3s ease;
 }
 
-.topbar-bar.is-expanding.is-expanding-height {
+.topbar-bar.is-transitioning.is-wide {
   width: 100vw;
   left: 0;
+}
+
+.topbar-bar.is-transitioning.is-fullscreen {
   height: 100vh;
   top: 0;
   border-radius: 0;
@@ -127,21 +133,21 @@
   flex-shrink: 0;
 }
 
-.topbar-bar.is-expanding .topbar-island-content > *:not(.topbar-brand) {
+.topbar-bar.is-transitioning .topbar-island-content > *:not(.topbar-brand) {
   transition: opacity 0.18s ease;
   opacity: 0;
   pointer-events: none;
 }
 
-.topbar-bar.is-expanding {
-  background: var(--bg-primary);
+.topbar-bar.is-transitioning {
+  background: var(--bg-secondary, #1c1c1e);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 /* Contenido de login anidado dentro de la MISMA caja que se expande
    (ver showAuthSlot en layout.ts). Se mantiene en opacity:0 mientras
-   is-expanding está creciendo (fase 'expanding') y solo se revela
+   is-transitioning está creciendo (fase 'expanding') y solo se revela
    (.is-ready, fase 'login' ya asentada) cuando la caja terminó de
    ocupar toda la pantalla — así no compite visualmente con el
    crecimiento del ancho/alto. */
@@ -550,11 +556,11 @@
     max-width: none;
   }
 
-  .topbar-bar.is-expanding {
+  .topbar-bar.is-transitioning {
     width: var(--logout-start-width);
   }
 
-  .topbar-bar.is-expanding.is-expanding-height {
+  .topbar-bar.is-transitioning.is-wide {
     width: 100vw;
   }
 
@@ -591,6 +597,15 @@
     max-height: none;
     z-index: var(--z-modal);
     margin: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-bar,
+  .topbar-bar.is-transitioning,
+  .topbar-auth-slot {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }
 

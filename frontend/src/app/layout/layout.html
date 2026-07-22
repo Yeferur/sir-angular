@@ -14,8 +14,9 @@
       [style.--logout-start-left.px]="logoutStartRect()?.left"
       [style.--logout-start-width.px]="logoutStartRect()?.width"
       [style.--logout-start-height.px]="logoutStartRect()?.height"
-      [class.is-expanding]="!showAppChrome()"
-      [class.is-expanding-height]="!showAppChrome()"
+      [class.is-transitioning]="!showAppChrome()"
+      [class.is-wide]="transitionStage() === 'wide' || transitionStage() === 'fullscreen'"
+      [class.is-fullscreen]="transitionStage() === 'fullscreen'"
       [class.is-collapsing]="transitionPhase() === 'collapsing'"
       [class.is-measuring]="measuringTopbar()">
       @if (showAppChrome()) {
@@ -168,8 +169,8 @@
       </div><!-- /topbar-right -->
       </div><!-- /topbar-island-content -->
       } @else {
-      <!-- La isla, ya expandida a pantalla completa por is-expanding /
-           is-expanding-height, aloja aquí el login — es la MISMA caja
+      <!-- La isla, ya expandida a pantalla completa por is-transitioning /
+           is-fullscreen, aloja aquí el login — es la MISMA caja
            que crece, no un componente aparte apareciendo en otro sitio. -->
       <div class="topbar-auth-slot" [class.is-ready]="transitionPhase() === 'login'">
         <app-login></app-login>

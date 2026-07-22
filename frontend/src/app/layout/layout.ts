@@ -19,7 +19,7 @@ import {
     NavigationEnd,
     ActivatedRoute,
 } from '@angular/router';
-import { filter, map } from 'rxjs/operators';
+import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 
@@ -101,27 +101,50 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     topbarWidth = signal<number | null>(null);
     measuringTopbar = signal(false);
     logoutStartRect = signal<{ top: number; left: number; width: number; height: number } | null>(null);
+    transitionStage = signal<'island' | 'wide' | 'fullscreen'>('fullscreen');
     readonly transitionPhase = this.transitionService.phase;
 
     @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
+    private transitionFallbackTimer?: number;
 
     private readonly topbarStateEffect = effect(() => {
         this.topbarState();
         queueMicrotask(() => this.syncTopbarWidth());
     });
 
+    private readonly loginTargetEffect = effect(() => {
+        if (this.transitionService.phase() === 'login') {
+            this.transitionStage.set('fullscreen');
+        }
+    });
+
     private readonly collapseEffect = effect(() => {
         if (this.transitionService.phase() !== 'collapsing') return;
-        requestAnimationFrame(() => {
-            this.router.navigateByUrl('/');
-            window.setTimeout(() => {
-                this.logoutStartRect.set(null);
-                this.transitionService.markAppReady();
-            }, 360);
-        });
+
+        this.user.set(this.authService.getUser());
+        this.refreshAvatar();
+
+        if (!this.logoutStartRect()) {
+            this.logoutStartRect.set(this.getFallbackIslandRect());
+        }
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            // Regreso inverso: primero recupera la altura de la isla y
+            // después reduce el ancho hacia el centro superior.
+            this.transitionStage.set('wide');
+            this.afterTopbarTransition(['height', 'top'], () => {
+                this.transitionStage.set('island');
+                this.afterTopbarTransition(['width', 'left'], () => {
+                    this.router.navigateByUrl('/');
+                    this.logoutStartRect.set(null);
+                    this.transitionService.markAppReady();
+                    queueMicrotask(() => this.syncTopbarWidth());
+                });
+            });
+        }));
     });
 
 
@@ -175,7 +198,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
         // Usuario y avatar
         this.user.set(this.authService.getUser());
-        this.refreshAvatar();
+        if (this.authService.getToken?.()) this.refreshAvatar();
 
         // Título de la página desde datos de ruta. También mantiene
         // currentUrl al día siempre (con o sin sesión) — showAuthSlot
@@ -206,11 +229,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         try {
             const token = this.authService.getToken?.() || null;
             if (!token) {
+                this.transitionStage.set('fullscreen');
                 this.transitionService.markLoginReady();
                 this.ready.set(true);
                 return;
             }
 
+            this.transitionStage.set('island');
             this.transitionService.markAppReady();
 
             this.router.events
@@ -243,6 +268,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     ngOnDestroy(): void {
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
+        if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
     }
 
     // Sin manejo de transitionend ni timers: el título se muestra siempre,
@@ -325,16 +351,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     async handleLogout(): Promise<void> {
         this.closeProfileMenu();
 
-        this.transitionService.requestExpandToFullscreen();
-
         const bar = this.topbarBar?.nativeElement;
         if (!bar) {
             this.finishLogout();
             return;
         }
 
-        // Por si quedó algo pegado de un intento anterior (ver nota en
-        // resetBarGeometryOverrides): arrancar siempre desde limpio.
+        // Captura el rectángulo real antes de sacar la isla del flujo.
         const rect = bar.getBoundingClientRect();
         this.logoutStartRect.set({
             top: rect.top,
@@ -342,33 +365,71 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             width: rect.width,
             height: rect.height,
         });
-        // Toda la geometría va por inline style (nunca por la hoja de
-        // estilos): un inline style siempre gana sobre una regla CSS
-        // externa sin !important, así que si el "to" viviera en una
-        // clase, pelearía contra este mismo "from" inline y el valor
-        // nunca cambiaría de verdad — y sin cambio real, transitionend
-        // jamás dispara. Ver nota en layout.css.
-        requestAnimationFrame(() => {
-            window.setTimeout(() => this.finishLogout(), 720);
-        });
+        this.transitionStage.set('island');
+        this.transitionService.requestExpandToFullscreen();
+
+        // Secuencia explícita: isla centrada → 100% del ancho → 100% de
+        // la altura. Cada etapa espera su propia propiedad CSS.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            this.transitionStage.set('wide');
+            this.afterTopbarTransition(['width', 'left'], () => {
+                this.transitionStage.set('fullscreen');
+                this.afterTopbarTransition(['height', 'top'], () => this.finishLogout());
+            });
+        }));
     }
 
-    /**
-     * Espera transitionend de una propiedad puntual en un elemento
-     * concreto. Si no dispara dentro de `timeoutMs` (reduced motion,
-     * pestaña en segundo plano, o cualquier caso donde el valor no
-     * cambió de verdad), fuerza igual el siguiente paso — nunca deja
-     * una coreografía colgada a medias.
-     */
-    /** Limpia clase + inline styles de geometría dejados por la animación de logout. */
+    /** Finaliza el logout cuando la isla ya cubre el viewport. */
     private finishLogout(): void {
-        this.logoutStartRect.set(null);
         this.userService.clearUser();
         this.authService.logout();
         this.user.set(null);
         this.avatarUrl.set(null);
         this.router.navigateByUrl('/');
+        this.transitionStage.set('fullscreen');
         this.transitionService.markLoginReady();
+    }
+
+    private getFallbackIslandRect(): { top: number; left: number; width: number; height: number } {
+        const viewportWidth = window.innerWidth;
+        const mobile = viewportWidth <= 766;
+        const width = mobile
+            ? Math.max(220, viewportWidth - 20)
+            : Math.min(620, Math.max(320, viewportWidth - 30));
+        const height = mobile ? 52 : 56;
+
+        return {
+            top: 10,
+            left: Math.max(0, (viewportWidth - width) / 2),
+            width,
+            height,
+        };
+    }
+
+    private afterTopbarTransition(properties: string[], callback: () => void): void {
+        const bar = this.topbarBar?.nativeElement;
+        if (!bar || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            callback();
+            return;
+        }
+
+        let completed = false;
+        const finish = () => {
+            if (completed) return;
+            completed = true;
+            bar.removeEventListener('transitionend', onTransitionEnd);
+            if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
+            this.transitionFallbackTimer = undefined;
+            callback();
+        };
+        const onTransitionEnd = (event: TransitionEvent) => {
+            if (event.target === bar && properties.includes(event.propertyName)) {
+                finish();
+            }
+        };
+
+        bar.addEventListener('transitionend', onTransitionEnd);
+        this.transitionFallbackTimer = window.setTimeout(finish, 650);
     }
 
 
