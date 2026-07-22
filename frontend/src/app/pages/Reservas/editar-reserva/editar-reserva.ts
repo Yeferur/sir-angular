@@ -71,7 +71,7 @@ interface LegacyNavbarFacade {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent],
   templateUrl: './editar-reserva.html',
-  styleUrls: ['./editar-reserva.css'],
+  styleUrls: ['../reserva-shared.css'],
 })
 export class EditarReservaComponent implements OnInit, OnDestroy {
   Number = Number;

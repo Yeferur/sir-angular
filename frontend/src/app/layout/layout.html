@@ -1,5 +1,25 @@
+@if (!isPublicAuthRoute()) {
 <div class="topnav-host" [attr.data-state]="topbarState()">
-  <div class="topbar-bar">
+  <div class="topbar-row">
+    @if (showAppChrome()) {
+    <div class="topbar-quick-actions">
+      <a routerLink="/Reservas/VerReservas" class="topbar-pill">Ver Reservas</a>
+      <a routerLink="/Reservas/NuevaReserva" class="topbar-pill">Crear Reserva</a>
+    </div>
+    }
+
+    <div class="topbar-bar" #topbarBar
+      [style.width.px]="transitionPhase() === 'app' && !measuringTopbar() ? (topbarWidth() || null) : null"
+      [style.--logout-start-top.px]="logoutStartRect()?.top"
+      [style.--logout-start-left.px]="logoutStartRect()?.left"
+      [style.--logout-start-width.px]="logoutStartRect()?.width"
+      [style.--logout-start-height.px]="logoutStartRect()?.height"
+      [class.is-expanding]="!showAppChrome()"
+      [class.is-expanding-height]="!showAppChrome()"
+      [class.is-collapsing]="transitionPhase() === 'collapsing'"
+      [class.is-measuring]="measuringTopbar()">
+      @if (showAppChrome()) {
+      <div class="topbar-island-content" #topbarContent>
 
       <!-- Hamburger (solo móvil) -->
       <button
@@ -31,23 +51,19 @@
 
       <div class="topbar-sep topbar-sep--after-brand"></div>
 
-      <!-- Zona izquierda — accesos rápidos (desktop) -->
-      <div class="topbar-left">
-        <a routerLink="/Reservas/VerReservas"  class="topbar-pill">Ver Reservas</a>
-        <a routerLink="/Reservas/NuevaReserva" class="topbar-pill">Crear Reserva</a>
+      <!-- Título de la página activa — SIEMPRE visible, sin condición -->
+      <div class="topbar-title-zone">
+        <span class="topbar-page-title">{{ pageTitle() }}</span>
       </div>
 
-      <!-- Título de la página activa -->
-      @if (pageTitle()) {
-        <div class="topbar-title-zone">
-          <span class="topbar-page-title">{{ pageTitle() }}</span>
-        </div>
-      }
-
-      <!-- Zona derecha — novedades + avatar -->
+      <!-- Zona derecha — búsqueda, novedades, tema, avatar -->
       <div class="topbar-right">
 
-        <button class="topbar-icon-btn" type="button" (click)="openAppUpdates()" aria-label="Novedades de la app">
+        <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openGlobalSearch()" aria-label="Buscar" title="Buscar (Ctrl/Cmd+K)">
+          <i class="bx bx-search" aria-hidden="true"></i>
+        </button>
+
+        <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openAppUpdates()" aria-label="Novedades de la app">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -58,7 +74,7 @@
         </button>
 
         <button
-          class="topbar-icon-btn topbar-theme-btn"
+          class="topbar-icon-btn topbar-icon-btn--secondary topbar-theme-btn"
           type="button"
           (click)="toggleTheme()"
           [attr.aria-label]="isDarkMode ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
@@ -87,7 +103,7 @@
           }
         </button>
 
-        <div class="topbar-profile" (clickOutside)="closeProfileMenu()">
+        <div class="topbar-profile">
           <button
             class="topbar-avatar-btn"
             (click)="toggleProfileMenu()"
@@ -109,6 +125,22 @@
                 <div class="pdd-email">{{ user()?.email }}</div>
               </div>
               <div class="profile-dropdown-sep"></div>
+
+              <!-- Solo en mobile: acciones que en desktop viven en el topbar -->
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openGlobalSearch(); closeProfileMenu()">
+                <i class="bx bx-search" aria-hidden="true"></i>
+                Buscar
+              </button>
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
+                <i class="bx bx-bell" aria-hidden="true"></i>
+                Novedades
+              </button>
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme(); closeProfileMenu()">
+                <i class="bx" [class.bx-sun]="!isDarkMode" [class.bx-moon]="isDarkMode" aria-hidden="true"></i>
+                {{ isDarkMode ? 'Tema claro' : 'Tema oscuro' }}
+              </button>
+              <div class="profile-dropdown-sep profile-dropdown-sep--mobile-only"></div>
+
               <button class="profile-dropdown-item" role="menuitem" (click)="navigateToProfile()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2"
@@ -134,22 +166,40 @@
         </div>
 
       </div><!-- /topbar-right -->
+      </div><!-- /topbar-island-content -->
+      } @else {
+      <!-- La isla, ya expandida a pantalla completa por is-expanding /
+           is-expanding-height, aloja aquí el login — es la MISMA caja
+           que crece, no un componente aparte apareciendo en otro sitio. -->
+      <div class="topbar-auth-slot" [class.is-ready]="transitionPhase() === 'login'">
+        <app-login></app-login>
+      </div>
+      }
     </div><!-- /topbar-bar -->
+  </div><!-- /topbar-row -->
 
     <!-- Panel expandido — búsqueda global -->
     @if (topbarState() === 'global-search') {
       <div class="topbar-expanded topbar-expanded--search" role="dialog"
            aria-modal="true" aria-label="Buscador global">
-        <app-global-search></app-global-search>
+        <app-global-search mode="search"></app-global-search>
+      </div>
+    }
+    @if (topbarState() === 'sistema') {
+      <div class="topbar-expanded topbar-expanded--system" role="status" aria-live="polite">
+        <i class="bx bx-info-circle" aria-hidden="true"></i>
+        <span>{{ systemEvent()?.message || systemEvent()?.title || 'Evento del sistema' }}</span>
       </div>
     }
 
 </div><!-- /topnav-host -->
+}
 
 
 <!-- ═══════════════════════════════════════════
      SIDEBAR — desktop flotante (≥767px)
 ═══════════════════════════════════════════ -->
+@if (showAppChrome()) {
 <div class="sidebar"
      [class.is-expanded]="sidebarHovered()"
      (mouseenter)="sidebarHovered.set(true)"
@@ -208,6 +258,7 @@
     }
   </div>
 </div>
+}
 
 
 <!-- ═══════════════════════════════════════════
@@ -222,6 +273,7 @@
      tocar dentro no active el cierre del backdrop.
 ═══════════════════════════════════════════ -->
 
+@if (showAppChrome()) {
 <!-- Backdrop: cubre toda la pantalla; click → cierra -->
 <div class="mobile-backdrop"
      [class.is-open]="mobileDrawerOpen()"
@@ -349,3 +401,5 @@
   </div><!-- /mobile-menu-wrap -->
 
 </nav>
+
+}

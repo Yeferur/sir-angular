@@ -5,7 +5,7 @@ Diseño coherente con el sistema de cards de la app.
 ========================================
 -->
 <div class="login-view-container">
-  <div class="login-card">
+  <div class="login-card" [class.is-recovery]="recoveryOpen" [class.is-reset]="resetMode">
 
     <!-- Línea de acento azul superior -->
     <div class="card-accent"></div>
@@ -23,6 +23,80 @@ Diseño coherente con el sistema de cards de la app.
         <div class="brand-sub">Sistema Integrado de Reservas</div>
       </div>
 
+      @if (resetMode) {
+        <!-- RESTABLECIMIENTO DENTRO DEL CONTEXTO DEL LOGIN -->
+        <form class="login-form reset-form" autocomplete="off" (ngSubmit)="submitReset()">
+          <div class="reset-heading">
+            <h1>Restablecer contraseña</h1>
+            <p>Define una nueva contraseña para volver a ingresar a SIR.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="reset-password" class="form-label">Nueva contraseña</label>
+            <div class="input-wrap password-wrapper" #pwdWrapReset
+              (focusin)="openPasswordStrength()"
+              (focusout)="closePasswordStrengthIfOutside($event, pwdWrapReset)">
+              <span class="input-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
+              <input id="reset-password" type="password" class="form-input pw-input" [(ngModel)]="resetPassword" (ngModelChange)="updateResetPasswordStrength($event)" name="new-password" autocomplete="new-password" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" placeholder="Mínimo 8 caracteres" required>
+
+              @if (passwordStrengthOpen) {
+                <div class="password-strength-popover">
+                  <div class="strength-top" [attr.data-level]="resetPasswordStrength.label">
+                    <span class="strength-label">Seguridad: <strong>{{ resetPasswordStrength.label }}</strong></span>
+                    <span class="strength-score">{{ resetPasswordStrength.score }}/6</span>
+                  </div>
+                  <div class="strength-bars" [attr.data-level]="resetPasswordStrength.label">
+                    @for (level of [1, 2, 3, 4, 5, 6]; track level) {
+                      <span class="bar" [class.on]="resetPasswordStrength.score >= level"></span>
+                    }
+                  </div>
+                  <ul class="strength-checks">
+                    <li [class.ok]="resetPasswordStrength.checks.length8">Mínimo 8 caracteres</li>
+                    <li [class.ok]="resetPasswordStrength.checks.upper">Una mayúscula</li>
+                    <li [class.ok]="resetPasswordStrength.checks.lower">Una minúscula</li>
+                    <li [class.ok]="resetPasswordStrength.checks.digit">Un número</li>
+                    <li [class.ok]="resetPasswordStrength.checks.symbol">Un símbolo</li>
+                    <li [class.ok]="resetPasswordStrength.checks.length12">Recomendado: 12+ caracteres</li>
+                  </ul>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="reset-form-rest" [class.is-dimmed]="passwordStrengthOpen">
+            <div class="form-group">
+              <label for="reset-password-confirmation" class="form-label">Confirmar contraseña</label>
+              <div class="input-wrap password-wrapper">
+                <span class="input-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 12l2 2 4-4"/>
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </span>
+                <input id="reset-password-confirmation" type="password" class="form-input pw-input" [(ngModel)]="resetPasswordConfirmation" name="new-password-confirmation" autocomplete="new-password" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" placeholder="Repite la contraseña" required>
+              </div>
+            </div>
+
+            @if (resetError) {
+              <div class="error-message" role="alert">{{ resetError }}</div>
+            }
+            @if (resetSuccess) {
+              <div class="success-message" role="status">{{ resetSuccess }}</div>
+            }
+
+            <button type="submit" class="btn-primary" [disabled]="resetSubmitting || !!resetSuccess">
+              @if (!resetSubmitting) { <span>Actualizar contraseña</span> }
+              @if (resetSubmitting) { <div class="spinner-small"></div> }
+            </button>
+          </div>
+        </form>
+      } @else if (!recoveryOpen) {
       <!-- FORMULARIO -->
       <form class="login-form" (ngSubmit)="login()">
 
@@ -126,13 +200,47 @@ Diseño coherente con el sistema de cards de la app.
         </button>
 
       </form>
+      } @else {
+        <!-- RECUPERACIÓN DENTRO DE LA MISMA CARD -->
+        <section class="recovery-form-view" aria-label="Recuperar contraseña">
+          <div class="recovery-panel-header">
+            <div>
+              <h2>Recuperar contraseña</h2>
+              <p>Ingresa tu correo para continuar.</p>
+            </div>
+          </div>
+          <form class="recovery-form" (ngSubmit)="submitRecovery()">
+            <label for="recovery-email" class="form-label">Correo</label>
+            <input id="recovery-email" class="form-input" type="email" [(ngModel)]="recoveryEmail" name="recoveryEmail" autocomplete="email" required>
+            @if (recoveryMessage) {
+              <div class="success-message" role="status">{{ recoveryMessage }}</div>
+            }
+            @if (recoveryResetUrl) {
+              <a class="local-reset-link" [href]="recoveryResetUrl">Abrir enlace de prueba local</a>
+            }
+            @if (recoveryError) {
+              <div class="error-message" role="alert">{{ recoveryError }}</div>
+            }
+            <button type="submit" class="btn-primary" [disabled]="recoverySubmitting">
+              @if (!recoverySubmitting) { <span>Enviar enlace</span> }
+              @if (recoverySubmitting) { <div class="spinner-small"></div> }
+            </button>
+          </form>
+        </section>
+      }
     </div>
 
     <!-- FOOTER -->
     <div class="card-footer">
-      <a routerLink="/forgot-password" class="forgot-password-link">
-        ¿Olvidaste tu contraseña?
-      </a>
+      @if (resetMode) {
+        <button type="button" class="forgot-password-link" (click)="returnToLogin()">Volver al inicio de sesión</button>
+      } @else if (recoveryOpen) {
+        <button type="button" class="forgot-password-link" (click)="toggleRecovery()">Volver al inicio de sesión</button>
+      } @else {
+        <a href="#recovery" class="forgot-password-link" (click)="$event.preventDefault(); toggleRecovery()">
+          ¿Olvidaste tu contraseña?
+        </a>
+      }
       <span class="version-tag">SIR v2 · Maxitours</span>
     </div>
 

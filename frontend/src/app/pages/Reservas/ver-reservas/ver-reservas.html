@@ -324,7 +324,7 @@
             (keydown.space)="$event.preventDefault(); verReserva(r.Id_Reserva)"
             [attr.aria-label]="'Ver reserva ' + r.Id_Reserva + ' — ' + r.Nombre_Tour">
 
-            <span class="status-pill" [ngClass]="'status-' + (r.Estado ? (r.Estado | lowercase) : '')">
+            <span class="badge" [ngClass]="getEstadoBadgeClass(r.Estado)">
               {{ r.Estado }}
             </span>
 
@@ -332,8 +332,9 @@
               <span class="item-id">#{{ r.Id_Reserva }}</span>
               <span class="item-tour">{{ r.Nombre_Tour }}</span>
               <span
-                class="tipo-reserva-badge"
-                [class.tipo-reserva-badge--privada]="getTipoReservaLabel(r) === 'Privada'">
+                class="badge"
+                [class.badge--privada]="getTipoReservaLabel(r) === 'Privada'"
+                [class.badge--grupal]="getTipoReservaLabel(r) !== 'Privada'">
                 {{ getTipoReservaLabel(r) }}
               </span>
               <span class="item-meta">
@@ -347,7 +348,7 @@
               @if (canUpdateReserva) {
                 <button
                   type="button"
-                  class="btn-edit-row"
+                  class="btn-row-edit"
                   (click)="$event.stopPropagation(); editarReserva(r.Id_Reserva)"
                   [attr.aria-label]="'Editar reserva ' + r.Id_Reserva"
                 >
@@ -361,7 +362,7 @@
               @if (canCancelReserva(r)) {
                 <button
                   type="button"
-                  class="btn-edit-row btn-cancel-row"
+                  class="btn-row-cancel"
                   (click)="$event.stopPropagation(); confirmCancelarReserva(r)"
                   [attr.aria-label]="'Cancelar reserva ' + r.Id_Reserva"
                 >
@@ -375,7 +376,7 @@
               @if (canDeleteReserva) {
                 <button
                   type="button"
-                  class="btn-edit-row btn-delete-row"
+                  class="btn-row-delete"
                   (click)="$event.stopPropagation(); confirmEliminarReserva(r)"
                   [attr.aria-label]="'Eliminar reserva ' + r.Id_Reserva"
                 >

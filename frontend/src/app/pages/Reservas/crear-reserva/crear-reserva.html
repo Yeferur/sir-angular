@@ -673,10 +673,10 @@
             <div class="payment-file-status">
               @if (form.get('ComprobantePago')?.value; as f) {
               @if (f?.SoporteUrl) {
-              <span class="payment-chip saved">Guardado</span>
+              <span class="badge badge--success">Guardado</span>
               <span class="file-name">Comprobante guardado</span>
               } @else {
-              <span class="payment-chip loaded">Cargado</span>
+              <span class="badge badge--info">Cargado</span>
               <span class="file-name">{{ f?.name }}</span>
               }
               } @else {
@@ -738,7 +738,7 @@
               </div>
               <div class="payment-file-status">
                 @if (abonos.controls[i].get('Comprobante')?.value) {
-                <span class="payment-chip loaded">Cargado</span>
+                <span class="badge badge--info">Cargado</span>
                 <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
                 } @else {
                 <span class="file-name text-muted">Sin archivo</span>

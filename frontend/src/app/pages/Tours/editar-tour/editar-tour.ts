@@ -92,7 +92,7 @@ type EditarTourFullPayload = {
 @Component({
   selector: 'app-editar-tour',
   templateUrl: './editar-tour.html',
-  styleUrls: ['./editar-tour.css'],
+  styleUrls: ['../tour-shared.css'],
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent],
 })

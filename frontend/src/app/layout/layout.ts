@@ -1,12 +1,16 @@
 import {
     Component,
+    AfterViewInit,
     HostListener,
+    ElementRef,
     OnDestroy,
     OnInit,
     inject,
     signal,
     computed,
     ChangeDetectorRef,
+    ViewChild,
+    effect,
 } from '@angular/core';
 import {
     Router,
@@ -28,6 +32,8 @@ import { UsuariosService } from '../services/Usuarios/usuarios';
 import { environment } from '../../environments/environment';
 
 import { GlobalSearchComponent } from '../components/global-search/global-search';
+import { TopbarTransitionService } from '../components/login/topbar-transition.service';
+import { LoginContentComponent } from '../components/login/login';
 
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -53,11 +59,12 @@ interface SidebarItem {
         RouterLinkActive,
         FormsModule,
         GlobalSearchComponent,
+        LoginContentComponent,
     ],
     templateUrl: './layout.html',
     styleUrls: ['./layout.css'],
 })
-export class LayoutComponent implements OnInit, OnDestroy {
+export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // ── Servicios ────────────────────────────────────────────────
     private authService = inject(AuthService);
@@ -66,6 +73,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     private drawer = inject(SirDrawerService);
     private permisosService = inject(PermisosService);
     private usuariosService = inject(UsuariosService);
+    private transitionService = inject(TopbarTransitionService);
     private cdr = inject(ChangeDetectorRef);
     private router = inject(Router);
     private activatedRoute = inject(ActivatedRoute);
@@ -89,16 +97,63 @@ export class LayoutComponent implements OnInit, OnDestroy {
     currentUrl = signal<string>(this.router.url);
     ready = signal(false);
     loadingError = signal<string | null>(null);
+    systemEvent = signal<any>(null);
+    topbarWidth = signal<number | null>(null);
+    measuringTopbar = signal(false);
+    logoutStartRect = signal<{ top: number; left: number; width: number; height: number } | null>(null);
+    readonly transitionPhase = this.transitionService.phase;
+
+    @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
 
+    private readonly topbarStateEffect = effect(() => {
+        this.topbarState();
+        queueMicrotask(() => this.syncTopbarWidth());
+    });
+
+    private readonly collapseEffect = effect(() => {
+        if (this.transitionService.phase() !== 'collapsing') return;
+        requestAnimationFrame(() => {
+            this.router.navigateByUrl('/');
+            window.setTimeout(() => {
+                this.logoutStartRect.set(null);
+                this.transitionService.markAppReady();
+            }, 360);
+        });
+    });
+
 
     // ── Estado computado del topbar ──────────────────────────────
     topbarState = computed(() => {
+        if (this.systemEvent()) return 'sistema';
         if (this.globalSearchOpen()) return 'global-search';
         return 'idle';
     });
+
+    // /reset-password se resuelve por su propia ruta (router-outlet en
+    // app.html), no por esta isla — si estamos ahí, la isla no debe
+    // mostrar su propio login por encima.
+    readonly isPublicAuthRoute = computed(() =>
+        this.normalizeUrl(this.currentUrl()).startsWith('/reset-password')
+    );
+
+    // La isla aloja el login cuando no estamos autenticados (fase
+    // 'login'), y también durante 'expanding'/'collapsing' — así el
+    // login queda dentro de la MISMA caja que se expande/colapsa, sin
+    // el corte que da desmontar el layout entero y montar un login
+    // aparte en otro contenedor.
+    readonly showAuthSlot = computed(() => {
+        if (this.isPublicAuthRoute()) return false;
+        const phase = this.transitionPhase();
+        return phase === 'expanding' || phase === 'login' || phase === 'collapsing';
+    });
+
+    // El contenido normal de la app (título, iconos, avatar) y el resto
+    // del chrome (sidebar, drawer, pills) solo tiene sentido con sesión
+    // activa y ya asentada.
+    readonly showAppChrome = computed(() => this.transitionPhase() === 'app');
 
 
     // ── Lifecycle ────────────────────────────────────────────────
@@ -122,17 +177,22 @@ export class LayoutComponent implements OnInit, OnDestroy {
         this.user.set(this.authService.getUser());
         this.refreshAvatar();
 
-        // Título de la página desde datos de ruta
+        // Título de la página desde datos de ruta. También mantiene
+        // currentUrl al día siempre (con o sin sesión) — showAuthSlot
+        // lo necesita para saber si estamos en /reset-password.
         this.routerSub = this.router.events
-            .pipe(
-                filter(e => e instanceof NavigationEnd),
-                map(() => {
-                    let route = this.activatedRoute;
-                    while (route.firstChild) route = route.firstChild;
-                    return route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
-                })
-            )
-            .subscribe(title => this.pageTitle.set(this.extractTitle(title)));
+            .pipe(filter(e => e instanceof NavigationEnd))
+            .subscribe(event => {
+                const navEnd = event as NavigationEnd;
+                this.currentUrl.set(navEnd.urlAfterRedirects || navEnd.url);
+
+                let route = this.activatedRoute;
+                while (route.firstChild) route = route.firstChild;
+                const title = route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
+                this.pageTitle.set(this.extractTitle(title));
+                // El título cambia el ancho del contenido; remedir tras el cambio.
+                queueMicrotask(() => this.syncTopbarWidth());
+            });
 
         // Título inicial (carga directa)
         const getLeafTitle = () => {
@@ -146,18 +206,16 @@ export class LayoutComponent implements OnInit, OnDestroy {
         try {
             const token = this.authService.getToken?.() || null;
             if (!token) {
+                this.transitionService.markLoginReady();
                 this.ready.set(true);
                 return;
             }
 
+            this.transitionService.markAppReady();
+
             this.router.events
                 .pipe(filter(e => e instanceof NavigationEnd))
-                .subscribe(event => {
-                    const navEnd = event as NavigationEnd;
-                    this.currentUrl.set(navEnd.urlAfterRedirects || navEnd.url);
-                    // this.resetNavbarStates();
-                    this.syncActiveSubmenu();
-                });
+                .subscribe(() => this.syncActiveSubmenu());
 
             await this.permisosService.loadSessionData();
             this.syncActiveSubmenu();
@@ -169,9 +227,55 @@ export class LayoutComponent implements OnInit, OnDestroy {
         }
     }
 
+    ngAfterViewInit(): void {
+        this.syncTopbarWidth();
+
+        // Reintento tras cargar fuentes (Boxicons). La primera medición
+        // de scrollWidth puede ocurrir antes de que la fuente de íconos
+        // tenga su tamaño final, dejando la isla fijada más angosta de
+        // lo necesario y recortando contenido con el overflow:hidden.
+        if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+            (document as any).fonts.ready.then(() => this.syncTopbarWidth());
+        }
+
+    }
+
     ngOnDestroy(): void {
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
+    }
+
+    // Sin manejo de transitionend ni timers: el título se muestra siempre,
+    // solo el ancho de la isla se anima. La medición se hace con doble rAF
+    // para dejar que el layout (fuentes, imágenes) se asiente antes de
+    // leer scrollWidth, en vez de medir en el mismo frame del cambio.
+    private syncTopbarWidth(): void {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const bar = this.topbarBar?.nativeElement;
+            if (!bar) return;
+
+            // Medir en modo natural mediante una clase CSS controlada por
+            // Angular; no escribir geometrÃ­a directamente en el elemento.
+            this.measuringTopbar.set(true);
+
+            requestAnimationFrame(() => {
+                const nextWidth = Math.min(
+                    Math.ceil(bar.scrollWidth + 8),
+                    Math.max(220, window.innerWidth - 30),
+                );
+                this.measuringTopbar.set(false);
+
+                if (this.topbarWidth() !== nextWidth) {
+                    this.topbarWidth.set(nextWidth);
+                }
+
+            // Rect real tras el cambio de ancho — un frame más para que el
+            // navegador ya haya re-centrado la isla con el ancho nuevo
+            // (el left depende del width porque está centrada por flex).
+                requestAnimationFrame(() => {
+                });
+            });
+        }));
     }
 
 
@@ -220,14 +324,58 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     async handleLogout(): Promise<void> {
         this.closeProfileMenu();
+
+        this.transitionService.requestExpandToFullscreen();
+
+        const bar = this.topbarBar?.nativeElement;
+        if (!bar) {
+            this.finishLogout();
+            return;
+        }
+
+        // Por si quedó algo pegado de un intento anterior (ver nota en
+        // resetBarGeometryOverrides): arrancar siempre desde limpio.
+        const rect = bar.getBoundingClientRect();
+        this.logoutStartRect.set({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+        });
+        // Toda la geometría va por inline style (nunca por la hoja de
+        // estilos): un inline style siempre gana sobre una regla CSS
+        // externa sin !important, así que si el "to" viviera en una
+        // clase, pelearía contra este mismo "from" inline y el valor
+        // nunca cambiaría de verdad — y sin cambio real, transitionend
+        // jamás dispara. Ver nota en layout.css.
+        requestAnimationFrame(() => {
+            window.setTimeout(() => this.finishLogout(), 720);
+        });
+    }
+
+    /**
+     * Espera transitionend de una propiedad puntual en un elemento
+     * concreto. Si no dispara dentro de `timeoutMs` (reduced motion,
+     * pestaña en segundo plano, o cualquier caso donde el valor no
+     * cambió de verdad), fuerza igual el siguiente paso — nunca deja
+     * una coreografía colgada a medias.
+     */
+    /** Limpia clase + inline styles de geometría dejados por la animación de logout. */
+    private finishLogout(): void {
+        this.logoutStartRect.set(null);
         this.userService.clearUser();
         this.authService.logout();
         this.user.set(null);
         this.avatarUrl.set(null);
+        this.router.navigateByUrl('/');
+        this.transitionService.markLoginReady();
     }
 
 
-    // ── Búsqueda global (disponible para Ctrl+K, sin botón visible) ──
+    // ── Búsqueda global ──
+    openGlobalSearch(): void { this.search.openSearch(); }
+    closeGlobalSearch(): void { this.search.closeSearch(); }
+    showSystemEvent(payload: any): void { this.systemEvent.set(payload); }
 
 
     // ── Novedades ────────────────────────────────────────────────
@@ -237,31 +385,35 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     // ── Atajos de teclado globales ───────────────────────────────
 
-    // @HostListener('document:keydown', ['$event'])
-    // handleGlobalShortcuts(event: KeyboardEvent): void {
-    //     const target = event.target as HTMLElement | null;
-    //     const tagName = target?.tagName?.toLowerCase() || '';
-    //     const editable = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+    @HostListener('document:keydown', ['$event'])
+    handleGlobalShortcuts(event: KeyboardEvent): void {
+        const target = event.target as HTMLElement | null;
+        const tagName = target?.tagName?.toLowerCase() || '';
+        const editable = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
 
-    //     // Ctrl/Cmd + K → búsqueda global (mantenido aunque el botón no sea visible)
-    //     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-    //         event.preventDefault();
-    //         this.openGlobalSearch();
-    //         return;
-    //     }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            this.openGlobalSearch();
+            return;
+        }
 
-    //     // Escape
-    //     if (event.key === 'Escape') {
-    //         if (this.globalSearchOpen()) {
-    //             if (editable && !target?.closest('app-global-search')) return;
-    //             event.preventDefault();
-    //             this.closeGlobalSearch();
-    //         }
-    //         if (this.profileMenuOpen()) {
-    //             this.closeProfileMenu();
-    //         }
-    //     }
-    // }
+        if (event.key === 'Escape') {
+            if (this.globalSearchOpen()) {
+                if (editable && !target?.closest('app-global-search')) return;
+                event.preventDefault();
+                this.closeGlobalSearch();
+            }
+            if (this.profileMenuOpen()) this.closeProfileMenu();
+        }
+    }
+
+    @HostListener('document:click', ['$event'])
+    handleDocumentClick(event: MouseEvent): void {
+        const target = event.target as HTMLElement | null;
+        if (this.profileMenuOpen() && !target?.closest('.topbar-profile')) {
+            this.closeProfileMenu();
+        }
+    }
 
 
     // ── Helpers privados ─────────────────────────────────────────
@@ -287,18 +439,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
             }
         }
     }
-
-    // private resetNavbarStates(): void {
-    //     const currentOverlay = this.navbar?.overlay?.();
-    //     if (!currentOverlay?.loading) {
-    //         this.navbar?.clearOverlay?.();
-    //     }
-    //     this.navbar?.clearBaseState?.({
-    //         cupos: true,
-    //         reserva: true,
-    //         transfer: true,
-    //     });
-    // }
 
     private normalizeUrl(url: string): string {
         const sanitized = String(url || '').split(/[?#]/)[0].replace(/\/+$/, '');

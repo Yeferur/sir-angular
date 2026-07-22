@@ -7,8 +7,8 @@
         <span class="gs-brand-star">✦</span>
       </div>
       <div class="gs-brand-info">
-        <span class="gs-brand-name">{{ aiEnabled ? 'Maxi' : 'Buscador global' }}</span>
-        <span class="gs-brand-badge">{{ aiEnabled ? 'Beta' : 'SIR' }}</span>
+        <span class="gs-brand-name">{{ isMaxiMode ? 'Maxi' : 'Buscador global' }}</span>
+        <span class="gs-brand-badge">{{ isMaxiMode ? 'Beta' : 'SIR' }}</span>
       </div>
     </div>
     <button type="button" class="gs-close-btn" (click)="closeFromButton($event)" aria-label="Cerrar">
@@ -23,9 +23,9 @@
     @if (showWelcome()) {
       <div class="gs-welcome" role="region" aria-label="Bienvenida">
         <div class="gs-welcome-orb" aria-hidden="true">✦</div>
-        <h2 class="gs-welcome-title">{{ aiEnabled ? '¿En qué te ayudo hoy?' : 'Busca en SIR' }}</h2>
+        <h2 class="gs-welcome-title">{{ isMaxiMode ? '¿En qué te ayudo hoy?' : 'Busca en SIR' }}</h2>
         <p class="gs-welcome-sub">
-          {{ aiEnabled ? 'Consulta reservas, cupos, transfers y operación diaria en lenguaje natural.' : 'Busca reservas, transfers, tours, puntos y accesos rápidos del sistema.' }}
+          {{ isMaxiMode ? 'Consulta reservas, cupos, transfers y operación diaria en lenguaje natural.' : 'Busca reservas, transfers, tours, puntos y accesos rápidos del sistema.' }}
         </p>
         <div class="gs-chips" role="list" aria-label="Sugerencias">
           @for (s of suggestions; track s) {
@@ -42,7 +42,7 @@
           <div class="gs-bubble gs-bubble--user">{{ msg.content }}</div>
         </div>
       } @else {
-        <div class="gs-msg gs-msg--ia" [attr.aria-label]="aiEnabled ? 'Respuesta de Maxi' : 'Respuesta del buscador'">
+        <div class="gs-msg gs-msg--ia" [attr.aria-label]="isMaxiMode ? 'Respuesta de Maxi' : 'Respuesta del buscador'">
           <div class="gs-ia-avatar" aria-hidden="true">✦</div>
           <div class="gs-ia-content">
             <div class="gs-bubble gs-bubble--ia">{{ msg.content }}</div>
@@ -103,7 +103,7 @@
         (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); close()"
         (focus)="inputFocused.set(true)"
         (blur)="inputFocused.set(false)"
-        [placeholder]="aiEnabled ? 'Pregúntale a Maxi...' : 'Buscar reservas, transfers, tours o puntos'"
+        [placeholder]="isMaxiMode ? 'Pregúntale a Maxi...' : 'Buscar reservas, transfers, tours o puntos'"
         autocomplete="off"
         spellcheck="false"
         aria-label="Escribe tu consulta"
@@ -123,7 +123,7 @@
         }
       </button>
     </div>
-    @if (aiEnabled) {
+    @if (isMaxiMode) {
     <p class="gs-disclaimer">Maxi puede cometer errores. Verifica información crítica.</p>
     }
   </div>

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import {
   AfterViewInit, Component, ElementRef, HostListener, NgZone,
+  Input,
   OnDestroy, ViewChild, computed, effect, inject, signal
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -29,6 +30,8 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly zone = inject(NgZone);
   readonly aiEnabled = !!environment.aiEnabled;
+  @Input() mode: 'search' | 'maxi' = 'maxi';
+  get isMaxiMode(): boolean { return this.mode === 'maxi' && this.aiEnabled; }
 
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
@@ -120,7 +123,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
-      if (!this.aiEnabled) return;
+      if (!this.isMaxiMode) return;
       const isLoading  = this.loading();
       const hasResults = this.flatResults().length > 0;
       const q          = this.query().trim();
@@ -158,7 +161,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     this.resetIa();
     this.addConversationMessage({ role: 'user', content: q });
     // Si termina en ? → IA directa
-    if (this.aiEnabled && q.endsWith('?')) {
+    if (this.isMaxiMode && q.endsWith('?')) {
       this.search.results.set([]);
       this.callIa(q);
       return;
@@ -170,7 +173,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     this.search.query.set(text);
     this.resetIa();
     this.addConversationMessage({ role: 'user', content: text });
-    if (this.aiEnabled && text.endsWith('?')) {
+    if (this.isMaxiMode && text.endsWith('?')) {
       this.search.results.set([]);
       this.callIa(text);
     } else {
@@ -181,7 +184,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
 
   // ─── IA ────────────────────────────────────────────────────────
   private callIa(q: string): void {
-    if (!this.aiEnabled || !q || this.iaLoading()) return;
+    if (!this.isMaxiMode || !q || this.iaLoading()) return;
     this.iaQuery = q;
     this.iaActivada.set(true);
     this.iaLoading.set(true);

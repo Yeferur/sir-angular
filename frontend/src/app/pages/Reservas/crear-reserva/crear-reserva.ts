@@ -54,7 +54,7 @@ interface SubmitValidationIssue {
     DatepickerComponent, UppercaseInputDirective, CuposStripComponent
   ],
   templateUrl: './crear-reserva.html',
-  styleUrls: ['./crear-reserva.css'],
+  styleUrls: ['../reserva-shared.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);

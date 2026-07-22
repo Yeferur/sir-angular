@@ -80,13 +80,14 @@ exports.forgotPassword = async (req, res) => {
     }
 
     const result = await loginService.createPasswordResetTokenForEmail(email);
+    const resetUrl = result?.rawToken ? buildPasswordResetUrl(result.rawToken) : null;
 
     if (result?.user && result?.rawToken) {
       try {
         await emailService.sendPasswordResetEmail({
           to: result.user.Correo,
           name: result.user.Nombres_Apellidos,
-          resetUrl: buildPasswordResetUrl(result.rawToken),
+          resetUrl,
           expiresInMinutes: result.expiresInMinutes
         });
       } catch (mailError) {
@@ -108,7 +109,15 @@ exports.forgotPassword = async (req, res) => {
       }
     }
 
-    return sendSuccess(res, { message: genericMessage });
+    // En desarrollo se devuelve el enlace para poder probar el flujo local
+    // aunque SMTP todavía no esté configurado. Nunca se expone en producción.
+    return sendSuccess(res, {
+      data: {
+        message: genericMessage,
+        resetUrl: process.env.NODE_ENV === 'production' ? null : resetUrl
+      },
+      message: genericMessage
+    });
   } catch (e) {
     console.error('forgot-password error:', e);
     return sendSuccess(res, { message: genericMessage });

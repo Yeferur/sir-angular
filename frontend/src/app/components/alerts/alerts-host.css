@@ -12,8 +12,10 @@
 ═══════════════════════════════════════════════ */
 .sir-pill-area {
   position: fixed;
-  top: calc(15px + 48px + 10px);
-  left: calc(15px + 52px + 14px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
 
   right: 0;
   display: flex;
@@ -186,9 +188,9 @@
   inset: 0;
   z-index: 1550;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: calc(10px + 48px + 12px);
+  padding: 16px;
   background: rgba(0,0,0,0.25);
   backdrop-filter: blur(3px);
   animation: sirFadeIn 0.2s ease forwards;

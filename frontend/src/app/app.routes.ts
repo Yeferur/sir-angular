@@ -2,32 +2,31 @@ import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 import { authGuard } from './guards/auth.guard';
 import { permisoGuard } from './guards/permission.guard';
+import { LoginContentComponent } from './components/login/login';
 
 export const routes: Routes = [
   {
-    path: 'forgot-password',
-    loadComponent: () => import('./pages/Auth/forgot-password/forgot-password').then((m) => m.ForgotPasswordPageComponent),
-    title: 'Recuperar contraseña',
-  },
-  {
     path: 'reset-password',
-    loadComponent: () => import('./pages/Auth/reset-password/reset-password').then((m) => m.ResetPasswordPageComponent),
+    component: LoginContentComponent,
     title: 'Restablecer contraseña',
   },
   {
     path: '',
     loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    canActivate: [authGuard],
     data: { preload: true },
     title: 'Aforos',
   },
   {
     path: 'Dashboard',
     loadComponent: () => import('./pages/Dashboard/dashboard').then((m) => m.DashboardComponent),
+    canActivate: [authGuard],
     title: 'Dashboard',
   },
   {
     path: 'Historial',
     loadComponent: () => import('./pages/Historial/ver-historial').then((m) => m.VerHistorialComponent),
+    canActivate: [authGuard],
     title: 'Historial',
   },
 
@@ -42,6 +41,7 @@ export const routes: Routes = [
   {
     path: 'Reservas/VerReservas',
     loadComponent: () => import('./pages/Reservas/ver-reservas/ver-reservas').then((m) => m.VerReservasComponent),
+    canActivate: [authGuard],
     data: { preload: true },
     title: 'Ver Reservas',
   },
@@ -73,6 +73,7 @@ export const routes: Routes = [
   {
     path: 'Transfers/VerTransfers',
     loadComponent: () => import('./pages/Transfers/ver-transfers/ver-transfers').then((m) => m.VerTransfersComponent),
+    canActivate: [authGuard],
     data: { preload: true },
     title: 'Ver Transfers',
   },
@@ -80,6 +81,7 @@ export const routes: Routes = [
   {
     path: 'Puntos/VerPuntos',
     loadComponent: () => import('./pages/Puntos/ver-puntos/ver-puntos').then((m) => m.VerPuntos),
+    canActivate: [authGuard],
     title: 'Puntos de Encuentro',
   },
   {
@@ -109,6 +111,7 @@ export const routes: Routes = [
   {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    canActivate: [authGuard],
     data: { preload: true },
     title: 'Programación',
   },
@@ -124,17 +127,20 @@ export const routes: Routes = [
   {
     path: 'Comisiones',
     loadComponent: () => import('./pages/Comisiones/comisiones').then((m) => m.ComisionesComponent),
+    canActivate: [authGuard],
     title: 'Comisiones',
   },
   {
     path: 'Seguros',
     loadComponent: () => import('./pages/Seguros/seguros').then((m) => m.SegurosComponent),
+    canActivate: [authGuard],
     title: 'Seguros',
   },
 
   {
     path: 'Usuarios',
     loadComponent: () => import('./pages/Usuarios/usuarios/usuarios').then((m) => m.Usuarios),
+    canActivate: [authGuard],
     title: 'Usuarios',
   },
   {
@@ -178,6 +184,7 @@ export const routes: Routes = [
   {
     path: 'Tours/VerTours',
     loadComponent: () => import('./pages/Tours/ver-tours/ver-tours').then((m) => m.VerToursComponent),
+    canActivate: [authGuard],
     data: { preload: true },
     title: 'Ver Tours',
   },

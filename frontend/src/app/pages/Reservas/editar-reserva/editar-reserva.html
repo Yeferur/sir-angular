@@ -63,7 +63,7 @@
   @if (showDuplicate || puedeCancelarReserva || canDeleteReserva) {
   <div class="editar-action-bar">
     @if (showDuplicate) {
-    <button type="button" class="btn-editar-action btn-editar-duplicate" (click)="duplicarReserva()"
+    <button type="button" class="btn-row-edit btn-row-duplicate" (click)="duplicarReserva()"
       [disabled]="isSubmitting()">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
         <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.8" />
@@ -73,7 +73,7 @@
     </button>
     }
     @if (puedeCancelarReserva) {
-    <button type="button" class="btn-editar-action btn-editar-cancel" (click)="cancelarReserva()"
+    <button type="button" class="btn-row-cancel" (click)="cancelarReserva()"
       [disabled]="isSubmitting()">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
         <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.8" />
@@ -83,7 +83,7 @@
     </button>
     }
     @if (canDeleteReserva) {
-    <button type="button" class="btn-editar-action btn-editar-delete" (click)="eliminarReserva()"
+    <button type="button" class="btn-row-delete" (click)="eliminarReserva()"
       [disabled]="isSubmitting()">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
         <path d="M3 4.5h10M6 4.5V3h4v1.5M5.5 4.5l.5 8h4l.5-8" stroke="currentColor" stroke-width="1.8"
@@ -688,10 +688,10 @@
             <div class="payment-file-status">
               @if (form.get('ComprobantePago')?.value; as f) {
               @if (f?.SoporteUrl) {
-              <span class="payment-chip saved">Guardado</span>
+              <span class="badge badge--success">Guardado</span>
               <span class="file-name">Comprobante guardado</span>
               } @else {
-              <span class="payment-chip loaded">Cargado</span>
+              <span class="badge badge--info">Cargado</span>
               <span class="file-name">{{ f?.name }}</span>
               }
               } @else {
@@ -753,10 +753,10 @@
               </div>
               <div class="payment-file-status">
                 @if (abonos.controls[i].get('Comprobante')?.value) {
-                <span class="payment-chip loaded">Cargado</span>
+                <span class="badge badge--info">Cargado</span>
                 <span class="file-name">{{ abonos.controls[i].get('Comprobante')?.value?.name }}</span>
                 } @else if (abonos.controls[i].get('SoporteUrl')?.value) {
-                <span class="payment-chip saved">Guardado</span>
+                <span class="badge badge--success">Guardado</span>
                 <span class="file-name">Comprobante guardado</span>
                 } @else {
                 <span class="file-name text-muted">Sin archivo</span>

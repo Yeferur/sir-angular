@@ -14,7 +14,7 @@
       <div class="top-cards-grid">
         @for (card of [0, 1]; track card) {
           <div class="card skeleton-card">
-            <div class="card-heading">
+            <div class="card-header">
               <div>
                 <div class="skeleton-shape sk-card-title"></div>
                 <div class="skeleton-shape sk-card-subtitle"></div>
@@ -34,7 +34,7 @@
       </div>
 
       <div class="card skeleton-card permissions-card">
-        <div class="card-heading">
+        <div class="card-header">
           <div>
             <div class="skeleton-shape sk-card-title"></div>
             <div class="skeleton-shape sk-card-subtitle"></div>
@@ -68,7 +68,7 @@
       <div class="main-content">
         <div class="top-cards-grid">
           <div class="card">
-            <div class="card-heading">
+            <div class="card-header">
               <div>
                 <h2>Identidad</h2>
                 <p class="card-subtitle">Datos personales del usuario.</p>
@@ -109,7 +109,7 @@
           </div>
 
           <div class="card">
-            <div class="card-heading">
+            <div class="card-header">
               <div>
                 <h2>Acceso</h2>
                 <p class="card-subtitle">Credenciales de inicio de sesión.</p>
@@ -219,7 +219,7 @@
         </div>
 
         <div class="card permissions-card">
-          <div class="card-heading">
+          <div class="card-header">
             <div>
               <h2>Rol y Permisos</h2>
               <p class="card-subtitle">Define qué puede hacer este usuario en el sistema.</p>
@@ -247,7 +247,7 @@
                 <span class="form-label">Permisos asignables</span>
                 @if (permisos.length > 0) {
                   <span class="permissions-meta">
-                    <span class="count-badge">{{ selectedPermisos.length }}</span> seleccionados
+                    <span class="badge badge--info">{{ selectedPermisos.length }}</span> seleccionados
                   </span>
                 }
               </div>
@@ -259,9 +259,9 @@
               } @else {
                 <div class="permissions-grid">
                     @for (p of permisos; track p.Id_Permiso) {
-                    <button type="button" class="permission-option"
+                    <button type="button" class="permission-option chip"
                       (click)="togglePermiso(+p.Id_Permiso)"
-                      [class.active]="selectedPermisos.includes(+p.Id_Permiso)">
+                      [class.chip--active]="selectedPermisos.includes(+p.Id_Permiso)">
                         <span class="permission-label">{{ p.Descripcion }}</span>
                       </button>
                     }

@@ -7,7 +7,7 @@ const permisosService = require('../Permisos/permisos.service');
 const wsManager = require('../../websocketManager');
 
 const PASSWORD_HASH_ROUNDS = 10;
-const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = 10;
 
 /**
  * Buscar usuario por username/email/id

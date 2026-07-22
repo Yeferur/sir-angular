@@ -5,26 +5,31 @@ import {
   effect,
   inject,
   Injector,
+  OnDestroy,
   OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
+import { CountUpDirective } from './count-up.directive';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { InicioService, Tour, Transfer, TransfersSummary } from '../../services/inicio';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 
 type DrawerMode = 'edit' | 'privados';
+type DateAnimDirection = 'next' | 'prev';
+
+const FLASH_DURATION_MS = 1100;
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, FormsModule, PermisoDirective, DatepickerComponent],
+  imports: [CommonModule, FormsModule, PermisoDirective, CountUpDirective, DatepickerComponent],
   templateUrl: './inicio.html',
   styleUrls: ['./inicio.css'],
 })
-export class Inicio implements OnInit {
+export class Inicio implements OnInit, OnDestroy {
   private readonly inicioService = inject(InicioService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly alerts = inject(SirAlertService);
@@ -37,6 +42,10 @@ export class Inicio implements OnInit {
   private savingAforo = false;
 
   fecha: string = this.getTomorrowIso();
+
+  // Slide de fecha: dirección + key que fuerza recrear el nodo y así re-disparar la animación CSS
+  dateAnimDirection: DateAnimDirection = 'next';
+  dateAnimKey = 0;
 
   tours: Tour[] = [];
   transfers: Transfer[] = [];
@@ -54,6 +63,12 @@ export class Inicio implements OnInit {
   drawerTour: Tour | null = null;
   nuevoCupoDrawer = 0;
 
+  // Flash de cambio en tiempo real
+  flashIds = new Set<number>();
+  flashLinked = false;
+  private flashTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private flashLinkedTimer: ReturnType<typeof setTimeout> | null = null;
+
   private readonly LINKED_IDS = [1, 5];
   private readonly CUPO_SOURCE = 5;
 
@@ -64,15 +79,24 @@ export class Inicio implements OnInit {
 
       const id = Number(aforo.Id_Tour);
       const nuevo = Number(aforo.NuevoCupo);
+      let touchedLinked = false;
 
       this.tours.forEach((tour) => {
-        if (
-          tour.Id_Tour === id ||
-          (this.LINKED_IDS.includes(id) && this.LINKED_IDS.includes(tour.Id_Tour))
-        ) {
+        const isDirectMatch = tour.Id_Tour === id;
+        const isLinkedMatch = this.LINKED_IDS.includes(id) && this.LINKED_IDS.includes(tour.Id_Tour);
+
+        if ((isDirectMatch || isLinkedMatch) && tour.cupos !== nuevo) {
           tour.cupos = nuevo;
+
+          if (this.isLinked(tour)) {
+            touchedLinked = true;
+          } else {
+            this.flashTour(tour.Id_Tour);
+          }
         }
       });
+
+      if (touchedLinked) this.flashLinkedCard();
 
       this.cdr.markForCheck();
     }, { injector: this.injector });
@@ -81,7 +105,7 @@ export class Inicio implements OnInit {
       const reserva = this.inicioService.reservaActualizada();
       if (!reserva || reserva.Fecha_Tour !== this.fecha) return;
 
-      queueMicrotask(() => this.loadData());
+      queueMicrotask(() => this.loadData({ silent: true }));
     }, { injector: this.injector });
   }
 
@@ -89,52 +113,56 @@ export class Inicio implements OnInit {
     this.loadData();
   }
 
-  onFechaChange(iso: string | null): void {
-    if (!iso || iso === this.fecha) return;
+  ngOnDestroy(): void {
+    this.flashTimers.forEach((timer) => clearTimeout(timer));
+    this.flashTimers.clear();
+    if (this.flashLinkedTimer) clearTimeout(this.flashLinkedTimer);
+  }
 
-    this.fecha = iso;
-    this.loadData();
+  onFechaChange(iso: string | null): void {
+    if (!iso) return;
+    this.goToDate(iso);
   }
 
   irDiaAnterior(): void {
-    this.fecha = this.shiftDate(this.fecha, -1);
-    this.loadData();
+    this.goToDate(this.shiftDate(this.fecha, -1));
   }
 
   irDiaSiguiente(): void {
-    this.fecha = this.shiftDate(this.fecha, 1);
-    this.loadData();
+    this.goToDate(this.shiftDate(this.fecha, 1));
   }
 
   irHoy(): void {
-    const hoy = this.getTodayIso();
-    if (hoy === this.fecha) return;
-
-    this.fecha = hoy;
-    this.loadData();
+    this.goToDate(this.getTodayIso());
   }
 
   irManana(): void {
-    const manana = this.getTomorrowIso();
-    if (manana === this.fecha) return;
-
-    this.fecha = manana;
-    this.loadData();
+    this.goToDate(this.getTomorrowIso());
   }
 
   isTomorrowSelected(): boolean {
     return this.fecha === this.getTomorrowIso();
   }
 
-  loadData(): void {
+  private goToDate(iso: string): void {
+    if (!iso || iso === this.fecha) return;
+
+    this.dateAnimDirection = iso > this.fecha ? 'next' : 'prev';
+    this.dateAnimKey++;
+    this.fecha = iso;
+    this.loadData();
+  }
+
+  loadData(options: { silent?: boolean } = {}): void {
     if (this.loading) return;
 
     this.loading = true;
     const isInitialLoad = this.tours.length === 0;
+    const previousById = new Map(this.tours.map((tour) => [tour.Id_Tour, tour]));
 
     if (isInitialLoad) {
       this.isLoading = true;
-    } else {
+    } else if (!options.silent) {
       this.isUpdatingDate = true;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -148,13 +176,72 @@ export class Inicio implements OnInit {
       }),
     ).subscribe({
       next: (data) => {
-        this.tours = data.tours ?? [];
+        const newTours = data.tours ?? [];
+
+        if (options.silent && !isInitialLoad) {
+          this.detectRealtimeChanges(previousById, newTours);
+        }
+
+        this.tours = newTours;
         this.transfers = Array.isArray(data.transfers) ? data.transfers as Transfer[] : [];
         this.transfersSummary = this.normalizeTransfers(data.transfers);
         this.cdr.markForCheck();
       },
       error: () => this.cdr.markForCheck(),
     });
+  }
+
+  private detectRealtimeChanges(previousById: Map<number, Tour>, newTours: Tour[]): void {
+    let touchedLinked = false;
+
+    for (const tour of newTours) {
+      const prev = previousById.get(tour.Id_Tour);
+      if (!prev) continue;
+
+      const changed =
+        Number(prev.NumeroPasajeros || 0) !== Number(tour.NumeroPasajeros || 0) ||
+        Number(prev.cupos || 0) !== Number(tour.cupos || 0);
+
+      if (!changed) continue;
+
+      if (this.isLinked(tour)) {
+        touchedLinked = true;
+      } else {
+        this.flashTour(tour.Id_Tour);
+      }
+    }
+
+    if (touchedLinked) this.flashLinkedCard();
+  }
+
+  private flashTour(id: number): void {
+    this.flashIds.add(id);
+    this.cdr.markForCheck();
+
+    const existing = this.flashTimers.get(id);
+    if (existing) clearTimeout(existing);
+
+    this.flashTimers.set(id, setTimeout(() => {
+      this.flashIds.delete(id);
+      this.flashTimers.delete(id);
+      this.cdr.markForCheck();
+    }, FLASH_DURATION_MS));
+  }
+
+  private flashLinkedCard(): void {
+    this.flashLinked = true;
+    this.cdr.markForCheck();
+
+    if (this.flashLinkedTimer) clearTimeout(this.flashLinkedTimer);
+
+    this.flashLinkedTimer = setTimeout(() => {
+      this.flashLinked = false;
+      this.cdr.markForCheck();
+    }, FLASH_DURATION_MS);
+  }
+
+  isFlashing(tour: Tour): boolean {
+    return this.flashIds.has(tour.Id_Tour);
   }
 
   isLinked(tour: Tour): boolean {

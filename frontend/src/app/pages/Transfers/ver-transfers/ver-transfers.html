@@ -264,8 +264,8 @@
             (keydown.space)="$event.preventDefault(); verTransfer(t.Id_Transfer)"
             [attr.aria-label]="'Ver transfer ' + (t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0'))) + ' — ' + (t.Nombre_Servicio || t.Nombre_Titular)">
 
-            <span class="status-pill" [ngClass]="'status-' + (t.Estado ? (t.Estado | lowercase) : '')">
-              {{ t.Estado }}
+            <span class="badge" [ngClass]="getEstadoBadgeClass(t.Estado || t.Estado_Transfer)">
+              {{ t.Estado || t.Estado_Transfer }}
             </span>
 
             <div class="item-main-info">
@@ -292,7 +292,7 @@
               @if (canUpdateTransfer) {
                 <button
                   type="button"
-                  class="btn-edit-row"
+                  class="btn-row-edit"
                   (click)="$event.stopPropagation(); editarTransfer(t.Id_Transfer)"
                   [attr.aria-label]="'Editar transfer ' + (t.Codigo_Transfer || t.Id_Transfer)"
                 >
@@ -306,7 +306,7 @@
               @if (canCancelTransfer(t)) {
                 <button
                   type="button"
-                  class="btn-edit-row btn-cancel-row"
+                  class="btn-row-cancel"
                   (click)="$event.stopPropagation(); confirmCancelarTransfer(t)"
                   [attr.aria-label]="'Cancelar transfer ' + (t.Codigo_Transfer || t.Id_Transfer)"
                 >
@@ -320,7 +320,7 @@
               @if (canDeleteTransfer) {
                 <button
                   type="button"
-                  class="btn-edit-row btn-delete-row"
+                  class="btn-row-delete"
                   (click)="$event.stopPropagation(); confirmEliminarTransfer(t)"
                   [attr.aria-label]="'Eliminar transfer ' + (t.Codigo_Transfer || t.Id_Transfer)"
                 >

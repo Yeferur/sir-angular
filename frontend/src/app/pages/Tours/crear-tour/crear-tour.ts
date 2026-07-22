@@ -78,7 +78,7 @@ type DisponibilidadPayload = {
 @Component({
   selector: 'app-crear-tour',
   templateUrl: './crear-tour.html',
-  styleUrls: ['./crear-tour.css'],
+  styleUrls: ['../tour-shared.css'],
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent],
 })

@@ -36,15 +36,20 @@
   background: rgba(28, 28, 30, 0.80);
   border: 1.5px solid var(--separator-color);
   border-radius: var(--radius-lg);
-  overflow: hidden;
   position: relative;
   z-index: 1;
   box-shadow: 0 2px 40px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
-/* Línea de acento azul superior */
+/* Coreografía isla↔login: mientras la card colapsa de vuelta al tamaño
+   de la isla (login.ts collapseToIsland()), el contenido se desvanece
+   para no verse comprimido/deformado durante la animación de tamaño. */
+/* overflow visible a propósito: el popover de fuerza de contraseña necesita
+   poder salirse del borde de la card sin recortarse. La barra de acento se
+   redondea por su cuenta arriba para no depender de ese overflow:hidden. */
 .card-accent {
   height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: linear-gradient(
     90deg,
     transparent 0%,
@@ -53,9 +58,15 @@
   );
 }
 
+
+
 .card-body {
   padding: 32px 28px 24px;
+  min-height: 390px;
+  box-sizing: border-box;
 }
+
+.login-card.is-recovery .card-body { min-height: 0; }
 
 /* =========================================================
    ANIMACIÓN EN CASCADA (STAGGER)
@@ -129,6 +140,210 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  transition: opacity .3s var(--ease-soft), filter .3s var(--ease-soft);
+}
+
+.login-form.is-dimmed { opacity: .38; filter: saturate(.7); pointer-events: none; }
+
+.reset-heading h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.35rem;
+}
+
+.reset-heading p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.recovery-panel {
+  padding: 22px 28px 26px;
+  border-top: 1px solid var(--separator-color);
+  animation: recoveryPanelIn .4s var(--ease-panel) both;
+}
+.recovery-form-view {
+  animation: recoveryFormIn .32s var(--ease-panel) both;
+  padding-bottom: 4px;
+}
+.recovery-form-view .recovery-panel-header { margin-bottom: 18px; }
+.recovery-panel-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.recovery-panel h2 { margin: 0; font-size: 1rem; color: var(--text-primary); }
+.recovery-panel p { margin: 4px 0 16px; color: var(--text-secondary); font-size: .78rem; }
+.recovery-close { border: 0; background: transparent; color: var(--text-secondary); font-size: 1.4rem; cursor: pointer; }
+.recovery-form { display: flex; flex-direction: column; gap: 8px; }
+.recovery-form .btn-primary { opacity: 1; animation: none; margin-top: 8px; }
+
+/* =========================================================
+   BLOQUE DE FUERZA DE CONTRASEÑA
+   Vuelve a flotar (absolute) para que la card no cambie de
+   tamaño cada vez que se abre/cierra — en su lugar, mientras
+   está abierto, todo lo que queda debajo se atenúa vía
+   .reset-form-rest.is-dimmed para que la superposición sea
+   intencional y legible, no un choque de textos.
+   ========================================================= */
+/* Absolute a propósito: el popover nunca debe empujar el layout de lo
+   que sigue debajo (confirmar contraseña + botón). isolation en
+   .password-wrapper (ver más abajo) evita que un opacity/filter de un
+   ancestro se filtre visualmente hacia el popover. */
+.password-strength-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 100;
+  padding: 14px 16px 12px;
+  border: 1.5px solid var(--separator-color);
+  border-radius: 14px;
+  background: #1c1c1e !important;
+  background-image: linear-gradient(#1c1c1e, #1c1c1e) !important;
+  opacity: 1 !important;
+  isolation: isolate;
+  contain: paint;
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(10, 132, 255, 0.12);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(10, 132, 255, 0.08);
+  overflow: hidden;
+  transform-origin: top center;
+  animation: strengthPopIn 0.22s var(--ease-panel, cubic-bezier(0.23, 1, 0.32, 1)) both;
+}
+
+/* Acento — mismo lenguaje que .card-accent, en miniatura */
+.password-strength-popover::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--accent-blue) 45%, rgba(10, 132, 255, 0.3) 100%);
+}
+
+@keyframes strengthPopIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.reset-form-rest {
+  transition: opacity .25s var(--ease-soft), filter .25s var(--ease-soft);
+}
+
+.reset-form-rest.is-dimmed {
+  opacity: .25;
+  filter: none;
+  pointer-events: none;
+}
+
+.password-strength-popover .strength-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.password-strength-popover .strength-label {
+  font-size: .85rem;
+  color: var(--text-secondary);
+}
+
+.password-strength-popover .strength-label strong { color: var(--text-primary); }
+.password-strength-popover .strength-top[data-level="Débil"] strong { color: #ff453a; }
+.password-strength-popover .strength-top[data-level="Media"] strong { color: #ff9f0a; }
+.password-strength-popover .strength-top[data-level="Fuerte"] strong { color: #34c759; }
+
+.password-strength-popover .strength-score {
+  font-size: .82rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.password-strength-popover .strength-bars {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.password-strength-popover .strength-bars .bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  transition: background .2s, border-color .2s;
+}
+
+.password-strength-popover .strength-bars[data-level="Débil"] .bar.on {
+  background: rgba(255, 69, 58, .4);
+  border-color: rgba(255, 69, 58, .55);
+}
+
+.password-strength-popover .strength-bars[data-level="Media"] .bar.on {
+  background: rgba(255, 159, 10, .4);
+  border-color: rgba(255, 159, 10, .55);
+}
+
+.password-strength-popover .strength-bars[data-level="Fuerte"] .bar.on {
+  background: rgba(52, 199, 89, .4);
+  border-color: rgba(52, 199, 89, .55);
+}
+
+.password-strength-popover .strength-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+}
+
+.password-strength-popover .strength-checks li {
+  font-size: .8rem;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.35;
+}
+
+.password-strength-popover .strength-checks li::before {
+  content: '·';
+  font-size: 1.2em;
+  opacity: .4;
+  flex-shrink: 0;
+}
+
+.password-strength-popover .strength-checks li.ok {
+  color: #34d058;
+  font-weight: 600;
+}
+
+.password-strength-popover .strength-checks li.ok::before {
+  content: '✓';
+  font-size: .85em;
+  opacity: 1;
+}
+
+@keyframes recoveryPanelIn {
+  from { opacity: 0; max-height: 0; transform: translateY(-10px) scale(.98); }
+  to { opacity: 1; max-height: 240px; transform: none; }
+}
+
+/* Sin max-height fijo: el contenido de recovery-form-view varía (mensaje de
+   éxito, link de prueba local, error) y un tope en px lo recortaba contra
+   el overflow:hidden de .login-card. Solo fade + slide, altura natural. */
+@keyframes recoveryFormIn {
+  from { opacity: 0; transform: translateY(-10px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 766px) {
+  .recovery-panel {
+    position: fixed; inset: 10px; z-index: var(--z-modal); margin: 0;
+    background: var(--bg-secondary); border: 1px solid var(--separator-color);
+    border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  }
 }
 
 .form-group {
@@ -202,6 +417,7 @@
 /* Campo de contraseña */
 .password-wrapper {
   position: relative;
+  isolation: isolate;
 }
 
 .form-input.pw-input {
@@ -322,6 +538,7 @@
    ========================================================= */
 .card-footer {
   border-top: 1.5px solid var(--separator-color);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   padding: 14px 28px 16px;
   display: flex;
   align-items: center;
@@ -333,6 +550,11 @@
 }
 
 .forgot-password-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.82rem;
   color: var(--accent-blue);
   text-decoration: none;
@@ -352,4 +574,74 @@
   letter-spacing: 0.03em;
   font-feature-settings: "tnum";
   white-space: nowrap;
+}
+
+/* =========================================================
+   AJUSTES DE DISTRIBUCIÓN — RESTABLECIMIENTO
+   ========================================================= */
+.login-card.is-reset {
+  max-width: 430px;
+}
+
+.login-card.is-reset .card-body {
+  min-height: 0;
+  padding: 34px 32px 28px;
+}
+
+.login-card.is-reset .login-header {
+  margin-bottom: 30px;
+}
+
+.login-card.is-reset .reset-form {
+  gap: 18px;
+}
+
+/* Confirmación, mensajes y botón deben formar una columna con
+   separación consistente; antes el botón quedaba pegado al input. */
+.reset-form-rest {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-card.is-reset .btn-primary {
+  width: 100%;
+  min-height: 48px;
+}
+
+@media (max-width: 480px) {
+  .login-card.is-reset {
+    margin: 12px;
+  }
+
+  .login-card.is-reset .card-body {
+    padding: 28px 20px 24px;
+  }
+
+  .login-card.is-reset .login-header {
+    margin-bottom: 26px;
+  }
+
+  .login-card.is-reset .card-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+.success-message {
+  color: #34d058;
+  font-size: 0.875rem;
+  text-align: center;
+  background-color: rgba(52, 208, 88, 0.10);
+  border: 1px solid rgba(52, 208, 88, 0.22);
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.local-reset-link {
+  display: block;
+  color: var(--accent-blue);
+  font-size: .78rem;
+  text-align: center;
+  overflow-wrap: anywhere;
 }

@@ -90,15 +90,6 @@
   </div>
 
 </div>
-<!-- Floating summary skeleton -->
-<div class="floating-summary" data-state="compact" style="pointer-events:none">
-  <div class="summary-collapsed">
-    <div class="summary-left">
-      <div class="sk-field sk-summary-badge"></div>
-      <div class="sk-line sk-summary-meta"></div>
-    </div>
-  </div>
-</div>
 } @else {
   
 <div class="wizard-shell" [formGroup]="form">
@@ -340,7 +331,7 @@
             <div class="payment-file-row">
               <div class="payment-file-status">
                 @if (form.get('ComprobantePago')?.value; as f) {
-                <span class="payment-chip loaded">Cargado</span>
+      <span class="badge badge--info">Cargado</span>
                 <span class="file-name">{{ f?.name }}</span>
                 } @else {
                 <span class="file-name text-muted">Sin archivo</span>
@@ -406,7 +397,7 @@
 
                 <div class="payment-file-status">
                   @if (abonos.controls[i].get('Comprobante')?.value) {
-                  <span class="payment-chip loaded">Cargado</span>
+                  <span class="badge badge--info">Cargado</span>
                   <span class="file-name">{{ getAbonoFileName(i) }}</span>
                   } @else {
                   <span class="file-name text-muted">Sin archivo</span>
@@ -471,60 +462,60 @@
         </div>
       </div>
 
-      <div class="summary-grid">
-        <div class="summary-item">
+      <div class="resumen-grid">
+        <div class="resumen-item">
           <label class="form-label">Servicio</label>
-          <span class="summary-value">{{ getNombreServicio() || '—' }}</span>
+          <span class="resumen-value">{{ getNombreServicio() || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Titular</label>
-          <span class="summary-value">{{ form.get('Titular')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('Titular')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Pasajeros</label>
-          <span class="summary-value">{{ form.get('Cantidad_Personas')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('Cantidad_Personas')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Ruta</label>
-          <span class="summary-value">{{ getResumenRuta() }}</span>
+          <span class="resumen-value">{{ getResumenRuta() }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Fecha</label>
-          <span class="summary-value">{{ form.get('Fecha')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('Fecha')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Hora</label>
-          <span class="summary-value">{{ form.get('Hora')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('Hora')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Reporta</label>
-          <span class="summary-value">{{ form.get('Reporta')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('Reporta')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Teléfono reserva</label>
-          <span class="summary-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span>
+          <span class="resumen-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Rango detectado</label>
-          <span class="summary-value">{{ selectedRangoDescripcion || '—' }}</span>
+          <span class="resumen-value">{{ selectedRangoDescripcion || '—' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Tipo de pago</label>
-          <span class="summary-value">{{ getResumenTipoPago() }}</span>
+          <span class="resumen-value">{{ getResumenTipoPago() }}</span>
         </div>
         @if (form.get('TipoPago')?.value === 'Abonos') {
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Total abonado</label>
-          <span class="summary-value">{{ getTotalAbonado() | number:'1.2-2' }}</span>
+          <span class="resumen-value">{{ getTotalAbonado() | number:'1.2-2' }}</span>
         </div>
-        <div class="summary-item">
+        <div class="resumen-item">
           <label class="form-label">Pendiente</label>
-          <span class="summary-value">{{ getPendiente() | number:'1.2-2' }}</span>
+          <span class="resumen-value">{{ getPendiente() | number:'1.2-2' }}</span>
         </div>
         }
-        <div class="summary-item total-row">
+        <div class="resumen-item total-row">
           <label class="form-label">Valor</label>
-          <span class="summary-value summary-total">{{ form.get('Moneda')?.value || 'COP' }} {{
+          <span class="resumen-value resumen-total">{{ form.get('Moneda')?.value || 'COP' }} {{
             (form.get('Valor')?.value || 0) | number:'1.0-0' }}</span>
         </div>
       </div>
@@ -557,7 +548,15 @@
         </button>
         } @else {
         <button type="button" class="btn-wizard-submit" (click)="onSubmit()" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Guardando...' : 'Crear Transfer' }}
+          @if (isSubmitting()) {
+          <svg class="spin" width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="5.5" stroke="rgba(255,255,255,.3)" stroke-width="2" />
+            <path d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <span>Guardando...</span>
+          } @else {
+          <span>Crear Transfer</span>
+          }
         </button>
         }
     </div>

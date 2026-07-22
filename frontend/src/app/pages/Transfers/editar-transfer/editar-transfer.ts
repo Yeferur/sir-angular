@@ -23,7 +23,7 @@ interface WizardStep {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent],
   templateUrl: './editar-transfer.html',
-  styleUrls: ['./editar-transfer.css']
+  styleUrls: ['../transfer-shared.css']
 })
 export class EditarTransferComponent implements OnInit, OnDestroy {
   private alerts = inject(SirAlertService);

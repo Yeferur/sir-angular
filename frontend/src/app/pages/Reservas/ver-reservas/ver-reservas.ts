@@ -17,7 +17,7 @@ import { UiStateService } from '../../../services/ui-state.service';
   standalone: true,
   imports: [CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent],
   templateUrl: './ver-reservas.html',
-  styleUrls: ['./ver-reservas.css']
+  styleUrls: ['../../listado-reservas-transfers.css']
 })
 export class VerReservasComponent implements OnInit {
   readonly estadoOptions = ['Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completada', 'Cancelada'];
@@ -535,5 +535,14 @@ seleccionarPuntoAutocomplete(p: any) {
       'Grupal'
     ).trim().toLowerCase();
     return tipo === 'privada' ? 'Privada' : 'Grupal';
+  }
+
+  getEstadoBadgeClass(estado: string | null | undefined): string {
+    const normalized = String(estado || '').trim().toLowerCase();
+    if (['confirmada', 'activa'].includes(normalized)) return 'badge--success';
+    if (['cancelada', 'cancelado'].includes(normalized)) return 'badge--danger';
+    if (['pendiente', 'pendiente de datos', 'pendiente de pago'].includes(normalized)) return 'badge--pending';
+    if (['completada', 'completado'].includes(normalized)) return 'badge--info';
+    return 'badge--grupal';
   }
 }

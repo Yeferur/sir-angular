@@ -550,3 +550,13 @@
   .gs-footer { padding: 10px 12px 14px; }
   .gs-bubble--user { max-width: 88%; }
 }
+.gs-shell.is-closing {
+  animation: globalSearchExit .14s var(--ease-panel) both;
+  transform-origin: center top;
+  pointer-events: none;
+}
+
+@keyframes globalSearchExit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(.985); }
+}

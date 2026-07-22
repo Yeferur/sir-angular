@@ -5,7 +5,15 @@
       <span class="page-date-label">Operación del día</span>
       <p class="page-subtitle">
         Disponibilidad de cupos ·
-        {{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+        <span class="date-slide-track">
+          @for (frame of [dateAnimKey]; track frame) {
+            <span
+              class="date-slide-item"
+              [class.slide-prev]="dateAnimDirection === 'prev'">
+              {{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+            </span>
+          }
+        </span>
       </p>
     </div>
 
@@ -65,14 +73,14 @@
       </div>
     </section>
   } @else {
-    <div
-      [style.opacity]="isUpdatingDate ? '0.4' : '1'"
-      [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'"
-      [style.transition]="'opacity .2s'">
+    <div class="content-wrap" [class.is-updating]="isUpdatingDate">
 
       <div class="tours-grid">
 
-        <div class="tour-card card-linked" [class.has-privados]="hasAnyLinkedPrivados()">
+        <div
+          class="tour-card card-linked"
+          [class.has-privados]="hasAnyLinkedPrivados()"
+          [class.card-flash]="flashLinked">
           <div class="card-head">
             <div class="card-name-col">
               <span class="card-tour-name">{{ getLinkedTourNames() }}</span>
@@ -82,20 +90,18 @@
           <div class="linked-content linked-content-split">
             <div class="linked-summary">
               <div class="card-avail">
-                <span class="avail-big" [ngClass]="getLinkedAvailabilityTone()">
-                  {{ getLinkedAvailableSeats() }}
-                </span>
+                <span class="avail-big" [ngClass]="getLinkedAvailabilityTone()" [countUp]="getLinkedAvailableSeats()"></span>
                 <span class="avail-sub">disponibles</span>
               </div>
 
               <div class="card-stats">
                 <div class="card-stat">
                   <span class="card-stat-label">Pasajeros:</span>
-                  <span class="card-stat-value">{{ getLinkedTotalPax() }}</span>
+                  <span class="card-stat-value" [countUp]="getLinkedTotalPax()"></span>
                 </div>
                 <div class="card-stat">
                   <span class="card-stat-label">Capacidad:</span>
-                  <span class="card-stat-value">{{ getCupoCompartido() }}</span>
+                  <span class="card-stat-value" [countUp]="getCupoCompartido()"></span>
                 </div>
               </div>
 
@@ -113,7 +119,7 @@
               @for (tour of getLinkedTours(); track tour.Id_Tour) {
                 <div class="linked-side-tour">
                   <span class="linked-side-tour-name">{{ tour.Nombre_Tour }}</span>
-                  <span class="linked-side-tour-pax">{{ tour.NumeroPasajeros }} pasajeros</span>
+                  <span class="linked-side-tour-pax" [countUp]="tour.NumeroPasajeros"></span>
                   @if (hasPrivados(tour)) {
                     <button
                       type="button"
@@ -148,7 +154,7 @@
 
         @for (tour of tours; track tour.Id_Tour) {
           @if (!isLinked(tour)) {
-            <div class="tour-card" [class.has-privados]="hasPrivados(tour)">
+            <div class="tour-card" [class.has-privados]="hasPrivados(tour)" [class.card-flash]="isFlashing(tour)">
               <div class="card-head">
                 <div class="card-name-col">
                   <span class="card-tour-name">{{ tour.Nombre_Tour }}</span>
@@ -156,20 +162,18 @@
               </div>
 
               <div class="card-avail">
-                <span class="avail-big" [ngClass]="getAvailabilityTone(tour)">
-                  {{ getAvailableSeats(tour) }}
-                </span>
+                <span class="avail-big" [ngClass]="getAvailabilityTone(tour)" [countUp]="getAvailableSeats(tour)"></span>
                 <span class="avail-sub">disponibles</span>
               </div>
 
               <div class="card-stats">
                 <div class="card-stat">
                   <span class="card-stat-label">Pasajeros:</span>
-                  <span class="card-stat-value">{{ tour.NumeroPasajeros }}</span>
+                  <span class="card-stat-value" [countUp]="tour.NumeroPasajeros"></span>
                 </div>
                 <div class="card-stat">
                   <span class="card-stat-label">Capacidad:</span>
-                  <span class="card-stat-value">{{ getCuposParaMeta(tour) }}</span>
+                  <span class="card-stat-value" [countUp]="getCuposParaMeta(tour)"></span>
                 </div>
               </div>
 
@@ -219,21 +223,21 @@
             <span class="transfers-title">Transfers</span>
             <span class="transfers-sub">Servicios del día</span>
           </div>
-          <span class="transfer-total-badge">{{ transfersSummary.total }}</span>
+          <span class="transfer-total-badge" [countUp]="transfersSummary.total"></span>
         </div>
 
         <div class="transfers-body">
           <div class="transfer-col">
             <span class="transfer-label">Hotel/Aeropuerto</span>
-            <strong class="transfer-value">{{ transfersSummary.hotelAeropuerto }}</strong>
+            <strong class="transfer-value" [countUp]="transfersSummary.hotelAeropuerto"></strong>
           </div>
           <div class="transfer-col">
             <span class="transfer-label">Aeropuerto/Hotel</span>
-            <strong class="transfer-value">{{ transfersSummary.aeropuertoHotel }}</strong>
+            <strong class="transfer-value" [countUp]="transfersSummary.aeropuertoHotel"></strong>
           </div>
           <div class="transfer-col">
             <span class="transfer-label">Otro</span>
-            <strong class="transfer-value">{{ transfersSummary.otros }}</strong>
+            <strong class="transfer-value" [countUp]="transfersSummary.otros"></strong>
           </div>
         </div>
       </div>

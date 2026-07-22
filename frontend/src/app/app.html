@@ -1,8 +1,9 @@
-@if (loggedIn) {
+<app-layout></app-layout>
+
+@if (viewLoggedIn()) {
   <div class="app-shell app-shell--private">
     <app-sir-alerts></app-sir-alerts>
     <app-sir-drawer></app-sir-drawer>
-    <app-layout></app-layout>
     <div class="main-shell">
       <main class="content">
         <router-outlet></router-outlet>
@@ -15,11 +16,8 @@
       <router-outlet></router-outlet>
     }
   </main>
-} @else {
-  <main class="auth-public-shell">
-    @if (!routeTransitioning) {
-      <app-login></app-login>
-    }
-  </main>
 }
-
+<!-- El login por defecto (ni privado ni /reset-password) ya no se monta
+     aquí aparte: vive dentro de <app-layout>, anidado en la misma caja
+     del topbar que se expande a pantalla completa. Ver
+     LayoutComponent.showAuthSlot / .topbar-auth-slot en layout.html. -->

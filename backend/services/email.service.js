@@ -34,7 +34,7 @@ function createTransporter() {
   });
 }
 
-async function sendPasswordResetEmail({ to, name, resetUrl, expiresInMinutes = 30 }) {
+async function sendPasswordResetEmail({ to, name, resetUrl, expiresInMinutes = 10 }) {
   const transporter = createTransporter();
   const config = getSmtpConfig();
 

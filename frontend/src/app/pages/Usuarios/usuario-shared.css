@@ -61,12 +61,6 @@
   line-height: 1.1;
 }
 
-.subtitle {
-  font-size: .875rem;
-  color: var(--text-secondary);
-  margin: 5px 0 0;
-}
-
 .page-header-actions {
   display: flex;
   align-items: center;
@@ -86,7 +80,7 @@
   transition: background-color .3s ease;
 }
 
-.card-heading {
+.card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -96,7 +90,7 @@
   border-bottom: 1.5px solid var(--separator-color);
 }
 
-.card-heading h2 {
+.card-header h2 {
   font-size: 1.05rem;
   font-weight: 800;
   margin: 0;
@@ -104,7 +98,7 @@
   letter-spacing: -0.02em;
 }
 
-.card-heading p {
+.card-header p {
   font-size: .82rem;
   color: var(--text-secondary);
   margin: 3px 0 0;
@@ -303,7 +297,6 @@
   padding-right: 40px;
 }
 
-/* Autofill trap */
 .autofill-trap {
   position: absolute !important;
   opacity: 0 !important;
@@ -434,19 +427,6 @@
   color: var(--text-secondary);
 }
 
-.count-badge {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(10, 132, 255, .12);
-  border: 1px solid rgba(10, 132, 255, .22);
-  color: var(--accent-blue);
-  font-weight: 800;
-  font-size: .75rem;
-}
-
 .permissions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -459,10 +439,8 @@
   gap: 10px;
   padding: 12px 13px;
   border-radius: 14px;
-  background: var(--bg-tertiary);
-  border: 1.5px solid var(--separator-color);
   cursor: pointer;
-  transition: background .15s, border-color .15s, transform .1s, box-shadow .15s;
+  transition: border-color .15s, transform .1s, box-shadow .15s;
   text-align: left;
   font-family: var(--font-family);
 }
@@ -472,21 +450,12 @@
   transform: translateY(-1px);
 }
 
-.permission-option.active {
-  background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-tertiary));
-  border-color: var(--accent-blue);
-  transform: none;
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .08);
-}
-
 .permission-label {
   font-weight: 600;
   font-size: .875rem;
   color: var(--text-primary);
   line-height: 1.25;
 }
-
-.permission-option.active .permission-label { color: var(--text-primary); }
 
 /* =========================================================
    SKELETON

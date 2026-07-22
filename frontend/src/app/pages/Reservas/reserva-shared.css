@@ -3,215 +3,8 @@
 }
 
 /* =========================================================
-   WIZARD LAYOUT
-   ========================================================= */
-.wizard-shell {
-  max-width: 1350px;
-  margin: 0 auto;
-  padding-bottom: 104px;
-  animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) forwards;
-}
-
-/* =========================================================
-   STEPPER HEADER
-   ========================================================= */
-.wizard-stepper {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  margin-bottom: 18px;
-  position: relative;
-  padding: 0 8px;
-}
-
-.step-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  /* pasos futuros no alcanzados: no clickeables visualmente */
-}
-
-.step-item.is-locked {
-  cursor: default;
-  pointer-events: none;
-}
-
-.step-bubble {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .77rem;
-  font-weight: 700;
-  border: 1.5px solid rgba(255, 255, 255, .10);
-  background: rgba(255, 255, 255, .03);
-  color: var(--text-secondary);
-  transition: background .3s cubic-bezier(.22,1,.36,1),
-              border-color .3s cubic-bezier(.22,1,.36,1),
-              box-shadow .3s cubic-bezier(.22,1,.36,1),
-              color .3s;
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-}
-
-/* Icono SVG check dentro del bubble */
-.step-bubble svg {
-  width: 14px;
-  height: 14px;
-  stroke: #fff;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
-  flex-shrink: 0;
-}
-
-.step-bubble .icon-error {
-  width: 14px;
-  height: 14px;
-  stroke: var(--accent-red);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  fill: none;
-  flex-shrink: 0;
-}
-
-.step-item.is-done .step-bubble {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(10, 132, 255, .22);
-}
-
-.step-item.is-active .step-bubble {
-  background: rgba(10, 132, 255, .12);
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
-  box-shadow:
-    0 0 0 4px rgba(10, 132, 255, .12),
-    0 10px 22px rgba(10, 132, 255, .12);
-}
-
-.step-item.has-error .step-bubble {
-  background: rgba(255,69,58,.08);
-  border-color: var(--accent-red);
-  color: var(--accent-red);
-  box-shadow: 0 0 0 4px rgba(255, 69, 58, .12);
-}
-
-/* hover en pasos ya completados o activos */
-.step-item.is-done:hover .step-bubble,
-.step-item.is-active:hover .step-bubble {
-  filter: brightness(1.12);
-}
-
-.step-label {
-  font-size: .62rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-align: center;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  transition: color .3s;
-  white-space: nowrap;
-  opacity: .92;
-}
-
-.step-item.is-active .step-label { color: var(--accent-blue); }
-.step-item.is-done   .step-label { color: var(--text-primary); }
-.step-item.has-error .step-label { color: var(--accent-red); }
-
-/* línea entre steps individual (progreso) */
-.step-connector {
-  flex: 1;
-  height: 2px;
-  margin-top: 14px;
-  background: rgba(255, 255, 255, .08);
-  transition: background .4s cubic-bezier(.22,1,.36,1);
-  position: relative;
-  z-index: 0;
-  flex-shrink: 1;
-  border-radius: 999px;
-}
-
-.step-connector.filled {
-  background: var(--accent-blue);
-  box-shadow: 0 0 12px rgba(10, 132, 255, .2);
-}
-
-/* =========================================================
-   CARD BASE
-   ========================================================= */
-.card {
-  background-color: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: 28px;
-  border: 1.5px solid var(--separator-color);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, .07);
-  transition: background-color .3s ease;
-}
-
-.card-header {
-  padding-bottom: 16px;
-  margin-bottom: 24px;
-  border-bottom: 1.5px solid var(--separator-color);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.card-header h2 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -.015em;
-}
-
-.card-header .card-header-hint {
-  font-size: .8rem;
-  color: var(--text-secondary);
-  margin: 4px 0 0;
-}
-
-/* =========================================================
    STEP PANEL
    ========================================================= */
-.wizard-step-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  /* Sin animación por defecto — solo cuando step-animating está activo */
-}
-
-.wizard-step-panel.step-animating {
-  animation: stepEnter .35s cubic-bezier(.22, 1, .36, 1) forwards;
-  will-change: opacity, transform;
-}
-
-.wizard-step-panel.step-animating.going-back {
-  animation: stepEnterBack .35s cubic-bezier(.22, 1, .36, 1) forwards;
-}
-
-@keyframes stepEnter {
-  from { opacity: 0; transform: translateX(18px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes stepEnterBack {
-  from { opacity: 0; transform: translateX(-18px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
 /* ── Animación aislada para cuerpos que entran/salen (Global/Individual) ── */
 @keyframes bodyReveal {
   from { opacity: 0; transform: translateY(-6px); }
@@ -236,11 +29,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
 }
 
 .form-group {
@@ -771,7 +559,7 @@
 
 .payment-file-status .text-muted { opacity: .7; }
 
-.payment-chip {
+.payment-file-status .badge {
   font-size: .75rem;
   font-weight: 700;
   padding: 4px 10px;
@@ -780,9 +568,6 @@
   letter-spacing: .04em;
   white-space: nowrap;
 }
-
-.payment-chip.saved { background: rgba(52, 199, 89, 0.15); color: var(--accent-green); }
-.payment-chip.loaded { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); }
 
 .payment-actions {
   display: flex;
@@ -1154,77 +939,10 @@
   color: var(--accent-red);
 }
 
-/* =========================================================
-   WIZARD NAV FOOTER
-   ========================================================= */
-.wizard-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: transparent;
-  padding: 0 0 14px;
-}
-
-.wizard-nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 18px;
-  min-height: 60px;
-  width: min(1400px, calc(100% - 28px));
-  margin: 0 auto;
-  background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.85));
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
-  border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
-}
-
-.wizard-nav-left,
-.wizard-nav-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.wizard-nav-center {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: stretch;
-  min-width: 0;
-}
-
-.wizard-nav-summary {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
 .nav-cupos-mobile {
   display: none;
   align-items: center;
   gap: 6px;
-}
-
-.wizard-nav-tour {
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: .94rem;
-  font-weight: 800;
-  color: var(--text-primary);
 }
 
 .wizard-nav-item,
@@ -1269,87 +987,6 @@
 .viaje-cupos-inline {
   width: min(720px, 100%);
   align-self: center;
-}
-
-.btn-wizard-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-primary);
-  font-size: .84rem;
-  font-weight: 650;
-  cursor: pointer;
-  transition: border-color .2s, color .2s, background .2s, transform .2s;
-  white-space: nowrap;
-}
-
-.btn-wizard-back:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
-}
-
-.btn-wizard-next {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: 12px;
-  border: none;
-  background: var(--accent-blue);
-  color: #fff;
-  font-size: .84rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: filter .2s, opacity .2s, transform .2s;
-  white-space: nowrap;
-}
-
-.btn-wizard-next:hover:not(:disabled) {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
-}
-.btn-wizard-next:disabled { opacity: .4; cursor: not-allowed; filter: none; }
-
-.btn-wizard-submit {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 20px;
-  border-radius: 12px;
-  border: none;
-  background: var(--accent-green, #34c759);
-  color: #fff;
-  font-size: .84rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: filter .2s, opacity .2s, transform .2s;
-  white-space: nowrap;
-}
-
-.btn-wizard-submit:hover:not(:disabled) {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
-}
-.btn-wizard-submit:disabled { opacity: .4; cursor: not-allowed; filter: none; }
-
-/* spinner de submit */
-@keyframes navSpin {
-  to { transform: rotate(360deg); }
-}
-.btn-wizard-submit .spin {
-  animation: navSpin .8s linear infinite;
-  flex-shrink: 0;
-}
-
-@media (max-width: 1120px) {
-  .wizard-nav-summary {
-    justify-content: flex-start;
-  }
 }
 
 /* ── cupos dot (reutilizado) ── */
@@ -1454,21 +1091,6 @@
   background: var(--separator-color);
 }
 
-/* =========================================================
-   MISC
-   ========================================================= */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--accent-blue);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1496,80 +1118,8 @@
    RESPONSIVE
    ========================================================= */
 @media (max-width: 640px) {
-  .wizard-stepper::after { display: none; }
-
-  .step-label { display: none; }
-
-  .wizard-stepper {
-    padding: 0;
-    margin-bottom: 28px;
-    align-items: center;
-  }
-
-  .step-bubble { width: 28px; height: 28px; font-size: .74rem; }
-
-  .step-item {
-    position: relative;
-  }
-
-  .step-item.is-active .step-label {
-    display: block;
-    position: absolute;
-    top: 34px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: .66rem;
-    white-space: nowrap;
-  }
-
-  .step-item.is-done .step-label,
-  .step-item.has-error .step-label {
-    display: none;
-  }
-
-  .wizard-nav {
-    padding: 0 0 8px;
-  }
-
-  .wizard-nav-row {
-    width: calc(100% - 16px);
-    padding: 12px 14px;
-    gap: 12px;
-    border-radius: 16px;
-    min-height: auto;
-    align-items: center;
-  }
-
-  .wizard-nav-left,
-  .wizard-nav-right {
-    align-self: stretch;
-  }
-
-  .wizard-nav-center {
-    min-width: 0;
-  }
-
-  .wizard-nav-summary {
-    display: none;
-  }
-
   .nav-cupos-mobile {
     display: flex;
-  }
-
-  .btn-wizard-back {
-    padding: 10px 12px;
-    font-size: .82rem;
-  }
-
-  .btn-wizard-back span {
-    display: none;
-  }
-
-  .btn-wizard-next,
-  .btn-wizard-submit {
-    padding: 10px 16px;
-    font-size: .82rem;
   }
 
   .viaje-cupos-inline {
@@ -1741,8 +1291,6 @@
 /* =========================================================================
    ESTILOS EXCLUSIVOS — EDITAR RESERVA
    ========================================================================= */
-
-/* ── Barra de acciones (entre stepper y panel) ── */
 .editar-action-bar {
   display: flex;
   align-items: center;
@@ -1751,73 +1299,15 @@
   flex-wrap: wrap;
 }
 
-.btn-editar-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.editar-action-bar .btn-row-edit,
+.editar-action-bar .btn-row-cancel,
+.editar-action-bar .btn-row-delete {
   height: 32px;
   padding: 0 13px;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: .01em;
-  cursor: pointer;
-  white-space: nowrap;
-  border: 1px solid transparent;
-  transition: background 0.15s, opacity 0.15s, transform 0.12s;
-  flex-shrink: 0;
+  font-size: .78rem;
 }
 
-.btn-editar-action svg {
-  flex-shrink: 0;
-  opacity: .85;
-}
 
-.btn-editar-action:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-}
-
-.btn-editar-action:not(:disabled):hover {
-  transform: translateY(-1px);
-}
-
-/* Duplicar — amarillo tenue */
-.btn-editar-duplicate {
-  background: rgba(255, 204, 0, 0.12);
-  border-color: rgba(255, 204, 0, 0.30);
-  color: #d4a800;
-}
-[data-theme="dark"] .btn-editar-duplicate { color: #f0c800; }
-
-.btn-editar-duplicate:not(:disabled):hover {
-  background: rgba(255, 204, 0, 0.20);
-}
-
-/* Cancelar — rojo translúcido */
-.btn-editar-cancel {
-  background: rgba(255, 59, 48, 0.08);
-  border-color: rgba(255, 59, 48, 0.28);
-  color: var(--accent-red, #ff3b30);
-}
-
-.btn-editar-cancel:not(:disabled):hover {
-  background: rgba(255, 59, 48, 0.16);
-}
-
-/* Eliminar — rojo sólido */
-.btn-editar-delete {
-  background: var(--accent-red, #ff3b30);
-  border-color: transparent;
-  color: #fff;
-}
-
-.btn-editar-delete:not(:disabled):hover {
-  background: #e0332a;
-  box-shadow: 0 4px 14px rgba(255, 59, 48, 0.28);
-}
-
-/* ── Historial de actividad ── */
 .forensic-card {
   margin-top: 20px;
 }
@@ -1927,17 +1417,4 @@
   padding: 6px 10px;
   border-radius: 4px;
   border: 1px solid var(--border-color);
-}
-
-/* En mobile ocultar el label de los botones de acción, solo icono */
-@media (max-width: 600px) {
-  .btn-editar-action span {
-    display: none;
-  }
-
-  .btn-editar-action {
-    width: 32px;
-    padding: 0;
-    justify-content: center;
-  }
 }

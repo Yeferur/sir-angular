@@ -23,7 +23,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
     standalone: true,
     imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective],
     templateUrl: './editar-usuario.html',
-    styleUrls: ['./editar-usuario.css'],
+    styleUrls: ['../usuario-shared.css'],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EditarUsuarioComponent implements OnInit, OnDestroy {

@@ -21,7 +21,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective],
   templateUrl: './crear-usuario.html',
-  styleUrls: ['./crear-usuario.css'],
+  styleUrls: ['../usuario-shared.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CrearUsuarioComponent implements OnInit, OnDestroy {

@@ -14,7 +14,7 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
   standalone: true,
   imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent],
   templateUrl: './ver-transfers.html',
-  styleUrls: ['./ver-transfers.css']
+  styleUrls: ['../../listado-reservas-transfers.css']
 })
 export class VerTransfersComponent implements OnInit {
   private uiState = inject(UiStateService);
@@ -316,5 +316,14 @@ export class VerTransfersComponent implements OnInit {
   verTransfer(Id_Transfer: string) {
     this.uiState.transferId.set(Id_Transfer);
     this.drawer.openTransfer(Id_Transfer);
+  }
+
+  getEstadoBadgeClass(estado: string | null | undefined): string {
+    const normalized = String(estado || '').trim().toLowerCase();
+    if (['confirmado', 'confirmada', 'activo', 'activa'].includes(normalized)) return 'badge--success';
+    if (['cancelado', 'cancelada'].includes(normalized)) return 'badge--danger';
+    if (['pendiente', 'pendiente de datos', 'pendiente de pago'].includes(normalized)) return 'badge--pending';
+    if (['completado', 'completada'].includes(normalized)) return 'badge--info';
+    return 'badge--grupal';
   }
 }

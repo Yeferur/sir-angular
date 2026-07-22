@@ -22,6 +22,7 @@ interface LoginResponse {
 
 interface GenericMessageResponse {
   message: string;
+  resetUrl?: string | null;
 }
 
 @Injectable({

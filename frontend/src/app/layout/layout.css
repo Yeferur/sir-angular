@@ -1,10 +1,3 @@
-/*
-  ╔══════════════════════════════════════════════════════╗
-  ║  TOP-NAVBAR — SIR                                   ║
-  ║  Barra flotante superior + estados expandidos       ║
-  ╚══════════════════════════════════════════════════════╝
-*/
-
 /* ═══════════════════════════════════════════════
    HOST
 ═══════════════════════════════════════════════ */
@@ -28,39 +21,50 @@
 
 
 /* ═══════════════════════════════════════════════
-   ESTADO LOGIN
+   FILA SUPERIOR — pills externos + isla, centrada por grid
 ═══════════════════════════════════════════════ */
-.login-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: var(--bg-primary);
+.topbar-row {
+  width: calc(100% - 24px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.topbar-quick-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
   pointer-events: all;
-  z-index: 10;
-  animation: loginFadeIn 0.35s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-.login-panel { width: min(420px, 94vw); }
-
-@keyframes loginFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+.topbar-quick-actions--mirror {
+  visibility: hidden;
+  pointer-events: none;
 }
+
+/* Columna 3 vacía a propósito: es el espejo de la columna 1.
+   Al ser ambas "1fr", la isla en la columna central (auto)
+   queda matemáticamente centrada sin importar el ancho
+   real de los pills. No hace falta ningún elemento aquí. */
 
 
 /* ═══════════════════════════════════════════════
-   BARRA PRINCIPAL
+   ISLA — barra principal
 ═══════════════════════════════════════════════ */
 .topbar-bar {
   pointer-events: all;
+  overflow: visible;
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 0 14px;
+
+  width: auto;
   min-height: 56px;
-  width: calc(100% - 24px);
+  max-width: calc(100vw - 30px);
+  transition: width 0.4s var(--ease-panel);
 
   background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.85));
   backdrop-filter: blur(24px) saturate(180%);
@@ -68,10 +72,94 @@
   border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
   border-radius: 16px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
 
+/* Wrapper interno usado para medir el ancho natural de la isla
+   (scrollWidth) independientemente del ancho fijado por JS en
+   .topbar-bar. Sin esta regla queda como bloque sin estilos y
+   sus hijos (logo, separador, título, iconos) se apilan en
+   vertical en vez de ir en fila — este es el fix del bug. */
+.topbar-island-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ─── Expansión a fullscreen (logout) ───────────────────────────
+   La clase solo habilita el contexto (position:fixed, overflow,
+   centrado) y el fade del contenido interno. Los valores de
+   width/height/top/left/border-radius/transition van 100% por
+   inline style desde layout.ts — un inline style siempre le gana
+   a una regla de hoja de estilos, así que si esos valores vivieran
+   acá pelearían con el JS y la transición nunca dispararía
+   (transitionend jamás se dispara si el valor nunca cambia de
+   verdad). Ver TopbarTransitionService / handleLogout(). */
+.topbar-bar.is-expanding {
+  position: fixed;
+  z-index: 950;
+  overflow: hidden;
+  max-width: none;
+  top: var(--logout-start-top, 10px);
+  left: var(--logout-start-left, 50%);
+  width: var(--logout-start-width, auto);
+  height: var(--logout-start-height, 56px);
+  border-radius: 16px;
   transition:
-    width 0.4s cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 0.3s ease;
+    width 0.36s var(--ease-panel),
+    left 0.36s var(--ease-panel),
+    height 0.36s var(--ease-panel) 0.36s,
+    top 0.36s var(--ease-panel) 0.36s,
+    border-radius 0.36s var(--ease-panel) 0.36s;
+}
+
+.topbar-bar.is-expanding.is-expanding-height {
+  width: 100vw;
+  left: 0;
+  height: 100vh;
+  top: 0;
+  border-radius: 0;
+}
+
+.topbar-bar.is-measuring {
+  width: max-content;
+  flex-shrink: 0;
+}
+
+.topbar-bar.is-expanding .topbar-island-content > *:not(.topbar-brand) {
+  transition: opacity 0.18s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.topbar-bar.is-expanding {
+  background: var(--bg-primary);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Contenido de login anidado dentro de la MISMA caja que se expande
+   (ver showAuthSlot en layout.ts). Se mantiene en opacity:0 mientras
+   is-expanding está creciendo (fase 'expanding') y solo se revela
+   (.is-ready, fase 'login' ya asentada) cuando la caja terminó de
+   ocupar toda la pantalla — así no compite visualmente con el
+   crecimiento del ancho/alto. */
+.topbar-auth-slot {
+  width: 100%;
+  height: 100%;
+  /* grid en vez de flex: por defecto estira al hijo (app-login trae su
+     propio :host{width:100%;height:100%}) — con flex/align-items:center
+     el hijo quedaría con alto "auto" y no llenaría la caja. El propio
+     login-view-container interno ya centra la card con su flex. */
+  display: grid;
+  overflow: auto;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-soft, ease);
+}
+
+.topbar-auth-slot.is-ready {
+  opacity: 1;
 }
 
 /* ─── Hamburger ─── */
@@ -133,16 +221,7 @@
   margin: 0 2px;
 }
 
-/* ─── Zona izquierda (pills) ─── */
-.topbar-left {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ─── Pills ─── */
+/* ─── Pills externos ─── */
 .topbar-pill {
   display: inline-flex;
   align-items: center;
@@ -167,11 +246,14 @@
   border-color: var(--separator-color);
 }
 
-/* ─── Título central ─── */
+/* ─── Título central — SIEMPRE visible ─── */
 .topbar-title-zone {
-  flex: 0 1 auto;
+  flex: 0 0 clamp(180px, 20vw, 280px);
+  width: clamp(180px, 20vw, 280px);
   min-width: 0;
-  max-width: 48%;
+  max-width: none;
+  overflow: hidden;
+  box-sizing: border-box;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -192,11 +274,9 @@
 
 /* ─── Zona derecha ─── */
 .topbar-right {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -270,12 +350,12 @@
   top: calc(100% + 10px);
   right: 0;
   min-width: 220px;
-  background: var(--bg-secondary-translucent, rgba(28, 28, 30, 0.96));
+  background: var(--bg-secondary);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--separator-color);
   border-radius: 16px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--sidebar-shadow, 0 12px 40px rgba(0, 0, 0, 0.45));
   padding: 6px;
   z-index: 100;
   pointer-events: all;
@@ -331,9 +411,19 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+.profile-dropdown-item i { font-size: 16px; color: var(--text-secondary); }
+
 .profile-dropdown-item:hover { background: rgba(255, 255, 255, 0.07); }
 .profile-dropdown-item.danger { color: var(--accent-red, #ff453a); }
 .profile-dropdown-item.danger:hover { background: rgba(255, 69, 58, 0.1); }
+
+/* Items que solo tienen sentido en mobile (buscar/novedades/tema) —
+   en desktop ya viven como iconos en el topbar, así que se ocultan
+   aquí para no duplicar la acción. */
+.profile-dropdown-item--mobile-only,
+.profile-dropdown-sep--mobile-only {
+  display: none;
+}
 
 
 /* ═══════════════════════════════════════════════
@@ -428,6 +518,13 @@
   overflow-y: auto;
 }
 
+.topbar-expanded--system {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+}
+
 /* ═══════════════════════════════════════════════
    RESPONSIVE — TOPBAR
 ═══════════════════════════════════════════════ */
@@ -442,21 +539,58 @@
 }
 
 @media (max-width: 766px) {
-  .topbar-hamburger { display: flex; }
+  .topbar-row { width: calc(100% - 20px); }
+  .topbar-quick-actions { display: none; }
 
-  .topbar-left,
+  .topbar-hamburger { display: flex; }
   .topbar-sep--after-brand { display: none; }
 
-  .topbar-title-zone {
-    flex: 1;
+  .topbar-bar {
+    width: calc(100vw - 20px);
     max-width: none;
+  }
+
+  .topbar-bar.is-expanding {
+    width: var(--logout-start-width);
+  }
+
+  .topbar-bar.is-expanding.is-expanding-height {
+    width: 100vw;
+  }
+
+  /* Título siempre visible pero muy truncado: apenas unas letras
+     y puntos suspensivos — hay poco espacio junto al resto de la isla. */
+  .topbar-title-zone {
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 40px;
+    width: auto !important;
     justify-content: flex-start;
     padding-left: 6px;
   }
-
   .topbar-page-title {
     font-size: 1rem;
     line-height: 1.15;
+  }
+
+  /* Buscar, novedades y tema salen del topbar para ganar espacio;
+     se ofrecen dentro del dropdown de perfil en su lugar. */
+  .topbar-icon-btn--secondary { display: none; }
+
+  .profile-dropdown-item--mobile-only,
+  .profile-dropdown-sep--mobile-only {
+    display: flex;
+  }
+  .profile-dropdown-sep--mobile-only { display: block; }
+
+  .topbar-expanded {
+    position: fixed;
+    inset: 10px;
+    width: auto;
+    height: auto;
+    max-height: none;
+    z-index: var(--z-modal);
+    margin: 0;
   }
 }
 
