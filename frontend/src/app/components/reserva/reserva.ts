@@ -4,12 +4,12 @@ import {
   Input,
   Output,
   EventEmitter,
-  OnInit,
   OnChanges,
+  OnDestroy,
   ChangeDetectorRef,
   SimpleChanges
 } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
@@ -22,6 +22,8 @@ import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { UiStateService } from '../../services/ui-state.service';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../shared/errors/user-error-message';
 
 // PDF.js
 import * as pdfjsLib from 'pdfjs-dist';
@@ -94,15 +96,19 @@ interface Reserva {
 @Component({
   selector: 'app-reserva',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LoadingStateComponent],
   templateUrl: './reserva.html',
   styleUrls: ['./reserva.css'],
 })
-export class ReservasDynamicComponent implements OnInit, OnChanges {
+export class ReservasDynamicComponent implements OnChanges, OnDestroy {
   @Input() Id_Reserva!: string;
   @Output() onClose = new EventEmitter<void>();
 
   isLoading = false;
+  isRefreshing = false;
+  loadError = '';
+  activeAction: 'pdf' | 'comprobantes' | 'cancelar' | 'eliminar' | null = null;
+  private loadSubscription?: Subscription;
 
   reserva: Reserva | null = null;
   responsable: ResponsableVM = { nombre: '—', telefono: '—', CanalReserva: '—' };
@@ -127,10 +133,6 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     if (changes['Id_Reserva']?.currentValue) {
       this.loadReservaData(changes['Id_Reserva'].currentValue);
     }
-  }
-
-  ngOnInit(): void {
-    if (this.Id_Reserva) this.loadReservaData(this.Id_Reserva);
   }
 
   get puedeCancelar(): boolean {
@@ -168,6 +170,30 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       'Grupal'
     ).trim().toLowerCase();
     return tipo === 'privada' ? 'Privada' : 'Grupal';
+  }
+
+  get esPagoDirecto(): boolean {
+    return this.hasDirectPayment();
+  }
+
+  get porcentajePagado(): number {
+    if (this.esPagoDirecto) return 0;
+    const total = Number(this.reserva?.TotalNeto || 0);
+    const pendiente = Number(this.reserva?.Pendiente || 0);
+    if (total <= 0) return 0;
+    return Math.min(100, Math.max(0, ((total - pendiente) / total) * 100));
+  }
+
+  get resumenTiposPasajero(): string {
+    const partes: string[] = [];
+    if (this.pasajeros.adultos.length) partes.push(`${this.pasajeros.adultos.length} ${this.pasajeros.adultos.length === 1 ? 'adulto' : 'adultos'}`);
+    if (this.pasajeros.ninos.length) partes.push(`${this.pasajeros.ninos.length} ${this.pasajeros.ninos.length === 1 ? 'niño' : 'niños'}`);
+    if (this.pasajeros.infantes.length) partes.push(`${this.pasajeros.infantes.length} ${this.pasajeros.infantes.length === 1 ? 'infante' : 'infantes'}`);
+    return partes.join(' · ');
+  }
+
+  retryLoad(): void {
+    if (this.Id_Reserva) this.loadReservaData(this.Id_Reserva);
   }
 
   editarReserva() {
@@ -210,12 +236,15 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       'Cancelar reserva',
       `¿Deseas cancelar la reserva #${id}? La información se conservará para consulta futura.`,
       () => {
+        this.activeAction = 'cancelar';
         this.api.cancelarReserva(id).subscribe({
           next: () => {
             this.alerts.successToast('Reserva cancelada', `La reserva #${id} quedó en estado Cancelada.`);
+            this.activeAction = null;
             this.loadReservaData(id);
           },
           error: (err) => {
+            this.activeAction = null;
             this.alerts.showModal({
               type: 'error',
               title: 'No se pudo cancelar',
@@ -237,6 +266,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       'Eliminar reserva',
       `¿Deseas eliminar la reserva #${id}? Esta acción eliminará el registro de forma permanente.`,
       () => {
+        this.activeAction = 'eliminar';
         this.api.deleteReserva(id).subscribe({
           next: () => {
             this.uiState.needsRefresh.set('reservas');
@@ -246,6 +276,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
             this.alerts.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
           },
           error: (err) => {
+            this.activeAction = null;
             this.alerts.showModal({
               type: 'error',
               title: 'No se pudo eliminar',
@@ -641,8 +672,19 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
   }
 
   loadReservaData(id: string) {
-    this.isLoading = true;
-    this.api.getReserva(id).subscribe({
+    this.loadSubscription?.unsubscribe();
+
+    const keepsCurrentData = this.reserva?.Id_Reserva === String(id);
+    if (!keepsCurrentData) {
+      this.reserva = null;
+      this.pasajeros = { adultos: [], ninos: [], infantes: [] };
+      this.isLoading = true;
+    } else {
+      this.isRefreshing = true;
+    }
+    this.loadError = '';
+
+    this.loadSubscription = this.api.getReserva(id).subscribe({
       next: (data) => {
         const { r, adultos, ninos, infantes, responsable } = this.normalizeApi(data);
         this.reserva = r;
@@ -651,12 +693,15 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
         this.pasajeros.infantes = infantes;
         this.responsable = responsable;
         this.isLoading = false;
+        this.isRefreshing = false;
+        this.loadError = '';
         this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error al cargar la reserva:', err);
         this.isLoading = false;
-        this.alerts.errorToast('No se pudo cargar la reserva', err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.');
+        this.isRefreshing = false;
+        this.loadError = toUserErrorMessage(err, 'No pudimos cargar la reserva. Intenta nuevamente.');
         this.cdr.markForCheck();
       },
     });
@@ -977,16 +1022,22 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       return;
     }
 
-    let descargados = 0;
-    for (let i = 0; i < comprobantes.length; i++) {
-      const ok = await this.descargarComprobante(comprobantes[i], i + 1, { silent: true });
-      if (ok) descargados++;
-    }
+    this.activeAction = 'comprobantes';
+    try {
+      let descargados = 0;
+      for (let i = 0; i < comprobantes.length; i++) {
+        const ok = await this.descargarComprobante(comprobantes[i], i + 1, { silent: true });
+        if (ok) descargados++;
+      }
 
-    if (descargados === comprobantes.length) {
-      this.alerts.successToast('Comprobantes descargados', `Se descargaron ${descargados} comprobantes de la reserva.`);
-    } else {
-      this.alerts.warningToast('Descarga parcial', `Se procesaron ${descargados} de ${comprobantes.length} comprobantes.`);
+      if (descargados === comprobantes.length) {
+        this.alerts.successToast('Comprobantes descargados', `Se descargaron ${descargados} comprobantes de la reserva.`);
+      } else {
+        this.alerts.warningToast('Descarga parcial', `Se procesaron ${descargados} de ${comprobantes.length} comprobantes.`);
+      }
+    } finally {
+      this.activeAction = null;
+      this.cdr.markForCheck();
     }
   }
 
@@ -1022,7 +1073,7 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
     if (!r?.Id_Reserva) return;
 
     try {
-      this.isLoading = true;
+      this.activeAction = 'pdf';
       this.cdr.markForCheck();
 
       const doc = this.buildReservaPdfDoc();
@@ -1051,12 +1102,16 @@ export class ReservasDynamicComponent implements OnInit, OnChanges {
       console.error(e);
       this.alerts.errorToast('Error', 'No se pudo generar el archivo. Revisa consola.');
     } finally {
-      this.isLoading = false;
+      this.activeAction = null;
       this.cdr.markForCheck();
     }
   }
 
   close() {
     this.onClose.emit();
+  }
+
+  ngOnDestroy(): void {
+    this.loadSubscription?.unsubscribe();
   }
 }

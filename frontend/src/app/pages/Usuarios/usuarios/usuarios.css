@@ -69,12 +69,6 @@
   transition: transform 0.2s;
 }
 
-.skeleton-card {
-  box-shadow: none;
-  pointer-events: none;
-  transform: none !important;
-}
-
 .kpi-card:hover {
   transform: translateY(-2px);
 }
@@ -163,10 +157,6 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
-.skeleton-search {
-  max-width: 100%;
-}
-
 /* === LISTA DE RESULTADOS === */
 .results-list {
   display: flex;
@@ -183,10 +173,6 @@
   border-radius: 16px;
   transition: all 0.2s ease;
   gap: 20px;
-}
-
-.skeleton-row {
-  pointer-events: none;
 }
 
 .result-item:hover {
@@ -306,85 +292,6 @@
   cursor: not-allowed;
 }
 
-.skeleton-shape {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(90deg,
-      var(--bg-tertiary) 0%,
-      color-mix(in srgb, var(--bg-tertiary) 82%, white 8%) 50%,
-      var(--bg-tertiary) 100%);
-  background-size: 200% 100%;
-  animation: skeletonShimmer 1.4s ease-in-out infinite;
-}
-
-.sk-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  flex: 0 0 44px;
-}
-
-.sk-number {
-  width: 74px;
-  height: 24px;
-  border-radius: 10px;
-  margin-bottom: 6px;
-}
-
-.sk-label {
-  width: 120px;
-  height: 14px;
-  border-radius: 999px;
-}
-
-.sk-search {
-  width: 100%;
-  height: 54px;
-  border-radius: 14px;
-}
-
-.sk-status {
-  width: 72px;
-  height: 22px;
-  border-radius: 999px;
-  flex: 0 0 72px;
-}
-
-.sk-title {
-  width: min(260px, 38vw);
-  height: 18px;
-  border-radius: 999px;
-}
-
-.sk-subtitle {
-  width: min(180px, 28vw);
-  height: 14px;
-  border-radius: 999px;
-  margin-top: 8px;
-}
-
-.sk-username {
-  width: 112px;
-  height: 30px;
-  border-radius: 8px;
-}
-
-.sk-action {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-}
-
-@keyframes skeletonShimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 /* Empty state */
 .empty-state {
   text-align: center;
@@ -437,17 +344,5 @@
     flex-grow: 1;
     background: var(--bg-tertiary);
     border-color: var(--separator-color);
-  }
-
-  .sk-title {
-    width: min(220px, 58vw);
-  }
-
-  .sk-subtitle {
-    width: min(150px, 46vw);
-  }
-
-  .sk-username {
-    width: 92px;
   }
 }

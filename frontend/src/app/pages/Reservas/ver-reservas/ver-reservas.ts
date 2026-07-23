@@ -1,9 +1,9 @@
-import { ChangeDetectorRef, Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
-import { finalize, forkJoin, firstValueFrom } from 'rxjs';
+import { finalize, forkJoin, firstValueFrom, Subscription } from 'rxjs';
 // Importa tus servicios
 import { Reservas } from '../../../services/Reservas/reservas';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
@@ -11,15 +11,17 @@ import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent],
+  imports: [CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './ver-reservas.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })
-export class VerReservasComponent implements OnInit {
+export class VerReservasComponent implements OnInit, OnDestroy {
   readonly estadoOptions = ['Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completada', 'Cancelada'];
   mainInputFocused = signal(false);
 private settingFromAutocomplete = false;
@@ -138,12 +140,16 @@ seleccionarPuntoAutocomplete(p: any) {
   private permisosService = inject(PermisosService);
   private drawer = inject(SirDrawerService);
   private alertService = inject(SirAlertService);
+  private hostElement = inject(ElementRef<HTMLElement>);
+  private searchRequest?: Subscription;
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
   reservas = signal<any[]>([]);
   isLoading = signal(true);
   isSearching = signal(false);
+  loadError = signal('');
+  searchError = signal('');
   hasSearched = signal(false);
   filtersApplied = signal(false);
 
@@ -195,6 +201,10 @@ seleccionarPuntoAutocomplete(p: any) {
 
   ngOnInit(): void {
     this.loadInitialData();
+  }
+
+  ngOnDestroy(): void {
+    this.searchRequest?.unsubscribe();
   }
 
   listar() {
@@ -309,8 +319,22 @@ seleccionarPuntoAutocomplete(p: any) {
     this.cdr.markForCheck();
   }
 
+  clearMainSearch(): void {
+    this.puntoSeleccionado = null;
+    this.puntoSugerencias.set([]);
+    this.puntoAutocompleteVisible.set(false);
+    this.filters.update((current) => ({
+      ...current,
+      NombreApellido: '',
+      IdPas: '',
+      Id_Reserva: '',
+      Punto: '',
+    }));
+  }
+
   loadInitialData() {
     this.isLoading.set(true);
+    this.loadError.set('');
     forkJoin({
       tours: this.reservasService.getTours(),
       categorias: this.reservasService.getCanales(),
@@ -329,6 +353,7 @@ seleccionarPuntoAutocomplete(p: any) {
         console.error('Error al cargar catálogos:', error);
         this.resultsTours.set([]);
         this.resultsCategoria.set([]);
+        this.loadError.set(this.getApiErrorMessage(error, 'Revisa tu conexión e inténtalo nuevamente.'));
         this.cdr.markForCheck();
       }
     });
@@ -342,6 +367,38 @@ seleccionarPuntoAutocomplete(p: any) {
     this.dropdownOpenTour.set(name === 'tour' ? !this.dropdownOpenTour() : false);
     this.dropdownOpenCategoria.set(name === 'categoria' ? !this.dropdownOpenCategoria() : false);
     this.dropdownOpenEstado.set(name === 'estado' ? !this.dropdownOpenEstado() : false);
+  }
+
+  toggleAdvancedFilters(): void {
+    const shouldOpen = !this.advancedFiltersVisible();
+    this.closeFilterDropdowns();
+    this.advancedFiltersVisible.set(shouldOpen);
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  onDocumentPointerDown(event: PointerEvent): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const clickedOwnMultiFilter =
+      this.hostElement.nativeElement.contains(target) && !!target.closest('.multi-filter');
+    if (!clickedOwnMultiFilter) this.closeFilterDropdowns();
+  }
+
+  @HostListener('document:keydown.escape')
+  onFilterEscape(): void {
+    this.closeFilterDropdowns();
+  }
+
+  private closeFilterDropdowns(): void {
+    this.dropdownOpenTour.set(false);
+    this.dropdownOpenCategoria.set(false);
+    this.dropdownOpenEstado.set(false);
+  }
+
+  private closeAdvancedFilters(): void {
+    this.advancedFiltersVisible.set(false);
+    this.closeFilterDropdowns();
   }
 
   isSelected(filterKey: 'CategoriaReserva' | 'tour' | 'Estado', value: any): boolean {
@@ -457,7 +514,6 @@ seleccionarPuntoAutocomplete(p: any) {
         autoClose: true,
         autoCloseTime: 3000
       });
-      this.reservas.set([]);
       return;
     }
     // Si no hay ningún filtro relevante, no buscar
@@ -470,15 +526,16 @@ seleccionarPuntoAutocomplete(p: any) {
         autoClose: true,
         autoCloseTime: 3000
       });
-      this.reservas.set([]);
       return;
     }
+    this.searchRequest?.unsubscribe();
     this.hasSearched.set(true);
     this.isSearching.set(true);
+    this.searchError.set('');
     this.filtersApplied.set(true);
-    this.advancedFiltersVisible.set(false); // Oculta el panel de filtros al buscar
+    this.closeAdvancedFilters();
     this.cdr.markForCheck();
-    this.reservasService.getReservas(filtros).pipe(
+    this.searchRequest = this.reservasService.getReservas(filtros).pipe(
       finalize(() => {
         this.isSearching.set(false);
         this.cdr.markForCheck();
@@ -487,26 +544,9 @@ seleccionarPuntoAutocomplete(p: any) {
       next: (data) => {
         this.reservas.set(data);
         this.cdr.markForCheck();
-        if (data.length === 0) {
-          this.alertService.showAlert({
-            type: 'info',
-            title: 'Sin resultados',
-            message: 'No se encontraron reservas con los filtros actuales.',
-            autoClose: true,
-            autoCloseTime: 3000
-          });
-        } else {
-          this.alertService.successToast('Reservas encontradas', `Se encontraron ${data.length} reservas.`);
-        }
       },
       error: (error) => {
-        this.alertService.showAlert({
-          type: 'error',
-          title: 'Error en la búsqueda',
-          message: error.message,
-          autoClose: false
-        });
-        this.reservas.set([]);
+        this.searchError.set(this.getApiErrorMessage(error, 'No fue posible consultar las reservas.'));
         this.cdr.markForCheck();
       }
     });
@@ -517,13 +557,7 @@ seleccionarPuntoAutocomplete(p: any) {
   }
 
   private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
-    return (
-      error?.error?.message ||
-      error?.error?.error ||
-      error?.error?.mensaje ||
-      error?.message ||
-      fallback
-    );
+    return toUserErrorMessage(error, fallback);
   }
 
   getTipoReservaLabel(reserva: any): string {

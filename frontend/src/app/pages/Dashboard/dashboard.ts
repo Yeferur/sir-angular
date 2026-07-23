@@ -3,6 +3,7 @@ import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef,
 import { FormsModule }          from '@angular/forms';
 import { forkJoin, finalize, catchError, of } from 'rxjs';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
 import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
@@ -72,7 +73,7 @@ function axisStyle(): any {
 @Component({
   selector:    'app-dashboard',
   standalone:  true,
-  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent],
+  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './dashboard.html',
   styleUrls:   ['./dashboard.css']
 })

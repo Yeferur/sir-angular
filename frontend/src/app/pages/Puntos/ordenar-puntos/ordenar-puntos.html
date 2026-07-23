@@ -14,45 +14,7 @@
   </div>
 
   @if (isLoadingRutas()) {
-    <div class="skeleton-section">
-      <div class="card skeleton-card">
-        <div class="sk-line sk-title skeleton-shape"></div>
-        <div class="sk-line sk-subtitle skeleton-shape"></div>
-
-        <div class="controls-grid">
-          <div class="control-block">
-            <div class="sk-line sk-label skeleton-shape"></div>
-            <div class="sk-field skeleton-shape"></div>
-          </div>
-          <div class="control-block">
-            <div class="sk-line sk-label skeleton-shape"></div>
-            <div class="sk-field skeleton-shape"></div>
-          </div>
-          <div class="control-block">
-            <div class="sk-line sk-label skeleton-shape"></div>
-            <div class="sk-field skeleton-shape"></div>
-          </div>
-        </div>
-        <div class="sk-button skeleton-shape"></div>
-      </div>
-
-      <div class="card skeleton-card">
-        <div class="sk-line sk-title skeleton-shape"></div>
-        <div class="sk-line sk-subtitle skeleton-shape"></div>
-        <div class="skeleton-list">
-          @for (slot of skeletonRows; track slot) {
-            <div class="point-card skeleton-point-row" [style.--i]="slot">
-              <div class="sk-position skeleton-shape"></div>
-              <div class="sk-main">
-                <div class="sk-line skeleton-shape sk-name"></div>
-                <div class="sk-line skeleton-shape sk-meta"></div>
-              </div>
-              <div class="sk-handle skeleton-shape"></div>
-            </div>
-          }
-        </div>
-      </div>
-    </div>
+    <app-loading-state label="Cargando rutas y puntos…"></app-loading-state>
   } @else {
     <div class="toolbar-card">
       <div class="toolbar-grid">
@@ -93,22 +55,7 @@
         No hay rutas disponibles para ordenar.
       </div>
     } @else if (isLoadingPuntos()) {
-      <div class="card skeleton-card list-card">
-        <div class="sk-line sk-title skeleton-shape"></div>
-        <div class="sk-line sk-subtitle skeleton-shape"></div>
-        <div class="skeleton-list">
-          @for (slot of skeletonRows; track slot) {
-            <div class="point-card skeleton-point-row" [style.--i]="slot">
-              <div class="sk-position skeleton-shape"></div>
-              <div class="sk-main">
-                <div class="sk-line skeleton-shape sk-name"></div>
-                <div class="sk-line skeleton-shape sk-meta"></div>
-              </div>
-              <div class="sk-handle skeleton-shape"></div>
-            </div>
-          }
-        </div>
-      </div>
+      <app-loading-state label="Actualizando los puntos de la ruta…"></app-loading-state>
     } @else if (!rutaSeleccionada) {
       <div class="empty-state-card">
         Selecciona una ruta para cargar sus puntos.

@@ -31,6 +31,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   private readonly zone = inject(NgZone);
   readonly aiEnabled = !!environment.aiEnabled;
   @Input() mode: 'search' | 'maxi' = 'maxi';
+  @Input() integrated = false;
   get isMaxiMode(): boolean { return this.mode === 'maxi' && this.aiEnabled; }
 
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;

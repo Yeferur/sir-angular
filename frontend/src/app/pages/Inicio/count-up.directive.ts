@@ -1,4 +1,4 @@
-import { Directive, ElementRef, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
+import { Directive, ElementRef, Input, OnChanges, OnDestroy, SimpleChanges, inject } from '@angular/core';
 
 /**
  * Anima el textContent de su elemento host desde el valor previo hasta el nuevo
@@ -13,7 +13,7 @@ import { Directive, ElementRef, Input, OnChanges, SimpleChanges, inject } from '
   selector: '[countUp]',
   standalone: true,
 })
-export class CountUpDirective implements OnChanges {
+export class CountUpDirective implements OnChanges, OnDestroy {
   private readonly el = inject(ElementRef<HTMLElement>);
 
   @Input('countUp') value = 0;
@@ -39,6 +39,10 @@ export class CountUpDirective implements OnChanges {
     }
   }
 
+  ngOnDestroy(): void {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+  }
+
   private animateTo(target: number): void {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -47,6 +51,12 @@ export class CountUpDirective implements OnChanges {
 
     const start = this.displayed;
     const delta = target - start;
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.displayed = target;
+      this.render(target);
+      return;
+    }
 
     if (delta === 0) {
       this.render(target);

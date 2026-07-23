@@ -33,14 +33,21 @@ export class App implements OnInit, OnDestroy {
    * sin animación posible, por un fallback de sincronización).
    */
   viewLoggedIn = signal(false);
+  shellEntering = signal(false);
 
   private transition = inject(TopbarTransitionService);
   private viewGateBooted = false;
   private pendingViewSyncTimer: any;
+  private shellEntryTimer: any;
 
   private readonly shellPhaseEffect = effect(() => {
     const phase = this.transition.phase();
-    if (phase === 'app') this.viewLoggedIn.set(true);
+    if (phase === 'app') {
+      this.viewLoggedIn.set(true);
+      this.shellEntering.set(true);
+      clearTimeout(this.shellEntryTimer);
+      this.shellEntryTimer = setTimeout(() => this.shellEntering.set(false), 650);
+    }
     if (phase === 'login') this.viewLoggedIn.set(false);
     this.cdr.markForCheck();
   });
@@ -109,6 +116,15 @@ export class App implements OnInit, OnDestroy {
   ngOnInit() {
     this.syncShellForUrl(this.router.url);
 
+    // En una recarga con token vigente, el primer frame ya debe usar la
+    // geometría privada. No hay una transición de login que reproducir.
+    if (this.auth.getToken()) {
+      this.loggedIn = true;
+      this.viewGateBooted = true;
+      this.viewLoggedIn.set(true);
+      this.transition.markAppReady();
+    }
+
     // Arranque en frío (carga directa / refresh): nadie va a llamar
     // completeLoginView/completeLogoutView porque no hubo un logout/login
     // interactivo que animar. A los 60ms, si el gate sigue sin "armar",
@@ -128,10 +144,6 @@ export class App implements OnInit, OnDestroy {
         if (event instanceof NavigationStart) {
           this.routeTransitioning = true;
           this.syncShellForUrl(event.url);
-          if (this.loggedIn && !this.publicAuthRoute) {
-            this.alerts.showLoading('Cargando datos...');
-            this.cdr.markForCheck();
-          }
         } else if (
           event instanceof NavigationEnd ||
           event instanceof NavigationCancel ||
@@ -141,7 +153,6 @@ export class App implements OnInit, OnDestroy {
           this.routeTransitioning = false;
           this.syncShellForUrl(url);
 
-          this.alerts.closeModal();
           this.cdr.markForCheck();
         }
       });
@@ -154,21 +165,20 @@ export class App implements OnInit, OnDestroy {
         if (this.isAdminForceLogoutEvent(msg)) {
           clearTimeout(this.pendingViewSyncTimer);
           this.viewLoggedIn.set(false);
-          this.cdr.markForCheck();
+          this.ws.disconnect();
+          this.auth.clearLocalSession();
+          this.permisosService.limpiarPermisos();
+          this.wsStarted = false;
           this.alerts.showAlert({
             type: 'warning',
-            title: 'Sesión Cerrada',
+            title: 'Sesión cerrada',
             message: 'Tu sesión fue cerrada por un administrador.',
+            dismissible: false,
+            buttons: [
+              { text: 'Entendido', style: 'primary', onClick: () => this.alerts.closeModal() },
+            ],
           });
-
-          setTimeout(() => {
-            this.alerts.closeModal();
-            this.ws.disconnect();
-            this.auth.clearLocalSession();
-            this.permisosService.limpiarPermisos();
-            this.wsStarted = false;
-            this.cdr.markForCheck();
-          }, 1500);
+          this.cdr.markForCheck();
 
           return;
         }
@@ -176,21 +186,20 @@ export class App implements OnInit, OnDestroy {
         if (this.isSelfLogoutAllSessionsEvent(msg)) {
           clearTimeout(this.pendingViewSyncTimer);
           this.viewLoggedIn.set(false);
-          this.cdr.markForCheck();
+          this.ws.disconnect();
+          this.auth.clearLocalSession();
+          this.permisosService.limpiarPermisos();
+          this.wsStarted = false;
           this.alerts.showAlert({
             type: 'info',
             title: 'Sesión cerrada',
             message: 'Tu sesión fue cerrada en todos tus dispositivos.',
+            dismissible: false,
+            buttons: [
+              { text: 'Entendido', style: 'primary', onClick: () => this.alerts.closeModal() },
+            ],
           });
-
-          setTimeout(() => {
-            this.alerts.closeModal();
-            this.ws.disconnect();
-            this.auth.clearLocalSession();
-            this.permisosService.limpiarPermisos();
-            this.wsStarted = false;
-            this.cdr.markForCheck();
-          }, 900);
+          this.cdr.markForCheck();
 
           return;
         }
@@ -237,6 +246,8 @@ export class App implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    clearTimeout(this.pendingViewSyncTimer);
+    clearTimeout(this.shellEntryTimer);
     this.ws.disconnect();
   }
 }

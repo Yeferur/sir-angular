@@ -1,81 +1,17 @@
 @if (isLoading()) {
-  <div class="page-container sk-ver-reservas">
-    <div class="page-header">
-      <div class="header-top">
-        <div class="header-text">
-          <div class="sk-line sk-vr-title"></div>
-          <div class="sk-line sk-vr-subtitle"></div>
-        </div>
-        <div class="header-actions">
-          <div class="sk-field sk-vr-btn"></div>
-        </div>
-      </div>
-
-      <div class="search-row">
-        <div class="search-container">
-          <div class="sk-field sk-vr-search"></div>
-        </div>
-        <div class="sk-field sk-vr-icon-btn"></div>
-        <div class="sk-field sk-vr-btn"></div>
-      </div>
-
-      <div class="active-filters">
-        <div class="sk-field sk-vr-chip"></div>
-        <div class="sk-field sk-vr-chip"></div>
-        <div class="sk-field sk-vr-chip"></div>
-      </div>
-    </div>
-
-    <div class="results-area">
-      <div class="results-list">
-        <div class="sk-result-item">
-          <div class="sk-field sk-vr-status"></div>
-          <div class="sk-vr-item-info">
-            <div class="sk-line sk-vr-item-id"></div>
-            <div class="sk-line sk-vr-item-tour"></div>
-            <div class="sk-line sk-vr-item-meta"></div>
-          </div>
-          <div class="sk-line sk-vr-arrow"></div>
-        </div>
-
-        <div class="sk-result-item">
-          <div class="sk-field sk-vr-status"></div>
-          <div class="sk-vr-item-info">
-            <div class="sk-line sk-vr-item-id"></div>
-            <div class="sk-line sk-vr-item-tour"></div>
-            <div class="sk-line sk-vr-item-meta"></div>
-          </div>
-          <div class="sk-line sk-vr-arrow"></div>
-        </div>
-
-        <div class="sk-result-item">
-          <div class="sk-field sk-vr-status"></div>
-          <div class="sk-vr-item-info">
-            <div class="sk-line sk-vr-item-id"></div>
-            <div class="sk-line sk-vr-item-tour"></div>
-            <div class="sk-line sk-vr-item-meta"></div>
-          </div>
-          <div class="sk-line sk-vr-arrow"></div>
-        </div>
-
-        <div class="sk-result-item sk-result-item--last">
-          <div class="sk-field sk-vr-status"></div>
-          <div class="sk-vr-item-info">
-            <div class="sk-line sk-vr-item-id"></div>
-            <div class="sk-line sk-vr-item-tour"></div>
-            <div class="sk-line sk-vr-item-meta"></div>
-          </div>
-          <div class="sk-line sk-vr-arrow"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <app-loading-state label="Preparando la consulta de reservas…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar las reservas"
+    [detail]="loadError()"
+    (action)="loadInitialData()">
+  </app-loading-state>
 } @else {
-<div class="page-container">
+<div class="page-container reservation-browser">
 
-  <!-- HEADER -->
-  <div class="page-header">
-    <!-- SEARCH ROW -->
+  <!-- SEARCH COMMAND -->
+  <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -89,9 +25,21 @@
           (input)="onMainSearchInput($any($event.target).value)"
           (keyup.enter)="buscarReservas()"
           autocomplete="off"
+          aria-label="Buscar reservas"
           (focus)="onMainInputFocus()"
           (blur)="onMainInputBlur()"
         />
+        @if (filters().NombreApellido) {
+          <button
+            type="button"
+            class="search-clear"
+            (click)="clearMainSearch()"
+            aria-label="Limpiar búsqueda">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        }
         @if (puntoAutocompleteVisible()) {
           <div class="autocomplete-dropdown">
             @for (p of puntoSugerencias(); track p) {
@@ -103,24 +51,30 @@
         }
       </div>
 
-      <button class="btn-filter" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())"
-        [class.btn-filter--active]="advancedFiltersVisible()">
+      <button type="button" class="btn-filter" (click)="toggleAdvancedFilters()"
+        [class.btn-filter--active]="advancedFiltersVisible()"
+        aria-controls="reservation-advanced-filters"
+        [attr.aria-label]="activeFilterCount() ? 'Filtros, ' + activeFilterCount() + ' activos' : 'Filtros'"
+        [attr.aria-expanded]="advancedFiltersVisible()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
         </svg>
         Filtros
-        @if (activeFilterCount() > 0) {
-          <span class="filter-count">{{ activeFilterCount() }}</span>
-        }
+        <span
+          class="filter-count"
+          [class.filter-count--empty]="activeFilterCount() === 0"
+          aria-hidden="true">{{ activeFilterCount() || 0 }}</span>
       </button>
 
-      <button class="btn-primary" (click)="buscarReservas()" [disabled]="isSearching()">
-        @if (isSearching()) {
-          <span class="btn-spinner"></span>
-          Buscando...
-        } @else {
-          Buscar
-        }
+      <button
+        type="button"
+        class="btn-primary reservation-search-button"
+        (click)="buscarReservas()"
+        [disabled]="isSearching()"
+        [attr.aria-busy]="isSearching()"
+        [attr.aria-label]="isSearching() ? 'Buscando reservas' : 'Buscar reservas'">
+        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Buscar</span>
+        <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
       </button>
     </div>
 
@@ -173,7 +127,7 @@
 
   <!-- ADVANCED FILTERS PANEL -->
   @if (advancedFiltersVisible()) {
-    <div class="advanced-filters-panel">
+    <div id="reservation-advanced-filters" class="advanced-filters-panel">
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Fecha del tour</label>
@@ -266,7 +220,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Categoría / Canal</label>
+          <label class="form-label">Canal</label>
           <div class="multi-filter">
             <button
               type="button"
@@ -308,13 +262,25 @@
 
   <!-- RESULTS -->
   <div class="results-area">
-    @if (isSearching()) {
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Buscando resultados...</p>
+    @if (searchError() && reservas().length > 0) {
+      <div class="results-notice results-notice--error" role="alert">
+        <span>{{ searchError() }} Los resultados anteriores siguen disponibles.</span>
+        <button type="button" (click)="buscarReservas()">Reintentar</button>
       </div>
-    } @else if (reservas().length > 0) {
-      <div class="results-list">
+    }
+
+    @if (reservas().length > 0) {
+      <div class="results-toolbar">
+        <strong aria-live="polite">{{ reservas().length }} {{ reservas().length === 1 ? 'reserva' : 'reservas' }}</strong>
+        @if (isSearching()) {
+          <span class="updating-pill" role="status">
+            <span aria-hidden="true"></span>
+            Actualizando
+          </span>
+        }
+      </div>
+
+      <div class="results-list" [class.results-list--updating]="isSearching()" [attr.aria-busy]="isSearching()">
         @for (r of reservas(); track r.Id_Reserva) {
           <div class="result-item"
             role="button"
@@ -400,6 +366,15 @@
           </div>
         }
       </div>
+    } @else if (isSearching()) {
+      <app-loading-state label="Buscando reservas…"></app-loading-state>
+    } @else if (searchError()) {
+      <app-loading-state
+        mode="error"
+        label="No pudimos consultar las reservas"
+        [detail]="searchError()"
+        (action)="buscarReservas()">
+      </app-loading-state>
     } @else if (hasSearched()) {
       <div class="empty-state">
         <div class="empty-icon">

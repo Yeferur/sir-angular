@@ -48,8 +48,7 @@
    ========================================================= */
 .toolbar-card,
 .list-card,
-.empty-state-card,
-.skeleton-card {
+.empty-state-card {
   background-color: var(--bg-secondary);
   border: 1.5px solid var(--separator-color);
   border-radius: 20px;
@@ -332,52 +331,6 @@
   font-size: .92rem;
 }
 
-/* =========================================================
-   SKELETON
-   ========================================================= */
-.skeleton-section {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  pointer-events: none;
-  user-select: none;
-}
-
-.skeleton-card {
-  padding: 20px;
-  pointer-events: none;
-}
-
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.skeleton-shape {
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 0%,
-    var(--bg-tertiary) 45%,
-    var(--bg-secondary) 100%
-  );
-  background-size: 800px 100%;
-  animation: sk-shimmer 1.6s ease-in-out infinite;
-  border-radius: 8px;
-}
-
-.sk-title {
-  width: 260px;
-  height: 22px;
-}
-
-.sk-subtitle {
-  width: 360px;
-  height: 14px;
-  margin-top: 10px;
-}
-
 .controls-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1.1fr) repeat(2, minmax(120px, .7fr));
@@ -389,65 +342,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.sk-label {
-  width: 72px;
-  height: 11px;
-}
-
-.sk-field {
-  height: 44px;
-  border-radius: 12px;
-  border: 1.5px solid var(--separator-color);
-}
-
-.sk-button {
-  width: 140px;
-  height: 44px;
-  border-radius: 12px;
-  margin-top: 18px;
-}
-
-.skeleton-point-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-}
-
-.sk-position {
-  width: 44px;
-  height: 46px;
-  border-radius: 12px;
-}
-
-.sk-main {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.sk-name {
-  width: 260px;
-  height: 15px;
-}
-
-.sk-meta {
-  width: 360px;
-  height: 12px;
-}
-
-.sk-handle {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-}
-
-@keyframes sk-shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
 }
 
 /* =========================================================
@@ -510,8 +404,7 @@
     width: 100%;
   }
 
-  .point-card,
-  .skeleton-point-row {
+  .point-card {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
   }
@@ -524,8 +417,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ordenar-page,
-  .point-card,
-  .skeleton-shape {
+  .point-card {
     animation: none !important;
     transition: none !important;
   }

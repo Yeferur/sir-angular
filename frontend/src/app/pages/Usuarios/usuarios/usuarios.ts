@@ -6,11 +6,12 @@ import type { Usuario } from '../../../services/Usuarios/usuarios';
 import { AuthService } from '../../../services/Login/login-service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, LoadingStateComponent],
   templateUrl: './usuarios.html',
   styleUrl: './usuarios.css'
 })
@@ -19,8 +20,6 @@ export class Usuarios implements OnInit {
   estados!: Signal<Map<string, string>>;
 
   isLoading = signal<boolean>(true);
-  skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
-
   // Search signal
   searchQuery = signal('');
   currentUserId = signal('');

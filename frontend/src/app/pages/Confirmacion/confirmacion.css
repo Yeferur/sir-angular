@@ -499,69 +499,6 @@
 }
 
 /* =========================================================
-   SKELETON
-   ========================================================= */
-.table-skeleton {
-  padding: 16px 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sk-meta,
-.sk-table-header,
-.sk-row {
-  display: grid;
-  grid-template-columns: 1.1fr .9fr .8fr .9fr 1.1fr .55fr;
-  gap: 12px;
-}
-
-.sk-meta {
-  grid-template-columns: 1.6fr .8fr .9fr;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.skeleton-shape {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  background: linear-gradient(90deg,
-    var(--bg-tertiary) 0%,
-    color-mix(in oklab, var(--bg-tertiary) 92%, white 8%) 50%,
-    var(--bg-tertiary) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.sk-pill { height: 22px; border-radius: 999px; }
-.sk-wide { width: 72%; }
-.sk-medium { width: 54%; }
-
-.sk-cell {
-  min-height: 20px;
-}
-
-.sk-header {
-  height: 16px;
-  border-radius: 8px;
-  margin-bottom: 4px;
-}
-
-.sk-row {
-  align-items: center;
-  padding: 12px 0;
-  border-top: 1px solid var(--separator-color);
-}
-
-.sk-reserva { height: 44px; }
-.sk-passenger { height: 48px; }
-.sk-document { height: 18px; width: 82%; }
-.sk-contact { height: 24px; width: 68%; }
-.sk-meet { height: 18px; width: 74%; }
-.sk-toggle { height: 26px; width: 46px; border-radius: 999px; justify-self: center; }
-
-/* =========================================================
    FLOATING SAVE BUTTON
    ========================================================= */
 .floating-save-btn {
@@ -619,11 +556,6 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -639,16 +571,6 @@
 
   .report-actions {
     justify-content: flex-start;
-  }
-
-  .sk-meta,
-  .sk-table-header,
-  .sk-row {
-    min-width: 760px;
-  }
-
-  .table-skeleton {
-    overflow-x: auto;
   }
 }
 
@@ -670,8 +592,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .page-container,
-  .floating-save-btn,
-  .skeleton-shape {
+  .floating-save-btn {
     animation: none !important;
   }
 }

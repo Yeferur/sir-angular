@@ -51,26 +51,7 @@
 
   <!-- CONTENT -->
   @if (!vm.hasLoadedOnce) {
-  <div class="puntos-list skeleton-list" aria-live="polite" aria-busy="true">
-    @for (slot of skeletonRows; track slot) {
-    <div class="punto-card skeleton-card" [style.--i]="slot">
-      <div class="sk-main">
-        <div class="sk-title skeleton-shape"></div>
-        <div class="sk-address skeleton-shape"></div>
-      </div>
-      <div class="sk-chip skeleton-shape"></div>
-      <div class="sk-schedule">
-        <span class="skeleton-shape sk-schedule-chip"></span>
-        <span class="skeleton-shape sk-schedule-chip"></span>
-        <span class="skeleton-shape sk-schedule-chip"></span>
-      </div>
-      <div class="sk-actions">
-        <span class="sk-button skeleton-shape"></span>
-        <span class="sk-button skeleton-shape"></span>
-      </div>
-    </div>
-    }
-  </div>
+  <app-loading-state label="Cargando puntos de encuentro…"></app-loading-state>
   } @else if (vm.puntos.length === 0) {
   <div class="empty-state">
     <div class="empty-icon">•</div>

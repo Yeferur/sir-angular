@@ -35,6 +35,40 @@
       </div>
     }
 
+    @if (!isMaxiMode && flatResults().length > 0) {
+      <div class="gs-results" role="list" aria-label="Resultados de búsqueda">
+        @for (group of groupedResults(); track group.label; let gi = $index) {
+          <section class="gs-result-group">
+            <h3>{{ group.label }}</h3>
+            @for (result of group.items; track result.id; let ii = $index) {
+              <button
+                type="button"
+                class="gs-result-item"
+                [class.is-selected]="isSelected(getFlatIndex(gi, ii))"
+                (mouseenter)="onResultHover(getFlatIndex(gi, ii))"
+                (click)="execute(result)"
+              >
+                <span class="gs-result-copy">
+                  <strong>{{ result.title }}</strong>
+                  @if (result.subtitle) { <small>{{ result.subtitle }}</small> }
+                </span>
+                @if (result.badge) { <span class="gs-result-badge">{{ result.badge }}</span> }
+                <i class="bx bx-chevron-right" aria-hidden="true"></i>
+              </button>
+            }
+          </section>
+        }
+      </div>
+    }
+
+    @if (!isMaxiMode && showNoResults()) {
+      <div class="gs-search-empty" role="status">
+        <i class="bx bx-search-alt" aria-hidden="true"></i>
+        <strong>Sin resultados todavía</strong>
+        <span>Presiona Enter para buscar en todo SIR.</span>
+      </div>
+    }
+
     <!-- Historial de mensajes -->
     @for (msg of conversationHistory(); track msg.id) {
       @if (msg.role === 'user') {
@@ -89,7 +123,8 @@
 
   </div>
 
-  <!-- FOOTER: INPUT -->
+  <!-- FOOTER: INPUT (en modo integrado vive dentro del topbar) -->
+  @if (!integrated) {
   <div class="gs-footer">
     <div class="gs-input-wrap" [class.focused]="inputFocused()">
       <span class="gs-input-icon" aria-hidden="true">⌕</span>
@@ -127,5 +162,6 @@
     <p class="gs-disclaimer">Maxi puede cometer errores. Verifica información crítica.</p>
     }
   </div>
+  }
 
 </section>

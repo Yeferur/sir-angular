@@ -1,10 +1,11 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 import { PermisosService } from './Permisos/permisos.service';
 import { SirAlertService } from './Alertas/alert.service';
 import { UiStateService } from './ui-state.service';
+import { SILENT_APP_ACTIVITY } from '../interceptors/app-activity.interceptor';
 
 export interface GlobalSearchAction {
   label: string;
@@ -113,7 +114,8 @@ export class GlobalSearchService {
 
     this.globalSearchDebounceTimer = setTimeout(() => {
       const params = new HttpParams().set('q', safeQuery);
-      this.http.get<GlobalSearchResponse>(`${this.apiUrl}/search/global`, { params }).subscribe({
+      const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
+      this.http.get<GlobalSearchResponse>(`${this.apiUrl}/search/global`, { params, context }).subscribe({
         next: (response) => {
           if (requestId !== this.globalSearchRequestId) return;
           const rawResults = Array.isArray(response?.results) ? response.results : [];

@@ -6,11 +6,12 @@ import { firstValueFrom } from 'rxjs';
 
 import { puntosService, Punto, OrdenPuntoItem } from '../../../services/Puntos/puntos';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 @Component({
   selector: 'app-ordenar-puntos',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule],
+  imports: [CommonModule, FormsModule, DragDropModule, LoadingStateComponent],
   templateUrl: './ordenar-puntos.html',
   styleUrls: ['./ordenar-puntos.css']
 })
@@ -27,7 +28,6 @@ export class OrdenarPuntosComponent implements OnInit {
   isLoadingPuntos = signal<boolean>(false);
   isSaving = signal<boolean>(false);
   hasPendingOrderChanges = signal<boolean>(false);
-  skeletonRows = [0, 1, 2, 3, 4, 5];
 
   async ngOnInit(): Promise<void> {
     await this.loadRutas();

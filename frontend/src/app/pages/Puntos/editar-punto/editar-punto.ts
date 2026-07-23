@@ -14,6 +14,7 @@ import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 const ADDRESS_SIMILARITY_THRESHOLD = 0.88;
 const ADDRESS_NAME_SIMILARITY_THRESHOLD = 0.82;
@@ -24,7 +25,7 @@ const NAME_SIMILARITY_THRESHOLD = 0.75;
   templateUrl: './editar-punto.html',
   styleUrls: ['../crear-punto/crear-punto.css'],
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, CommonModule]
+  imports: [ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
 })
 export class EditarPuntoComponent implements OnInit {
   isLoading = signal(true);

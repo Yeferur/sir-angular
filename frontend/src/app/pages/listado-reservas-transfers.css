@@ -10,28 +10,6 @@
 }
 
 /* =========================================================
-   LOADING
-   ========================================================= */
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 60px 0;
-  color: var(--text-secondary);
-  font-size: .9rem;
-}
-
-.spinner {
-  width: 22px;
-  height: 22px;
-  border: 2.5px solid var(--separator-color);
-  border-top-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-
-/* =========================================================
    PAGE HEADER
    ========================================================= */
 .page-header {
@@ -39,6 +17,56 @@
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.module-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 2px 2px 4px;
+}
+
+.module-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent-blue);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.module-intro h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(1.18rem, 1.8vw, 1.55rem);
+  line-height: 1.18;
+  letter-spacing: -.025em;
+}
+
+.module-intro p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: .82rem;
+}
+
+.result-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-pill);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: .72rem;
+}
+
+.result-summary strong {
+  color: var(--text-primary);
+  font-size: .92rem;
 }
 
 .header-top {
@@ -110,6 +138,30 @@
 }
 
 .search-input::placeholder { color: var(--text-tertiary); opacity: .6; }
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color .15s ease, background-color .15s ease, transform .15s ease;
+}
+
+.search-clear:hover {
+  background: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-tertiary));
+  color: var(--accent-blue);
+  transform: translateY(-50%) scale(1.06);
+}
 
 /* =========================================================
    AUTOCOMPLETE
@@ -220,6 +272,10 @@
   color: #fff;
   font-size: .68rem;
   font-weight: 800;
+}
+
+.filter-count--empty {
+  visibility: hidden;
 }
 
 .btn-spinner {
@@ -411,14 +467,104 @@
 /* =========================================================
    RESULTS LIST
    ========================================================= */
-.results-area { margin-top: 30px; }
+.results-area { margin-top: 22px; }
+
+.results-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 0 3px;
+}
+
+.results-toolbar > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+}
+
+.results-toolbar strong {
+  color: var(--text-primary);
+  font-size: .86rem;
+}
+
+.results-toolbar div > span {
+  color: var(--text-secondary);
+  font-size: .76rem;
+}
+
+.updating-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: var(--accent-blue);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.updating-pill > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent);
+  animation: updatingPulse 1.2s ease-out infinite;
+}
+
+.results-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-red) 24%, var(--separator-color));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-red) 7%, var(--bg-secondary));
+  color: var(--text-secondary);
+  font-size: .78rem;
+}
+
+.results-notice button {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-red) 35%, var(--separator-color));
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent-red);
+  font: 700 .72rem var(--font-family);
+  cursor: pointer;
+}
 
 .results-list {
+  position: relative;
   background-color: var(--bg-secondary);
   border-radius: 16px;
   overflow: hidden;
   border: 1.5px solid var(--separator-color);
   box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  transition: opacity .18s ease, border-color .18s ease;
+}
+
+.results-list--updating {
+  opacity: .72;
+  border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color));
+}
+
+.results-list--updating::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 32%;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+  animation: resultsProgress 1.05s ease-in-out infinite;
 }
 
 .result-item {
@@ -539,95 +685,148 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes updatingPulse {
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+@keyframes resultsProgress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(420%); }
+}
+
+/* Ver Reservas: la búsqueda es la cabecera; evita repetir el título del topbar. */
+.reservation-browser .reservation-search-panel {
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 10px;
+  border: 1px solid var(--separator-color);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .05);
+}
+
+.reservation-browser .search-input {
+  height: 42px;
+  padding-right: 44px;
+  background: var(--bg-tertiary);
+}
+
+.reservation-browser .btn-filter,
+.reservation-browser .btn-primary {
+  height: 42px;
+}
+
+.reservation-browser .btn-filter {
+  width: 112px;
+  justify-content: center;
+}
+
+.reservation-browser .reservation-search-button {
+  position: relative;
+  width: 108px;
+  justify-content: center;
+}
+
+.search-button-label {
+  transition: opacity .12s ease;
+}
+
+.search-button-label--hidden {
+  opacity: 0;
+}
+
+.btn-spinner--centered {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+  animation: none;
+  transition: opacity .12s ease;
+}
+
+.btn-spinner--centered.btn-spinner--active {
+  opacity: 1;
+  animation: spin .7s linear infinite;
+}
+
+.reservation-browser .reservation-search-button:disabled {
+  background: var(--accent-blue);
+  color: #fff;
+  opacity: .72;
+  cursor: progress;
+  box-shadow: 0 2px 10px rgba(10, 132, 255, .2);
+}
+
+.reservation-browser .active-filters {
+  padding: 0 2px 1px;
+}
+
+.reservation-browser .advanced-filters-panel {
+  margin-top: 10px;
+}
+
+.reservation-browser .results-area {
+  margin-top: 14px;
+}
+
+.reservation-browser .results-toolbar {
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.search-idle-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 54px;
+  color: var(--text-tertiary);
+  font-size: .76rem;
+  animation: fadeIn .3s ease both;
+}
+
+.search-idle-hint kbd {
+  padding: 3px 7px;
+  border: 1px solid var(--separator-color);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: 700 .68rem var(--font-family);
 }
 
 /* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 700px) {
+  .module-intro { align-items: flex-start; }
   .header-top { flex-direction: column; align-items: flex-start; }
   .header-actions { width: 100%; }
   .btn-primary { flex: 1; justify-content: center; }
   .search-row { flex-wrap: wrap; }
   .search-container { flex: 1 1 100%; }
   .btn-filter, .btn-primary { flex: 1; justify-content: center; }
-  .item-actions { width: 100%; justify-content: flex-start; }
-  .btn-row-edit,
-  .btn-row-cancel,
-  .btn-row-delete { width: 100%; justify-content: center; }
 }
 
 @media (max-width: 560px) {
   .page-container { padding: 0 16px; }
   .form-grid { grid-template-columns: 1fr; }
   .multi-filter-menu { min-width: 0; }
+  .module-intro { flex-direction: column; gap: 10px; }
+  .result-summary { align-self: flex-start; }
+  .results-toolbar { align-items: flex-start; }
+  .results-toolbar > div { flex-direction: column; align-items: flex-start; }
+  .results-notice { align-items: flex-start; }
 }
-/* =========================================================
-   SKELETON LOADER � Ver Reservas
-   ========================================================= */
-
-@keyframes sk-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
-.sk-ver-reservas { pointer-events: none; user-select: none; }
-
-.sk-line,
-.sk-field {
-  background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--bg-tertiary) 45%, var(--bg-secondary) 100%);
-  background-size: 800px 100%;
-  animation: sk-shimmer 1.6s ease-in-out infinite;
-  border-radius: 8px;
-  display: block;
-}
-
-.sk-line { height: 14px; width: 100%; }
-.sk-vr-title    { height: 30px; width: 220px; border-radius: 10px; margin-bottom: 10px; }
-.sk-vr-subtitle { height: 14px; width: 320px; }
-
-.sk-field {
-  height: 42px; width: 100%;
-  border: 1.5px solid var(--separator-color); border-radius: 12px; background-clip: padding-box;
-}
-
-.sk-vr-btn      { height: 40px; width: 130px; border-radius: 12px; border: none; }
-.sk-vr-search   { height: 42px; border-radius: 14px; }
-.sk-vr-icon-btn { height: 42px; width: 80px; border-radius: 12px; flex-shrink: 0; }
-.sk-vr-chip     { height: 28px; width: 110px; border-radius: 999px; border: none; }
-
-/* Skeleton de resultado � copia .result-item */
-.sk-result-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--separator-color);
-}
-.sk-result-item--last { border-bottom: none; }
-
-.sk-vr-status   { height: 22px; width: 80px; border-radius: 999px; border: none; flex-shrink: 0; }
-.sk-vr-item-info { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.sk-vr-item-id   { height: 12px; width: 55px; border-radius: 6px; }
-.sk-vr-item-tour { height: 14px; width: 70%; border-radius: 6px; }
-.sk-vr-item-meta { height: 11px; width: 45%; border-radius: 6px; }
-.sk-vr-arrow     { height: 16px; width: 16px; border-radius: 4px; flex-shrink: 0; }
-
-.sk-ver-transfers { pointer-events: none; user-select: none; }
-.sk-vt-title    { height: 30px; width: 220px; border-radius: 10px; margin-bottom: 10px; }
-.sk-vt-subtitle { height: 14px; width: 320px; }
-.sk-vt-btn      { height: 40px; width: 130px; border-radius: 12px; border: none; }
-.sk-vt-search   { height: 42px; border-radius: 14px; }
-.sk-vt-icon-btn { height: 42px; width: 80px; border-radius: 12px; flex-shrink: 0; }
-.sk-vt-chip     { height: 28px; width: 110px; border-radius: 999px; border: none; }
-.sk-vt-status   { height: 22px; width: 80px; border-radius: 999px; border: none; flex-shrink: 0; }
-.sk-vt-item-info { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.sk-vt-item-id   { height: 12px; width: 55px; border-radius: 6px; }
-.sk-vt-item-tour { height: 14px; width: 70%; border-radius: 6px; }
-.sk-vt-item-meta { height: 11px; width: 45%; border-radius: 6px; }
-.sk-vt-arrow     { height: 16px; width: 16px; border-radius: 4px; flex-shrink: 0; }
 
 .item-actions {
   display: flex;
@@ -649,11 +848,6 @@
 
 .item-actions {
   flex-shrink: 0;
-}
-
-@media (max-width: 700px) {
-  .sk-vr-btn { width: 100%; }
-  .sk-vt-btn { width: 100%; }
 }
 
 @media (max-width: 640px) {
@@ -681,6 +875,7 @@
     grid-area: main;
     display: flex;
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: flex-start;
     gap: 3px;
     min-width: 0;
@@ -701,6 +896,7 @@
   }
 
   .item-meta {
+    width: 100%;
     flex-wrap: wrap;
   }
 
@@ -724,4 +920,13 @@
   }
 }
 
-
+@media (prefers-reduced-motion: reduce) {
+  .page-container,
+  .advanced-filters-panel,
+  .autocomplete-dropdown,
+  .updating-pill > span,
+  .results-list--updating::before,
+  .search-idle-hint {
+    animation: none !important;
+  }
+}

@@ -7,6 +7,7 @@ import {
   HttpResponse,
 } from '@angular/common/http';
 import { catchError, map, Observable, throwError } from 'rxjs';
+import { sanitizeUserErrorMessage, toUserErrorMessage } from '../shared/errors/user-error-message';
 
 type ApiEnvelope<T = unknown> = {
   success: boolean;
@@ -36,7 +37,10 @@ function getFriendlyErrorMessage(errorCode?: string, fallback?: string): string 
     return byCode[errorCode];
   }
 
-  return fallback || 'No se pudo completar la operacion solicitada.';
+  return sanitizeUserErrorMessage(
+    fallback,
+    'No se pudo completar la operación solicitada.'
+  );
 }
 
 export const apiEnvelopeInterceptor: HttpInterceptorFn = (
@@ -70,23 +74,25 @@ export const apiEnvelopeInterceptor: HttpInterceptorFn = (
       const errorCode = envelope?.errorCode;
       const fallback = envelope?.message || error?.error?.message || error?.message;
 
-      if (errorCode || envelope) {
-        const friendlyMessage = getFriendlyErrorMessage(errorCode, fallback);
-        return throwError(
-          () =>
-            new HttpErrorResponse({
-              status: error.status || 400,
-              statusText: error.statusText || 'Bad Request',
-              url: error.url || req.url,
-              error: {
-                ...(envelope || error.error || {}),
-                message: friendlyMessage,
-              },
-            })
-        );
-      }
+      const friendlyMessage = errorCode || envelope
+        ? getFriendlyErrorMessage(errorCode, fallback)
+        : toUserErrorMessage(error);
+      const errorBody = error?.error && typeof error.error === 'object'
+        ? error.error
+        : {};
 
-      return throwError(() => error);
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: error.status || 0,
+            statusText: error.statusText || 'Request failed',
+            url: error.url || req.url,
+            error: {
+              ...errorBody,
+              message: friendlyMessage,
+            },
+          })
+      );
     })
   );
 };

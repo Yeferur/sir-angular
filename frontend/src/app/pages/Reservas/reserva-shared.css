@@ -18,12 +18,6 @@
   will-change: opacity, transform;
 }
 
-.config-two-col {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .field-label-row {
   display: flex;
   align-items: center;
@@ -626,8 +620,6 @@
 .pago-completo .pc-grid { display: grid; gap: 12px 16px; align-items: center; }
 .pago-completo .payments-sub { font-size: .8rem; color: var(--text-secondary); }
 
-.pc-error { margin-top: 4px; }
-
 /* =========================================================
    CUPOS DOT
    ========================================================= */
@@ -682,6 +674,10 @@
   background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
 }
 
+.resumen-summary-item--payment-mode {
+  border-color: color-mix(in srgb, var(--accent-blue) 42%, var(--separator-color));
+}
+
 .resumen-summary-label {
   font-size: .72rem;
   font-weight: 700;
@@ -730,10 +726,27 @@
   white-space: nowrap;
 }
 
+.resumen-payment-mode-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: .76rem;
+}
+
+.resumen-payment-mode-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent-blue);
+}
+
 .resumen-review-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  align-items: start;
 }
 
 .resumen-review-card {
@@ -828,6 +841,12 @@
   letter-spacing: -.02em;
 }
 
+.resumen-section-copy p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: .76rem;
+}
+
 .resumen-section-count {
   display: inline-flex;
   align-items: center;
@@ -843,7 +862,7 @@
 
 .resumen-passengers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 10px;
 }
 
@@ -899,9 +918,7 @@
   font-size: .94rem;
   font-weight: 750;
   line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .resumen-passenger-detail {
@@ -989,13 +1006,6 @@
   align-self: center;
 }
 
-/* ── cupos dot (reutilizado) ── */
-.nav-cupos-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .nav-cupos-label {
   font-size: .8rem;
   font-weight: 600;
@@ -1026,92 +1036,6 @@
 
 .errorInput {
   border-color: var(--accent-red) !important;
-}
-
-/* =========================================================
-   SKELETON
-   ========================================================= */
-@keyframes sk-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
-.sk-line,
-.sk-field {
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 0%,
-    var(--bg-tertiary) 45%,
-    var(--bg-secondary) 100%
-  );
-  background-size: 800px 100%;
-  animation: sk-shimmer 1.6s ease-in-out infinite;
-  border-radius: 8px;
-  display: block;
-}
-
-.skeleton-page {
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-  pointer-events: none;
-  user-select: none;
-  padding-bottom: 80px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.sk-line { height: 14px; width: 100%; }
-.sk-title   { height: 28px; width: 240px; border-radius: 10px; margin-bottom: 8px; }
-.sk-heading  { height: 18px; width: 160px; }
-.sk-label    { height: 11px; width: 70px; border-radius: 6px; }
-.sk-field { height: 42px; width: 100%; border: 1.5px solid var(--separator-color); border-radius: 12px; }
-.sk-field.sk-field-sm  { height: 42px; }
-.sk-field.sk-field-tall { height: 80px; border-radius: 12px; }
-
-/* stepper skeleton */
-.sk-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 32px;
-}
-
-.sk-step-bubble {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--bg-tertiary);
-  flex-shrink: 0;
-}
-
-.sk-step-line {
-  flex: 1;
-  height: 1.5px;
-  background: var(--separator-color);
-}
-
-@keyframes pageEnter {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* phone */
-.phone-input-group { display: flex; gap: 8px; }
-.phone-prefix { flex: 0 0 70px; }
-.phone-number { flex: 1 1 auto; }
-
-/* paso logistica punto individual por pax */
-.punto-individual-nota {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .82rem;
-  color: var(--text-secondary);
-  padding: 10px 12px;
-  background: rgba(255, 159, 10, .07);
-  border: 1px solid rgba(255, 159, 10, .18);
-  border-radius: 10px;
 }
 
 /* =========================================================
@@ -1238,10 +1162,6 @@
 }
 
 @media (max-width: 820px) {
-  .config-two-col {
-    grid-template-columns: 1fr;
-  }
-
   .field-label-row {
     align-items: flex-start;
     flex-direction: column;
@@ -1279,15 +1199,6 @@
 }
 
 /* precio en resumen pasajero */
-.resumen-pasajero-precio {
-  margin-left: auto;
-  font-size: .82rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  padding-left: 8px;
-}
-
 /* =========================================================================
    ESTILOS EXCLUSIVOS — EDITAR RESERVA
    ========================================================================= */
@@ -1307,10 +1218,6 @@
   font-size: .78rem;
 }
 
-
-.forensic-card {
-  margin-top: 20px;
-}
 
 .timeline-empty {
   padding: 32px 24px;

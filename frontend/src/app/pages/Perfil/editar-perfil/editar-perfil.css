@@ -338,121 +338,6 @@
   line-height: 1.4;
 }
 
-/* Skeleton */
-.skeleton-page {
-  gap: 22px;
-}
-
-.sk-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.skeleton-card {
-  align-items: center;
-}
-
-.sk-line,
-.sk-title,
-.sk-subtitle,
-.sk-card-title,
-.sk-label,
-.sk-field,
-.sk-button,
-.sk-avatar {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(90deg,
-      var(--bg-tertiary) 0%,
-      color-mix(in oklab, var(--bg-tertiary) 90%, white 10%) 50%,
-      var(--bg-tertiary) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-
-.sk-title {
-  width: min(340px, 72vw);
-  height: 24px;
-  border-radius: 10px;
-}
-
-.sk-subtitle {
-  width: min(460px, 82vw);
-  height: 16px;
-  border-radius: 10px;
-}
-
-.sk-card-title {
-  width: 180px;
-  height: 18px;
-  border-radius: 10px;
-}
-
-.sk-label {
-  width: 84px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.sk-field {
-  height: 44px;
-  border-radius: 12px;
-}
-
-.sk-wide {
-  grid-column: 1 / -1;
-}
-
-.sk-button {
-  width: 128px;
-  height: 42px;
-  border-radius: 12px;
-}
-
-.sk-button-secondary {
-  width: 112px;
-}
-
-.sk-button-primary {
-  width: 178px;
-  align-self: flex-end;
-}
-
-.sk-avatar {
-  width: 108px;
-  height: 108px;
-  border-radius: 50%;
-}
-
-.skeleton-avatar-shell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 0 2px;
-}
-
-.skeleton-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.sk-grid {
-  width: 100%;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 @keyframes pageEnter {
   from {
     opacity: 0;
@@ -492,8 +377,7 @@
     font-size: 1.55rem;
   }
 
-  .avatar-wrapper,
-  .sk-avatar {
+  .avatar-wrapper {
     width: 100px;
     height: 100px;
   }
@@ -511,8 +395,7 @@
     justify-content: stretch;
   }
 
-  .btn-primary,
-  .sk-button-primary {
+  .btn-primary {
     width: 100%;
     min-width: 0;
     align-self: stretch;
@@ -523,15 +406,7 @@
 
   .booking-dashboard,
   .avatar-wrapper,
-  .avatar-image.preview,
-  .sk-line,
-  .sk-title,
-  .sk-subtitle,
-  .sk-card-title,
-  .sk-label,
-  .sk-field,
-  .sk-button,
-  .sk-avatar {
+  .avatar-image.preview {
     animation: none !important;
   }
 }

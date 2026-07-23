@@ -7,11 +7,12 @@ import { Router } from '@angular/router';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 @Component({
     selector: 'app-ver-tours',
     standalone: true,
-    imports: [FormsModule],
+    imports: [FormsModule, LoadingStateComponent],
     templateUrl: './ver-tours.html',
     styleUrls: ['./ver-tours.css']
 })
@@ -25,8 +26,6 @@ export class VerToursComponent implements OnInit {
     tours     = signal<Tour[]>([]);
     isLoading = signal(true);
     busqueda  = signal('');
-
-    skeletonRows = [0, 1, 2, 3, 4, 5];
 
     private refreshEffect = effect(() => {
         const entity = this.uiState.needsRefresh();

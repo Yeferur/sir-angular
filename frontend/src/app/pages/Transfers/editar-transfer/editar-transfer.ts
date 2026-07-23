@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
+import { finalize, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
@@ -12,6 +12,8 @@ import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { UiStateService } from '../../../services/ui-state.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 interface WizardStep {
   id: string;
@@ -21,7 +23,7 @@ interface WizardStep {
 @Component({
   selector: 'app-editar-transfer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './editar-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })
@@ -304,6 +306,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  loadError = signal('');
   private isHydrating = false;
 
   resultsServicioTransfer: any[] = [];
@@ -561,7 +564,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
       return { valid: false, error: 'Tipo no permitido. Solo JPG, PNG o PDF.' };
     }
     if (file.size > maxSize) {
-      return { valid: false, error: 'Archivo muy grande. Máximo 5MB.' };
+      return { valid: false, error: 'Archivo muy grande. Máximo 5 MB.' };
     }
     return { valid: true };
   }
@@ -787,6 +790,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
   private loadCatalogosAndTransferData(): void {
     this.isLoading.set(true);
+    this.loadError.set('');
 
     const transferId = this.getTransferIdFromRoute();
     if (!transferId) {
@@ -797,11 +801,16 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     }
 
     forkJoin({
-      servicios: this.transferSvc.getServicios().pipe(catchError(() => of([]))),
-      rangos: this.transferSvc.getRangos().pipe(catchError(() => of([]))),
-      monedas: this.transferSvc.getMonedas().pipe(catchError(() => of([]))),
-      transfer: this.transferSvc.getTransfer(transferId).pipe(catchError(() => of(null)))
-    }).subscribe({
+      servicios: this.transferSvc.getServicios(),
+      rangos: this.transferSvc.getRangos(),
+      monedas: this.transferSvc.getMonedas(),
+      transfer: this.transferSvc.getTransfer(transferId)
+    }).pipe(
+      finalize(() => {
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: ({ servicios, rangos, monedas, transfer }) => {
         this.resultsServicioTransfer = this.unwrapListResponse(servicios);
         this.resultsRangos = this.unwrapListResponse(rangos);
@@ -809,28 +818,20 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
         const detalle = this.unwrapTransferDetalle(transfer);
         if (!detalle) {
-          const backendMessage =
-            transfer?.message ||
-            transfer?.error?.message ||
-            transfer?.error?.error ||
-            null;
-
-          this.navbar.errorToast('Error', backendMessage || 'No se pudo cargar el detalle del transfer.');
-          this.router.navigate(['/Transfers/VerTransfers']);
+          this.loadError.set('No encontramos la información de este transfer.');
           return;
         }
 
         this.fillFormWithTransferData(detalle);
       },
-      error: () => {
-        this.navbar.errorToast('Error', 'No se pudieron cargar los catálogos.');
-        this.isLoading.set(false);
-      },
-      complete: () => {
-        this.isLoading.set(false);
-        this.cdr.markForCheck();
+      error: (error) => {
+        this.loadError.set(toUserErrorMessage(error, 'No pudimos cargar el transfer y sus datos.'));
       }
     });
+  }
+
+  retryLoad(): void {
+    this.loadCatalogosAndTransferData();
   }
 
   private fillFormWithTransferData(data: any): void {
@@ -926,7 +927,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
         Reporta: 'Nombre del reportante',
-        TelefonoReserva: 'Teléfono de reserva (ej: +573001234567)'
+        TelefonoReserva: 'Teléfono de contacto (ej: +573001234567)'
       };
 
       const fields = invalid.map(f => friendly[f] || f);
@@ -1055,9 +1056,8 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
                 this.isSubmitting.set(false);
                 this.router.navigate(['/Transfers/VerTransfers']);
               },
-              error: (err) => {
-                const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo cancelar el transfer.';
-                this.navbar.errorToast('No se pudo cancelar', message);
+              error: (error) => {
+                this.navbar.errorToast('No se pudo cancelar', toUserErrorMessage(error, 'No fue posible cancelar el transfer.'));
                 this.isSubmitting.set(false);
               }
             });
@@ -1085,47 +1085,12 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
             this.isSubmitting.set(false);
             this.router.navigate(['/Transfers/VerTransfers']);
           },
-          error: (err) => {
-            const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo eliminar el transfer.';
-            this.navbar.errorToast('No se pudo eliminar', message);
+          error: (error) => {
+            this.navbar.errorToast('No se pudo eliminar', toUserErrorMessage(error, 'No fue posible eliminar el transfer.'));
             this.isSubmitting.set(false);
           }
         });
       }
-    );
-    return;
-
-    this.navbar.showConfirm(
-      'Eliminar transfer',
-      `¿Deseas eliminar el transfer #${id}? Esta acción eliminará el registro de forma permanente.`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'secondary',
-          onClick: () => this.navbar.clearOverlay()
-        },
-        {
-          text: 'Eliminar',
-          style: 'delete',
-          onClick: () => {
-            this.navbar.clearOverlay();
-            this.isSubmitting.set(true);
-            this.transferSvc.deleteTransfer(id).subscribe({
-              next: () => {
-                this.navbar.needsRefresh.set('transfers');
-                this.navbar.successToast('Transfer eliminado', `El transfer #${id} fue eliminado correctamente.`);
-                this.isSubmitting.set(false);
-                this.router.navigate(['/Transfers/VerTransfers']);
-              },
-              error: (err) => {
-                const message = err?.error?.message || err?.error?.error || err?.message || 'No se pudo eliminar el transfer.';
-                this.navbar.errorToast('No se pudo eliminar', message);
-                this.isSubmitting.set(false);
-              }
-            });
-          }
-        }
-      ]
     );
   }
 
@@ -1212,10 +1177,8 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
         this.finishSubmitSuccess('Transfer actualizado correctamente.');
       },
-      error: (err) => {
-        console.error('Error:', err);
-        const message = err?.error?.message || err?.error?.error || err?.message || 'Hubo un error al actualizar el transfer.';
-        this.navbar.errorToast('Error', message);
+      error: (error) => {
+        this.navbar.errorToast('No se pudo actualizar', toUserErrorMessage(error, 'No fue posible actualizar el transfer.'));
         this.isSubmitting.set(false);
       }
     });

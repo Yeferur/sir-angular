@@ -1,21 +1,24 @@
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectorRef,
+  ChangeDetectionStrategy,
   Component,
   effect,
   inject,
   Injector,
+  HostListener,
   OnDestroy,
   OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
 import { CountUpDirective } from './count-up.directive';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { InicioService, Tour, Transfer, TransfersSummary } from '../../services/inicio';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
 type DrawerMode = 'edit' | 'privados';
 type DateAnimDirection = 'next' | 'prev';
@@ -25,9 +28,10 @@ const FLASH_DURATION_MS = 1100;
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, FormsModule, PermisoDirective, CountUpDirective, DatepickerComponent],
+  imports: [CommonModule, FormsModule, PermisoDirective, CountUpDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './inicio.html',
   styleUrls: ['./inicio.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Inicio implements OnInit, OnDestroy {
   private readonly inicioService = inject(InicioService);
@@ -37,9 +41,16 @@ export class Inicio implements OnInit, OnDestroy {
 
   isLoading = true;
   isUpdatingDate = false;
+  hasLoaded = false;
+  loadError: string | null = null;
+  loadedFecha: string | null = null;
 
-  private loading = false;
   private savingAforo = false;
+  private loadRequestId = 0;
+  private activeLoad?: Subscription;
+  private drawerClearTimer?: ReturnType<typeof setTimeout>;
+  private previousBodyOverflow = '';
+  private previousFocus: HTMLElement | null = null;
 
   fecha: string = this.getTomorrowIso();
 
@@ -55,8 +66,6 @@ export class Inicio implements OnInit, OnDestroy {
     aeropuertoHotel: 0,
     otros: 0,
   };
-
-  skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
 
   drawerOpen = false;
   drawerMode: DrawerMode = 'edit';
@@ -107,6 +116,18 @@ export class Inicio implements OnInit, OnDestroy {
 
       queueMicrotask(() => this.loadData({ silent: true }));
     }, { injector: this.injector });
+
+    effect(() => {
+      const transfer = this.inicioService.transferActualizado();
+      if (!transfer) return;
+
+      const eventDate = String(
+        transfer.Fecha_Transfer || transfer.FechaTransfer || transfer.Fecha || '',
+      );
+      if (eventDate && eventDate !== this.fecha) return;
+
+      queueMicrotask(() => this.loadData({ silent: true }));
+    }, { injector: this.injector });
   }
 
   ngOnInit(): void {
@@ -114,9 +135,12 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.activeLoad?.unsubscribe();
     this.flashTimers.forEach((timer) => clearTimeout(timer));
     this.flashTimers.clear();
     if (this.flashLinkedTimer) clearTimeout(this.flashLinkedTimer);
+    if (this.drawerClearTimer) clearTimeout(this.drawerClearTimer);
+    this.restoreDrawerPageState();
   }
 
   onFechaChange(iso: string | null): void {
@@ -154,28 +178,31 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   loadData(options: { silent?: boolean } = {}): void {
-    if (this.loading) return;
-
-    this.loading = true;
-    const isInitialLoad = this.tours.length === 0;
+    const requestId = ++this.loadRequestId;
+    const requestDate = this.fecha;
+    const isInitialLoad = !this.hasLoaded;
     const previousById = new Map(this.tours.map((tour) => [tour.Id_Tour, tour]));
+
+    this.activeLoad?.unsubscribe();
+    this.loadError = null;
 
     if (isInitialLoad) {
       this.isLoading = true;
     } else if (!options.silent) {
       this.isUpdatingDate = true;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    this.cdr.markForCheck();
 
-    this.inicioService.getDatosInicio(this.fecha).pipe(
+    this.activeLoad = this.inicioService.getDatosInicio(requestDate, Boolean(options.silent)).pipe(
       finalize(() => {
-        this.loading = false;
+        if (requestId !== this.loadRequestId) return;
         this.isLoading = false;
         this.isUpdatingDate = false;
         this.cdr.markForCheck();
       }),
     ).subscribe({
       next: (data) => {
+        if (requestId !== this.loadRequestId) return;
         const newTours = data.tours ?? [];
 
         if (options.silent && !isInitialLoad) {
@@ -185,10 +212,24 @@ export class Inicio implements OnInit, OnDestroy {
         this.tours = newTours;
         this.transfers = Array.isArray(data.transfers) ? data.transfers as Transfer[] : [];
         this.transfersSummary = this.normalizeTransfers(data.transfers);
+        this.hasLoaded = true;
+        this.loadedFecha = requestDate;
+        this.loadError = null;
         this.cdr.markForCheck();
       },
-      error: () => this.cdr.markForCheck(),
+      error: (error) => {
+        if (requestId !== this.loadRequestId) return;
+        this.loadError = this.extractLoadError(error);
+        if (this.hasLoaded && !options.silent) {
+          this.alerts.errorToast('No se pudo actualizar Inicio', this.loadError);
+        }
+        this.cdr.markForCheck();
+      },
     });
+  }
+
+  retryLoad(): void {
+    this.loadData();
   }
 
   private detectRealtimeChanges(previousById: Map<number, Tour>, newTours: Tour[]): void {
@@ -341,6 +382,7 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   abrirDrawerEdicion(tour: Tour): void {
+    this.prepareDrawerOpen();
     this.drawerTour = tour;
     this.drawerMode = 'edit';
     this.nuevoCupoDrawer = this.getCuposParaMeta(tour);
@@ -360,6 +402,7 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   abrirDrawerPrivados(tour: Tour): void {
+    this.prepareDrawerOpen();
     this.drawerTour = tour;
     this.drawerMode = 'privados';
     this.drawerOpen = true;
@@ -367,9 +410,67 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   cerrarDrawer(): void {
+    if (!this.drawerOpen) return;
     this.drawerOpen = false;
-    this.drawerTour = null;
+    if (this.drawerClearTimer) clearTimeout(this.drawerClearTimer);
+    const closeDelay = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 320;
+    this.drawerClearTimer = setTimeout(() => {
+      this.drawerTour = null;
+      this.drawerClearTimer = undefined;
+      this.cdr.markForCheck();
+    }, closeDelay);
+    this.restoreDrawerPageState();
     this.cdr.markForCheck();
+  }
+
+  @HostListener('document:keydown.escape')
+  onDrawerEscape(): void {
+    if (this.drawerOpen) this.cerrarDrawer();
+  }
+
+  onDrawerKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Tab') return;
+    const panel = event.currentTarget as HTMLElement | null;
+    if (!panel?.classList.contains('open')) return;
+    const focusable = Array.from(panel.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => element.offsetParent !== null);
+    if (!focusable.length) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  private prepareDrawerOpen(): void {
+    if (this.drawerClearTimer) {
+      clearTimeout(this.drawerClearTimer);
+      this.drawerClearTimer = undefined;
+    }
+    if (!this.drawerOpen && typeof document !== 'undefined') {
+      this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      this.previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.drawer.open')?.focus({ preventScroll: true });
+    });
+  }
+
+  private restoreDrawerPageState(): void {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = this.previousBodyOverflow;
+    this.previousFocus?.focus({ preventScroll: true });
+    this.previousFocus = null;
   }
 
   getDrawerTitle(): string {
@@ -596,5 +697,14 @@ export class Inicio implements OnInit, OnDestroy {
       aeropuertoHotel,
       otros,
     };
+  }
+
+  private extractLoadError(error: any): string {
+    return String(
+      error?.error?.message ||
+      error?.error?.error ||
+      error?.message ||
+      'No fue posible cargar la información. Comprueba tu conexión e inténtalo nuevamente.',
+    );
   }
 }

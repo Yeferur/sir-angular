@@ -1,17 +1,9 @@
 <div class="page-container">
   @if (isLoading) {
-  <div class="loading-state">
-    <div class="spinner"></div>
-    <p>Cargando transfer...</p>
-  </div>
-  } @else if (isError) {
-  <div class="error-view">
-    <div class="error-content">
-      <h1>Transfer</h1>
-      <p class="error-message">{{ errorMessage }}</p>
-      <button class="btn-close" (click)="close()">Cerrar</button>
-    </div>
-  </div>
+    <app-loading-state label="Cargando transfer…"></app-loading-state>
+  } @else if (errorMessage && !data) {
+    <app-loading-state mode="error" label="No pudimos cargar el transfer" [detail]="errorMessage"
+      actionLabel="Reintentar" (action)="retryLoad()"></app-loading-state>
   } @else if (data) {
   <div class="transfer-view detail-shell">
     <header class="detail-header view-header-top">
@@ -24,10 +16,16 @@
         </div>
       </div>
 
-      <button class="btn-close" (click)="close()">✕</button>
+      <button class="btn-close" type="button" aria-label="Cerrar detalle del transfer" (click)="close()">✕</button>
     </header>
 
     <main class="detail-scroll">
+      @if (isRefreshing) {
+        <div class="detail-update-state" role="status"><span class="detail-update-dot" aria-hidden="true"></span>Actualizando</div>
+      }
+      @if (errorMessage) {
+        <div class="detail-inline-error" role="alert"><span>{{ errorMessage }}</span><button type="button" (click)="retryLoad()">Reintentar</button></div>
+      }
       <div class="view-header">
         <div class="summary-strip">
           <div class="summary-item">
@@ -38,24 +36,32 @@
             <span class="summary-label">Pagado</span>
             <span class="summary-value">{{ transfer.MonedaCodigo || 'COP' }} {{ totalPagado | number:'1.0-0' }}</span>
           </div>
+          @if (esPagoDirecto) {
+          <div class="summary-item summary-item--payment-mode">
+            <span class="summary-label">Modalidad de pago</span>
+            <span class="summary-value">Pago en punto</span>
+          </div>
+          } @else {
           <div class="summary-item">
             <span class="summary-label">Pendiente</span>
             <span class="summary-value">{{ transfer.MonedaCodigo || 'COP' }} {{ saldoPendiente | number:'1.0-0'
               }}</span>
           </div>
+          }
         </div>
 
-        @if (valorTotal > 0) {
-        @let pagadoPct = totalPagado > 0 ? (totalPagado / valorTotal) * 100 : 0;
+        @if (valorTotal > 0 && !esPagoDirecto) {
         <div class="payment-progress">
           <div class="progress-track">
-            <div class="progress-fill" [class.green]="pagadoPct >= 100"
-              [class.blue]="pagadoPct >= 50 && pagadoPct < 100" [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
-              [class.red]="pagadoPct === 0" [style.width.%]="pagadoPct">
+            <div class="progress-fill" [class.green]="porcentajePagado >= 100"
+              [class.blue]="porcentajePagado >= 50 && porcentajePagado < 100" [class.yellow]="porcentajePagado > 0 && porcentajePagado < 50"
+              [class.red]="porcentajePagado === 0" [style.width.%]="porcentajePagado">
             </div>
           </div>
-          <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
+          <span class="progress-label">{{ porcentajePagado | number:'1.0-0' }}% pagado</span>
         </div>
+        } @else if (esPagoDirecto) {
+          <div class="payment-mode-note"><span class="payment-mode-dot" aria-hidden="true"></span>El cobro se registra al momento del servicio.</div>
         }
       </div>
 
@@ -234,20 +240,27 @@
     </main>
 
     <footer class="detail-footer actions-footer">
-      <button class="btn-secondary action-pill" (click)="descargarTransfer()">Descargar PDF</button>
+      <div class="footer-action-group footer-action-group--files">
+      <button class="btn-secondary action-pill" [disabled]="activeAction !== null" (click)="descargarTransfer()">
+        @if (activeAction === 'pdf') { <span class="button-spinner" aria-hidden="true"></span>Generando… } @else { Descargar PDF }
+      </button>
       @if (comprobantesDisponibles.length) {
-      <button class="btn-secondary action-pill" (click)="descargarComprobantesTransfer()">Descargar
-        comprobantes</button>
+      <button class="btn-secondary action-pill" [disabled]="activeAction !== null" (click)="descargarComprobantesTransfer()">
+        @if (activeAction === 'comprobantes') { <span class="button-spinner" aria-hidden="true"></span>Descargando… } @else { Comprobantes }
+      </button>
       }
+      </div>
+      <div class="footer-action-group footer-action-group--primary">
       @if (puedeCancelar) {
-      <button class="btn-danger btn-cancel-soft action-pill" (click)="cancelarTransfer()">Cancelar</button>
+      <button class="btn-danger btn-cancel-soft action-pill" [disabled]="activeAction !== null" (click)="cancelarTransfer()">Cancelar</button>
       }
       @if (canDeleteTransfer) {
-      <button class="btn-danger btn-delete-strong action-pill" (click)="eliminarTransfer()">Eliminar</button>
+      <button class="btn-danger btn-delete-strong action-pill" [disabled]="activeAction !== null" (click)="eliminarTransfer()">Eliminar</button>
       }
       @if (canUpdateTransfer) {
-        <button class="btn-primary action-pill" type="button" (click)="editarTransfer()">Editar</button>
+        <button class="btn-primary action-pill" type="button" [disabled]="activeAction !== null" (click)="editarTransfer()">Editar</button>
       }
+      </div>
   </footer>
   </div>
   }

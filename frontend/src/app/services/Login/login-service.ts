@@ -199,6 +199,10 @@ private setSession(token: string) {
     if (token) {
       const payload = this.decodeToken(token);
       if (payload?.exp && Date.now() < payload.exp * 1000) {
+        // La sesión almacenada ya es válida localmente. Publicarla antes de
+        // refrescar permisos evita montar durante un instante la vista de
+        // login y recalcular después todo el shell autenticado.
+        this.loggedIn$.next(true);
         void this.restoreSessionFromToken(token);
       } else {
         this.clearLocalSession();

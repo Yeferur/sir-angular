@@ -16,7 +16,10 @@ import {
     Router,
     RouterLink,
     RouterLinkActive,
+    NavigationStart,
     NavigationEnd,
+    NavigationCancel,
+    NavigationError,
     ActivatedRoute,
 } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -29,11 +32,13 @@ import { GlobalSearchService } from '../services/global-search.service';
 import { SirDrawerService } from '../services/Drawer/drawer.service';
 import { PermisosService } from '../services/Permisos/permisos.service';
 import { UsuariosService } from '../services/Usuarios/usuarios';
+import { SirAlertService } from '../services/Alertas/alert.service';
 import { environment } from '../../environments/environment';
 
 import { GlobalSearchComponent } from '../components/global-search/global-search';
 import { TopbarTransitionService } from '../components/login/topbar-transition.service';
 import { LoginContentComponent } from '../components/login/login';
+import { AppActivityService } from '../services/app-activity.service';
 
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -73,15 +78,19 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private drawer = inject(SirDrawerService);
     private permisosService = inject(PermisosService);
     private usuariosService = inject(UsuariosService);
+    private alerts = inject(SirAlertService);
     private transitionService = inject(TopbarTransitionService);
     private cdr = inject(ChangeDetectorRef);
     private router = inject(Router);
     private activatedRoute = inject(ActivatedRoute);
+    private activity = inject(AppActivityService);
 
     readonly aiEnabled = !!environment.aiEnabled;
 
     // ── Señales del servicio global ──────────────────────────────
     globalSearchOpen = this.search.open;
+    searchQuery = this.search.query;
+    searchLoading = this.search.loading;
 
     // ── Estado local ─────────────────────────────────────────────
     user = signal<any>(null);
@@ -91,6 +100,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     mobileDrawerOpen = signal(false);
     sidebarHovered = signal(false);
     pageTitle = signal<string>('');
+    titleLeaving = signal(false);
+    titleEntering = signal(false);
+    readonly navigationActive = this.activity.visible;
 
     // Sidebar
     activeMenu = signal<string | null>(null);
@@ -99,20 +111,51 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     loadingError = signal<string | null>(null);
     systemEvent = signal<any>(null);
     topbarWidth = signal<number | null>(null);
-    measuringTopbar = signal(false);
     logoutStartRect = signal<{ top: number; left: number; width: number; height: number } | null>(null);
     transitionStage = signal<'island' | 'wide' | 'fullscreen'>('fullscreen');
     readonly transitionPhase = this.transitionService.phase;
+    readonly sessionTransitionMessage = computed(() => {
+        const phase = this.transitionPhase();
+        if (phase !== 'collapsing' && phase !== 'expanding') return null;
+
+        const sessionUser = this.user() || this.authService.getUser();
+        const firstName = String(sessionUser?.name || '').trim().split(/\s+/)[0];
+
+        if (phase === 'collapsing') {
+            return {
+                kind: 'welcome' as const,
+                title: firstName ? `Qué bueno verte, ${firstName}` : 'Qué bueno verte',
+            };
+        }
+
+        return {
+            kind: 'farewell' as const,
+            title: firstName ? `Hasta pronto, ${firstName}` : 'Hasta pronto',
+        };
+    });
+    readonly topbarFeedbackType = computed(() => {
+        const toasts = this.alerts.toasts();
+        return toasts.length ? toasts[toasts.length - 1].type : null;
+    });
 
     @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
+    @ViewChild('topbarContent') private topbarContent?: ElementRef<HTMLElement>;
+    @ViewChild('topbarSearchInput') private topbarSearchInput?: ElementRef<HTMLInputElement>;
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
     private transitionFallbackTimer?: number;
+    private finishRouteActivity?: () => void;
+    private titleMotionTimer?: number;
 
     private readonly topbarStateEffect = effect(() => {
         this.topbarState();
         queueMicrotask(() => this.syncTopbarWidth());
+    });
+
+    private readonly searchFocusEffect = effect(() => {
+        if (!this.globalSearchOpen()) return;
+        window.setTimeout(() => this.topbarSearchInput?.nativeElement.focus(), 80);
     });
 
     private readonly loginTargetEffect = effect(() => {
@@ -203,19 +246,28 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // Título de la página desde datos de ruta. También mantiene
         // currentUrl al día siempre (con o sin sesión) — showAuthSlot
         // lo necesita para saber si estamos en /reset-password.
-        this.routerSub = this.router.events
-            .pipe(filter(e => e instanceof NavigationEnd))
-            .subscribe(event => {
-                const navEnd = event as NavigationEnd;
+        this.routerSub = this.router.events.subscribe(event => {
+            if (event instanceof NavigationStart) {
+                this.startNavigationMotion();
+                return;
+            }
+
+            if (event instanceof NavigationEnd) {
+                const navEnd = event;
                 this.currentUrl.set(navEnd.urlAfterRedirects || navEnd.url);
 
                 let route = this.activatedRoute;
                 while (route.firstChild) route = route.firstChild;
                 const title = route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
                 this.pageTitle.set(this.extractTitle(title));
-                // El título cambia el ancho del contenido; remedir tras el cambio.
-                queueMicrotask(() => this.syncTopbarWidth());
-            });
+                this.finishNavigationMotion(true);
+                return;
+            }
+
+            if (event instanceof NavigationCancel || event instanceof NavigationError) {
+                this.finishNavigationMotion(false);
+            }
+        });
 
         // Título inicial (carga directa)
         const getLeafTitle = () => {
@@ -269,38 +321,33 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
         if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
+        this.finishRouteActivity?.();
+        if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
     }
 
-    // Sin manejo de transitionend ni timers: el título se muestra siempre,
-    // solo el ancho de la isla se anima. La medición se hace con doble rAF
-    // para dejar que el layout (fuentes, imágenes) se asiente antes de
-    // leer scrollWidth, en vez de medir en el mismo frame del cambio.
+    // El ancho se obtiene del contenido interno, que conserva su medida
+    // natural sin cambiar la geometría visible de la isla. Así la barra no
+    // salta a max-content durante la carga o al asentarse las fuentes.
     private syncTopbarWidth(): void {
         requestAnimationFrame(() => requestAnimationFrame(() => {
             const bar = this.topbarBar?.nativeElement;
-            if (!bar) return;
+            const content = this.topbarContent?.nativeElement;
+            if (!bar || !content) return;
 
-            // Medir en modo natural mediante una clase CSS controlada por
-            // Angular; no escribir geometrÃ­a directamente en el elemento.
-            this.measuringTopbar.set(true);
+            const styles = getComputedStyle(bar);
+            const horizontalChrome =
+                (Number.parseFloat(styles.paddingLeft) || 0) +
+                (Number.parseFloat(styles.paddingRight) || 0) +
+                (Number.parseFloat(styles.borderLeftWidth) || 0) +
+                (Number.parseFloat(styles.borderRightWidth) || 0);
+            const nextWidth = Math.min(
+                Math.ceil(content.scrollWidth + horizontalChrome),
+                Math.max(220, window.innerWidth - 30),
+            );
 
-            requestAnimationFrame(() => {
-                const nextWidth = Math.min(
-                    Math.ceil(bar.scrollWidth + 8),
-                    Math.max(220, window.innerWidth - 30),
-                );
-                this.measuringTopbar.set(false);
-
-                if (this.topbarWidth() !== nextWidth) {
-                    this.topbarWidth.set(nextWidth);
-                }
-
-            // Rect real tras el cambio de ancho — un frame más para que el
-            // navegador ya haya re-centrado la isla con el ancho nuevo
-            // (el left depende del width porque está centrada por flex).
-                requestAnimationFrame(() => {
-                });
-            });
+            if (this.topbarWidth() !== nextWidth) {
+                this.topbarWidth.set(nextWidth);
+            }
         }));
     }
 
@@ -334,18 +381,119 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.closeAllSubmenus();
     }
 
+    onBrandClick(): void {
+        this.closeProfileMenu();
+        this.closeMobileDrawer();
+        this.closeGlobalSearch();
+    }
+
 
     navigateToProfile(): void {
         this.closeProfileMenu();
         this.router.navigate(['/Perfil/Editar']);
     }
 
-    toggleTheme(): void {
-        this.isDarkMode = !this.isDarkMode;
-        const nextTheme = this.isDarkMode ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('theme', nextTheme);
-        this.cdr.markForCheck();
+    toggleTheme(event?: MouseEvent): void {
+        if (document.documentElement.classList.contains('sir-theme-switching')) return;
+
+        const nextDarkMode = !this.isDarkMode;
+        const nextTheme = nextDarkMode ? 'dark' : 'light';
+        const root = document.documentElement;
+        const applyTheme = () => {
+            this.isDarkMode = nextDarkMode;
+            root.setAttribute('data-theme', nextTheme);
+            localStorage.setItem('theme', nextTheme);
+            this.cdr.markForCheck();
+        };
+
+        const startViewTransition = (
+            document as Document & {
+                startViewTransition?: (
+                    update: () => void | Promise<void>
+                ) => { ready: Promise<void>; finished: Promise<void> };
+            }
+        ).startViewTransition;
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            applyTheme();
+            return;
+        }
+
+        const x = event?.clientX ?? window.innerWidth / 2;
+        const y = event?.clientY ?? 38;
+        const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+
+        if (!startViewTransition) {
+            root.classList.add('sir-theme-switching');
+
+            const orb = document.createElement('span');
+            orb.className = 'sir-theme-transition-orb';
+            orb.style.setProperty('--theme-x', `${x}px`);
+            orb.style.setProperty('--theme-y', `${y}px`);
+            orb.style.setProperty('--theme-scale', String(Math.max(1, radius / 10)));
+            // Coincide con --body-color del tema de destino. Así la cubierta y
+            // el fondo revelado no producen dos tonalidades consecutivas.
+            orb.style.background = nextDarkMode ? '#121212' : '#ffffff';
+            document.body.appendChild(orb);
+
+            let applied = false;
+            const revealFinalTheme = () => {
+                if (applied) return;
+                applied = true;
+                applyTheme();
+
+                // Espera a que Angular y el navegador hayan pintado el tema
+                // final antes de retirar la cubierta circular.
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    orb.classList.add('is-fading');
+                    window.setTimeout(() => {
+                        orb.remove();
+                        root.classList.remove('sir-theme-switching');
+                    }, 160);
+                }));
+            };
+
+            orb.addEventListener('transitionend', (transitionEvent) => {
+                if (transitionEvent.propertyName === 'transform') revealFinalTheme();
+            });
+            requestAnimationFrame(() => requestAnimationFrame(() => orb.classList.add('is-active')));
+            window.setTimeout(revealFinalTheme, 650);
+            return;
+        }
+
+        root.classList.add('sir-theme-switching');
+
+        // El callback debe terminar de inmediato: mientras está pendiente, la
+        // View Transition mantiene congelada la captura anterior y el navegador
+        // puede impedir que requestAnimationFrame llegue a ejecutarse.
+        const transition = startViewTransition.call(document, applyTheme);
+
+        const finishThemeSwitch = () => root.classList.remove('sir-theme-switching');
+
+        transition.ready.then(() => {
+            try {
+                root.animate(
+                    {
+                        clipPath: [
+                            `circle(0px at ${x}px ${y}px)`,
+                            `circle(${radius}px at ${x}px ${y}px)`,
+                        ],
+                    },
+                    {
+                        duration: 560,
+                        easing: 'cubic-bezier(.22,.75,.2,1)',
+                        fill: 'both',
+                        pseudoElement: '::view-transition-new(root)',
+                    }
+                );
+            } catch {
+                // El tema ya quedó aplicado; solo evitamos dejar bloqueado el
+                // control si el navegador no admite animar el pseudo-elemento.
+                finishThemeSwitch();
+            }
+        }, finishThemeSwitch);
+
+        transition.finished.then(finishThemeSwitch, finishThemeSwitch);
     }
 
     async handleLogout(): Promise<void> {
@@ -434,8 +582,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
     // ── Búsqueda global ──
-    openGlobalSearch(): void { this.search.openSearch(); }
+    openGlobalSearch(): void {
+        this.closeProfileMenu();
+        this.search.openSearch();
+    }
     closeGlobalSearch(): void { this.search.closeSearch(); }
+    onTopbarSearchInput(event: Event): void {
+        this.search.query.set((event.target as HTMLInputElement).value);
+    }
+    submitTopbarSearch(): void {
+        const query = this.searchQuery().trim();
+        if (query) this.search.searchGlobal(query);
+    }
     showSystemEvent(payload: any): void { this.systemEvent.set(payload); }
 
 
@@ -476,6 +634,11 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         }
     }
 
+    @HostListener('window:resize')
+    handleWindowResize(): void {
+        this.syncTopbarWidth();
+    }
+
 
     // ── Helpers privados ─────────────────────────────────────────
 
@@ -483,6 +646,32 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // "SIR · Nueva Reserva" → "Nueva Reserva"
         const parts = docTitle.split('·');
         return parts.length > 1 ? parts[parts.length - 1].trim() : docTitle.trim();
+    }
+
+    private startNavigationMotion(): void {
+        if (!this.showAppChrome()) return;
+        if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
+
+        this.finishRouteActivity?.();
+        this.finishRouteActivity = this.activity.begin();
+        this.titleEntering.set(false);
+        this.titleLeaving.set(true);
+    }
+
+    private finishNavigationMotion(titleChanged: boolean): void {
+        this.finishRouteActivity?.();
+        this.finishRouteActivity = undefined;
+        this.titleLeaving.set(false);
+
+        if (titleChanged) {
+            this.titleEntering.set(false);
+            requestAnimationFrame(() => {
+                this.titleEntering.set(true);
+                this.titleMotionTimer = window.setTimeout(() => this.titleEntering.set(false), 320);
+            });
+            queueMicrotask(() => this.syncTopbarWidth());
+        }
+
     }
 
     private refreshAvatar(): void {

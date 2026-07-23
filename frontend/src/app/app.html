@@ -1,8 +1,11 @@
 <app-layout></app-layout>
+<!-- El host es global: también debe sobrevivir al logout y a las rutas públicas. -->
+<app-sir-alerts></app-sir-alerts>
 
 @if (viewLoggedIn()) {
-  <div class="app-shell app-shell--private">
-    <app-sir-alerts></app-sir-alerts>
+  <div class="app-shell app-shell--private"
+       [class.is-entering]="shellEntering()"
+       [class.is-navigating]="routeTransitioning">
     <app-sir-drawer></app-sir-drawer>
     <div class="main-shell">
       <main class="content">

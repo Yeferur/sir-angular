@@ -1,10 +1,15 @@
 <!-- components/reserva/reserva.html -->
 <div class="page-container">
   @if (isLoading) {
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Cargando reserva...</p>
-    </div>
+    <app-loading-state label="Cargando reserva…"></app-loading-state>
+  } @else if (loadError && !reserva) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos cargar la reserva"
+      [detail]="loadError"
+      actionLabel="Reintentar"
+      (action)="retryLoad()">
+    </app-loading-state>
   } @else if (reserva) {
     <div class="reserva-view detail-shell">
       <header class="detail-header view-header-top">
@@ -22,10 +27,22 @@
           </div>
         </div>
 
-        <button class="btn-close" (click)="onClose.emit()">✕</button>
+        <button class="btn-close" type="button" aria-label="Cerrar detalle de reserva" (click)="onClose.emit()">✕</button>
       </header>
 
       <main class="detail-scroll">
+        @if (isRefreshing) {
+          <div class="detail-update-state" role="status">
+            <span class="detail-update-dot" aria-hidden="true"></span>
+            Actualizando
+          </div>
+        }
+        @if (loadError) {
+          <div class="detail-inline-error" role="alert">
+            <span>{{ loadError }}</span>
+            <button type="button" (click)="retryLoad()">Reintentar</button>
+          </div>
+        }
         <div class="view-header">
           <div class="summary-strip">
             <div class="summary-item">
@@ -42,7 +59,12 @@
               </div>
             }
 
-            @if (reserva.Pendiente != null) {
+            @if (esPagoDirecto) {
+              <div class="summary-item summary-item--payment-mode">
+                <span class="summary-label">Modalidad de pago</span>
+                <span class="summary-value">Pago en punto</span>
+              </div>
+            } @else if (reserva.Pendiente != null) {
               <div class="summary-item">
                 <span class="summary-label">Pendiente</span>
                 <span class="summary-value">
@@ -52,21 +74,23 @@
             }
           </div>
 
-          @if (reserva.TotalNeto != null && reserva.Pendiente != null) {
-            @let total = reserva.TotalNeto;
-            @let pendiente = reserva.Pendiente;
-            @let pagadoPct = total > 0 ? ((total - pendiente) / total) * 100 : 0;
+          @if (!esPagoDirecto && reserva.TotalNeto != null && reserva.Pendiente != null) {
             <div class="payment-progress">
               <div class="progress-track">
                 <div class="progress-fill"
-                  [class.green]="pagadoPct >= 100"
-                  [class.blue]="pagadoPct >= 50 && pagadoPct < 100"
-                  [class.yellow]="pagadoPct > 0 && pagadoPct < 50"
-                  [class.red]="pagadoPct === 0"
-                  [style.width.%]="pagadoPct">
+                  [class.green]="porcentajePagado >= 100"
+                  [class.blue]="porcentajePagado >= 50 && porcentajePagado < 100"
+                  [class.yellow]="porcentajePagado > 0 && porcentajePagado < 50"
+                  [class.red]="porcentajePagado === 0"
+                  [style.width.%]="porcentajePagado">
                 </div>
               </div>
-              <span class="progress-label">{{ pagadoPct | number:'1.0-0' }}% pagado</span>
+              <span class="progress-label">{{ porcentajePagado | number:'1.0-0' }}% pagado</span>
+            </div>
+          } @else if (esPagoDirecto) {
+            <div class="payment-mode-note">
+              <span class="payment-mode-dot" aria-hidden="true"></span>
+              El cobro se registra al momento del servicio.
             </div>
           }
         </div>
@@ -78,10 +102,6 @@
             <div class="info-row">
               <span class="info-label">Tour</span>
               <span class="info-value">{{ reserva.TourReserva || '—' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Tipo de reserva</span>
-              <span class="info-value">{{ tipoReservaMostrada }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Fecha</span>
@@ -158,7 +178,12 @@
 
       <div class="passengers-section">
         <div class="section-head">
-          <h2>Pasajeros</h2>
+          <div>
+            <h2>Pasajeros</h2>
+            @if (resumenTiposPasajero) {
+              <p>{{ resumenTiposPasajero }}</p>
+            }
+          </div>
           <span class="section-count">{{ reserva.NumeroPasajeros || 0 }}</span>
         </div>
 
@@ -169,6 +194,9 @@
                 <div class="passenger-main">
                   <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
                   <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                  @if (p.Nacionalidad || (p.IdPas && p.TelefonoPasajero)) {
+                    <span class="passenger-meta">{{ p.Nacionalidad || '—' }}{{ p.IdPas && p.TelefonoPasajero ? ' · ' + p.TelefonoPasajero : '' }}</span>
+                  }
                 </div>
                 <div class="passenger-side">
                   <span class="passenger-pill adulto">Adulto</span>
@@ -186,6 +214,9 @@
                 <div class="passenger-main">
                   <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
                   <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                  @if (p.Nacionalidad || (p.IdPas && p.TelefonoPasajero)) {
+                    <span class="passenger-meta">{{ p.Nacionalidad || '—' }}{{ p.IdPas && p.TelefonoPasajero ? ' · ' + p.TelefonoPasajero : '' }}</span>
+                  }
                 </div>
                 <div class="passenger-side">
                   <span class="passenger-pill nino">Niño</span>
@@ -203,6 +234,9 @@
                 <div class="passenger-main">
                   <span class="passenger-name">{{ p.NombrePasajero || '—' }}</span>
                   <span class="passenger-detail">{{ p.IdPas || p.TelefonoPasajero || '—' }}</span>
+                  @if (p.Nacionalidad || (p.IdPas && p.TelefonoPasajero)) {
+                    <span class="passenger-meta">{{ p.Nacionalidad || '—' }}{{ p.IdPas && p.TelefonoPasajero ? ' · ' + p.TelefonoPasajero : '' }}</span>
+                  }
                 </div>
                 <div class="passenger-side">
                   <span class="passenger-pill infante">Infante</span>
@@ -218,20 +252,33 @@
       </main>
 
       <footer class="detail-footer actions-footer">
-        <button class="btn-secondary action-pill" (click)="descargarArchivoReserva()">Descargar PDF</button>
-        @if (comprobantesDisponibles.length) {
-          <button class="btn-secondary action-pill" (click)="descargarComprobantesReserva()">Descargar comprobantes</button>
-        }
-        <button class="btn-secondary action-pill" (click)="abrirDuplicarReserva()">Duplicar</button>
-        @if (puedeCancelar) {
-          <button class="btn-danger btn-cancel-soft" (click)="cancelarReserva()">Cancelar</button>
-        }
-        @if (canDeleteReserva) {
-          <button class="btn-danger btn-delete-strong action-pill" (click)="eliminarReserva()">Eliminar</button>
-        }
-        @if (canUpdateReserva) {
-          <button class="btn-primary" (click)="editarReserva()">Editar</button>
-        }
+        <div class="footer-action-group footer-action-group--files">
+          <button type="button" class="btn-secondary action-pill" [disabled]="activeAction !== null" (click)="descargarArchivoReserva()">
+            @if (activeAction === 'pdf') { <span class="button-spinner" aria-hidden="true"></span> Generando… } @else { Descargar PDF }
+          </button>
+          @if (comprobantesDisponibles.length) {
+            <button type="button" class="btn-secondary action-pill" [disabled]="activeAction !== null" (click)="descargarComprobantesReserva()">
+              @if (activeAction === 'comprobantes') { <span class="button-spinner" aria-hidden="true"></span> Descargando… } @else { Comprobantes }
+            </button>
+          }
+        </div>
+
+        <div class="footer-action-group footer-action-group--primary">
+          <button type="button" class="btn-secondary action-pill" [disabled]="activeAction !== null" (click)="abrirDuplicarReserva()">Duplicar</button>
+          @if (puedeCancelar) {
+            <button type="button" class="btn-danger btn-cancel-soft" [disabled]="activeAction !== null" (click)="cancelarReserva()">
+              @if (activeAction === 'cancelar') { <span class="button-spinner" aria-hidden="true"></span> Cancelando… } @else { Cancelar }
+            </button>
+          }
+          @if (canDeleteReserva) {
+            <button type="button" class="btn-danger btn-delete-strong action-pill" [disabled]="activeAction !== null" (click)="eliminarReserva()">
+              @if (activeAction === 'eliminar') { <span class="button-spinner" aria-hidden="true"></span> Eliminando… } @else { Eliminar }
+            </button>
+          }
+          @if (canUpdateReserva) {
+            <button type="button" class="btn-primary" [disabled]="activeAction !== null" (click)="editarReserva()">Editar</button>
+          }
+        </div>
       </footer>
     </div>
   }

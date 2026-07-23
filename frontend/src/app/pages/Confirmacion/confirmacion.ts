@@ -7,11 +7,12 @@ import { ConfirmacionService } from '../../services/confirmacion.service';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService, type AlertButton } from '../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
 @Component({
     selector: 'app-confirmacion',
     standalone: true,
-    imports: [CommonModule, FormsModule, DatepickerComponent],
+    imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
     templateUrl: './confirmacion.html',
     styleUrl: './confirmacion.css'
 })
@@ -20,7 +21,6 @@ export class ConfirmacionComponent implements OnInit {
 
     toursList: any[] = [];
     pasajeros: any[] = [];
-    skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
 
     allChecked  = false;
     hasSearched = false;

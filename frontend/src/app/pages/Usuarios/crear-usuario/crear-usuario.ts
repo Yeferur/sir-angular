@@ -8,6 +8,7 @@ import { PermisosService, Rol } from '../../../services/Permisos/permisos.servic
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const pass = group.get('Contrasena')?.value;
@@ -19,7 +20,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 @Component({
   selector: 'app-crear-usuario',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective],
+  imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective, LoadingStateComponent],
   templateUrl: './crear-usuario.html',
   styleUrls: ['../usuario-shared.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -38,8 +39,6 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   isLoading = signal(true);
   catalogLoading = signal(false);
   isSubmitting = signal(false);
-  skeletonCards = [0, 1, 2];
-  skeletonPermissionRows = [0, 1, 2, 3, 4, 5];
   private pendingLoads = 0;
   errorMsg = '';
 

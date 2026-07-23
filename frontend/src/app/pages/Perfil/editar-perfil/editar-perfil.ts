@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService, type AlertButton } from '../../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const pass = group.get('Contrasena')?.value;
@@ -15,7 +16,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 @Component({
   selector: 'app-editar-perfil',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, LoadingStateComponent],
   templateUrl: './editar-perfil.html',
   styleUrls: ['./editar-perfil.css'],
   changeDetection: ChangeDetectionStrategy.Default,
@@ -35,8 +36,6 @@ export class EditarPerfilComponent implements OnInit {
   isUploadingAvatar = signal(false);
   isDeletingAvatar = signal(false);
 
-  readonly skeletonAccountFields = [0, 1, 2, 3];
-  readonly skeletonSecurityFields = [0, 1];
 
   private readonly PHONE_REGEX = /^[0-9]{7,15}$/;
   private mapAlertButtons(buttons?: Array<{ text: string; style: string; onClick: () => void }>): AlertButton[] | undefined {

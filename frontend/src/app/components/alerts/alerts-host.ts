@@ -1,23 +1,29 @@
 import {
-  Component, inject, HostListener, OnInit, OnDestroy,
-  NgZone, ChangeDetectorRef, ChangeDetectionStrategy, effect
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  effect,
+  HostListener,
+  inject,
+  NgZone,
+  OnDestroy,
 } from '@angular/core';
-import { SirAlertService } from '../../services/Alertas/alert.service';
+import { AlertType, SirAlertService, SirToast } from '../../services/Alertas/alert.service';
 
-interface PillToast {
-  id:      string;
-  type:    'success' | 'info' | 'warning' | 'error';
-  title:   string;
-  message?: string;
-  phase:   'drop' | 'expand' | 'live' | 'collapse' | 'fade';
-  width:   number;
+type ToastPhase = 'enter' | 'live' | 'exit';
+
+interface ToastView extends SirToast {
+  phase: ToastPhase;
+  remainingMs: number;
+  startedAt: number;
+  paused: boolean;
 }
 
-const COLORS: Record<string, { icon: string; bg: string }> = {
-  success: { icon: '#30d158', bg: 'rgba(48,209,88,0.15)'  },
-  error:   { icon: '#ff453a', bg: 'rgba(255,69,58,0.15)'  },
-  info:    { icon: '#5ac8fa', bg: 'rgba(10,132,255,0.15)' },
-  warning: { icon: '#ffd60a', bg: 'rgba(255,214,10,0.12)' },
+const TYPE_LABEL: Record<AlertType, string> = {
+  success: 'Listo',
+  info: 'Información',
+  warning: 'Atención',
+  error: 'Error',
 };
 
 @Component({
@@ -25,141 +31,212 @@ const COLORS: Record<string, { icon: string; bg: string }> = {
   standalone: true,
   imports: [],
   templateUrl: './alerts-host.html',
-  styleUrls:  ['./alerts-host.css'],
+  styleUrls: ['./alerts-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SirAlertsHostComponent implements OnInit, OnDestroy {
-  readonly alertSvc  = inject(SirAlertService);
-  private  zone      = inject(NgZone);
-  private  cdr       = inject(ChangeDetectorRef);
+export class SirAlertsHostComponent implements OnDestroy {
+  readonly alertSvc = inject(SirAlertService);
+  private readonly zone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
 
-  readonly modal    = this.alertSvc.modal;
+  readonly modal = this.alertSvc.modal;
   readonly critical = this.alertSvc.critical;
 
-  pills: PillToast[] = [];
-  private timers = new Map<string, ReturnType<typeof setTimeout>[]>();
-  private prevToastIds = new Set<string>();
-  private modalTimer?: ReturnType<typeof setTimeout>;
+  visibleToasts: ToastView[] = [];
 
-  private readonly T_DROP     = 260;
-  private readonly T_WAIT1    = 100;
-  private readonly T_EXPAND   = 360;
-  private readonly T_LIVE_MIN = 2800;
-  private readonly T_LIVE_MAX = 6000;
-  private readonly T_COLLAPSE = 300;
-  private readonly T_WAIT2    = 180;
-  private readonly T_FADE     = 220;
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private modalTimer?: ReturnType<typeof setTimeout>;
+  private restoreFocusTo: HTMLElement | null = null;
+  private dialogWasOpen = false;
 
   private readonly toastEffect = effect(() => {
-    const current = this.alertSvc.toasts();
-    this.zone.runOutsideAngular(() => {
-      for (const toast of current) {
-        if (!this.prevToastIds.has(toast.id)) {
-          this.prevToastIds.add(toast.id);
-          this.zone.run(() => this.addPill(toast.id, toast.type, toast.title, toast.message, toast.durationMs));
-        }
-      }
-    });
+    const queued = this.alertSvc.toasts();
+    const visibleIds = new Set(this.visibleToasts.map((toast) => toast.id));
+    const available = queued.filter((toast) => !visibleIds.has(toast.id));
+    const slots = Math.max(0, 3 - this.visibleToasts.length);
+
+    for (const toast of available.slice(0, slots)) {
+      this.mountToast(toast);
+    }
   });
 
-  private readonly modalEffect = effect(() => {
+  private readonly dialogEffect = effect(() => {
     const modal = this.modal();
+    const critical = this.critical();
+    const dialogOpen = Boolean(modal || critical);
+
     clearTimeout(this.modalTimer);
     this.modalTimer = undefined;
 
-    if (!modal?.autoClose) {
-      return;
+    if (modal?.autoClose) {
+      const timeout = Math.max(2500, Number(modal.autoCloseTime || 4500));
+      this.modalTimer = setTimeout(() => {
+        if (this.modal()?.id === modal.id) this.alertSvc.closeModal();
+      }, timeout);
     }
 
-    const timeout = Math.max(500, Number(modal.autoCloseTime || 3000));
-    this.modalTimer = setTimeout(() => {
-      if (this.modal()?.id === modal.id) {
-        this.alertSvc.closeModal();
-      }
-    }, timeout);
-  });
+    if (dialogOpen && !this.dialogWasOpen) {
+      this.restoreFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.body.classList.add('sir-dialog-open');
+      queueMicrotask(() => this.focusDialog());
+    } else if (!dialogOpen && this.dialogWasOpen) {
+      document.body.classList.remove('sir-dialog-open');
+      queueMicrotask(() => this.restoreFocusTo?.focus());
+      this.restoreFocusTo = null;
+    } else if (dialogOpen) {
+      queueMicrotask(() => this.focusDialog());
+    }
 
-  ngOnInit(): void {}
+    this.dialogWasOpen = dialogOpen;
+  });
 
   ngOnDestroy(): void {
     clearTimeout(this.modalTimer);
-    for (const timers of this.timers.values()) timers.forEach(clearTimeout);
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    document.body.classList.remove('sir-dialog-open');
   }
 
-  iconColor(type: string): string { return COLORS[type]?.icon ?? '#fff'; }
-  iconBg(type: string):    string { return COLORS[type]?.bg   ?? 'rgba(255,255,255,0.1)'; }
+  typeLabel(type: AlertType): string {
+    return TYPE_LABEL[type];
+  }
 
-  /** Ancho objetivo de la píldora según cuánto texto trae.
-   *  Ya no se intenta caber todo en una sola línea: el mensaje
-   *  puede ocupar hasta 2 líneas (ver CSS), así que esto solo
-   *  define una columna de lectura cómoda, no el ancho exacto del texto. */
-  private computePillWidth(title: string, message?: string): number {
-    if (!message) {
-      // solo título -> píldora compacta ajustada al texto
-      return Math.min(260, Math.max(150, 76 + title.length * 6.5));
+  pauseToast(id: string): void {
+    const toast = this.visibleToasts.find((item) => item.id === id);
+    if (!toast || toast.paused || toast.phase === 'exit') return;
+
+    const elapsed = performance.now() - toast.startedAt;
+    toast.remainingMs = Math.max(600, toast.remainingMs - elapsed);
+    toast.paused = true;
+    this.clearToastTimer(id);
+    this.updateToast(id, { ...toast });
+  }
+
+  resumeToast(id: string): void {
+    const toast = this.visibleToasts.find((item) => item.id === id);
+    if (!toast || !toast.paused || toast.phase === 'exit') return;
+
+    toast.paused = false;
+    toast.startedAt = performance.now();
+    this.updateToast(id, { ...toast });
+    this.scheduleDismiss(toast);
+  }
+
+  dismissToast(id: string): void {
+    const toast = this.visibleToasts.find((item) => item.id === id);
+    if (!toast || toast.phase === 'exit') return;
+
+    this.clearToastTimer(id);
+    this.updateToast(id, { ...toast, phase: 'exit', paused: false });
+    this.zone.runOutsideAngular(() => {
+      const timer = setTimeout(() => this.zone.run(() => this.removeToast(id)), 220);
+      this.timers.set(id, timer);
+    });
+  }
+
+  runToastAction(toast: ToastView): void {
+    try {
+      toast.action?.onClick();
+    } finally {
+      this.dismissToast(toast.id);
     }
-    const longest = Math.max(title.length, message.length);
-    if (longest <= 28) return 280;
-    if (longest <= 48) return 320;
-    return 360; // a partir de aquí, el clamp de 2 líneas + ellipsis hace el resto
-  }
-
-  /** Tiempo "vivo" proporcional a la cantidad de texto — solo se usa
-   *  como fallback si el servicio no mandó un durationMs explícito. */
-  private computeLiveDuration(title: string, message?: string): number {
-    const chars = title.length + (message?.length ?? 0);
-    return Math.min(this.T_LIVE_MAX, Math.max(this.T_LIVE_MIN, chars * 45));
-  }
-
-  addPill(id: string, type: any, title: string, message?: string, durationMs?: number): void {
-    const width = this.computePillWidth(title, message);
-    const liveDuration = durationMs && durationMs > 0
-      ? durationMs
-      : this.computeLiveDuration(title, message);
-
-    const pill: PillToast = { id, type, title, message, phase: 'drop', width };
-    this.pills = [...this.pills, pill];
-    this.cdr.markForCheck();
-
-    const t = (ms: number, fn: () => void) => setTimeout(fn, ms);
-    const ts: ReturnType<typeof setTimeout>[] = [];
-    const total = (a: number, b: number) => a + b;
-
-    const t1 = total(this.T_DROP, this.T_WAIT1);
-    const t2 = total(t1, this.T_EXPAND + liveDuration);
-    const t3 = total(t2, this.T_COLLAPSE + this.T_WAIT2);
-    const t4 = total(t3, this.T_FADE + 60);
-
-    ts.push(t(t1, () => this.setPhase(id, 'expand')));
-    ts.push(t(t2, () => this.setPhase(id, 'collapse')));
-    ts.push(t(t3, () => this.setPhase(id, 'fade')));
-    ts.push(t(t4, () => { this.removePill(id); this.alertSvc.dismissToast(id); }));
-
-    this.timers.set(id, ts);
-  }
-
-  private setPhase(id: string, phase: PillToast['phase']): void {
-    this.pills = this.pills.map(p => p.id === id ? { ...p, phase } : p);
-    this.cdr.markForCheck();
-  }
-
-  private removePill(id: string): void {
-    this.pills = this.pills.filter(p => p.id !== id);
-    this.timers.get(id)?.forEach(clearTimeout);
-    this.timers.delete(id);
-    this.prevToastIds.delete(id);
-    this.cdr.markForCheck();
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    if (this.modal()) this.alertSvc.closeModal();
   }
 
   onModalBackdrop(): void {
-    const m = this.modal();
-    if (!m) return;
-    const hasRequired = (m.buttons ?? []).some(b => b.style !== 'secondary');
-    if (!hasRequired) this.alertSvc.closeModal();
+    if (this.modal()?.closeOnBackdrop) this.alertSvc.closeModal();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      if (this.critical()?.closeOnEscape) this.alertSvc.closeCritical();
+      else if (this.modal()?.closeOnEscape) this.alertSvc.closeModal();
+      return;
+    }
+
+    if (event.key === 'Tab' && (this.modal() || this.critical())) {
+      this.trapFocus(event);
+    }
+  }
+
+  private mountToast(toast: SirToast): void {
+    const view: ToastView = {
+      ...toast,
+      phase: 'enter',
+      remainingMs: toast.durationMs,
+      startedAt: performance.now(),
+      paused: false,
+    };
+
+    this.visibleToasts = [...this.visibleToasts, view];
+    this.cdr.markForCheck();
+
+    this.zone.runOutsideAngular(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        this.zone.run(() => {
+          const current = this.visibleToasts.find((item) => item.id === toast.id);
+          if (!current) return;
+          current.phase = 'live';
+          current.startedAt = performance.now();
+          this.updateToast(current.id, { ...current });
+          this.scheduleDismiss(current);
+        });
+      }));
+    });
+  }
+
+  private scheduleDismiss(toast: ToastView): void {
+    this.clearToastTimer(toast.id);
+    this.zone.runOutsideAngular(() => {
+      const timer = setTimeout(() => this.zone.run(() => this.dismissToast(toast.id)), toast.remainingMs);
+      this.timers.set(toast.id, timer);
+    });
+  }
+
+  private clearToastTimer(id: string): void {
+    const timer = this.timers.get(id);
+    if (timer) clearTimeout(timer);
+    this.timers.delete(id);
+  }
+
+  private removeToast(id: string): void {
+    this.clearToastTimer(id);
+    this.visibleToasts = this.visibleToasts.filter((toast) => toast.id !== id);
+    this.alertSvc.dismissToast(id);
+    this.cdr.markForCheck();
+  }
+
+  private updateToast(id: string, replacement: ToastView): void {
+    this.visibleToasts = this.visibleToasts.map((toast) => toast.id === id ? replacement : toast);
+    this.cdr.markForCheck();
+  }
+
+  private focusDialog(): void {
+    const panel = document.querySelector<HTMLElement>('[data-sir-dialog]');
+    if (!panel) return;
+    const preferred = panel.querySelector<HTMLElement>('[data-autofocus], button:not([disabled])');
+    (preferred ?? panel).focus();
+  }
+
+  private trapFocus(event: KeyboardEvent): void {
+    const panel = document.querySelector<HTMLElement>('[data-sir-dialog]');
+    if (!panel) return;
+    const focusable = Array.from(panel.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    if (!focusable.length) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 }

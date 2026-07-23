@@ -1,79 +1,17 @@
-@if (isPageLoading()) {
-<div class="page-container sk-ver-transfers">
-  <div class="page-header">
-    <div class="header-top">
-      <div class="header-text">
-        <div class="sk-line sk-vt-title"></div>
-        <div class="sk-line sk-vt-subtitle"></div>
-      </div>
-      <div class="header-actions">
-        <div class="sk-field sk-vt-btn"></div>
-      </div>
-    </div>
-
-    <div class="search-row">
-      <div class="search-container">
-        <div class="sk-field sk-vt-search"></div>
-      </div>
-      <div class="sk-field sk-vt-icon-btn"></div>
-      <div class="sk-field sk-vt-btn"></div>
-    </div>
-
-    <div class="active-filters">
-      <div class="sk-field sk-vt-chip"></div>
-      <div class="sk-field sk-vt-chip"></div>
-      <div class="sk-field sk-vt-chip"></div>
-    </div>
-  </div>
-
-  <div class="results-area">
-    <div class="results-list">
-      <div class="sk-result-item">
-        <div class="sk-field sk-vt-status"></div>
-        <div class="sk-vt-item-info">
-          <div class="sk-line sk-vt-item-id"></div>
-          <div class="sk-line sk-vt-item-tour"></div>
-          <div class="sk-line sk-vt-item-meta"></div>
-        </div>
-        <div class="sk-line sk-vt-arrow"></div>
-      </div>
-      <div class="sk-result-item">
-        <div class="sk-field sk-vt-status"></div>
-        <div class="sk-vt-item-info">
-          <div class="sk-line sk-vt-item-id"></div>
-          <div class="sk-line sk-vt-item-tour"></div>
-          <div class="sk-line sk-vt-item-meta"></div>
-        </div>
-        <div class="sk-line sk-vt-arrow"></div>
-      </div>
-      <div class="sk-result-item">
-        <div class="sk-field sk-vt-status"></div>
-        <div class="sk-vt-item-info">
-          <div class="sk-line sk-vt-item-id"></div>
-          <div class="sk-line sk-vt-item-tour"></div>
-          <div class="sk-line sk-vt-item-meta"></div>
-        </div>
-        <div class="sk-line sk-vt-arrow"></div>
-      </div>
-      <div class="sk-result-item sk-result-item--last">
-        <div class="sk-field sk-vt-status"></div>
-        <div class="sk-vt-item-info">
-          <div class="sk-line sk-vt-item-id"></div>
-          <div class="sk-line sk-vt-item-tour"></div>
-          <div class="sk-line sk-vt-item-meta"></div>
-        </div>
-        <div class="sk-line sk-vt-arrow"></div>
-      </div>
-    </div>
-  </div>
-</div>
+@if (isLoading()) {
+  <app-loading-state label="Preparando la consulta de transfers…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar los transfers"
+    [detail]="loadError()"
+    (action)="loadInitialData()">
+  </app-loading-state>
 } @else {
-<div class="page-container">
+<div class="page-container reservation-browser transfer-browser">
 
-  <!-- HEADER -->
-  <div class="page-header">
-
-    <!-- SEARCH ROW -->
+  <!-- SEARCH COMMAND -->
+  <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -87,27 +25,45 @@
           (input)="onMainSearchInput($any($event.target).value)"
           (keyup.enter)="buscarTransfers()"
           autocomplete="off"
+          aria-label="Buscar transfers"
         />
+        @if (filters().Nombre_Titular) {
+          <button
+            type="button"
+            class="search-clear"
+            (click)="clearMainSearch()"
+            aria-label="Limpiar búsqueda">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        }
       </div>
 
-      <button class="btn-filter" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())"
-        [class.btn-filter--active]="advancedFiltersVisible()">
+      <button type="button" class="btn-filter" (click)="toggleAdvancedFilters()"
+        [class.btn-filter--active]="advancedFiltersVisible()"
+        aria-controls="transfer-advanced-filters"
+        [attr.aria-label]="activeFilterCount() ? 'Filtros, ' + activeFilterCount() + ' activos' : 'Filtros'"
+        [attr.aria-expanded]="advancedFiltersVisible()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
         </svg>
         Filtros
-        @if (activeFilterCount() > 0) {
-          <span class="filter-count">{{ activeFilterCount() }}</span>
-        }
+        <span
+          class="filter-count"
+          [class.filter-count--empty]="activeFilterCount() === 0"
+          aria-hidden="true">{{ activeFilterCount() || 0 }}</span>
       </button>
 
-      <button class="btn-primary" (click)="buscarTransfers()" [disabled]="isPageLoading() || isSearching()">
-        @if (isSearching()) {
-          <span class="btn-spinner"></span>
-          Buscando...
-        } @else {
-          Buscar
-        }
+      <button
+        type="button"
+        class="btn-primary reservation-search-button"
+        (click)="buscarTransfers()"
+        [disabled]="isSearching()"
+        [attr.aria-busy]="isSearching()"
+        [attr.aria-label]="isSearching() ? 'Buscando transfers' : 'Buscar transfers'">
+        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Buscar</span>
+        <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
       </button>
     </div>
 
@@ -117,7 +73,7 @@
         @if (filters().Fecha_Transfer) {
           <div class="filter-token">
             Fecha transfer: {{ filters().Fecha_Transfer | date:'d MMM yyyy':'':'es-CO' }}
-            <button class="remove-token-btn" (click)="clearFechaTransfer()">
+            <button type="button" class="remove-token-btn" (click)="clearFechaTransfer()" aria-label="Quitar fecha del transfer">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -125,7 +81,7 @@
         @if (filters().Fecha_Registro) {
           <div class="filter-token">
             Registro: {{ filters().Fecha_Registro | date:'d MMM yyyy':'':'es-CO' }}
-            <button class="remove-token-btn" (click)="clearFechaRegistro()">
+            <button type="button" class="remove-token-btn" (click)="clearFechaRegistro()" aria-label="Quitar fecha de registro">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -133,7 +89,7 @@
         @if (filters().Estado?.length > 0) {
           <div class="filter-token">
             Estado: {{ filters().Estado.join(', ') }}
-            <button class="remove-token-btn" (click)="clearMultiFilter('Estado')">
+            <button type="button" class="remove-token-btn" (click)="clearMultiFilter('Estado')" aria-label="Quitar filtro de estado">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -141,7 +97,7 @@
         @if (filters().Id_Servicio?.length > 0) {
           <div class="filter-token">
             Servicio: {{ getSelectedServiciosText() }}
-            <button class="remove-token-btn" (click)="clearMultiFilter('Id_Servicio')">
+            <button type="button" class="remove-token-btn" (click)="clearMultiFilter('Id_Servicio')" aria-label="Quitar filtro de servicio">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -152,7 +108,7 @@
 
   <!-- ADVANCED FILTERS PANEL -->
   @if (advancedFiltersVisible()) {
-    <div class="advanced-filters-panel">
+    <div id="transfer-advanced-filters" class="advanced-filters-panel">
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Fecha del transfer</label>
@@ -182,6 +138,8 @@
               [class.multi-filter-trigger-active]="filters().Estado.length > 0"
               (click)="toggleDropdown('estado')"
               [attr.aria-expanded]="dropdownOpenEstado()"
+              aria-haspopup="listbox"
+              aria-controls="transfer-state-options"
             >
               <span>{{ getMultiFilterLabel('Estado') }}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -189,9 +147,9 @@
               </svg>
             </button>
             @if (dropdownOpenEstado()) {
-              <div class="multi-filter-menu">
+              <div id="transfer-state-options" class="multi-filter-menu" role="listbox" aria-label="Estados del transfer">
                 @for (e of estadoOptions; track e) {
-                  <button type="button" class="multi-filter-option" (click)="toggleSelection(e, 'Estado')">
+                  <button type="button" class="multi-filter-option" role="option" [attr.aria-selected]="isSelected('Estado', e)" (click)="toggleSelection(e, 'Estado')">
                     <span class="multi-filter-checkbox" [class.checked]="isSelected('Estado', e)">
                       @if (isSelected('Estado', e)) {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -220,6 +178,8 @@
               [class.multi-filter-trigger-active]="filters().Id_Servicio.length > 0"
               (click)="toggleDropdown('servicio')"
               [attr.aria-expanded]="dropdownOpenServicio()"
+              aria-haspopup="listbox"
+              aria-controls="transfer-service-options"
             >
               <span>{{ getMultiFilterLabel('Id_Servicio') }}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -227,9 +187,9 @@
               </svg>
             </button>
             @if (dropdownOpenServicio()) {
-              <div class="multi-filter-menu">
+              <div id="transfer-service-options" class="multi-filter-menu" role="listbox" aria-label="Servicios de transfer">
                 @for (s of resultsServicios(); track s.id) {
-                  <button type="button" class="multi-filter-option" (click)="toggleSelection(s.id, 'Id_Servicio')">
+                  <button type="button" class="multi-filter-option" role="option" [attr.aria-selected]="isSelected('Id_Servicio', s.id)" (click)="toggleSelection(s.id, 'Id_Servicio')">
                     <span class="multi-filter-checkbox" [class.checked]="isSelected('Id_Servicio', s.id)">
                       @if (isSelected('Id_Servicio', s.id)) {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -253,8 +213,25 @@
 
   <!-- RESULTS -->
   <div class="results-area">
+    @if (searchError() && transfers().length > 0) {
+      <div class="results-notice results-notice--error" role="alert">
+        <span>{{ searchError() }} Los resultados anteriores siguen disponibles.</span>
+        <button type="button" (click)="buscarTransfers()">Reintentar</button>
+      </div>
+    }
+
     @if (transfers().length > 0) {
-      <div class="results-list">
+      <div class="results-toolbar">
+        <strong aria-live="polite">{{ transfers().length }} {{ transfers().length === 1 ? 'transfer' : 'transfers' }}</strong>
+        @if (isSearching()) {
+          <span class="updating-pill" role="status">
+            <span aria-hidden="true"></span>
+            Actualizando
+          </span>
+        }
+      </div>
+
+      <div class="results-list" [class.results-list--updating]="isSearching()" [attr.aria-busy]="isSearching()">
         @for (t of transfers(); track t.Id_Transfer) {
           <div class="result-item"
             role="button"
@@ -262,29 +239,19 @@
             (click)="verTransfer(t.Id_Transfer)"
             (keydown.enter)="verTransfer(t.Id_Transfer)"
             (keydown.space)="$event.preventDefault(); verTransfer(t.Id_Transfer)"
-            [attr.aria-label]="'Ver transfer ' + (t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0'))) + ' — ' + (t.Nombre_Servicio || t.Nombre_Titular)">
+            [attr.aria-label]="'Ver transfer ' + (t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0'))) + ' — ' + (t.Nombre_Servicio || 'Transfer')">
 
             <span class="badge" [ngClass]="getEstadoBadgeClass(t.Estado || t.Estado_Transfer)">
-              {{ t.Estado || t.Estado_Transfer }}
+              {{ t.Estado || t.Estado_Transfer || 'Pendiente' }}
             </span>
 
             <div class="item-main-info">
               <span class="item-id">#{{ t.Codigo_Transfer || ('TRS' + ('' + t.Id_Transfer).padStart(5, '0')) }}</span>
-              <span class="item-tour">{{ t.Nombre_Servicio || t.Nombre_Titular }}</span>
+              <span class="item-tour">{{ t.Nombre_Servicio || 'Transfer' }}</span>
               <span class="item-meta">
                 {{ t.Fecha_Transfer | date:'d MMM yyyy':'':'es-CO' }}
-                @if (t.Telefono_Titular || t.Telefono_Reportante) {
-                  <span class="sep">·</span>
-                  {{ t.Telefono_Titular || t.Telefono_Reportante }}
-                }
-                @if (t.Cantidad_Personas || t.RangoDescripcion) {
-                  <span class="sep">·</span>
-                  {{ t.Cantidad_Personas || '—' }} pax
-                  @if (t.RangoDescripcion) {
-                    <span class="sep">·</span>
-                    {{ t.RangoDescripcion }}
-                  }
-                }
+                <span class="sep">·</span>
+                {{ t.Cantidad_Personas || 0 }} pax
               </span>
             </div>
 
@@ -344,6 +311,15 @@
           </div>
         }
       </div>
+    } @else if (isSearching()) {
+      <app-loading-state label="Buscando transfers…"></app-loading-state>
+    } @else if (searchError()) {
+      <app-loading-state
+        mode="error"
+        label="No pudimos consultar los transfers"
+        [detail]="searchError()"
+        (action)="buscarTransfers()">
+      </app-loading-state>
     } @else if (hasSearched()) {
       <div class="empty-state">
         <div class="empty-icon">

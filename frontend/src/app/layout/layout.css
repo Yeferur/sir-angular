@@ -41,23 +41,13 @@
   pointer-events: all;
 }
 
-.topbar-quick-actions--mirror {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-/* Columna 3 vacía a propósito: es el espejo de la columna 1.
-   Al ser ambas "1fr", la isla en la columna central (auto)
-   queda matemáticamente centrada sin importar el ancho
-   real de los pills. No hace falta ningún elemento aquí. */
-
-
 /* ═══════════════════════════════════════════════
    ISLA — barra principal
 ═══════════════════════════════════════════════ */
 .topbar-bar {
   grid-column: 2;
   justify-self: center;
+  position: relative;
   pointer-events: all;
   overflow: visible;
   box-sizing: border-box;
@@ -88,8 +78,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
+  width: max-content;
   min-width: 0;
+  animation: topbarChromeEnter 420ms var(--ease-panel) both;
+}
+
+@keyframes topbarChromeEnter {
+  from { opacity: 0; transform: translateY(-5px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ─── Transición isla ↔ fullscreen ──────────────────────────────
@@ -126,11 +122,6 @@
   height: 100vh;
   top: 0;
   border-radius: 0;
-}
-
-.topbar-bar.is-measuring {
-  width: max-content;
-  flex-shrink: 0;
 }
 
 .topbar-bar.is-transitioning .topbar-island-content > *:not(.topbar-brand) {
@@ -210,6 +201,14 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  transition: opacity 150ms ease;
+}
+
+.topbar-brand:hover { opacity: .82; }
+
+.topbar-brand:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
 }
 
 .topbar-logo {
@@ -276,6 +275,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 150ms ease, transform 180ms var(--ease-panel), filter 180ms ease;
+}
+
+.topbar-page-title.is-leaving {
+  opacity: 0;
+  transform: translateY(-8px);
+  filter: blur(3px);
+}
+
+.topbar-page-title.is-entering {
+  animation: topbarTitleEnter 300ms var(--ease-panel) both;
+}
+
+@keyframes topbarTitleEnter {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 /* ─── Zona derecha ─── */
@@ -284,6 +299,99 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ─── Búsqueda integrada: la isla sustituye título y acciones ─── */
+.topbar-search-mode {
+  width: clamp(340px, 46vw, 620px);
+  min-width: 0;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 0 10px;
+  animation: topbarSearchEnter 280ms var(--ease-panel) both;
+}
+
+.topbar-search-mode > .bx-search {
+  color: var(--accent-blue);
+  font-size: 1.05rem;
+}
+
+.topbar-search-mode input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: .92rem;
+}
+
+.topbar-search-mode input::placeholder { color: var(--text-tertiary); }
+
+.topbar-search-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.topbar-search-close:hover { background: rgba(255,255,255,.11); color: var(--text-primary); transform: scale(1.05); }
+.topbar-search-close:active { transform: scale(.92); }
+
+.topbar-search-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(10,132,255,.2);
+  border-top-color: var(--accent-blue);
+  animation: topbarSpin .65s linear infinite;
+}
+
+@keyframes topbarSpin { to { transform: rotate(360deg); } }
+@keyframes topbarSearchEnter {
+  from { opacity: 0; transform: scaleX(.94); filter: blur(3px); }
+  to { opacity: 1; transform: scaleX(1); filter: blur(0); }
+}
+
+/* Progreso de ruta y eco cromático de los toasts existentes. */
+.topbar-navigation-progress {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.topbar-feedback-glow {
+  position: absolute;
+  inset: auto 18% -1px;
+  height: 2px;
+  border-radius: 999px;
+  opacity: .85;
+  pointer-events: none;
+  animation: feedbackGlowIn 320ms ease both;
+}
+
+.topbar-feedback-glow[data-type="success"] { background: #30d158; box-shadow: 0 0 12px rgba(48,209,88,.7); }
+.topbar-feedback-glow[data-type="info"] { background: #0a84ff; box-shadow: 0 0 12px rgba(10,132,255,.7); }
+.topbar-feedback-glow[data-type="warning"] { background: #ffd60a; box-shadow: 0 0 12px rgba(255,214,10,.65); }
+.topbar-feedback-glow[data-type="error"] { background: #ff453a; box-shadow: 0 0 12px rgba(255,69,58,.7); }
+
+@keyframes feedbackGlowIn {
+  from { opacity: 0; transform: scaleX(.35); }
+  to { opacity: .85; transform: scaleX(1); }
 }
 
 /* ─── Botones icono ─── */
@@ -299,13 +407,17 @@
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s var(--ease-panel), box-shadow 0.15s ease;
 }
 
 .topbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.07);
   color: var(--text-primary);
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
 }
+
+.topbar-icon-btn:active { transform: scale(.92); }
 
 .topbar-dot { color: var(--accent-red, #ff453a); }
 
@@ -326,13 +438,14 @@
   justify-content: center;
   cursor: pointer;
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.16s var(--ease-panel);
 }
 
 .topbar-avatar-btn:hover,
 .topbar-avatar-btn.active {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+  transform: translateY(-1px) scale(1.04);
 }
 
 .topbar-avatar-img {
@@ -545,15 +658,34 @@
 }
 
 @media (max-width: 766px) {
-  .topbar-row { width: calc(100% - 20px); }
+  .topbar-row {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    column-gap: 0;
+    padding-inline: 10px;
+    box-sizing: border-box;
+  }
   .topbar-quick-actions { display: none; }
 
   .topbar-hamburger { display: flex; }
   .topbar-sep--after-brand { display: none; }
 
-  .topbar-bar {
-    width: calc(100vw - 20px);
+  .topbar-bar:not(.is-transitioning) {
+    /* Ocupa el área útil de la fila sin depender de 100vw, que puede
+       incluir zonas desbordadas durante la apertura del drawer. */
+    width: 100% !important;
     max-width: none;
+  }
+
+  .topbar-island-content { width: 100%; }
+
+  .topbar-bar.is-searching .topbar-brand,
+  .topbar-bar.is-searching .topbar-sep { display: none; }
+
+  .topbar-search-mode {
+    width: calc(100vw - 48px);
+    padding-left: 4px;
   }
 
   .topbar-bar.is-transitioning {
@@ -607,6 +739,18 @@
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
   }
+
+  .topbar-page-title,
+  .topbar-search-mode,
+  .topbar-island-content,
+  .sidebar,
+  .profile-dropdown,
+  .topbar-expanded,
+  .topbar-feedback-glow {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
 }
 
 
@@ -868,6 +1012,7 @@
   pointer-events: auto;
   z-index: var(--z-sidebar, 800);
   will-change: width;
+  animation: sidebarShellEnter 520ms var(--ease-panel) both;
 
   transition:
     width        0.42s cubic-bezier(0.16, 1, 0.3, 1),
@@ -875,6 +1020,11 @@
     background-color 0.25s ease,
     border-color 0.25s ease,
     box-shadow   0.32s ease;
+}
+
+@keyframes sidebarShellEnter {
+  from { opacity: 0; transform: translateY(-50%) translateX(-16px) scale(.96); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
 }
 
 .sidebar::-webkit-scrollbar { display: none; }

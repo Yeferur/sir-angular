@@ -310,11 +310,12 @@ function formatoCodigoTransfer(idTransfer) {
 }
 
 function normalizarIdTransferInput(value) {
-  return String(value || '')
+  const normalized = String(value || '')
     .trim()
     .replace(/^TRS/i, '')
     .replace(/^TRC/i, '')
     .replace(/^TR-?/i, '');
+  return /^\d+$/.test(normalized) ? normalized : null;
 }
 
 async function generarIdTransferUnico(conn) {
@@ -642,6 +643,7 @@ async function crearTransferSvc(payload, files = {}) {
 async function filtrarTransfersSvc(q) {
   const {
     Fecha_Transfer,
+    Fecha_Registro,
     Id_Servicio,
     Id_Rango,
     Estado,
@@ -650,11 +652,13 @@ async function filtrarTransfersSvc(q) {
     Telefono_Titular,
     DNI,
     Punto_Salida,
-    Punto_Destino
+    Punto_Destino,
+    q: busquedaGeneral
   } = q;
 
   const conds = [];
   if (Fecha_Transfer) conds.push(`tr.Fecha_Transfer = ${db.escape(Fecha_Transfer)}`);
+  if (Fecha_Registro) conds.push(`DATE(tr.Fecha_Registro) = ${db.escape(Fecha_Registro)}`);
   if (Id_Servicio) {
     if (Array.isArray(Id_Servicio)) {
       const ids = Id_Servicio.map(i => db.escape(i)).join(',');
@@ -686,6 +690,23 @@ async function filtrarTransfersSvc(q) {
   if (DNI) conds.push(`tr.DNI LIKE ${db.escape('%' + DNI + '%')}`);
   if (Punto_Salida) conds.push(`tr.Punto_Salida LIKE ${db.escape('%' + Punto_Salida + '%')}`);
   if (Punto_Destino) conds.push(`tr.Punto_Destino LIKE ${db.escape('%' + Punto_Destino + '%')}`);
+  if (busquedaGeneral) {
+    const term = String(busquedaGeneral).trim();
+    if (term) {
+      const likeTerm = db.escape(`%${term}%`);
+      const idFromTerm = normalizarIdTransferInput(term);
+      const generalConditions = [
+        `tr.Nombre_Titular LIKE ${likeTerm}`,
+        `tr.DNI LIKE ${likeTerm}`,
+        `tr.Telefono_Titular LIKE ${likeTerm}`,
+        `tr.Punto_Salida LIKE ${likeTerm}`,
+        `tr.Punto_Destino LIKE ${likeTerm}`,
+        `s.Nombre_Servicio LIKE ${likeTerm}`,
+      ];
+      if (idFromTerm) generalConditions.unshift(`tr.Id_Transfer = ${db.escape(idFromTerm)}`);
+      conds.push(`(${generalConditions.join(' OR ')})`);
+    }
+  }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 

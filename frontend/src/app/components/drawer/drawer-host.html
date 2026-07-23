@@ -1,11 +1,15 @@
 @if (drawer()) {
   <!-- Backdrop -->
-  <div class="sir-drawer-backdrop" (click)="close()" aria-hidden="true"></div>
+  <div class="sir-drawer-backdrop" [class.is-closing]="drawerSvc.closing()" (click)="close()" aria-hidden="true"></div>
 
   <!-- Panel -->
   <div class="sir-drawer-panel"
+       #drawerPanel
        role="dialog"
        aria-modal="true"
+       tabindex="-1"
+       [class.is-closing]="drawerSvc.closing()"
+       (keydown)="onPanelKeydown($event)"
        [attr.aria-label]="drawer()!.type === 'reserva' ? 'Detalle de reserva' :
                           drawer()!.type === 'transfer' ? 'Detalle de transfer' :
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :

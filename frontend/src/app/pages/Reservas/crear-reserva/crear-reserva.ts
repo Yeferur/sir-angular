@@ -14,6 +14,7 @@ import { firstValueFrom, of, from } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { isTourDateAvailable, toDateOnly } from '../../../shared/utils/calendar-date';
 import {
   Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto,
@@ -51,7 +52,7 @@ interface SubmitValidationIssue {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, DecimalPipe,
-    DatepickerComponent, UppercaseInputDirective, CuposStripComponent
+    DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
   ],
   templateUrl: './crear-reserva.html',
   styleUrls: ['../reserva-shared.css'],
@@ -725,6 +726,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   // ── Signals ────────────────────────────────────────────────────────
   isLoading = signal<boolean>(true);
+  initialLoadError = signal<string>('');
   isSubmitting = signal<boolean>(false);
   cuposDisponiblesActuales = signal<number | null>(null);
   cuposValidosActuales = signal<boolean>(true);
@@ -970,8 +972,18 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         });
       });
 
+    await this.loadInitialData();
+  }
+
+  retryInitialLoad(): void {
+    void this.loadInitialData();
+  }
+
+  private async loadInitialData(): Promise<void> {
+    this.initialLoadError.set('');
+    this.isLoading.set(true);
+
     try {
-      this.isLoading.set(true);
       const [tours, canales, monedas] = await Promise.all([
         firstValueFrom(this.reservasSvc.getTours()),
         firstValueFrom(this.reservasSvc.getCanales()),
@@ -982,15 +994,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.ensureDefaultCanal();
       this.monedas.set(monedas || []);
     } catch {
-      this.alertService.showModal({
-        type: 'error',
-        title: 'Error cargando datos',
-        message: 'No fue posible cargar Tours, Canales o Monedas.',
-        buttons: [
-          { text: 'Reintentar', style: 'primary', onClick: () => { this.alertService.closeModal(); this.ngOnInit(); } },
-          { text: 'Cerrar', style: 'secondary', onClick: () => this.alertService.closeModal() },
-        ],
-      });
+      this.initialLoadError.set('No pudimos cargar la información necesaria. Intenta nuevamente.');
     } finally {
       this.isLoading.set(false);
       this.cdr.markForCheck();
@@ -1675,6 +1679,20 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     return this.pasajeros.controls.reduce((sum, c) => sum + Number(c.get('Precio_Pasajero')?.value || 0), 0);
   }
 
+  totalPorTipo(tipo: ReservaPassengerType): number {
+    return this.pasajeros.controls
+      .filter((control) => normalizeReservaPassengerType(control.get('Tipo_Pasajero')?.value) === tipo)
+      .reduce((total, control) => total + Number(control.get('Precio_Pasajero')?.value || 0), 0);
+  }
+
+  resumenTiposPasajero(): string {
+    return (['ADULTO', 'NINO', 'INFANTE'] as ReservaPassengerType[])
+      .map((tipo) => ({ tipo, cantidad: this.countByTipo(tipo) }))
+      .filter(({ cantidad }) => cantidad > 0)
+      .map(({ tipo, cantidad }) => `${cantidad} ${reservaPassengerTypeLabel(tipo).toLocaleLowerCase('es-CO')}${cantidad === 1 ? '' : 's'}`)
+      .join(' · ');
+  }
+
   comisionTotal(): number {
     return this.pasajeros.controls.reduce((sum, c) => sum + Number(c.get('Comision')?.value || 0), 0);
   }
@@ -2124,7 +2142,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     ctrl.setValue(file);
     ctrl.markAsDirty();
     ctrl.updateValueAndValidity({ emitEvent: false });
-    this.alertService.showModal({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el comprobante: ${file.name}` });
+    this.alertService.successToast('Comprobante listo', file.name, 3200);
   }
 
   onAbonoFileSelected(event: Event, index: number): void {
@@ -2146,7 +2164,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     abonoControl.get('Comprobante')?.setValue(file);
     abonoControl.markAsDirty();
     abonoControl.updateValueAndValidity({ emitEvent: false });
-    this.alertService.showModal({ type: 'success', title: 'Archivo cargado', message: `Se ha cargado el archivo: ${file.name}` });
+    this.alertService.successToast('Archivo listo', file.name, 3200);
   }
 
   eliminarComprobanteAbono(index: number): void {
@@ -2194,7 +2212,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
               this.reservasSvc.eliminarComprobantePagoReserva(idReserva, idPago).subscribe({
                 next: () => {
                   this.clearComprobanteLocalState();
-                  this.alertService.showModal({ type: 'success', title: 'Comprobante eliminado', message: 'El comprobante se eliminó correctamente.' });
+                  this.alertService.successToast('Comprobante eliminado', '', 3000);
                 },
                 error: () => {
                   this.alertService.showModal({ type: 'error', title: 'Error al eliminar', message: 'No se pudo eliminar el comprobante.' });
@@ -2203,7 +2221,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
               return;
             }
             this.clearComprobanteLocalState();
-            this.alertService.showModal({ type: 'info', title: 'Archivo eliminado', message: 'Se eliminó del formulario local.' });
+            this.alertService.infoToast('Archivo retirado del formulario', '', 3000);
           },
         },
       ],

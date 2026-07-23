@@ -883,8 +883,6 @@ async function obtenerReserva(Id_Reserva) {
       r.Idioma_Reserva,
       r.Telefono_Reportante,
       r.Nombre_Reportante,
-      r.Placa_Bus,
-      r.Orden_Ruta,
       COALESCE((
         SELECT SUM(COALESCE(px.Precio_Pasajero, 0))
         FROM pasajeros px
@@ -1368,8 +1366,8 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
     await conn.query(
       `INSERT INTO reservas
        (Id_Reserva, Tipo_Reserva, Id_Horario, Fecha_Tour, Id_Canal, Idioma_Reserva,
-        Telefono_Reportante, Nombre_Reportante, Estado, Observaciones, Placa_Bus, Orden_Ruta)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        Telefono_Reportante, Nombre_Reportante, Estado, Observaciones)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         idReserva,
         r.Tipo_Reserva || 'Grupal',
@@ -1381,8 +1379,6 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
         r.Nombre_Reportante || null,
         estadoCalculado,
         r.Observaciones || null,
-        r.Placa_Bus || null,
-        r.Orden_Ruta || null,
       ]
     );
 

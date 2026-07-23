@@ -1,95 +1,14 @@
 @if (isLoading()) {
-<div class="skeleton-page ">
-
-  <div class="page-header">
-    <div>
-      <div class="sk-line sk-title"></div>
-      <div class="sk-line sk-subtitle"></div>
-    </div>
-  </div>
-
-  <div class="main-content">
-    <!-- Card: Editar Transfer skeleton -->
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group full-width">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field sk-field-textarea"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card sk-card">
-      <div class="card-header">
-        <div class="sk-line sk-heading"></div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-        <div class="form-group">
-          <div class="sk-line sk-label"></div>
-          <div class="sk-field"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
+  <app-loading-state label="Cargando el transfer y sus datos…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar la edición del transfer"
+    [detail]="loadError()"
+    (action)="retryLoad()">
+  </app-loading-state>
 } @else {
-<div class="wizard-shell" [formGroup]="form">
+<div class="wizard-shell wizard-shell--page-enter" [class.is-panel-animating]="panelAnimating" [formGroup]="form">
 
   <div class="wizard-stepper">
     @for (step of wizardSteps; let i = $index; track step.id) {
@@ -146,7 +65,7 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Detalles del Transfer</h2>
+          <h2>Detalles del transfer</h2>
           <p class="card-header-hint">Define la ruta, la fecha y las condiciones del servicio.</p>
         </div>
         @if (transferHeaderCode) {
@@ -274,7 +193,7 @@
       <div class="card-header">
         <div>
           <h2>Responsable</h2>
-          <p class="card-header-hint">Registra quién reporta y el teléfono principal de la reserva.</p>
+          <p class="card-header-hint">Registra quién reporta y el teléfono principal del transfer.</p>
         </div>
       </div>
 
@@ -289,7 +208,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Teléfono Reserva <span class="required-star">*</span></label>
+          <label class="form-label">Teléfono de contacto <span class="required-star">*</span></label>
           <input type="tel" class="form-input"
             [ngClass]="form.get('TelefonoReserva')?.touched && form.get('TelefonoReserva')?.invalid ? 'errorInput' : ''"
             formControlName="TelefonoReserva" placeholder="+573001234567" />
@@ -311,15 +230,21 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Pagos</h2>
+          <h2>Pago</h2>
           <p class="card-header-hint">Configura el valor del servicio y la forma de pago.</p>
+        </div>
+        <div class="pago-total-badge" aria-live="polite">
+          <span class="pago-total-label">Total</span>
+          <span class="pago-total-value">{{ (form.get('Valor')?.value || 0) | number:'1.0-0' }} {{ form.get('Moneda')?.value || 'COP' }}</span>
         </div>
       </div>
 
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Valor del servicio</label>
-          <input type="number" formControlName="Valor" class="form-input" />
+          <input type="number" formControlName="Valor" class="form-input" min="0"
+            [readonly]="!valorEsEditable" />
+          <small class="hint">{{ valorEsEditable ? 'Puedes ajustar el valor guardado cuando sea necesario.' : 'Se calcula automáticamente según el rango y la moneda.' }}</small>
         </div>
         <div class="form-group">
           <label class="form-label">Moneda</label>
@@ -333,13 +258,18 @@
 
       <div class="payments-grid">
         <div class="form-group full-width">
-          <label class="form-label">Tipo de pago</label>
-          <select formControlName="TipoPago" class="form-select" (change)="recalcularTotales()">
-            <option value="PagaEnPunto">Paga en el punto</option>
-            <option value="Completo">Ya pagó</option>
-            <option value="Abonos">Abonos</option>
-          </select>
-          <small class="hint">Selecciona cómo se registrará el pago de este transfer.</small>
+          <label class="form-label">Forma de pago</label>
+          <div class="segmented-control">
+            <button type="button" [class.active]="form.get('TipoPago')?.value === 'PagaEnPunto'"
+              [attr.aria-pressed]="form.get('TipoPago')?.value === 'PagaEnPunto'"
+              (click)="form.get('TipoPago')?.setValue('PagaEnPunto'); recalcularTotales()">Pago en el punto</button>
+            <button type="button" [class.active]="form.get('TipoPago')?.value === 'Completo'"
+              [attr.aria-pressed]="form.get('TipoPago')?.value === 'Completo'"
+              (click)="form.get('TipoPago')?.setValue('Completo'); recalcularTotales()">Ya pagó</button>
+            <button type="button" [class.active]="form.get('TipoPago')?.value === 'Abonos'"
+              [attr.aria-pressed]="form.get('TipoPago')?.value === 'Abonos'"
+              (click)="form.get('TipoPago')?.setValue('Abonos'); recalcularTotales()">Abonos</button>
+          </div>
         </div>
 
         <div class="form-group full-width payments-right">
@@ -347,8 +277,8 @@
           <div class="payments-panel pago-completo">
             <div class="payments-panel-head">
               <div class="payments-title">
-                <h3>Comprobante de Pago</h3>
-                <span class="payments-sub">Sube el soporte del pago completo (máx. 5MB).</span>
+                <h3>Comprobante de pago</h3>
+                <span class="payments-sub">Sube el soporte del pago completo (máx. 5 MB).</span>
               </div>
             </div>
 
@@ -483,8 +413,7 @@
           @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
           <div class="payments-panel payments-panel-muted">
             <h3>Pago en el punto</h3>
-            <p class="hint">No se requiere comprobante. El cobro queda pendiente para registrarse por fuera del sistema.
-            </p>
+            <p class="hint">El cobro se registra al momento del servicio. No se requiere comprobante ahora.</p>
           </div>
           }
         </div>
@@ -498,66 +427,72 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Resumen del Transfer</h2>
-          <p class="card-header-hint">Revisa la información antes de crear el servicio.</p>
+          <h2>Resumen del transfer</h2>
+          <p class="card-header-hint">Revisa los cambios antes de guardar. Puedes volver a cualquier paso para corregir.</p>
         </div>
       </div>
 
-      <div class="resumen-grid">
-        <div class="resumen-item">
-          <label class="form-label">Servicio</label>
-          <span class="resumen-value">{{ getNombreServicio() || '—' }}</span>
+      <div class="resumen-review">
+        <div class="resumen-summary-strip">
+          <div class="resumen-summary-item"><span class="resumen-summary-label">Pasajeros</span><span class="resumen-summary-value">{{ form.get('Cantidad_Personas')?.value || 0 }}</span></div>
+          <div class="resumen-summary-item"><span class="resumen-summary-label">Total</span><span class="resumen-summary-value">{{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) | number:'1.0-0' }}</span></div>
+          @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
+          <div class="resumen-summary-item resumen-summary-item--payment-mode"><span class="resumen-summary-label">Modalidad de pago</span><span class="resumen-summary-value">Pago en punto</span></div>
+          } @else {
+          <div class="resumen-summary-item"><span class="resumen-summary-label">Pendiente</span><span class="resumen-summary-value">{{ form.get('Moneda')?.value || 'COP' }} {{ getPendiente() | number:'1.0-0' }}</span></div>
+          }
         </div>
-        <div class="resumen-item">
-          <label class="form-label">Titular</label>
-          <span class="resumen-value">{{ form.get('Titular')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Pasajeros</label>
-          <span class="resumen-value">{{ form.get('Cantidad_Personas')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Ruta</label>
-          <span class="resumen-value">{{ getResumenRuta() }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Fecha</label>
-          <span class="resumen-value">{{ form.get('Fecha')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Hora</label>
-          <span class="resumen-value">{{ form.get('Hora')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Reporta</label>
-          <span class="resumen-value">{{ form.get('Reporta')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Teléfono reserva</label>
-          <span class="resumen-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Rango detectado</label>
-          <span class="resumen-value">{{ selectedRangoDescripcion || '—' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Tipo de pago</label>
-          <span class="resumen-value">{{ getResumenTipoPago() }}</span>
-        </div>
-        @if (form.get('TipoPago')?.value === 'Abonos') {
-        <div class="resumen-item">
-          <label class="form-label">Total abonado</label>
-          <span class="resumen-value">{{ getTotalAbonado() | number:'1.2-2' }}</span>
-        </div>
-        <div class="resumen-item">
-          <label class="form-label">Pendiente</label>
-          <span class="resumen-value">{{ getPendiente() | number:'1.2-2' }}</span>
+
+        @if (form.get('TipoPago')?.value === 'PagaEnPunto') {
+        <div class="resumen-payment-mode-note"><span class="resumen-payment-mode-dot" aria-hidden="true"></span>El cobro se registra al momento del servicio.</div>
+        } @else {
+        <div class="resumen-payment-progress">
+          <div class="resumen-progress-track"><div class="resumen-progress-fill blue" [style.width.%]="form.get('TipoPago')?.value === 'Completo' ? 100 : ((form.get('Valor')?.value || 0) > 0 ? (getTotalAbonado() / (form.get('Valor')?.value || 1)) * 100 : 0)"></div></div>
+          <span class="resumen-progress-label">{{ form.get('TipoPago')?.value === 'Completo' ? 100 : ((form.get('Valor')?.value || 0) > 0 ? ((getTotalAbonado() / (form.get('Valor')?.value || 1)) * 100 | number:'1.0-0') : 0) }}% cubierto</span>
         </div>
         }
-        <div class="resumen-item total-row">
-          <label class="form-label">Valor</label>
-          <span class="resumen-value resumen-total">{{ form.get('Moneda')?.value || 'COP' }} {{
-            (form.get('Valor')?.value || 0) | number:'1.0-0' }}</span>
+
+        <div class="resumen-review-grid">
+          <div class="resumen-review-card">
+            <div class="resumen-review-card-header"><h3>Servicio y recorrido</h3></div>
+            <div class="resumen-review-card-body">
+              <div class="resumen-info-row"><span class="resumen-info-label">Servicio</span><span class="resumen-info-value">{{ getNombreServicio() || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Fecha</span><span class="resumen-info-value">{{ form.get('Fecha')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Hora</span><span class="resumen-info-value">{{ form.get('Hora')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Ruta</span><span class="resumen-info-value">{{ getResumenRuta() }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Rango</span><span class="resumen-info-value">{{ selectedRangoDescripcion || '—' }}</span></div>
+              @if (showFlightFields) {<div class="resumen-info-row"><span class="resumen-info-label">Vuelo</span><span class="resumen-info-value">{{ form.get('Vuelo')?.value || '—' }} · {{ form.get('TipoVuelo')?.value || '—' }}</span></div>}
+            </div>
+          </div>
+
+          <div class="resumen-review-card">
+            <div class="resumen-review-card-header"><h3>Responsables</h3></div>
+            <div class="resumen-review-card-body">
+              <div class="resumen-info-row"><span class="resumen-info-label">Titular</span><span class="resumen-info-value">{{ form.get('Titular')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Documento</span><span class="resumen-info-value">{{ form.get('DNI')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Teléfono</span><span class="resumen-info-value">{{ form.get('TelefonoTitular')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Reporta</span><span class="resumen-info-value">{{ form.get('Reporta')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Teléfono de contacto</span><span class="resumen-info-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span></div>
+            </div>
+          </div>
+
+          <div class="resumen-review-card resumen-review-card-full">
+            <div class="resumen-review-card-header"><h3>Pago</h3></div>
+            <div class="resumen-review-card-body resumen-review-card-body-compact">
+              <div class="resumen-info-row resumen-info-row-strong"><span class="resumen-info-label">Forma de pago</span><span class="resumen-info-value">{{ getResumenTipoPago() }}</span></div>
+              @if (form.get('TipoPago')?.value === 'Abonos') {
+              <div class="resumen-info-row"><span class="resumen-info-label">Total abonado</span><span class="resumen-info-value">{{ form.get('Moneda')?.value || 'COP' }} {{ getTotalAbonado() | number:'1.0-0' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Pendiente</span><span class="resumen-info-value">{{ form.get('Moneda')?.value || 'COP' }} {{ getPendiente() | number:'1.0-0' }}</span></div>
+              }
+            </div>
+          </div>
+
+          @if (form.get('Observaciones')?.value) {
+          <div class="resumen-review-card resumen-review-card-full">
+            <div class="resumen-review-card-header"><h3>Observaciones</h3></div>
+            <div class="resumen-review-card-body resumen-review-card-body-compact"><div class="resumen-observations-text">{{ form.get('Observaciones')?.value }}</div></div>
+          </div>
+          }
         </div>
       </div>
 
@@ -566,27 +501,52 @@
   }
 </div>
 
-<div class="wizard-nav">
+<div class="wizard-nav wizard-nav--page-enter">
   <div class="wizard-nav-row">
     <div class="wizard-nav-left">
       @if (currentStep > 0) {
-      <button type="button" class="btn-wizard-back" (click)="prevStep()">Atrás</button>
+      <button type="button" class="btn-wizard-back" (click)="prevStep()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+        <span>Anterior</span>
+      </button>
       }
     </div>
 
     <div class="wizard-nav-center">
       <div class="wizard-nav-summary">
-        <span class="wizard-nav-tour">{{ getNombreServicio() || 'Transfer' }}</span>
-        <span class="wizard-nav-item">{{ form.get('Cantidad_Personas')?.value || 0 }} pax</span>
-        <span class="wizard-nav-item">{{ form.get('Moneda')?.value || 'COP' }} {{ (form.get('Valor')?.value || 0) |
+        @if (form.get('TipoServicio')?.value && form.get('TipoServicio')?.value !== 'Seleccionar') {
+        <span class="wizard-nav-tour">{{ getNombreServicio() }}</span>
+        }
+        @if (form.get('Fecha')?.value) {
+        @if (form.get('TipoServicio')?.value && form.get('TipoServicio')?.value !== 'Seleccionar') {
+        <span class="nav-sep">•</span>
+        }
+        <span class="wizard-nav-item">{{ form.get('Fecha')?.value }}</span>
+        }
+        @if ((form.get('Cantidad_Personas')?.value || 0) > 0) {
+        <span class="nav-sep">•</span>
+        <span class="wizard-nav-item">{{ form.get('Cantidad_Personas')?.value }} pax</span>
+        }
+        @if ((form.get('Valor')?.value || 0) > 0) {
+        <span class="nav-sep">•</span>
+        <span class="wizard-nav-total">{{ form.get('Moneda')?.value || 'COP' }} {{ form.get('Valor')?.value |
           number:'1.0-0' }}</span>
+        }
       </div>
     </div>
 
     <div class="wizard-nav-right">
       @if (currentStep < wizardSteps.length - 1) { <button type="button" class="btn-wizard-next" (click)="nextStep()"
-        [disabled]="!canAdvanceFromStep(currentStep)">
-        Siguiente
+        [class.is-disabled]="!canAdvanceFromStep(currentStep)"
+        [attr.data-incomplete]="!canAdvanceFromStep(currentStep) ? true : null">
+        <span>Siguiente</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
         </button>
         } @else if (canUpdateTransfer) {
         <button type="button" class="btn-wizard-submit" (click)="onSubmit()" [disabled]="isSubmitting()">
@@ -597,7 +557,11 @@
           </svg>
           <span>Guardando...</span>
           } @else {
-          <span>Guardar Cambios</span>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Guardar cambios</span>
           }
         </button>
         }

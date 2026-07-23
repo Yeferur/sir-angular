@@ -1,42 +1,5 @@
 @if (isInitialLoading) {
-<!-- ════════════════════════════════════════ SKELETON ════════════════════════ -->
-<div class="skeleton-page dashboard-page">
-  <div class="main-content">
-    <div class="card sk-card">
-      <div class="sk-toolbar-grid">
-        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
-        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
-        <div class="form-group"><div class="sk-line sk-label"></div><div class="sk-field"></div></div>
-        <div class="sk-toolbar-actions"><div class="sk-field sk-btn-quick"></div><div class="sk-field sk-btn-quick"></div></div>
-      </div>
-    </div>
-    <div class="kpi-grid">
-      @for (_ of [1,2,3,4,5]; track $index) {
-      <div class="card sk-card sk-kpi">
-        <div class="sk-icon-box"></div>
-        <div class="sk-kpi-info">
-          <div class="sk-line sk-label"></div><div class="sk-line sk-kpi-value"></div><div class="sk-line sk-kpi-sub"></div>
-        </div>
-      </div>
-      }
-    </div>
-    <div class="charts-grid-2">
-      @for (_ of [1,2]; track $index) {
-      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
-      }
-    </div>
-    <div class="charts-grid-2">
-      @for (_ of [1,2]; track $index) {
-      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
-      }
-    </div>
-    <div class="charts-grid-2">
-      @for (_ of [1,2]; track $index) {
-      <div class="card sk-card"><div class="card-header"><div class="sk-line sk-heading"></div></div><div class="sk-field sk-chart"></div></div>
-      }
-    </div>
-  </div>
-</div>
+<app-loading-state label="Preparando indicadores y gráficas…"></app-loading-state>
 
 } @else {
 <!-- ═══════════════════════════════════════ DASHBOARD ═════════════════════════ -->

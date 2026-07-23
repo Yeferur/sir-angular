@@ -18,6 +18,7 @@ import { Tours, Tour, CanalComision } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 /* =========================================================
  * TYPES
@@ -94,7 +95,7 @@ type EditarTourFullPayload = {
   templateUrl: './editar-tour.html',
   styleUrls: ['../tour-shared.css'],
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent, LoadingStateComponent],
 })
 export class EditarTourComponent implements OnInit {
   private alerts = inject(SirAlertService);

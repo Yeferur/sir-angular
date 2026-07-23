@@ -1,181 +1,164 @@
-<!-- ═══════════════════════════════════════════════════
-     NIVEL 1 — Toasts píldora animados desde el topbar
-════════════════════════════════════════════════════ -->
-<div class="sir-pill-area" aria-live="polite" aria-atomic="false">
-  @for (pill of pills; track pill.id) {
-    <div
-      class="sir-pill"
-      [attr.data-phase]="pill.phase"
-      [attr.data-type]="pill.type"
-      [style.--pill-w.px]="pill.width"
-      role="status"
+<section class="sir-toast-region" aria-label="Avisos de la aplicación" aria-live="polite" aria-relevant="additions">
+  @for (toast of visibleToasts; track toast.id) {
+    <article
+      class="sir-toast"
+      [attr.data-phase]="toast.phase"
+      [attr.data-type]="toast.type"
+      [class.is-paused]="toast.paused"
+      [style.--toast-duration]="toast.durationMs + 'ms'"
+      [attr.role]="toast.type === 'error' ? 'alert' : 'status'"
+      (mouseenter)="pauseToast(toast.id)"
+      (mouseleave)="resumeToast(toast.id)"
+      (focusin)="pauseToast(toast.id)"
+      (focusout)="resumeToast(toast.id)"
     >
-      <!-- Ícono con color -->
-      <div class="sir-pill-icon"
-           [style.background]="iconBg(pill.type)"
-           [style.color]="iconColor(pill.type)">
-        @switch (pill.type) {
+      <div class="sir-toast-icon" aria-hidden="true">
+        @switch (toast.type) {
           @case ('success') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
           }
           @case ('error') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>
           }
           @case ('warning') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>
           }
           @default {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg>
           }
         }
       </div>
 
-      <!-- Texto (aparece en fase expand) -->
-      <div class="sir-pill-left"></div>
-      <div class="sir-pill-text">
-        <span class="sir-pill-title">{{ pill.title }}</span>
-        @if (pill.message) {
-          <span class="sir-pill-msg">{{ pill.message }}</span>
+      <div class="sir-toast-content">
+        <strong class="sir-toast-title">{{ toast.title }}</strong>
+        @if (toast.message) {
+          <p class="sir-toast-message">{{ toast.message }}</p>
+        }
+        @if (toast.action) {
+          <button class="sir-toast-action" type="button" (click)="runToastAction(toast)">
+            {{ toast.action.label }}
+            <span aria-hidden="true">→</span>
+          </button>
         }
       </div>
-    </div>
+
+      @if (toast.dismissible) {
+        <button class="sir-toast-close" type="button" [attr.aria-label]="'Cerrar aviso: ' + toast.title" (click)="dismissToast(toast.id)">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8"/></svg>
+        </button>
+      }
+
+      <span class="sir-toast-progress" aria-hidden="true"></span>
+    </article>
   }
-</div>
+</section>
 
-<!-- ═══════════════════════════════════════════════════
-     NIVEL 2 — Modal flotante (requiere acción simple)
-════════════════════════════════════════════════════ -->
 @if (modal()) {
-  <div class="sir-modal-backdrop" (click)="onModalBackdrop()" role="presentation">
-    <div class="sir-modal" role="dialog" aria-modal="true"
-         [attr.aria-labelledby]="'modal-title-' + modal()!.id"
-         (click)="$event.stopPropagation()">
+  <div class="sir-dialog-backdrop" (click)="onModalBackdrop()" role="presentation">
+    <section
+      class="sir-dialog"
+      [attr.data-type]="modal()!.type"
+      data-sir-dialog
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      [attr.aria-labelledby]="'modal-title-' + modal()!.id"
+      [attr.aria-describedby]="modal()!.message ? 'modal-message-' + modal()!.id : null"
+      (click)="$event.stopPropagation()"
+    >
+      @if (modal()!.dismissible) {
+        <button class="sir-dialog-close" type="button" aria-label="Cerrar" (click)="alertSvc.closeModal()">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8"/></svg>
+        </button>
+      }
 
-      <div class="sir-modal-icon" [attr.data-type]="modal()!.type">
+      <div class="sir-dialog-icon" aria-hidden="true">
         @if (modal()!.loading) {
-          <div class="sir-modal-spinner" aria-hidden="true"></div>
+          <span class="sir-spinner"></span>
         } @else {
           @switch (modal()!.type) {
             @case ('success') {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
+              <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
             }
             @case ('error') {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>
             }
             @case ('warning') {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+              <svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>
             }
             @default {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg>
             }
           }
         }
       </div>
 
-      <div class="sir-modal-body">
-        <h3 class="sir-modal-title" [id]="'modal-title-' + modal()!.id">
-          {{ modal()!.title }}
-        </h3>
+      <div class="sir-dialog-copy">
+        <span class="sir-dialog-kicker">{{ modal()!.loading ? 'Procesando' : typeLabel(modal()!.type) }}</span>
+        <h2 class="sir-dialog-title" [id]="'modal-title-' + modal()!.id">{{ modal()!.title }}</h2>
         @if (modal()!.message) {
-          <p class="sir-modal-msg">{{ modal()!.message }}</p>
+          <p class="sir-dialog-message" [id]="'modal-message-' + modal()!.id">{{ modal()!.message }}</p>
         }
       </div>
 
       @if (modal()!.buttons?.length) {
-        <div class="sir-modal-actions">
-          @for (btn of modal()!.buttons; track btn.text) {
-            <button class="sir-btn" [class]="btn.style" (click)="btn.onClick()">
-              {{ btn.text }}
-            </button>
+        <div class="sir-dialog-actions">
+          @for (btn of modal()!.buttons; track $index) {
+            <button
+              class="sir-button"
+              [attr.data-style]="btn.style"
+              [attr.data-autofocus]="btn.style === 'secondary' ? '' : null"
+              type="button"
+              (click)="btn.onClick()"
+            >{{ btn.text }}</button>
           }
         </div>
       }
-    </div>
+    </section>
   </div>
-
 }
 
-
-<!-- ═══════════════════════════════════════════════════
-     NIVEL 3 — Modal crítico bloqueante (irreversible)
-════════════════════════════════════════════════════ -->
 @if (critical()) {
-  <div class="sir-critical-overlay" role="alertdialog" aria-modal="true"
-       [attr.aria-labelledby]="'critical-title-' + critical()!.id">
-
-    <div class="sir-critical-panel">
-
-      <div class="sir-critical-icon" [attr.data-type]="critical()!.type">
-        @switch (critical()!.icon ?? critical()!.type) {
-          @case ('trash') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
-              <path d="M9 6V4h6v2"/>
-            </svg>
-          }
-          @case ('success') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-          }
-          @default {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-          }
+  <div class="sir-dialog-backdrop sir-dialog-backdrop--critical" role="presentation">
+    <section
+      class="sir-dialog sir-dialog--critical"
+      data-sir-dialog
+      data-type="error"
+      role="alertdialog"
+      aria-modal="true"
+      tabindex="-1"
+      [attr.aria-labelledby]="'critical-title-' + critical()!.id"
+      [attr.aria-describedby]="critical()!.message ? 'critical-message-' + critical()!.id : null"
+    >
+      <div class="sir-dialog-icon sir-dialog-icon--critical" aria-hidden="true">
+        @if (critical()!.icon === 'trash') {
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>
+        } @else {
+          <svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>
         }
       </div>
 
-      <h2 class="sir-critical-title" [id]="'critical-title-' + critical()!.id">
-        {{ critical()!.title }}
-      </h2>
-
-      @if (critical()!.message) {
-        <p class="sir-critical-msg">{{ critical()!.message }}</p>
-      }
+      <div class="sir-dialog-copy">
+        <span class="sir-dialog-kicker">Acción importante</span>
+        <h2 class="sir-dialog-title" [id]="'critical-title-' + critical()!.id">{{ critical()!.title }}</h2>
+        @if (critical()!.message) {
+          <p class="sir-dialog-message" [id]="'critical-message-' + critical()!.id">{{ critical()!.message }}</p>
+        }
+      </div>
 
       @if (critical()!.buttons?.length) {
-        <div class="sir-critical-actions">
-          <!-- Cancelar siempre arriba, separado visualmente -->
-          @for (btn of critical()!.buttons; track btn.text) {
-            @if (btn.style === 'secondary') {
-              <button class="sir-btn secondary" (click)="btn.onClick()">{{ btn.text }}</button>
-            }
-          }
-          <!-- Acción destructiva abajo, más prominente -->
-          @for (btn of critical()!.buttons; track btn.text) {
-            @if (btn.style !== 'secondary') {
-              <button class="sir-btn" [class]="btn.style" (click)="btn.onClick()">{{ btn.text }}</button>
-            }
+        <div class="sir-dialog-actions sir-dialog-actions--stacked">
+          @for (btn of critical()!.buttons; track $index) {
+            <button
+              class="sir-button"
+              [attr.data-style]="btn.style"
+              [attr.data-autofocus]="btn.style === 'secondary' ? '' : null"
+              type="button"
+              (click)="btn.onClick()"
+            >{{ btn.text }}</button>
           }
         </div>
       }
-    </div>
+    </section>
   </div>
 }

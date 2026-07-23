@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
 import {
@@ -28,7 +29,7 @@ type VM = {
 @Component({
   selector: 'app-ver-puntos',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoadingStateComponent],
   templateUrl: './ver-puntos.html',
   styleUrls: ['./ver-puntos.css']
 })
@@ -43,8 +44,6 @@ export class VerPuntos implements OnInit {
   searchTerm = '';
   page = 1;
   limit = 10;
-  skeletonRows = [0, 1, 2, 3, 4, 5, 6];
-
   // streams
   private search$ = new Subject<string>();
   private page$ = new BehaviorSubject<number>(1);

@@ -10,6 +10,7 @@ import { forkJoin, switchMap, of, finalize } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 type ViewStop = {
   key: string;
@@ -35,7 +36,7 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-programacion-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, DatepickerComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './listado.html',
   styleUrls: ['./listado.css']
 })
@@ -73,7 +74,6 @@ export class Listado implements OnInit {
   isPageLoading = true;
   isUpdatingDate = false;
   modoVista: 'dashboard' | 'editor' | 'privados' = 'dashboard';
-  skeletonCards = [0, 1, 2, 3, 4, 5, 6, 7];
 
   tourSeleccionado: TourProgramacion | null = null;
   planSeleccionado: Sugerencia | null = null;

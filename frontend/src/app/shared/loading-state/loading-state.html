@@ -1,0 +1,28 @@
+<section
+  class="loading-state"
+  [attr.data-mode]="mode"
+  [attr.aria-busy]="mode === 'loading'"
+  [attr.role]="mode === 'error' ? 'alert' : 'status'"
+  aria-live="polite"
+>
+  @if (mode === 'loading') {
+    <span class="loading-state-indicator" aria-hidden="true"></span>
+  } @else {
+    <span class="loading-state-icon" aria-hidden="true">
+      @if (mode === 'error') { ! } @else { — }
+    </span>
+  }
+
+  <div class="loading-state-copy">
+    <strong>{{ label }}</strong>
+    @if (visibleDetail) {
+      <span>{{ visibleDetail }}</span>
+    } @else if (mode === 'loading' && slow()) {
+      <span>Está tardando un poco más de lo normal.</span>
+    }
+  </div>
+
+  @if (mode === 'error') {
+    <button type="button" (click)="action.emit()">{{ actionLabel }}</button>
+  }
+</section>

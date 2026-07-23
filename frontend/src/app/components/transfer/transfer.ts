@@ -3,19 +3,21 @@ import {
   Input,
   Output,
   EventEmitter,
-  OnInit,
   OnChanges,
+  OnDestroy,
   SimpleChanges,
   ChangeDetectorRef
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { TransferService } from '../../services/Transfers/transfers';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { UiStateService } from '../../services/ui-state.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../shared/errors/user-error-message';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -87,19 +89,21 @@ interface TransferDetalle {
 @Component({
   selector: 'app-transfer-dynamic',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LoadingStateComponent],
   templateUrl: './transfer.html',
   styleUrls: ['./transfer.css']
 })
-export class TransferDynamicComponent implements OnInit, OnChanges {
+export class TransferDynamicComponent implements OnChanges, OnDestroy {
   @Input() Id_Transfer!: string | number;
   @Output() onClose = new EventEmitter<void>();
 
   private readonly datePipe = new DatePipe('es-CO');
 
   isLoading = true;
-  isError = false;
+  isRefreshing = false;
   errorMessage = '';
+  activeAction: 'pdf' | 'comprobantes' | 'cancelar' | 'eliminar' | null = null;
+  private loadSubscription?: Subscription;
 
   data: TransferDetalle | null = null;
 
@@ -119,32 +123,39 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     }
   }
 
-  ngOnInit(): void {
-    if (this.Id_Transfer) {
-      this.loadTransferData(this.Id_Transfer);
-    }
-  }
-
   private loadTransferData(id: string | number): void {
-    this.isLoading = true;
-    this.isError = false;
+    this.loadSubscription?.unsubscribe();
+    const keepsCurrent = String(this.data?.transfer?.Id_Transfer ?? '') === String(id);
+    this.isLoading = !keepsCurrent;
+    this.isRefreshing = keepsCurrent;
     this.errorMessage = '';
-    this.data = null;
+    if (!keepsCurrent) this.data = null;
 
-    this.api.getTransfer(id).subscribe({
+    this.loadSubscription = this.api.getTransfer(id).subscribe({
       next: (response: any) => {
         this.data = response?.data || response;
         this.isLoading = false;
+        this.isRefreshing = false;
+        this.activeAction = null;
         this.cdr.markForCheck();
       },
       error: (err: any) => {
         console.error('Error loading transfer:', err);
-        this.isError = true;
-        this.errorMessage = 'No se pudo cargar el detalle del transfer.';
+        this.errorMessage = toUserErrorMessage(err, 'No pudimos cargar el transfer.');
         this.isLoading = false;
+        this.isRefreshing = false;
+        this.activeAction = null;
         this.cdr.markForCheck();
       }
     });
+  }
+
+  retryLoad(): void {
+    if (this.Id_Transfer) this.loadTransferData(this.Id_Transfer);
+  }
+
+  ngOnDestroy(): void {
+    this.loadSubscription?.unsubscribe();
   }
 
   get transfer(): Transfer {
@@ -212,11 +223,11 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
             this.alerts.successToast('Transfer cancelado', `El transfer #${this.transferCodigo} quedó en estado Cancelado.`);
             this.loadTransferData(id);
           },
-          error: (err) => {
+          error: (error) => {
             this.alerts.showModal({
               type: 'error',
               title: 'No se pudo cancelar',
-              message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+              message: toUserErrorMessage(error, 'No fue posible cancelar el transfer.'),
             });
           }
         });
@@ -241,11 +252,11 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
             this.close();
             this.alerts.successToast('Transfer eliminado', `El transfer #${this.transferCodigo} fue eliminado correctamente.`);
           },
-          error: (err) => {
+          error: (error) => {
             this.alerts.showModal({
               type: 'error',
               title: 'No se pudo eliminar',
-              message: err?.error?.message || err?.error?.error || err?.message || 'Intenta nuevamente.',
+              message: toUserErrorMessage(error, 'No fue posible eliminar el transfer.'),
             });
           }
         });
@@ -282,7 +293,11 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
   }
 
   get porcentajePagado(): number {
-    return this.valorTotal > 0 ? (this.totalPagado / this.valorTotal) * 100 : 0;
+    return this.valorTotal > 0 ? Math.min(100, Math.max(0, (this.totalPagado / this.valorTotal) * 100)) : 0;
+  }
+
+  get esPagoDirecto(): boolean {
+    return this.pagos.some((pago) => this.isDirectPayment(pago));
   }
 
   get estadoNormalizado(): string {
@@ -583,6 +598,7 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     const t = this.transfer;
     if (!t?.Id_Transfer) return;
 
+    this.activeAction = 'pdf';
     try {
       const doc = this.buildTransferPdfDoc();
       const pdfArrayBuffer = doc.output('arraybuffer') as ArrayBuffer;
@@ -593,6 +609,8 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
     } catch (e) {
       console.error(e);
       this.alerts.errorToast('Error', 'No se pudo generar el PDF.');
+    } finally {
+      this.activeAction = null;
     }
   }
 
@@ -632,12 +650,17 @@ export class TransferDynamicComponent implements OnInit, OnChanges {
       return;
     }
 
-    for (let i = 0; i < comprobantes.length; i += 1) {
-      await this.descargarComprobante(comprobantes[i].url || null, i + 1);
-    }
+    this.activeAction = 'comprobantes';
+    try {
+      for (let i = 0; i < comprobantes.length; i += 1) {
+        await this.descargarComprobante(comprobantes[i].url || null, i + 1);
+      }
 
-    if (comprobantes.length > 1) {
-      this.alerts.successToast('Comprobantes descargados', `Se descargaron ${comprobantes.length} comprobantes asociados al transfer.`);
+      if (comprobantes.length > 1) {
+        this.alerts.successToast('Comprobantes descargados', `Se descargaron ${comprobantes.length} comprobantes asociados al transfer.`);
+      }
+    } finally {
+      this.activeAction = null;
     }
   }
 }

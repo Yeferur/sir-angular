@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
+import { finalize, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
@@ -11,6 +11,8 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { UiStateService } from '../../../services/ui-state.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 type CrearTransferLoadResult = {
   servicios: any[];
@@ -26,7 +28,7 @@ interface WizardStep {
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './crear-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })
@@ -288,6 +290,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   openSummary = false;
   isLoading = signal<boolean>(true);
   isSubmitting = signal<boolean>(false);
+  loadError = signal('');
 
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
@@ -762,11 +765,6 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
         this.actualizarRangoDetectado({ preservarValor: false, notificarSinPrecio: true });
       });
 
-    this.form.get('Valor')?.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-      });
-
     this.form.get('Moneda')?.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -818,20 +816,22 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
       });
   }
 
-  checkWhatsappForReserva(): void {
-    // WhatsApp verification removed — no operation.
-  }
-
   private loadCatalogos(): void {
     this.isLoading.set(true);
+    this.loadError.set('');
 
     const requests: any = {
-      servicios: this.transferSvc.getServicios().pipe(catchError(() => of([] as any[]))),
-      rangos: this.transferSvc.getRangos().pipe(catchError(() => of([] as any[]))),
-      monedas: this.transferSvc.getMonedas().pipe(catchError(() => of([] as any[])))
+      servicios: this.transferSvc.getServicios(),
+      rangos: this.transferSvc.getRangos(),
+      monedas: this.transferSvc.getMonedas()
     };
 
-    forkJoin<CrearTransferLoadResult>(requests).subscribe({
+    forkJoin<CrearTransferLoadResult>(requests).pipe(
+      finalize(() => {
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: (result: CrearTransferLoadResult) => {
         this.resultsServicioTransfer = Array.isArray(result.servicios) ? result.servicios : [];
         this.resultsRangos = Array.isArray(result.rangos) ? result.rangos : [];
@@ -842,19 +842,16 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
         const defaultMon = hasCOP ? 'COP' : (this.resultsMonedas[0]?.Codigo || 'COP');
         this.form.get('Moneda')?.setValue(defaultMon);
 
-        if (result.servicios.length === 0) {
-          this.navbar.errorToast('Error', 'No se pudieron cargar los servicios de transfer.');
-        }
-
+        if (result.servicios.length === 0) this.loadError.set('No hay servicios de transfer disponibles en este momento.');
       },
-      error: () => {
-        this.navbar.errorToast('Error', 'No se pudieron cargar los catálogos necesarios.');
-      },
-      complete: () => {
-        this.isLoading.set(false);
-        this.cdr.markForCheck();
+      error: (error) => {
+        this.loadError.set(toUserErrorMessage(error, 'No pudimos cargar los datos necesarios para crear el transfer.'));
       }
     });
+  }
+
+  retryLoad(): void {
+    this.loadCatalogos();
   }
 
   async onSubmit(): Promise<void> {
@@ -883,7 +880,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
         Reporta: 'Nombre del reportante',
-        TelefonoReserva: 'Teléfono de reserva (ej: +573001234567)',
+        TelefonoReserva: 'Teléfono de contacto (ej: +573001234567)',
         ComprobantePago: 'Comprobante del pago completo'
       };
 
@@ -1017,8 +1014,8 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
           ],
         });
       },
-      error: () => {
-        this.navbar.errorToast('Error', 'Hubo un error al crear el transfer.');
+      error: (error) => {
+        this.navbar.errorToast('No se pudo crear', toUserErrorMessage(error, 'No fue posible crear el transfer.'));
         this.isSubmitting.set(false);
       }
     });

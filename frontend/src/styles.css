@@ -124,6 +124,8 @@
   --sidebar-active-bg: rgba(10, 132, 255, 0.14);
   --sidebar-submenu-line: rgba(255, 255, 255, 0.08);
   --sidebar-logout-bg: rgba(255, 69, 58, 0.12);
+  --scrollbar-thumb: rgba(142, 142, 147, 0.4);
+  --scrollbar-thumb-hover: rgba(174, 174, 178, 0.68);
 }
 
 /* MODO CLARO */
@@ -206,6 +208,8 @@
   --sidebar-active-bg: rgba(0, 122, 255, 0.10);
   --sidebar-submenu-line: rgba(0, 0, 0, 0.10);
   --sidebar-logout-bg: rgba(255, 59, 48, 0.08);
+  --scrollbar-thumb: rgba(99, 99, 102, 0.3);
+  --scrollbar-thumb-hover: rgba(72, 72, 74, 0.55);
 }
 
 *,
@@ -214,13 +218,43 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 42px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
 body {
   margin: 0;
   background-color: var(--body-color);
   font-family: var(--body-font);
   font-size: var(--normal-font-size);
   color: var(--text-color);
-  transition: background 0.4s ease-in-out;
 }
 
 .content {
@@ -984,6 +1018,16 @@ input[type=number] {
   padding-bottom: 110px;
 }
 
+.wizard-shell--page-enter,
+.wizard-nav--page-enter {
+  animation: wizardPageEnter .38s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes wizardPageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .wizard-stepper {
   display: flex;
   align-items: flex-start;
@@ -1115,15 +1159,15 @@ input[type=number] {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  animation: none;
+}
+
+.wizard-shell.is-panel-animating .wizard-step-panel {
   animation: wizardSlideIn .32s ease;
 }
 
-.wizard-step-panel.going-back {
+.wizard-shell.is-panel-animating .wizard-step-panel.going-back {
   animation-name: wizardSlideBack;
-}
-
-.wizard-step-panel:not(.is-entering) {
-  animation: none;
 }
 
 @keyframes wizardSlideIn {
@@ -1257,10 +1301,18 @@ input[type=number] {
   filter: none;
 }
 
+.btn-wizard-next.is-disabled {
+  opacity: .48;
+  cursor: pointer;
+  filter: none;
+}
+
 .btn-wizard-submit {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  min-width: 136px;
   padding: 9px 20px;
   border-radius: 12px;
   border: none;
@@ -1373,5 +1425,154 @@ input[type=number] {
   .card {
     padding: 18px;
     border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wizard-shell--page-enter,
+  .wizard-nav--page-enter,
+  .wizard-shell.is-panel-animating .wizard-step-panel,
+  .btn-wizard-submit .spin {
+    animation: none;
+  }
+}
+/* La captura nueva contiene el tema final completo. La transición circular
+   solo lo revela; no coloca un color plano sobre la interfaz. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+html.sir-theme-switching *:not(.sir-theme-transition-orb),
+html.sir-theme-switching *:not(.sir-theme-transition-orb)::before,
+html.sir-theme-switching *:not(.sir-theme-transition-orb)::after {
+  transition: none !important;
+}
+
+/* Alternativa para navegadores sin View Transitions. Conserva la expansión
+   circular y cambia el tema únicamente cuando la pantalla ya está cubierta. */
+.sir-theme-transition-orb {
+  position: fixed;
+  z-index: 2147483000;
+  left: calc(var(--theme-x) - 10px);
+  top: calc(var(--theme-y) - 10px);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 1;
+  transform: scale(0);
+  transition:
+    transform 540ms cubic-bezier(.22, .75, .2, 1),
+    opacity 140ms ease;
+  will-change: transform, opacity;
+}
+
+.sir-theme-transition-orb.is-active {
+  transform: scale(var(--theme-scale));
+}
+
+.sir-theme-transition-orb.is-fading {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+
+  .sir-theme-transition-orb {
+    display: none !important;
+  }
+}
+/* Actividad HTTP/navegación del topbar. Global para no inflar el presupuesto
+   aislado del componente Layout. */
+app-layout .topbar-navigation-progress span {
+  display: block;
+  width: 34%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-blue), #64d2ff);
+  box-shadow: 0 0 10px rgba(10,132,255,.65);
+  transform: translateX(-120%);
+  animation: sirTopbarActivity 1.15s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+@keyframes sirTopbarActivity {
+  to { transform: translateX(395%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-layout .topbar-navigation-progress span {
+    width: 100%;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* Mensaje contextual dentro de la isla durante login/logout. Global para no
+   cargar el presupuesto aislado del componente Layout. */
+app-layout .topbar-session-message {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 18px;
+  color: var(--text-primary);
+  text-align: center;
+  pointer-events: none;
+  animation: sirSessionMessageEnter .28s var(--ease-soft, ease) both;
+}
+
+app-layout .topbar-session-message strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: .88rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-layout .topbar-session-signal {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent-blue);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-blue) 55%, transparent);
+  transform: translateX(-50%);
+  animation: sirSessionSignal 1s ease-in-out infinite;
+}
+
+app-layout .topbar-session-message[data-kind='farewell'] .topbar-session-signal {
+  background: var(--text-tertiary);
+  box-shadow: none;
+}
+
+@keyframes sirSessionMessageEnter {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sirSessionSignal {
+  50% { opacity: .42; transform: translateX(-50%) scaleX(.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-layout .topbar-session-message,
+  app-layout .topbar-session-signal {
+    animation: none;
   }
 }

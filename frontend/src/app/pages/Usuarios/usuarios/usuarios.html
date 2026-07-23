@@ -11,45 +11,7 @@
   </div>
 
   @if (isLoading()) {
-  <div class="kpi-grid">
-    @for (slot of [0, 1]; track slot) {
-    <div class="kpi-card skeleton-card">
-      <div class="skeleton-shape sk-icon"></div>
-      <div class="kpi-content">
-        <div class="skeleton-shape sk-number"></div>
-        <div class="skeleton-shape sk-label"></div>
-      </div>
-    </div>
-    }
-  </div>
-
-  <div class="toolbar">
-    <div class="search-container skeleton-search">
-      <div class="skeleton-shape sk-search"></div>
-    </div>
-  </div>
-
-  <div class="results-area">
-    <div class="results-list skeleton-list">
-      @for (row of skeletonRows; track row) {
-      <div class="result-item skeleton-row">
-        <div class="skeleton-shape sk-status"></div>
-        <div class="item-main-info">
-          <div class="skeleton-shape sk-title"></div>
-          <div class="skeleton-shape sk-subtitle"></div>
-        </div>
-        <div class="item-secondary-info">
-          <div class="skeleton-shape sk-username"></div>
-        </div>
-        <div class="item-actions">
-          <div class="skeleton-shape sk-action"></div>
-          <div class="skeleton-shape sk-action"></div>
-          <div class="skeleton-shape sk-action"></div>
-        </div>
-      </div>
-      }
-    </div>
-  </div>
+  <app-loading-state label="Cargando usuarios y sesiones…"></app-loading-state>
   } @else {
   <div class="kpi-grid">
     <div class="kpi-card">

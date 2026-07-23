@@ -24,30 +24,56 @@ export class SirDrawerService {
 
   private _drawer = signal<DrawerState | null>(null);
   readonly drawer = this._drawer.asReadonly();
+  private _closing = signal(false);
+  readonly closing = this._closing.asReadonly();
+  private closeTimer?: ReturnType<typeof setTimeout>;
 
   readonly isOpen = () => !!this._drawer();
 
+  private open(drawer: DrawerState): void {
+    if (this.closeTimer) clearTimeout(this.closeTimer);
+    this.closeTimer = undefined;
+    this._closing.set(false);
+    this._drawer.set(drawer);
+  }
+
   openReserva(id: string): void {
-    this._drawer.set({ type: 'reserva', id });
+    this.open({ type: 'reserva', id });
   }
 
   openTransfer(id: string): void {
-    this._drawer.set({ type: 'transfer', id });
+    this.open({ type: 'transfer', id });
   }
 
   openMapa(puntos: any[], destino?: DrawerMapDestination | null): void {
-    this._drawer.set({ type: 'mapa', puntos, destino: destino ?? null });
+    this.open({ type: 'mapa', puntos, destino: destino ?? null });
   }
 
   openDuplicar(props: Record<string, any>): void {
-    this._drawer.set({ type: 'duplicar', props });
+    this.open({ type: 'duplicar', props });
   }
 
   openAppUpdates(): void {
-    this._drawer.set({ type: 'app-updates' });
+    this.open({ type: 'app-updates' });
   }
 
-  close(): void {
-    this._drawer.set(null);
+  close(immediate = false): void {
+    if (!this._drawer() || this._closing()) return;
+
+    const reduceMotion = typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (immediate || reduceMotion) {
+      this._drawer.set(null);
+      this._closing.set(false);
+      return;
+    }
+
+    this._closing.set(true);
+    this.closeTimer = setTimeout(() => {
+      this._drawer.set(null);
+      this._closing.set(false);
+      this.closeTimer = undefined;
+    }, 220);
   }
 }

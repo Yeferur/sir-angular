@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,28 +8,35 @@ import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { finalize, Subscription } from 'rxjs';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-transfers',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './ver-transfers.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })
-export class VerTransfersComponent implements OnInit {
+export class VerTransfersComponent implements OnInit, OnDestroy {
   private uiState = inject(UiStateService);
   private router = inject(Router);
   private transferService = inject(TransferService);
   private permisosService = inject(PermisosService);
   private alerts = inject(SirAlertService);
   private drawer = inject(SirDrawerService);
+  private hostElement = inject(ElementRef<HTMLElement>);
+  private searchRequest?: Subscription;
 
   readonly estadoOptions = ['Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completado', 'Cancelado'];
 
   resultsServicios = signal<any[]>([]);
   transfers = signal<any[]>([]);
-  isPageLoading = signal(false);
+  isLoading = signal(true);
   isSearching = signal(false);
+  loadError = signal('');
+  searchError = signal('');
   hasSearched = signal(false);
   advancedFiltersVisible = signal(false);
 
@@ -65,6 +72,10 @@ export class VerTransfersComponent implements OnInit {
     this.loadInitialData();
   }
 
+  ngOnDestroy(): void {
+    this.searchRequest?.unsubscribe();
+  }
+
   get canDeleteTransfer(): boolean {
     return this.permisosService.tienePermiso('TRANSFERS.ELIMINAR');
   }
@@ -83,11 +94,16 @@ export class VerTransfersComponent implements OnInit {
   }
 
   loadInitialData() {
-    this.isPageLoading.set(true);
-    this.transferService.getServicios().subscribe({
+    this.isLoading.set(true);
+    this.loadError.set('');
+    this.transferService.getServicios().pipe(
+      finalize(() => this.isLoading.set(false))
+    ).subscribe({
       next: (s) => this.resultsServicios.set(s || []),
-      error: () => this.resultsServicios.set([]),
-      complete: () => this.isPageLoading.set(false)
+      error: (error) => {
+        this.resultsServicios.set([]);
+        this.loadError.set(this.getApiErrorMessage(error, 'Revisa tu conexión e inténtalo nuevamente.'));
+      }
     });
   }
 
@@ -153,11 +169,11 @@ export class VerTransfersComponent implements OnInit {
         );
         this.alerts.successToast('Transfer cancelado', `El transfer #${transfer?.Codigo_Transfer || id} quedó en estado Cancelado.`);
       },
-      error: (err) => {
+      error: (error) => {
         this.alerts.showAlert({
           type: 'error',
           title: 'No se pudo cancelar',
-          message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible cancelar el transfer.',
+          message: this.getApiErrorMessage(error, 'No fue posible cancelar el transfer.'),
           autoClose: false
         });
       }
@@ -176,11 +192,11 @@ export class VerTransfersComponent implements OnInit {
         }
         this.alerts.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
       },
-      error: (err) => {
+      error: (error) => {
         this.alerts.showAlert({
           type: 'error',
           title: 'No se pudo eliminar',
-          message: err?.error?.message || err?.error?.error || err?.message || 'No fue posible eliminar el transfer.',
+          message: this.getApiErrorMessage(error, 'No fue posible eliminar el transfer.'),
           autoClose: false
         });
       }
@@ -194,22 +210,10 @@ export class VerTransfersComponent implements OnInit {
   onMainSearchInput(val: string) {
     const v = (val || '').trim();
     this.updateFilter('Nombre_Titular', v);
+  }
 
-    // Reset specific filters first
-    this.updateFilter('DNI', '');
-    this.updateFilter('Id_Transfer', '');
-    this.updateFilter('Telefono_Titular', '');
-
-    if (/^\d{6,}$/.test(v)) {
-      // 6+ digits → DNI
-      this.updateFilter('DNI', v);
-    } else if (/^(TRS|TRC|TR)-?\d+/i.test(v)) {
-      const idNum = v.replace(/^(TRS|TRC|TR)-?/i, '');
-      this.updateFilter('Id_Transfer', idNum);
-    } else if (/^\+?\d[\d\s\-]{6,}$/.test(v)) {
-      // Phone-like pattern → Telefono_Titular
-      this.updateFilter('Telefono_Titular', v);
-    }
+  clearMainSearch(): void {
+    this.updateFilter('Nombre_Titular', '');
   }
 
   // --- Dropdown management ---
@@ -217,6 +221,37 @@ export class VerTransfersComponent implements OnInit {
   toggleDropdown(name: 'estado' | 'servicio') {
     this.dropdownOpenEstado.set(name === 'estado' ? !this.dropdownOpenEstado() : false);
     this.dropdownOpenServicio.set(name === 'servicio' ? !this.dropdownOpenServicio() : false);
+  }
+
+  toggleAdvancedFilters(): void {
+    const shouldOpen = !this.advancedFiltersVisible();
+    this.closeFilterDropdowns();
+    this.advancedFiltersVisible.set(shouldOpen);
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  onDocumentPointerDown(event: PointerEvent): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const clickedOwnMultiFilter =
+      this.hostElement.nativeElement.contains(target) && !!target.closest('.multi-filter');
+    if (!clickedOwnMultiFilter) this.closeFilterDropdowns();
+  }
+
+  @HostListener('document:keydown.escape')
+  onFilterEscape(): void {
+    this.closeFilterDropdowns();
+  }
+
+  private closeFilterDropdowns(): void {
+    this.dropdownOpenEstado.set(false);
+    this.dropdownOpenServicio.set(false);
+  }
+
+  private closeAdvancedFilters(): void {
+    this.advancedFiltersVisible.set(false);
+    this.closeFilterDropdowns();
   }
 
   isSelected(filterKey: 'Estado' | 'Id_Servicio', value: any): boolean {
@@ -281,12 +316,12 @@ export class VerTransfersComponent implements OnInit {
     const f = this.filters();
     const api: any = {};
     if (f.Fecha_Transfer) api.Fecha_Transfer = f.Fecha_Transfer;
-    // Fecha_Registro: not supported by backend query
+    if (f.Fecha_Registro) api.Fecha_Registro = f.Fecha_Registro;
     if (f.Id_Servicio?.length) api.Id_Servicio = f.Id_Servicio;
     if (f.Id_Rango) api.Id_Rango = f.Id_Rango;
     if (f.Estado?.length) api.Estado = f.Estado;
     if (f.Id_Transfer) api.Id_Transfer = f.Id_Transfer;
-    if (f.Nombre_Titular?.trim()) api.Nombre_Titular = f.Nombre_Titular.trim();
+    if (f.Nombre_Titular?.trim()) api.q = f.Nombre_Titular.trim();
     if (f.Telefono_Titular?.trim()) api.Telefono_Titular = f.Telefono_Titular.trim();
     if (f.DNI?.trim()) api.DNI = f.DNI.trim();
     if (f.Punto_Salida?.trim()) api.Punto_Salida = f.Punto_Salida.trim();
@@ -298,24 +333,30 @@ export class VerTransfersComponent implements OnInit {
     const filtros = this.buildApiFilters();
     if (Object.keys(filtros).length === 0) {
       this.alerts.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
-      this.transfers.set([]);
       return;
     }
+    this.searchRequest?.unsubscribe();
     this.hasSearched.set(true);
     this.isSearching.set(true);
-    this.advancedFiltersVisible.set(false);
-    this.dropdownOpenEstado.set(false);
-    this.dropdownOpenServicio.set(false);
-    this.transferService.getTransfers(filtros).subscribe({
-      next: (data) => { this.transfers.set(data || []); },
-      error: (err) => { this.alerts.showAlert({ type: 'error', title: 'Error', message: err?.message || 'Error', autoClose: false }); this.transfers.set([]); },
-      complete: () => { this.isSearching.set(false); }
+    this.searchError.set('');
+    this.closeAdvancedFilters();
+    this.searchRequest = this.transferService.getTransfers(filtros).pipe(
+      finalize(() => this.isSearching.set(false))
+    ).subscribe({
+      next: (data) => this.transfers.set(data || []),
+      error: (error) => {
+        this.searchError.set(this.getApiErrorMessage(error, 'No fue posible consultar los transfers.'));
+      }
     });
   }
 
   verTransfer(Id_Transfer: string) {
     this.uiState.transferId.set(Id_Transfer);
     this.drawer.openTransfer(Id_Transfer);
+  }
+
+  private getApiErrorMessage(error: any, fallback = 'No fue posible completar la operación.'): string {
+    return toUserErrorMessage(error, fallback);
   }
 
   getEstadoBadgeClass(estado: string | null | undefined): string {

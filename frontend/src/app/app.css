@@ -1,6 +1,31 @@
 .app-shell--private {
   display: flex;
 }
+
+.app-shell--private .main-shell {
+  transition: opacity 180ms ease, transform 220ms var(--ease-panel);
+}
+
+.app-shell--private.is-navigating .main-shell {
+  opacity: 0.72;
+  transform: translateY(3px);
+}
+
+.app-shell--private.is-entering .main-shell {
+  animation: shellContentEnter 560ms var(--ease-panel) both;
+}
+
+@keyframes shellContentEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell--private .main-shell {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
  
 .main-shell {
   flex: 1;

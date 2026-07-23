@@ -69,6 +69,71 @@
   margin-top: 5px;
 }
 
+.segmented-control {
+  display: flex;
+  width: 100%;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+}
+
+.segmented-control button {
+  flex: 1;
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 .9rem var(--font-family);
+  cursor: pointer;
+  transition: background-color .25s, color .25s, box-shadow .25s;
+}
+
+.segmented-control button.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+}
+
+.form-input[readonly] {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.pago-total-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.pago-total-label {
+  color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.pago-total-value {
+  color: var(--accent-blue);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.nav-sep {
+  flex-shrink: 0;
+  opacity: .45;
+}
+
+.wizard-nav-total {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 /* =========================================================
    LOADING / ANIMATION
    ========================================================= */
@@ -83,55 +148,10 @@
   }
 }
 
-/* =========================================================
-   SKELETON LOADER
-   ========================================================= */
-
-@keyframes sk-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
-.skeleton-page {
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-  pointer-events: none;
-  user-select: none;
-  padding-bottom: 80px;
-}
-
-/* Base shimmer */
-.sk-line,
-.sk-field {
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 0%,
-    var(--bg-tertiary) 45%,
-    var(--bg-secondary) 100%
-  );
-  background-size: 800px 100%;
-  animation: sk-shimmer 1.6s ease-in-out infinite;
-  border-radius: 8px;
-  display: block;
-}
 
 /* Lines */
-.sk-line { height: 14px; width: 100%; }
-.sk-title   { height: 30px; width: 260px; border-radius: 10px; margin-bottom: 10px; }
-.sk-subtitle { height: 14px; width: 380px; margin-bottom: 0; }
-.sk-heading  { height: 18px; width: 180px; }
-.sk-label    { height: 11px; width: 70px;  border-radius: 6px; }
 
 /* Fields */
-.sk-field {
-  height: 42px;
-  width: 100%;
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  background-clip: padding-box;
-}
-.sk-field.sk-field-textarea { height: 80px; border-radius: 12px; }
 
 /* =========================================================
    RESPONSIVE
@@ -477,14 +497,13 @@
   resize: vertical;
 }
 
-@media (min-width: 900px) {
-  .payments-grid {
-    grid-template-columns: 1fr 1.2fr;
-    align-items: start;
+@media (max-width: 560px) {
+  .segmented-control {
+    flex-direction: column;
   }
 
-  .payments-right {
-    grid-column: auto;
+  .pago-total-badge {
+    align-items: flex-start;
   }
 }
 
@@ -498,6 +517,170 @@
   .payment-actions {
     justify-content: flex-start;
   }
+}
+
+.resumen-review {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.resumen-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.resumen-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--separator-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+}
+
+.resumen-summary-item--payment-mode {
+  border-color: color-mix(in srgb, var(--accent-blue) 42%, var(--separator-color));
+}
+
+.resumen-summary-label {
+  color: var(--text-tertiary);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.resumen-summary-value {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+  font-feature-settings: "tnum";
+}
+
+.resumen-payment-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resumen-progress-track {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+}
+
+.resumen-progress-fill {
+  height: 100%;
+  max-width: 100%;
+  border-radius: inherit;
+  transition: width .35s ease;
+}
+
+.resumen-progress-fill.blue { background: var(--accent-blue); }
+
+.resumen-progress-label {
+  color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.resumen-payment-mode-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: .76rem;
+}
+
+.resumen-payment-mode-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent-blue);
+}
+
+.resumen-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.resumen-review-card {
+  overflow: hidden;
+  border: 1px solid var(--separator-color);
+  border-radius: 18px;
+  background: var(--bg-secondary);
+}
+
+.resumen-review-card-full { grid-column: 1 / -1; }
+
+.resumen-review-card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.resumen-review-card-header h3 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.resumen-review-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.resumen-review-card-body-compact { gap: 8px; }
+
+.resumen-info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resumen-info-label {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: .9rem;
+}
+
+.resumen-info-value {
+  flex-shrink: 0;
+  max-width: 68%;
+  color: var(--text-primary);
+  font-size: .92rem;
+  font-weight: 650;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.resumen-info-row-strong .resumen-info-label,
+.resumen-info-row-strong .resumen-info-value {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.resumen-observations-text {
+  color: var(--text-primary);
+  font-size: .92rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .resumen-grid {
@@ -555,6 +738,8 @@
 }
 
 @media (max-width: 900px) {
+  .resumen-review-grid,
+  .resumen-summary-strip,
   .resumen-grid {
     grid-template-columns: 1fr;
   }

@@ -7,46 +7,35 @@
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        @if (isInitialLoading()) {
-          <div class="skeleton-shape sk-search"></div>
-        } @else {
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Buscar por usuario, descripción, tabla..."
-            [value]="filters().searchText"
-            (input)="updateFilter('searchText', $any($event.target).value)"
-            (keyup.enter)="buscar()"
-            autocomplete="off" />
-        }
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Buscar por usuario, descripción, tabla..."
+          [value]="filters().searchText"
+          (input)="updateFilter('searchText', $any($event.target).value)"
+          (keyup.enter)="buscar()"
+          autocomplete="off" />
       </div>
 
-      @if (isInitialLoading()) {
-        <div class="skeleton-shape sk-button"></div>
-        <div class="skeleton-shape sk-button"></div>
-        <div class="skeleton-shape sk-button"></div>
-        <div class="skeleton-shape sk-button"></div>
-      } @else {
-        <button class="btn-filter" [class.btn-filter--active]="advancedFiltersVisible()" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
-          <i class="bx bx-filter-alt"></i>
-          Filtros
-        </button>
-        <button class="btn-filter btn-export" (click)="exportarHistorial()">
-          <i class="bx bx-download"></i>
-          Exportar
-        </button>
-        <button class="btn-filter" (click)="limpiarFiltros()">
-          <i class="bx bx-refresh"></i>
-          Limpiar
-        </button>
-        <button class="btn-primary" (click)="buscar()" [disabled]="isTableRefreshing()">
-          Buscar
-        </button>
-      }
+      <button class="btn-filter" [class.btn-filter--active]="advancedFiltersVisible()" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
+        <i class="bx bx-filter-alt"></i>
+        Filtros
+      </button>
+      <button class="btn-filter btn-export" (click)="exportarHistorial()">
+        <i class="bx bx-download"></i>
+        Exportar
+      </button>
+      <button class="btn-filter" (click)="limpiarFiltros()">
+        <i class="bx bx-refresh"></i>
+        Limpiar
+      </button>
+      <button class="btn-primary" (click)="buscar()" [disabled]="isTableRefreshing() || isInitialLoading()">
+        Buscar
+      </button>
     </div>
 
     <!-- FILTER TOKENS -->
-    @if (!isInitialLoading() && (filters().Usuario || filters().Tipo_Accion || filters().Tabla_Afectada || filters().FechaInicio || filters().FechaFin)) {
+    @if (filters().Usuario || filters().Tipo_Accion || filters().Tabla_Afectada || filters().FechaInicio || filters().FechaFin) {
       <div class="active-filters">
         @if (filters().Usuario) {
           <div class="filter-token">
@@ -92,36 +81,8 @@
     }
   </div>
 
-  <!-- SKELETON -->
   @if (isInitialLoading()) {
-    <div class="table-card skeleton-card">
-      <table class="historial-table">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Usuario</th>
-            <th>Acción</th>
-            <th>Tabla</th>
-            <th>ID Registro</th>
-            <th>Descripción</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of skeletonRows; track row) {
-            <tr class="skeleton-table-row">
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td><div class="skeleton-shape sk-cell"></div></td>
-              <td></td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <app-loading-state label="Cargando historial de actividad…"></app-loading-state>
 
   } @else {
 

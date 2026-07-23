@@ -2,8 +2,7 @@
   display: block;
 }
 
-.dashboard-page,
-.skeleton-page {
+.dashboard-page {
   max-width: 1350px;
   margin: auto;
 }
@@ -476,134 +475,6 @@
   color: var(--accent-blue);
 }
 
-/* ── Skeleton ─────────────────────────────────────────────────────────────── */
-@keyframes sk-shimmer {
-  0% {
-    background-position: -400px 0;
-  }
-
-  100% {
-    background-position: 400px 0;
-  }
-}
-
-.skeleton-page {
-  gap: 20px;
-  pointer-events: none;
-  user-select: none;
-  padding-bottom: 80px;
-}
-
-.sk-line,
-.sk-field,
-.sk-icon-box,
-.sk-admin-item {
-  background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--bg-tertiary) 45%, var(--bg-secondary) 100%);
-  background-size: 800px 100%;
-  animation: sk-shimmer 1.6s ease-in-out infinite;
-}
-
-.sk-line,
-.sk-field {
-  border-radius: 8px;
-  display: block;
-}
-
-.sk-line {
-  height: 14px;
-  width: 100%;
-}
-
-.sk-title {
-  height: 30px;
-  width: 260px;
-  margin-bottom: 10px;
-}
-
-.sk-subtitle {
-  height: 14px;
-  width: 360px;
-}
-
-.sk-heading {
-  height: 18px;
-  width: 180px;
-  margin-bottom: 8px;
-}
-
-.sk-label {
-  height: 11px;
-  width: 70px;
-}
-
-.sk-range-chip {
-  height: 32px;
-  width: 220px;
-  border-radius: 999px;
-}
-
-.sk-field {
-  height: 42px;
-  border: 1.5px solid var(--separator-color);
-}
-
-.sk-toolbar-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
-  gap: 16px;
-  align-items: end;
-}
-
-.sk-toolbar-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.sk-btn-quick {
-  height: 42px;
-  flex: 1;
-  min-width: 80px;
-  border-radius: 10px;
-}
-
-.sk-kpi {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.sk-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-}
-
-.sk-kpi-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
-
-.sk-kpi-value {
-  height: 22px;
-  width: 60%;
-}
-
-.sk-kpi-sub {
-  height: 11px;
-  width: 80%;
-}
-
-.sk-chart {
-  height: 300px;
-}
-
-.sk-admin-item {
-  height: 82px;
-  border-radius: 12px;
-}
-
 /* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes pageEnter {
   from {
@@ -658,16 +529,11 @@
   .admin-preview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .sk-toolbar-grid {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 @media (max-width: 768px) {
 
-  .dashboard-page,
-  .skeleton-page {
+  .dashboard-page {
     padding-left: 14px;
     padding-right: 14px;
   }

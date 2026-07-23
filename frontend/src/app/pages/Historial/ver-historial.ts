@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { HistorialService, Historial, HistorialFilters } from '../../services/Historial/historial.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
 @Component({
   selector: 'app-ver-historial',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './ver-historial.html',
   styleUrls: ['./ver-historial.css']
 })
@@ -39,8 +40,6 @@ export class VerHistorialComponent implements OnInit {
 
   /** ID de la fila actualmente expandida; null = ninguna */
   expandedId = signal<number | null>(null);
-
-  skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
   tiposAccion = signal<string[]>([
     'CREATE', 'READ', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'EXPORT', 'IMPORT',

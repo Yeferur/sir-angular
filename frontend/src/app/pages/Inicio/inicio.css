@@ -149,6 +149,37 @@
   pointer-events: none;
 }
 
+.inicio-stale-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent-red) 20%, var(--separator-color));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-red) 6%, var(--bg-secondary));
+  color: var(--text-secondary);
+  font-size: .74rem;
+}
+
+.inicio-stale-notice small {
+  color: var(--text-tertiary);
+  font-size: .68rem;
+}
+
+.inicio-stale-notice button {
+  margin-left: auto;
+  padding: 6px 9px;
+  border: 1px solid var(--separator-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--accent-blue);
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 /* ── CARD BASE ─────────────────────────────────────────────── */
 @keyframes cardEnter {
   from { opacity: 0; transform: translateY(10px); }
@@ -509,47 +540,6 @@
   white-space: nowrap;
 }
 
-/* ── SKELETON ─────────────────────────────────────────────── */
-@keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
-.sk-card {
-  min-height: 214px;
-  overflow: hidden;
-  border: 1px solid var(--separator-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-}
-
-.sk-card-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.skeleton-shape {
-  border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--bg-tertiary) 92%, transparent) 0%,
-    color-mix(in srgb, var(--text-secondary) 12%, var(--bg-tertiary)) 45%,
-    color-mix(in srgb, var(--bg-tertiary) 92%, transparent) 100%
-  );
-  background-size: 800px 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
-}
-
-.sk-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sk-circle { width: 60px; height: 60px; flex-shrink: 0; border-radius: 50%; }
-.sk-lines { display: flex; flex: 1; flex-direction: column; gap: 8px; }
-.sk-line { width: 65%; height: 10px; }
-.sk-line-sm { width: 40%; height: 9px; }
-.sk-number { width: 50%; height: 52px; border-radius: 8px; }
-.sk-meta { width: 75%; height: 9px; }
-
 /* ── TRANSFERS ─────────────────────────────────────────────── */
 .transfers-card {
   overflow: hidden;
@@ -631,7 +621,7 @@
   z-index: calc(var(--z-modal) - 2);
   pointer-events: none;
   background: rgba(0, 0, 0, .5);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(3px);
   opacity: 0;
   transition: opacity .25s;
 }
@@ -653,8 +643,10 @@
   flex-direction: column;
   border-left: 1px solid var(--separator-color);
   background: var(--bg-secondary);
+  box-shadow: -12px 0 42px rgba(0, 0, 0, .28);
+  outline: none;
   transform: translateX(100%);
-  transition: transform .32s cubic-bezier(.22, 1, .36, 1);
+  transition: transform .38s cubic-bezier(.23, 1, .32, 1);
 }
 
 .drawer.open { transform: translateX(0); }
@@ -664,7 +656,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 20px 20px 16px;
+  padding: 20px 24px 14px;
   border-bottom: 1px solid var(--separator-color);
 }
 
@@ -684,13 +676,14 @@
 
 .drawer-close-btn {
   display: flex;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 8px;
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
@@ -958,6 +951,8 @@
   .drawer { width: 100%; }
   .transfers-body { flex-direction: column; }
   .transfer-col + .transfer-col { border-top: 1px solid var(--separator-color); border-left: none; }
+  .inicio-stale-notice { align-items: flex-start; flex-wrap: wrap; }
+  .inicio-stale-notice button { margin-left: 0; }
 }
 
 /* Card compartida: apila el layout en pantallas angostas */
@@ -1018,5 +1013,12 @@
   .card-linked .btn-edit-aforo {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-overlay {
+    transition: none;
   }
 }

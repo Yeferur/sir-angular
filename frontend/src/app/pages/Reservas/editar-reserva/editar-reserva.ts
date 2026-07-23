@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -30,6 +32,7 @@ import {
   sortReservaPassengerControls,
   type ReservaPassengerType,
 } from '../reserva-passengers.utils';
+import { isTourDateAvailable, toDateOnly } from '../../../shared/utils/calendar-date';
 
 interface WizardStep {
   id: string;
@@ -69,7 +72,7 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
   templateUrl: './editar-reserva.html',
   styleUrls: ['../reserva-shared.css'],
 })
@@ -91,6 +94,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   currentStep = 0;
   goingBack = false;
   maxReachedStep = 0;
+  panelAnimating = false;
 
   modoNacionalidad: 'global' | 'individual' = 'global';
   modoPrecio: 'global' | 'individual' = 'global';
@@ -190,7 +194,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       return 'La reserva ya no existe o no pudo encontrarse. Actualiza la página e intenta nuevamente.';
     }
 
-    return raw;
+    return toUserErrorMessage(error, 'No fue posible completar la operación.');
   }
 
   private normalizarDni(dni: unknown): string {
@@ -304,15 +308,22 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private triggerPanelAnimation(back: boolean): void {
     this.goingBack = back;
+    this.panelAnimating = false;
     this.cdr.markForCheck();
-    setTimeout(() => {
-      this.goingBack = false;
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
       this.cdr.markForCheck();
-    }, 380);
+      setTimeout(() => {
+        this.panelAnimating = false;
+        this.goingBack = false;
+        this.cdr.markForCheck();
+      }, 380);
+    });
   }
 
   canNavigateToStep(index: number): boolean {
-    return index >= 0 && index < this.wizardSteps.length;
+    return index >= 0 && index < this.wizardSteps.length &&
+      (index <= this.maxReachedStep || index <= this.currentStep);
   }
 
   goToStep(index: number): void {
@@ -324,6 +335,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   nextStep(): void {
+    if (!this.canAdvanceFromStep(this.currentStep)) {
+      this.markCurrentStepTouched();
+      return;
+    }
     if (this.currentStep === 2) this.aplicarConfiguracionGlobal();
 
     if (this.currentStep < this.wizardSteps.length - 1) {
@@ -343,7 +358,32 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   canAdvanceFromStep(step: number): boolean {
-    return step >= 0 && step < this.wizardSteps.length;
+    switch (step) {
+      case 0:
+        return !!(
+          this.form?.get('SelectTour')?.valid &&
+          this.form?.get('Fecha_Tour')?.valid
+        );
+      case 1:
+        return !!(
+          this.form?.get('Nombre_Reportante')?.valid &&
+          this.form?.get('Telefono_Reportante')?.valid
+        );
+      case 2:
+        return (
+          (this.planes().length <= 1 || !!this.form?.get('Id_Plan')?.value) &&
+          this.puntosSeleccionados().length > 0 &&
+          !this.tieneConflictoLogisticoActual()
+        );
+      case 3:
+        return this.pasajeros.length > 0;
+      case 4:
+        return this.abonosValidos;
+      case 5:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private markCurrentStepTouched(): void {
@@ -774,6 +814,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   // Estado
   isLoading = signal<boolean>(true);
+  initialLoadError = signal<string>('');
   isSubmitting = signal<boolean>(false);
   cuposDisponiblesActuales = signal<number | null>(null);
   cuposValidosActuales = signal<boolean>(true);
@@ -1005,11 +1046,15 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   // Snapshot original (útil si necesitas comparar cambios o saldo histórico)
   private originalReserva: any = null;
+  private disponibilidadActual: any = null;
+  private disponibilidadLookupSeq = 0;
+  readonly fechaTourDateFilter = (date: Date): boolean => this.isFechaTourHabilitada(date);
   // Modo creado desde duplicado
   private isDuplicateMode = false;
   private duplicateDrawerAutoOpenedForId: string | null = null;
 
   async ngOnInit(): Promise<void> {
+    this.initialLoadError.set('');
     // Estructura del form (idéntica a crear, pero la usaremos solo para editar)
     this.form = this.fb.group({
       // Cabecera
@@ -1071,14 +1116,11 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.tours.set(tours || []);
       this.canales.set(canales || []);
       this.monedas.set(monedas || []);
-    } catch {
-      this.navbar.showAlert({
-        type: 'error',
-        title: 'Error cargando datos',
-        message: 'No fue posible cargar Tours, Canales o Monedas.',
-        autoClose: false,
-        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.clearOverlay() }],
-      });
+    } catch (error) {
+      this.initialLoadError.set(toUserErrorMessage(error, 'No pudimos cargar la información necesaria. Intenta nuevamente.'));
+      this.isLoading.set(false);
+      this.cdr.markForCheck();
+      return;
     }
 
     // 2) leer parámetro de ruta (usa :Id_Reserva en tus rutas)
@@ -1087,12 +1129,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     if (!id) {
       this.isLoading.set(false);
-      this.navbar.showAlert({
-        type: 'warning',
-        title: 'ID de reserva inválido',
-        message: 'No se recibió Id_Reserva en la ruta.',
-        autoClose: true,
-      });
+      this.initialLoadError.set('No encontramos la reserva que intentas editar.');
       return;
     }
 
@@ -1163,6 +1200,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   // ===================== Carga / hidratación =====================
   private async cargarReservaExistente(id: string) {
+    this.initialLoadError.set('');
     this.isLoading.set(true);
     try {
       // Ajusta este método según tu servicio:
@@ -1212,6 +1250,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       if (idTour) {
         const planes = await firstValueFrom(this.reservasSvc.getPlanesByTour(idTour));
         this.planes.set(planes || []);
+        await this.cargarDisponibilidadTour(idTour);
         await this.onPlanMonedaChange(true); // solo cargar preciosRef
       }
 
@@ -1335,12 +1374,45 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       await this.recalcularComisionesPorCanal();
 
       this.ultimoTotalConocido = this.totalNeto() + Number(this.form.get('ComisionInternacional')?.value || 0);
+      // Una reserva existente ya tiene todas sus secciones disponibles para edición.
+      // La validación sigue aplicándose al avanzar después de cualquier cambio.
+      this.maxReachedStep = this.wizardSteps.length - 1;
 
       this.cdr.markForCheck();
     } catch (error) {
-      this.showApiError(error, 'Error al cargar reserva');
+      this.initialLoadError.set(toUserErrorMessage(error, 'No pudimos cargar la reserva. Intenta nuevamente.'));
     } finally {
       this.isLoading.set(false);
+      this.cdr.markForCheck();
+    }
+  }
+
+  async retryInitialLoad(): Promise<void> {
+    const id = this.reservaId() ?? this.route.snapshot.paramMap.get('Id_Reserva') ?? this.route.snapshot.paramMap.get('id');
+    if (!id) {
+      this.initialLoadError.set('No encontramos la reserva que intentas editar.');
+      return;
+    }
+
+    this.initialLoadError.set('');
+    this.isLoading.set(true);
+    try {
+      const [tours, canales, monedas] = await Promise.all([
+        firstValueFrom(this.reservasSvc.getTours()),
+        firstValueFrom(this.reservasSvc.getCanales()),
+        firstValueFrom(this.reservasSvc.getMonedas()),
+      ]);
+      this.tours.set(tours || []);
+      this.canales.set(canales || []);
+      this.monedas.set(monedas || []);
+      this.reservaId.set(id);
+      await this.cargarReservaExistente(id);
+      await this.cargarHistorialActividad(id);
+    } catch (error) {
+      this.initialLoadError.set(toUserErrorMessage(error, 'No pudimos cargar la reserva. Intenta nuevamente.'));
+    } finally {
+      this.isLoading.set(false);
+      this.cdr.markForCheck();
     }
   }
 
@@ -1536,6 +1608,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     this.horarioSeleccionado.set(null);
     this.preciosRef.set({});
     if (!idTour) {
+      this.disponibilidadLookupSeq++;
+      this.disponibilidadActual = null;
       this.cuposDisponiblesActuales.set(null);
       this.cuposValidosActuales.set(true);
       this.navbar.cuposInfo.set(null);
@@ -1548,6 +1622,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const planes = await firstValueFrom(this.reservasSvc.getPlanesByTour(idTour));
       this.planes.set(planes || []);
       if (this.planes().length === 1) this.form.get('Id_Plan')?.setValue(this.planes()[0].Id_Plan, { emitEvent: false });
+      await this.cargarDisponibilidadTour(idTour);
 
       if (!this.form.get('Id_Moneda')?.value) this.form.get('Id_Moneda')?.setValue(1, { emitEvent: false });
 
@@ -2056,6 +2131,68 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async cargarDisponibilidadTour(idTour: number): Promise<void> {
+    const lookupSeq = ++this.disponibilidadLookupSeq;
+
+    try {
+      const disponibilidad = await firstValueFrom(this.reservasSvc.getDisponibilidadTour(idTour));
+      if (lookupSeq !== this.disponibilidadLookupSeq || Number(this.form.get('SelectTour')?.value) !== idTour) return;
+      this.disponibilidadActual = disponibilidad || null;
+    } catch {
+      if (lookupSeq !== this.disponibilidadLookupSeq || Number(this.form.get('SelectTour')?.value) !== idTour) return;
+      this.disponibilidadActual = null;
+    }
+
+    this.applyDisponibilidadToDatepicker();
+  }
+
+  private applyDisponibilidadToDatepicker(): void {
+    const fechaActual = this.form.get('Fecha_Tour')?.value;
+    const fecha = this.parseDateOnly(fechaActual);
+
+    if (fecha && !this.isFechaTourHabilitada(fecha)) {
+      this.form.get('Fecha_Tour')?.setValue(null);
+      this.form.get('Fecha_Tour')?.markAsTouched();
+    }
+
+    this.cdr.markForCheck();
+  }
+
+  get fechaTourMinDate(): string {
+    return toDateOnly(new Date()) || '';
+  }
+
+  private isFechaTourHabilitada(date: Date): boolean {
+    const fecha = toDateOnly(date);
+    if (!fecha) return false;
+    if (this.esFechaOriginalDelTourActual(fecha)) return true;
+    if (fecha < this.fechaTourMinDate) return false;
+    if (!this.disponibilidadActual) return true;
+    return isTourDateAvailable(fecha, this.disponibilidadActual);
+  }
+
+  private esFechaOriginalDelTourActual(fecha: string): boolean {
+    if (this.isDuplicateMode || !this.originalReserva) return false;
+
+    const tourOriginal = Number(
+      this.originalReserva?.Cabecera?.Id_Tour ?? this.originalReserva?.Id_Tour ?? 0
+    );
+    const tourActual = Number(this.form.get('SelectTour')?.value);
+    const fechaOriginal = toDateOnly(
+      this.originalReserva?.Cabecera?.Fecha_Tour ?? this.originalReserva?.FechaReserva
+    );
+
+    return tourOriginal > 0 && tourOriginal === tourActual && fechaOriginal === fecha;
+  }
+
+  private parseDateOnly(value: unknown): Date | null {
+    const fecha = toDateOnly(value);
+    if (!fecha) return null;
+    const [year, month, day] = fecha.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  }
+
   pasajerosConAsiento(): number {
     return this.pasajeros.controls.filter(c => {
       const t = normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value); return t === 'ADULTO' || t === 'NINO';
@@ -2128,6 +2265,20 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (forma === 'Abono') return Math.max(0, total - this.totalAbonos());
     if (forma === 'Completo') return 0;
     return total;
+  }
+
+  totalPorTipo(tipo: ReservaPassengerType): number {
+    return this.pasajeros.controls
+      .filter((control) => normalizeReservaPassengerType(control.get('Tipo_Pasajero')?.value) === tipo)
+      .reduce((total, control) => total + Number(control.get('Precio_Pasajero')?.value || 0), 0);
+  }
+
+  resumenTiposPasajero(): string {
+    return (['ADULTO', 'NINO', 'INFANTE'] as ReservaPassengerType[])
+      .map((tipo) => ({ tipo, cantidad: this.countByTipo(tipo) }))
+      .filter(({ cantidad }) => cantidad > 0)
+      .map(({ tipo, cantidad }) => `${cantidad} ${reservaPassengerTypeLabel(tipo).toLocaleLowerCase('es-CO')}${cantidad === 1 ? '' : 's'}`)
+      .join(' · ');
   }
   recalcularTotales() {
     const nuevoTotal = this.totalNeto() + Number(this.form.get('ComisionInternacional')?.value || 0);

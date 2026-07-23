@@ -1,66 +1,7 @@
 <div class="booking-dashboard">
-  @if (isLoading()) {
-    <div class="page-header skeleton-header">
-      <div class="page-header-text">
-        <div class="skeleton-shape sk-title"></div>
-        <div class="skeleton-shape sk-subtitle"></div>
-      </div>
-      <div class="page-header-actions">
-        <div class="skeleton-shape sk-button"></div>
-      </div>
-    </div>
-
-    <div class="main-content">
-      <div class="top-cards-grid">
-        @for (card of [0, 1]; track card) {
-          <div class="card skeleton-card">
-            <div class="card-header">
-              <div>
-                <div class="skeleton-shape sk-card-title"></div>
-                <div class="skeleton-shape sk-card-subtitle"></div>
-              </div>
-            </div>
-
-            <div class="form-grid">
-              @for (field of (card === 0 ? [0, 1, 2, 3] : [0, 1, 2, 3]); track field) {
-                <div class="form-group">
-                  <div class="skeleton-shape sk-label"></div>
-                  <div class="skeleton-shape sk-input"></div>
-                </div>
-              }
-            </div>
-          </div>
-        }
-      </div>
-
-      <div class="card skeleton-card permissions-card">
-        <div class="card-header">
-          <div>
-            <div class="skeleton-shape sk-card-title"></div>
-            <div class="skeleton-shape sk-card-subtitle"></div>
-          </div>
-        </div>
-
-        <div class="form-grid">
-          <div class="form-group">
-            <div class="skeleton-shape sk-label"></div>
-            <div class="skeleton-shape sk-input"></div>
-          </div>
-          <div class="form-group full-width">
-            <div class="permissions-head">
-              <div class="skeleton-shape sk-label"></div>
-              <div class="skeleton-shape sk-button sk-count"></div>
-            </div>
-            <div class="skeleton-permissions">
-              @for (row of skeletonPermissionRows; track row) {
-                <div class="skeleton-shape sk-permission"></div>
-              }
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  } @else {
+@if (isLoading()) {
+  <app-loading-state label="Cargando usuario, roles y permisos…"></app-loading-state>
+} @else {
     <form id="usuarioForm" [formGroup]="form" (ngSubmit)="submit()" autocomplete="off" novalidate>
       <input class="autofill-trap" type="text" name="fake-user" autocomplete="username" tabindex="-1" aria-hidden="true" />
       <input class="autofill-trap" type="password" name="fake-pass" autocomplete="current-password" tabindex="-1" aria-hidden="true" />

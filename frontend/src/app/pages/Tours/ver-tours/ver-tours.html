@@ -21,41 +21,7 @@
   </div>
 
   @if (isLoading()) {
-    <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="tours-table">
-        <thead>
-          <tr>
-            <th class="col-nombre">Tour</th>
-            <th class="col-abrev">Abreviación</th>
-            <th class="col-cupo">Cupo base</th>
-            <th class="col-comisiones">Comisiones</th>
-            <th class="col-actions"></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (s of skeletonRows; track s) {
-            <tr class="skeleton-row">
-              <td><div class="sk sk-nombre"></div></td>
-              <td><div class="sk sk-pill"></div></td>
-              <td><div class="sk sk-cupo"></div></td>
-              <td>
-                <div class="sk-chips">
-                  <div class="sk sk-chip"></div>
-                  <div class="sk sk-chip"></div>
-                  <div class="sk sk-chip"></div>
-                </div>
-              </td>
-              <td>
-                <div class="sk-actions">
-                  <div class="sk sk-btn"></div>
-                  <div class="sk sk-btn"></div>
-                </div>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <app-loading-state label="Cargando tours y configuraciones…"></app-loading-state>
 
   } @else if (toursFiltrados().length === 0) {
     <section class="empty-state" aria-live="polite">

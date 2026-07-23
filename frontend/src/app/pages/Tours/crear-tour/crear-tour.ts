@@ -7,6 +7,7 @@ import { Tours, Tour, CanalComision } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
+import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
 
@@ -80,7 +81,7 @@ type DisponibilidadPayload = {
   templateUrl: './crear-tour.html',
   styleUrls: ['../tour-shared.css'],
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, DatepickerComponent, LoadingStateComponent],
 })
 export class CrearTourComponent implements OnInit {
   private alerts = inject(SirAlertService);

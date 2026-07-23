@@ -6,6 +6,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { apiEnvelopeInterceptor } from './interceptors/api-envelope.interceptor';
+import { appActivityInterceptor } from './interceptors/app-activity.interceptor';
 import { IMAGE_CONFIG } from '@angular/common';
 
 import { SelectivePreloadingStrategyService } from './services/selective-preloading-strategy.service';
@@ -17,7 +18,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withPreloading(SelectivePreloadingStrategyService)),
     importProvidersFrom(DragDropModule),
     provideHttpClient(
-      withInterceptors([authInterceptor, apiEnvelopeInterceptor])
+      withInterceptors([appActivityInterceptor, authInterceptor, apiEnvelopeInterceptor])
     ),
     {
       provide: IMAGE_CONFIG,

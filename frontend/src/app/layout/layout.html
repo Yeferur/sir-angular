@@ -9,7 +9,7 @@
     }
 
     <div class="topbar-bar" #topbarBar
-      [style.width.px]="transitionPhase() === 'app' && !measuringTopbar() ? (topbarWidth() || null) : null"
+      [style.width.px]="transitionPhase() === 'app' ? (topbarWidth() || null) : null"
       [style.--logout-start-top.px]="logoutStartRect()?.top"
       [style.--logout-start-left.px]="logoutStartRect()?.left"
       [style.--logout-start-width.px]="logoutStartRect()?.width"
@@ -18,7 +18,7 @@
       [class.is-wide]="transitionStage() === 'wide' || transitionStage() === 'fullscreen'"
       [class.is-fullscreen]="transitionStage() === 'fullscreen'"
       [class.is-collapsing]="transitionPhase() === 'collapsing'"
-      [class.is-measuring]="measuringTopbar()">
+      [class.is-searching]="globalSearchOpen() && showAppChrome()">
       @if (showAppChrome()) {
       <div class="topbar-island-content" #topbarContent>
 
@@ -36,7 +36,12 @@
       </button>
 
       <!-- Marca -->
-      <div class="topbar-brand">
+      <a
+        class="topbar-brand"
+        routerLink="/"
+        aria-label="Ir a Inicio"
+        title="Ir a Inicio"
+        (click)="onBrandClick()">
         <img
           [src]="isDarkMode
             ? 'assets/img/LogoMaxitoursPNG.webp'
@@ -48,13 +53,37 @@
           fetchpriority="high"
           decoding="async"
         />
-      </div>
+      </a>
 
       <div class="topbar-sep topbar-sep--after-brand"></div>
 
+      @if (globalSearchOpen()) {
+      <div class="topbar-search-mode">
+        <i class="bx bx-search" aria-hidden="true"></i>
+        <input
+          #topbarSearchInput
+          type="search"
+          [value]="searchQuery()"
+          (input)="onTopbarSearchInput($event)"
+          (keydown.enter)="submitTopbarSearch()"
+          (keydown.escape)="$event.stopPropagation(); closeGlobalSearch()"
+          placeholder="Buscar reservas, transfers, tours o puntos"
+          autocomplete="off"
+          aria-label="Búsqueda global"
+        />
+        @if (searchLoading()) {
+          <span class="topbar-search-spinner" aria-label="Buscando"></span>
+        }
+        <button type="button" class="topbar-search-close" (click)="closeGlobalSearch()" aria-label="Cerrar búsqueda">
+          <i class="bx bx-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      } @else {
       <!-- Título de la página activa — SIEMPRE visible, sin condición -->
       <div class="topbar-title-zone">
-        <span class="topbar-page-title">{{ pageTitle() }}</span>
+        <span class="topbar-page-title"
+              [class.is-leaving]="titleLeaving()"
+              [class.is-entering]="titleEntering()">{{ pageTitle() }}</span>
       </div>
 
       <!-- Zona derecha — búsqueda, novedades, tema, avatar -->
@@ -77,7 +106,7 @@
         <button
           class="topbar-icon-btn topbar-icon-btn--secondary topbar-theme-btn"
           type="button"
-          (click)="toggleTheme()"
+          (click)="toggleTheme($event)"
           [attr.aria-label]="isDarkMode ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
           [attr.title]="isDarkMode ? 'Tema claro' : 'Tema oscuro'"
         >
@@ -136,7 +165,7 @@
                 <i class="bx bx-bell" aria-hidden="true"></i>
                 Novedades
               </button>
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme(); closeProfileMenu()">
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme($event); closeProfileMenu()">
                 <i class="bx" [class.bx-sun]="!isDarkMode" [class.bx-moon]="isDarkMode" aria-hidden="true"></i>
                 {{ isDarkMode ? 'Tema claro' : 'Tema oscuro' }}
               </button>
@@ -167,6 +196,7 @@
         </div>
 
       </div><!-- /topbar-right -->
+      }
       </div><!-- /topbar-island-content -->
       } @else {
       <!-- La isla, ya expandida a pantalla completa por is-transitioning /
@@ -176,6 +206,24 @@
         <app-login></app-login>
       </div>
       }
+      @if (sessionTransitionMessage(); as transitionMessage) {
+        <div
+          class="topbar-session-message"
+          [attr.data-kind]="transitionMessage.kind"
+          role="status"
+          aria-live="polite">
+          <span class="topbar-session-signal" aria-hidden="true"></span>
+          <strong>{{ transitionMessage.title }}</strong>
+        </div>
+      }
+      @if (navigationActive() && showAppChrome()) {
+        <div class="topbar-navigation-progress" role="progressbar" aria-label="La aplicación está procesando información">
+          <span></span>
+        </div>
+      }
+      @if (topbarFeedbackType() && showAppChrome()) {
+        <span class="topbar-feedback-glow" [attr.data-type]="topbarFeedbackType()" aria-hidden="true"></span>
+      }
     </div><!-- /topbar-bar -->
   </div><!-- /topbar-row -->
 
@@ -183,7 +231,7 @@
     @if (topbarState() === 'global-search') {
       <div class="topbar-expanded topbar-expanded--search" role="dialog"
            aria-modal="true" aria-label="Buscador global">
-        <app-global-search mode="search"></app-global-search>
+        <app-global-search mode="search" [integrated]="true"></app-global-search>
       </div>
     }
     @if (topbarState() === 'sistema') {

@@ -51,30 +51,28 @@
   </header>
 
   @if (isLoading) {
-    <section aria-live="polite" aria-busy="true">
-      <p class="sr-only">Cargando información de aforos</p>
-
-      <div class="tours-grid">
-        @for (s of skeletonCards; track s) {
-          <div class="sk-card">
-            <div class="sk-card-inner">
-              <div class="sk-row">
-                <div class="sk-lines">
-                  <div class="skeleton-shape sk-line"></div>
-                  <div class="skeleton-shape sk-line-sm"></div>
-                </div>
-                <div class="skeleton-shape sk-circle"></div>
-              </div>
-              <div class="skeleton-shape sk-number"></div>
-              <div class="skeleton-shape sk-meta"></div>
-            </div>
-          </div>
-        }
-      </div>
-    </section>
+    <app-loading-state label="Cargando aforos y servicios del día…"></app-loading-state>
+  } @else if (loadError && !hasLoaded) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos cargar Inicio"
+      [detail]="loadError"
+      (action)="retryLoad()">
+    </app-loading-state>
   } @else {
-    <div class="content-wrap" [class.is-updating]="isUpdatingDate">
+    <div class="content-wrap" [class.is-updating]="isUpdatingDate" [attr.aria-busy]="isUpdatingDate">
 
+      @if (loadError) {
+        <div class="inicio-stale-notice" role="alert">
+          <span>{{ loadError }}</span>
+          @if (loadedFecha && loadedFecha !== fecha) {
+            <small>Se conservan los datos de {{ loadedFecha | date:"d 'de' MMMM" : '' : 'es-CO' }}.</small>
+          }
+          <button type="button" (click)="retryLoad()">Reintentar</button>
+        </div>
+      }
+
+      @if (tours.length) {
       <div class="tours-grid">
 
         <div
@@ -216,6 +214,13 @@
           }
         }
       </div>
+      } @else {
+        <app-loading-state
+          mode="empty"
+          label="No hay tours activos para mostrar"
+          detail="Puedes consultar otra fecha o revisar la configuración de tours.">
+        </app-loading-state>
+      }
 
       <div class="transfers-card">
         <div class="transfers-head">
@@ -252,6 +257,10 @@
   [class.open]="drawerOpen && drawerMode === 'edit'"
   role="dialog"
   aria-modal="true"
+  [attr.aria-hidden]="drawerOpen && drawerMode === 'edit' ? null : true"
+  [attr.inert]="drawerOpen && drawerMode === 'edit' ? null : ''"
+  tabindex="-1"
+  (keydown)="onDrawerKeydown($event)"
   aria-labelledby="drawer-edit-title">
   @if (drawerTour) {
     <div class="drawer-header">
@@ -341,6 +350,10 @@
   [class.open]="drawerOpen && drawerMode === 'privados'"
   role="dialog"
   aria-modal="true"
+  [attr.aria-hidden]="drawerOpen && drawerMode === 'privados' ? null : true"
+  [attr.inert]="drawerOpen && drawerMode === 'privados' ? null : ''"
+  tabindex="-1"
+  (keydown)="onDrawerKeydown($event)"
   aria-labelledby="drawer-priv-title">
   @if (drawerTour) {
     <div class="drawer-header">

@@ -1,8 +1,9 @@
 import { Injectable, NgZone, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { WebSocketService } from './WebSocket/web-socket';
+import { SILENT_APP_ACTIVITY } from '../interceptors/app-activity.interceptor';
 
 export interface Privado {
   Id_Reserva: number;
@@ -63,7 +64,7 @@ export class InicioService {
   // Signal para cambios en tiempo real
   aforoActualizado = signal<any>(null);
   reservaActualizada = signal<any>(null);
-  // TODO: Integrar evento WebSocket de transfers para refrescar Inicio cuando se cree, edite o elimine un transfer de la fecha visible.
+  transferActualizado = signal<any>(null);
 
   constructor() {
     this.setupWebSocketListeners();
@@ -82,13 +83,20 @@ export class InicioService {
         this.reservaActualizada.set(msg);
       });
     });
+
+    this.ws.transferEvents$.subscribe(msg => {
+      this.zone.run(() => {
+        this.transferActualizado.set(msg);
+      });
+    });
   }
 
-  getDatosInicio(fecha: string): Observable<{ tours: Tour[]; transfers: Transfer[] | TransfersSummary }> {
+  getDatosInicio(fecha: string, silent = false): Observable<{ tours: Tour[]; transfers: Transfer[] | TransfersSummary }> {
     const url = `${this.baseUrl}/tours-data`;
     // Evitar devoluciones en caché del navegador cuando la URL es idéntica
     const params = { fecha, t: Date.now().toString() };
-    return this.http.get<{ tours: Tour[]; transfers: Transfer[] }>(url, { params });
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, silent);
+    return this.http.get<{ tours: Tour[]; transfers: Transfer[] }>(url, { params, context });
   }
 
   guardarCupo(body: { SelectTour: number; NuevoCupo: number; Fecha: string; id_user?: number }): Observable<{ message: string }> {

@@ -1,37 +1,17 @@
-<!-- ============================================================
-     SKELETON
-     ============================================================ -->
 @if (isLoading()) {
-<div class="skeleton-page">
-  <div class="sk-stepper">
-    @for (s of [1,2,3,4,5,6]; track s) {
-    @if (s > 1) { <div class="sk-step-line"></div> }
-    <div class="sk-step-bubble sk-field"></div>
-    }
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <div class="sk-line sk-heading"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-group">
-        <div class="sk-line sk-label"></div>
-        <div class="sk-field"></div>
-      </div>
-      <div class="form-group">
-        <div class="sk-line sk-label"></div>
-        <div class="sk-field"></div>
-      </div>
-      <div class="form-group">
-        <div class="sk-line sk-label"></div>
-        <div class="sk-field"></div>
-      </div>
-    </div>
-  </div>
-</div>
+<app-loading-state label="Cargando la reserva y sus datos…"></app-loading-state>
+
+} @else if (initialLoadError()) {
+<app-loading-state
+  mode="error"
+  label="No pudimos preparar la edición"
+  [detail]="initialLoadError()"
+  actionLabel="Reintentar"
+  (action)="retryInitialLoad()">
+</app-loading-state>
 
 } @else {
-<div class="wizard-shell" [formGroup]="form">
+<div class="wizard-shell wizard-shell--page-enter" [class.is-panel-animating]="panelAnimating" [formGroup]="form">
   <!-- ── STEPPER ── -->
   <div class="wizard-stepper">
     @for (step of wizardSteps; let i = $index; track step.id) {
@@ -144,6 +124,8 @@
         <div class="form-group">
           <label class="form-label">Fecha <span class="required-star">*</span></label>
           <app-datepicker formControlName="Fecha_Tour" placeholder="Selecciona una fecha"
+            [minDate]="fechaTourMinDate"
+            [dateFilter]="fechaTourDateFilter"
             [invalid]="!!(form.get('Fecha_Tour')?.touched && form.get('Fecha_Tour')?.invalid)"
             (dateChange)="onFechaTourChange()">
           </app-datepicker>
@@ -819,20 +801,28 @@
       <div class="resumen-summary-strip">
         <div class="resumen-summary-item">
           <span class="resumen-summary-label">Pasajeros</span>
-          <span class="resumen-summary-value">{{ pasajerosConAsiento() }}</span>
+          <span class="resumen-summary-value">{{ pasajeros.length }}</span>
         </div>
 
         <div class="resumen-summary-item">
           <span class="resumen-summary-label">Total</span>
-          <span class="resumen-summary-value">{{ monedaCodigo() }} {{ totalNeto() | number:'1.0-0' }}</span>
+          <span class="resumen-summary-value">{{ totalNeto() | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
         </div>
 
+        @if (form.get('FormaPago')?.value === 'Directo') {
+        <div class="resumen-summary-item resumen-summary-item--payment-mode">
+          <span class="resumen-summary-label">Modalidad de pago</span>
+          <span class="resumen-summary-value">Pago en punto</span>
+        </div>
+        } @else {
         <div class="resumen-summary-item">
           <span class="resumen-summary-label">Pendiente</span>
-          <span class="resumen-summary-value">{{ monedaCodigo() }} {{ pendientePorPagar() | number:'1.0-0' }}</span>
+          <span class="resumen-summary-value">{{ pendientePorPagar() | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
         </div>
+        }
       </div>
 
+      @if (form.get('FormaPago')?.value !== 'Directo') {
       @let totalReserva = totalNeto() + Number(form.get('ComisionInternacional')?.value || 0);
       @let pagadoPct = totalReserva > 0 ? ((totalReserva - pendientePorPagar()) / totalReserva) * 100 : 0;
       <div class="resumen-payment-progress">
@@ -844,6 +834,12 @@
         </div>
         <span class="resumen-progress-label">{{ pagadoPct | number:'1.0-0' }}% cubierto</span>
       </div>
+      } @else {
+      <div class="resumen-payment-mode-note">
+        <span class="resumen-payment-mode-dot" aria-hidden="true"></span>
+        El cobro se registra al momento del servicio.
+      </div>
+      }
 
       <div class="resumen-review-grid">
         <div class="resumen-review-card">
@@ -904,10 +900,6 @@
               <span class="resumen-info-label">Canal de Reserva</span>
               <span class="resumen-info-value">{{ nombreCanalSeleccionado() }}</span>
             </div>
-            <div class="resumen-info-row">
-              <span class="resumen-info-label">Tipo de reserva</span>
-              <span class="resumen-info-value">{{ form.get('Tipo_Reserva')?.value || 'Grupal' }}</span>
-            </div>
             @if (modoNacionalidad === 'global' && form.get('NacionalidadGlobal')?.value) {
             <div class="resumen-info-row">
               <span class="resumen-info-label">Nacionalidad</span>
@@ -924,31 +916,28 @@
           <div class="resumen-review-card-body resumen-review-card-body-compact">
             <div class="resumen-info-row">
               <span class="resumen-info-label">Adultos ({{ adultosInputValue() }})</span>
-              <span class="resumen-info-value">{{ monedaCodigo() }} {{ (adultosInputValue() *
-                (form.get('PrecioAdulto')?.value || 0)) | number:'1.0-0' }}</span>
+              <span class="resumen-info-value">{{ totalPorTipo('ADULTO') | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
             </div>
             @if (ninosInputValue() > 0) {
             <div class="resumen-info-row">
               <span class="resumen-info-label">Niños ({{ ninosInputValue() }})</span>
-              <span class="resumen-info-value">{{ monedaCodigo() }} {{ (ninosInputValue() *
-                (form.get('PrecioNino')?.value || 0)) | number:'1.0-0' }}</span>
+              <span class="resumen-info-value">{{ totalPorTipo('NINO') | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
             </div>
             }
             @if (infantesInputValue() > 0) {
             <div class="resumen-info-row">
               <span class="resumen-info-label">Infantes ({{ infantesInputValue() }})</span>
-              <span class="resumen-info-value">{{ monedaCodigo() }} {{ (infantesInputValue() *
-                (form.get('PrecioInfante')?.value || 0)) | number:'1.0-0' }}</span>
+              <span class="resumen-info-value">{{ totalPorTipo('INFANTE') | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
             </div>
             }
             <div class="resumen-info-row">
               <span class="resumen-info-label">Comisión total</span>
-              <span class="resumen-info-value">{{ monedaCodigo() }} {{ comisionTotal() | number:'1.0-0' }}</span>
+              <span class="resumen-info-value">{{ comisionTotal() | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
             </div>
             @if (form.get('FormaPago')?.value === 'Abono') {
             <div class="resumen-info-row">
               <span class="resumen-info-label">Total abonado</span>
-              <span class="resumen-info-value">{{ monedaCodigo() }} {{ totalAbonos() | number:'1.0-0' }}</span>
+              <span class="resumen-info-value">{{ totalAbonos() | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}</span>
             </div>
             }
             <div class="resumen-info-row resumen-info-row-strong">
@@ -957,7 +946,6 @@
             </div>
           </div>
         </div>
-      </div>
 
       @if (form.get('Observaciones')?.value) {
       <div class="resumen-review-card resumen-review-card-full">
@@ -982,7 +970,10 @@
 
     <div class="resumen-passengers-section">
       <div class="resumen-section-head">
-        <h3>Pasajeros</h3>
+        <div class="resumen-section-copy">
+          <h3>Pasajeros</h3>
+          <p>{{ resumenTiposPasajero() }}</p>
+        </div>
         <span class="resumen-section-count">{{ pasajeros.length }}</span>
       </div>
 
@@ -998,13 +989,18 @@
                 · {{ nombrePuntoPorId(ctrl.get('Id_Punto')?.value) }}
                 }
               </span>
+              @if (ctrl.get('Nacionalidad')?.value || ctrl.get('Telefono_Pasajero')?.value) {
+              <span class="resumen-passenger-detail">
+                {{ ctrl.get('Nacionalidad')?.value || '—' }}{{ ctrl.get('Telefono_Pasajero')?.value ? ' · ' + ctrl.get('Telefono_Pasajero')?.value : '' }}
+              </span>
+              }
             </div>
             <div class="resumen-passenger-side">
               <span class="resumen-passenger-pill" [attr.data-type]="ctrl.get('Tipo_Pasajero')?.value">
                 {{ displayTipo(ctrl.get('Tipo_Pasajero')?.value) }}
               </span>
               <span class="resumen-passenger-price">
-                {{ monedaCodigo() }} {{ ctrl.get('Precio_Pasajero')?.value | number:'1.0-0' }}
+                {{ ctrl.get('Precio_Pasajero')?.value | currency:monedaCodigo():'symbol':'1.0-0':'es-CO' }}
               </span>
             </div>
           </div>
@@ -1012,6 +1008,7 @@
         }
       </div>
     </div>
+  </div>
   </div>
 
   <!-- ── Historial de actividad ── -->
@@ -1056,7 +1053,7 @@
 <!-- ================================================================
      BARRA DE NAVEGACIÓN FIJA
      ================================================================ -->
-<div class="wizard-nav">
+<div class="wizard-nav wizard-nav--page-enter">
   <div class="wizard-nav-row">
 
     <div class="wizard-nav-left">
@@ -1134,7 +1131,8 @@
 
     <div class="wizard-nav-right">
       @if (currentStep < wizardSteps.length - 1) { <button type="button" class="btn-wizard-next" (click)="nextStep()"
-        [disabled]="!canAdvanceFromStep(currentStep)">
+        [class.is-disabled]="!canAdvanceFromStep(currentStep)"
+        [attr.data-incomplete]="!canAdvanceFromStep(currentStep) ? true : null">
         <span>Siguiente</span>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"

@@ -39,8 +39,6 @@ const IA_ALLOWED_TABLES = {
       'Nombre_Reportante',
       'Estado',
       'Observaciones',
-      'Placa_Bus',
-      'Orden_Ruta',
     ],
     dateColumns: ['Fecha_Tour', 'Fecha_Registro'],
     stateColumns: ['Estado'],

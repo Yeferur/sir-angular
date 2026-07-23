@@ -33,35 +33,7 @@
 
   <!-- RESULTS -->
   @if (isLoading) {
-    <div class="card results-card">
-      <!-- SKELETON -->
-      <div class="table-skeleton" aria-live="polite" aria-busy="true">
-        <div class="sk-meta">
-          <div class="skeleton-shape sk-pill sk-wide"></div>
-          <div class="skeleton-shape sk-pill"></div>
-          <div class="skeleton-shape sk-pill sk-medium"></div>
-        </div>
-        <div class="sk-table-header">
-          <div class="skeleton-shape sk-cell sk-header"></div>
-          <div class="skeleton-shape sk-cell sk-header"></div>
-          <div class="skeleton-shape sk-cell sk-header"></div>
-          <div class="skeleton-shape sk-cell sk-header"></div>
-          <div class="skeleton-shape sk-cell sk-header"></div>
-          <div class="skeleton-shape sk-cell sk-header"></div>
-        </div>
-        @for (row of skeletonRows; track row) {
-          <div class="sk-row">
-            <div class="skeleton-shape sk-cell sk-reserva"></div>
-            <div class="skeleton-shape sk-cell sk-passenger"></div>
-            <div class="skeleton-shape sk-cell sk-document"></div>
-            <div class="skeleton-shape sk-cell sk-contact"></div>
-            <div class="skeleton-shape sk-cell sk-meet"></div>
-            <div class="skeleton-shape sk-cell sk-toggle"></div>
-          </div>
-        }
-      </div>
-    </div>
-
+    <app-loading-state label="Cargando pasajeros y confirmaciones…"></app-loading-state>
   } @else if (!hasSearched) {
     <div class="results-area">
       <div class="empty-state">
