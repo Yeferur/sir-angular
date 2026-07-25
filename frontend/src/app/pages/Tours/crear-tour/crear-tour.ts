@@ -1,13 +1,14 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject, signal } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Tours, Tour, CanalComision } from '../../../services/Tours/tours';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { tourAvailabilityValidator, tourPlanValidityValidator } from '../tour-form.validators';
 
 type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
 
@@ -87,10 +88,26 @@ export class CrearTourComponent implements OnInit {
   private alerts = inject(SirAlertService);
   private uiState = inject(UiStateService);
   isLoading = signal<boolean>(true);
+  loadError = signal('');
   isSubmitting = signal(false);
+  readonly wizardSteps = [
+    { id: 'info', label: 'Información' },
+    { id: 'pricing', label: 'Planes y tarifas' },
+    { id: 'calendar', label: 'Calendario' },
+    { id: 'settings', label: 'Configuración' },
+    { id: 'review', label: 'Revisar' },
+  ];
+  currentStep = 0;
+  maxReachedStep = 0;
+  expandedPlanIndex = 0;
+  expandedSeasonIndex: number | null = null;
+  expandedPlanCurrencies = new Set<number>();
+  goingBack = false;
+  panelAnimating = false;
   private toursLoaded = false;
   private currenciesLoaded = false;
   private canalesLoaded = false;
+  private availabilityListenerReady = false;
   private readonly dayKeys: DiaSemana[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
   // Canales disponibles con comisión
@@ -131,7 +148,8 @@ export class CrearTourComponent implements OnInit {
     private fb: FormBuilder,
     private tours: Tours,
     private reservas: Reservas,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {
     this.form = this.fb.group({
       Nombre_Tour: ['', [Validators.required, Validators.maxLength(255)]],
@@ -152,14 +170,28 @@ export class CrearTourComponent implements OnInit {
       }),
       temporadas: this.fb.array([], [this.temporadasValidator()]),
 
-    });
+    }, { validators: [tourAvailabilityValidator()] });
   }
 
   ngOnInit(): void {
+    this.loadError.set('');
     this.loadExistingTours();
     this.loadCurrenciesAndInitPlans();
     this.loadCanales();
     this.listenModoDisponibilidad();
+  }
+
+  retryInitialLoad(): void {
+    this.toursLoaded = false;
+    this.currenciesLoaded = false;
+    this.canalesLoaded = false;
+    this.isLoading.set(true);
+    this.loadError.set('');
+    this.canalesComisiones = [];
+    this.toursExistentes = [];
+    this.monedas = [];
+    while (this.plans.length) this.plans.removeAt(0);
+    this.ngOnInit();
   }
 
   // Getter
@@ -180,6 +212,23 @@ export class CrearTourComponent implements OnInit {
 
   getPlanCurrencies(planIndex: number): FormArray {
     return (this.plans.at(planIndex) as FormGroup).get('monedas') as FormArray;
+  }
+
+  getSelectedPlanGroup(): FormGroup {
+    return this.plans.at(this.expandedPlanIndex) as FormGroup;
+  }
+
+  getCurrencyPriceControl(
+    planIndex: number,
+    currencyIndex: number,
+    type: TipoPasajero
+  ): FormControl {
+    return this.getPlanCurrencies(planIndex).at(currencyIndex).get(type) as FormControl;
+  }
+
+  selectPriceValue(event: FocusEvent): void {
+    const input = event.target as HTMLInputElement | null;
+    input?.select();
   }
 
   /* ---------------------------
@@ -208,16 +257,13 @@ export class CrearTourComponent implements OnInit {
       },
       error: () => {
         // fallback mínimo
-        this.monedas = [{ Id_Moneda: 1, Codigo: 'COP', Nombre_Moneda: 'Peso colombiano' }];
-        this.initBasePlan();
+        this.loadError.set('No pudimos cargar las monedas. Reintenta antes de configurar precios.');
         this.markInitialLoadStep('currencies');
       },
       complete: () => this.markInitialLoadStep('currencies'),
     });
   }
 
-  // Canales con comisión: por ahora mock local hasta que el back esté listo
-  // TODO: reemplazar por this.tours.getCanales().subscribe(...)
   private loadCanales(): void {
     this.tours.getCanalesComision().subscribe({
       next: (canales) => {
@@ -231,6 +277,7 @@ export class CrearTourComponent implements OnInit {
       },
       error: () => {
         this.canalesComisiones = [];
+        this.loadError.set('No pudimos cargar los canales de comisión. Reintenta para evitar una configuración incompleta.');
         this.markInitialLoadStep('canales');
       },
     });
@@ -274,9 +321,103 @@ export class CrearTourComponent implements OnInit {
       esPermanente: [true],
       Fecha_Inicio: [null],
       Fecha_Fin: [null],
-      AllowNino: [true],
-      AllowInfante: [true],
+      AllowNino: [false],
+      AllowInfante: [false],
       monedas: currenciesFA,
+    }, { validators: [tourPlanValidityValidator()] });
+  }
+
+  goToStep(step: number): void {
+    if (step < 0 || step >= this.wizardSteps.length || step > this.maxReachedStep) return;
+    if (step === this.currentStep) return;
+    this.goingBack = step < this.currentStep;
+    this.currentStep = step;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (!this.validateStep(this.currentStep)) return;
+    if (this.currentStep >= this.wizardSteps.length - 1) return;
+    this.goingBack = false;
+    this.currentStep += 1;
+    this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    if (step === 0) {
+      return ['Nombre_Tour', 'Abreviacion', 'Cupo_Base']
+        .every((name) => this.form.get(name)?.valid);
+    }
+    if (step === 1) return this.plans.valid && this.isPricingValid();
+    if (step === 2) {
+      return this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios'];
+    }
+    if (step === 3) return !!this.form.get('Coordenadas')?.valid;
+    return true;
+  }
+
+  prevStep(): void {
+    if (this.currentStep === 0) return;
+    this.goingBack = true;
+    this.currentStep -= 1;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  stepHasError(step: number): boolean {
+    if (step === 0) {
+      return ['Nombre_Tour', 'Abreviacion', 'Cupo_Base']
+        .some((name) => !!(this.form.get(name)?.touched && this.form.get(name)?.invalid));
+    }
+    if (step === 1) return this.plans.touched && this.plans.invalid;
+    if (step === 2) {
+      return (this.temporadasFA.touched && this.temporadasFA.invalid)
+        || (this.form.touched && !!this.form.errors?.['diasBaseVacios']);
+    }
+    if (step === 3) {
+      return !!(this.form.get('Coordenadas')?.touched && this.form.get('Coordenadas')?.invalid);
+    }
+    return false;
+  }
+
+  private validateStep(step: number): boolean {
+    if (step === 0) {
+      const controls = ['Nombre_Tour', 'Abreviacion', 'Cupo_Base'];
+      controls.forEach((name) => this.form.get(name)?.markAsTouched());
+      return controls.every((name) => this.form.get(name)?.valid);
+    }
+    if (step === 1) {
+      this.plans.markAllAsTouched();
+      this.touchAllPricingControls();
+      return this.plans.valid && this.isPricingValid();
+    }
+    if (step === 2) {
+      this.temporadasFA.markAllAsTouched();
+      this.form.markAsTouched();
+      this.form.updateValueAndValidity({ emitEvent: false });
+      return this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios'];
+    }
+    if (step === 3) {
+      this.form.get('Coordenadas')?.markAsTouched();
+      return !!this.form.get('Coordenadas')?.valid;
+    }
+    return true;
+  }
+
+  private animatePanel(): void {
+    this.panelAnimating = false;
+    this.cdr.markForCheck();
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
+      this.cdr.markForCheck();
+      setTimeout(() => {
+        this.panelAnimating = false;
+        this.goingBack = false;
+        this.cdr.markForCheck();
+      }, 380);
     });
   }
 
@@ -297,6 +438,8 @@ export class CrearTourComponent implements OnInit {
   addNewPlan(): void {
     this.plans.push(this.createPlanGroup('Nuevo plan', false));
     const idx = this.plans.length - 1;
+    this.expandedPlanIndex = idx;
+    this.form.markAsDirty();
 
     this.applyPassengerRules(idx, 'NINO');
     this.applyPassengerRules(idx, 'INFANTE');
@@ -306,6 +449,121 @@ export class CrearTourComponent implements OnInit {
   deletePlan(index: number): void {
     if (index === 0) return; // no borrar plan básico
     this.plans.removeAt(index);
+    this.expandedPlanCurrencies = new Set(
+      [...this.expandedPlanCurrencies]
+        .filter((planIndex) => planIndex !== index)
+        .map((planIndex) => planIndex > index ? planIndex - 1 : planIndex)
+    );
+    this.expandedPlanIndex = Math.min(this.expandedPlanIndex, this.plans.length - 1);
+    this.form.markAsDirty();
+  }
+
+  togglePlanEditor(index: number): void {
+    this.expandedPlanIndex = index;
+  }
+
+  duplicatePlan(index: number): void {
+    const source = this.plans.at(index) as FormGroup;
+    if (!source) return;
+
+    const raw = source.getRawValue();
+    const copy = this.createPlanGroup(`Copia de ${String(raw.Nombre_Plan || 'plan')}`.slice(0, 255), false);
+    copy.patchValue({
+      esPermanente: raw.esPermanente,
+      Fecha_Inicio: raw.Fecha_Inicio,
+      Fecha_Fin: raw.Fecha_Fin,
+      AllowNino: raw.AllowNino,
+      AllowInfante: raw.AllowInfante,
+    }, { emitEvent: false });
+
+    const copyCurrencies = copy.get('monedas') as FormArray;
+    for (const sourceCurrency of raw.monedas || []) {
+      const target = copyCurrencies.controls.find((currency) =>
+        Number(currency.get('Id_Moneda')?.value) === Number(sourceCurrency.Id_Moneda)
+      );
+      target?.patchValue({
+        ADULTO: Number(sourceCurrency.ADULTO || 0),
+        NINO: Number(sourceCurrency.NINO || 0),
+        INFANTE: Number(sourceCurrency.INFANTE || 0),
+      }, { emitEvent: false });
+    }
+
+    this.plans.push(copy);
+    const newIndex = this.plans.length - 1;
+    this.applyPassengerRules(newIndex, 'NINO');
+    this.applyPassengerRules(newIndex, 'INFANTE');
+    this.applyAdultRulesAcrossPlans();
+    this.expandedPlanIndex = newIndex;
+    this.form.markAsDirty();
+  }
+
+  setPlanPermanent(planIndex: number, permanent: boolean): void {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    plan.get('esPermanente')?.setValue(permanent);
+    if (permanent) {
+      plan.get('Fecha_Inicio')?.setValue(null);
+      plan.get('Fecha_Fin')?.setValue(null);
+    }
+    plan.updateValueAndValidity();
+  }
+
+  getPlanValidityLabel(planIndex: number): string {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    if (plan.get('esPermanente')?.value) return 'Permanente';
+    const start = plan.get('Fecha_Inicio')?.value;
+    const end = plan.get('Fecha_Fin')?.value;
+    return start && end ? `${start} – ${end}` : 'Vigencia pendiente';
+  }
+
+  getPlanPassengerLabel(planIndex: number): string {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    const labels = ['Adultos'];
+    if (plan.get('AllowNino')?.value) labels.push('Niños');
+    if (plan.get('AllowInfante')?.value) labels.push('Infantes');
+    return labels.join(', ');
+  }
+
+  toggleAdditionalCurrencies(planIndex: number): void {
+    const next = new Set(this.expandedPlanCurrencies);
+    if (next.has(planIndex)) next.delete(planIndex);
+    else next.add(planIndex);
+    this.expandedPlanCurrencies = next;
+  }
+
+  areAdditionalCurrenciesVisible(planIndex: number): boolean {
+    return this.expandedPlanCurrencies.has(planIndex);
+  }
+
+  shouldShowCurrencyInReview(planIndex: number, currencyIndex: number): boolean {
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return true;
+    const currency = this.getPlanCurrencies(planIndex).at(currencyIndex) as FormGroup;
+    return ['ADULTO', 'NINO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
+  }
+
+  getPrimaryCurrencyIndex(planIndex: number): number {
+    const currencies = this.getPlanCurrencies(planIndex);
+    const copIndex = currencies.controls.findIndex((currency) =>
+      String(currency.get('Codigo')?.value || '').toUpperCase() === 'COP'
+    );
+    return copIndex >= 0 ? copIndex : 0;
+  }
+
+  getPlanPrimaryPriceLabel(planIndex: number): string {
+    const primaryIndex = this.getPrimaryCurrencyIndex(planIndex);
+    const currency = this.getPlanCurrencies(planIndex).at(primaryIndex) as FormGroup;
+    if (!currency) return 'Precio pendiente';
+    const amount = Number(currency.get('ADULTO')?.value || 0);
+    if (amount <= 0) return 'Precio pendiente';
+    const code = String(currency.get('Codigo')?.value || 'COP').toUpperCase();
+    try {
+      return `Desde ${new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: code,
+        maximumFractionDigits: 0,
+      }).format(amount)}`;
+    } catch {
+      return `Desde ${amount.toLocaleString('es-CO')} ${code}`;
+    }
   }
 
   /* ---------------------------
@@ -316,10 +574,21 @@ export class CrearTourComponent implements OnInit {
     this.applyAdultRulesAcrossPlans();
   }
 
+  setPassengerEnabled(
+    planIndex: number,
+    tipo: Exclude<TipoPasajero, 'ADULTO'>,
+    enabled: boolean
+  ): void {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    plan.get(allowKey)?.setValue(enabled);
+    this.togglePassengerType(planIndex, tipo);
+  }
+
   /**
    * Reglas:
    * - Si NO permite Niño/Infante => se deshabilita, se pone 0.
-   * - Si permite => en la PRIMERA moneda del plan exigimos min 1 (para que no quede vacío “permitido” pero sin precio base).
+   * - Si permite => en COP (o la primera moneda disponible) exigimos min 1.
    * - En otras monedas queda min 0.
    */
   private applyPassengerRules(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
@@ -340,7 +609,9 @@ export class CrearTourComponent implements OnInit {
         ctrl.setValidators([Validators.min(0)]);
       } else {
         ctrl.enable({ emitEvent: false });
-        if (i === 0) ctrl.setValidators([Validators.required, Validators.min(1)]);
+        if (i === this.getPrimaryCurrencyIndex(planIndex)) {
+          ctrl.setValidators([Validators.required, Validators.min(1)]);
+        }
         else ctrl.setValidators([Validators.min(0)]);
       }
 
@@ -354,19 +625,13 @@ export class CrearTourComponent implements OnInit {
 
       for (let i = 0; i < currencies.length; i++) {
         const cg = currencies.at(i) as FormGroup;
-        const code = String(cg.get('Codigo')?.value || '');
         const adulto = cg.get('ADULTO');
         if (!adulto) continue;
 
-        // 1) Plan básico + COP (regla histórica)
-        if (p === 0 && code === 'COP') {
+        // COP es la moneda base; si no existe, se usa la primera disponible.
+        if (i === this.getPrimaryCurrencyIndex(p)) {
           adulto.setValidators([Validators.required, Validators.min(1)]);
         }
-        // 2) Cualquier plan: primera moneda del plan debe tener Adulto > 0 (precio base del plan)
-        else if (i === 0) {
-          adulto.setValidators([Validators.required, Validators.min(1)]);
-        }
-        // 3) Resto de monedas: opcional
         else {
           adulto.setValidators([Validators.min(0)]);
         }
@@ -384,8 +649,7 @@ export class CrearTourComponent implements OnInit {
   }
 
   isAdultRequired(planIndex: number, currencyIndex: number): boolean {
-    // Adulto requerido en: Plan básico + COP, y en la primera moneda de cualquier plan
-    return this.isBaseCop(planIndex, currencyIndex) || currencyIndex === 0;
+    return currencyIndex === this.getPrimaryCurrencyIndex(planIndex);
   }
 
 
@@ -396,20 +660,19 @@ export class CrearTourComponent implements OnInit {
 
   // Mensajes “bonitos” y consistentes
   getAdultErrorMessage(planIndex: number, currencyIndex: number): string {
-    if (this.isBaseCop(planIndex, currencyIndex)) {
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) {
       return 'Ingresa un precio válido.';
     }
     return 'Ingresa un precio válido para Adulto.';
   }
 
   getChildErrorMessage(planIndex: number, currencyIndex: number): string {
-    // Por regla, el requerido es en la primera moneda del plan cuando AllowNino=true
-    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return 'Ingresa un precio válido.';
     return 'Ingresa un precio válido para Niño.';
   }
 
   getInfantErrorMessage(planIndex: number, currencyIndex: number): string {
-    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return 'Ingresa un precio válido.';
     return 'Ingresa un precio válido para Infante.';
   }
 
@@ -417,23 +680,17 @@ export class CrearTourComponent implements OnInit {
    * Validación global antes de enviar
    * --------------------------- */
   private isPricingValid(): boolean {
-    // 1) Adulto COP del plan básico > 0
-    const baseCurrencies = this.getPlanCurrencies(0);
-    const copGroup = baseCurrencies.controls.find((c) => String(c.get('Codigo')?.value || '') === 'COP') as FormGroup | undefined;
-    const copAdult = Number(copGroup?.get('ADULTO')?.value || 0);
-    if (!copGroup || copAdult <= 0) return false;
-
-    // 2) Si AllowNino/AllowInfante está ON, primera moneda del plan debe ser > 0 para ese tipo
+    // Cada plan requiere Adulto en COP (o en la primera moneda si COP no existe).
     for (let p = 0; p < this.plans.length; p++) {
       const plan = this.plans.at(p) as FormGroup;
       const allowNino = !!plan.get('AllowNino')?.value;
       const allowInf = !!plan.get('AllowInfante')?.value;
 
-      const firstCurrency = (this.getPlanCurrencies(p).at(0) as FormGroup) || null;
-      if (!firstCurrency) continue;
+      const primaryCurrency = (this.getPlanCurrencies(p).at(this.getPrimaryCurrencyIndex(p)) as FormGroup) || null;
+      if (!primaryCurrency || Number(primaryCurrency.get('ADULTO')?.value || 0) <= 0) return false;
 
-      if (allowNino && Number(firstCurrency.get('NINO')?.value || 0) <= 0) return false;
-      if (allowInf && Number(firstCurrency.get('INFANTE')?.value || 0) <= 0) return false;
+      if (allowNino && Number(primaryCurrency.get('NINO')?.value || 0) <= 0) return false;
+      if (allowInf && Number(primaryCurrency.get('INFANTE')?.value || 0) <= 0) return false;
     }
 
     return true;
@@ -455,6 +712,8 @@ export class CrearTourComponent implements OnInit {
 
 
   private listenModoDisponibilidad(): void {
+  if (this.availabilityListenerReady) return;
+  this.availabilityListenerReady = true;
   this.form.get('Modo_Disponibilidad')?.valueChanges.subscribe((modo) => {
     const isTodo = modo === 'TODO_EL_ANO';
 
@@ -465,6 +724,9 @@ export class CrearTourComponent implements OnInit {
         base.get(k)?.setValue(false, { emitEvent: false });
         base.get(k)?.disable({ emitEvent: false });
       });
+      if (this.temporadasFA.length === 0) {
+        this.addTemporada();
+      }
     } else {
       Object.keys(base.controls).forEach((k) => {
         base.get(k)?.enable({ emitEvent: false });
@@ -488,12 +750,47 @@ export class CrearTourComponent implements OnInit {
 
 addTemporada(): void {
   this.temporadasFA.push(this.createTemporadaGroup());
+  this.expandedSeasonIndex = this.temporadasFA.length - 1;
   this.temporadasFA.updateValueAndValidity({ emitEvent: false });
 }
 
 deleteTemporada(index: number): void {
   this.temporadasFA.removeAt(index);
+  if (!this.temporadasFA.length) this.expandedSeasonIndex = null;
+  else if (this.expandedSeasonIndex === index) this.expandedSeasonIndex = Math.min(index, this.temporadasFA.length - 1);
+  else if (this.expandedSeasonIndex !== null && this.expandedSeasonIndex > index) this.expandedSeasonIndex -= 1;
   this.temporadasFA.updateValueAndValidity({ emitEvent: false });
+}
+
+toggleSeasonEditor(index: number): void {
+  this.expandedSeasonIndex = this.expandedSeasonIndex === index ? null : index;
+}
+
+getSeasonSummary(index: number): string {
+  const season = this.temporadasFA.at(index) as FormGroup;
+  const start = season.get('Fecha_Inicio')?.value;
+  const end = season.get('Fecha_Fin')?.value;
+  const days = this.getTemporadaDiasKeys(index).length;
+  const range = start && end ? `${start} – ${end}` : 'Fechas pendientes';
+  return `${range} · ${days} ${days === 1 ? 'día' : 'días'}`;
+}
+
+getSelectedBaseDaysLabel(): string {
+  const selected = this.diasSemana.filter((day) => !!this.diasBaseFG.get(day.key)?.value);
+  if (selected.length === 7) return 'Todos los días';
+  if (!selected.length) return 'Sin días seleccionados';
+  return selected.map((day) => day.label.slice(0, 3)).join(', ');
+}
+
+getActiveCommissionsCount(): number {
+  return this.canalesComisiones.filter((canal) => canal.activo && Number(canal.valor) > 0).length;
+}
+
+getOriginTourName(): string {
+  const originId = this.form.get('Id_Tour_Origen')?.value;
+  if (!originId) return 'Se configurarán después';
+  return this.toursExistentes.find((tour) => String(tour.Id_Tour) === String(originId))?.Nombre_Tour
+    || 'Tour seleccionado';
 }
 
 private createTemporadaGroup(): FormGroup {
@@ -748,6 +1045,7 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.goToFirstInvalidStep();
 
       // recoge controles inválidos en el nivel superior
       const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
@@ -794,11 +1092,14 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
     this.touchAllPricingControls();
 
     if (!this.isPricingValid()) {
+      this.goingBack = true;
+      this.currentStep = 1;
+      this.animatePanel();
       this.navbar.alert?.set?.({
         type: 'error',
         title: 'Faltan precios',
         message:
-          'En el Plan básico, el precio de Adulto en COP es obligatorio. Si Niño/Infante están habilitados, deben tener precio base en la primera moneda del plan.',
+          'Cada plan necesita precio de Adulto en COP. Si Niño o Infante están habilitados, también necesitan su tarifa principal en COP.',
         autoClose: false,
         buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
       });
@@ -811,13 +1112,28 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
     this.confirmCreateTour();
   }
 
+  private goToFirstInvalidStep(): void {
+    let target = 0;
+    if (['Nombre_Tour', 'Abreviacion', 'Cupo_Base'].every((name) => this.form.get(name)?.valid)) {
+      target = this.plans.valid && this.isPricingValid()
+        ? (this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios']
+          ? (this.form.get('Coordenadas')?.valid ? 4 : 3)
+          : 2)
+        : 1;
+    }
+    this.maxReachedStep = Math.max(this.maxReachedStep, target);
+    this.goingBack = target < this.currentStep;
+    this.currentStep = target;
+    this.animatePanel();
+  }
+
   private buildCreateTourConfirmationMessage(): string {
     const nombreTour = String(this.form.get('Nombre_Tour')?.value || '').trim();
     const abreviacion = String(this.form.get('Abreviacion')?.value || '').trim();
     const cupoBase = Number(this.form.get('Cupo_Base')?.value || 0);
     const cantidadPlanes = this.plans.length;
     const modoDisponibilidad = this.form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'
-      ? 'Solo por temporadas'
+      ? 'Por temporadas'
       : 'Todo el año';
     const origenId = this.form.get('Id_Tour_Origen')?.value;
     const nombreOrigen = origenId
@@ -833,9 +1149,9 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
     ];
 
     if (origenId) {
-      partes.push(`Copiará horarios desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
+      partes.push(`Copiará los puntos de encuentro desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
     } else {
-      partes.push('Los horarios quedarán pendientes/configurables.');
+      partes.push('Los puntos de encuentro podrán configurarse después.');
     }
 
     partes.push('¿Deseas continuar?');
@@ -880,7 +1196,7 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
     this.tours.crearTour(payload as any).subscribe({
       next: (resp: any) => {
         this.navbar.needsRefresh.set('tours');
-        this.navbar.successToast('Tour creado', `Tour creado correctamente. ID: ${resp?.Id_Tour ?? 'N/A'}`);
+        this.navbar.successToast('Tour creado', 'El tour quedó listo y ya está disponible en el catálogo.');
         this.form.markAsPristine();
         this.router.navigate(['/Tours/VerTours']);
       },

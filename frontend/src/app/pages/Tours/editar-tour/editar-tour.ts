@@ -5,6 +5,7 @@ import {
   AbstractControl,
   FormArray,
   FormBuilder,
+  FormControl,
   FormsModule,
   FormGroup,
   ReactiveFormsModule,
@@ -19,6 +20,7 @@ import { Reservas } from '../../../services/Reservas/reservas';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { tourAvailabilityValidator, tourPlanValidityValidator } from '../tour-form.validators';
 
 /* =========================================================
  * TYPES
@@ -48,6 +50,7 @@ type CanalComisionVM = {
 };
 
 type PlanPayload = {
+  Id_Plan?: number | null;
   Nombre_Plan: string;
   Fecha_Inicio: string | null;
   Fecha_Fin: string | null;
@@ -85,7 +88,6 @@ type EditarTourFullPayload = {
   Cupo_Base: number;
   Latitud: number | null;
   Longitud: number | null;
-  Id_Tour_Origen: number | null;
   Planes: PlanPayload[];
   Disponibilidad: DisponibilidadPayload;
 };
@@ -100,7 +102,21 @@ type EditarTourFullPayload = {
 export class EditarTourComponent implements OnInit {
   private alerts = inject(SirAlertService);
   isLoading = signal<boolean>(true);
+  loadError = signal('');
   isSubmitting = signal(false);
+  readonly wizardSteps = [
+    { id: 'info', label: 'Información' },
+    { id: 'pricing', label: 'Planes y tarifas' },
+    { id: 'availability', label: 'Calendario' },
+    { id: 'settings', label: 'Configuración' },
+    { id: 'review', label: 'Revisar' },
+  ];
+  currentStep = 0;
+  maxReachedStep = this.wizardSteps.length - 1;
+  expandedPlanIndex = 0;
+  expandedSeasonIndex: number | null = null;
+  goingBack = false;
+  panelAnimating = false;
   private toursLoaded = false;
   private currenciesLoaded = false;
   private canalesLoaded = false;
@@ -153,7 +169,6 @@ export class EditarTourComponent implements OnInit {
       Abreviacion: ['', [Validators.required, Validators.maxLength(50)]],
       Cupo_Base: [null, [Validators.required, Validators.min(0)]],
       Coordenadas: ['', [this.coordenadasValidator()]],
-      Id_Tour_Origen: [null],
 
       // compat simple pricing (no lo usamos si hay planes)
       Id_Moneda: [null],
@@ -174,7 +189,7 @@ export class EditarTourComponent implements OnInit {
         domingo: [true],
       }),
       temporadas: this.fb.array([], [this.temporadasValidator()]),
-    });
+    }, { validators: [tourAvailabilityValidator()] });
   }
 
   get canUpdateTour(): boolean {
@@ -195,6 +210,18 @@ export class EditarTourComponent implements OnInit {
   }
   getPlanCurrencies(planIndex: number): FormArray {
     return (this.plans.at(planIndex) as FormGroup).get('monedas') as FormArray;
+  }
+
+  getSelectedPlanGroup(): FormGroup {
+    return this.plans.at(this.expandedPlanIndex) as FormGroup;
+  }
+
+  getCurrencyPriceControl(planIndex: number, currencyIndex: number, type: TipoPasajero): FormControl {
+    return this.getPlanCurrencies(planIndex).at(currencyIndex).get(type) as FormControl;
+  }
+
+  selectPriceValue(event: FocusEvent): void {
+    (event.target as HTMLInputElement | null)?.select();
   }
 
   ngOnInit(): void {
@@ -229,6 +256,10 @@ export class EditarTourComponent implements OnInit {
     });
   }
 
+  retryInitialLoad(): void {
+    window.location.reload();
+  }
+
   /* =========================================================
    * CARGA INICIAL
    * ========================================================= */
@@ -255,10 +286,10 @@ export class EditarTourComponent implements OnInit {
         done?.();
       },
       error: () => {
-        this.monedas = [{ Id_Moneda: 1, Codigo: 'COP', Nombre_Moneda: 'Peso colombiano' }];
-        this.initBasePlan();
-        done?.();
+        this.loadError.set('No pudimos cargar las monedas. Reintenta para proteger las tarifas existentes.');
         this.markInitialLoadStep('currencies');
+        this.markInitialLoadStep('canales');
+        this.markInitialLoadStep('tour');
       },
       complete: () => this.markInitialLoadStep('currencies'),
     });
@@ -281,6 +312,7 @@ export class EditarTourComponent implements OnInit {
       },
       error: () => {
         this.canalesComisiones = [];
+        this.loadError.set('No pudimos cargar las comisiones. No se habilitará el guardado para evitar perder información.');
         try { this.cd.detectChanges(); } catch {}
         this.markInitialLoadStep('canales');
       },
@@ -332,6 +364,99 @@ export class EditarTourComponent implements OnInit {
       AllowNino: [true],
       AllowInfante: [true],
       monedas: currenciesFA,
+    }, { validators: [tourPlanValidityValidator()] });
+  }
+
+  goToStep(step: number): void {
+    if (step < 0 || step >= this.wizardSteps.length || step > this.maxReachedStep) return;
+    if (step === this.currentStep) return;
+    this.goingBack = step < this.currentStep;
+    this.currentStep = step;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (!this.validateStep(this.currentStep) || this.currentStep >= this.wizardSteps.length - 1) return;
+    this.goingBack = false;
+    this.currentStep += 1;
+    this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    if (step === 0) {
+      return ['Nombre_Tour', 'Abreviacion', 'Cupo_Base']
+        .every((name) => this.form.get(name)?.valid);
+    }
+    if (step === 1) return this.plans.valid && this.isPricingValid();
+    if (step === 2) {
+      return this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios'];
+    }
+    if (step === 3) return !!this.form.get('Coordenadas')?.valid;
+    return true;
+  }
+
+  prevStep(): void {
+    if (this.currentStep === 0) return;
+    this.goingBack = true;
+    this.currentStep -= 1;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  stepHasError(step: number): boolean {
+    if (step === 0) {
+      return ['Nombre_Tour', 'Abreviacion', 'Cupo_Base']
+        .some((name) => !!(this.form.get(name)?.touched && this.form.get(name)?.invalid));
+    }
+    if (step === 1) return this.plans.touched && this.plans.invalid;
+    if (step === 2) {
+      return (this.temporadasFA.touched && this.temporadasFA.invalid)
+        || (this.form.touched && !!this.form.errors?.['diasBaseVacios']);
+    }
+    if (step === 3) {
+      return !!(this.form.get('Coordenadas')?.touched && this.form.get('Coordenadas')?.invalid);
+    }
+    return false;
+  }
+
+  private validateStep(step: number): boolean {
+    if (step === 0) {
+      const controls = ['Nombre_Tour', 'Abreviacion', 'Cupo_Base'];
+      controls.forEach((name) => this.form.get(name)?.markAsTouched());
+      return controls.every((name) => this.form.get(name)?.valid);
+    }
+    if (step === 1) {
+      this.plans.markAllAsTouched();
+      this.touchAllPricingControls();
+      return this.plans.valid && this.isPricingValid();
+    }
+    if (step === 2) {
+      this.temporadasFA.markAllAsTouched();
+      this.form.markAsTouched();
+      this.form.updateValueAndValidity({ emitEvent: false });
+      return this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios'];
+    }
+    if (step === 3) {
+      this.form.get('Coordenadas')?.markAsTouched();
+      return !!this.form.get('Coordenadas')?.valid;
+    }
+    return true;
+  }
+
+  private animatePanel(): void {
+    this.panelAnimating = false;
+    this.cd.markForCheck();
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
+      this.cd.markForCheck();
+      setTimeout(() => {
+        this.panelAnimating = false;
+        this.goingBack = false;
+        this.cd.markForCheck();
+      }, 380);
     });
   }
 
@@ -351,6 +476,8 @@ export class EditarTourComponent implements OnInit {
   addNewPlan(): void {
     this.plans.push(this.createPlanGroup('Nuevo plan', false, null));
     const idx = this.plans.length - 1;
+    this.expandedPlanIndex = idx;
+    this.form.markAsDirty();
 
     this.applyPassengerRules(idx, 'NINO');
     this.applyPassengerRules(idx, 'INFANTE');
@@ -359,12 +486,141 @@ export class EditarTourComponent implements OnInit {
 
   deletePlan(index: number): void {
     if (index === 0) return;
-    this.plans.removeAt(index);
+    const plan = this.plans.at(index) as FormGroup;
+    const name = String(plan.get('Nombre_Plan')?.value || 'este plan');
+    const remove = () => {
+      this.plans.removeAt(index);
+      this.expandedPlanIndex = Math.min(this.expandedPlanIndex, this.plans.length - 1);
+      this.form.markAsDirty();
+      this.applyAdultRulesAcrossPlans();
+    };
+
+    if (!plan.get('Id_Plan')?.value) {
+      remove();
+      return;
+    }
+
+    this.alerts.confirm(
+      '¿Retirar plan?',
+      `Se retirará “${name}” al guardar. Si tiene pasajeros históricos, SIR lo conservará y te explicará por qué no puede eliminarse.`,
+      remove,
+      undefined,
+      { confirmText: 'Retirar', cancelText: 'Conservar', type: 'warning' }
+    );
+  }
+
+  togglePlanEditor(index: number): void {
+    this.expandedPlanIndex = index;
+  }
+
+  duplicatePlan(index: number): void {
+    const source = this.plans.at(index) as FormGroup;
+    if (!source) return;
+    const raw = source.getRawValue();
+    const copy = this.createPlanGroup(
+      `Copia de ${String(raw.Nombre_Plan || 'plan')}`.slice(0, 255),
+      false,
+      null,
+      raw.Fecha_Inicio || null,
+      raw.Fecha_Fin || null
+    );
+    copy.patchValue({
+      esPermanente: raw.esPermanente,
+      AllowNino: raw.AllowNino,
+      AllowInfante: raw.AllowInfante,
+    }, { emitEvent: false });
+
+    const copyCurrencies = copy.get('monedas') as FormArray;
+    for (const sourceCurrency of raw.monedas || []) {
+      const target = copyCurrencies.controls.find((currency) =>
+        Number(currency.get('Id_Moneda')?.value) === Number(sourceCurrency.Id_Moneda)
+      );
+      target?.patchValue({
+        ADULTO: Number(sourceCurrency.ADULTO || 0),
+        NINO: Number(sourceCurrency.NINO || 0),
+        INFANTE: Number(sourceCurrency.INFANTE || 0),
+      }, { emitEvent: false });
+    }
+
+    this.plans.push(copy);
+    const newIndex = this.plans.length - 1;
+    this.applyPassengerRules(newIndex, 'NINO');
+    this.applyPassengerRules(newIndex, 'INFANTE');
+    this.applyAdultRulesAcrossPlans();
+    this.expandedPlanIndex = newIndex;
+    this.form.markAsDirty();
+  }
+
+  setPlanPermanent(planIndex: number, permanent: boolean): void {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    plan.get('esPermanente')?.setValue(permanent);
+    if (permanent) {
+      plan.get('Fecha_Inicio')?.setValue(null);
+      plan.get('Fecha_Fin')?.setValue(null);
+    }
+    plan.updateValueAndValidity();
+  }
+
+  getPlanValidityLabel(planIndex: number): string {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    if (plan.get('esPermanente')?.value) return 'Permanente';
+    const start = plan.get('Fecha_Inicio')?.value;
+    const end = plan.get('Fecha_Fin')?.value;
+    return start && end ? `${start} – ${end}` : 'Vigencia pendiente';
+  }
+
+  getPlanPassengerLabel(planIndex: number): string {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    const labels = ['Adultos'];
+    if (plan.get('AllowNino')?.value) labels.push('Niños');
+    if (plan.get('AllowInfante')?.value) labels.push('Infantes');
+    return labels.join(', ');
+  }
+
+  getPrimaryCurrencyIndex(planIndex: number): number {
+    const currencies = this.getPlanCurrencies(planIndex);
+    const copIndex = currencies.controls.findIndex((currency) =>
+      String(currency.get('Codigo')?.value || '').toUpperCase() === 'COP'
+    );
+    return copIndex >= 0 ? copIndex : 0;
+  }
+
+  getPlanPrimaryPriceLabel(planIndex: number): string {
+    const primaryIndex = this.getPrimaryCurrencyIndex(planIndex);
+    const currency = this.getPlanCurrencies(planIndex).at(primaryIndex) as FormGroup;
+    if (!currency) return 'Precio pendiente';
+    const amount = Number(currency.get('ADULTO')?.value || 0);
+    if (amount <= 0) return 'Precio pendiente';
+    const code = String(currency.get('Codigo')?.value || 'COP').toUpperCase();
+    try {
+      return `Desde ${new Intl.NumberFormat('es-CO', {
+        style: 'currency', currency: code, maximumFractionDigits: 0,
+      }).format(amount)}`;
+    } catch {
+      return `Desde ${amount.toLocaleString('es-CO')} ${code}`;
+    }
+  }
+
+  shouldShowCurrencyInReview(planIndex: number, currencyIndex: number): boolean {
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return true;
+    const currency = this.getPlanCurrencies(planIndex).at(currencyIndex) as FormGroup;
+    return ['ADULTO', 'NINO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
   }
 
   togglePassengerType(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
     this.applyPassengerRules(planIndex, tipo);
     this.applyAdultRulesAcrossPlans();
+  }
+
+  setPassengerEnabled(
+    planIndex: number,
+    tipo: Exclude<TipoPasajero, 'ADULTO'>,
+    enabled: boolean
+  ): void {
+    const plan = this.plans.at(planIndex) as FormGroup;
+    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    plan.get(allowKey)?.setValue(enabled);
+    this.togglePassengerType(planIndex, tipo);
   }
 
   private applyPassengerRules(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
@@ -385,7 +641,7 @@ export class EditarTourComponent implements OnInit {
         ctrl.setValidators([Validators.min(0)]);
       } else {
         ctrl.enable({ emitEvent: false });
-        if (i === 0) ctrl.setValidators([Validators.required, Validators.min(1)]);
+        if (i === this.getPrimaryCurrencyIndex(planIndex)) ctrl.setValidators([Validators.required, Validators.min(1)]);
         else ctrl.setValidators([Validators.min(0)]);
       }
 
@@ -399,12 +655,10 @@ export class EditarTourComponent implements OnInit {
 
       for (let i = 0; i < currencies.length; i++) {
         const cg = currencies.at(i) as FormGroup;
-        const code = String(cg.get('Codigo')?.value || '');
         const adulto = cg.get('ADULTO');
         if (!adulto) continue;
 
-        if (p === 0 && code === 'COP') adulto.setValidators([Validators.required, Validators.min(1)]);
-        else if (i === 0) adulto.setValidators([Validators.required, Validators.min(1)]);
+        if (i === this.getPrimaryCurrencyIndex(p)) adulto.setValidators([Validators.required, Validators.min(1)]);
         else adulto.setValidators([Validators.min(0)]);
 
         adulto.updateValueAndValidity({ emitEvent: false });
@@ -463,7 +717,7 @@ export class EditarTourComponent implements OnInit {
   }
 
   isAdultRequired(planIndex: number, currencyIndex: number): boolean {
-    return this.isBaseCop(planIndex, currencyIndex) || currencyIndex === 0;
+    return currencyIndex === this.getPrimaryCurrencyIndex(planIndex);
   }
 
   private getCurrencyCode(planIndex: number, currencyIndex: number): string {
@@ -472,20 +726,43 @@ export class EditarTourComponent implements OnInit {
   }
 
   getAdultErrorMessage(planIndex: number, currencyIndex: number): string {
-    if (this.isBaseCop(planIndex, currencyIndex)) {
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) {
       return 'Ingresa un precio válido.';
     }
     return 'Ingresa un precio válido para Adulto.';
   }
 
   getChildErrorMessage(planIndex: number, currencyIndex: number): string {
-    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return 'Ingresa un precio válido.';
     return 'Ingresa un precio válido para Niño.';
   }
 
   getInfantErrorMessage(planIndex: number, currencyIndex: number): string {
-    if (currencyIndex === 0) return 'Ingresa un precio válido.';
+    if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return 'Ingresa un precio válido.';
     return 'Ingresa un precio válido para Infante.';
+  }
+
+  private isPricingValid(): boolean {
+    for (let p = 0; p < this.plans.length; p++) {
+      const plan = this.plans.at(p) as FormGroup;
+      const primary = this.getPlanCurrencies(p).at(this.getPrimaryCurrencyIndex(p)) as FormGroup;
+      if (!primary || Number(primary.get('ADULTO')?.value || 0) <= 0) return false;
+      if (plan.get('AllowNino')?.value && Number(primary.get('NINO')?.value || 0) <= 0) return false;
+      if (plan.get('AllowInfante')?.value && Number(primary.get('INFANTE')?.value || 0) <= 0) return false;
+    }
+    return true;
+  }
+
+  private touchAllPricingControls(): void {
+    this.plans.controls.forEach((plan) => {
+      plan.get('Nombre_Plan')?.markAsTouched();
+      const currencies = plan.get('monedas') as FormArray;
+      currencies.controls.forEach((currency) => {
+        currency.get('ADULTO')?.markAsTouched();
+        currency.get('NINO')?.markAsTouched();
+        currency.get('INFANTE')?.markAsTouched();
+      });
+    });
   }
 
   /* =========================================================
@@ -524,6 +801,9 @@ export class EditarTourComponent implements OnInit {
           base.get(k)?.setValue(false, { emitEvent: false });
           base.get(k)?.disable({ emitEvent: false });
         });
+        if (!this.isHydratingTour && this.temporadasFA.length === 0) {
+          this.addTemporada();
+        }
       } else {
         Object.keys(base.controls).forEach((k) => base.get(k)?.enable({ emitEvent: false }));
 
@@ -540,12 +820,42 @@ export class EditarTourComponent implements OnInit {
 
   addTemporada(): void {
     this.temporadasFA.push(this.createTemporadaGroup());
+    this.expandedSeasonIndex = this.temporadasFA.length - 1;
+    this.form.markAsDirty();
     this.temporadasFA.updateValueAndValidity({ emitEvent: false });
   }
 
   deleteTemporada(index: number): void {
     this.temporadasFA.removeAt(index);
+    if (!this.temporadasFA.length) this.expandedSeasonIndex = null;
+    else if (this.expandedSeasonIndex === index) this.expandedSeasonIndex = Math.min(index, this.temporadasFA.length - 1);
+    else if (this.expandedSeasonIndex !== null && this.expandedSeasonIndex > index) this.expandedSeasonIndex -= 1;
+    this.form.markAsDirty();
     this.temporadasFA.updateValueAndValidity({ emitEvent: false });
+  }
+
+  toggleSeasonEditor(index: number): void {
+    this.expandedSeasonIndex = this.expandedSeasonIndex === index ? null : index;
+  }
+
+  getSeasonSummary(index: number): string {
+    const season = this.temporadasFA.at(index) as FormGroup;
+    const start = season.get('Fecha_Inicio')?.value;
+    const end = season.get('Fecha_Fin')?.value;
+    const days = this.getTemporadaDiasKeys(index).length;
+    const range = start && end ? `${start} – ${end}` : 'Fechas pendientes';
+    return `${range} · ${days} ${days === 1 ? 'día' : 'días'}`;
+  }
+
+  getSelectedBaseDaysLabel(): string {
+    const selected = this.diasSemana.filter((day) => !!this.diasBaseFG.get(day.key)?.value);
+    if (selected.length === 7) return 'Todos los días';
+    if (!selected.length) return 'Sin días seleccionados';
+    return selected.map((day) => day.label.slice(0, 3)).join(', ');
+  }
+
+  getActiveCommissionsCount(): number {
+    return this.canalesComisiones.filter((canal) => canal.activo && Number(canal.valor) > 0).length;
   }
 
   isSoloTemporadas(): boolean {
@@ -743,7 +1053,6 @@ export class EditarTourComponent implements OnInit {
               Abreviacion: tour.Abreviacion,
               Cupo_Base: tour.Cupo_Base,
               Coordenadas: this.formatCoordenadas(tour.Latitud, tour.Longitud),
-              Id_Tour_Origen: tour.Id_Tour_Origen ?? null,
             },
             { emitEvent: false }
           );
@@ -821,6 +1130,7 @@ export class EditarTourComponent implements OnInit {
             }
 
             this.temporadasFA.updateValueAndValidity({ emitEvent: false });
+            this.expandedSeasonIndex = this.temporadasFA.length ? 0 : null;
           }
 
           // ✅ Planes + precios desde backend
@@ -871,6 +1181,8 @@ export class EditarTourComponent implements OnInit {
 
             this.markInitialLoadStep('tour');
             this.adjustControlsAfterPopulate();
+            const loadedMode = this.form.get('Modo_Disponibilidad')?.value;
+            if (loadedMode) this.form.get('Modo_Disponibilidad')?.setValue(loadedMode);
             try { this.cd.detectChanges(); } catch {}
             this.isHydratingTour = false;
             return;
@@ -888,8 +1200,8 @@ export class EditarTourComponent implements OnInit {
       error: (err) => {
         this.isHydratingTour = false;
         this.markInitialLoadStep('tour');
-        this.navbar.errorToast('Error al cargar tour', err?.error?.error || 'No se pudo cargar la información del tour');
-        this.router.navigate(['/Tours/VerTours']);
+        this.markInitialLoadStep('canales');
+        this.loadError.set(err?.error?.message || err?.error?.error || 'No pudimos cargar la información del tour.');
       },
     });
   }
@@ -916,6 +1228,7 @@ export class EditarTourComponent implements OnInit {
       }));
 
       return {
+        Id_Plan: p.Id_Plan != null ? Number(p.Id_Plan) : null,
         Nombre_Plan: String(p.Nombre_Plan || '').trim(),
         Fecha_Inicio: (p.esPermanente !== false) ? null : (p.Fecha_Inicio || null),
         Fecha_Fin: (p.esPermanente !== false) ? null : (p.Fecha_Fin || null),
@@ -938,10 +1251,15 @@ export class EditarTourComponent implements OnInit {
       Cupo_Base: Number(raw.Cupo_Base || 0),
       Latitud: coords?.lat ?? null,
       Longitud: coords?.lng ?? null,
-      Id_Tour_Origen: raw.Id_Tour_Origen ?? null,
       Planes: planes,
       Disponibilidad: disponibilidad,
     };
+  }
+
+  getTemporadaDiasKeys(tempIndex: number): DiaSemana[] {
+    const t = this.temporadasFA.at(tempIndex) as FormGroup;
+    const dias = t.get('dias') as FormGroup;
+    return Object.keys(dias.controls).filter((k) => !!dias.get(k)?.value) as DiaSemana[];
   }
 
   /* =========================================================
@@ -954,6 +1272,7 @@ export class EditarTourComponent implements OnInit {
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.goToFirstInvalidStep();
 
       const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
 
@@ -979,7 +1298,7 @@ export class EditarTourComponent implements OnInit {
         Nombre_Tour: 'Nombre del Tour',
         Abreviacion: 'Abreviacion',
         Cupo_Base: 'Cupo Base',
-        Coordenadas: 'Coordenadas',
+        Coordenadas: 'Geolocalización',
         Modo_Disponibilidad: 'Modo de disponibilidad',
         planes: 'Planes y precios',
         temporadas: 'Temporadas'
@@ -1000,10 +1319,40 @@ export class EditarTourComponent implements OnInit {
       return;
     }
 
+    this.touchAllPricingControls();
+    if (!this.isPricingValid()) {
+      this.maxReachedStep = Math.max(this.maxReachedStep, 1);
+      this.currentStep = 1;
+      this.animatePanel();
+      this.navbar.alert?.set?.({
+        type: 'error',
+        title: 'Faltan precios',
+        message: 'Cada plan necesita precio de Adulto en COP. Si Niño o Infante están habilitados, también necesitan su tarifa principal en COP.',
+        autoClose: false,
+        buttons: [{ text: 'Cerrar', style: 'secondary', onClick: () => this.navbar.alert?.set?.(null) }],
+      });
+      return;
+    }
+
     const confirmed = await this.requestUpdateTourConfirmation();
     if (!confirmed) return;
 
     this.editarTourConfirmado();
+  }
+
+  private goToFirstInvalidStep(): void {
+    let target = 0;
+    if (['Nombre_Tour', 'Abreviacion', 'Cupo_Base'].every((name) => this.form.get(name)?.valid)) {
+      target = this.plans.valid && this.isPricingValid()
+        ? (this.temporadasFA.valid && !this.form.errors?.['diasBaseVacios']
+          ? (this.form.get('Coordenadas')?.valid ? 4 : 3)
+          : 2)
+        : 1;
+    }
+    this.maxReachedStep = Math.max(this.maxReachedStep, target);
+    this.goingBack = target < this.currentStep;
+    this.currentStep = target;
+    this.animatePanel();
   }
 
   private buildUpdateTourConfirmationMessage(): string {
@@ -1012,13 +1361,8 @@ export class EditarTourComponent implements OnInit {
     const cupoBase = Number(this.form.get('Cupo_Base')?.value || 0);
     const cantidadPlanes = this.plans.length;
     const modoDisponibilidad = this.form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'
-      ? 'Solo por temporadas'
+      ? 'Por temporadas'
       : 'Todo el año';
-    const origenId = this.form.get('Id_Tour_Origen')?.value;
-    const nombreOrigen = origenId
-      ? this.toursExistentes.find((tour) => String(tour.Id_Tour) === String(origenId))?.Nombre_Tour
-      : null;
-
     const partes = [
       `Vas a guardar los cambios del tour ${nombreTour || '—'}.`,
       `Abreviación: ${abreviacion || '—'}.`,
@@ -1026,10 +1370,6 @@ export class EditarTourComponent implements OnInit {
       `Planes: ${cantidadPlanes}.`,
       `Disponibilidad: ${modoDisponibilidad}.`,
     ];
-
-    if (origenId) {
-      partes.push(`Copiará horarios desde: ${nombreOrigen || 'tour origen seleccionado'}.`);
-    }
 
     partes.push('¿Deseas continuar?');
     return partes.join('\n');
@@ -1079,6 +1419,7 @@ export class EditarTourComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error al actualizar tour:', err);
+        this.isSubmitting.set(false);
         this.navbar.errorToast('Error al actualizar tour', err?.error?.error || err?.error?.message || 'Error al actualizar el tour');
       },
       complete: () => this.isSubmitting.set(false),

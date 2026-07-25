@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DrawerType = 'reserva' | 'transfer' | 'mapa' | 'duplicar' | 'app-updates';
+export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'mapa' | 'duplicar' | 'app-updates';
 
 export interface DrawerMapDestination {
   lat: number;
@@ -43,6 +43,10 @@ export class SirDrawerService {
 
   openTransfer(id: string): void {
     this.open({ type: 'transfer', id });
+  }
+
+  openTour(id: string): void {
+    this.open({ type: 'tour', id });
   }
 
   openMapa(puntos: any[], destino?: DrawerMapDestination | null): void {

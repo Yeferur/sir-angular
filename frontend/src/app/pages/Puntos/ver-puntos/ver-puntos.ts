@@ -1,92 +1,76 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import {
+  Subject,
+  Subscription,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  forkJoin,
+  map
+} from 'rxjs';
 
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
-import { BehaviorSubject, Subject, combineLatest, of } from 'rxjs';
-import {
-  catchError,
-  debounceTime,
-  distinctUntilChanged,
-  map,
-  startWith,
-  switchMap
-} from 'rxjs/operators';
-
-type VM = {
-  puntos: Punto[];
-  total: number;
-  page: number;
-  totalPages: number;
-  hasLoadedOnce: boolean;
-};
+type PuntoHorario = NonNullable<Punto['horarios']>[number];
 
 @Component({
   selector: 'app-ver-puntos',
   standalone: true,
   imports: [CommonModule, FormsModule, LoadingStateComponent],
   templateUrl: './ver-puntos.html',
-  styleUrls: ['./ver-puntos.css']
+  styleUrls: ['../../listado-reservas-transfers.css', './ver-puntos.css']
 })
-export class VerPuntos implements OnInit {
-
+export class VerPuntos implements OnInit, OnDestroy {
   private puntosSvc = inject(puntosService);
   private router = inject(Router);
   private permisosService = inject(PermisosService);
   private alerts = inject(SirAlertService);
 
-  // ui
+  readonly limit = 10;
+  readonly puntos = signal<Punto[]>([]);
+  readonly rutas = signal<string[]>([]);
+  readonly total = signal(0);
+  readonly page = signal(1);
+  readonly totalPages = signal(1);
+  readonly isLoading = signal(true);
+  readonly isSearching = signal(false);
+  readonly loadError = signal('');
+  readonly searchError = signal('');
+  readonly hasLoadedOnce = signal(false);
+  readonly filtersVisible = signal(false);
+  readonly deletingIds = signal<Set<number>>(new Set());
+
   searchTerm = '';
-  page = 1;
-  limit = 10;
-  // streams
-  private search$ = new Subject<string>();
-  private page$ = new BehaviorSubject<number>(1);
+  selectedRoute = '';
+  descargandoExcel = false;
 
-  vm$ = combineLatest([
-    this.page$,
-    this.search$.pipe(
-      map(v => (v ?? '').trim()),
+  private readonly searchInput$ = new Subject<string>();
+  private inputSubscription?: Subscription;
+  private searchRequest?: Subscription;
+  private deleteRequests = new Subscription();
+
+  ngOnInit(): void {
+    this.inputSubscription = this.searchInput$.pipe(
+      map((value) => String(value || '').trim()),
       debounceTime(300),
-      distinctUntilChanged(),
-      startWith('')
-    )
-  ]).pipe(
-    switchMap(([page, q]) =>
-      this.puntosSvc.getPuntos(page, this.limit, q).pipe(
-        catchError(err => {
-          console.error('Error cargando puntos', err);
-          return of({ data: [], total: 0 });
-        }),
-        map(res => {
-          const total = Number(res?.total || 0);
-          const puntos = (res?.data || []) as Punto[];
-          const totalPages = Math.max(1, Math.ceil(total / this.limit));
-          return {
-            puntos,
-            total,
-            page,
-            totalPages,
-            hasLoadedOnce: true
-          } as VM;
-        })
-      )
-    ),
-    startWith({
-      puntos: [],
-      total: 0,
-      page: 1,
-      totalPages: 1,
-      hasLoadedOnce: false
-    } as VM)
-  );
+      distinctUntilChanged()
+    ).subscribe(() => this.buscarPuntos(true));
 
-  ngOnInit(): void { }
+    this.loadInitialData();
+  }
+
+  ngOnDestroy(): void {
+    this.inputSubscription?.unsubscribe();
+    this.searchRequest?.unsubscribe();
+    this.deleteRequests.unsubscribe();
+  }
 
   get canDeletePunto(): boolean {
     return this.permisosService.tienePermiso('PUNTOS.ELIMINAR');
@@ -108,10 +92,98 @@ export class VerPuntos implements OnInit {
     return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
   }
 
-  /* ===============================
-     NAV
-     =============================== */
-  crearPunto() {
+  loadInitialData(): void {
+    this.searchRequest?.unsubscribe();
+    this.isLoading.set(true);
+    this.loadError.set('');
+
+    this.searchRequest = forkJoin({
+      rutas: this.puntosSvc.getRutasPuntos(),
+      result: this.puntosSvc.getPuntos(1, this.limit)
+    }).pipe(
+      finalize(() => this.isLoading.set(false))
+    ).subscribe({
+      next: ({ rutas, result }) => {
+        this.rutas.set(Array.isArray(rutas) ? rutas : []);
+        this.applyResult(result);
+        this.hasLoadedOnce.set(true);
+      },
+      error: (error) => {
+        this.loadError.set(toUserErrorMessage(error, 'Revisa tu conexión e inténtalo nuevamente.'));
+      }
+    });
+  }
+
+  buscarPuntos(resetPage = true): void {
+    this.searchRequest?.unsubscribe();
+    if (resetPage) this.page.set(1);
+
+    this.isSearching.set(true);
+    this.searchError.set('');
+
+    this.searchRequest = this.puntosSvc.getPuntos(
+      this.page(),
+      this.limit,
+      this.searchTerm,
+      this.selectedRoute
+    ).pipe(
+      finalize(() => this.isSearching.set(false))
+    ).subscribe({
+      next: (result) => {
+        this.applyResult(result);
+        this.hasLoadedOnce.set(true);
+      },
+      error: (error) => {
+        this.searchError.set(toUserErrorMessage(error, 'No fue posible consultar los puntos de encuentro.'));
+      }
+    });
+  }
+
+  private applyResult(result: { data: Punto[]; total: number; page?: number }): void {
+    const total = Number(result?.total || 0);
+    const normalizedPage = Math.max(1, Number(result?.page || this.page()) || 1);
+    this.puntos.set(Array.isArray(result?.data) ? result.data : []);
+    this.total.set(total);
+    this.page.set(normalizedPage);
+    this.totalPages.set(Math.max(1, Math.ceil(total / this.limit)));
+  }
+
+  onSearchInput(value: string): void {
+    this.searchTerm = value;
+    this.searchInput$.next(value);
+  }
+
+  clearSearch(): void {
+    if (!this.searchTerm) return;
+    this.searchTerm = '';
+    this.searchInput$.next('');
+  }
+
+  submitSearch(): void {
+    this.buscarPuntos(true);
+  }
+
+  toggleFilters(): void {
+    this.filtersVisible.update((visible) => !visible);
+  }
+
+  onRouteChange(route: string): void {
+    this.selectedRoute = String(route || '').trim();
+    this.filtersVisible.set(false);
+    this.buscarPuntos(true);
+  }
+
+  clearRoute(): void {
+    if (!this.selectedRoute) return;
+    this.selectedRoute = '';
+    this.buscarPuntos(true);
+  }
+
+  activeFilterCount(): number {
+    return this.selectedRoute ? 1 : 0;
+  }
+
+  crearPunto(): void {
     if (!this.canCreatePunto) {
       this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear puntos.');
       return;
@@ -119,7 +191,7 @@ export class VerPuntos implements OnInit {
     this.router.navigate(['/Puntos/NuevoPunto']);
   }
 
-  irAOrdenarPuntos() {
+  irAOrdenarPuntos(): void {
     if (!this.canSortPuntos) {
       this.alerts.errorToast('Acceso denegado', 'No tienes permiso para ordenar puntos.');
       return;
@@ -127,129 +199,132 @@ export class VerPuntos implements OnInit {
     this.router.navigate(['/Puntos/OrdenarPuntos']);
   }
 
-  editarPunto(p: Punto) {
-    const id = Number((p as any).Id_Punto || (p as any).IdPunto);
-    if (!isNaN(id)) {
-      this.router.navigate(['/Puntos/Editar', id]);
-    }
+  editarPunto(punto: Punto): void {
+    if (!this.canUpdatePunto) return;
+    const id = this.getPuntoId(punto);
+    if (id) this.router.navigate(['/Puntos/Editar', id]);
   }
 
-  /* ===============================
-     ELIMINAR
-     =============================== */
-  confirmEliminarPunto(p: Punto) {
-    const id = Number((p as any).Id_Punto || (p as any).IdPunto);
-    if (isNaN(id)) return;
+  confirmEliminarPunto(punto: Punto): void {
+    const id = this.getPuntoId(punto);
+    if (!id || !this.canDeletePunto || this.isDeleting(id)) return;
 
-    this.alerts.confirm(
-      'Eliminar punto',
-      '¿Deseas eliminar este punto? Esta acción no se puede deshacer.',
-      () => this.deletePunto(p),
+    const nombre = this.getPuntoName(punto);
+    this.alerts.confirmDelete(
+      'Eliminar punto de encuentro',
+      `¿Deseas eliminar “${nombre}”? También se eliminarán sus horarios asociados y esta acción no se puede deshacer.`,
+      () => this.deletePunto(punto),
       undefined,
-      { confirmText: 'Eliminar', cancelText: 'Cancelar', type: 'warning' }
+      { confirmText: 'Eliminar punto', cancelText: 'Conservar' }
     );
   }
 
-  private deletePunto(p: Punto) {
-    const id = Number((p as any).Id_Punto || (p as any).IdPunto);
-    if (isNaN(id)) return;
+  private deletePunto(punto: Punto): void {
+    const id = this.getPuntoId(punto);
+    if (!id || this.isDeleting(id)) return;
 
-    this.puntosSvc.deletePunto(id).subscribe({
+    this.setDeleting(id, true);
+    const request = this.puntosSvc.deletePunto(id).pipe(
+      finalize(() => this.setDeleting(id, false))
+    ).subscribe({
       next: () => {
-        // animación opcional
-        try { (p as any)._deleting = true; } catch { }
+        this.puntos.update((items) => items.filter((item) => this.getPuntoId(item) !== id));
+        this.total.update((value) => Math.max(0, value - 1));
 
-        setTimeout(() => {
-          // recargar lista
-          this.page$.next(this.page);
-          this.alerts.showAlert({
-            type: 'success',
-            title: 'Eliminado',
-            message: 'Punto eliminado correctamente',
-            autoClose: true
-          });
-        }, 350);
+        if (this.puntos().length === 0 && this.page() > 1) {
+          this.page.update((value) => value - 1);
+        }
+        this.buscarPuntos(false);
       },
-      error: err => {
-        console.error('Error eliminando punto', err);
+      error: (error) => {
         this.alerts.showAlert({
           type: 'error',
-          title: 'Error',
-          message: 'No se pudo eliminar el punto',
+          title: 'No se pudo eliminar',
+          message: toUserErrorMessage(error, 'No fue posible eliminar el punto de encuentro.'),
           autoClose: false
         });
       }
     });
+    this.deleteRequests.add(request);
   }
 
-  /* ===============================
-     SEARCH
-     =============================== */
-  onSearchInput(v: string) {
-    this.searchTerm = v;
-    this.page = 1;
-    this.page$.next(1);
-    this.search$.next(v);
+  isDeleting(id: number): boolean {
+    return this.deletingIds().has(id);
   }
 
-  clearSearch() {
-    this.searchTerm = '';
-    this.page = 1;
-    this.page$.next(1);
-    this.search$.next('');
+  private setDeleting(id: number, deleting: boolean): void {
+    this.deletingIds.update((current) => {
+      const next = new Set(current);
+      if (deleting) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
-  /* ===============================
-     PAGINATION
-     =============================== */
-  prevPage() {
-    if (this.page <= 1) return;
-    this.page--;
-    this.page$.next(this.page);
+  prevPage(): void {
+    if (this.page() <= 1 || this.isSearching()) return;
+    this.page.update((value) => value - 1);
+    this.buscarPuntos(false);
   }
 
-  nextPage(totalPages: number) {
-    if (this.page >= totalPages) return;
-    this.page++;
-    this.page$.next(this.page);
+  nextPage(): void {
+    if (this.page() >= this.totalPages() || this.isSearching()) return;
+    this.page.update((value) => value + 1);
+    this.buscarPuntos(false);
   }
 
-  /* ===============================
-     EXCEL EXPORT
-     =============================== */
-  descargandoExcel = false;
-
-  descargarExcel() {
-    if (!this.canExportPuntos) {
-      this.alerts.errorToast('Acceso denegado', 'No tienes permiso para exportar puntos.');
-      return;
-    }
+  descargarExcel(): void {
+    if (!this.canExportPuntos || this.descargandoExcel) return;
 
     this.descargandoExcel = true;
-    this.puntosSvc.exportarExcel(this.searchTerm).subscribe({
-      next: (blob: Blob) => {
+    this.puntosSvc.exportarExcel(this.searchTerm, this.selectedRoute).pipe(
+      finalize(() => this.descargandoExcel = false)
+    ).subscribe({
+      next: (blob) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = 'Puntos_Encuentro.xlsx';
         link.click();
         URL.revokeObjectURL(url);
-        this.descargandoExcel = false;
       },
-      error: (err: any) => {
-        console.error('Error al exportar puntos al Excel', err);
+      error: (error) => {
         this.alerts.showAlert({
           type: 'error',
-          title: 'Error',
-          message: 'No se pudieron exportar los puntos desde el servidor.',
+          title: 'No se pudo exportar',
+          message: toUserErrorMessage(error, 'No fue posible generar el archivo de puntos.'),
           autoClose: false
         });
-        this.descargandoExcel = false;
       }
     });
   }
 
-  trackById(_: number, item: Punto) {
-    return Number((item as any).Id_Punto || (item as any).IdPunto);
+  configuredSchedules(punto: Punto): PuntoHorario[] {
+    return (punto.horarios || []).filter((horario) => !this.isPendingSchedule(horario));
+  }
+
+  pendingSchedules(punto: Punto): PuntoHorario[] {
+    return (punto.horarios || []).filter((horario) => this.isPendingSchedule(horario));
+  }
+
+  isPendingSchedule(horario: PuntoHorario): boolean {
+    const value = String(horario?.HoraSalida || '').trim().toLowerCase();
+    return !value || value === 'pendiente';
+  }
+
+  scheduleTourName(horario: PuntoHorario): string {
+    return String(horario?.NombreTour || `Tour ${horario?.Id_Tour || '—'}`);
+  }
+
+  getPuntoId(punto: Punto): number {
+    return Number(punto?.Id_Punto || punto?.IdPunto || 0);
+  }
+
+  getPuntoName(punto: Punto): string {
+    return String(punto?.NombrePunto || punto?.Nombre_Punto || 'Punto sin nombre');
+  }
+
+  trackById(_: number, item: Punto): number {
+    return this.getPuntoId(item);
   }
 }

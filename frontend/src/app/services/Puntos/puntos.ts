@@ -32,16 +32,21 @@ export class puntosService {
   constructor(private http: HttpClient) { }
   private baseUrl = environment.apiUrl; // ej. 'http://localhost:4000/api'
 
-  // Fetch paginated points. Returns an object with data and total count.
-  getPuntos(page = 1, limit = 10, q = '') {
+  // Fetch paginated points. Returns the normalized page selected by the server.
+  getPuntos(page = 1, limit = 10, q = '', ruta = '') {
     const params: any = { page: String(page), limit: String(limit) };
     if (q.trim()) params.q = q.trim();
-    return this.http.get<{ data: Punto[]; total: number }>(`${this.baseUrl}/puntos`, { params });
+    if (ruta.trim()) params.ruta = ruta.trim();
+    return this.http.get<{ data: Punto[]; total: number; page?: number; limit?: number }>(
+      `${this.baseUrl}/puntos`,
+      { params }
+    );
   }
 
-  exportarExcel(q = ''): Observable<Blob> {
+  exportarExcel(q = '', ruta = ''): Observable<Blob> {
     const params: any = {};
     if (q.trim()) params.q = q.trim();
+    if (ruta.trim()) params.ruta = ruta.trim();
     return this.http.get(`${this.baseUrl}/puntos/exportar`, { params, responseType: 'blob' });
   }
 

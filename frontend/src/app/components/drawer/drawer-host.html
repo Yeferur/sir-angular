@@ -12,6 +12,7 @@
        (keydown)="onPanelKeydown($event)"
        [attr.aria-label]="drawer()!.type === 'reserva' ? 'Detalle de reserva' :
                           drawer()!.type === 'transfer' ? 'Detalle de transfer' :
+                          drawer()!.type === 'tour' ? 'Detalle de tour' :
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' : 'Novedades de la app'">
 
@@ -33,6 +34,13 @@
       <app-mapa
         [puntos]="drawer()!.puntos!"
         [destino]="drawer()!.destino ?? null"
+        (onClose)="close()"
+      />
+    }
+
+    @if (drawer()!.type === 'tour') {
+      <app-tour-detail
+        [Id_Tour]="drawer()!.id!"
         (onClose)="close()"
       />
     }

@@ -1,396 +1,501 @@
 @if (isLoading()) {
-  <app-loading-state label="Cargando tour, planes y tarifas…"></app-loading-state>
+  <app-loading-state label="Cargando el tour, sus planes y tarifas…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state mode="error" label="No pudimos cargar el tour" [detail]="loadError()"
+    (action)="retryInitialLoad()"></app-loading-state>
 } @else {
-<div class="booking-dashboard">
+<div class="wizard-shell wizard-shell--page-enter" [class.is-panel-animating]="panelAnimating">
+  <div class="wizard-stepper" aria-label="Pasos para editar el tour">
+    @for (step of wizardSteps; track step.id; let i = $index) {
+      @if (i > 0) { <div class="step-connector" [class.filled]="currentStep > i"></div> }
+      <button type="button" class="step-item"
+        [class.is-active]="currentStep === i" [class.is-done]="currentStep > i"
+        [class.has-error]="stepHasError(i)" [class.is-locked]="i > maxReachedStep"
+        [disabled]="i > maxReachedStep" (click)="goToStep(i)">
+        <span class="step-bubble">
+          @if (currentStep > i && !stepHasError(i)) {
+            <svg viewBox="0 0 14 14" aria-hidden="true"><polyline points="2,7 6,11 12,3"/></svg>
+          } @else if (stepHasError(i)) {
+            <svg class="icon-error" viewBox="0 0 14 14" aria-hidden="true">
+              <line x1="7" y1="2" x2="7" y2="8"/><circle cx="7" cy="11.5" r=".8" fill="currentColor" stroke="none"/>
+            </svg>
+          } @else { {{ i + 1 }} }
+        </span>
+        <span class="step-label">{{ step.label }}</span>
+      </button>
+    }
+  </div>
 
-  <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
+  @if (currentStep < 4) {
+    <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
+  }
 
-  <form id="tourForm" [formGroup]="form" (ngSubmit)="onSubmitEditarTour()">
-    <div class="main-content">
-
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2>Informacion del Tour</h2>
-          </div>
-        </div>
-
-        <div class="form-grid form-grid-3">
-          <div class="form-group">
-            <label class="form-label">Nombre del Tour <span class="required-star">*</span></label>
-            <input formControlName="Nombre_Tour" type="text" class="form-input" maxlength="255"
-              placeholder="Ej: Guatape"
-              [class.errorInput]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid" />
-            @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
-            <div class="errorMessage">Ingresa un nombre valido.</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Abreviacion <span class="required-star">*</span></label>
-            <input formControlName="Abreviacion" type="text" class="form-input" maxlength="50" placeholder="Ej: TG"
-              [class.errorInput]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid" />
-            @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
-            <div class="errorMessage">La abreviacion es obligatoria.</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Cupo Base <span class="required-star">*</span></label>
-            <input formControlName="Cupo_Base" type="number" class="form-input" min="0" placeholder="0"
-              [class.errorInput]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid" />
-            @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
-            <div class="errorMessage">El cupo base es obligatorio.</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Coordenadas <span class="label-optional">(Opcional)</span></label>
-            <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
-              [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
-            @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
-            @if (form.get('Coordenadas')?.errors?.['coordenadasInvalidas']) {
-            <div class="errorMessage">Formato invalido. Usa: lat, lng</div>
-            } @else if (form.get('Coordenadas')?.errors?.['latitudInvalida']) {
-            <div class="errorMessage">Latitud fuera de rango.</div>
-            } @else if (form.get('Coordenadas')?.errors?.['longitudInvalida']) {
-            <div class="errorMessage">Longitud fuera de rango.</div>
-            }
-            }
-            <p class="form-hint">Busca el tour en Google Maps -> click derecho -> "Copiar coordenadas" y pégalas aquí.</p>
-          </div>
-
-          <div class="form-group full-width">
-            <label class="form-label">Puntos de encuentro <span class="label-optional">(Opcional)</span></label>
-            <p class="form-hint">¿Copiar los puntos de encuentro de un tour existente?</p>
-            <div class="origen-toggle-row">
-              <button type="button" class="origen-toggle-btn"
-                [class.active]="form.get('Id_Tour_Origen')?.value === null"
-                (click)="form.get('Id_Tour_Origen')?.setValue(null)">
-                No, configurar despues
-              </button>
-              <button type="button" class="origen-toggle-btn"
-                [class.active]="form.get('Id_Tour_Origen')?.value !== null"
-                (click)="form.get('Id_Tour_Origen')?.value === null && form.get('Id_Tour_Origen')?.setValue(toursExistentes[0]?.Id_Tour ?? null)">
-                Si, copiar de otro tour
-              </button>
+  <form id="editTourForm" [formGroup]="form" (ngSubmit)="onSubmitEditarTour()">
+    <div class="wizard-step-panel" [class.going-back]="goingBack" [class.is-entering]="panelAnimating">
+      @if (currentStep === 0) {
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2>Información del tour</h2>
+              <p class="card-header-hint">Actualiza los datos principales sin mezclar la configuración comercial y operativa.</p>
             </div>
-            @if (form.get('Id_Tour_Origen')?.value !== null) {
-            <div class="origen-chips">
-              @for (tour of toursExistentes; track tour.Id_Tour) {
-              <button type="button" class="origen-chip"
-                [class.active]="form.get('Id_Tour_Origen')?.value === tour.Id_Tour"
-                (click)="form.get('Id_Tour_Origen')?.setValue(tour.Id_Tour)">
-                {{ tour.Nombre_Tour }}
-              </button>
+          </div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group full-width">
+              <label class="form-label">Nombre del tour <span class="required-star">*</span></label>
+              <input formControlName="Nombre_Tour" type="text" class="form-input" maxlength="255"
+                placeholder="Ej: Guatapé"
+                [class.errorInput]="form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid" />
+              @if (form.get('Nombre_Tour')?.touched && form.get('Nombre_Tour')?.invalid) {
+                <div class="errorMessage">Ingresa un nombre válido.</div>
               }
             </div>
+            <div class="form-group">
+              <label class="form-label">Abreviación <span class="required-star">*</span></label>
+              <input formControlName="Abreviacion" type="text" class="form-input" maxlength="50"
+                placeholder="Ej: TG"
+                [class.errorInput]="form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid" />
+              @if (form.get('Abreviacion')?.touched && form.get('Abreviacion')?.invalid) {
+                <div class="errorMessage">La abreviación es obligatoria.</div>
+              }
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cupo base <span class="required-star">*</span></label>
+              <input formControlName="Cupo_Base" type="number" class="form-input" min="0"
+                placeholder="Ej: 38"
+                [class.errorInput]="form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid" />
+              @if (form.get('Cupo_Base')?.touched && form.get('Cupo_Base')?.invalid) {
+                <div class="errorMessage">Ingresa el cupo habitual del tour.</div>
+              }
+              <p class="form-hint">Las excepciones se pueden manejar después desde la operación.</p>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (currentStep === 1) {
+        <section class="card pricing-workspace-card">
+          <div class="card-header pricing-header">
+            <div>
+              <h2>Planes y tarifas</h2>
+              <p class="card-header-hint">Selecciona un plan y actualiza su oferta sin perder de vista las demás alternativas.</p>
+            </div>
+          </div>
+          <div formArrayName="planes" class="pricing-workspace">
+            <aside class="plan-selector" aria-label="Planes del tour">
+              <div class="plan-selector-heading">
+                <div><span class="pricing-eyebrow">Oferta comercial</span>
+                  <strong>{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }}</strong>
+                </div>
+              </div>
+              <div class="plan-selector-list">
+                @for (planCtrl of plans.controls; track planCtrl; let i = $index) {
+                  <button type="button" class="plan-selector-item"
+                    [class.is-selected]="expandedPlanIndex === i"
+                    [class.has-error]="planCtrl.touched && planCtrl.invalid"
+                    (click)="togglePlanEditor(i)">
+                    <span class="plan-selector-top">
+                      <strong>{{ planCtrl.get('Nombre_Plan')?.value || 'Plan sin nombre' }}</strong>
+                      @if (i === 0) { <span class="label-badge">Principal</span> }
+                    </span>
+                    <span class="plan-selector-price">{{ getPlanPrimaryPriceLabel(i) }}</span>
+                    <span class="plan-selector-meta">{{ getPlanValidityLabel(i) }} · {{ getPlanPassengerLabel(i) }}</span>
+                  </button>
+                }
+              </div>
+              <button type="button" class="plan-selector-add" (click)="addNewPlan()">
+                <span aria-hidden="true">+</span>
+                <span><strong>Agregar otro plan</strong><small>Crea una alternativa de venta</small></span>
+              </button>
+            </aside>
+
+            @if (plans.length && expandedPlanIndex >= 0) {
+              <article class="plan-editor" [formGroup]="getSelectedPlanGroup()">
+                <header class="plan-editor-header">
+                  <div>
+                    <span class="pricing-eyebrow">Configuración del plan</span>
+                    <p>Actualiza el nombre, las tarifas y la vigencia de la alternativa seleccionada.</p>
+                  </div>
+                  <div class="plan-editor-actions">
+                    <button type="button" class="btn-secondary btn-sm" (click)="duplicatePlan(expandedPlanIndex)">Duplicar</button>
+                    @if (expandedPlanIndex !== 0) {
+                      <button type="button" class="btn-icon-delete" (click)="deletePlan(expandedPlanIndex)"
+                        title="Eliminar plan" aria-label="Eliminar plan">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2.5"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                      </button>
+                    }
+                  </div>
+                </header>
+                <div class="plan-editor-content">
+                  <div class="form-group">
+                    <label class="form-label">Nombre del plan <span class="required-star">*</span></label>
+                    <input type="text" formControlName="Nombre_Plan" class="form-input" placeholder="Ej: Plan básico"
+                      [class.errorInput]="plans.at(expandedPlanIndex).get('Nombre_Plan')?.touched && plans.at(expandedPlanIndex).get('Nombre_Plan')?.invalid" />
+                    @if (plans.at(expandedPlanIndex).get('Nombre_Plan')?.touched && plans.at(expandedPlanIndex).get('Nombre_Plan')?.invalid) {
+                      <div class="errorMessage">El nombre del plan es obligatorio.</div>
+                    }
+                  </div>
+
+                  <section class="rate-builder">
+                    <div class="rate-builder-heading">
+                      <div>
+                        <span class="pricing-eyebrow">Tarifas</span><h4>Precio por pasajero</h4>
+                        <p>Las tres monedas permanecen visibles. Deja en cero las que todavía no tengan tarifa.</p>
+                      </div>
+                    </div>
+                    <div class="tariff-matrix-scroll">
+                      <div class="tariff-matrix">
+                        <div class="tariff-matrix-header">
+                          <span>Tipo de pasajero</span>
+                          @for (monCtrl of getPlanCurrencies(expandedPlanIndex).controls; track monCtrl) {
+                            <div><strong>{{ monCtrl.get('Codigo')?.value }}</strong>
+                              <small>{{ monCtrl.get('Nombre_Moneda')?.value }}</small></div>
+                          }
+                        </div>
+                        <div class="passenger-rate-row is-enabled tariff-matrix-row">
+                          <div class="passenger-rate-identity"><span class="passenger-icon">A</span><div><strong>Adulto</strong></div></div>
+                          @for (monCtrl of getPlanCurrencies(expandedPlanIndex).controls; track monCtrl; let mi = $index) {
+                            <div class="passenger-rate-value">
+                              <input type="number" class="form-input precio-input" min="0" placeholder="0"
+                                [formControl]="getCurrencyPriceControl(expandedPlanIndex, mi, 'ADULTO')"
+                                (focus)="selectPriceValue($event)"
+                                [class.errorInput]="getCurrencyPriceControl(expandedPlanIndex, mi, 'ADULTO').touched && getCurrencyPriceControl(expandedPlanIndex, mi, 'ADULTO').invalid" />
+                            </div>
+                          }
+                        </div>
+                        <div class="passenger-rate-row tariff-matrix-row"
+                          [class.is-enabled]="plans.at(expandedPlanIndex).get('AllowNino')?.value">
+                          <div class="passenger-rate-identity">
+                            <button type="button" class="passenger-enable"
+                              [class.active]="plans.at(expandedPlanIndex).get('AllowNino')?.value"
+                              [attr.aria-pressed]="plans.at(expandedPlanIndex).get('AllowNino')?.value"
+                              (click)="setPassengerEnabled(expandedPlanIndex, 'NINO', !plans.at(expandedPlanIndex).get('AllowNino')?.value)"><span></span></button>
+                            <div><strong>Niño</strong></div>
+                          </div>
+                          @for (monCtrl of getPlanCurrencies(expandedPlanIndex).controls; track monCtrl; let mi = $index) {
+                            <div class="passenger-rate-value">
+                              <input type="number" class="form-input precio-input" min="0" placeholder="0"
+                                [formControl]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO')"
+                                (focus)="selectPriceValue($event)"
+                                [class.errorInput]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO').touched && getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO').invalid" />
+                            </div>
+                          }
+                        </div>
+                        <div class="passenger-rate-row tariff-matrix-row"
+                          [class.is-enabled]="plans.at(expandedPlanIndex).get('AllowInfante')?.value">
+                          <div class="passenger-rate-identity">
+                            <button type="button" class="passenger-enable"
+                              [class.active]="plans.at(expandedPlanIndex).get('AllowInfante')?.value"
+                              [attr.aria-pressed]="plans.at(expandedPlanIndex).get('AllowInfante')?.value"
+                              (click)="setPassengerEnabled(expandedPlanIndex, 'INFANTE', !plans.at(expandedPlanIndex).get('AllowInfante')?.value)"><span></span></button>
+                            <div><strong>Infante</strong></div>
+                          </div>
+                          @for (monCtrl of getPlanCurrencies(expandedPlanIndex).controls; track monCtrl; let mi = $index) {
+                            <div class="passenger-rate-value">
+                              <input type="number" class="form-input precio-input" min="0" placeholder="0"
+                                [formControl]="getCurrencyPriceControl(expandedPlanIndex, mi, 'INFANTE')"
+                                (focus)="selectPriceValue($event)"
+                                [class.errorInput]="getCurrencyPriceControl(expandedPlanIndex, mi, 'INFANTE').touched && getCurrencyPriceControl(expandedPlanIndex, mi, 'INFANTE').invalid" />
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="advanced-settings is-static">
+                    <div class="advanced-settings-heading">
+                      <span><strong>Vigencia del plan</strong><small>{{ getPlanValidityLabel(expandedPlanIndex) }}</small></span>
+                    </div>
+                    <div class="advanced-settings-body">
+                      <div class="choice-grid choice-grid-2">
+                        <button type="button" class="choice-card"
+                          [class.active]="plans.at(expandedPlanIndex).get('esPermanente')?.value"
+                          (click)="setPlanPermanent(expandedPlanIndex, true)">
+                          <strong>Permanente</strong><span>Sin fecha de vencimiento</span>
+                        </button>
+                        <button type="button" class="choice-card"
+                          [class.active]="!plans.at(expandedPlanIndex).get('esPermanente')?.value"
+                          (click)="setPlanPermanent(expandedPlanIndex, false)">
+                          <strong>Con fechas</strong><span>Disponible durante un periodo</span>
+                        </button>
+                      </div>
+                      @if (!plans.at(expandedPlanIndex).get('esPermanente')?.value) {
+                        <div class="plan-fechas-grid">
+                          <div class="form-group"><label class="form-label">Inicio <span class="required-star">*</span></label>
+                            <app-datepicker formControlName="Fecha_Inicio" placeholder="Inicio"
+                              [invalid]="!!(plans.at(expandedPlanIndex).get('Fecha_Inicio')?.touched && plans.at(expandedPlanIndex).get('Fecha_Inicio')?.invalid)"></app-datepicker>
+                          </div>
+                          <div class="form-group"><label class="form-label">Fin <span class="required-star">*</span></label>
+                            <app-datepicker formControlName="Fecha_Fin" placeholder="Fin"
+                              [invalid]="!!(plans.at(expandedPlanIndex).get('Fecha_Fin')?.touched && plans.at(expandedPlanIndex).get('Fecha_Fin')?.invalid)"></app-datepicker>
+                          </div>
+                        </div>
+                        @if (plans.at(expandedPlanIndex).touched && plans.at(expandedPlanIndex).errors?.['vigenciaIncompleta']) {
+                          <div class="errorMessage">Selecciona las fechas de inicio y fin.</div>
+                        }
+                        @if (plans.at(expandedPlanIndex).touched && plans.at(expandedPlanIndex).errors?.['vigenciaInvalida']) {
+                          <div class="errorMessage">La fecha final no puede ser anterior al inicio.</div>
+                        }
+                      }
+                    </div>
+                  </section>
+                </div>
+              </article>
             }
           </div>
+        </section>
+      }
 
-          <div class="form-group full-width">
-            <div class="divider"></div>
+      @if (currentStep === 2) {
+        <section class="card">
+          <div class="card-header"><div><h2>Calendario de operación</h2>
+            <p class="card-header-hint">Define si el tour opera todo el año o por temporadas y configura sus días disponibles.</p></div></div>
+          <div class="choice-grid choice-grid-2 operation-choice-grid">
+            <button type="button" class="choice-card operation-choice"
+              [class.active]="form.get('Modo_Disponibilidad')?.value === 'TODO_EL_ANO'"
+              (click)="form.get('Modo_Disponibilidad')?.setValue('TODO_EL_ANO')">
+              <span><strong>Todo el año</strong><small>Opera en los días disponibles durante todo el año</small></span>
+            </button>
+            <button type="button" class="choice-card operation-choice"
+              [class.active]="form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'"
+              (click)="form.get('Modo_Disponibilidad')?.setValue('SOLO_TEMPORADAS')">
+              <span><strong>Por temporadas</strong><small>Opera únicamente en periodos específicos</small></span>
+            </button>
           </div>
+          @if (!isSoloTemporadas()) {
+            <div class="configuration-block calendar-days-block">
+              <div class="section-header-row">
+                <div class="configuration-title"><div><strong>Días disponibles</strong>
+                  <span>Selecciona los días de la semana en que estará disponible el tour.</span></div></div>
+                <button type="button" class="btn-secondary btn-sm" (click)="toggleAllBaseDaysToggle()">
+                  {{ areAllBaseDaysSelected() ? 'Quitar todos' : 'Seleccionar todos' }}
+                </button>
+              </div>
+              <div [formGroup]="diasBaseFG" class="days-row">
+                @for (d of diasSemana; track d.key) {
+                  <label class="day-chip"><input type="checkbox" [formControlName]="d.key" /><span>{{ d.label }}</span></label>
+                }
+              </div>
+              @if (form.touched && form.errors?.['diasBaseVacios']) {
+                <div class="errorMessage">Selecciona al menos un día disponible.</div>
+              }
+            </div>
+          }
+          <div class="configuration-block seasons-block">
+            <div class="section-header-row">
+              <div class="configuration-title"><div>
+                <strong>{{ isSoloTemporadas() ? 'Temporadas de operación' : 'Temporadas o excepciones' }}</strong>
+                <span>{{ isSoloTemporadas() ? 'Agrega los periodos en los que este tour estará disponible.' : 'Úsalas si el calendario cambia durante una época concreta.' }}</span>
+              </div></div>
+              <button type="button" class="btn-secondary btn-sm" (click)="addTemporada()">Agregar temporada</button>
+            </div>
+            @if (!temporadasFA.length) {
+              <div class="empty-inline" [class.is-required]="isSoloTemporadas()">
+                <strong>{{ isSoloTemporadas() ? 'Falta una temporada' : 'Sin temporadas especiales' }}</strong>
+                <span>{{ isSoloTemporadas() ? 'Agrega al menos una para continuar.' : 'Se utilizarán los días disponibles configurados.' }}</span>
+              </div>
+            }
+            <div formArrayName="temporadas" class="temporadas-list">
+              @for (tempCtrl of temporadasFA.controls; track $index; let ti = $index) {
+                <article class="temporada-card season-accordion" [class.is-expanded]="expandedSeasonIndex === ti" [formGroupName]="ti">
+                  <div class="accordion-header season-accordion-header">
+                    <button type="button" class="season-accordion-toggle" (click)="toggleSeasonEditor(ti)">
+                      <span class="accordion-main"><strong>{{ tempCtrl.get('Nombre_Temporada')?.value || 'Temporada sin nombre' }}</strong>
+                        <span class="accordion-summary">{{ getSeasonSummary(ti) }}</span></span>
+                    </button>
+                    <button type="button" class="btn-icon-delete season-header-delete" (click)="deleteTemporada(ti)"
+                      title="Eliminar temporada" aria-label="Eliminar temporada">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  @if (expandedSeasonIndex === ti) {
+                    <div class="accordion-body">
+                      <div class="form-group"><label class="form-label">Nombre <span class="required-star">*</span></label>
+                        <input type="text" class="form-input" formControlName="Nombre_Temporada" placeholder="Ej: Semana Santa"
+                          [class.errorInput]="tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid" />
+                      </div>
+                      <div class="temp-grid">
+                        <div class="form-group"><label class="form-label">Fecha de inicio <span class="required-star">*</span></label>
+                          <app-datepicker formControlName="Fecha_Inicio" placeholder="Fecha de inicio"
+                            [invalid]="!!(tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid)"></app-datepicker>
+                        </div>
+                        <div class="form-group"><label class="form-label">Fecha final <span class="required-star">*</span></label>
+                          <app-datepicker formControlName="Fecha_Fin" placeholder="Fecha final"
+                            [invalid]="!!(tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid)"></app-datepicker>
+                        </div>
+                      </div>
+                      @if (tempCtrl.touched && tempCtrl.errors?.['rangoInvalido']) {
+                        <div class="errorMessage">La fecha final no puede ser anterior al inicio.</div>
+                      }
+                      <div class="season-days">
+                        <div class="section-header-row"><label class="form-label">Días dentro de la temporada <span class="required-star">*</span></label>
+                          <button type="button" class="btn-secondary btn-sm" (click)="toggleAllSeasonDaysToggle(ti)">
+                            {{ areAllSeasonDaysSelected(ti) ? 'Quitar todos' : 'Seleccionar todos' }}
+                          </button>
+                        </div>
+                        <div formGroupName="dias" class="days-row">
+                          @for (d of diasSemana; track d.key) {
+                            <label class="day-chip"><input type="checkbox" [formControlName]="d.key" /><span>{{ d.label }}</span></label>
+                          }
+                        </div>
+                        @if (tempCtrl.touched && tempCtrl.errors?.['sinDias']) {
+                          <div class="errorMessage">Selecciona al menos un día para esta temporada.</div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </article>
+              }
+            </div>
+          </div>
+        </section>
+      }
 
-          <div class="form-group full-width">
-            <label class="form-label">Comisiones por canal <span class="label-optional">(opcional)</span></label>
-            <p class="form-hint">Activa los canales que aplican comision para este tour.</p>
-            <div class="canales-list">
-              @for (canal of canalesComisiones; track canal.Id_Canal; let ci = $index) {
+      @if (currentStep === 3) {
+        <section class="card settings-card">
+          <div class="card-header">
+            <div><h2>Comisiones por canal</h2><p class="card-header-hint">Activa los canales que reciben un valor por cada venta.</p></div>
+            <span class="optional-pill">Opcional</span>
+          </div>
+          <div class="canales-list">
+            @for (canal of canalesComisiones; track canal.Id_Canal; let ci = $index) {
               <div class="canal-row" [class.canal-active]="canal.activo">
                 <button type="button" class="canal-toggle" [class.active]="canal.activo" (click)="toggleCanal(ci)">
                   <span class="canal-nombre">{{ canal.Nombre_Canal }}</span>
                 </button>
                 @if (canal.activo) {
-                <div class="canal-valor-wrap">
-                  <input type="number" class="form-input canal-valor-input" min="0" placeholder="0"
-                    [(ngModel)]="canal.valor" [ngModelOptions]="{standalone: true}" />
-                  <span class="canal-valor-suffix">COP</span>
-                </div>
+                  <div class="canal-valor-wrap">
+                    <input type="number" class="form-input canal-valor-input" min="0" placeholder="0"
+                      [(ngModel)]="canal.valor" [ngModelOptions]="{standalone: true}" />
+                    <span class="canal-valor-suffix">COP</span>
+                  </div>
                 }
               </div>
-              }
-            </div>
+            }
           </div>
-        </div>
-      </div>
+        </section>
+        <section class="card settings-card">
+          <div class="card-header">
+            <div><h2>Geolocalización del tour</h2>
+              <p class="card-header-hint">Añade coordenadas solo si existe un destino o punto fijo para orientar las rutas de recogida. Puedes omitirlas en recorridos por zonas amplias o con puntos que cambian según la temporada.</p>
+            </div>
+            <span class="optional-pill">Opcional</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Coordenadas del punto fijo</label>
+            <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
+              [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
+            @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
+              <div class="errorMessage">Usa una latitud y longitud válidas separadas por coma.</div>
+            }
+            <p class="form-hint">Puede ser el destino o el lugar fijo donde inicia el recorrido después de recoger a los pasajeros. El sistema funciona normalmente si queda vacío.</p>
+          </div>
+        </section>
+      }
 
-      <div class="card">
-        <div class="card-header header-row">
-          <div class="card-header-left">
+      @if (currentStep === 4) {
+        <section class="review-shell">
+          <header class="review-header">
             <div>
-              <h2>Planes y Precios</h2>
-              <p class="card-subtitle">Configura precios por plan y moneda.</p>
+              <span class="review-eyebrow">Editar tour</span>
+              <div class="review-title-row"><h2>{{ form.get('Nombre_Tour')?.value || 'Tour sin nombre' }}</h2>
+                <span class="review-code">{{ form.get('Abreviacion')?.value || '—' }}</span></div>
+              <p>Comprueba los cambios antes de guardarlos.</p>
             </div>
+            <span class="review-status">Listo para guardar</span>
+          </header>
+          <div class="review-metrics">
+            <div><span>Cupo base</span><strong>{{ form.get('Cupo_Base')?.value || 0 }}</strong></div>
+            <div><span>Planes</span><strong>{{ plans.length }}</strong></div>
+            <div><span>Operación</span><strong>{{ isSoloTemporadas() ? 'Por temporadas' : 'Todo el año' }}</strong></div>
           </div>
-          <button type="button" class="btn-secondary btn-sm" (click)="addNewPlan()">
-            Agregar plan
-          </button>
-        </div>
-
-        <div formArrayName="planes" class="planes-list">
-          @for (planCtrl of plans.controls; track (planCtrl.get('Id_Plan')?.value ?? $index); let i = $index) {
-          <div class="plan-card" [formGroupName]="i">
-            <div class="plan-header">
-              <div class="plan-name-group">
-                <label class="form-label">
-                  Nombre del plan <span class="required-star">*</span>
-                  @if (i === 0) { <span class="label-badge">Principal</span> }
-                </label>
-                <input type="text" formControlName="Nombre_Plan" class="form-input"
-                  placeholder="Ej: Plan basico / Premium"
-                  [class.errorInput]="planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid" />
-                @if (planCtrl.get('Nombre_Plan')?.touched && planCtrl.get('Nombre_Plan')?.invalid) {
-                <div class="errorMessage">El nombre del plan es obligatorio.</div>
+          <section class="review-section">
+            <div class="review-section-heading"><span>Comercial</span><h3>Planes y tarifas</h3></div>
+            <div class="review-plans">
+              @for (planCtrl of plans.controls; track $index; let i = $index) {
+                <article class="review-plan">
+                  <div class="review-plan-header">
+                    <div><strong>{{ planCtrl.get('Nombre_Plan')?.value }}</strong><span>{{ getPlanValidityLabel(i) }}</span></div>
+                    @if (i === 0) { <span class="label-badge">Principal</span> }
+                  </div>
+                  <p>{{ getPlanPassengerLabel(i) }}</p>
+                  <div class="review-price-list">
+                    @for (monCtrl of getPlanCurrencies(i).controls; track $index; let mi = $index) {
+                      @if (shouldShowCurrencyInReview(i, mi)) {
+                        <div><strong>{{ monCtrl.get('Codigo')?.value }}</strong>
+                          <span>Adulto {{ monCtrl.get('ADULTO')?.value || 0 }}</span>
+                          @if (planCtrl.get('AllowNino')?.value) { <span>Niño {{ monCtrl.get('NINO')?.value || 0 }}</span> }
+                          @if (planCtrl.get('AllowInfante')?.value) { <span>Infante {{ monCtrl.get('INFANTE')?.value || 0 }}</span> }
+                        </div>
+                      }
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+          <section class="review-section">
+            <div class="review-section-heading"><span>Operación</span><h3>Disponibilidad y temporadas</h3></div>
+            <div class="review-detail-list">
+              <div><span>Modalidad</span><strong>{{ isSoloTemporadas() ? 'Por temporadas' : 'Todo el año' }}</strong></div>
+              @if (!isSoloTemporadas()) { <div><span>Días disponibles</span><strong>{{ getSelectedBaseDaysLabel() }}</strong></div> }
+              <div><span>Temporadas configuradas</span><strong>{{ temporadasFA.length }}</strong></div>
+            </div>
+            @if (temporadasFA.length) {
+              <div class="review-season-list">
+                @for (tempCtrl of temporadasFA.controls; track $index; let ti = $index) {
+                  <div><strong>{{ tempCtrl.get('Nombre_Temporada')?.value }}</strong><span>{{ getSeasonSummary(ti) }}</span></div>
                 }
               </div>
-              @if (i !== 0) {
-              <button type="button" class="btn-icon-delete" (click)="deletePlan(i)" title="Eliminar plan">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-              }
-            </div>
-
-            <div class="plan-vigencia-section">
-              <div class="plan-vigencia-label">Vigencia del plan</div>
-              <div class="plan-vigencia">
-                <button type="button" class="perm-btn" [class.active]="planCtrl.get('esPermanente')?.value"
-                  (click)="planCtrl.get('esPermanente')?.setValue(true); planCtrl.get('Fecha_Inicio')?.setValue(null); planCtrl.get('Fecha_Fin')?.setValue(null)">
-                  <span class="perm-codigo">Permanente</span>
-                  <span class="perm-desc">Sin fecha de vencimiento</span>
-                </button>
-                <button type="button" class="perm-btn" [class.active]="!planCtrl.get('esPermanente')?.value"
-                  (click)="planCtrl.get('esPermanente')?.setValue(false)">
-                  <span class="perm-codigo">Con fechas</span>
-                  <span class="perm-desc">Plan valido por temporada</span>
-                </button>
-              </div>
-              @if (!planCtrl.get('esPermanente')?.value) {
-              <div class="plan-fechas-grid">
-                <div class="form-group">
-                  <label class="form-label">Inicio vigencia <span class="required-star">*</span></label>
-                  <app-datepicker formControlName="Fecha_Inicio" placeholder="Inicio vigencia"
-                    [invalid]="!!(planCtrl.get('Fecha_Inicio')?.touched && planCtrl.get('Fecha_Inicio')?.invalid)">
-                  </app-datepicker>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Fin vigencia <span class="required-star">*</span></label>
-                  <app-datepicker formControlName="Fecha_Fin" placeholder="Fin vigencia"
-                    [invalid]="!!(planCtrl.get('Fecha_Fin')?.touched && planCtrl.get('Fecha_Fin')?.invalid)">
-                  </app-datepicker>
-                </div>
-              </div>
-              }
-            </div>
-
-            <div class="plan-controls">
-              <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowNino')?.value"
-                (click)="planCtrl.get('AllowNino')?.setValue(!planCtrl.get('AllowNino')?.value); togglePassengerType(i, 'NINO')">
-                <span class="perm-codigo">Ninos</span>
-                <span class="perm-desc">Permite pasajeros tipo Nino</span>
-              </button>
-              <button type="button" class="perm-btn" [class.active]="planCtrl.get('AllowInfante')?.value"
-                (click)="planCtrl.get('AllowInfante')?.setValue(!planCtrl.get('AllowInfante')?.value); togglePassengerType(i, 'INFANTE')">
-                <span class="perm-codigo">Infantes</span>
-                <span class="perm-desc">Permite pasajeros tipo Infante</span>
-              </button>
-            </div>
-
-            <div formArrayName="monedas" class="plan-monedas">
-              @for (monCtrl of getPlanCurrencies(i).controls; track (monCtrl.get('Id_Moneda')?.value ?? $index); let mi = $index) {
-              <div class="moneda-card" [formGroupName]="mi">
-                <div class="moneda-title">
-                  {{ monCtrl.get('Nombre_Moneda')?.value }}
-                  <span class="moneda-code">{{ monCtrl.get('Codigo')?.value }}</span>
-                </div>
-                <div class="moneda-grid">
-                  <div class="form-group">
-                    <label class="form-label">
-                      Adulto @if (isAdultRequired(i, mi)) { <span class="required-star">*</span> }
-                    </label>
-                    <input type="number" class="form-input precio-input" formControlName="ADULTO" min="0" placeholder="0"
-                      [class.errorInput]="monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid" />
-                    @if (monCtrl.get('ADULTO')?.touched && monCtrl.get('ADULTO')?.invalid) {
-                    <div class="errorMessage">{{ getAdultErrorMessage(i, mi) }}</div>
-                    }
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Nino</label>
-                    <input type="number" class="form-input precio-input" formControlName="NINO" min="0" placeholder="0"
-                      [class.errorInput]="monCtrl.get('NINO')?.touched && monCtrl.get('NINO')?.invalid" />
-                    @if (planCtrl.get('AllowNino')?.value && monCtrl.get('NINO')?.touched &&
-                    monCtrl.get('NINO')?.invalid) {
-                    <div class="errorMessage">{{ getChildErrorMessage(i, mi) }}</div>
-                    }
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Infante</label>
-                    <input type="number" class="form-input precio-input" formControlName="INFANTE" min="0" placeholder="0"
-                      [class.errorInput]="monCtrl.get('INFANTE')?.touched && monCtrl.get('INFANTE')?.invalid" />
-                    @if (planCtrl.get('AllowInfante')?.value && monCtrl.get('INFANTE')?.touched &&
-                    monCtrl.get('INFANTE')?.invalid) {
-                    <div class="errorMessage">{{ getInfantErrorMessage(i, mi) }}</div>
-                    }
-                  </div>
-                </div>
-              </div>
-              }
-            </div>
-          </div>
-          }
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2>Disponibilidad y Temporadas</h2>
-            <p class="card-subtitle">Define cuando opera el tour.</p>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Modo de disponibilidad</label>
-          <div class="segmented-control">
-            <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'TODO_EL_ANO'"
-              (click)="form.get('Modo_Disponibilidad')?.setValue('TODO_EL_ANO')">
-              Todo el ano
-            </button>
-            <button type="button" [class.active]="form.get('Modo_Disponibilidad')?.value === 'SOLO_TEMPORADAS'"
-              (click)="form.get('Modo_Disponibilidad')?.setValue('SOLO_TEMPORADAS')">
-              Solo por temporadas
-            </button>
-          </div>
-        </div>
-
-        @if (!isSoloTemporadas()) {
-        <div class="section-divider">
-          <div class="section-header-row">
-            <span class="form-label">Dias de operacion</span>
-            <button type="button" class="btn-secondary btn-sm" (click)="toggleAllBaseDaysToggle()">
-              {{ areAllBaseDaysSelected() ? 'Ninguno' : 'Todos' }}
-            </button>
-          </div>
-          <div [formGroup]="diasBaseFG" class="days-row">
-            @for (d of diasSemana; track d.key) {
-            <label class="day-chip">
-              <input type="checkbox" [formControlName]="d.key" />
-              <span>{{ d.label }}</span>
-            </label>
             }
-          </div>
-        </div>
-        }
-
-        <div class="section-divider">
-          <div class="section-header-row">
-            <span class="form-label">Temporadas</span>
-            <button type="button" class="btn-secondary btn-sm" (click)="addTemporada()">
-              Agregar temporada
-            </button>
-          </div>
-
-          @if (temporadasFA.touched && temporadasFA.invalid && temporadasFA.errors?.['requiereTemporada']) {
-          <div class="errorMessage" style="margin-bottom: 12px;">
-            Debes agregar al menos una temporada en el modo "Solo por temporadas".
-          </div>
-          }
-
-          <div formArrayName="temporadas" class="temporadas-list">
-            @for (tempCtrl of temporadasFA.controls; track $index; let ti = $index) {
-            <div class="temporada-card" [formGroupName]="ti">
-              <div class="plan-header">
-                <div class="plan-name-group" style="flex:1">
-                  <label class="form-label">Nombre de temporada <span class="required-star">*</span></label>
-                  <input type="text" class="form-input" formControlName="Nombre_Temporada"
-                    placeholder="Ej: Diciembre (alta)"
-                    [class.errorInput]="tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid" />
-                  @if (tempCtrl.get('Nombre_Temporada')?.touched && tempCtrl.get('Nombre_Temporada')?.invalid) {
-                  <div class="errorMessage">Nombre obligatorio.</div>
-                  }
-                </div>
-                <button type="button" class="btn-icon-delete" (click)="deleteTemporada(ti)" title="Eliminar temporada">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-
-              <div class="temp-grid">
-                <div class="form-group">
-                  <label class="form-label">Fecha inicio <span class="required-star">*</span></label>
-                  <app-datepicker formControlName="Fecha_Inicio" placeholder="Fecha inicio"
-                    [invalid]="!!(tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid)">
-                  </app-datepicker>
-                  @if (tempCtrl.get('Fecha_Inicio')?.touched && tempCtrl.get('Fecha_Inicio')?.invalid) {
-                  <div class="errorMessage">Obligatoria.</div>
-                  }
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Fecha fin <span class="required-star">*</span></label>
-                  <app-datepicker formControlName="Fecha_Fin" placeholder="Fecha fin"
-                    [invalid]="!!(tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid)">
-                  </app-datepicker>
-                  @if (tempCtrl.get('Fecha_Fin')?.touched && tempCtrl.get('Fecha_Fin')?.invalid) {
-                  <div class="errorMessage">Obligatoria.</div>
-                  }
-                </div>
-              </div>
-
-              @if (tempCtrl.touched && tempCtrl.errors?.['rangoInvalido']) {
-              <div class="errorMessage" style="margin-top: 8px;">
-                La fecha fin no puede ser menor que la fecha inicio.
-              </div>
-              }
-
-              <div class="section-divider" style="margin-top: 16px; padding-top: 16px;">
-                <div class="section-header-row">
-                  <span class="form-label">Dias de operacion <span class="required-star">*</span></span>
-                  <button type="button" class="btn-secondary btn-sm" (click)="toggleAllSeasonDaysToggle(ti)">
-                    {{ areAllSeasonDaysSelected(ti) ? 'Ninguno' : 'Todos' }}
-                  </button>
-                </div>
-                <div formGroupName="dias" class="days-row">
-                  @for (d of diasSemana; track d.key) {
-                  <label class="day-chip">
-                    <input type="checkbox" [formControlName]="d.key" />
-                    <span>{{ d.label }}</span>
-                  </label>
-                  }
-                </div>
-                @if (tempCtrl.touched && tempCtrl.errors?.['sinDias']) {
-                <div class="errorMessage" style="margin-top: 8px;">
-                  Selecciona al menos un dia para esta temporada.
-                </div>
-                }
-              </div>
+          </section>
+          <section class="review-section">
+            <div class="review-section-heading"><span>Configuración</span><h3>Opciones adicionales</h3></div>
+            <div class="review-detail-list">
+              <div><span>Comisiones activas</span><strong>{{ getActiveCommissionsCount() }}</strong></div>
+              <div><span>Geolocalización</span><strong>{{ form.get('Coordenadas')?.value || 'Sin configurar' }}</strong></div>
             </div>
-            }
-          </div>
-        </div>
-      </div>
+          </section>
+        </section>
+      }
     </div>
   </form>
 </div>
 
-    @if (canUpdateTour) {
-    <div class="floating-save-bar">
-      <button class="btn-submit btn-submit-floating" type="submit" form="tourForm" [disabled]="isSubmitting()">
-        @if (isSubmitting()) {
-        <span class="btn-spinner"></span>
-        Guardando...
-        } @else {
-        Guardar cambios
+@if (canUpdateTour) {
+  <div class="wizard-nav wizard-nav--page-enter">
+    <div class="wizard-nav-row">
+      <div class="wizard-nav-left">
+        @if (currentStep > 0) {
+          <button type="button" class="btn-wizard-back" (click)="prevStep()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="2"/></svg>
+            <span>Anterior</span>
+          </button>
         }
-      </button>
+      </div>
+      <div class="wizard-nav-center">
+        <div class="wizard-nav-summary">
+          <span class="wizard-nav-tour">{{ form.get('Nombre_Tour')?.value || 'Tour' }}</span><span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ plans.length }} {{ plans.length === 1 ? 'plan' : 'planes' }}</span><span class="nav-sep">•</span>
+          <span class="wizard-nav-item">Cupo {{ form.get('Cupo_Base')?.value || 0 }}</span>
+        </div>
+      </div>
+      <div class="wizard-nav-right">
+        @if (currentStep < wizardSteps.length - 1) {
+          <button type="button" class="btn-wizard-next" (click)="nextStep()" [class.is-disabled]="!canAdvanceFromStep(currentStep)">
+            <span>{{ currentStep === 3 ? 'Revisar' : 'Siguiente' }}</span>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        } @else {
+          <button class="btn-wizard-submit" type="submit" form="editTourForm" [disabled]="isSubmitting()">
+            @if (isSubmitting()) { <span class="btn-spinner"></span> Guardando… } @else { Guardar cambios }
+          </button>
+        }
+      </div>
     </div>
-    }
+  </div>
+}
 }

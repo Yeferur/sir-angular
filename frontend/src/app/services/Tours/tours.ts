@@ -14,7 +14,35 @@ export interface Tour {
   Comision_Hotel?: number;
   Comision_Agencia?: number;
   Comision_Freelance?: number;
-  Planes?: Array<{ Id_Plan?: number | null; Nombre_Plan?: string }>;
+  Cantidad_Planes?: number;
+  Cantidad_Dias_Base?: number;
+  Cantidad_Temporadas?: number;
+  Proxima_Temporada?: string | null;
+  Disponibilidad?: {
+    Modo?: string;
+    Dias_Base?: string[];
+    Temporadas?: Array<{
+      Id_Temporada?: number;
+      Nombre_Temporada?: string;
+      Fecha_Inicio?: string;
+      Fecha_Fin?: string;
+      Dias?: string[];
+    }>;
+  };
+  Planes?: Array<{
+    Id_Plan?: number | null;
+    Nombre_Plan?: string;
+    Fecha_Inicio?: string | null;
+    Fecha_Fin?: string | null;
+    AllowNino?: boolean;
+    AllowInfante?: boolean;
+    Monedas?: Array<{
+      Id_Moneda: number;
+      Codigo?: string;
+      Nombre_Moneda?: string;
+      Precios?: { ADULTO?: number; NINO?: number; INFANTE?: number };
+    }>;
+  }>;
   Comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
   comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;
 }

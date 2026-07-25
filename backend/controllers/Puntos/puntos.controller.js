@@ -4,8 +4,9 @@ const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 exports.exportarPuntosExcel = async (req, res) => {
   const q = req.query.q || '';
+  const ruta = req.query.ruta || '';
   try {
-    const result = await obtenerPuntos({ page: 1, limit: 10000, q });
+    const result = await obtenerPuntos({ page: 1, limit: 10000, q, ruta, allowLargeLimit: true });
     const puntos = result.rows || [];
 
     const workbook = new ExcelJS.Workbook();
@@ -42,10 +43,19 @@ exports.getPuntos = async (req, res) => {
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const q = req.query.q || '';
+  const ruta = req.query.ruta || '';
 
   try {
-    const result = await obtenerPuntos({ page, limit, q });
-    return sendSuccess(res, { data: { data: result.rows, total: result.total }, message: 'Puntos obtenidos correctamente' });
+    const result = await obtenerPuntos({ page, limit, q, ruta });
+    return sendSuccess(res, {
+      data: {
+        data: result.rows,
+        total: result.total,
+        page: result.page,
+        limit: result.limit
+      },
+      message: 'Puntos obtenidos correctamente'
+    });
   } catch (error) {
     console.error('Error al obtener puntos:', error);
     return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });

@@ -311,6 +311,7 @@ body {
 
 .required-star {
   color: var(--accent-blue);
+  font-weight: 900;
 }
 
 .cardHeader {
@@ -385,6 +386,13 @@ body {
   color: var(--text-secondary);
 }
 
+.card-header-hint {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
 .hint {
   display: block;
   font-size: .8rem;
@@ -452,6 +460,16 @@ input[type=number] {
   color: #e57373;
   font-size: 12px;
   margin-top: 5px;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
 }
 
 .errorCard {
@@ -1064,6 +1082,17 @@ input[type=number] {
   position: relative;
   z-index: 1;
   min-width: 0;
+}
+
+.wizard-stepper .step-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+}
+
+.wizard-stepper .step-item:disabled {
+  cursor: default;
 }
 
 .step-item.is-locked {

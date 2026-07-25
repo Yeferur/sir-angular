@@ -65,6 +65,43 @@ function normalizarFechaPlan(value, fieldName) {
   return assertFechaISO(value, fieldName);
 }
 
+function normalizarVigenciaPlan(plan) {
+  const Fecha_Inicio = normalizarFechaPlan(plan?.Fecha_Inicio, 'Fecha_Inicio');
+  const Fecha_Fin = normalizarFechaPlan(plan?.Fecha_Fin, 'Fecha_Fin');
+
+  if ((Fecha_Inicio && !Fecha_Fin) || (!Fecha_Inicio && Fecha_Fin)) {
+    throw new Error('Los planes con vigencia deben tener fecha de inicio y fecha fin');
+  }
+  if (Fecha_Inicio && Fecha_Fin) assertRangoFechas(Fecha_Inicio, Fecha_Fin);
+
+  return { Fecha_Inicio, Fecha_Fin };
+}
+
+async function guardarPreciosPlan(conn, Id_Tour, Id_Plan, monedas) {
+  await conn.query(
+    'DELETE FROM tour_precios WHERE Id_Tour = ? AND Id_Plan = ?',
+    [Id_Tour, Id_Plan]
+  );
+
+  for (const moneda of Array.isArray(monedas) ? monedas : []) {
+    const Id_Moneda = Number(moneda?.Id_Moneda) || null;
+    if (!Id_Moneda) throw new Error('Cada tarifa debe tener una moneda válida');
+
+    const precios = moneda?.Precios || {};
+    for (const tipo of ['ADULTO', 'NINO', 'INFANTE']) {
+      const precio = Number(precios[tipo] || 0);
+      if (!Number.isFinite(precio) || precio < 0) {
+        throw new Error(`El precio de ${tipo.toLowerCase()} no puede ser negativo`);
+      }
+      await conn.query(
+        `INSERT INTO tour_precios (Id_Tour, Id_Plan, Id_Moneda, Tipo_Pasajero, Precio)
+         VALUES (?, ?, ?, ?, ?)`,
+        [Id_Tour, Id_Plan, Id_Moneda, tipo, precio]
+      );
+    }
+  }
+}
+
 async function guardarComisionesTour(conn, Id_Tour, comisiones) {
   const lista = normalizarComisionesEntrada(comisiones);
   if (!lista.length) return;
@@ -127,6 +164,11 @@ async function obtenerComisionesToursMap(idsTour) {
 
 async function guardarDisponibilidadYTemporadas(conn, Id_Tour, data) {
   const dispo = data?.Disponibilidad || data || {};
+  const modo = String(dispo?.Modo || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
   const temporadas = Array.isArray(dispo?.Temporadas)
     ? dispo.Temporadas
     : Array.isArray(dispo?.temporadas)
@@ -145,6 +187,13 @@ async function guardarDisponibilidadYTemporadas(conn, Id_Tour, data) {
       .filter((d) => DIAS_VALIDOS.has(d));
   } else if (dispo?.diasBase && typeof dispo.diasBase === 'object') {
     diasBaseSel = pickDiasSeleccionados(dispo.diasBase);
+  }
+
+  if (modo === 'TODO_EL_ANO' && diasBaseSel.length === 0) {
+    throw new Error('Selecciona al menos un día habitual de operación');
+  }
+  if (modo === 'SOLO_TEMPORADAS' && temporadas.length === 0) {
+    throw new Error('Agrega al menos una temporada para este modo de disponibilidad');
   }
 
   if (tieneDiasBase) {
@@ -281,10 +330,10 @@ async function crearTour(data, userId = null) {
     
     // 3) Planes y precios (frontend envía Planes[] con Monedas[].Precios)
     const planes = Array.isArray(data?.Planes) ? data.Planes : [];
+    if (!planes.length) throw new Error('Agrega al menos un plan al tour');
     for (let pi = 0; pi < planes.length; pi++) {
       const p = planes[pi] || {};
-      const Fecha_Inicio = normalizarFechaPlan(p.Fecha_Inicio, 'Fecha_Inicio');
-      const Fecha_Fin = normalizarFechaPlan(p.Fecha_Fin, 'Fecha_Fin');
+      const { Fecha_Inicio, Fecha_Fin } = normalizarVigenciaPlan(p);
       // Crear registro en planes_tours para TODOS los planes (incluido el básico)
       const [insPlan] = await conn.query(
         'INSERT INTO planes_tours (Id_Tour, Nombre_Plan, Fecha_Inicio, Fecha_Fin) VALUES (?, ?, ?, ?)',
@@ -414,7 +463,24 @@ async function crearPlanTour(Id_Tour, Nombre_Plan) {
 
 async function obtenerTours() {
   const [rows] = await db.query(
-    'SELECT Id_Tour, Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Activo = 1'
+    `SELECT
+       t.Id_Tour,
+       t.Nombre_Tour,
+       t.Abreviacion,
+       t.Cupo_Base,
+       t.Latitud,
+       t.Longitud,
+       (SELECT COUNT(*) FROM planes_tours pt WHERE pt.Id_Tour = t.Id_Tour) AS Cantidad_Planes,
+       (SELECT COUNT(*) FROM tours_dias td WHERE td.Id_Tour = t.Id_Tour) AS Cantidad_Dias_Base,
+       (SELECT COUNT(*) FROM tours_temporadas tt WHERE tt.Id_Tour = t.Id_Tour) AS Cantidad_Temporadas,
+       (
+         SELECT DATE_FORMAT(MIN(tt2.Fecha_Inicio), '%Y-%m-%d')
+         FROM tours_temporadas tt2
+         WHERE tt2.Id_Tour = t.Id_Tour AND tt2.Fecha_Fin >= CURDATE()
+       ) AS Proxima_Temporada
+     FROM tours t
+     WHERE t.Activo = 1
+     ORDER BY t.Nombre_Tour ASC`
   );
   const comisionesMap = await obtenerComisionesToursMap(rows.map((row) => row.Id_Tour));
   return rows.map((row) => ({
@@ -604,8 +670,13 @@ async function actualizarTour(Id_Tour, data, userId = null) {
       ]
     );
 
-    await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
-    await guardarComisionesTour(conn, Id_Tour, Comisiones ?? comisiones);
+    const actualizaComisiones =
+      Object.prototype.hasOwnProperty.call(data || {}, 'Comisiones')
+      || Object.prototype.hasOwnProperty.call(data || {}, 'comisiones');
+    if (actualizaComisiones) {
+      await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
+      await guardarComisionesTour(conn, Id_Tour, Comisiones ?? comisiones);
+    }
 
     // Opcional: actualizar disponibilidad/temporadas
     if (
@@ -618,37 +689,59 @@ async function actualizarTour(Id_Tour, data, userId = null) {
       await guardarDisponibilidadYTemporadas(conn, Id_Tour, data);
     }
 
-    // Si vienen `Planes` en el payload, recreamos planes y precios para reflejar el nuevo estado
+    // Actualiza por Id_Plan para conservar referencias históricas.
     if (Array.isArray(data?.Planes)) {
-      // borramos precios existentes del tour
-      await conn.query('DELETE FROM tour_precios WHERE Id_Tour = ?', [Id_Tour]);
-      // borramos planes existentes (las FK en tour_precios ya fueron limpiadas)
-      await conn.query('DELETE FROM planes_tours WHERE Id_Tour = ?', [Id_Tour]);
-
+      if (!data.Planes.length) throw new Error('El tour debe conservar al menos un plan');
+      const [planesActuales] = await conn.query(
+        'SELECT Id_Plan FROM planes_tours WHERE Id_Tour = ?',
+        [Id_Tour]
+      );
+      const idsActuales = new Set(planesActuales.map((plan) => Number(plan.Id_Plan)));
+      const idsRecibidos = new Set();
       const planes = data.Planes;
-      for (const p of planes) {
-        const Fecha_Inicio = normalizarFechaPlan(p.Fecha_Inicio, 'Fecha_Inicio');
-        const Fecha_Fin = normalizarFechaPlan(p.Fecha_Fin, 'Fecha_Fin');
-        const [insPlan] = await conn.query(
-          'INSERT INTO planes_tours (Id_Tour, Nombre_Plan, Fecha_Inicio, Fecha_Fin) VALUES (?, ?, ?, ?)',
-          [Id_Tour, p.Nombre_Plan || null, Fecha_Inicio, Fecha_Fin]
-        );
-        const Id_Plan = insPlan.insertId;
 
-        const monedas = Array.isArray(p.Monedas) ? p.Monedas : [];
-        for (const m of monedas) {
-          const Id_Moneda = m?.Id_Moneda ? Number(m.Id_Moneda) : null;
-          const precios = m?.Precios || {};
-          const tipos = ['ADULTO', 'NINO', 'INFANTE'];
-          for (const tipo of tipos) {
-            const precio = Number(precios[tipo] || 0);
-            await conn.query(
-              `INSERT INTO tour_precios (Id_Tour, Id_Plan, Id_Moneda, Tipo_Pasajero, Precio)
-               VALUES (?, ?, ?, ?, ?)`,
-              [Id_Tour, Id_Plan, Id_Moneda, tipo, precio]
-            );
-          }
+      for (const p of planes) {
+        const nombrePlan = String(p?.Nombre_Plan || '').trim();
+        if (!nombrePlan) throw new Error('El nombre del plan es obligatorio');
+        const { Fecha_Inicio, Fecha_Fin } = normalizarVigenciaPlan(p);
+        let Id_Plan = Number(p?.Id_Plan) || null;
+
+        if (Id_Plan && idsActuales.has(Id_Plan)) {
+          await conn.query(
+            `UPDATE planes_tours
+             SET Nombre_Plan = ?, Fecha_Inicio = ?, Fecha_Fin = ?
+             WHERE Id_Plan = ? AND Id_Tour = ?`,
+            [nombrePlan, Fecha_Inicio, Fecha_Fin, Id_Plan, Id_Tour]
+          );
+        } else {
+          const [insPlan] = await conn.query(
+            'INSERT INTO planes_tours (Id_Tour, Nombre_Plan, Fecha_Inicio, Fecha_Fin) VALUES (?, ?, ?, ?)',
+            [Id_Tour, nombrePlan, Fecha_Inicio, Fecha_Fin]
+          );
+          Id_Plan = Number(insPlan.insertId);
         }
+
+        idsRecibidos.add(Id_Plan);
+        await guardarPreciosPlan(conn, Id_Tour, Id_Plan, p.Monedas);
+      }
+
+      const idsRetirados = [...idsActuales].filter((id) => !idsRecibidos.has(id));
+      for (const Id_Plan of idsRetirados) {
+        const [[usoHistorico]] = await conn.query(
+          'SELECT COUNT(*) AS total FROM pasajeros WHERE Id_Plan = ?',
+          [Id_Plan]
+        );
+        if (Number(usoHistorico?.total || 0) > 0) {
+          throw new Error('No puedes eliminar un plan utilizado por pasajeros. Conserva el plan para proteger el histórico.');
+        }
+        await conn.query(
+          'DELETE FROM tour_precios WHERE Id_Tour = ? AND Id_Plan = ?',
+          [Id_Tour, Id_Plan]
+        );
+        await conn.query(
+          'DELETE FROM planes_tours WHERE Id_Tour = ? AND Id_Plan = ?',
+          [Id_Tour, Id_Plan]
+        );
       }
     }
 
@@ -683,54 +776,47 @@ async function eliminarTour(Id_Tour, userId = null) {
     }
 
     const [[programacionActiva]] = await conn.query(
-      'SELECT COUNT(*) AS total FROM programaciones WHERE Id_Tour = ?',
+      `SELECT COUNT(*) AS total
+       FROM programaciones
+       WHERE Id_Tour = ?
+         AND Fecha_Tour >= CURDATE()
+         AND UPPER(COALESCE(Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')`,
       [Id_Tour]
     );
     if (Number(programacionActiva?.total || 0) > 0) {
       await conn.rollback();
-      throw new Error('No se puede eliminar el tour porque tiene programaciones asociadas.');
+      throw new Error('No se puede desactivar el tour porque tiene programaciones futuras asociadas.');
     }
 
     const [[programacionRelacionada]] = await conn.query(
-      'SELECT COUNT(*) AS total FROM programacion_tours WHERE Id_Tour = ?',
+      `SELECT COUNT(*) AS total
+       FROM programacion_tours pt
+       INNER JOIN programaciones p ON p.Id_Programacion = pt.Id_Programacion
+       WHERE pt.Id_Tour = ?
+         AND p.Fecha_Tour >= CURDATE()
+         AND UPPER(COALESCE(p.Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')`,
       [Id_Tour]
     );
     if (Number(programacionRelacionada?.total || 0) > 0) {
       await conn.rollback();
-      throw new Error('No se puede eliminar el tour porque está vinculado a una programación guardada.');
+      throw new Error('No se puede desactivar el tour porque está vinculado a una programación futura.');
     }
 
-    const [tempsExist] = await conn.query(
-      'SELECT Id_Temporada FROM tours_temporadas WHERE Id_Tour = ?',
+    const [result] = await conn.query(
+      'UPDATE tours SET Activo = 0 WHERE Id_Tour = ? AND Activo = 1',
       [Id_Tour]
     );
-    if (tempsExist.length) {
-      const ids = tempsExist.map((x) => x.Id_Temporada);
-      await conn.query(
-        `DELETE FROM tours_temporada_dias WHERE Id_Temporada IN (${ids.map(() => '?').join(',')})`,
-        ids
-      );
-    }
-
-    await conn.query('DELETE FROM tours_temporadas WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM tours_dias WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM horarios WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM tour_precios WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM planes_tours WHERE Id_Tour = ?', [Id_Tour]);
-    await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
-
-    const [result] = await conn.query('DELETE FROM tours WHERE Id_Tour = ?', [Id_Tour]);
 
     await recordHistorial({
       conexion: conn,
       tabla: 'tours',
       id_registro: Id_Tour,
-      accion: 'ELIMINAR_TOUR',
+      accion: 'DESACTIVAR_TOUR',
       id_usuario: userId,
       detalles: [
-        { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: null },
-        { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: null },
-        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: null }
+        { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null },
+        { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: prev ? prev.Abreviacion : null },
+        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: 0 }
       ]
     });
     await conn.commit();

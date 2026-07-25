@@ -1,133 +1,304 @@
-<div class="page-container">
-  @if (vm$ | async; as vm) {
+@if (isLoading()) {
+  <app-loading-state label="Preparando la consulta de puntos…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar los puntos de encuentro"
+    [detail]="loadError()"
+    (action)="loadInitialData()">
+  </app-loading-state>
+} @else {
+<div class="page-container reservation-browser points-browser">
 
-  <!-- HEADER -->
-  <div class="page-header">
-    <div class="header-top">
-      <p class="subtitle">
-        @if (vm.hasLoadedOnce) {
-        <span class="count-badge">{{ vm.total ?? vm.puntos.length }}</span> puntos registrados
-        } @else {
-        Cargando...
-        }
-      </p>
+  <div class="points-overview">
+    <div class="overview-copy">
+      <strong>{{ total() }} {{ total() === 1 ? 'punto registrado' : 'puntos registrados' }}</strong>
+      <span>Consulta su ubicación y los horarios aproximados de recogida.</span>
+    </div>
 
-      <div class="search">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input type="text" [ngModel]="searchTerm" (ngModelChange)="onSearchInput($event)"
-          placeholder="Buscar por nombre, sector o dirección..." />
-        @if (searchTerm?.length) {
-        <button type="button" class="clear-btn" (click)="clearSearch()" aria-label="Limpiar búsqueda">×</button>
-        }
-      </div>
-
-      <div class="header-actions">
-        @if (canSortPuntos) {
-        <button class="btn-icon-only" type="button" (click)="irAOrdenarPuntos()" title="Ordenar puntos">
+    <div class="header-actions">
+      @if (canSortPuntos) {
+        <button class="btn-secondary" type="button" (click)="irAOrdenarPuntos()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18M7 12h10M10 18h4"/>
+          </svg>
           Ordenar
         </button>
-        }
-        @if (canExportPuntos) {
+      }
+      @if (canExportPuntos) {
         <button class="btn-secondary" type="button" (click)="descargarExcel()" [disabled]="descargandoExcel">
           @if (descargandoExcel) {
-          <span class="btn-spinner"></span> Exportando...
+            <span class="btn-spinner" aria-hidden="true"></span>
+            Exportando
           } @else {
-          Exportar
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/>
+            </svg>
+            Exportar
           }
         </button>
-        }
-        @if (canCreatePunto) {
+      }
+      @if (canCreatePunto) {
         <button class="btn-primary" type="button" (click)="crearPunto()">
-          Crear Punto
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Crear punto
         </button>
-        }
-      </div>
+      }
     </div>
   </div>
 
-  <!-- CONTENT -->
-  @if (!vm.hasLoadedOnce) {
-  <app-loading-state label="Cargando puntos de encuentro…"></app-loading-state>
-  } @else if (vm.puntos.length === 0) {
-  <div class="empty-state">
-    <div class="empty-icon">•</div>
-    <h3>Sin resultados</h3>
-    <p>{{ searchTerm?.length ? 'Prueba con otro término de búsqueda.' : 'Aún no hay puntos creados.' }}</p>
-    @if (!searchTerm?.length && canCreatePunto) {
-    <button class="btn-primary" type="button" (click)="crearPunto()">Crear primer punto</button>
-    }
-  </div>
-  } @else {
-  <div class="puntos-list">
-    @for (p of vm.puntos; track trackById($index, p)) {
-    <div class="punto-card" [style.--i]="$index" [class.deleting]="p._deleting">
-
-      <!-- TOP ROW -->
-      <div class="card-main">
-        <div class="punto-identity">
-          <div class="punto-meta">
-            <div class="punto-name">{{ p.NombrePunto || p.Nombre_Punto }}</div>
-            <div class="punto-address">{{ p.Direccion || 'Sin dirección' }}</div>
-          </div>
-        </div>
-
-        <div class="punto-tags">
-          @if (p.Sector) {
-          <span class="chip chip--sector">{{ p.Sector }}</span>
-          }
-        </div>
+  <div class="page-header reservation-search-panel">
+    <div class="search-row">
+      <div class="search-container">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="search"
+          class="search-input"
+          placeholder="Buscar por nombre, dirección o sector…"
+          [ngModel]="searchTerm"
+          (ngModelChange)="onSearchInput($event)"
+          (keyup.enter)="submitSearch()"
+          autocomplete="off"
+          aria-label="Buscar puntos de encuentro"
+        />
+        @if (searchTerm) {
+          <button type="button" class="search-clear" (click)="clearSearch()" aria-label="Limpiar búsqueda">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        }
       </div>
 
-      <!-- HORARIOS -->
-      <div class="card-schedules">
-        @if (!p.horarios?.length) {
-        <div class="no-horarios">
-          Sin horarios asignados
+      <button
+        type="button"
+        class="btn-filter"
+        [class.btn-filter--active]="filtersVisible()"
+        (click)="toggleFilters()"
+        aria-controls="points-route-filter"
+        [attr.aria-expanded]="filtersVisible()"
+        [attr.aria-label]="activeFilterCount() ? 'Filtros, 1 activo' : 'Filtros'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="4" y1="6" x2="20" y2="6"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+          <line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        Filtros
+        <span class="filter-count" [class.filter-count--empty]="activeFilterCount() === 0" aria-hidden="true">
+          {{ activeFilterCount() }}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        class="btn-primary reservation-search-button"
+        (click)="submitSearch()"
+        [disabled]="isSearching()"
+        [attr.aria-busy]="isSearching()"
+        [attr.aria-label]="isSearching() ? 'Buscando puntos' : 'Buscar puntos'">
+        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Buscar</span>
+        <span class="btn-spinner btn-spinner--centered"
+          [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    @if (selectedRoute) {
+      <div class="active-filters">
+        <div class="filter-token">
+          Ruta {{ selectedRoute }}
+          <button type="button" class="remove-token-btn" (click)="clearRoute()"
+            [attr.aria-label]="'Quitar filtro de ruta ' + selectedRoute">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
-        } @else {
-        <div class="schedule-list">
-          @for (h of p.horarios; track h.Id_Tour) {
-          <span class="schedule">
-            <span class="tour">{{ h.NombreTour || ('Tour ' + h.Id_Tour) }}</span>
-            <span class="dot">·</span>
-            <span class="hora" [class.hora--pending]="!h.HoraSalida">{{ h.HoraSalida || 'Pendiente' }}</span>
+      </div>
+    }
+  </div>
+
+  @if (filtersVisible()) {
+    <div id="points-route-filter" class="advanced-filters-panel points-filter-panel">
+      <div class="form-group">
+        <label class="form-label" for="route-filter">Ruta o zona operativa</label>
+        <select id="route-filter" class="form-select" [ngModel]="selectedRoute"
+          (ngModelChange)="onRouteChange($event)">
+          <option value="">Todas las rutas</option>
+          @for (ruta of rutas(); track ruta) {
+            <option [value]="ruta">Ruta {{ ruta }}</option>
+          }
+        </select>
+        <p class="filter-help">Filtra los puntos que pertenecen a una zona operativa de la ciudad.</p>
+      </div>
+    </div>
+  }
+
+  <div class="results-area">
+    @if (searchError() && puntos().length > 0) {
+      <div class="results-notice results-notice--error" role="alert">
+        <span>{{ searchError() }} Los resultados anteriores siguen disponibles.</span>
+        <button type="button" (click)="buscarPuntos(false)">Reintentar</button>
+      </div>
+    }
+
+    @if (puntos().length > 0) {
+      <div class="results-toolbar">
+        <strong aria-live="polite">
+          {{ total() }} {{ total() === 1 ? 'resultado' : 'resultados' }}
+        </strong>
+        @if (isSearching()) {
+          <span class="updating-pill" role="status">
+            <span aria-hidden="true"></span>
+            Actualizando
           </span>
-          }
+        }
+      </div>
+
+      <div class="points-list" [class.points-list--updating]="isSearching()" [attr.aria-busy]="isSearching()">
+        @for (punto of puntos(); track trackById($index, punto)) {
+          <article class="point-card" [class.point-card--deleting]="isDeleting(getPuntoId(punto))">
+            <header class="point-card__header">
+              <div class="point-identity">
+                <h2>{{ getPuntoName(punto) }}</h2>
+                <p>{{ punto.Direccion || 'Sin dirección registrada' }}</p>
+                <div class="point-context">
+                  @if (punto.Sector) {
+                    <span>{{ punto.Sector }}</span>
+                  }
+                  @if (punto.ruta) {
+                    <span class="route-chip">Ruta {{ punto.ruta }}</span>
+                  }
+                </div>
+              </div>
+
+              <div class="point-actions">
+                @if (canUpdatePunto) {
+                  <button type="button" class="btn-row-edit" (click)="editarPunto(punto)"
+                    [disabled]="isDeleting(getPuntoId(punto))"
+                    [attr.aria-label]="'Editar ' + getPuntoName(punto)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 20h9"/>
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                    </svg>
+                    Editar
+                  </button>
+                }
+                @if (canDeletePunto) {
+                  <button type="button" class="btn-row-delete" (click)="confirmEliminarPunto(punto)"
+                    [disabled]="isDeleting(getPuntoId(punto))"
+                    [attr.aria-label]="'Eliminar ' + getPuntoName(punto)">
+                    @if (isDeleting(getPuntoId(punto))) {
+                      <span class="action-spinner" aria-hidden="true"></span>
+                      Eliminando
+                    } @else {
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 6h18"/>
+                        <path d="M8 6V4h8v2"/>
+                        <path d="M19 6l-1 14H6L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                      </svg>
+                      Eliminar
+                    }
+                  </button>
+                }
+              </div>
+            </header>
+
+            <section class="schedule-section" [attr.aria-label]="'Horarios de ' + getPuntoName(punto)">
+              <div class="schedule-heading">
+                <span>Horarios aproximados</span>
+                <small>
+                  {{ configuredSchedules(punto).length }}
+                  {{ configuredSchedules(punto).length === 1 ? 'configurado' : 'configurados' }}
+                </small>
+              </div>
+
+              @if (!punto.horarios?.length) {
+                <div class="schedule-empty">Este punto todavía no tiene horarios asociados.</div>
+              } @else {
+                <div class="schedule-grid">
+                  @for (horario of configuredSchedules(punto); track $index) {
+                    <div class="schedule-item">
+                      <span class="schedule-tour">{{ scheduleTourName(horario) }}</span>
+                      <strong>{{ horario.HoraSalida }}</strong>
+                    </div>
+                  }
+                  @for (horario of pendingSchedules(punto); track $index) {
+                    <div class="schedule-item schedule-item--pending">
+                      <span class="schedule-tour">{{ scheduleTourName(horario) }}</span>
+                      <strong>Pendiente</strong>
+                    </div>
+                  }
+                </div>
+              }
+            </section>
+          </article>
+        }
+      </div>
+
+      @if (totalPages() > 1) {
+        <nav class="pagination" aria-label="Paginación de puntos de encuentro">
+          <button class="btn-secondary" type="button" (click)="prevPage()"
+            [disabled]="page() <= 1 || isSearching()">
+            Anterior
+          </button>
+          <span class="page-indicator" aria-live="polite">
+            Página {{ page() }} de {{ totalPages() }}
+          </span>
+          <button class="btn-secondary" type="button" (click)="nextPage()"
+            [disabled]="page() >= totalPages() || isSearching()">
+            Siguiente
+          </button>
+        </nav>
+      }
+    } @else if (isSearching()) {
+      <app-loading-state label="Buscando puntos de encuentro…"></app-loading-state>
+    } @else if (searchError()) {
+      <app-loading-state
+        mode="error"
+        label="No pudimos consultar los puntos"
+        [detail]="searchError()"
+        (action)="buscarPuntos(false)">
+      </app-loading-state>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
+          </svg>
         </div>
+        <h3>Sin puntos encontrados</h3>
+        <p>
+          @if (searchTerm || selectedRoute) {
+            Prueba con otro nombre, dirección, sector o ruta.
+          } @else {
+            Aún no hay puntos de encuentro registrados.
+          }
+        </p>
+        @if (!searchTerm && !selectedRoute && canCreatePunto) {
+          <button class="btn-primary" type="button" (click)="crearPunto()">Crear primer punto</button>
         }
       </div>
-
-      <!-- ACTIONS -->
-      <div class="card-actions">
-        @if (canUpdatePunto) {
-        <button type="button" class="btn-row-edit" (click)="editarPunto(p)">Editar</button>
-
-        }
-        @if (canDeletePunto) {
-        <button type="button" class="btn-row-delete" (click)="confirmEliminarPunto(p)">Eliminar</button>
-        }
-      </div>
-
-    </div>
     }
   </div>
-
-  <!-- PAGINATION -->
-  @if (vm.totalPages > 1) {
-  <div class="pagination">
-    <button class="btn-secondary" (click)="prevPage()" [disabled]="page <= 1">
-      Anterior
-    </button>
-    <span class="page-indicator">{{ vm.page }} <span class="page-sep">/</span> {{ vm.totalPages }}</span>
-    <button class="btn-secondary" (click)="nextPage(vm.totalPages)" [disabled]="page >= vm.totalPages">
-      Siguiente
-    </button>
-  </div>
-  }
-  }
-  }
 </div>
+}

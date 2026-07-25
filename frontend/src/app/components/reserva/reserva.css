@@ -272,10 +272,6 @@
   background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
 }
 
-.summary-item--payment-mode {
-  border-color: color-mix(in srgb, var(--accent-blue) 24%, var(--separator-color));
-}
-
 .summary-label {
   font-size: 0.7rem;
   font-weight: 600;

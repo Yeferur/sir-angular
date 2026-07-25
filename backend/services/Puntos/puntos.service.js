@@ -281,34 +281,45 @@ async function actualizarOrdenPuntosRuta(rutaInput, ordenItems, userId = null) {
 /**
  * Devuelve puntos paginados (orden: ruta + posicion).
  */
-async function obtenerPuntos({ page = 1, limit = 10, q = '' }) {
-  page = Number(page) || 1;
-  limit = Number(limit) || 10;
-  const offset = (page - 1) * limit;
+async function obtenerPuntos({
+  page = 1,
+  limit = 10,
+  q = '',
+  ruta = '',
+  allowLargeLimit = false
+}) {
+  page = Math.max(1, Math.trunc(Number(page)) || 1);
+  const maxLimit = allowLargeLimit ? 10000 : 100;
+  limit = Math.min(maxLimit, Math.max(1, Math.trunc(Number(limit)) || 10));
 
-  const search = (q ?? '').trim();
-  const hasSearch = search.length > 0;
+  const search = String(q ?? '').trim();
+  const routeFilter = String(ruta ?? '').trim();
+  const conditions = [];
+  const args = [];
 
-  const term = hasSearch ? `%${search}%` : null;
-  const where = hasSearch
-    ? `WHERE
-        p.Nombre_Punto LIKE ?
-        OR p.Sector LIKE ?
-        OR p.Direccion LIKE ?
-        OR EXISTS (
-          SELECT 1
-          FROM horarios h
-          WHERE h.Id_Punto = p.Id_Punto
-            AND h.Hora_Salida LIKE ?
-        )
-      `
-    : ``;
+  if (search) {
+    const term = `%${search}%`;
+    conditions.push(`(
+      p.Nombre_Punto LIKE ?
+      OR p.Sector LIKE ?
+      OR p.Direccion LIKE ?
+    )`);
+    args.push(term, term, term);
+  }
 
-  const args = hasSearch ? [term, term, term, term] : [];
+  if (routeFilter) {
+    conditions.push('p.ruta = ?');
+    args.push(routeFilter);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const sqlCount = `SELECT COUNT(*) AS total FROM puntos p ${where}`;
   const [countRows] = await db.query(sqlCount, args);
   const total = Number(countRows?.[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  page = Math.min(page, totalPages);
+  const offset = (page - 1) * limit;
 
   const sql = `
     SELECT
@@ -327,10 +338,10 @@ async function obtenerPuntos({ page = 1, limit = 10, q = '' }) {
   `;
 
   const [rows] = await db.query(sql, [...args, limit, offset]);
-  if (!rows?.length) return { rows: [], total };
+  if (!rows?.length) return { rows: [], total, page, limit };
 
   const ids = rows.map(r => r.Id_Punto).filter(Boolean);
-  if (!ids.length) return { rows, total };
+  if (!ids.length) return { rows, total, page, limit };
 
   const placeholders = ids.map(() => '?').join(',');
 
@@ -362,7 +373,7 @@ async function obtenerPuntos({ page = 1, limit = 10, q = '' }) {
     r.horarios = map[r.Id_Punto] || [];
   }
 
-  return { rows, total };
+  return { rows, total, page, limit };
 }
 
 async function obtenerPuntosQuery(query) {

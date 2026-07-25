@@ -7,11 +7,12 @@ import { TransferDynamicComponent } from '../transfer/transfer';
 import { Mapa } from '../mapa/mapa';
 import { DuplicarPanelComponent } from '../duplicar-panel/duplicar-panel';
 import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel';
+import { TourDetailComponent } from '../tour/tour';
 
 @Component({
   selector: 'app-sir-drawer',
   standalone: true,
-  imports: [ReservasDynamicComponent, TransferDynamicComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent],
+  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent],
   templateUrl: './drawer-host.html',
   styleUrls: ['./drawer-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

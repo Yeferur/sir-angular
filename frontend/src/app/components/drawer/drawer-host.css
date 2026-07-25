@@ -80,6 +80,7 @@
 /* El contenido ocupa todo el panel */
 .sir-drawer-panel app-reserva,
 .sir-drawer-panel app-transfer-dynamic,
+.sir-drawer-panel app-tour-detail,
 .sir-drawer-panel app-mapa,
 .sir-drawer-panel app-duplicar-panel,
 .sir-drawer-panel app-updates-panel {

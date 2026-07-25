@@ -1,0 +1,153 @@
+<header class="detail-header view-header-top">
+  <div class="header-copy detail-header-main">
+    <div class="header-title-row">
+      <h1 class="tour-title">{{ tour()?.Nombre_Tour || 'Tour' }}</h1>
+      @if (tour()?.Abreviacion) {
+        <span class="tour-code">{{ tour()!.Abreviacion }}</span>
+      }
+    </div>
+  </div>
+
+  <button type="button" class="btn-close" (click)="onClose.emit()" aria-label="Cerrar detalle del tour">
+    ✕
+  </button>
+</header>
+
+<main class="tour-drawer-body detail-scroll">
+  @if (isLoading()) {
+    <app-loading-state label="Cargando configuración del tour…"></app-loading-state>
+  } @else if (loadError()) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos abrir el tour"
+      [detail]="loadError()"
+      (action)="loadTour()">
+    </app-loading-state>
+  } @else if (tour(); as currentTour) {
+    <section class="hero-summary">
+      <div class="hero-stat">
+        <span>Cupo base</span>
+        <strong>{{ currentTour.Cupo_Base ?? 0 }}</strong>
+      </div>
+      <div class="hero-stat">
+        <span>Planes</span>
+        <strong>{{ currentTour.Planes?.length || 0 }}</strong>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Operación</span>
+          <h3>Disponibilidad y temporadas</h3>
+        </div>
+        <span class="status-chip" [class.status-chip--seasonal]="availabilityLabel(currentTour) === 'Por temporadas'">
+          {{ availabilityLabel(currentTour) }}
+        </span>
+      </div>
+
+      @if (currentTour.Disponibilidad?.Dias_Base?.length) {
+        <p class="detail-label">Días disponibles</p>
+        <div class="chip-row">
+          @for (day of currentTour.Disponibilidad!.Dias_Base!; track day) {
+            <span class="day-chip">{{ day }}</span>
+          }
+        </div>
+      }
+
+      @if (currentTour.Disponibilidad?.Temporadas?.length) {
+        <div class="season-list">
+          @for (season of currentTour.Disponibilidad!.Temporadas!; track season.Id_Temporada || $index) {
+            <article class="season-item">
+              <div>
+                <strong>{{ season.Nombre_Temporada || 'Temporada' }}</strong>
+                <span>{{ season.Fecha_Inicio | date:'d MMM yyyy':'':'es-CO' }} — {{ season.Fecha_Fin | date:'d MMM yyyy':'':'es-CO' }}</span>
+              </div>
+              <small>{{ formatDays(season.Dias) }}</small>
+            </article>
+          }
+        </div>
+      } @else if (!currentTour.Disponibilidad?.Dias_Base?.length) {
+        <p class="inline-empty">Este tour todavía no tiene días de operación configurados.</p>
+      }
+    </section>
+
+    <section class="detail-card">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Comercial</span>
+          <h3>Planes y precios</h3>
+        </div>
+      </div>
+
+      <div class="plan-list">
+        @for (plan of currentTour.Planes || []; track plan.Id_Plan || $index) {
+          <article class="drawer-plan">
+            <div class="plan-heading">
+              <div>
+                <strong>{{ plan.Nombre_Plan || 'Plan' }}</strong>
+                <span>{{ plan.Fecha_Inicio && plan.Fecha_Fin ? 'Vigente por fechas' : 'Permanente' }}</span>
+              </div>
+              @if (plan.Fecha_Inicio && plan.Fecha_Fin) {
+                <small>{{ plan.Fecha_Inicio | date:'d MMM yyyy':'':'es-CO' }} — {{ plan.Fecha_Fin | date:'d MMM yyyy':'':'es-CO' }}</small>
+              }
+            </div>
+
+            <div class="currency-list">
+              @for (currency of plan.Monedas || []; track currency.Id_Moneda) {
+                <div class="currency-row">
+                  <strong>{{ currency.Codigo }}</strong>
+                  <span>Adulto {{ formatPrice(currency.Precios?.ADULTO, currency.Codigo) }}</span>
+                  @if (plan.AllowNino) {
+                    <span>Niño {{ formatPrice(currency.Precios?.NINO, currency.Codigo) }}</span>
+                  }
+                  @if (plan.AllowInfante) {
+                    <span>Infante {{ formatPrice(currency.Precios?.INFANTE, currency.Codigo) }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="inline-empty">No hay planes configurados.</p>
+        }
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Canales</span>
+          <h3>Comisiones</h3>
+        </div>
+      </div>
+      <div class="commission-list">
+        @for (commission of currentTour.Comisiones || currentTour.comisiones || []; track commission.Id_Canal) {
+          <div class="commission-row">
+            <span>{{ commission.Nombre_Canal || ('Canal ' + commission.Id_Canal) }}</span>
+            <strong>{{ formatMoney(commission.Valor, 'COP') }}</strong>
+          </div>
+        } @empty {
+          <p class="inline-empty">Este tour no tiene comisiones por canal.</p>
+        }
+      </div>
+    </section>
+  }
+</main>
+
+@if ((canUpdate || canDelete) && tour()) {
+  <footer class="detail-footer">
+    @if (canDelete) {
+      <button
+        type="button"
+        class="drawer-deactivate"
+        [disabled]="isDeactivating()"
+        (click)="deactivateTour()">
+        {{ isDeactivating() ? 'Desactivando…' : 'Desactivar' }}
+      </button>
+    }
+    @if (canUpdate) {
+      <button type="button" class="drawer-edit" [disabled]="isDeactivating()" (click)="editTour()">Editar tour</button>
+    }
+  </footer>
+}

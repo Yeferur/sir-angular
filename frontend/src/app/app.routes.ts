@@ -3,6 +3,7 @@ import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 import { authGuard } from './guards/auth.guard';
 import { permisoGuard } from './guards/permission.guard';
 import { LoginContentComponent } from './components/login/login';
+import { EditarTourComponent } from './pages/Tours/editar-tour/editar-tour';
 
 export const routes: Routes = [
   {
@@ -190,7 +191,7 @@ export const routes: Routes = [
   },
   {
     path: 'Tours/Editar/:id',
-    loadComponent: () => import('./pages/Tours/editar-tour/editar-tour').then((m) => m.EditarTourComponent),
+    component: EditarTourComponent,
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, permiso: 'TOURS.ACTUALIZAR', redirectTo: '/Tours/VerTours' },

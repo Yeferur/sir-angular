@@ -1,102 +1,145 @@
-<div class="page-container">
-
-  <div class="page-header">
-
-      <div>
-        <p class="subtitle"><span class="count-badge">{{ toursFiltrados().length }}</span> tour{{ toursFiltrados().length !== 1 ? 's' : '' }} registrado{{ toursFiltrados().length !== 1 ? 's' : '' }}</p>
-      </div>
-      <div class="search-box">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input
-          type="text"
-          placeholder="Buscar tour o abreviación…"
-          [ngModel]="busqueda()"
-          (ngModelChange)="busqueda.set($event)"
-        />
-      </div>
-      @if (canCreateTour) {
-        <button class="btn-primary" (click)="crearTour()">Nuevo Tour</button>
-      }
- 
-  </div>
-
-  @if (isLoading()) {
-    <app-loading-state label="Cargando tours y configuraciones…"></app-loading-state>
-
-  } @else if (toursFiltrados().length === 0) {
-    <section class="empty-state" aria-live="polite">
-      <div class="empty-state-icon">✦</div>
-      <h2>{{ busqueda() ? 'Sin resultados' : 'No hay tours registrados' }}</h2>
-      <p>{{ busqueda() ? 'Intenta con otro nombre o abreviación.' : 'Crea tu primer tour para empezar a configurar cupos, comisiones y programación.' }}</p>
-      @if (!busqueda() && canCreateTour) {
-        <button class="btn-primary" type="button" (click)="crearTour()">Nuevo Tour</button>
-      }
-    </section>
-
-  } @else {
-    <div class="table-wrap">
-      <table class="tours-table">
-        <thead>
-          <tr>
-            <th class="col-nombre">Tour</th>
-            <th class="col-abrev">Abreviación</th>
-            <th class="col-cupo">Cupo base</th>
-            <th class="col-comisiones">Comisiones por canal</th>
-            <th class="col-actions"></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (tour of toursFiltrados(); track tour.Id_Tour) {
-            <tr class="tour-row">
-
-              <td class="col-nombre">
-                <span class="tour-name" [title]="tour.Nombre_Tour">{{ tour.Nombre_Tour }}</span>
-              </td>
-
-              <td class="col-abrev">
-                @if (tour.Abreviacion) {
-                  <span class="pill">{{ tour.Abreviacion }}</span>
-                } @else {
-                  <span class="muted">—</span>
-                }
-              </td>
-
-              <td class="col-cupo">
-                <span class="cupo-value">{{ showNumber(tour.Cupo_Base) }}</span>
-              </td>
-
-              <td class="col-comisiones">
-                @if (tourComisiones(tour).length > 0) {
-                  <div class="chips-row">
-                    @for (c of tourComisiones(tour); track c.Id_Canal) {
-                      <span class="commission-chip" [class.chip-active]="c.Valor > 0">
-                        <span class="chip-canal">{{ c.Nombre_Canal }}</span>
-                        <span class="chip-sep"></span>
-                        <span class="chip-valor">{{ formatValor(c.Valor) }}</span>
-                      </span>
-                    }
-                  </div>
-                } @else {
-                  <span class="muted">Sin comisiones</span>
-                }
-              </td>
-
-              <td class="col-actions">
-                <div class="row-actions">
-                  @if (canUpdateTour) {
-                    <button class="btn-row-edit"   (click)="editarTour(tour)">Editar</button>
-                  }
-                  @if (canDeleteTour) {
-                  <button class="btn-row-delete" (click)="eliminarTour(tour)">Eliminar</button>
-                  }
-                </div>
-              </td>
-
-            </tr>
+@if (isLoading()) {
+  <app-loading-state label="Preparando el catálogo de tours…"></app-loading-state>
+} @else if (loadError() && tours().length === 0) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos cargar los tours"
+    [detail]="loadError()"
+    (action)="loadTours()">
+  </app-loading-state>
+} @else {
+  <div class="page-container reservation-browser tour-browser">
+    <div class="page-header reservation-search-panel">
+      <div class="search-row">
+        <div class="search-container">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Buscar por nombre o abreviación…"
+            [ngModel]="busqueda()"
+            (ngModelChange)="busqueda.set($event)"
+            autocomplete="off"
+            aria-label="Buscar tours"
+          />
+          @if (busqueda()) {
+            <button type="button" class="search-clear" (click)="clearSearch()" aria-label="Limpiar búsqueda">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+              </svg>
+            </button>
           }
-        </tbody>
-      </table>
-    </div>
-  }
+        </div>
 
-</div>
+        @if (canCreateTour) {
+          <button type="button" class="btn-primary new-tour-button" (click)="crearTour()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Nuevo tour
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="results-area">
+      @if (loadError() && tours().length > 0) {
+        <div class="results-notice results-notice--error" role="alert">
+          <span>{{ loadError() }} Los resultados anteriores siguen disponibles.</span>
+          <button type="button" (click)="loadTours()">Reintentar</button>
+        </div>
+      }
+
+      @if (toursFiltrados().length > 0) {
+        <div class="results-toolbar">
+          <div>
+            <strong aria-live="polite">{{ toursFiltrados().length }} {{ toursFiltrados().length === 1 ? 'tour' : 'tours' }}</strong>
+          </div>
+          @if (isRefreshing()) {
+            <span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span>
+          }
+        </div>
+
+        <div class="results-list" [class.results-list--updating]="isRefreshing()" [attr.aria-busy]="isRefreshing()">
+          @for (tour of toursFiltrados(); track tour.Id_Tour) {
+            <article
+              class="result-item tour-result"
+              role="button"
+              tabindex="0"
+              (click)="verTour(tour)"
+              (keydown.enter)="verTour(tour)"
+              (keydown.space)="$event.preventDefault(); verTour(tour)"
+              [attr.aria-label]="'Ver información del tour ' + tour.Nombre_Tour">
+
+              <span
+                class="tour-status"
+                [class.tour-status--ready]="configurationStatus(tour) === 'ready'"
+                [class.tour-status--incomplete]="configurationStatus(tour) === 'incomplete'">
+                {{ configurationStatus(tour) === 'ready' ? 'Configurado' : 'Incompleto' }}
+              </span>
+
+              <div class="item-main-info">
+                <span class="item-tour">{{ tour.Nombre_Tour }}</span>
+                @if (tour.Abreviacion) {
+                  <span class="tour-abbreviation">{{ tour.Abreviacion }}</span>
+                }
+                <span class="item-meta">
+                  {{ operationLabel(tour) }}
+                  <span class="sep">·</span>
+                  {{ planCountLabel(tour) }}
+                  <span class="sep">·</span>
+                  Cupo {{ tour.Cupo_Base || 0 }}
+                </span>
+              </div>
+
+              <div class="item-actions">
+                @if (canUpdateTour) {
+                  <button
+                    type="button"
+                    class="btn-row-edit"
+                    (click)="$event.stopPropagation(); editarTour(tour)"
+                    [attr.aria-label]="'Editar tour ' + tour.Nombre_Tour">
+                    Editar
+                  </button>
+                }
+                @if (canDeleteTour) {
+                  <button
+                    type="button"
+                    class="btn-row-delete"
+                    [disabled]="deactivatingId() === tour.Id_Tour"
+                    (click)="$event.stopPropagation(); desactivarTour(tour)"
+                    [attr.aria-label]="'Desactivar tour ' + tour.Nombre_Tour">
+                    {{ deactivatingId() === tour.Id_Tour ? 'Desactivando…' : 'Desactivar' }}
+                  </button>
+                }
+              </div>
+
+              <div class="item-arrow" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+          <h3>{{ busqueda() ? 'Sin resultados' : 'No hay tours activos' }}</h3>
+          <p>{{ busqueda() ? 'Prueba con otro nombre o abreviación.' : 'Crea el primer tour para configurar su operación.' }}</p>
+          @if (busqueda()) {
+            <button type="button" class="btn-secondary" (click)="clearSearch()">Limpiar búsqueda</button>
+          } @else if (canCreateTour) {
+            <button type="button" class="btn-primary" (click)="crearTour()">Nuevo tour</button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
