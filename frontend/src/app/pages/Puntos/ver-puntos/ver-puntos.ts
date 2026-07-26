@@ -37,6 +37,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   readonly puntos = signal<Punto[]>([]);
   readonly rutas = signal<string[]>([]);
   readonly total = signal(0);
+  readonly registeredTotal = signal(0);
   readonly page = signal(1);
   readonly totalPages = signal(1);
   readonly isLoading = signal(true);
@@ -44,7 +45,6 @@ export class VerPuntos implements OnInit, OnDestroy {
   readonly loadError = signal('');
   readonly searchError = signal('');
   readonly hasLoadedOnce = signal(false);
-  readonly filtersVisible = signal(false);
   readonly deletingIds = signal<Set<number>>(new Set());
 
   searchTerm = '';
@@ -105,6 +105,7 @@ export class VerPuntos implements OnInit, OnDestroy {
     ).subscribe({
       next: ({ rutas, result }) => {
         this.rutas.set(Array.isArray(rutas) ? rutas : []);
+        this.registeredTotal.set(Number(result?.total || 0));
         this.applyResult(result);
         this.hasLoadedOnce.set(true);
       },
@@ -163,24 +164,9 @@ export class VerPuntos implements OnInit, OnDestroy {
     this.buscarPuntos(true);
   }
 
-  toggleFilters(): void {
-    this.filtersVisible.update((visible) => !visible);
-  }
-
   onRouteChange(route: string): void {
     this.selectedRoute = String(route || '').trim();
-    this.filtersVisible.set(false);
     this.buscarPuntos(true);
-  }
-
-  clearRoute(): void {
-    if (!this.selectedRoute) return;
-    this.selectedRoute = '';
-    this.buscarPuntos(true);
-  }
-
-  activeFilterCount(): number {
-    return this.selectedRoute ? 1 : 0;
   }
 
   crearPunto(): void {
@@ -230,6 +216,7 @@ export class VerPuntos implements OnInit, OnDestroy {
       next: () => {
         this.puntos.update((items) => items.filter((item) => this.getPuntoId(item) !== id));
         this.total.update((value) => Math.max(0, value - 1));
+        this.registeredTotal.update((value) => Math.max(0, value - 1));
 
         if (this.puntos().length === 0 && this.page() > 1) {
           this.page.update((value) => value - 1);

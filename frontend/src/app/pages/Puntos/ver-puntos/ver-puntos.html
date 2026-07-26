@@ -11,11 +11,6 @@
 <div class="page-container reservation-browser points-browser">
 
   <div class="points-overview">
-    <div class="overview-copy">
-      <strong>{{ total() }} {{ total() === 1 ? 'punto registrado' : 'puntos registrados' }}</strong>
-      <span>Consulta su ubicación y los horarios aproximados de recogida.</span>
-    </div>
-
     <div class="header-actions">
       @if (canSortPuntos) {
         <button class="btn-secondary" type="button" (click)="irAOrdenarPuntos()">
@@ -42,10 +37,6 @@
       }
       @if (canCreatePunto) {
         <button class="btn-primary" type="button" (click)="crearPunto()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
           Crear punto
         </button>
       }
@@ -82,25 +73,21 @@
         }
       </div>
 
-      <button
-        type="button"
-        class="btn-filter"
-        [class.btn-filter--active]="filtersVisible()"
-        (click)="toggleFilters()"
-        aria-controls="points-route-filter"
-        [attr.aria-expanded]="filtersVisible()"
-        [attr.aria-label]="activeFilterCount() ? 'Filtros, 1 activo' : 'Filtros'">
+      <div class="route-filter-inline">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <line x1="4" y1="6" x2="20" y2="6"/>
-          <line x1="8" y1="12" x2="16" y2="12"/>
-          <line x1="11" y1="18" x2="13" y2="18"/>
+          <path d="M3 6h18M7 12h10M10 18h4"/>
         </svg>
-        Filtros
-        <span class="filter-count" [class.filter-count--empty]="activeFilterCount() === 0" aria-hidden="true">
-          {{ activeFilterCount() }}
-        </span>
-      </button>
+        <select
+          aria-label="Filtrar puntos por ruta"
+          [ngModel]="selectedRoute"
+          (ngModelChange)="onRouteChange($event)">
+          <option value="">Todas las rutas</option>
+          @for (ruta of rutas(); track ruta) {
+            <option [value]="ruta">Ruta {{ ruta }}</option>
+          }
+        </select>
+      </div>
 
       <button
         type="button"
@@ -115,38 +102,7 @@
       </button>
     </div>
 
-    @if (selectedRoute) {
-      <div class="active-filters">
-        <div class="filter-token">
-          Ruta {{ selectedRoute }}
-          <button type="button" class="remove-token-btn" (click)="clearRoute()"
-            [attr.aria-label]="'Quitar filtro de ruta ' + selectedRoute">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    }
   </div>
-
-  @if (filtersVisible()) {
-    <div id="points-route-filter" class="advanced-filters-panel points-filter-panel">
-      <div class="form-group">
-        <label class="form-label" for="route-filter">Ruta o zona operativa</label>
-        <select id="route-filter" class="form-select" [ngModel]="selectedRoute"
-          (ngModelChange)="onRouteChange($event)">
-          <option value="">Todas las rutas</option>
-          @for (ruta of rutas(); track ruta) {
-            <option [value]="ruta">Ruta {{ ruta }}</option>
-          }
-        </select>
-        <p class="filter-help">Filtra los puntos que pertenecen a una zona operativa de la ciudad.</p>
-      </div>
-    </div>
-  }
 
   <div class="results-area">
     @if (searchError() && puntos().length > 0) {
@@ -159,7 +115,8 @@
     @if (puntos().length > 0) {
       <div class="results-toolbar">
         <strong aria-live="polite">
-          {{ total() }} {{ total() === 1 ? 'resultado' : 'resultados' }}
+          {{ registeredTotal() }}
+          {{ registeredTotal() === 1 ? 'punto' : 'puntos' }}
         </strong>
         @if (isSearching()) {
           <span class="updating-pill" role="status">
@@ -175,8 +132,8 @@
             <header class="point-card__header">
               <div class="point-identity">
                 <h2>{{ getPuntoName(punto) }}</h2>
-                <p>{{ punto.Direccion || 'Sin dirección registrada' }}</p>
-                <div class="point-context">
+                <div class="point-details">
+                  <span class="point-address">{{ punto.Direccion || 'Sin dirección registrada' }}</span>
                   @if (punto.Sector) {
                     <span>{{ punto.Sector }}</span>
                   }
@@ -221,18 +178,17 @@
               </div>
             </header>
 
-            <section class="schedule-section" [attr.aria-label]="'Horarios de ' + getPuntoName(punto)">
-              <div class="schedule-heading">
-                <span>Horarios aproximados</span>
-                <small>
-                  {{ configuredSchedules(punto).length }}
-                  {{ configuredSchedules(punto).length === 1 ? 'configurado' : 'configurados' }}
-                </small>
-              </div>
-
-              @if (!punto.horarios?.length) {
-                <div class="schedule-empty">Este punto todavía no tiene horarios asociados.</div>
-              } @else {
+            @if (!punto.horarios?.length) {
+              <section class="schedule-section schedule-section--empty"
+                [attr.aria-label]="'Horarios de ' + getPuntoName(punto)">
+                <span class="schedule-empty__label">Horarios de recogida</span>
+                <span class="schedule-empty__message">Sin horarios asociados</span>
+              </section>
+            } @else {
+              <section class="schedule-section" [attr.aria-label]="'Horarios de ' + getPuntoName(punto)">
+                <div class="schedule-heading">
+                  <span>Horarios de recogida</span>
+                </div>
                 <div class="schedule-grid">
                   @for (horario of configuredSchedules(punto); track $index) {
                     <div class="schedule-item">
@@ -247,8 +203,8 @@
                     </div>
                   }
                 </div>
-              }
-            </section>
+              </section>
+            }
           </article>
         }
       </div>
