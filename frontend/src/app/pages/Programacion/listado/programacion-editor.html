@@ -1,0 +1,278 @@
+<section class="editor-shell" cdkDropListGroup>
+  <header class="editor-command">
+    <div class="editor-context">
+      <button type="button" class="icon-button back-button" (click)="closeRequested.emit()" aria-label="Volver a servicios">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="context-copy">
+        <span class="eyebrow">Editando listado</span>
+        <div class="title-line">
+          <h2>{{ tourName() }}</h2>
+          @if (statusText()) {
+            <span
+              class="status-chip"
+              [class.status-chip--saved]="persisted() && !dirty()"
+              [class.status-chip--dirty]="dirty()">
+              <span class="status-dot" aria-hidden="true"></span>
+              {{ statusText() }}
+            </span>
+          }
+        </div>
+        <p>{{ operationDate() }} · {{ totalPassengers }} pasajeros · {{ totalReservations }} reservas</p>
+      </div>
+    </div>
+
+    <div class="command-actions">
+      <button type="button" class="button button--secondary" (click)="exportAllRequested.emit()">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+        Exportar
+      </button>
+      @if (canUpdate()) {
+        <button
+          type="button"
+          class="button button--primary"
+          [disabled]="saving() || (!dirty() && persisted())"
+          (click)="saveRequested.emit()">
+          @if (saving()) {
+            <span class="button-spinner" aria-hidden="true"></span>
+            Guardando…
+          } @else {
+            Guardar listado
+          }
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (routingFallback()) {
+    <div class="routing-notice" role="status">
+      <span class="routing-notice__mark" aria-hidden="true">i</span>
+      <span><strong>Ruta estimada con distancia directa.</strong> OSRM no estuvo disponible y el listado se generó con Haversine.</span>
+    </div>
+  }
+
+  @if (unassigned().length > 0) {
+    <button
+      type="button"
+      class="unassigned-banner"
+      [class.is-active]="activeBusIndex() === -1"
+      cdkDropList
+      id="unassigned-bus"
+      [cdkDropListData]="unassigned()"
+      [cdkDropListConnectedTo]="connectedDropLists()"
+      (cdkDropListDropped)="reservationDropped.emit($event)"
+      (click)="busSelected.emit(-1)">
+      <span class="alert-mark" aria-hidden="true">!</span>
+      <span class="unassigned-copy">
+        <strong>{{ unassigned().length }} {{ unassigned().length === 1 ? 'reserva pendiente' : 'reservas pendientes' }}</strong>
+        <small>Deben asignarse a un bus antes de confirmar la operación.</small>
+      </span>
+      <span class="unassigned-count">{{ totalPaxUnassigned() }} pax</span>
+      <span class="unassigned-action">Revisar <span aria-hidden="true">→</span></span>
+    </button>
+  }
+
+  <div class="editor-workspace">
+    <aside class="fleet-panel" aria-label="Buses del listado">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">Flota</span>
+          <h3>{{ buses.length }} {{ buses.length === 1 ? 'bus' : 'buses' }}</h3>
+        </div>
+        <span class="panel-total">{{ totalPassengers - totalPaxUnassigned() }} pax</span>
+      </div>
+
+      <div class="fleet-list">
+        <div
+          class="new-bus-target"
+          [class.is-visible]="dragging()"
+          cdkDropList
+          id="new-bus"
+          [cdkDropListData]="newBusDropData"
+          [cdkDropListConnectedTo]="connectedDropLists()"
+          (cdkDropListDropped)="reservationDropped.emit($event)">
+          <span aria-hidden="true">＋</span>
+          Suelta aquí para crear otro bus
+        </div>
+
+        @for (bus of buses; track bus; let i = $index) {
+          @let pct = occupancy(bus);
+          <button
+            type="button"
+            class="fleet-card"
+            [class.is-active]="i === activeBusIndex()"
+            [attr.data-load]="occupancyState(bus)"
+            cdkDropList
+            [id]="'busdrop-' + i"
+            [cdkDropListData]="bus.reservas"
+            [cdkDropListConnectedTo]="connectedDropLists()"
+            (cdkDropListDropped)="reservationDropped.emit($event)"
+            (click)="busSelected.emit(i)">
+            <span class="fleet-card-top">
+              <span class="bus-identity">
+                <span class="bus-index">{{ i + 1 }}</span>
+                <span class="bus-label">Bus {{ i + 1 }}</span>
+              </span>
+              <span class="occupancy-chip">{{ pct }}%</span>
+            </span>
+            <span class="capacity-line">
+              <span class="capacity-track"><span [style.width.%]="pct"></span></span>
+              <span>{{ bus.ocupados }} / {{ bus.capacidad }}</span>
+            </span>
+            <span class="fleet-card-bottom">
+              <span>{{ bus.reservas.length }} reservas</span>
+              <span>{{ bus.guia || 'Guía pendiente' }}</span>
+            </span>
+          </button>
+        }
+
+      </div>
+    </aside>
+
+    <main class="operation-panel">
+      @if (activeBus(); as bus) {
+        <div class="bus-toolbar">
+          <div class="bus-navigation">
+            <button type="button" class="icon-button" (click)="previousBusRequested.emit()" aria-label="Bus anterior">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div>
+              <h3>{{ activeBusIndex() === -1 ? 'Reservas sin asignar' : ('Bus ' + (activeBusIndex() + 1)) }}</h3>
+            </div>
+            <button type="button" class="icon-button" (click)="nextBusRequested.emit()" aria-label="Bus siguiente">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          @if (activeBusIndex() !== -1) {
+            <div class="bus-fields">
+              <label>
+                <span>Placa o identificación</span>
+                <input
+                  type="text"
+                  [ngModel]="bus.id"
+                  (ngModelChange)="bus.id = $event; busChanged.emit()"
+                  placeholder="Bus {{ activeBusIndex() + 1 }}">
+              </label>
+              <label>
+                <span>Guía</span>
+                <input
+                  type="text"
+                  [ngModel]="bus.guia"
+                  (ngModelChange)="bus.guia = $event; busChanged.emit()"
+                  placeholder="Asignar guía">
+              </label>
+            </div>
+
+            <div class="bus-tools">
+              <button type="button" class="button button--quiet" (click)="mapRequested.emit({ bus, index: activeBusIndex() })">
+                Ver mapa
+              </button>
+              <button type="button" class="button button--quiet" (click)="exportBusRequested.emit(activeBusIndex())">
+                Descargar
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="editing-grid">
+          <section class="route-panel">
+            <div class="subpanel-heading">
+              <div>
+                <span class="eyebrow">Recorrido</span>
+                <h4>{{ activeStops().length }} paradas</h4>
+              </div>
+              <span class="hint">Arrastra para ordenar</span>
+            </div>
+
+            <div
+              class="route-list"
+              cdkDropList
+              id="route-order"
+              [cdkDropListData]="activeStops()"
+              cdkDropListLockAxis="y"
+              (cdkDropListDropped)="stopDropped.emit($event)">
+              @for (stop of activeStops(); track stop.key; let position = $index) {
+                <article class="route-stop" cdkDrag cdkDragLockAxis="y">
+                  <span class="stop-sequence">{{ position + 1 }}</span>
+                  <span class="stop-copy">
+                    <strong>{{ stop.NombrePunto }}</strong>
+                    <small>{{ stop.totalPax }} pax · {{ stop.reservas.length }} {{ stop.reservas.length === 1 ? 'reserva' : 'reservas' }}</small>
+                  </span>
+                  <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+                </article>
+              } @empty {
+                <div class="subpanel-empty">
+                  <span aria-hidden="true">○</span>
+                  <strong>Sin paradas</strong>
+                  <small>Este bus todavía no tiene reservas asignadas.</small>
+                </div>
+              }
+            </div>
+          </section>
+
+          <section class="reservations-panel">
+            <div class="subpanel-heading">
+              <div>
+                <span class="eyebrow">Pasajeros</span>
+                <h4>{{ bus.reservas.length }} reservas · {{ bus.ocupados }} pax</h4>
+              </div>
+              <span class="hint">Arrastra para mover</span>
+            </div>
+
+            <div
+              class="reservation-list"
+              cdkDropList
+              id="active-bus"
+              [cdkDropListData]="bus.reservas"
+              [cdkDropListConnectedTo]="connectedDropLists()"
+              [cdkDropListSortingDisabled]="true"
+              (cdkDropListDropped)="reservationDropped.emit($event)">
+              @for (stop of activeStops(); track stop.key; let position = $index) {
+                <section class="reservation-group">
+                  <header>
+                    <span class="group-position">{{ position + 1 }}</span>
+                    <span class="group-title">
+                      <strong>{{ stop.NombrePunto }}</strong>
+                      <small>{{ stop.totalPax }} pax</small>
+                    </span>
+                  </header>
+
+                  <div class="group-reservations">
+                    @for (reserva of stop.reservas; track reserva.Id_Reserva) {
+                      <article
+                        class="reservation-row"
+                        cdkDrag
+                        (cdkDragStarted)="dragStarted.emit()"
+                        (cdkDragEnded)="dragEnded.emit()">
+                        <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+                        <span class="reservation-id">#{{ reserva.Id_Reserva }}</span>
+                        @if (isMultipoint(reserva)) {
+                          <span class="multipoint-chip">Multipunto</span>
+                        }
+                        <span class="reservation-pax">{{ reservationPax(reserva) }} pax</span>
+                      </article>
+                    }
+                  </div>
+                </section>
+              } @empty {
+                <div class="subpanel-empty">
+                  <span aria-hidden="true">↔</span>
+                  <strong>No hay reservas en este bus</strong>
+                  <small>Arrastra una reserva desde otro bus o desde pendientes.</small>
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+      } @else {
+        <div class="workspace-empty">
+          <span aria-hidden="true">○</span>
+          <strong>No hay un bus disponible</strong>
+          <p>Selecciona una reserva pendiente y crea un bus para comenzar.</p>
+        </div>
+      }
+    </main>
+  </div>
+
+</section>

@@ -127,6 +127,38 @@ exports.generarComparacionLogisticaShadowController = async (req, res) => {
     }
 };
 
+exports.generarPlanLogisticoOptimizadoController = async (req, res) => {
+    const { fecha, idTour, idsTours, maxGuiasBilingues } = req.body || {};
+    const tours = idsTours || idTour;
+
+    if (!fecha || !tours) {
+        return sendError(res, {
+            status: 400,
+            message: 'Se requiere fecha e idsTours (o idTour).',
+            errorCode: 'MISSING_PARAMS'
+        });
+    }
+
+    try {
+        const resultado = await cerebro.generarPlanLogisticoOptimizado(
+            fecha,
+            tours,
+            { maxGuiasBilingues }
+        );
+        return sendSuccess(res, {
+            data: resultado,
+            message: 'Plan logístico optimizado generado correctamente'
+        });
+    } catch (error) {
+        console.error('Error al generar el plan logístico optimizado:', error);
+        return sendError(res, {
+            status: 500,
+            message: error?.message || 'No fue posible generar el plan logístico.',
+            errorCode: 'OPTIMIZED_PLAN_FAILED'
+        });
+    }
+};
+
 /**
  * Exporta una reserva privada en formato Excel.
  * Body: { fecha: 'YYYY-MM-DD', idReserva: string, buses: [...], nombreTour?: string, nombreReportante?: string }

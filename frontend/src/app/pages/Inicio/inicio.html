@@ -46,7 +46,13 @@
         {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
       </button>
 
-      <button type="button" class="date-hoy-btn" (click)="irHoy()">Hoy</button>
+      <button
+        type="button"
+        class="date-hoy-btn"
+        [class.active]="isTodaySelected()"
+        (click)="irHoy()">
+        Hoy
+      </button>
     </div>
   </header>
 

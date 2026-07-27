@@ -114,6 +114,7 @@ export const routes: Routes = [
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
     canActivate: [authGuard],
+    canDeactivate: [unsavedChangesGuard],
     data: { preload: true },
     title: 'Programación',
   },

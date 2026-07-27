@@ -2207,6 +2207,60 @@ async function generarComparacionLogisticaShadow(fecha, idsTours, opciones = {})
     };
 }
 
+/**
+ * Genera el listado operativo con el optimizador geográfico nuevo.
+ * Usa OSRM cuando está disponible y conserva el fallback local por Haversine.
+ */
+async function generarPlanLogisticoOptimizado(fecha, idsTours, opciones = {}) {
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+    const [reservas, tourDestinos] = await Promise.all([
+        obtenerReservas(fecha, tours),
+        obtenerCoordenadasTours(tours),
+    ]);
+    const destinoTour = resolverDestinoTour(tours, tourDestinos);
+    const reservasNormalizadas = normalizarReservasSombra(reservas);
+    const puntosMatriz = [
+        CONFIG.PUNTO_BASE,
+        destinoTour,
+        ...reservasNormalizadas.flatMap(reserva => reserva.puntos),
+    ].filter(Boolean);
+    const matrizDistancias = await prepararMatrizOSRM({ puntos: puntosMatriz });
+    const plan = generarPlanSombra({
+        reservas,
+        puntoBase: CONFIG.PUNTO_BASE,
+        destino: destinoTour,
+        maxGuiasBilingues: opciones?.maxGuiasBilingues ?? null,
+        distancias: matrizDistancias.contexto,
+        fuenteDistancias: matrizDistancias.fuente,
+        metadataDistancias: matrizDistancias.metadata,
+    });
+
+    if (matrizDistancias.metadata?.motivoFallback
+        && matrizDistancias.metadata?.osrmConfigurado) {
+        plan.alertas.push({
+            tipo: 'OSRM_NO_DISPONIBLE',
+            mensaje: matrizDistancias.metadata.motivoFallback,
+        });
+    }
+
+    const reservasAsignadas = new Set(
+        (plan.buses || [])
+            .flatMap(bus => bus.reservas || [])
+            .map(reserva => String(reserva?.Id_Reserva || '').trim())
+            .filter(Boolean)
+    );
+
+    return {
+        ...plan,
+        fecha,
+        tours,
+        destinoTour,
+        reservasSinAsignar: (reservas || []).filter(
+            reserva => !reservasAsignadas.has(String(reserva?.Id_Reserva || '').trim())
+        ),
+    };
+}
+
 async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
     if (!fecha || !idsTours || !Array.isArray(buses)) {
         throw createValidationError('Datos inválidos para guardar el listado.', [
@@ -2333,6 +2387,7 @@ async function resumenPrivadosDia(fecha, idsTours) {
 
 module.exports = {
     generarPlanLogistico,
+    generarPlanLogisticoOptimizado,
     generarComparacionLogisticaShadow,
     resumenPrivadosDia,
     generarExcelReservaPrivada,

@@ -1,0 +1,157 @@
+<section class="day-overview" [class.is-updating]="updating()" aria-label="Resumen de la operación">
+  <div class="day-metrics" aria-live="polite">
+    <div class="day-metric">
+      <strong [countUp]="totalPasajeros"></strong>
+      <span>pasajeros</span>
+    </div>
+    <div class="day-metric">
+      <strong [countUp]="totalReservas"></strong>
+      <span>reservas</span>
+    </div>
+    <div class="day-metric">
+      <strong [countUp]="operacionesActivas"></strong>
+      <span>servicios activos</span>
+    </div>
+    <div class="day-metric">
+      <strong [countUp]="listadosGenerados"></strong>
+      <span>listados generados</span>
+    </div>
+  </div>
+
+  @if (updating()) {
+    <div class="update-indicator" role="status">
+      <span class="update-dot" aria-hidden="true"></span>
+      Actualizando operación…
+    </div>
+  }
+
+  @if (tours().length === 0) {
+    <div class="empty-day">
+      <span class="empty-icon" aria-hidden="true">○</span>
+      <strong>No hay servicios disponibles</strong>
+      <p>Selecciona otra fecha o revisa la configuración de los tours.</p>
+    </div>
+  } @else {
+    <div class="operation-grid">
+      @for (tour of tours(); track tour.Id_Tour) {
+        @let hasPassengers = (tour.totalPasajeros || 0) > 0;
+        @let generated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+        <button
+          type="button"
+          class="operation-card"
+          [class.is-ready]="generated"
+          [class.is-empty]="!hasPassengers"
+          [disabled]="!canCreate() || !hasPassengers || updating()"
+          (click)="openTour(tour)">
+          <span class="operation-top">
+            <span class="operation-name">{{ tour.NombreTour }}</span>
+            <span
+              class="status-chip"
+              [class.status-chip--ready]="generated"
+              [class.status-chip--pending]="hasPassengers && !generated">
+              {{ hasPassengers ? (generated ? 'Generado' : 'Por generar') : 'Sin reservas' }}
+            </span>
+          </span>
+
+          <span class="operation-numbers">
+            <span>
+              <strong [countUp]="tour.totalPasajeros || 0"></strong>
+              <small>pasajeros</small>
+            </span>
+            <span>
+              <strong [countUp]="tour.totalReservas || 0"></strong>
+              <small>reservas</small>
+            </span>
+            @if (tour.totalBuses) {
+              <span>
+                <strong [countUp]="tour.totalBuses"></strong>
+                <small>buses</small>
+              </span>
+            }
+          </span>
+
+          <span class="operation-progress" aria-hidden="true">
+            <span [style.width.%]="generated ? occupancy(tour) : 0"></span>
+          </span>
+
+          <span class="operation-action">
+            {{ !hasPassengers ? 'Sin operación' : (generated ? 'Editar listado' : 'Generar listado') }}
+            @if (hasPassengers) {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+            }
+          </span>
+        </button>
+      }
+
+      <button
+        type="button"
+        class="operation-card private-card"
+        [class.is-empty]="totalReservasPrivadas() === 0"
+        [disabled]="totalReservasPrivadas() === 0 || updating()"
+        (click)="privadosSelected.emit()">
+        <span class="operation-top">
+          <span class="operation-name">Reservas privadas</span>
+          <span class="status-chip status-chip--private">
+            {{ totalReservasPrivadas() > 0 ? 'Por completar' : 'Sin reservas' }}
+          </span>
+        </span>
+        <span class="operation-numbers">
+          <span>
+            <strong [countUp]="totalPaxPrivados()"></strong>
+            <small>pasajeros</small>
+          </span>
+          <span>
+            <strong [countUp]="totalReservasPrivadas()"></strong>
+            <small>reservas</small>
+          </span>
+          <span>
+            <strong [countUp]="totalBusesPrivados()"></strong>
+            <small>buses</small>
+          </span>
+        </span>
+        <span class="operation-progress" aria-hidden="true">
+          <span [class.private-progress]="totalReservasPrivadas() > 0"></span>
+        </span>
+        <span class="operation-action">
+          {{ totalReservasPrivadas() > 0 ? 'Preparar vehículos y guías' : 'Sin servicios privados' }}
+          @if (totalReservasPrivadas() > 0) {
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          }
+        </span>
+      </button>
+
+      <article class="operation-card transfer-card" aria-label="Programación de transfers, próximamente">
+        <span class="operation-top">
+          <span class="operation-name">Transfers</span>
+          <span class="status-chip status-chip--transfer">Próximamente</span>
+        </span>
+
+        <span class="transfer-copy">
+          <span class="transfer-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 16V8l2-4h14l2 4v8"/>
+              <path d="M5 16v3M19 16v3M3 12h18"/>
+              <circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>
+            </svg>
+          </span>
+          <span>
+            <strong>Operación de traslados</strong>
+            <small>Consulta y organiza recogidas, destinos y vehículos desde Programación.</small>
+          </span>
+        </span>
+
+        <span class="operation-progress transfer-track" aria-hidden="true">
+          <span></span>
+        </span>
+        <span class="operation-action">La asignación se habilitará en una siguiente etapa</span>
+      </article>
+    </div>
+  }
+</section>

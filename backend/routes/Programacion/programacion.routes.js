@@ -8,6 +8,7 @@ const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 const {
     generarPlanLogisticoController,
     generarComparacionLogisticaShadowController,
+    generarPlanLogisticoOptimizadoController,
     generarPlanAsistidoController,
     exportarListadoBusController,
     exportarReservaPrivadaController,
@@ -58,6 +59,13 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     exportarListadoBusController
+);
+
+router.post(
+    '/plan-logistico-optimizado',
+    authMiddleware,
+    checkPermission('PROGRAMACION.CREAR'),
+    generarPlanLogisticoOptimizadoController
 );
 
 router.post(

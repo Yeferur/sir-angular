@@ -1,28 +1,25 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
 import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { forkJoin, switchMap, of, finalize } from 'rxjs';
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
-
-type ViewStop = {
-  key: string;
-  Id_Punto?: number | string | null;
-  NombrePunto: string;
-  reservas: (Reserva & { __paxEnEstePunto?: number })[];
-  totalPax: number;
-  ruta?: string | null;
-  ordenRuta?: number | null;
-  Latitud?: number | string | null;
-  Longitud?: number | string | null;
-};
+import { ProgramacionDashboardComponent } from './programacion-dashboard';
+import { ProgramacionEditorComponent } from './programacion-editor';
+import { ProgramacionViewStop as ViewStop } from './programacion-view.types';
+import {
+  bestBusCapacity,
+  groupProgramacionStops,
+  renumberGenericBuses,
+  reservationPointKey,
+} from './programacion-editor.utils';
 
 type LegacyButton = { text: string; style: string; onClick: () => void };
 
@@ -36,11 +33,18 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-programacion-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, DatepickerComponent, LoadingStateComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    DatepickerComponent,
+    LoadingStateComponent,
+    ProgramacionDashboardComponent,
+    ProgramacionEditorComponent,
+  ],
   templateUrl: './listado.html',
   styleUrls: ['./listado.css']
 })
-export class Listado implements OnInit {
+export class Listado implements OnInit, OnDestroy {
   private programacionService = inject(ProgramacionDashboardService);
   private inicioService = inject(InicioService);
   private cdr = inject(ChangeDetectorRef);
@@ -69,10 +73,12 @@ export class Listado implements OnInit {
     clearOverlay: () => this.alerts.closeModal(),
   };
 
-  fechaSeleccionada: string = new Date().toISOString().split('T')[0];
+  fechaSeleccionada: string = this.getTodayIso();
   toursDelDia: TourProgramacion[] = [];
   isPageLoading = true;
   isUpdatingDate = false;
+  isSaving = false;
+  loadError = '';
   modoVista: 'dashboard' | 'editor' | 'privados' = 'dashboard';
 
   tourSeleccionado: TourProgramacion | null = null;
@@ -80,11 +86,11 @@ export class Listado implements OnInit {
   listadoDirty = false;
   listadoPersistido = false;
   listadoOrigen: 'nuevo' | 'db' | null = null;
+  routingFallback = false;
 
   readonly CAPACIDADES_BUSES = [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b);
 
   isDragging = false;
-  newBusDropData: Reserva[] = [];
 
   reservasSinAsignar: Reserva[] = [];
   busesPrivados: any[] = [];  // buses para reservas privadas del día
@@ -130,9 +136,21 @@ export class Listado implements OnInit {
 
   // Orden transitorio solo para drag/drop de la sesion actual; el array bus.reservas es la fuente de verdad.
   private stopOrderByBus = new Map<number, string[]>();
+  private loadSubscription?: Subscription;
+  private editorSubscription?: Subscription;
+  private loadSequence = 0;
 
   ngOnInit(): void {
     this.cargarToursDelDia();
+  }
+
+  ngOnDestroy(): void {
+    this.loadSubscription?.unsubscribe();
+    this.editorSubscription?.unsubscribe();
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.listadoDirty && !this.isSaving;
   }
 
   get editorStatusText(): string {
@@ -164,6 +182,9 @@ export class Listado implements OnInit {
   }
 
   cargarToursDelDia(): void {
+    const requestSequence = ++this.loadSequence;
+    this.loadSubscription?.unsubscribe();
+    this.loadError = '';
     const isInitialLoad = this.toursDelDia.length === 0;
 
     if (isInitialLoad) {
@@ -173,7 +194,7 @@ export class Listado implements OnInit {
     }
 
     // Obtener tours
-    this.programacionService.getTours().pipe(
+    this.loadSubscription = this.programacionService.getTours().pipe(
       switchMap(tours => {
         // Obtener datos del día y listados para los tours
         const listadoObservables: { [key: number]: any } = {};
@@ -212,12 +233,14 @@ export class Listado implements OnInit {
         });
       }),
       finalize(() => {
+        if (requestSequence !== this.loadSequence) return;
         this.isPageLoading = false;
         this.isUpdatingDate = false;
         this.cdr.markForCheck();
       })
     ).subscribe({
       next: (result: any) => {
+        if (requestSequence !== this.loadSequence) return;
         const tours = result.tours;
         const datosDelDia = result.datosDelDia;
         const listados = result.listados || {};
@@ -335,15 +358,66 @@ export class Listado implements OnInit {
         this.cdr.markForCheck();
       },
       error: (err) => {
+        if (requestSequence !== this.loadSequence) return;
         console.error('Error al cargar tours del día', err);
-        this.toursDelDia = [];
+        this.loadError = 'No fue posible consultar los servicios de esta fecha. Revisa la conexión e inténtalo nuevamente.';
         this.cdr.markForCheck();
       }
     });
   }
 
-  onFechaOperacionChange(): void {
+  onFechaOperacionSelected(iso: string | null): void {
+    if (!iso) return;
+    this.goToDate(iso);
+  }
+
+  irDiaAnterior(): void {
+    this.goToDate(this.shiftDate(this.fechaSeleccionada, -1));
+  }
+
+  irDiaSiguiente(): void {
+    this.goToDate(this.shiftDate(this.fechaSeleccionada, 1));
+  }
+
+  irHoy(): void {
+    this.goToDate(this.getTodayIso());
+  }
+
+  irManana(): void {
+    this.goToDate(this.getTomorrowIso());
+  }
+
+  isTodaySelected(): boolean {
+    return this.fechaSeleccionada === this.getTodayIso();
+  }
+
+  isTomorrowSelected(): boolean {
+    return this.fechaSeleccionada === this.getTomorrowIso();
+  }
+
+  getTomorrowIso(): string {
+    return this.shiftDate(this.getTodayIso(), 1);
+  }
+
+  private getTodayIso(): string {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  private shiftDate(isoDate: string, days: number): string {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + days);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  private goToDate(iso: string): void {
+    if (!iso || iso === this.fechaSeleccionada) return;
+
     this.confirmarPerdidaCambios(() => {
+      this.fechaSeleccionada = iso;
       this.resetEditorState();
       this.modoVista = 'dashboard';
       this.cargarToursDelDia();
@@ -361,27 +435,11 @@ export class Listado implements OnInit {
     this.listadoOrigen = null;
     this.busesPrivados = [];
     this.destinoTourActual = null;
+    this.routingFallback = false;
   }
 
   markDirty(): void {
     this.listadoDirty = true;
-  }
-
-  private isGenericBusId(value: string | null | undefined): boolean {
-    const normalized = String(value || '').trim();
-    return !normalized || /^Bus\s+\d+$/i.test(normalized);
-  }
-
-  private renumerarBusesGenericos(buses: Bus[] | null | undefined): void {
-    if (!Array.isArray(buses) || !buses.length) return;
-
-    let genericIndex = 1;
-    for (const bus of buses) {
-      if (this.isGenericBusId(bus.id)) {
-        bus.id = `Bus ${genericIndex}`;
-        genericIndex += 1;
-      }
-    }
   }
 
   private confirmarPerdidaCambios(continuar: () => void): void {
@@ -441,7 +499,8 @@ export class Listado implements OnInit {
       payload.idTour = tour.Id_Tour;
     }
 
-    this.programacionService.obtenerListadoFinal(payload).subscribe({
+    this.editorSubscription?.unsubscribe();
+    this.editorSubscription = this.programacionService.obtenerListadoFinal(payload).subscribe({
       next: (data) => {
         if (data?.exists) {
           const sugerencia = this.construirSugerenciaDesdeListado(data);
@@ -619,7 +678,7 @@ export class Listado implements OnInit {
     if (!destinoBus) return;
 
     const nuevaCarga = (destinoBus.ocupados || 0) + (reserva.NumeroPasajeros || 0);
-    const mejorCapacidad = this.findBestCapacityForPassengers(nuevaCarga);
+    const mejorCapacidad = bestBusCapacity(nuevaCarga, this.CAPACIDADES_BUSES);
 
     if (!mejorCapacidad) {
       this.navbar.showAlert({
@@ -655,7 +714,7 @@ export class Listado implements OnInit {
       // Deduplicar: una reserva multi-punto aparece en varias paradas de groupStops.
       // El mapa solo necesita verla una vez (usará su puntoPrincipal para el pin).
       const seen = new Set<number | string>();
-      reservasOrdenadas = this.groupStops(reservas, order)
+      reservasOrdenadas = groupProgramacionStops(reservas, order)
         .flatMap(stop => stop.reservas)
         .filter(r => {
           if (seen.has(r.Id_Reserva)) return false;
@@ -710,23 +769,29 @@ export class Listado implements OnInit {
       payload.idTour = this.tourSeleccionado.Id_Tour;
     }
 
-    this.isPageLoading = true;
-    this.programacionService.guardarListadoFinal(payload).subscribe({
+    this.isSaving = true;
+    this.programacionService.guardarListadoFinal(payload).pipe(
+      finalize(() => {
+        this.isSaving = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
       next: () => {
-        this.isPageLoading = false;
         this.listadoDirty = false;
         this.listadoPersistido = true;
         this.listadoOrigen = 'db';
-        this.navbar.showAlert({ type: 'success', title: 'Listado guardado', message: 'El listado ha sido guardado exitosamente.', autoClose: true, autoCloseTime: 2000 });
         this.reservasSinAsignar = [];
         this.resetEditorState();
         this.modoVista = 'dashboard';
         this.cargarToursDelDia();
       },
       error: (err) => {
-        this.isPageLoading = false;
         console.error('Error al guardar', err);
-        this.navbar.showAlert({ type: 'error', title: 'Error', message: 'Ha ocurrido un error al guardar el listado.', autoClose: true, autoCloseTime: 4000 });
+        this.navbar.showAlert({
+          type: 'error',
+          title: 'No pudimos guardar el listado',
+          message: 'Tus cambios siguen en pantalla. Revisa la conexión e inténtalo nuevamente.',
+        });
       }
     });
   }
@@ -816,8 +881,13 @@ export class Listado implements OnInit {
   private generarPlanDesdeCero(tour: TourProgramacion): void {
     this.isPageLoading = true;
 
-    this.programacionService.generarPlanLogistico(this.fechaSeleccionada, ((tour as any).idsTours || tour.Id_Tour) as any).subscribe({
+    this.editorSubscription?.unsubscribe();
+    this.editorSubscription = this.programacionService.generarPlanLogistico(
+      this.fechaSeleccionada,
+      ((tour as any).idsTours || tour.Id_Tour) as any
+    ).subscribe({
       next: (plan: any) => {
+        this.routingFallback = plan?.fuenteDistancias === 'haversine-local';
         const esFormatoNuevo = Array.isArray(plan) || Array.isArray(plan?.buses);
         this.listadoPersistido = false;
         this.listadoDirty = true;
@@ -850,7 +920,7 @@ export class Listado implements OnInit {
           this.reservasSinAsignar = reservasSinAsignar;
           this.destinoTourActual = destinoTour;
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
-          this.renumerarBusesGenericos(this.planSeleccionado?.buses);
+          renumberGenericBuses(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
         } else {
           tour.planGenerado = plan;
@@ -860,7 +930,7 @@ export class Listado implements OnInit {
           this.reservasSinAsignar = [];
           this.destinoTourActual = plan?.destinoTour || null;
           this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
-          this.renumerarBusesGenericos(this.planSeleccionado?.buses);
+          renumberGenericBuses(this.planSeleccionado?.buses);
           this.modoVista = 'editor';
         }
 
@@ -874,6 +944,11 @@ export class Listado implements OnInit {
       error: (err) => {
         console.error(`Error al generar plan para ${tour.NombreTour}`, err);
         this.isPageLoading = false;
+        this.navbar.showAlert({
+          type: 'error',
+          title: 'No pudimos preparar el listado',
+          message: 'No se perdió información. Revisa la conexión y vuelve a intentarlo desde el servicio.',
+        });
       }
     });
   }
@@ -896,6 +971,7 @@ export class Listado implements OnInit {
   }
 
   private aplicarPlan(tour: TourProgramacion, sugerencia: Sugerencia, reservasSinAsignar: Reserva[], privados: any[] = [], destinoTour: DestinoTourProgramacion | null = null): void {
+    this.routingFallback = false;
     this.listadoPersistido = true;
     this.listadoDirty = false;
     this.listadoOrigen = 'db';
@@ -909,7 +985,7 @@ export class Listado implements OnInit {
     tour.totalReservas = totalReservas;
 
     this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
-    this.renumerarBusesGenericos(this.planSeleccionado?.buses);
+    renumberGenericBuses(this.planSeleccionado?.buses);
     this.reservasSinAsignar = reservasSinAsignar || [];
     this.busesPrivados = privados || [];
     this.destinoTourActual = destinoTour;
@@ -949,7 +1025,7 @@ export class Listado implements OnInit {
   crearNuevoBus(reserva: Reserva): void {
     if (!this.planSeleccionado) return;
 
-    const capacidad = this.findBestCapacityForPassengers(reserva.NumeroPasajeros) || this.CAPACIDADES_BUSES[0];
+    const capacidad = bestBusCapacity(reserva.NumeroPasajeros, this.CAPACIDADES_BUSES) || this.CAPACIDADES_BUSES[0];
     const nuevoBus: Bus = {
       id: '',
       capacidad,
@@ -959,7 +1035,7 @@ export class Listado implements OnInit {
     };
 
     this.planSeleccionado.buses.push(nuevoBus);
-    this.renumerarBusesGenericos(this.planSeleccionado.buses);
+    renumberGenericBuses(this.planSeleccionado.buses);
     this.markDirty();
   }
 
@@ -970,7 +1046,7 @@ export class Listado implements OnInit {
     const busesFiltrados = this.planSeleccionado.buses.filter(bus => bus.reservas && bus.reservas.length > 0);
 
     this.planSeleccionado.buses = busesFiltrados;
-    this.renumerarBusesGenericos(this.planSeleccionado.buses);
+    renumberGenericBuses(this.planSeleccionado.buses);
 
     const nuevaMapa = new Map<number, string[]>();
     busesFiltrados.forEach((bus, newIndex) => {
@@ -987,17 +1063,9 @@ export class Listado implements OnInit {
     this.planSeleccionado?.buses.forEach(bus => {
       bus.ocupados = bus.reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
       const needed = bus.ocupados || 0;
-      const best = this.findBestCapacityForPassengers(needed);
+      const best = bestBusCapacity(needed, this.CAPACIDADES_BUSES);
       if (best && best !== bus.capacidad) bus.capacidad = best;
     });
-  }
-
-  private findBestCapacityForPassengers(pasajeros: number): number | null {
-    if (!pasajeros || pasajeros <= 0) return this.CAPACIDADES_BUSES[0] ?? null;
-    for (const c of this.CAPACIDADES_BUSES) {
-      if (c >= pasajeros) return c;
-    }
-    return null;
   }
 
   private findBusByContainerId(containerId: string): Bus | undefined {
@@ -1015,8 +1083,8 @@ export class Listado implements OnInit {
     return [...reservas]
       .map((r, idx) => ({ r, idx }))
       .sort((a, b) => {
-        const ra = rank.get(this.getReservaPointKey(a.r));
-        const rb = rank.get(this.getReservaPointKey(b.r));
+        const ra = rank.get(reservationPointKey(a.r));
+        const rb = rank.get(reservationPointKey(b.r));
         const oa = ra !== undefined ? ra : Number.MAX_SAFE_INTEGER;
         const ob = rb !== undefined ? rb : Number.MAX_SAFE_INTEGER;
         if (oa !== ob) return oa - ob;
@@ -1033,93 +1101,7 @@ export class Listado implements OnInit {
     }
 
     const order = this.stopOrderByBus.get(this.activeBusIndex);
-    this.activeStops = this.groupStops(bus.reservas, order);
-  }
-
-  private groupStops(reservas: Reserva[], preferredOrder?: string[]): ViewStop[] {
-    const map = new Map<string, ViewStop>();
-    const appearanceOrder: string[] = [];
-
-    for (const r of reservas) {
-      // Si la reserva tiene múltiples puntos de encuentro, la expandimos en una entrada por punto.
-      // Cada entrada lleva __paxEnEstePunto con el sub-conteo de pasajeros de ese punto.
-      // Si no tiene puntosReserva, cae al comportamiento clásico: un único punto con NumeroPasajeros total.
-      const puntos: Array<{
-        Id_Punto: number | string | null;
-        NombrePunto: string;
-        Latitud: number | string | null;
-        Longitud: number | string | null;
-        ruta: string | null;
-        ordenRuta: number | null;
-        pasajeros: number;
-      }> = (r as any).puntosReserva?.length
-        ? (r as any).puntosReserva
-        : [{
-            Id_Punto: r.Id_Punto ?? (r as any).idPunto ?? (r as any).IdPunto ?? null,
-            NombrePunto: String(r.NombrePunto || (r as any).PuntoEncuentro || 'Sin punto').trim() || 'Sin punto',
-            Latitud: r.Latitud ?? null,
-            Longitud: r.Longitud ?? null,
-            ruta: (r as any).ruta ?? null,
-            ordenRuta: r.Orden_Ruta ?? (r as any).ordenRuta ?? null,
-            pasajeros: r.NumeroPasajeros || 0
-          }];
-
-      for (const punto of puntos) {
-        const idPunto = punto.Id_Punto;
-        const key = idPunto !== null && idPunto !== undefined && String(idPunto).trim() !== ''
-          ? `punto-${idPunto}`
-          : `nombre-${String(punto.NombrePunto || 'SIN_PUNTO').trim().toUpperCase()}`;
-
-        if (!map.has(key)) {
-          map.set(key, {
-            key,
-            Id_Punto: punto.Id_Punto ?? null,
-            NombrePunto: punto.NombrePunto || 'Sin punto',
-            reservas: [],
-            totalPax: 0,
-            ruta: punto.ruta ?? null,
-            ordenRuta: punto.ordenRuta ?? null,
-            Latitud: punto.Latitud ?? null,
-            Longitud: punto.Longitud ?? null
-          });
-          appearanceOrder.push(key);
-        }
-
-        const stop = map.get(key)!;
-        // Adjuntamos __paxEnEstePunto para que el template pueda mostrar el sub-conteo correcto.
-        stop.reservas.push({ ...r, __paxEnEstePunto: punto.pasajeros } as Reserva & { __paxEnEstePunto: number });
-        stop.totalPax += punto.pasajeros;
-      }
-    }
-
-    const stops = Array.from(map.values());
-
-    // Si el usuario ya reordenó paradas, respetar ese orden.
-    if (preferredOrder?.length) {
-      const rank = new Map(preferredOrder.map((n, i) => [n, i]));
-      stops.sort((a, b) =>
-        (rank.get(a.key) ?? 999) - (rank.get(b.key) ?? 999)
-      );
-      return stops;
-    }
-
-    // Orden recibido/actual del array: backend, DB o drag/drop ya convertido a bus.reservas.
-    stops.sort(
-      (a, b) =>
-        appearanceOrder.indexOf(a.key) -
-        appearanceOrder.indexOf(b.key)
-    );
-
-    return stops;
-  }
-
-  private getReservaPointKey(reserva: Reserva): string {
-    const idPunto = reserva.Id_Punto ?? (reserva as any).idPunto ?? (reserva as any).IdPunto;
-    if (idPunto !== null && idPunto !== undefined && String(idPunto).trim() !== '') {
-      return `punto-${idPunto}`;
-    }
-    const nombre = String(reserva.NombrePunto || (reserva as any).PuntoEncuentro || 'SIN_PUNTO').trim().toUpperCase();
-    return `nombre-${nombre}`;
+    this.activeStops = groupProgramacionStops(bus.reservas, order);
   }
 
   private syncAfterPlanMutation(options?: { updateMap?: boolean }): void {

@@ -1,484 +1,168 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="page-header-text">
-      <p>Gestiona la programación, generación y revisión de listados por fecha.</p>
-    </div>
-
-    <div class="page-header-actions">
-      <div class="form-group">
-        <label for="fecha" class="form-label">Fecha de Operación</label>
-        <app-datepicker
-          [(ngModel)]="fechaSeleccionada"
-          (dateChange)="onFechaOperacionChange()">
-        </app-datepicker>
+<div class="programacion-page">
+  @if (modoVista === 'dashboard') {
+    <header class="operation-header">
+      <div>
+        <span class="operation-label">Operación del día</span>
+        <p>Listados, capacidad y distribución de pasajeros por servicio.</p>
       </div>
-    </div>
-  </div>
+
+      <div class="date-control">
+        <label>Fecha de operación</label>
+        <div class="date-nav-control">
+          <button type="button" class="date-nav-btn" (click)="irDiaAnterior()" aria-label="Día anterior">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+          </button>
+
+          <div class="date-picker-wrap">
+            <app-datepicker
+              [ngModel]="fechaSeleccionada"
+              (dateChange)="onFechaOperacionSelected($event)">
+            </app-datepicker>
+          </div>
+
+          <button type="button" class="date-nav-btn" (click)="irDiaSiguiente()" aria-label="Día siguiente">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+
+          <button type="button" class="date-shortcut-btn" [class.active]="isTomorrowSelected()" (click)="irManana()">
+            {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+          </button>
+          <button type="button" class="date-shortcut-btn" [class.active]="isTodaySelected()" (click)="irHoy()">
+            Hoy
+          </button>
+        </div>
+      </div>
+    </header>
+  }
 
   @if (isPageLoading) {
     <app-loading-state
-      [label]="tourSeleccionado ? 'Cargando el editor de programación…' : 'Cargando la programación del día…'">
+      [label]="tourSeleccionado ? 'Preparando el editor…' : 'Cargando la operación del día…'">
     </app-loading-state>
-  }
-
-  @if (!isPageLoading && modoVista === 'dashboard') {
-  <section class="dashboard-section" [style.opacity]="isUpdatingDate ? '0.5' : '1'"
-    [style.pointer-events]="isUpdatingDate ? 'none' : 'auto'" style="transition: opacity 0.3s ease;">
-    @if (toursDelDia.length === 0) {
-    <div class="empty-state">
-      <h3>No hay programación para esta fecha</h3>
-      <p>Elige otra fecha o revisa que existan reservas y tours configurados.</p>
-    </div>
+  } @else if (loadError && modoVista === 'dashboard') {
+    <app-loading-state
+      mode="error"
+      label="No pudimos cargar la programación"
+      [detail]="loadError"
+      (action)="cargarToursDelDia()">
+    </app-loading-state>
+  } @else {
+    @if (modoVista === 'dashboard') {
+      <app-programacion-day-dashboard
+        [tours]="toursDelDia"
+        [updating]="isUpdatingDate"
+        [canCreate]="canCreateProgramacion"
+        [totalReservasPrivadas]="totalReservasPrivadas"
+        [totalBusesPrivados]="totalBusesPrivados"
+        [totalPaxPrivados]="totalPaxPrivados"
+        (tourSelected)="generarPlan($event)"
+        (privadosSelected)="abrirVistaPrivados()">
+      </app-programacion-day-dashboard>
     }
 
-    @if (toursDelDia.length > 0) {
-    <div class="capacity-dashboard">
-      @for (tour of toursDelDia; track tour.Id_Tour) {
-      <div class="capacity-card" role="button" tabindex="0"
-        (click)="canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
-        (keydown.enter)="canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
-        (keydown.space)="$event.preventDefault(); canCreateProgramacion && tour.totalPasajeros && tour.totalPasajeros > 0 ? generarPlan(tour) : null"
-        [attr.aria-label]="'Generar plan para ' + tour.NombreTour"
-        [attr.aria-disabled]="!canCreateProgramacion || !tour.totalPasajeros || tour.totalPasajeros === 0 ? 'true' : null"
-        [class.generated]="tour.estado === 'Generado'"
-        [class.disabled]="!canCreateProgramacion || !tour.totalPasajeros || tour.totalPasajeros === 0">
-
-        <div class="card-content">
-          <div class="stats-container">
-            <div class="card-header">
-              <h2 class="tour-name" [title]="tour.NombreTour">{{ tour.NombreTour }}</h2>
-              @if (tour.totalPasajeros && tour.totalPasajeros > 0) {
-              <span class="badge" [ngClass]="(tour.estado || 'Pendiente') | lowercase">
-                {{ tour.estado === 'Generado' ? 'Generado' : 'Pendiente' }}
-              </span>
-              } @else {
-              <span class="badge disabled">Sin reservas</span>
-              }
-            </div>
-
-            @if (!tour.totalPasajeros || tour.totalPasajeros === 0) {
-            <div class="metrics-row">
-              <div class="metric-cell">
-                <span class="metric-value">0</span>
-                <span class="metric-label">pasajeros</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
-                <span class="metric-label">reservas</span>
-              </div>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill blue" style="width: 0%"></div>
-            </div>
-
-            } @else if (tour.estado === 'Generado') {
-            <div class="metrics-row">
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalPasajeros || 0 }}</span>
-                <span class="metric-label">pasajeros</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
-                <span class="metric-label">reservas</span>
-              </div>
-              @if (tour.totalBuses) {
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalBuses }}</span>
-                <span class="metric-label">buses</span>
-              </div>
-              }
-            </div>
-            <div class="progress-track">
-              @let pct = tour.ocupacionPromedio || 0;
-              <div class="progress-fill" [class.green]="pct < 70" [class.yellow]="pct >= 70 && pct < 90"
-                [class.red]="pct >= 90" [style.width.%]="pct">
-              </div>
-            </div>
-
-            } @else {
-            <div class="metrics-row">
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalPasajeros || 0 }}</span>
-                <span class="metric-label">pasajeros</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ tour.totalReservas || 0 }}</span>
-                <span class="metric-label">reservas</span>
-              </div>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill blue" style="width: 0%"></div>
-            </div>
-            }
-          </div>
-        </div>
-
-        <div class="card-footer">
-          @if (tour.totalPasajeros && tour.totalPasajeros > 0) {
-          <span>{{ tour.estado === 'Generado' ? 'Plan generado, clic para revisar' : 'Clic para generar el plan logístico' }}</span>
-          } @else {
-          <span>Sin pasajeros</span>
-          }
-        </div>
-      </div>
-      }
-
-      <!-- ═══════════════════════════════════════════════════
-           CARD PRIVADOS
-           Card especial al final del dashboard. Solo visible
-           cuando hay reservas privadas en el día.
-           ═══════════════════════════════════════════════════ -->
-      @if (totalReservasPrivadas > 0) {
-      <div class="capacity-card privados-card"
-        role="button" tabindex="0"
-        (click)="abrirVistaPrivados()"
-        (keydown.enter)="abrirVistaPrivados()"
-        [attr.aria-label]="'Ver reservas privadas del día'">
-
-        <div class="card-content">
-          <div class="stats-container">
-            <div class="card-header">
-              <h2 class="tour-name">Privados del día</h2>
-              <span class="badge privados">{{ totalBusesPrivados }} buses</span>
-            </div>
-
-            <div class="metrics-row">
-              <div class="metric-cell">
-                <span class="metric-value">{{ totalReservasPrivadas }}</span>
-                <span class="metric-label">reservas</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ totalPaxPrivados }}</span>
-                <span class="metric-label">pasajeros</span>
-              </div>
-              <div class="metric-divider"></div>
-              <div class="metric-cell">
-                <span class="metric-value">{{ totalBusesPrivados }}</span>
-                <span class="metric-label">buses</span>
-              </div>
-            </div>
-
-            <div class="progress-track">
-              <div class="progress-fill blue" style="width: 100%"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card-footer">
-          <span>Clic para asignar placa y guía a cada bus</span>
-        </div>
-      </div>
-      }
-    </div>
+    @if (modoVista === 'editor' && planSeleccionado) {
+      <app-programacion-editor
+        [tourName]="tourSeleccionado?.NombreTour || ''"
+        [operationDate]="fechaSeleccionada"
+        [statusText]="editorStatusText"
+        [persisted]="listadoPersistido"
+        [dirty]="listadoDirty"
+        [newDraft]="listadoOrigen === 'nuevo' && !listadoPersistido"
+        [plan]="planSeleccionado"
+        [activeBusIndex]="activeBusIndex"
+        [activeBus]="activeBus"
+        [activeStops]="activeStops"
+        [unassigned]="reservasSinAsignar"
+        [totalPaxUnassigned]="totalPaxUnassigned"
+        [connectedDropLists]="connectedDropLists"
+        [canUpdate]="canUpdateProgramacion"
+        [dragging]="isDragging"
+        [saving]="isSaving"
+        [routingFallback]="routingFallback"
+        (closeRequested)="volverAlDashboard()"
+        (saveRequested)="guardarListadoFinal()"
+        (exportAllRequested)="descargarTodosLosListados()"
+        (busSelected)="selectBus($event)"
+        (previousBusRequested)="prevBus()"
+        (nextBusRequested)="nextBus()"
+        (busChanged)="markDirty()"
+        (mapRequested)="verMapa($event.bus, $event.index)"
+        (exportBusRequested)="descargarListadoBus($event)"
+        (stopDropped)="dropStop($event)"
+        (reservationDropped)="dropReserva($event)"
+        (dragStarted)="onDragStarted()"
+        (dragEnded)="onDragEnded()">
+      </app-programacion-editor>
     }
-  </section>
 
-  @if (reservasSinAsignar.length > 0) {
-  <section class="main-card unassigned-card">
-    <div class="main-card-header">
-      <div class="main-card-title">
-        <div class="t">Reservas sin asignar</div>
-        <div class="s">Nuevas reservas detectadas despues de generar el listado.</div>
-      </div>
-      <div class="main-card-actions">
-        <span class="pill">{{ reservasSinAsignar.length }} reservas</span>
-      </div>
-    </div>
-
-    <div class="unassigned-list">
-      @for (reserva of reservasSinAsignar; track reserva.Id_Reserva) {
-      <div class="unassigned-item">
-        <div class="unassigned-left">
-          <span class="unassigned-id">#{{ reserva.Id_Reserva }}</span>
-          <span class="unassigned-point">{{ reserva.NombrePunto || 'Sin punto' }}</span>
-        </div>
-        <span class="unassigned-pax">{{ reserva.NumeroPasajeros }} Pax</span>
-      </div>
-      }
-    </div>
-  </section>
-  }
-  }
-
-  <!-- ═══════════════════════════════════════════════════
-       VISTA PRIVADOS
-       Carril separado para reservas de tipo Privada.
-       Sin drag-and-drop. Solo placa y guía por bus.
-       ═══════════════════════════════════════════════════ -->
-  @if (!isPageLoading && modoVista === 'privados') {
-  <section class="editor-section privados-section">
-    <div class="editor-header">
-      <div class="editor-title">
-        <h3>Buses Privados</h3>
-        <p>{{ fechaSeleccionada }} · {{ totalReservasPrivadas }} reservas · {{ totalBusesPrivados }} buses</p>
-        @if (listadoPersistido && !listadoDirty) {
-          <span class="editor-pill persisted">Guardado</span>
-        } @else if (listadoDirty) {
-          <span class="editor-pill dirty">Cambios sin guardar</span>
-        }
-      </div>
-      <div class="editor-actions">
-        <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
-        @if (canUpdateProgramacion) {
-          <button class="btn-primary" (click)="guardarListadoFinal()">Guardar</button>
-        }
-        <button class="btn-primary" (click)="descargarTodosLosPrivadosExcel()">Descargar privados (Excel)</button>
-      </div>
-    </div>
-
-    <!-- Listado de reservas privadas, cada una con sus buses -->
-    <div class="privados-list">
-      @for (grupo of gruposPrivados; track grupo.Id_Reserva) {
-      <div class="privado-grupo">
-
-        <!-- Cabecera de la reserva -->
-        <div class="privado-grupo-header">
-          <div class="privado-grupo-left">
-            <span class="privado-reserva-id">#{{ grupo.Id_Reserva }}</span>
-            <div class="privado-grupo-info">
-              <span class="privado-nombre">{{ grupo.Nombre_Reportante || 'Sin responsable' }}</span>
-              <span class="privado-meta">{{ grupo.Nombre_Tour }} · {{ grupo.totalPax }} pax</span>
+    @if (modoVista === 'privados') {
+      <section class="private-workspace">
+        <header class="private-command">
+          <div class="private-title">
+            <button type="button" class="icon-button" (click)="volverAlDashboard()" aria-label="Volver a servicios">←</button>
+            <div>
+              <span class="module-eyebrow">Servicios privados</span>
+              <h2>Vehículos y guías</h2>
+              <p>{{ fechaSeleccionada }} · {{ totalReservasPrivadas }} reservas · {{ totalPaxPrivados }} pasajeros</p>
             </div>
           </div>
-          <div class="bus-actions">
-            @if (grupo.totalBuses > 1) {
-            <span class="privado-multibus-badge">{{ grupo.totalBuses }} buses</span>
-            }
-            <button class="btn-primary" (click)="descargarReservaPrivadaExcel(grupo)">Descargar Excel</button>
+          <div class="private-actions">
+            <button type="button" class="button button--secondary" (click)="descargarTodosLosPrivadosExcel()">
+              Exportar todos
+            </button>
           </div>
-        </div>
+        </header>
 
-        <!-- Buses de esta reserva -->
-        <div class="privado-buses">
-          @for (bus of grupo.buses; track bus.id) {
-          <div class="privado-bus-row">
-            <div class="privado-bus-label">
-              Bus {{ bus.indice }}/{{ bus.totalBuses }}
-              <span class="privado-pax-pill">{{ bus.ocupados }} pax</span>
-            </div>
-            <div class="privado-bus-fields">
-              <input
-                class="form-input small"
-                placeholder="Placa (ej: ABC-123)"
-                [(ngModel)]="bus.id"
-                (ngModelChange)="markDirty()"
-              />
-              <input
-                class="form-input small"
-                placeholder="Guía (opcional)"
-                [(ngModel)]="bus.guia"
-                (ngModelChange)="markDirty()"
-              />
-            </div>
-          </div>
-          }
-        </div>
-
-      </div>
-      }
-
-      @if (gruposPrivados.length === 0) {
-      <div class="stops-empty" style="padding: 48px; text-align: center;">
-        No hay reservas privadas para este día.
-      </div>
-      }
-    </div>
-  </section>
-  }
-
-  @if (!isPageLoading && modoVista === 'editor' && planSeleccionado) {
-  <section class="editor-section">
-    <div class="editor-header">
-      <div class="editor-title">
-        <h3>Editor de Listado</h3>
-        <p>{{ tourSeleccionado?.NombreTour }}</p>
-        @if (editorStatusText) {
-        <span class="editor-pill" [class.persisted]="listadoPersistido && !listadoDirty"
-          [class.dirty]="listadoDirty" [class.new]="listadoOrigen === 'nuevo' && !listadoPersistido">
-          {{ editorStatusText }}
-        </span>
-        }
-      </div>
-      <div class="editor-actions">
-        <button class="btn-secondary" (click)="volverAlDashboard()">Volver al Dashboard</button>
-        @if (canUpdateProgramacion) {
-          <button class="btn-primary" (click)="guardarListadoFinal()">Guardar Listado Final</button>
-        }
-        <button class="btn-primary" (click)="descargarTodosLosListados()">Descargar todos (Excel)</button>
-      </div>
-    </div>
-
-    <div class="md-layout" cdkDropListGroup>
-      <aside class="md-sidebar">
-        <div class="sidebar-card">
-          <div class="bus-list">
-            @if (reservasSinAsignar.length > 0) {
-            <div class="bus-item unassigned-bus" [class.active]="activeBusIndex === -1" (click)="selectBus(-1)"
-              cdkDropList id="unassigned-bus" [cdkDropListData]="reservasSinAsignar"
-              [cdkDropListConnectedTo]="connectedDropLists" (cdkDropListDropped)="dropReserva($event)">
-              <div class="bus-item-top">
-                <div class="bus-item-title">
-                  <span class="dot warning"></span>
-                  <span class="bus-name">Reservas sin Asignar</span>
-                </div>
-                <div class="bus-item-right">
-                  {{ reservasSinAsignar.length }} res · {{ totalPaxUnassigned }} pax
-                </div>
-              </div>
-              <div class="bus-item-bottom">
-                <span>Arrastra aquí para desasignar</span>
-              </div>
-            </div>
-            }
-
-            @for (bus of planSeleccionado.buses; track $index; let i = $index) {
-            @let pct = bus.capacidad ? (bus.ocupados / bus.capacidad) * 100 : 0;
-            <div class="bus-item" [class.active]="i === activeBusIndex" (click)="selectBus(i)" cdkDropList
-              [id]="'busdrop-' + i" [cdkDropListData]="bus.reservas" [cdkDropListConnectedTo]="connectedDropLists"
-              (cdkDropListDropped)="dropReserva($event)">
-              <div class="bus-item-top">
-                <div class="bus-item-title">
-                  <span class="bus-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
-                  <span class="bus-occ-pill" [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90"
-                    [class.danger]="pct >= 90">
-                    {{ pct | number:'1.0-0' }}%
-                  </span>
-                </div>
-                <div class="bus-item-right">
-                  {{ bus.ocupados }} / {{ bus.capacidad }}
-                </div>
-              </div>
-
-              <div class="bus-item-mid">
-                <input class="form-input small" placeholder="Placa" [(ngModel)]="bus.id" (ngModelChange)="markDirty()" />
-                <input class="form-input small" placeholder="Guía" [(ngModel)]="bus.guia" (ngModelChange)="markDirty()" />
-              </div>
-
-              <div class="bus-item-bottom">
-                <span>{{ bus.reservas.length }} reservas</span>
-                <div class="bus-actions">
-                  <button class="btn-secondary" (click)="verMapa(bus, i)">Ver mapa</button>
-                  <button class="btn-primary" (click)="descargarListadoBus(i)">Descargar</button>
-                </div>
-              </div>
-
-              <!-- <div class="bus-progress">
-                <span [class.ok]="pct < 70" [class.warn]="pct >= 70 && pct < 90" [class.danger]="pct >= 90"
-                  [style.width.%]="pct"></span>
-              </div> -->
-            </div>
-            }
-
-            <div class="bus-item newbus" [class.hidden]="!isDragging" cdkDropList id="new-bus"
-              [cdkDropListData]="newBusDropData" [cdkDropListConnectedTo]="connectedDropLists"
-              (cdkDropListDropped)="dropReserva($event)">
-              <div class="bus-item-top">
-                <div class="bus-item-title">
-                  <span class="bus-name">Nuevo bus</span>
-                </div>
-                <div class="bus-item-right">Opcional</div>
-              </div>
-              <div class="bus-item-bottom">
-                <span>Suelta aquí para crear otro bus</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <main class="md-main">
-        @if (activeBusIndex !== -1) {
-        <section class="main-card">
-          <div class="main-card-header">
-            <div class="main-card-title">
-              <div class="t">Ruta · {{ activeBus?.id || ('Bus ' + (activeBusIndex + 1)) }}</div>
-              <div class="s">Arrastra para reordenar paradas</div>
-            </div>
+        <div class="private-list">
+          <div class="private-export-note" role="note">
+            <span aria-hidden="true">i</span>
+            <p><strong>Preparación para exportación</strong> La placa y el guía se aplican a los archivos que descargues en esta sesión.</p>
           </div>
 
-          <div class="route-list" cdkDropList id="route-order" [cdkDropListData]="activeStops" cdkDropListLockAxis="y"
-            (cdkDropListDropped)="dropStop($event)">
-            @for (stop of activeStops; track stop.key; let p = $index) {
-            <div class="route-item" cdkDrag cdkDragLockAxis="y">
-              <div class="route-left">
-                <span class="route-index">{{ p + 1 }}</span>
-                <div class="route-info">
-                  <div class="route-name">{{ stop.NombrePunto }}</div>
-                  <div class="route-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</div>
+          @for (grupo of gruposPrivados; track grupo.Id_Reserva) {
+            <article class="private-card">
+              <header>
+                <div>
+                  <span class="private-code">#{{ grupo.Id_Reserva }}</span>
+                  <h3>{{ grupo.Nombre_Reportante || 'Sin responsable' }}</h3>
+                  <p>{{ grupo.Nombre_Tour }} · {{ grupo.totalPax }} pasajeros</p>
                 </div>
-              </div>
-              <div class="route-handle">⋮⋮</div>
-            </div>
-            }
-          </div>
-        </section>
-        }
+                <button type="button" class="button button--quiet" (click)="descargarReservaPrivadaExcel(grupo)">
+                  Descargar
+                </button>
+              </header>
 
-        <section class="main-card">
-          <div class="main-card-header">
-            <div class="main-card-title">
-              <div class="t">Reservas · {{ activeBus?.id || ('Bus ' + (activeBusIndex + 1)) }}</div>
-              <div class="s">Arrastra una reserva al sidebar para moverla a otro bus</div>
-            </div>
-            <div class="main-card-actions">
-              <span class="pill">{{ activeBus?.reservas?.length || 0 }} reservas · {{ activeBus?.ocupados || 0 }} pax</span>
-            </div>
-          </div>
-
-          <div class="stops-grid" cdkDropList id="active-bus" [cdkDropListData]="activeBus?.reservas"
-            [cdkDropListConnectedTo]="connectedDropLists" [cdkDropListSortingDisabled]="true"
-            (cdkDropListDropped)="dropReserva($event)">
-
-            @if (activeBus?.reservas?.length === 0) {
-              <div class="stops-empty">Sin reservas asignadas a este bus</div>
-            }
-
-            @for (stop of activeStops; track stop.key; let p = $index) {
-            <div class="stop-group">
-              <div class="stop-group-header">
-                <span class="stop-group-index">{{ p + 1 }}</span>
-                <span class="stop-group-name">{{ stop.NombrePunto }}</span>
-                <span class="stop-group-meta">{{ stop.totalPax }} pax · {{ stop.reservas.length }} reservas</span>
-              </div>
-
-              <div class="stop-group-body">
-                @for (reserva of stop.reservas; track reserva.Id_Reserva) {
-                <div class="reserva-card" cdkDrag (cdkDragStarted)="onDragStarted()" (cdkDragEnded)="onDragEnded()">
-                  <div class="reserva-drag-col">
-                    <span class="reserva-drag-handle">⋮⋮</span>
+              <div class="private-buses">
+                @for (bus of grupo.buses; track bus) {
+                  <div class="private-bus">
+                    <span class="private-bus-number">{{ bus.indice || $index + 1 }}</span>
+                    <div class="private-bus-summary">
+                      <strong>Bus {{ bus.indice || $index + 1 }} de {{ bus.totalBuses || grupo.buses.length }}</strong>
+                      <span>{{ bus.ocupados }} pasajeros</span>
+                    </div>
+                    <label>
+                      <span>Placa o identificación</span>
+                      <input [(ngModel)]="bus.id" placeholder="Asignar vehículo">
+                    </label>
+                    <label>
+                      <span>Guía</span>
+                      <input [(ngModel)]="bus.guia" placeholder="Asignar guía">
+                    </label>
                   </div>
-                  <div class="reserva-main-col">
-                    <span class="reserva-id">#{{ reserva.Id_Reserva }}</span>
-                    @if (reserva.NumeroPasajeros > (reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros)) {
-                    <span class="reserva-multipunto-hint" title="Esta reserva tiene pasajeros en otros puntos de esta misma ruta">
-                      multipunto
-                    </span>
-                    }
-                  </div>
-                  <div class="reserva-pax-col">
-                    <!-- Si la reserva tiene pasajeros en múltiples puntos, mostrar los de ESTE punto
-                         en lugar del total. El total sigue visible en el tooltip. -->
-                    <span class="reserva-pax"
-                      [title]="reserva.NumeroPasajeros !== (reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros)
-                        ? 'Total reserva: ' + reserva.NumeroPasajeros + ' pax'
-                        : ''">
-                      {{ reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros }} Pax
-                    </span>
-                  </div>
-                </div>
                 }
               </div>
-            </div>
-            }
-          </div>
-        </section>
-      </main>
-    </div>
-  </section>
+            </article>
+          } @empty {
+            <div class="private-empty">No hay servicios privados para esta fecha.</div>
+          }
+        </div>
+      </section>
+    }
   }
 </div>

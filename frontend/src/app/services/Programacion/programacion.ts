@@ -57,7 +57,7 @@ export class ProgramacionDashboardService {
     } else {
       payload.idTour = idTour;
     }
-    return this.http.post<PlanLogistico>(`${this.apiUrl}/plan-logistico`, payload);
+    return this.http.post<PlanLogistico>(`${this.apiUrl}/plan-logistico-optimizado`, payload);
   }
 
   /**

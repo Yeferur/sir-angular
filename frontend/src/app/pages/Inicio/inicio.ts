@@ -168,6 +168,10 @@ export class Inicio implements OnInit, OnDestroy {
     return this.fecha === this.getTomorrowIso();
   }
 
+  isTodaySelected(): boolean {
+    return this.fecha === this.getTodayIso();
+  }
+
   private goToDate(iso: string): void {
     if (!iso || iso === this.fecha) return;
 
