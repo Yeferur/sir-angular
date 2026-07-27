@@ -7782,8 +7782,10 @@ CREATE TABLE IF NOT EXISTS `puntos` (
   `posicion` int NOT NULL DEFAULT '0',
   `Latitud` decimal(10,7) DEFAULT NULL,
   `Longitud` decimal(10,7) DEFAULT NULL,
+  `Activo` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`Id_Punto`),
-  KEY `idx_puntos_ruta_pos` (`ruta`,`posicion`,`Id_Punto`)
+  KEY `idx_puntos_ruta_pos` (`ruta`,`posicion`,`Id_Punto`),
+  KEY `idx_puntos_activo_ruta_pos` (`Activo`,`ruta`,`posicion`,`Id_Punto`)
 ) ENGINE=InnoDB AUTO_INCREMENT=632 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --

@@ -92,6 +92,42 @@ exports.exportarListadoBusController = async (req, res) => {
 };
 
 /**
+ * Ejecuta el generador actual y el nuevo optimizador en modo sombra.
+ * No guarda ni reemplaza listados.
+ */
+exports.generarComparacionLogisticaShadowController = async (req, res) => {
+    const { fecha, idTour, idsTours, maxGuiasBilingues } = req.body || {};
+    const tours = idsTours || idTour;
+
+    if (!fecha || !tours) {
+        return sendError(res, {
+            status: 400,
+            message: 'Se requiere fecha e idsTours (o idTour).',
+            errorCode: 'MISSING_PARAMS'
+        });
+    }
+
+    try {
+        const resultado = await cerebro.generarComparacionLogisticaShadow(
+            fecha,
+            tours,
+            { maxGuiasBilingues }
+        );
+        return sendSuccess(res, {
+            data: resultado,
+            message: 'Comparación logística en modo sombra generada correctamente'
+        });
+    } catch (error) {
+        console.error('Error al generar comparación logística en modo sombra:', error);
+        return sendError(res, {
+            status: 500,
+            message: error?.message || 'No fue posible ejecutar el banco de pruebas logístico.',
+            errorCode: 'SHADOW_PLAN_FAILED'
+        });
+    }
+};
+
+/**
  * Exporta una reserva privada en formato Excel.
  * Body: { fecha: 'YYYY-MM-DD', idReserva: string, buses: [...], nombreTour?: string, nombreReportante?: string }
  */

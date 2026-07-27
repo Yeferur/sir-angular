@@ -4,6 +4,13 @@ const fsSync = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 const { recordHistorial } = require('../Historial/logger');
+const {
+    generarPlanSombra,
+    normalizarReservas: normalizarReservasSombra,
+} = require('./shadow/programacion-shadow.optimizer');
+const {
+    prepararMatrizOSRM,
+} = require('./shadow/programacion-shadow.distances');
 
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
@@ -2091,6 +2098,115 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
     };
 }
 
+function resumirPlanParaComparacion(plan, reservasEsperadas = []) {
+    const buses = Array.isArray(plan?.buses) ? plan.buses : [];
+    const apariciones = new Map();
+
+    for (const bus of buses) {
+        for (const reserva of bus?.reservas || []) {
+            const id = String(reserva?.Id_Reserva || '').trim();
+            if (!id) continue;
+            apariciones.set(id, (apariciones.get(id) || 0) + 1);
+        }
+    }
+
+    const idsEsperados = new Set(
+        (reservasEsperadas || [])
+            .map(reserva => String(reserva?.Id_Reserva || '').trim())
+            .filter(Boolean)
+    );
+    const reservasDuplicadas = Array.from(apariciones.values()).filter(cantidad => cantidad > 1).length;
+    const reservasOmitidas = Array.from(idsEsperados).filter(id => !apariciones.has(id)).length;
+    const cargas = buses.map(bus => Number(bus?.ocupados || 0));
+    const busesBilingues = buses.filter(bus => (
+        (bus?.reservas || []).some(reserva => {
+            const idioma = String(reserva?.Idioma_Reserva || reserva?.IdiomaReserva || '')
+                .trim()
+                .toUpperCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+            return idioma.includes('INGLES');
+        })
+    )).length;
+
+    return {
+        totalBuses: buses.length,
+        busesCompletos: cargas.filter(carga => carga === CAPACIDAD_BUS_GENERACION).length,
+        busesBilingues,
+        cargas,
+        pasajeros: cargas.reduce((sum, carga) => sum + carga, 0),
+        sillasVacias: buses.reduce(
+            (sum, bus) => sum + Math.max(0, CAPACIDAD_BUS_GENERACION - Number(bus?.ocupados || 0)),
+            0
+        ),
+        distanciaTotalKm: Number(
+            buses.reduce((sum, bus) => sum + Number(bus?.recorridoKm || 0), 0).toFixed(2)
+        ),
+        reservasDuplicadas,
+        reservasOmitidas,
+        reservasSinAsignar: Array.isArray(plan?.reservasSinAsignar)
+            ? plan.reservasSinAsignar.length
+            : 0,
+    };
+}
+
+/**
+ * Banco de pruebas lógico. No persiste ni reemplaza la programación actual.
+ * Ejecuta ambos motores sobre la misma fecha y devuelve métricas comparables.
+ */
+async function generarComparacionLogisticaShadow(fecha, idsTours, opciones = {}) {
+    const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
+    const [planActual, reservas, tourDestinos] = await Promise.all([
+        generarPlanLogistico(fecha, tours),
+        obtenerReservas(fecha, tours),
+        obtenerCoordenadasTours(tours),
+    ]);
+    const destinoTour = resolverDestinoTour(tours, tourDestinos);
+    const reservasNormalizadas = normalizarReservasSombra(reservas);
+    const puntosMatriz = [
+        CONFIG.PUNTO_BASE,
+        destinoTour,
+        ...reservasNormalizadas.flatMap(reserva => reserva.puntos),
+    ].filter(Boolean);
+    const matrizDistancias = await prepararMatrizOSRM({ puntos: puntosMatriz });
+    const planSombra = generarPlanSombra({
+        reservas,
+        puntoBase: CONFIG.PUNTO_BASE,
+        destino: destinoTour,
+        maxGuiasBilingues: opciones?.maxGuiasBilingues ?? null,
+        distancias: matrizDistancias.contexto,
+        fuenteDistancias: matrizDistancias.fuente,
+        metadataDistancias: matrizDistancias.metadata,
+    });
+    if (matrizDistancias.metadata?.motivoFallback
+        && matrizDistancias.metadata?.osrmConfigurado) {
+        planSombra.alertas.push({
+            tipo: 'OSRM_NO_DISPONIBLE',
+            mensaje: matrizDistancias.metadata.motivoFallback,
+        });
+    }
+    const actual = resumirPlanParaComparacion(planActual, reservas);
+    const sombra = planSombra.metricas;
+
+    return {
+        modo: 'sombra',
+        fecha,
+        tours,
+        persisteCambios: false,
+        actual,
+        sombra: planSombra,
+        diferencia: {
+            buses: sombra.totalBuses - actual.totalBuses,
+            busesCompletos: sombra.busesCompletos - actual.busesCompletos,
+            busesBilingues: sombra.busesBilingues - actual.busesBilingues,
+            sillasVacias: sombra.sillasVacias - actual.sillasVacias,
+            distanciaKm: null,
+            distanciasComparables: false,
+            motivoDistanciaNoComparable: 'Los motores pueden usar fuentes y criterios de recorrido distintos; compare cada fuente por separado.',
+        },
+    };
+}
+
 async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
     if (!fecha || !idsTours || !Array.isArray(buses)) {
         throw createValidationError('Datos inválidos para guardar el listado.', [
@@ -2217,6 +2333,7 @@ async function resumenPrivadosDia(fecha, idsTours) {
 
 module.exports = {
     generarPlanLogistico,
+    generarComparacionLogisticaShadow,
     resumenPrivadosDia,
     generarExcelReservaPrivada,
     generarExcelListadoBus,

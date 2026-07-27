@@ -107,10 +107,15 @@ exports.deleteTour = async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.id || null;
     const data = await eliminarTour(id, userId);
-    return sendSuccess(res, { data, message: 'Tour desactivado correctamente' });
+    return sendSuccess(res, {
+      data,
+      message: data?.accion === 'DESACTIVADO'
+        ? 'El tour se desactivó porque tiene reservas asociadas.'
+        : 'Tour eliminado definitivamente.'
+    });
   } catch (e) {
-    console.error('Error al desactivar tour:', e);
-    return sendError(res, { status: 400, message: e.message || 'Error al desactivar tour', errorCode: 'BAD_REQUEST' });
+    console.error('Error al eliminar tour:', e);
+    return sendError(res, { status: 400, message: e.message || 'Error al eliminar tour', errorCode: 'BAD_REQUEST' });
   }
 };
 

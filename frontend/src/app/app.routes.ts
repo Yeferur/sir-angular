@@ -105,6 +105,7 @@ export const routes: Routes = [
     path: 'Puntos/OrdenarPuntos',
     loadComponent: () => import('./pages/Puntos/ordenar-puntos/ordenar-puntos').then((m) => m.OrdenarPuntosComponent),
     canActivate: [authGuard, permisoGuard],
+    canDeactivate: [unsavedChangesGuard],
     data: { permiso: 'PUNTOS.ORDENAR', redirectTo: '/Puntos/VerPuntos' },
     title: 'Ordenar Puntos',
   },

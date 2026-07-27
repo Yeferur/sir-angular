@@ -1,5 +1,12 @@
 @if (isLoading()) {
   <app-loading-state label="Cargando el punto y sus horarios…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar la edición del punto"
+    [detail]="loadError()"
+    (action)="loadInitialData()">
+  </app-loading-state>
 } @else {
 <div class="booking-dashboard">
   <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
@@ -75,7 +82,8 @@
             <label class="form-label">
               Coordenadas <span class="required-star">*</span>
             </label>
-            <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
+            <input formControlName="Coordenadas" type="text" class="form-input"
+              (input)="onCoordenadasInput()" placeholder="Ej: 6.244747, -75.574756"
               [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
             @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
             @if (form.get('Coordenadas')?.errors?.['required']) {
@@ -90,8 +98,84 @@
             }
             <p class="form-hint">Busca el punto en Google Maps -> click derecho -> "Copiar coordenadas" y pégalas aquí.
             </p>
+            @if (coordinateStatus() !== 'idle') {
+            <p class="coordinate-status" [class.coordinate-status--valid]="coordinateStatus() === 'valid'"
+              [class.coordinate-status--invalid]="coordinateStatus() === 'invalid'">
+              {{ coordinateDetail() }}
+            </p>
+            }
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Ruta y Posición</h2>
+            <p class="card-subtitle">Define la ruta del punto y el lugar que ocupará dentro del recorrido.</p>
+          </div>
+        </div>
+
+        @if (esPuntoProtegido()) {
+        <div class="protected-route">
+          <div>
+            <span class="form-label">Ruta</span>
+            <strong>Ruta 0</strong>
+          </div>
+          <div>
+            <span class="form-label">Posición</span>
+            <strong>Posición 1</strong>
+          </div>
+          <p>Estación Poblado es el inicio protegido de este recorrido.</p>
+        </div>
+        } @else {
+        <div class="route-mode-grid">
+          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'existing'">
+            <input type="radio" formControlName="routeMode" value="existing" (change)="onRouteModeChange()">
+            <span><strong>Ruta existente</strong><small>Ubicar dentro de un recorrido actual</small></span>
+          </label>
+          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'pending'">
+            <input type="radio" formControlName="routeMode" value="pending" (change)="onRouteModeChange()">
+            <span><strong>Dejar pendiente</strong><small>Definir la ruta más adelante</small></span>
+          </label>
+          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'new'">
+            <input type="radio" formControlName="routeMode" value="new" (change)="onRouteModeChange()">
+            <span><strong>Nueva ruta</strong><small>Crear una referencia flexible</small></span>
+          </label>
+        </div>
+
+        @if (form.value.routeMode === 'existing') {
+        <div class="form-grid route-fields">
+          <div class="form-group">
+            <label class="form-label" for="editarRutaExistente">Ruta</label>
+            <select id="editarRutaExistente" class="form-input" formControlName="rutaExistente"
+              (change)="onRutaExistenteChange($any($event.target).value)">
+              @for (ruta of rutas(); track ruta) {
+              <option [value]="ruta">Ruta {{ ruta }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editarPuntoAnterior">Posición</label>
+            <select id="editarPuntoAnterior" class="form-input" formControlName="IdPuntoAnterior"
+              (change)="onPosicionChange()">
+              <option [ngValue]="null">Al final de la ruta</option>
+              @for (punto of puntosRuta(); track punto.Id_Punto) {
+              <option [ngValue]="punto.Id_Punto">
+                Después de {{ punto.NombrePunto || punto.Nombre_Punto }} · Posición {{ punto.posicion || punto.Posicion }}
+              </option>
+              }
+            </select>
+          </div>
+        </div>
+        } @else if (form.value.routeMode === 'new') {
+        <div class="form-group route-new-field">
+          <label class="form-label" for="editarRutaNueva">Nombre o número de la nueva ruta</label>
+          <input id="editarRutaNueva" class="form-input" formControlName="rutaNueva" maxlength="50"
+            (input)="onPosicionChange()" placeholder="Ej: 15 u Occidente">
+        </div>
+        }
+        }
       </div>
 
       <div class="card">
@@ -133,10 +217,10 @@
 @if (canUpdatePunto) {
 <div class="floating-save-bar">
   <button class="btn-submit btn-submit-floating" type="submit" form="editarPuntoForm"
-    [disabled]="isSubmitting() || similarityState === 'exact'">
-    @if (isSubmitting()) {
+    [disabled]="isSubmitting() || coordinateStatus() === 'checking' || similarityState === 'exact'">
+    @if (isSubmitting() || coordinateStatus() === 'checking') {
     <span class="btn-spinner"></span>
-    Guardando...
+    {{ isSubmitting() ? 'Guardando...' : 'Validando...' }}
     } @else {
     Guardar cambios
     }

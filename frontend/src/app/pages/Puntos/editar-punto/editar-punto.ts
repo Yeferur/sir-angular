@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -15,6 +15,7 @@ import { Reservas } from '../../../services/Reservas/reservas';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { finalize, firstValueFrom, Subscription } from 'rxjs';
 
 const ADDRESS_SIMILARITY_THRESHOLD = 0.88;
 const ADDRESS_NAME_SIMILARITY_THRESHOLD = 0.82;
@@ -27,28 +28,44 @@ const NAME_SIMILARITY_THRESHOLD = 0.75;
   standalone: true,
   imports: [ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
 })
-export class EditarPuntoComponent implements OnInit {
+export class EditarPuntoComponent implements OnInit, OnDestroy {
   isLoading = signal(true);
+  loadError = signal('');
   isSubmitting = signal(false);
   successMsg = '';
   errorMsg = '';
 
   form: any;
   tours = signal<any[]>([]);
+  rutas = signal<string[]>([]);
+  puntosRuta = signal<any[]>([]);
+  coordinateStatus = signal<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  coordinateDetail = signal('');
+  esPuntoProtegido = signal(false);
   horariosMap: Record<number | string, string> = {};
   similarityState: 'none' | 'similar' | 'exact' = 'none';
   duplicatePoint: any = null;
   private addrTimer: any = null;
+  private routePointsRequest?: Subscription;
+  private addressRequest?: Subscription;
   puntoId: number | null = null;
   private toursLoaded = false;
+  private rutasLoaded = false;
   private puntoLoaded = false;
+  private rutaOriginal = '';
+  private posicionOriginal = 0;
+  private reubicar = false;
 
   constructor(private fb: FormBuilder, private puntos: puntosService, private route: ActivatedRoute, private router: Router, private reservasSvc: Reservas, private alerts: SirAlertService, private permisosService: PermisosService) {
     this.form = this.fb.group({
       NombrePunto: ['', [Validators.required, Validators.maxLength(255)]],
       Sector: ['', [Validators.required, Validators.maxLength(255)]],
       Direccion: ['', [Validators.required]],
-      Coordenadas: ['', [Validators.required, this.coordenadasValidator()]]
+      Coordenadas: ['', [Validators.required, this.coordenadasValidator()]],
+      routeMode: ['existing'],
+      rutaExistente: [''],
+      rutaNueva: [''],
+      IdPuntoAnterior: [null]
     });
   }
 
@@ -57,16 +74,56 @@ export class EditarPuntoComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadTours();
     const idParam = this.route.snapshot.paramMap.get('id');
-    if (idParam) {
-      this.puntoId = Number(idParam);
-      this.loadPunto(this.puntoId);
-    } else {
-      this.alerts.errorToast('Error', 'ID de punto inválido');
-      this.puntoLoaded = true;
-      this.markInitialLoadDone();
+    this.puntoId = Number(idParam);
+    this.loadInitialData();
+  }
+
+  ngOnDestroy(): void {
+    if (this.addrTimer) clearTimeout(this.addrTimer);
+    this.routePointsRequest?.unsubscribe();
+    this.addressRequest?.unsubscribe();
+  }
+
+  loadInitialData(): void {
+    if (!this.puntoId || !Number.isInteger(this.puntoId) || this.puntoId <= 0) {
+      this.isLoading.set(false);
+      this.loadError.set('El identificador del punto no es válido.');
+      return;
     }
+
+    this.loadError.set('');
+    this.isLoading.set(true);
+    this.toursLoaded = false;
+    this.rutasLoaded = false;
+    this.puntoLoaded = false;
+    this.horariosMap = {};
+    this.loadTours();
+    this.loadRutas();
+    this.loadPunto(this.puntoId);
+  }
+
+  private loadRutas(): void {
+    this.puntos.getRutasPuntos().subscribe({
+      next: rutas => {
+        this.rutas.set((rutas || [])
+          .filter(ruta => String(ruta).toUpperCase() !== 'PENDIENTE')
+          .sort((a, b) => String(a).localeCompare(String(b), 'es', {
+            numeric: true,
+            sensitivity: 'base'
+          })));
+      },
+      error: () => {
+        this.rutas.set([]);
+        this.loadError.set('No se pudieron cargar las rutas disponibles.');
+        this.rutasLoaded = true;
+        this.markInitialLoadDone();
+      },
+      complete: () => {
+        this.rutasLoaded = true;
+        this.markInitialLoadDone();
+      }
+    });
   }
 
   parseCoordenadas(val: string): { lat: number; lng: number } | null {
@@ -97,7 +154,7 @@ export class EditarPuntoComponent implements OnInit {
       error: () => {
         this.tours.set([]);
         this.toursLoaded = true;
-        this.alerts.errorToast('Error', 'No se pudieron cargar los tours.');
+        this.loadError.set('No se pudieron cargar los tours y sus horarios.');
         this.markInitialLoadDone();
       },
       complete: () => {
@@ -111,12 +168,23 @@ export class EditarPuntoComponent implements OnInit {
     this.isLoading.set(true);
     this.puntos.getPunto(id).subscribe({
       next: (p: Punto) => {
+        const rutaActual = String(p.ruta || 'PENDIENTE');
+        this.rutaOriginal = rutaActual;
+        this.posicionOriginal = Number(p.posicion || p.Posicion || 0);
+        this.esPuntoProtegido.set(Boolean((p as any).EsProtegido));
         this.form.patchValue({
           NombrePunto: p.NombrePunto || p.Nombre_Punto || '',
           Sector: p.Sector || '',
           Direccion: p.Direccion || '',
-          Coordenadas: this.formatCoordenadas(p.Latitud, p.Longitud)
+          Coordenadas: this.formatCoordenadas(p.Latitud, p.Longitud),
+          routeMode: rutaActual.toUpperCase() === 'PENDIENTE' ? 'pending' : 'existing',
+          rutaExistente: rutaActual.toUpperCase() === 'PENDIENTE' ? '' : rutaActual,
+          rutaNueva: '',
+          IdPuntoAnterior: null
         });
+        if (rutaActual.toUpperCase() !== 'PENDIENTE') {
+          this.loadPuntosRuta(rutaActual, true);
+        }
         // Cargar horarios si vienen del backend
         if ((p as any).horarios && Array.isArray((p as any).horarios)) {
           for (const h of (p as any).horarios) {
@@ -127,7 +195,7 @@ export class EditarPuntoComponent implements OnInit {
         this.markInitialLoadDone();
       },
       error: () => {
-        this.alerts.errorToast('Error', 'No se pudo cargar el punto');
+        this.loadError.set('No se pudo cargar la información del punto.');
         this.puntoLoaded = true;
         this.markInitialLoadDone();
       },
@@ -139,13 +207,84 @@ export class EditarPuntoComponent implements OnInit {
   }
 
   private markInitialLoadDone(): void {
-    if (this.toursLoaded && this.puntoLoaded) {
+    if (this.toursLoaded && this.rutasLoaded && this.puntoLoaded) {
       this.isLoading.set(false);
     }
   }
 
+  onRouteModeChange(): void {
+    if (this.esPuntoProtegido()) return;
+    this.routePointsRequest?.unsubscribe();
+    this.reubicar = true;
+    this.puntosRuta.set([]);
+    this.form.patchValue({ IdPuntoAnterior: null });
+    if (this.form.value.routeMode === 'existing' && this.form.value.rutaExistente) {
+      this.loadPuntosRuta(this.form.value.rutaExistente, false);
+    }
+  }
+
+  onRutaExistenteChange(ruta: string): void {
+    if (this.esPuntoProtegido()) return;
+    this.reubicar = true;
+    this.form.patchValue({ rutaExistente: ruta, IdPuntoAnterior: null });
+    this.loadPuntosRuta(ruta, false);
+  }
+
+  onPosicionChange(): void {
+    if (!this.esPuntoProtegido()) this.reubicar = true;
+  }
+
+  private loadPuntosRuta(ruta: string, seleccionarPosicionActual: boolean): void {
+    this.routePointsRequest?.unsubscribe();
+    if (!ruta) return this.puntosRuta.set([]);
+    this.routePointsRequest = this.puntos.getPuntosPorRuta(ruta).subscribe({
+      next: puntos => {
+        const lista = (puntos || []).filter(
+          punto => Number(punto?.Id_Punto || punto?.IdPunto) !== Number(this.puntoId)
+        );
+        this.puntosRuta.set(lista);
+        if (seleccionarPosicionActual && ruta === this.rutaOriginal) {
+          const anterior = lista
+            .filter(punto => Number(punto?.posicion || punto?.Posicion || 0) < this.posicionOriginal)
+            .sort((a, b) => Number(b?.posicion || b?.Posicion || 0) - Number(a?.posicion || a?.Posicion || 0))[0];
+          this.form.patchValue({ IdPuntoAnterior: anterior?.Id_Punto || anterior?.IdPunto || null });
+        }
+      },
+      error: () => this.puntosRuta.set([])
+    });
+  }
+
+  private rutaSeleccionada(): string {
+    if (this.esPuntoProtegido()) return '0';
+    const mode = this.form.value.routeMode;
+    if (mode === 'pending') return 'PENDIENTE';
+    if (mode === 'new') return String(this.form.value.rutaNueva || '').trim();
+    return String(this.form.value.rutaExistente || '').trim();
+  }
+
+  onCoordenadasInput(): void {
+    if (this.coordinateStatus() === 'idle') return;
+    this.coordinateStatus.set('idle');
+    this.coordinateDetail.set('');
+  }
+
+  private descripcionPosicion(): string {
+    if (!this.reubicar) return `Posición ${this.posicionOriginal}`;
+    const raw = this.form.getRawValue();
+    if (raw.routeMode === 'pending') return 'Al final de los puntos pendientes';
+    if (raw.routeMode === 'new') return 'Posición 1';
+    const anteriorId = Number(raw.IdPuntoAnterior || 0);
+    if (!anteriorId) return `Al final de la ruta · Posición ${this.puntosRuta().length + 1}`;
+    const anterior = this.puntosRuta().find(p => Number(p?.Id_Punto || p?.IdPunto) === anteriorId);
+    const nombre = String(anterior?.NombrePunto || anterior?.Nombre_Punto || 'punto seleccionado');
+    const index = this.puntosRuta().findIndex(
+      p => Number(p?.Id_Punto || p?.IdPunto) === anteriorId
+    );
+    return `Después de ${nombre}${index >= 0 ? ` · Posición ${index + 2}` : ''}`;
+  }
+
 async onSubmitGuardarCambios() {
-  if (this.isSubmitting()) return;
+  if (this.isSubmitting() || this.coordinateStatus() === 'checking') return;
 
   // ===== Validación del formulario ANTES de confirmar =====
   this.form.updateValueAndValidity({ emitEvent: false });
@@ -177,6 +316,27 @@ async onSubmitGuardarCambios() {
     this.alerts.warningToast('Punto duplicado', 'Ya existe un punto con ese nombre y esa dirección');
     return;
   }
+  if (!this.rutaSeleccionada()) {
+    this.alerts.warningToast('Ruta requerida', 'Selecciona una ruta, déjala pendiente o escribe una nueva.');
+    return;
+  }
+
+  const coords = this.parseCoordenadas(this.form.value.Coordenadas || '');
+  if (!coords) return;
+  if (this.coordinateStatus() !== 'valid') {
+    this.coordinateStatus.set('checking');
+    this.coordinateDetail.set('Validando conexión con la red vial…');
+    try {
+      const result = await firstValueFrom(this.puntos.validarCoordenadas(coords.lat, coords.lng));
+      this.coordinateStatus.set('valid');
+      this.coordinateDetail.set(`Ubicación operativa · vía a ${result.distanciaViaMetros} m`);
+    } catch (error: any) {
+      this.coordinateStatus.set('invalid');
+      this.coordinateDetail.set(error?.error?.message || 'OSRM no pudo conectar estas coordenadas con una vía.');
+      this.alerts.errorToast('Coordenadas no operativas', this.coordinateDetail());
+      return;
+    }
+  }
 
   const confirmed = this.similarityState === 'similar'
     ? await this.requestSimilarPointConfirmation()
@@ -203,11 +363,18 @@ private guardarCambiosConfirmado() {
     Latitud: coords?.lat ?? null,
     Longitud: coords?.lng ?? null
   };
+  payload.ruta = this.rutaSeleccionada();
+  payload.reubicar = this.reubicar;
+  payload.Id_Punto_Anterior = this.reubicar && raw.routeMode === 'existing'
+    ? Number(raw.IdPuntoAnterior || 0) || null
+    : null;
   payload.horarios = (this.tours() || []).map((t: any) => ({
     Id_Tour: t.Id_Tour,
     Hora_Salida: (this.horariosMap[t.Id_Tour] || '').trim() || 'Pendiente'
   }));
-  this.puntos.updatePunto(this.puntoId, payload).subscribe({
+  this.puntos.updatePunto(this.puntoId, payload).pipe(
+    finalize(() => this.isSubmitting.set(false))
+  ).subscribe({
     next: () => {
       this.successMsg = 'Punto actualizado correctamente';
       this.alerts.successToast('Punto actualizado', this.successMsg);
@@ -217,9 +384,6 @@ private guardarCambiosConfirmado() {
     error: (err: any) => {
       this.errorMsg = err?.error?.message || 'Error al actualizar el punto';
       this.alerts.errorToast('Error', this.errorMsg);
-    },
-    complete: () => {
-      this.isSubmitting.set(false);
     }
   });
 }
@@ -229,11 +393,15 @@ private buildUpdatePointConfirmationMessage(): string {
   const sector = String(this.form.get('Sector')?.value || '').trim() || '—';
   const direccion = String(this.form.get('Direccion')?.value || '').trim() || '—';
   const cantidadTours = this.tours().length;
+  const ruta = this.rutaSeleccionada();
+  const posicion = this.descripcionPosicion();
 
   return [
     `Vas a guardar los cambios del punto de encuentro ${nombrePunto}.`,
     `Sector: ${sector}.`,
     `Dirección: ${direccion}.`,
+    `Ruta: ${ruta}.`,
+    `Ubicación en la ruta: ${posicion}.`,
     `Se mantendrán horarios para ${cantidadTours} tours.`,
     '¿Deseas continuar?'
   ].join(' ');
@@ -311,7 +479,8 @@ private requestSimilarPointConfirmation(): Promise<boolean> {
     }
 
     this.addrTimer = setTimeout(() => {
-      this.puntos.buscarPuntosPorDireccion(term).subscribe({
+      this.addressRequest?.unsubscribe();
+      this.addressRequest = this.puntos.buscarPuntosPorDireccion(term).subscribe({
         next: (res: any[]) => {
           const currentName = String(this.form.get('NombrePunto')?.value || '').trim();
           const normalizedAddress = this.normalizeComparable(term);

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -30,6 +30,7 @@ type PuntoHorario = NonNullable<Punto['horarios']>[number];
 export class VerPuntos implements OnInit, OnDestroy {
   private puntosSvc = inject(puntosService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private permisosService = inject(PermisosService);
   private alerts = inject(SirAlertService);
 
@@ -37,7 +38,6 @@ export class VerPuntos implements OnInit, OnDestroy {
   readonly puntos = signal<Punto[]>([]);
   readonly rutas = signal<string[]>([]);
   readonly total = signal(0);
-  readonly registeredTotal = signal(0);
   readonly page = signal(1);
   readonly totalPages = signal(1);
   readonly isLoading = signal(true);
@@ -57,6 +57,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   private deleteRequests = new Subscription();
 
   ngOnInit(): void {
+    this.selectedRoute = String(this.route.snapshot.queryParamMap.get('ruta') || '').trim();
     this.inputSubscription = this.searchInput$.pipe(
       map((value) => String(value || '').trim()),
       debounceTime(300),
@@ -99,13 +100,12 @@ export class VerPuntos implements OnInit, OnDestroy {
 
     this.searchRequest = forkJoin({
       rutas: this.puntosSvc.getRutasPuntos(),
-      result: this.puntosSvc.getPuntos(1, this.limit)
+      result: this.puntosSvc.getPuntos(1, this.limit, '', this.selectedRoute)
     }).pipe(
       finalize(() => this.isLoading.set(false))
     ).subscribe({
       next: ({ rutas, result }) => {
-        this.rutas.set(Array.isArray(rutas) ? rutas : []);
-        this.registeredTotal.set(Number(result?.total || 0));
+        this.rutas.set(this.sortRoutes(Array.isArray(rutas) ? rutas : []));
         this.applyResult(result);
         this.hasLoadedOnce.set(true);
       },
@@ -193,12 +193,12 @@ export class VerPuntos implements OnInit, OnDestroy {
 
   confirmEliminarPunto(punto: Punto): void {
     const id = this.getPuntoId(punto);
-    if (!id || !this.canDeletePunto || this.isDeleting(id)) return;
+    if (!id || punto.EsProtegido || !this.canDeletePunto || this.isDeleting(id)) return;
 
     const nombre = this.getPuntoName(punto);
     this.alerts.confirmDelete(
       'Eliminar punto de encuentro',
-      `¿Deseas eliminar “${nombre}”? También se eliminarán sus horarios asociados y esta acción no se puede deshacer.`,
+      `Se eliminará “${nombre}”. Si tiene reservas asociadas, el sistema conservará su histórico y lo desactivará automáticamente.`,
       () => this.deletePunto(punto),
       undefined,
       { confirmText: 'Eliminar punto', cancelText: 'Conservar' }
@@ -213,15 +213,20 @@ export class VerPuntos implements OnInit, OnDestroy {
     const request = this.puntosSvc.deletePunto(id).pipe(
       finalize(() => this.setDeleting(id, false))
     ).subscribe({
-      next: () => {
+      next: (result: any) => {
         this.puntos.update((items) => items.filter((item) => this.getPuntoId(item) !== id));
         this.total.update((value) => Math.max(0, value - 1));
-        this.registeredTotal.update((value) => Math.max(0, value - 1));
 
         if (this.puntos().length === 0 && this.page() > 1) {
           this.page.update((value) => value - 1);
         }
         this.buscarPuntos(false);
+        this.alerts.successToast(
+          result?.accion === 'DESACTIVADO' ? 'Punto retirado' : 'Punto eliminado',
+          result?.accion === 'DESACTIVADO'
+            ? 'Tenía reservas asociadas; su histórico se conservó.'
+            : 'El punto y sus horarios se eliminaron definitivamente.'
+        );
       },
       error: (error) => {
         this.alerts.showAlert({
@@ -309,6 +314,22 @@ export class VerPuntos implements OnInit, OnDestroy {
 
   getPuntoName(punto: Punto): string {
     return String(punto?.NombrePunto || punto?.Nombre_Punto || 'Punto sin nombre');
+  }
+
+  routeLabel(route: string | undefined): string {
+    const value = String(route || '').trim();
+    return value.toUpperCase() === 'PENDIENTE' ? 'Ruta pendiente' : `Ruta ${value}`;
+  }
+
+  private sortRoutes(routes: string[]): string[] {
+    return [...routes].sort((a, b) => {
+      const routeA = String(a || '').trim();
+      const routeB = String(b || '').trim();
+      const pendingA = routeA.toUpperCase() === 'PENDIENTE';
+      const pendingB = routeB.toUpperCase() === 'PENDIENTE';
+      if (pendingA !== pendingB) return pendingA ? 1 : -1;
+      return routeA.localeCompare(routeB, 'es', { numeric: true, sensitivity: 'base' });
+    });
   }
 
   trackById(_: number, item: Punto): number {

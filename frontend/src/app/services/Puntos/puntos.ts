@@ -15,9 +15,20 @@ export interface Punto {
   Sector?: string;
   Direccion?: string;
   Posicion?: number;
+  Activo?: number | boolean;
+  EsProtegido?: boolean;
+  Id_Punto_Anterior?: number | null;
   horarios?: { Id_Tour?: number; HoraSalida?: string; NombreTour?: string }[];
   // client-only UI flags
   _deleting?: boolean;
+  _operatividad?: EstadoOperatividadPunto;
+}
+
+export interface EstadoOperatividadPunto {
+  Id_Punto: number;
+  estado: 'OPERATIVO' | 'NO_OPERATIVO' | 'SIN_COORDENADAS' | 'NO_VERIFICADO';
+  distanciaViaMetros?: number;
+  mensaje: string;
 }
 
 export interface OrdenPuntoItem {
@@ -91,6 +102,20 @@ export class puntosService {
 
   crearPunto(punto: Punto): Observable<any> {
     return this.http.post(`${this.baseUrl}/puntos`, punto);
+  }
+
+  getOperatividadPuntosPorRuta(ruta: string): Observable<EstadoOperatividadPunto[]> {
+    return this.http.get<EstadoOperatividadPunto[]>(
+      `${this.baseUrl}/puntos/rutas/${encodeURIComponent(ruta)}/operatividad`
+    );
+  }
+
+  validarCoordenadas(Latitud: number, Longitud: number): Observable<{
+    valida: boolean;
+    distanciaViaMetros: number;
+    coordenadasAjustadas: [number, number];
+  }> {
+    return this.http.post<any>(`${this.baseUrl}/puntos/validar-coordenadas`, { Latitud, Longitud });
   }
 
   getPunto(id: number): Observable<Punto> {

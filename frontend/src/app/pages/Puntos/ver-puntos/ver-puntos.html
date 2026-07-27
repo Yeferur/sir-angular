@@ -84,7 +84,7 @@
           (ngModelChange)="onRouteChange($event)">
           <option value="">Todas las rutas</option>
           @for (ruta of rutas(); track ruta) {
-            <option [value]="ruta">Ruta {{ ruta }}</option>
+            <option [value]="ruta">{{ routeLabel(ruta) }}</option>
           }
         </select>
       </div>
@@ -115,8 +115,8 @@
     @if (puntos().length > 0) {
       <div class="results-toolbar">
         <strong aria-live="polite">
-          {{ registeredTotal() }}
-          {{ registeredTotal() === 1 ? 'punto' : 'puntos' }}
+          {{ total() }}
+          {{ total() === 1 ? 'punto' : 'puntos' }}
         </strong>
         @if (isSearching()) {
           <span class="updating-pill" role="status">
@@ -138,7 +138,10 @@
                     <span>{{ punto.Sector }}</span>
                   }
                   @if (punto.ruta) {
-                    <span class="route-chip">Ruta {{ punto.ruta }}</span>
+                    <span class="route-chip">{{ routeLabel(punto.ruta) }}</span>
+                  }
+                  @if (punto.EsProtegido) {
+                    <span class="route-chip">Inicio protegido</span>
                   }
                 </div>
               </div>
@@ -156,7 +159,7 @@
                     Editar
                   </button>
                 }
-                @if (canDeletePunto) {
+                @if (canDeletePunto && !punto.EsProtegido) {
                   <button type="button" class="btn-row-delete" (click)="confirmEliminarPunto(punto)"
                     [disabled]="isDeleting(getPuntoId(punto))"
                     [attr.aria-label]="'Eliminar ' + getPuntoName(punto)">

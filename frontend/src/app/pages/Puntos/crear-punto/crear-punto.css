@@ -171,6 +171,45 @@
   margin-top: 5px;
 }
 
+.route-mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.choice-card {
+  display: flex; gap: 11px; align-items: flex-start; padding: 14px;
+  border: 1.5px solid var(--separator-color); border-radius: 14px;
+  background: var(--bg-tertiary); cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.choice-card:hover { transform: translateY(-1px); border-color: var(--accent-blue); }
+.choice-card--active { border-color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 9%, var(--bg-tertiary)); }
+.choice-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.choice-card span { display: flex; flex-direction: column; gap: 3px; }
+.choice-card strong { color: var(--text-primary); font-size: .9rem; }
+.choice-card small { color: var(--text-secondary); font-size: .76rem; line-height: 1.35; }
+.route-fields, .route-new-field { margin-top: 18px; }
+.route-new-field { max-width: 620px; }
+.coordinate-status { margin: 5px 0 0; font-size: .76rem; font-weight: 700; color: var(--text-secondary); }
+.coordinate-status--valid { color: var(--accent-green, #22c55e); }
+.coordinate-status--invalid { color: var(--accent-red, #ef4444); }
+
+.protected-route {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 260px)) 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  border: 1.5px solid color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-blue) 7%, var(--bg-tertiary));
+}
+.protected-route > div { display: flex; flex-direction: column; gap: 5px; }
+.protected-route strong { color: var(--text-primary); font-size: .92rem; }
+.protected-route p { margin: 0; color: var(--text-secondary); font-size: .82rem; }
+
 /* =========================================================
    FLOATING SAVE BAR
    ========================================================= */
@@ -269,6 +308,8 @@
     grid-template-columns: 1fr;
     gap: 10px;
   }
+  .route-mode-grid { grid-template-columns: 1fr; }
+  .protected-route { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {

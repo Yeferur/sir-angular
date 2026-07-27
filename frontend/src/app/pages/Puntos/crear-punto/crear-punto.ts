@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -15,6 +15,7 @@ import { puntosService } from '../../../services/Puntos/puntos';
 import { Reservas } from '../../../services/Reservas/reservas';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { finalize, firstValueFrom, forkJoin, Subscription } from 'rxjs';
 
 const ADDRESS_SIMILARITY_THRESHOLD = 0.88;
 const ADDRESS_NAME_SIMILARITY_THRESHOLD = 0.82;
@@ -27,16 +28,24 @@ const NAME_SIMILARITY_THRESHOLD = 0.75;
   standalone: true,
   imports: [ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
 })
-export class CrearPuntoComponent implements OnInit {
+export class CrearPuntoComponent implements OnInit, OnDestroy {
   isLoading = signal<boolean>(true);
+  loadError = signal('');
   isSubmitting = signal<boolean>(false);
 
   form!: FormGroup;
   tours = signal<any[]>([]);
+  rutas = signal<string[]>([]);
+  puntosRuta = signal<any[]>([]);
+  coordinateStatus = signal<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  coordinateDetail = signal('');
   horariosMap: Record<number | string, string> = {};
   similarityState: 'none' | 'similar' | 'exact' = 'none';
   duplicatePoint: any = null;
   private addrTimer: any = null;
+  private initialDataRequest?: Subscription;
+  private routePointsRequest?: Subscription;
+  private addressRequest?: Subscription;
 
   constructor(
     private fb: FormBuilder,
@@ -49,12 +58,23 @@ export class CrearPuntoComponent implements OnInit {
       NombrePunto: ['', [Validators.required, Validators.maxLength(255)]],
       Sector: ['', [Validators.required, Validators.maxLength(255)]],
       Direccion: ['', [Validators.required]],
-      Coordenadas: ['', [Validators.required, this.coordenadasValidator()]]
+      Coordenadas: ['', [Validators.required, this.coordenadasValidator()]],
+      routeMode: ['existing'],
+      rutaExistente: [''],
+      rutaNueva: [''],
+      IdPuntoAnterior: [null]
     });
   }
 
   ngOnInit(): void {
-    this.loadTours();
+    this.loadInitialData();
+  }
+
+  ngOnDestroy(): void {
+    if (this.addrTimer) clearTimeout(this.addrTimer);
+    this.initialDataRequest?.unsubscribe();
+    this.routePointsRequest?.unsubscribe();
+    this.addressRequest?.unsubscribe();
   }
 
   // ── Coordenadas ──────────────────────────────────────────────────────────────
@@ -81,23 +101,94 @@ export class CrearPuntoComponent implements OnInit {
   }
   // ── Carga inicial ────────────────────────────────────────────────────────────
 
-  private loadTours(): void {
+  loadInitialData(): void {
+    this.initialDataRequest?.unsubscribe();
     this.isLoading.set(true);
-    this.reservasSvc.getTours().subscribe({
-      next: t => this.tours.set(t || []),
+    this.loadError.set('');
+    this.initialDataRequest = forkJoin({
+      tours: this.reservasSvc.getTours(),
+      rutas: this.puntos.getRutasPuntos()
+    }).pipe(finalize(() => this.isLoading.set(false))).subscribe({
+      next: ({ tours, rutas }) => {
+        this.tours.set(tours || []);
+        const activas = (rutas || [])
+          .filter(r => String(r).toUpperCase() !== 'PENDIENTE')
+          .sort((a, b) => String(a).localeCompare(String(b), 'es', {
+            numeric: true,
+            sensitivity: 'base'
+          }));
+        this.rutas.set(activas);
+        if (activas.length) {
+          this.form.patchValue({ rutaExistente: activas[0] });
+          this.onRutaExistenteChange(activas[0]);
+        } else {
+          this.form.patchValue({ routeMode: 'pending' });
+        }
+      },
       error: () => {
         this.tours.set([]);
-        this.alerts.errorToast('Error', 'No se pudieron cargar los tours.');
-        this.isLoading.set(false);
-      },
-      complete: () => this.isLoading.set(false)
+        this.rutas.set([]);
+        this.loadError.set('No se pudieron cargar los tours y las rutas disponibles.');
+      }
     });
+  }
+
+  onRouteModeChange(): void {
+    this.routePointsRequest?.unsubscribe();
+    this.puntosRuta.set([]);
+    this.form.patchValue({ IdPuntoAnterior: null });
+    if (this.form.value.routeMode === 'existing' && this.form.value.rutaExistente) {
+      this.onRutaExistenteChange(this.form.value.rutaExistente);
+    }
+  }
+
+  onRutaExistenteChange(ruta: string): void {
+    this.routePointsRequest?.unsubscribe();
+    this.form.patchValue({ rutaExistente: ruta, IdPuntoAnterior: null });
+    if (!ruta) return this.puntosRuta.set([]);
+    this.routePointsRequest = this.puntos.getPuntosPorRuta(ruta).subscribe({
+      next: puntos => this.puntosRuta.set(puntos || []),
+      error: () => this.puntosRuta.set([])
+    });
+  }
+
+  private rutaSeleccionada(): string {
+    const mode = this.form.value.routeMode;
+    if (mode === 'pending') return 'PENDIENTE';
+    if (mode === 'new') return String(this.form.value.rutaNueva || '').trim();
+    return String(this.form.value.rutaExistente || '').trim();
+  }
+
+  onCoordenadasInput(): void {
+    if (this.coordinateStatus() === 'idle') return;
+    this.coordinateStatus.set('idle');
+    this.coordinateDetail.set('');
+  }
+
+  private descripcionPosicion(): string {
+    const raw = this.form.getRawValue();
+    if (raw.routeMode === 'pending') return 'Al final de los puntos pendientes';
+    if (raw.routeMode === 'new') return 'Posición 1';
+
+    const anteriorId = Number(raw.IdPuntoAnterior || 0);
+    if (!anteriorId) {
+      return `Al final de la ruta · Posición ${this.puntosRuta().length + 1}`;
+    }
+
+    const anterior = this.puntosRuta().find(
+      punto => Number(punto?.Id_Punto || punto?.IdPunto) === anteriorId
+    );
+    const nombre = String(anterior?.NombrePunto || anterior?.Nombre_Punto || 'punto seleccionado');
+    const posicionAnterior = Number(anterior?.posicion || anterior?.Posicion || 0);
+    return posicionAnterior > 0
+      ? `Después de ${nombre} · Posición ${posicionAnterior + 1}`
+      : `Después de ${nombre}`;
   }
 
   // ── Submit ───────────────────────────────────────────────────────────────────
 
   async onSubmitCrearPunto() {
-    if (this.isSubmitting()) return;
+    if (this.isSubmitting() || this.coordinateStatus() === 'checking') return;
 
     this.form.updateValueAndValidity({ emitEvent: false });
     if (this.form.invalid) {
@@ -129,6 +220,28 @@ export class CrearPuntoComponent implements OnInit {
       this.alerts.warningToast('Punto duplicado', 'Ya existe un punto con ese nombre y esa dirección');
       return;
     }
+    const ruta = this.rutaSeleccionada();
+    if (!ruta) {
+      this.alerts.warningToast('Ruta requerida', 'Selecciona una ruta, déjala pendiente o escribe una nueva.');
+      return;
+    }
+
+    const coords = this.parseCoordenadas(this.form.value.Coordenadas || '');
+    if (!coords) return;
+    if (this.coordinateStatus() !== 'valid') {
+      this.coordinateStatus.set('checking');
+      this.coordinateDetail.set('Validando conexión con la red vial…');
+      try {
+        const result = await firstValueFrom(this.puntos.validarCoordenadas(coords.lat, coords.lng));
+        this.coordinateStatus.set('valid');
+        this.coordinateDetail.set(`Ubicación operativa · vía a ${result.distanciaViaMetros} m`);
+      } catch (error: any) {
+        this.coordinateStatus.set('invalid');
+        this.coordinateDetail.set(error?.error?.message || 'OSRM no pudo conectar estas coordenadas con una vía.');
+        this.alerts.errorToast('Coordenadas no operativas', this.coordinateDetail());
+        return;
+      }
+    }
 
     const confirmed = this.similarityState === 'similar'
       ? await this.requestSimilarPointConfirmation()
@@ -153,13 +266,17 @@ export class CrearPuntoComponent implements OnInit {
       Direccion: raw.Direccion,
       Latitud: coords?.lat ?? null,
       Longitud: coords?.lng ?? null,
+      ruta: this.rutaSeleccionada(),
+      Id_Punto_Anterior: raw.routeMode === 'existing' ? Number(raw.IdPuntoAnterior || 0) || null : null,
       horarios: (this.tours() || []).map((t: any) => ({
         Id_Tour: t.Id_Tour,
         Hora_Salida: (this.horariosMap[t.Id_Tour] || '').trim() || 'Pendiente'
       }))
     };
 
-    this.puntos.crearPunto(payload).subscribe({
+    this.puntos.crearPunto(payload).pipe(
+      finalize(() => this.isSubmitting.set(false))
+    ).subscribe({
       next: () => {
         this.alerts.successToast('Punto creado', 'Punto creado correctamente');
         this.form.reset();
@@ -170,8 +287,7 @@ export class CrearPuntoComponent implements OnInit {
       },
       error: (err: any) => {
         this.alerts.errorToast('Error', err?.error?.message || 'Error al crear el punto');
-      },
-      complete: () => this.isSubmitting.set(false)
+      }
     });
   }
 
@@ -182,11 +298,15 @@ export class CrearPuntoComponent implements OnInit {
     const sector = String(this.form.get('Sector')?.value || '').trim() || '—';
     const direccion = String(this.form.get('Direccion')?.value || '').trim() || '—';
     const cantidadTours = this.tours().length;
+    const ruta = this.rutaSeleccionada();
+    const posicion = this.descripcionPosicion();
 
     return [
       `Vas a crear el punto de encuentro ${nombrePunto}.`,
       `Sector: ${sector}.`,
       `Dirección: ${direccion}.`,
+      `Ruta: ${ruta}.`,
+      `Ubicación en la ruta: ${posicion}.`,
       `Se configurarán horarios para ${cantidadTours} tours.`,
       '¿Deseas continuar?'
     ].join(' ');
@@ -250,7 +370,8 @@ export class CrearPuntoComponent implements OnInit {
     if (!term) { this.clearSimilarity(ctrl); return; }
 
     this.addrTimer = setTimeout(() => {
-      this.puntos.buscarPuntosPorDireccion(term).subscribe({
+      this.addressRequest?.unsubscribe();
+      this.addressRequest = this.puntos.buscarPuntosPorDireccion(term).subscribe({
         next: (res: any[]) => {
           const currentName = String(this.form.get('NombrePunto')?.value || '').trim();
           const normalizedAddress = this.normalizeComparable(term);

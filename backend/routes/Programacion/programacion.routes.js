@@ -7,6 +7,7 @@ const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 // Importamos el nuevo controlador inteligente
 const {
     generarPlanLogisticoController,
+    generarComparacionLogisticaShadowController,
     generarPlanAsistidoController,
     exportarListadoBusController,
     exportarReservaPrivadaController,
@@ -57,6 +58,13 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     exportarListadoBusController
+);
+
+router.post(
+    '/plan-logistico-shadow',
+    authMiddleware,
+    checkPermission('PROGRAMACION.CREAR'),
+    generarComparacionLogisticaShadowController
 );
 
 router.post(

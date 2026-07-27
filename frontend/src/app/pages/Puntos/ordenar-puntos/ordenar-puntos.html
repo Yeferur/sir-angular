@@ -1,58 +1,75 @@
 <div class="ordenar-page">
-  <div class="page-header">
-    <div class="page-header-text">
-      <h1>Ordenar Puntos por Ruta</h1>
-      <p class="subtitle">Arrastra y suelta los puntos para definir el orden visual de cada ruta.</p>
-    </div>
-
-    <div class="page-header-actions">
-      <button class="btn-save" type="button" (click)="guardarOrden()"
-        [disabled]="isSaving() || !hasPendingOrderChanges() || isLoadingPuntos()">
-        {{ isSaving() ? 'Guardando...' : 'Guardar Orden' }}
-      </button>
-    </div>
-  </div>
-
   @if (isLoadingRutas()) {
     <app-loading-state label="Cargando rutas y puntos…"></app-loading-state>
+  } @else if (loadError()) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos preparar el orden de los puntos"
+      [detail]="loadError() || ''"
+      (action)="loadRutas()">
+    </app-loading-state>
   } @else {
-    <div class="toolbar-card">
-      <div class="toolbar-grid">
-        <div class="field">
-          <label for="ruta">Ruta</label>
-          <select id="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="onRutaChangeRequest($event)"
-            [disabled]="isLoadingPuntos() || isSaving() || !rutas().length">
-            <option value="" disabled>Seleccionar ruta...</option>
-            @for (ruta of rutas(); track ruta) {
-            <option [value]="ruta">Ruta {{ ruta }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="route-summary">
-          <div class="summary-item">
-            <span class="summary-label">Puntos</span>
-            <span class="summary-value">{{ puntos().length || 0 }}</span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Estado</span>
-            @if (hasPendingOrderChanges()) {
-              <span class="status-chip status-chip--dirty">Hay cambios sin guardar</span>
-            } @else {
-              <span class="status-chip">Sin cambios pendientes</span>
-            }
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Ruta actual</span>
-            <span class="summary-value">{{ rutaSeleccionada || '—' }}</span>
-          </div>
+    <section class="card route-card">
+      <div class="section-header">
+        <div>
+          <h2>Selecciona una ruta</h2>
+          <p>Consulta sus puntos y define el orden en el que serán recogidos.</p>
         </div>
       </div>
-    </div>
+
+      <div class="field">
+        <label for="ruta">Ruta</label>
+        <select id="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="onRutaChangeRequest($event)"
+          [disabled]="isLoadingPuntos() || isSaving() || !rutas().length">
+          <option value="" disabled>Seleccionar ruta...</option>
+          @for (ruta of rutas(); track ruta) {
+            <option [value]="ruta">Ruta {{ ruta }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="route-summary" aria-live="polite">
+        <div class="summary-item">
+          <span class="summary-label">Puntos</span>
+          <span class="summary-value">{{ puntos().length || 0 }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Orden</span>
+          @if (hasPendingOrderChanges()) {
+            <span class="status-chip status-chip--dirty">Cambios sin guardar</span>
+          } @else {
+            <span class="status-chip">Actualizado</span>
+          }
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Ubicaciones</span>
+          @if (isValidatingLocations()) {
+            <span class="status-chip">Validando…</span>
+          } @else if (totalConAlertas() > 0) {
+            <span class="status-chip status-chip--warning">{{ totalConAlertas() }} por revisar</span>
+          } @else {
+            <span class="status-chip status-chip--ready">{{ totalOperativos() }} operativas</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    @if (pendingAssignmentCount() > 0) {
+      <section class="route-debt-card" role="status">
+        <div class="route-debt-icon" aria-hidden="true">!</div>
+        <div class="route-debt-copy">
+          <strong>{{ pendingAssignmentCount() }} {{ pendingAssignmentCount() === 1 ? 'punto necesita' : 'puntos necesitan' }} una ruta</strong>
+          <span>Completa su asignación para poder incluirlos en un recorrido.</span>
+        </div>
+        <button type="button" class="btn-debt-action" (click)="asignarRutasPendientes()">
+          Asignar rutas
+        </button>
+      </section>
+    }
 
     @if (rutas().length === 0) {
       <div class="empty-state-card">
-        No hay rutas disponibles para ordenar.
+        No hay rutas completas disponibles para ordenar.
       </div>
     } @else if (isLoadingPuntos()) {
       <app-loading-state label="Actualizando los puntos de la ruta…"></app-loading-state>
@@ -65,32 +82,61 @@
         No hay puntos registrados para esta ruta.
       </div>
     } @else {
-      <div class="list-card">
-        <div class="list-header">
+      <section class="card list-card">
+        <div class="section-header list-header">
           <div>
-            <h2>Puntos de la Ruta {{ rutaSeleccionada }}</h2>
-            <p>Arrastra para ajustar el orden visual. Los cambios se guardan al confirmar.</p>
+            <h2>Orden de recogida</h2>
+            <p>Arrastra los puntos para establecer su posición dentro de la Ruta {{ rutaSeleccionada }}.</p>
           </div>
+          <span class="point-count">{{ puntos().length }} {{ puntos().length === 1 ? 'punto' : 'puntos' }}</span>
         </div>
 
         <div class="list-wrapper" cdkDropList [cdkDropListData]="puntos()" (cdkDropListDropped)="drop($event)">
           @for (punto of puntos(); let i = $index; track trackByPuntoId($index, punto)) {
-          <div class="point-card" cdkDrag>
-            <div class="position-block">
-              <span class="position-number">{{ formatPosition(i + 1) }}</span>
-              <span class="position-label">Pos</span>
-            </div>
+            <div class="point-card" cdkDrag [cdkDragDisabled]="isProtected(punto)"
+              [class.point-card--protected]="isProtected(punto)">
+              <div class="position-block">
+                <span class="position-number">{{ formatPosition(i + 1) }}</span>
+                <span class="position-label">Posición</span>
+              </div>
 
-            <div class="point-meta">
-              <div class="point-title">{{ nombrePunto(punto) }}</div>
-              <div class="point-subtitle">{{ punto.Sector || 'Sin sector' }} · {{ punto.Direccion || 'Sin dirección' }}</div>
-            </div>
+              <div class="point-meta">
+                <div class="point-title-row">
+                  <div class="point-title">{{ nombrePunto(punto) }}</div>
+                  @if (isProtected(punto)) {
+                    <span class="protected-chip">Inicio protegido</span>
+                  }
+                  <span class="location-chip"
+                    [class.location-chip--ready]="punto._operatividad?.estado === 'OPERATIVO'"
+                    [class.location-chip--warning]="punto._operatividad?.estado === 'NO_OPERATIVO' || punto._operatividad?.estado === 'SIN_COORDENADAS'"
+                    [title]="punto._operatividad?.mensaje || 'Validación pendiente'">
+                    {{ operatividadLabel(punto) }}
+                  </span>
+                </div>
+                <div class="point-subtitle">{{ punto.Sector || 'Sin sector' }} · {{ punto.Direccion || 'Sin dirección' }}</div>
+              </div>
 
-            <button type="button" class="drag-handle" cdkDragHandle aria-label="Mover punto">⋮⋮</button>
-          </div>
+              <span class="drag-handle" aria-hidden="true">
+                <span aria-hidden="true">⋮⋮</span>
+              </span>
+            </div>
           }
         </div>
-      </div>
+      </section>
     }
   }
 </div>
+
+@if (!isLoadingRutas() && !loadError() && rutas().length > 0) {
+  <div class="floating-save-bar">
+    <button class="btn-save btn-save-floating" type="button" (click)="guardarOrden()"
+      [disabled]="isSaving() || !hasPendingOrderChanges() || isLoadingPuntos()">
+      @if (isSaving()) {
+        <span class="button-spinner" aria-hidden="true"></span>
+        Guardando...
+      } @else {
+        Guardar orden
+      }
+    </button>
+  </div>
+}

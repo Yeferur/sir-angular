@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { firstValueFrom } from 'rxjs';
+import { Router } from '@angular/router';
 
-import { puntosService, Punto, OrdenPuntoItem } from '../../../services/Puntos/puntos';
+import { puntosService, Punto, OrdenPuntoItem, EstadoOperatividadPunto } from '../../../services/Puntos/puntos';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
@@ -18,16 +19,19 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 export class OrdenarPuntosComponent implements OnInit {
   private puntosSvc = inject(puntosService);
   private alerts = inject(SirAlertService);
+  private router = inject(Router);
 
   rutas = signal<string[]>([]);
   puntos = signal<Punto[]>([]);
 
   rutaSeleccionada = '';
-  previousRutaSeleccionada = '';
   isLoadingRutas = signal<boolean>(true);
   isLoadingPuntos = signal<boolean>(false);
   isSaving = signal<boolean>(false);
+  isValidatingLocations = signal<boolean>(false);
   hasPendingOrderChanges = signal<boolean>(false);
+  pendingAssignmentCount = signal<number>(0);
+  loadError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     await this.loadRutas();
@@ -41,25 +45,42 @@ export class OrdenarPuntosComponent implements OnInit {
     return String((p as any).NombrePunto || (p as any).Nombre_Punto || 'Punto sin nombre');
   }
 
-  private async loadRutas(): Promise<void> {
+  async loadRutas(): Promise<void> {
     this.isLoadingRutas.set(true);
+    this.loadError.set(null);
     try {
       const rutas = await firstValueFrom(this.puntosSvc.getRutasPuntos());
-      this.rutas.set(Array.isArray(rutas) ? rutas : []);
+      const disponibles = (Array.isArray(rutas) ? rutas : [])
+        .filter(ruta => String(ruta).trim().toUpperCase() !== 'PENDIENTE');
+      this.rutas.set(disponibles.sort(
+        (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true, sensitivity: 'base' })
+      ));
+      try {
+        const pendientes = await firstValueFrom(this.puntosSvc.getPuntosPorRuta('PENDIENTE'));
+        this.pendingAssignmentCount.set(Array.isArray(pendientes) ? pendientes.length : 0);
+      } catch {
+        this.pendingAssignmentCount.set(0);
+      }
 
       if (!this.rutaSeleccionada && this.rutas().length) {
         this.rutaSeleccionada = this.rutas()[0];
-        this.previousRutaSeleccionada = this.rutaSeleccionada;
         await this.loadPuntosByRuta(this.rutaSeleccionada);
       } else if (!this.rutas().length) {
         this.puntos.set([]);
       }
     } catch (error) {
-      this.alerts.errorToast('Error', 'No fue posible cargar las rutas.');
+      this.loadError.set('No fue posible cargar las rutas y los puntos disponibles.');
       this.rutas.set([]);
+      this.puntos.set([]);
     } finally {
       this.isLoadingRutas.set(false);
     }
+  }
+
+  asignarRutasPendientes(): void {
+    void this.router.navigate(['/Puntos/VerPuntos'], {
+      queryParams: { ruta: 'PENDIENTE' }
+    });
   }
 
   async onRutaChangeRequest(nextRuta: string): Promise<void> {
@@ -77,7 +98,6 @@ export class OrdenarPuntosComponent implements OnInit {
       }
     }
 
-    this.previousRutaSeleccionada = rutaActual;
     this.rutaSeleccionada = nuevaRuta;
     this.hasPendingOrderChanges.set(false);
     await this.loadPuntosByRuta(nuevaRuta);
@@ -96,6 +116,7 @@ export class OrdenarPuntosComponent implements OnInit {
       const list = Array.isArray(puntos) ? [...puntos] : [];
       list.sort((a: Punto, b: Punto) => Number(a.posicion || 0) - Number(b.posicion || 0));
       this.puntos.set(list);
+      void this.validarOperatividad(ruta);
     } catch (error) {
       this.alerts.errorToast('Error', 'No fue posible cargar los puntos de la ruta seleccionada.');
       this.puntos.set([]);
@@ -104,12 +125,65 @@ export class OrdenarPuntosComponent implements OnInit {
     }
   }
 
+  private async validarOperatividad(ruta: string): Promise<void> {
+    this.isValidatingLocations.set(true);
+    try {
+      const estados = await firstValueFrom(this.puntosSvc.getOperatividadPuntosPorRuta(ruta));
+      if (this.rutaSeleccionada !== ruta) return;
+      const porId = new Map<number, EstadoOperatividadPunto>(
+        (estados || []).map(estado => [Number(estado.Id_Punto), estado])
+      );
+      this.puntos.update(puntos => puntos.map(punto => ({
+        ...punto,
+        _operatividad: porId.get(this.getPuntoId(punto))
+      })));
+    } catch {
+      if (this.rutaSeleccionada !== ruta) return;
+      this.puntos.update(puntos => puntos.map(punto => ({
+        ...punto,
+        _operatividad: {
+          Id_Punto: this.getPuntoId(punto),
+          estado: 'NO_VERIFICADO',
+          mensaje: 'No fue posible consultar OSRM.'
+        }
+      })));
+    } finally {
+      if (this.rutaSeleccionada === ruta) this.isValidatingLocations.set(false);
+    }
+  }
+
   drop(event: CdkDragDrop<Punto[]>): void {
     if (event.previousIndex === event.currentIndex) return;
+    if (this.rutaSeleccionada === '0' && event.currentIndex === 0) {
+      this.alerts.warningToast('Punto protegido', 'Estación Poblado debe permanecer en la primera posición.');
+      return;
+    }
     const ordered = [...this.puntos()];
     moveItemInArray(ordered, event.previousIndex, event.currentIndex);
     this.puntos.set(ordered);
     this.hasPendingOrderChanges.set(true);
+  }
+
+  isProtected(punto: Punto): boolean {
+    return Boolean(punto.EsProtegido);
+  }
+
+  operatividadLabel(punto: Punto): string {
+    const estado = punto._operatividad?.estado;
+    if (estado === 'OPERATIVO') return 'Operativo';
+    if (estado === 'NO_OPERATIVO') return 'No operativo';
+    if (estado === 'SIN_COORDENADAS') return 'Sin coordenadas';
+    return 'No verificado';
+  }
+
+  totalOperativos(): number {
+    return this.puntos().filter(p => p._operatividad?.estado === 'OPERATIVO').length;
+  }
+
+  totalConAlertas(): number {
+    return this.puntos().filter(p =>
+      p._operatividad && p._operatividad.estado !== 'OPERATIVO'
+    ).length;
   }
 
   async guardarOrden(): Promise<void> {

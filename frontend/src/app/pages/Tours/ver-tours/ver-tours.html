@@ -110,8 +110,8 @@
                     class="btn-row-delete"
                     [disabled]="deactivatingId() === tour.Id_Tour"
                     (click)="$event.stopPropagation(); desactivarTour(tour)"
-                    [attr.aria-label]="'Desactivar tour ' + tour.Nombre_Tour">
-                    {{ deactivatingId() === tour.Id_Tour ? 'Desactivando…' : 'Desactivar' }}
+                    [attr.aria-label]="'Eliminar tour ' + tour.Nombre_Tour">
+                    {{ deactivatingId() === tour.Id_Tour ? 'Eliminando…' : 'Eliminar' }}
                   </button>
                 }
               </div>

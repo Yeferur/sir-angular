@@ -1,0 +1,17 @@
+name: sir-osrm
+
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    command:
+      - osrm-routed
+      - --algorithm
+      - ch
+      - --max-table-size
+      - "100"
+      - /data/colombia-latest.osrm
+    ports:
+      - "127.0.0.1:5001:5000"
+    volumes:
+      - ./data:/data:ro
+    restart: unless-stopped

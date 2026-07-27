@@ -128,11 +128,11 @@ export class VerToursComponent implements OnInit {
   desactivarTour(tour: Tour): void {
     if (!tour.Id_Tour || !this.canDeleteTour) return;
     this.alerts.confirm(
-      '¿Desactivar tour?',
-      `El tour “${tour.Nombre_Tour}” dejará de aparecer para nuevas operaciones. Su configuración y su histórico se conservarán.`,
+      '¿Eliminar tour?',
+      `Se eliminará “${tour.Nombre_Tour}”. Si tiene reservas asociadas, el sistema conservará su histórico y lo desactivará automáticamente.`,
       () => this.confirmarDesactivacion(tour),
       undefined,
-      { confirmText: 'Desactivar', cancelText: 'Conservar', type: 'warning' }
+      { confirmText: 'Eliminar tour', cancelText: 'Conservar', type: 'warning' }
     );
   }
 
@@ -142,14 +142,19 @@ export class VerToursComponent implements OnInit {
     this.toursService.deleteTour(id).pipe(
       finalize(() => this.deactivatingId.set(null))
     ).subscribe({
-      next: () => {
+      next: (result: any) => {
         this.tours.update((current) => current.filter((item) => item.Id_Tour !== id));
-        this.alerts.successToast('Tour desactivado', 'La información histórica se conservó correctamente.');
+        this.alerts.successToast(
+          result?.accion === 'DESACTIVADO' ? 'Tour retirado' : 'Tour eliminado',
+          result?.accion === 'DESACTIVADO'
+            ? 'Tenía reservas asociadas; su histórico se conservó.'
+            : 'El tour se eliminó definitivamente.'
+        );
       },
       error: (error) => {
         this.alerts.errorToast(
-          'No pudimos desactivar el tour',
-          error?.error?.message || 'Revisa si el tour tiene programaciones futuras.'
+          'No pudimos eliminar el tour',
+          error?.error?.message || 'No fue posible completar la operación.'
         );
       },
     });

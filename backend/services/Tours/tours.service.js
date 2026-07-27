@@ -775,52 +775,42 @@ async function eliminarTour(Id_Tour, userId = null) {
       throw new Error('Tour no encontrado.');
     }
 
-    const [[programacionActiva]] = await conn.query(
-      `SELECT COUNT(*) AS total
-       FROM programaciones
-       WHERE Id_Tour = ?
-         AND Fecha_Tour >= CURDATE()
-         AND UPPER(COALESCE(Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')`,
+    const [[usoReservas]] = await conn.query(
+      `SELECT COUNT(DISTINCT r.Id_Reserva) AS total
+       FROM reservas r
+       INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+       WHERE h.Id_Tour = ?`,
       [Id_Tour]
     );
-    if (Number(programacionActiva?.total || 0) > 0) {
-      await conn.rollback();
-      throw new Error('No se puede desactivar el tour porque tiene programaciones futuras asociadas.');
+    const reservasAsociadas = Number(usoReservas?.total || 0);
+    let result;
+    let accion;
+    if (reservasAsociadas > 0) {
+      [result] = await conn.query('UPDATE tours SET Activo = 0 WHERE Id_Tour = ?', [Id_Tour]);
+      accion = 'DESACTIVADO';
+    } else {
+      await conn.query('DELETE FROM programacion_tours WHERE Id_Tour = ?', [Id_Tour]);
+      await conn.query('DELETE FROM programaciones WHERE Id_Tour = ?', [Id_Tour]);
+      await conn.query('DELETE FROM horarios WHERE Id_Tour = ?', [Id_Tour]);
+      await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
+      [result] = await conn.query('DELETE FROM tours WHERE Id_Tour = ?', [Id_Tour]);
+      accion = 'ELIMINADO';
     }
-
-    const [[programacionRelacionada]] = await conn.query(
-      `SELECT COUNT(*) AS total
-       FROM programacion_tours pt
-       INNER JOIN programaciones p ON p.Id_Programacion = pt.Id_Programacion
-       WHERE pt.Id_Tour = ?
-         AND p.Fecha_Tour >= CURDATE()
-         AND UPPER(COALESCE(p.Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')`,
-      [Id_Tour]
-    );
-    if (Number(programacionRelacionada?.total || 0) > 0) {
-      await conn.rollback();
-      throw new Error('No se puede desactivar el tour porque está vinculado a una programación futura.');
-    }
-
-    const [result] = await conn.query(
-      'UPDATE tours SET Activo = 0 WHERE Id_Tour = ? AND Activo = 1',
-      [Id_Tour]
-    );
 
     await recordHistorial({
       conexion: conn,
       tabla: 'tours',
       id_registro: Id_Tour,
-      accion: 'DESACTIVAR_TOUR',
+      accion: accion === 'DESACTIVADO' ? 'DESACTIVAR_TOUR' : 'ELIMINAR_TOUR',
       id_usuario: userId,
       detalles: [
         { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null },
         { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: prev ? prev.Abreviacion : null },
-        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: 0 }
+        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: accion === 'DESACTIVADO' ? 0 : null }
       ]
     });
     await conn.commit();
-    return { success: true, affectedRows: result.affectedRows };
+    return { success: true, accion, reservasAsociadas, affectedRows: result.affectedRows };
   } catch (e) {
     await conn.rollback();
     try { await logSistema({ mensaje: `eliminarTour error: ${e.message || e}`, meta: { Id_Tour } }); } catch (_) {}
