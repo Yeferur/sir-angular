@@ -13,7 +13,6 @@
               class="status-chip"
               [class.status-chip--saved]="persisted() && !dirty()"
               [class.status-chip--dirty]="dirty()">
-              <span class="status-dot" aria-hidden="true"></span>
               {{ statusText() }}
             </span>
           }
@@ -27,7 +26,7 @@
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
         Exportar
       </button>
-      @if (canUpdate()) {
+      @if (canUpdate() && !phoneReadOnly()) {
         <button
           type="button"
           class="button button--primary"
@@ -51,25 +50,30 @@
     </div>
   }
 
-  @if (unassigned().length > 0) {
-    <button
-      type="button"
-      class="unassigned-banner"
-      [class.is-active]="activeBusIndex() === -1"
-      cdkDropList
-      id="unassigned-bus"
-      [cdkDropListData]="unassigned()"
-      [cdkDropListConnectedTo]="connectedDropLists()"
-      (cdkDropListDropped)="reservationDropped.emit($event)"
-      (click)="busSelected.emit(-1)">
-      <span class="alert-mark" aria-hidden="true">!</span>
-      <span class="unassigned-copy">
-        <strong>{{ unassigned().length }} {{ unassigned().length === 1 ? 'reserva pendiente' : 'reservas pendientes' }}</strong>
-        <small>Deben asignarse a un bus antes de confirmar la operación.</small>
-      </span>
-      <span class="unassigned-count">{{ totalPaxUnassigned() }} pax</span>
-      <span class="unassigned-action">Revisar <span aria-hidden="true">→</span></span>
-    </button>
+  @if (qualitySummary(); as quality) {
+    <div class="quality-notice" role="note">
+      <span class="quality-notice__mark" aria-hidden="true">!</span>
+      <div>
+        <strong>{{ quality.affectedReservations }} reservas requieren completar sus puntos</strong>
+        <p>
+          @if (quality.missingCoordinates) {
+            {{ quality.missingCoordinates }} punto{{ quality.missingCoordinates === 1 ? '' : 's' }} sin coordenadas.
+            Se usó la ruta y la posición disponibles, pero OSRM y el mapa serán parciales.
+          }
+          @if (quality.missingRoute) {
+            {{ quality.missingRoute }} punto{{ quality.missingRoute === 1 ? '' : 's' }} sin ruta operativa.
+            La cercanía geográfica se usa como apoyo, con menor precisión de zonificación.
+          }
+        </p>
+      </div>
+    </div>
+  }
+
+  @if (phoneReadOnly()) {
+    <div class="mobile-readonly-notice" role="note">
+      <span aria-hidden="true">i</span>
+      <p><strong>Vista de consulta</strong> Para editar buses o mover reservas, abre Programación desde una tablet horizontal o un computador.</p>
+    </div>
   }
 
   <div class="editor-workspace">
@@ -83,7 +87,8 @@
       </div>
 
       <div class="fleet-list">
-        <div
+        @if (!phoneReadOnly()) {
+          <div
           class="new-bus-target"
           [class.is-visible]="dragging()"
           cdkDropList
@@ -92,14 +97,38 @@
           [cdkDropListConnectedTo]="connectedDropLists()"
           (cdkDropListDropped)="reservationDropped.emit($event)">
           <span aria-hidden="true">＋</span>
-          Suelta aquí para crear otro bus
-        </div>
+            Suelta aquí para crear otro bus
+          </div>
+        }
+
+        @if (unassigned().length > 0) {
+          <button
+            type="button"
+            class="fleet-card fleet-card--unassigned"
+            [class.is-active]="activeBusIndex() === -1"
+            (click)="busSelected.emit(-1)">
+            <span class="fleet-card-top">
+              <span class="bus-identity">
+                <span class="bus-index" aria-hidden="true">!</span>
+                <span class="bus-label">Sin asignar</span>
+              </span>
+              <span class="unassigned-card-count">{{ unassigned().length }}</span>
+            </span>
+            <span class="unassigned-card-copy">
+              {{ totalPaxUnassigned() }} pax pendientes
+            </span>
+            <span class="fleet-card-bottom">
+              <span>Solo pueden moverse hacia un bus</span>
+              <span>Revisar</span>
+            </span>
+          </button>
+        }
 
         @for (bus of buses; track bus; let i = $index) {
           @let pct = occupancy(bus);
           <button
             type="button"
-            class="fleet-card"
+                  class="fleet-card"
             [class.is-active]="i === activeBusIndex()"
             [attr.data-load]="occupancyState(bus)"
             cdkDropList
@@ -145,10 +174,12 @@
           </div>
 
           @if (activeBusIndex() !== -1) {
-            <div class="bus-fields">
+            @if (!phoneReadOnly()) {
+              <div class="bus-fields">
               <label>
                 <span>Placa o identificación</span>
                 <input
+                  class="form-input"
                   type="text"
                   [ngModel]="bus.id"
                   (ngModelChange)="bus.id = $event; busChanged.emit()"
@@ -157,12 +188,14 @@
               <label>
                 <span>Guía</span>
                 <input
+                  class="form-input"
                   type="text"
                   [ngModel]="bus.guia"
                   (ngModelChange)="bus.guia = $event; busChanged.emit()"
                   placeholder="Asignar guía">
               </label>
-            </div>
+              </div>
+            }
 
             <div class="bus-tools">
               <button type="button" class="button button--quiet" (click)="mapRequested.emit({ bus, index: activeBusIndex() })">
@@ -182,7 +215,7 @@
                 <span class="eyebrow">Recorrido</span>
                 <h4>{{ activeStops().length }} paradas</h4>
               </div>
-              <span class="hint">Arrastra para ordenar</span>
+              <span class="hint">{{ phoneReadOnly() ? 'Orden del recorrido' : 'Arrastra para ordenar' }}</span>
             </div>
 
             <div
@@ -193,7 +226,7 @@
               cdkDropListLockAxis="y"
               (cdkDropListDropped)="stopDropped.emit($event)">
               @for (stop of activeStops(); track stop.key; let position = $index) {
-                <article class="route-stop" cdkDrag cdkDragLockAxis="y">
+                <article class="route-stop" cdkDrag cdkDragLockAxis="y" [cdkDragDisabled]="phoneReadOnly()">
                   <span class="stop-sequence">{{ position + 1 }}</span>
                   <span class="stop-copy">
                     <strong>{{ stop.NombrePunto }}</strong>
@@ -217,7 +250,7 @@
                 <span class="eyebrow">Pasajeros</span>
                 <h4>{{ bus.reservas.length }} reservas · {{ bus.ocupados }} pax</h4>
               </div>
-              <span class="hint">Arrastra para mover</span>
+              <span class="hint">{{ phoneReadOnly() ? 'Solo consulta' : 'Arrastra para mover' }}</span>
             </div>
 
             <div
@@ -226,6 +259,7 @@
               id="active-bus"
               [cdkDropListData]="bus.reservas"
               [cdkDropListConnectedTo]="connectedDropLists()"
+              [cdkDropListEnterPredicate]="canEnterActiveList"
               [cdkDropListSortingDisabled]="true"
               (cdkDropListDropped)="reservationDropped.emit($event)">
               @for (stop of activeStops(); track stop.key; let position = $index) {
@@ -243,6 +277,7 @@
                       <article
                         class="reservation-row"
                         cdkDrag
+                        [cdkDragDisabled]="phoneReadOnly()"
                         (cdkDragStarted)="dragStarted.emit()"
                         (cdkDragEnded)="dragEnded.emit()">
                         <span class="drag-handle" aria-hidden="true">⋮⋮</span>

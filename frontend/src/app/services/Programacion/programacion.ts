@@ -118,4 +118,22 @@ export class ProgramacionDashboardService {
   exportarListadoBus(payload: { fecha: string; idTour: number; bus: any; nombreTour?: string }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-listado-bus`, payload, { responseType: 'blob' });
   }
+
+  calcularRutaVisual(coordenadas: Array<{ lat: number; lng: number }>): Observable<{
+    source: 'osrm-local';
+    coordinates: number[][];
+    distance: number;
+    duration: number;
+  }> {
+    return this.http.post<any>(`${this.apiUrl}/ruta-visual`, { coordenadas });
+  }
+
+  exportarListadosZip(payload: {
+    fecha: string;
+    idTour: number;
+    buses: any[];
+    nombreTour?: string;
+  }): Observable<Blob> {
+    return this.http.post(`${this.apiUrl}/exportar-listados-zip`, payload, { responseType: 'blob' });
+  }
 }

@@ -14,7 +14,8 @@
                           drawer()!.type === 'transfer' ? 'Detalle de transfer' :
                           drawer()!.type === 'tour' ? 'Detalle de tour' :
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :
-                          drawer()!.type === 'duplicar' ? 'Duplicar reserva' : 'Novedades de la app'">
+                          drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
+                          drawer()!.type === 'programacion-listado' ? 'Listado de programación' : 'Novedades de la app'">
 
     @if (drawer()!.type === 'reserva') {
       <app-reserva
@@ -51,6 +52,10 @@
 
     @if (drawer()!.type === 'app-updates') {
       <app-updates-panel />
+    }
+
+    @if (drawer()!.type === 'programacion-listado') {
+      <app-programacion-listado-panel />
     }
 
   </div>

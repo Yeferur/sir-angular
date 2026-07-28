@@ -41,7 +41,7 @@
           class="operation-card"
           [class.is-ready]="generated"
           [class.is-empty]="!hasPassengers"
-          [disabled]="!canCreate() || !hasPassengers || updating()"
+          [disabled]="(!generated && !canCreate()) || !hasPassengers || updating()"
           (click)="openTour(tour)">
           <span class="operation-top">
             <span class="operation-name">{{ tour.NombreTour }}</span>
@@ -75,7 +75,7 @@
           </span>
 
           <span class="operation-action">
-            {{ !hasPassengers ? 'Sin operación' : (generated ? 'Editar listado' : 'Generar listado') }}
+            {{ !hasPassengers ? 'Sin operación' : (generated ? 'Ver listado' : 'Generar listado') }}
             @if (hasPassengers) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

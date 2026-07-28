@@ -83,7 +83,8 @@
 .sir-drawer-panel app-tour-detail,
 .sir-drawer-panel app-mapa,
 .sir-drawer-panel app-duplicar-panel,
-.sir-drawer-panel app-updates-panel {
+.sir-drawer-panel app-updates-panel,
+.sir-drawer-panel app-programacion-listado-panel {
   flex: 1;
   min-height: 0;
   display: flex;

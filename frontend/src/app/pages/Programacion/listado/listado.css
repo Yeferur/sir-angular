@@ -8,6 +8,11 @@
   animation: pageEnter .4s cubic-bezier(.22, 1, .36, 1) both;
 }
 
+.programacion-page.is-editor {
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
 .operation-header {
   display: flex;
   align-items: flex-end;

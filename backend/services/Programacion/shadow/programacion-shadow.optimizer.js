@@ -187,6 +187,14 @@ function ordenarPuntosGeograficamente(
       const ordenCandidato = numeroFinito(candidato?.ordenRuta);
       const mismaRuta = normalizarRuta(actual?.ruta)
         && normalizarRuta(actual?.ruta) === normalizarRuta(candidato?.ruta);
+      const rutaActual = normalizarRuta(actual?.ruta);
+      const rutaCandidata = normalizarRuta(candidato?.ruta);
+      const rutaRelacionada = rutaActual && rutaCandidata
+        && !mismaRuta
+        && rutasRelacionadas(rutaActual, rutaCandidata);
+      const saltoNoRelacionado = rutaActual && rutaCandidata
+        && !mismaRuta
+        && !rutaRelacionada;
       const continuidad = ordenActual !== null && ordenCandidato !== null
         ? Math.min(10, Math.abs(ordenCandidato - ordenActual)) * 0.04
         : 0;
@@ -201,7 +209,8 @@ function ordenarPuntosGeograficamente(
       }
 
       const puntaje = distanciaSegura
-        - (mismaRuta ? 0.35 : 0)
+        - (mismaRuta ? 0.6 : rutaRelacionada ? 0.2 : 0)
+        + (saltoNoRelacionado ? 1.5 : 0)
         + continuidad
         + progresoDestino;
 
@@ -690,6 +699,9 @@ function generarPlanSombra({
       recorrido: {
         origen: puntoBase?.nombre || puntoBase?.NombrePunto || PUNTO_BASE.nombre,
         usaPosicionComoPreferenciaSuave: true,
+        usaRutasComoZonificacion: true,
+        priorizaMismaRutaORutasRelacionadas: true,
+        permiteSalirDeZonaCuandoLaCercaniaCompensa: true,
         ignoraTraficoTiempoReal: true,
         fuenteDistancias,
       },

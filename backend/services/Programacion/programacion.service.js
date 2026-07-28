@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const { recordHistorial } = require('../Historial/logger');
 const {
     generarPlanSombra,
@@ -11,6 +12,9 @@ const {
 const {
     prepararMatrizOSRM,
 } = require('./shadow/programacion-shadow.distances');
+const {
+    obtenerReservasSinAsignar,
+} = require('./programacion-reconciliation');
 
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
@@ -2243,21 +2247,12 @@ async function generarPlanLogisticoOptimizado(fecha, idsTours, opciones = {}) {
         });
     }
 
-    const reservasAsignadas = new Set(
-        (plan.buses || [])
-            .flatMap(bus => bus.reservas || [])
-            .map(reserva => String(reserva?.Id_Reserva || '').trim())
-            .filter(Boolean)
-    );
-
     return {
         ...plan,
         fecha,
         tours,
         destinoTour,
-        reservasSinAsignar: (reservas || []).filter(
-            reserva => !reservasAsignadas.has(String(reserva?.Id_Reserva || '').trim())
-        ),
+        reservasSinAsignar: obtenerReservasSinAsignar(plan.buses, reservas),
     };
 }
 
@@ -2270,6 +2265,7 @@ async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
 
     const tours = Array.isArray(idsTours) ? idsTours : [idsTours];
     const primaryTourId = tours.includes(5) ? 5 : tours[0];
+    const reservasEsperadas = await obtenerReservas(fecha, tours);
 
     const conn = await db.getConnection();
     try {
@@ -2277,6 +2273,22 @@ async function guardarListadoFinal({ fecha, idsTours, buses, userId = null }) {
 
         const validacion = await validarIntegridadBuses(conn, { fecha, tours, buses });
         const busesValidados = validacion.buses;
+        const idsAsignados = new Set(
+            busesValidados
+                .flatMap(bus => bus.reservas || [])
+                .map(reserva => String(reserva?.idReserva || '').trim())
+                .filter(Boolean)
+        );
+        const reservasFaltantes = (reservasEsperadas || [])
+            .map(reserva => String(reserva?.Id_Reserva || '').trim())
+            .filter(idReserva => idReserva && !idsAsignados.has(idReserva));
+
+        if (reservasFaltantes.length) {
+            throw createValidationError(
+                'Todas las reservas activas deben quedar asignadas antes de guardar el listado.',
+                reservasFaltantes.map(idReserva => `La reserva ${idReserva} no está asignada a ningún bus.`)
+            );
+        }
 
         const idProgramacion = await guardarSnapshotProgramacion(conn, {
             fecha,
@@ -2322,7 +2334,16 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
     const destinoTour = resolverDestinoTour(tours, tourDestinos);
 
     const snapshot = await obtenerListadoSnapshot({ fecha, idsTours: tours });
-    if (snapshot) return { ...snapshot, destinoTour };
+    if (snapshot) {
+        const reservasActuales = await obtenerReservas(fecha, tours);
+        const reservasSinAsignar = obtenerReservasSinAsignar(snapshot.buses, reservasActuales);
+
+        return {
+            ...snapshot,
+            reservasSinAsignar,
+            destinoTour
+        };
+    }
     return { exists: false, buses: [], reservasSinAsignar: [], destinoTour };
 }
 
@@ -2385,6 +2406,127 @@ async function resumenPrivadosDia(fecha, idsTours) {
     }
 }
 
+async function calcularRutaVisualOSRM(coordenadas) {
+    if (!Array.isArray(coordenadas) || coordenadas.length < 2) {
+        const error = new Error('Se requieren al menos dos coordenadas válidas.');
+        error.statusCode = 400;
+        error.errorCode = 'INVALID_ROUTE_POINTS';
+        throw error;
+    }
+
+    const puntos = coordenadas
+        .map((punto) => ({ lat: Number(punto?.lat), lng: Number(punto?.lng) }))
+        .filter((punto) =>
+            Number.isFinite(punto.lat) &&
+            Number.isFinite(punto.lng) &&
+            punto.lat >= -90 && punto.lat <= 90 &&
+            punto.lng >= -180 && punto.lng <= 180
+        );
+
+    if (puntos.length !== coordenadas.length || puntos.length > 50) {
+        const error = new Error('La ruta contiene coordenadas inválidas o supera el máximo de 50 puntos.');
+        error.statusCode = 400;
+        error.errorCode = 'INVALID_ROUTE_POINTS';
+        throw error;
+    }
+
+    const baseUrl = String(process.env.PROGRAMACION_OSRM_URL || '').replace(/\/+$/, '');
+    if (!baseUrl) {
+        const error = new Error('OSRM no está configurado para calcular la ruta visual.');
+        error.statusCode = 503;
+        error.errorCode = 'OSRM_NOT_CONFIGURED';
+        throw error;
+    }
+
+    const perfil = process.env.PROGRAMACION_OSRM_PROFILE || 'driving';
+    const textoCoordenadas = puntos.map((punto) => `${punto.lng},${punto.lat}`).join(';');
+    const url = new URL(`/route/v1/${encodeURIComponent(perfil)}/${textoCoordenadas}`, `${baseUrl}/`);
+    url.searchParams.set('overview', 'full');
+    url.searchParams.set('geometries', 'geojson');
+    url.searchParams.set('steps', 'false');
+    url.searchParams.set('alternatives', 'false');
+
+    let response;
+    try {
+        response = await fetch(url, {
+            signal: AbortSignal.timeout(Number(process.env.PROGRAMACION_OSRM_TIMEOUT_MS || 8000)),
+            headers: { accept: 'application/json' }
+        });
+    } catch (cause) {
+        const error = new Error('No fue posible conectar con OSRM para dibujar la ruta.');
+        error.statusCode = 503;
+        error.errorCode = 'OSRM_UNAVAILABLE';
+        error.cause = cause;
+        throw error;
+    }
+
+    if (!response.ok) {
+        const error = new Error(`OSRM respondió HTTP ${response.status}.`);
+        error.statusCode = 503;
+        error.errorCode = 'OSRM_UNAVAILABLE';
+        throw error;
+    }
+
+    const body = await response.json();
+    const route = body?.routes?.[0];
+    if (body?.code !== 'Ok' || !route?.geometry?.coordinates) {
+        const error = new Error('OSRM no encontró un recorrido para los puntos indicados.');
+        error.statusCode = 422;
+        error.errorCode = 'ROUTE_NOT_FOUND';
+        throw error;
+    }
+
+    return {
+        source: 'osrm-local',
+        coordinates: route.geometry.coordinates,
+        distance: Number(route.distance || 0),
+        duration: Number(route.duration || 0)
+    };
+}
+
+async function generarZipListados({ fecha, idTour, buses, nombreTour }) {
+    if (!fecha || !idTour || !Array.isArray(buses) || buses.length === 0) {
+        const error = new Error('Se requiere fecha, idTour y al menos un bus para exportar.');
+        error.statusCode = 400;
+        error.errorCode = 'MISSING_PARAMS';
+        throw error;
+    }
+
+    const safeName = (value, fallback) => {
+        const normalized = String(value || fallback)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '_')
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return normalized || fallback;
+    };
+
+    const zip = new JSZip();
+    const tourName = safeName(nombreTour, 'Tour');
+    const usedNames = new Set();
+
+    for (let index = 0; index < buses.length; index += 1) {
+        const bus = buses[index];
+        const buffer = await generarExcelListadoBus({ fecha, idTour, bus, nombreTour });
+        const baseName = `${String(index + 1).padStart(2, '0')}_${safeName(bus?.id, `Bus_${index + 1}`)}`;
+        let fileName = `${baseName}.xlsx`;
+        let suffix = 2;
+        while (usedNames.has(fileName.toLowerCase())) {
+            fileName = `${baseName}_${suffix}.xlsx`;
+            suffix += 1;
+        }
+        usedNames.add(fileName.toLowerCase());
+        zip.file(fileName, buffer);
+    }
+
+    return {
+        buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }),
+        fileName: `${fecha}_${tourName}_listados.zip`
+    };
+}
+
 module.exports = {
     generarPlanLogistico,
     generarPlanLogisticoOptimizado,
@@ -2393,7 +2535,9 @@ module.exports = {
     generarExcelReservaPrivada,
     generarExcelListadoBus,
     guardarListadoFinal,
-    obtenerListadoFinal
+    obtenerListadoFinal,
+    calcularRutaVisualOSRM,
+    generarZipListados
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {

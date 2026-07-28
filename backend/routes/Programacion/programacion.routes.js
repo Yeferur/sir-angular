@@ -14,7 +14,9 @@ const {
     exportarReservaPrivadaController,
     guardarListadoFinalController,
     obtenerListadoFinalController,
-    resumenPrivadosDiaController
+    resumenPrivadosDiaController,
+    calcularRutaVisualController,
+    exportarListadosZipController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -104,6 +106,20 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     obtenerListadoFinalController
+);
+
+router.post(
+    '/ruta-visual',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    calcularRutaVisualController
+);
+
+router.post(
+    '/exportar-listados-zip',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    exportarListadosZipController
 );
 
 

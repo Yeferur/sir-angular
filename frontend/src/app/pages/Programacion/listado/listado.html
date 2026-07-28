@@ -1,4 +1,4 @@
-<div class="programacion-page">
+<div class="programacion-page" [class.is-editor]="modoVista === 'editor'">
   @if (modoVista === 'dashboard') {
     <header class="operation-header">
       <div>
@@ -43,7 +43,7 @@
 
   @if (isPageLoading) {
     <app-loading-state
-      [label]="tourSeleccionado ? 'Preparando el editor…' : 'Cargando la operación del día…'">
+      [label]="pageLoadingLabel">
     </app-loading-state>
   } @else if (loadError && modoVista === 'dashboard') {
     <app-loading-state
@@ -85,6 +85,7 @@
         [dragging]="isDragging"
         [saving]="isSaving"
         [routingFallback]="routingFallback"
+        [qualitySummary]="qualitySummary"
         (closeRequested)="volverAlDashboard()"
         (saveRequested)="guardarListadoFinal()"
         (exportAllRequested)="descargarTodosLosListados()"

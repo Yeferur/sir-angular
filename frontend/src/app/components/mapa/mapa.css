@@ -61,6 +61,34 @@
   border-radius: 20px;
 }
 
+.mapa-topbar-warning {
+  font-size: 10px;
+  font-weight: 650;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.mapa-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mapa-theme-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 .mapa-close-btn {
   display: flex;
   align-items: center;
@@ -186,6 +214,49 @@
   letter-spacing: 0.6px;
   flex-shrink: 0;
 }
+
+.missing-points {
+  margin: 10px 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(245, 158, 11, .26);
+  border-radius: 9px;
+  color: #f8fafc;
+  background: rgba(245, 158, 11, .08);
+}
+
+.missing-points strong {
+  display: block;
+  color: #fbbf24;
+  font-size: 11px;
+}
+
+.missing-points p {
+  margin: 4px 0 8px;
+  color: #94a3b8;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.missing-points ul {
+  max-height: 92px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.missing-points li {
+  padding: 5px 0;
+  border-top: 1px solid rgba(245, 158, 11, .12);
+}
+
+.missing-points li span,
+.missing-points li small {
+  display: block;
+}
+
+.missing-points li span { font-size: 9px; font-weight: 650; }
+.missing-points li small { margin-top: 2px; color: #64748b; font-size: 8px; }
 
 /* Lista scrolleable */
 .panel-paradas {
@@ -499,4 +570,41 @@
   font-size: 11px;
   color: #374151;
   font-style: italic;
+}
+:host-context([data-theme="light"]) .mapa-container,
+.mapa-container.theme-light,
+:host-context([data-theme="light"]) .mapa-topbar,
+.mapa-container.theme-light .mapa-topbar,
+:host-context([data-theme="light"]) .mapa-panel,
+.mapa-container.theme-light .mapa-panel,
+:host-context([data-theme="light"]) .mapa-footer,
+.mapa-container.theme-light .mapa-footer {
+  color: #111827;
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, .12);
+}
+
+:host-context([data-theme="light"]) .mapa-topbar-title,
+.mapa-container.theme-light .mapa-topbar-title,
+:host-context([data-theme="light"]) .stat-value,
+.mapa-container.theme-light .stat-value,
+:host-context([data-theme="light"]) .parada-nombre,
+.mapa-container.theme-light .parada-nombre {
+  color: #111827;
+}
+
+:host-context([data-theme="light"]) .stat-card,
+.mapa-container.theme-light .stat-card,
+:host-context([data-theme="light"]) .mapa-theme-btn,
+.mapa-container.theme-light .mapa-theme-btn,
+:host-context([data-theme="light"]) .mapa-close-btn,
+.mapa-container.theme-light .mapa-close-btn {
+  background: #f4f5f7;
+  border-color: rgba(15, 23, 42, .1);
+}
+
+:host-context([data-theme="light"]) .missing-points,
+.mapa-container.theme-light .missing-points {
+  color: #111827;
+  background: #fffbeb;
 }

@@ -319,3 +319,34 @@ exports.resumenPrivadosDiaController = async (req, res) => {
         return sendError(res, { status: 500, message: 'Error interno al consultar privados.', errorCode: 'INTERNAL_ERROR' });
     }
 };
+
+exports.calcularRutaVisualController = async (req, res) => {
+    try {
+        const resultado = await cerebro.calcularRutaVisualOSRM(req.body?.coordenadas);
+        return sendSuccess(res, { data: resultado, message: 'Ruta visual calculada con OSRM' });
+    } catch (error) {
+        console.error('Error al calcular ruta visual con OSRM:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible calcular la ruta visual.',
+            errorCode: error.errorCode || 'ROUTE_FAILED'
+        });
+    }
+};
+
+exports.exportarListadosZipController = async (req, res) => {
+    const { fecha, idTour, buses, nombreTour } = req.body || {};
+    try {
+        const resultado = await cerebro.generarZipListados({ fecha, idTour, buses, nombreTour });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${resultado.fileName}"`);
+        res.send(resultado.buffer);
+    } catch (error) {
+        console.error('Error al exportar ZIP de listados:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible generar el archivo comprimido.',
+            errorCode: error.errorCode || 'ZIP_EXPORT_FAILED'
+        });
+    }
+};

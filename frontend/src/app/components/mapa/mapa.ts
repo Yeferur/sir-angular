@@ -16,6 +16,7 @@ import * as L from 'leaflet';
 import 'leaflet-routing-machine';
 import { CommonModule } from '@angular/common';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { ProgramacionDashboardService } from '../../services/Programacion/programacion';
 
 declare module 'leaflet' {
   namespace Routing {
@@ -41,6 +42,12 @@ interface DestinoTourMapa {
   nombre?: string | null;
 }
 
+interface PuntoSinCoordenadas {
+  nombre: string;
+  idReserva: string;
+  pasajeros: number;
+}
+
 @Component({
   selector: 'app-mapa',
   standalone: true,
@@ -60,16 +67,22 @@ export class Mapa implements OnInit, OnDestroy {
   distanciaKm: string = '—';
   tiempoMin: string = '—';
   totalPax: number = 0;
+  puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
+  mapTheme: 'dark' | 'light' =
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
+      ? 'light'
+      : 'dark';
 
   private map!: L.Map;
   private routingControl!: any;
   private markers: L.Marker[] = [];
-  private readonly apiKeyORS = '5b3ce3597851110001cf62480a1123878ce84377a396b6a142b35c3a';
+  private tileLayer?: L.TileLayer;
   private initRetryHandle: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private alerts: SirAlertService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private programacion: ProgramacionDashboardService
   ) {}
 
   cerrar() {
@@ -111,6 +124,12 @@ export class Mapa implements OnInit, OnDestroy {
     return punto.reservas.reduce((sum, r) => sum + (Number(r.NumeroPasajeros) || 0), 0);
   }
 
+  toggleMapTheme(): void {
+    this.mapTheme = this.mapTheme === 'dark' ? 'light' : 'dark';
+    this.applyTileLayer();
+    this.cdr.markForCheck();
+  }
+
   // ── Init del mapa ────────────────────────────────────────────
   private initMap(): void {
     if (this.map) {
@@ -119,6 +138,7 @@ export class Mapa implements OnInit, OnDestroy {
     }
     this.routingControl = undefined;
     this.markers = [];
+    this.puntosSinCoordenadas = [];
 
     if (!Array.isArray(this.puntos) || this.puntos.length === 0) return;
 
@@ -176,7 +196,14 @@ export class Mapa implements OnInit, OnDestroy {
         lat === null || lng === null ||
         Math.abs(lat) < 1e-4 || Math.abs(lng) < 1e-4 ||
         lat < -90 || lat > 90 || lng < -180 || lng > 180
-      ) continue;
+      ) {
+        this.puntosSinCoordenadas.push({
+          nombre: r.NombrePunto || `Punto ${r.Id_Punto ?? 'sin identificar'}`,
+          idReserva: String(r.Id_Reserva ?? ''),
+          pasajeros: Number(r.__paxEnEstePunto || r.NumeroPasajeros || 0)
+        });
+        continue;
+      }
 
       const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
       if (!puntosAgrupados.has(key)) {
@@ -245,12 +272,7 @@ export class Mapa implements OnInit, OnDestroy {
       zoomControl: false  // lo añadimos nosotros con posición custom
     }).setView(center, 13);
 
-    // Tile oscuro de CartoDB (sin API key, gratuito)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>',
-      subdomains: 'abcd',
-      maxZoom: 20
-    }).addTo(this.map);
+    this.applyTileLayer();
 
     // Zoom control en posición bottom-left
     L.control.zoom({ position: 'bottomleft' }).addTo(this.map);
@@ -265,7 +287,7 @@ export class Mapa implements OnInit, OnDestroy {
 
     this.routingControl = Routing.control({
       waypoints,
-      router: this.orsRouter(this.apiKeyORS),
+      router: this.osrmRouter(),
       addWaypoints: false,
       routeWhileDragging: false,
       show: false,
@@ -454,38 +476,43 @@ export class Mapa implements OnInit, OnDestroy {
     };
   }
 
-  private orsRouter(apiKey: string) {
+  private applyTileLayer(): void {
+    if (!this.map) return;
+    if (this.tileLayer) this.map.removeLayer(this.tileLayer);
+
+    const style = this.mapTheme === 'dark' ? 'dark_all' : 'light_all';
+    this.tileLayer = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
+      attribution: '© CARTO · OpenStreetMap',
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(this.map);
+  }
+
+  private osrmRouter() {
     return {
       route: (wps: any[], done: any, ctx?: any) => {
         const max  = 50;
         const step = Math.max(1, Math.floor(wps.length / (max - 2)));
         const slice = wps.filter((_, i) => i === 0 || i === wps.length - 1 || i % step === 0);
-        const coords = slice.map(wp => [wp.latLng.lng, wp.latLng.lat]);
+        const coords = slice.map(wp => ({ lat: wp.latLng.lat, lng: wp.latLng.lng }));
 
-        fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-          method: 'POST',
-          headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ coordinates: coords, instructions: false })
-        })
-          .then(r => r.ok ? r.json() : Promise.reject(new Error(`ORS ${r.status}`)))
-          .then(json => {
-            const feat = json.features?.[0];
-            if (!feat) return done.call(ctx, new Error('Ruta no encontrada'));
-
-            const ll = feat.geometry.coordinates.map((c: number[]) => L.latLng(c[1], c[0]));
+        this.programacion.calcularRutaVisual(coords).subscribe({
+          next: (route) => {
+            const ll = route.coordinates.map((c: number[]) => L.latLng(c[1], c[0]));
             done.call(ctx, null, [{
               name: '',
               coordinates: ll,
               instructions: [],
               summary: {
-                totalDistance: feat.properties.summary?.distance ?? 0,
-                totalTime:     feat.properties.summary?.duration ?? 0
+                totalDistance: route.distance ?? 0,
+                totalTime: route.duration ?? 0
               },
               inputWaypoints:  wps,
               actualWaypoints: wps
             }]);
-          })
-          .catch(err => done.call(ctx, err, null));
+          },
+          error: (error) => done.call(ctx, error, null)
+        });
       }
     };
   }

@@ -1,5 +1,5 @@
 <!-- Wrapper principal -->
-<div class="mapa-container">
+<div class="mapa-container" [class.theme-light]="mapTheme === 'light'">
 
   <!-- ── Top bar ─────────────────────────────────────────────── -->
   <div class="mapa-topbar">
@@ -11,13 +11,22 @@
       </svg>
       <span class="mapa-topbar-title">Ruta del día</span>
       <span class="mapa-topbar-badge">{{ agrupadosConBase.length }} paradas</span>
+      <span class="mapa-topbar-warning" *ngIf="puntosSinCoordenadas.length">
+        {{ puntosSinCoordenadas.length }} sin coordenadas
+      </span>
     </div>
-    <button class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" width="14" height="14">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
+    <div class="mapa-topbar-actions">
+      <button class="mapa-theme-btn" (click)="toggleMapTheme()"
+        [attr.aria-label]="mapTheme === 'dark' ? 'Usar mapa claro' : 'Usar mapa oscuro'">
+        {{ mapTheme === 'dark' ? 'Mapa claro' : 'Mapa oscuro' }}
+      </button>
+      <button class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" width="14" height="14">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
   <!-- ── Cuerpo: mapa + panel ────────────────────────────────── -->
@@ -51,6 +60,17 @@
           <div class="stat-label">Pasajeros</div>
           <div class="stat-value">{{ totalPax }}<span class="stat-unit">pax</span></div>
         </div>
+      </div>
+
+      <div class="missing-points" *ngIf="puntosSinCoordenadas.length" role="note">
+        <strong>Ruta parcial en el mapa</strong>
+        <p>Estos puntos sí permanecen en el listado, pero OSRM no puede mostrarlos ni incluirlos en la distancia hasta que tengan coordenadas.</p>
+        <ul>
+          <li *ngFor="let punto of puntosSinCoordenadas">
+            <span>{{ punto.nombre }}</span>
+            <small>#{{ punto.idReserva }} · {{ punto.pasajeros }} pax</small>
+          </li>
+        </ul>
       </div>
 
       <!-- Lista de paradas -->
@@ -102,7 +122,7 @@
   <!-- ── Footer ──────────────────────────────────────────────── -->
   <div class="mapa-footer">
     <span class="footer-attribution">
-      © CARTO · OpenStreetMap · OpenRouteService
+      © CARTO · OpenStreetMap · OSRM
     </span>
     <div class="footer-legend">
       <span class="legend-item">

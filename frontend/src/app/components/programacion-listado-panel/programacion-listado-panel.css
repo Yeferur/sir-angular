@@ -1,0 +1,150 @@
+:host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+
+.viewer-header,
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--separator-translucent);
+  background: var(--bg-secondary);
+}
+
+.viewer-eyebrow,
+.pending-label {
+  display: block;
+  color: var(--accent-color, #0a84ff);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+h2, h3, p { margin: 0; }
+h2 { margin-top: 4px; font-size: 1.35rem; }
+.viewer-header p { margin-top: 4px; color: var(--text-secondary); font-size: .82rem; }
+
+.close-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--separator-translucent);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: var(--fill-tertiary);
+  cursor: pointer;
+}
+
+.viewer-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--separator-translucent);
+}
+
+.viewer-summary span {
+  padding: 13px 20px;
+  color: var(--text-secondary);
+  font-size: .74rem;
+}
+
+.viewer-summary span + span { border-left: 1px solid var(--separator-translucent); }
+.viewer-summary strong { display: block; color: var(--text-primary); font-size: 1.05rem; }
+
+.viewer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.pending-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-warning, #ff9f0a) 55%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-warning, #ff9f0a) 9%, var(--bg-secondary));
+}
+
+.pending-card strong { display: block; margin-top: 4px; }
+.pending-card p { margin-top: 5px; color: var(--text-secondary); font-size: .78rem; line-height: 1.45; }
+.pending-card button,
+.viewer-actions button {
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 38px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--accent-color, #0a84ff);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.bus-list { display: grid; gap: 12px; }
+.bus-card {
+  overflow: hidden;
+  border: 1px solid var(--separator-translucent);
+  border-radius: 14px;
+  background: var(--fill-quaternary, rgba(127,127,127,.06));
+}
+
+.bus-card > header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px 9px;
+}
+
+.bus-number {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent-color, #0a84ff);
+  background: color-mix(in srgb, var(--accent-color, #0a84ff) 14%, transparent);
+  font-weight: 800;
+  font-size: .76rem;
+}
+
+.bus-card h3 { font-size: .88rem; }
+.bus-card header p { margin-top: 2px; color: var(--text-tertiary); font-size: .7rem; }
+.occupancy { font-size: .82rem; font-weight: 800; }
+.progress { height: 3px; margin: 0 14px; overflow: hidden; border-radius: 4px; background: var(--fill-tertiary); }
+.progress span { display: block; height: 100%; border-radius: inherit; background: var(--color-success, #30d158); }
+.bus-meta { display: flex; gap: 14px; padding: 8px 14px 11px; color: var(--text-tertiary); font-size: .68rem; }
+
+ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--separator-translucent); }
+li { display: grid; grid-template-columns: 23px 1fr; gap: 8px; padding: 8px 14px; }
+li + li { border-top: 1px solid var(--separator-translucent); }
+li > span { color: var(--text-tertiary); font-size: .68rem; }
+li strong, li small { display: block; }
+li strong { font-size: .75rem; }
+li small { margin-top: 2px; color: var(--text-tertiary); font-size: .67rem; }
+
+.viewer-actions { border-top: 1px solid var(--separator-translucent); border-bottom: 0; }
+.viewer-actions strong, .viewer-actions span { display: block; }
+.viewer-actions strong { font-size: .8rem; }
+.viewer-actions span { margin-top: 2px; color: var(--text-secondary); font-size: .7rem; }
+
+@media (max-width: 560px) {
+  .viewer-header { padding: 16px; }
+  .viewer-summary span { padding: 11px 12px; }
+  .pending-card { display: block; }
+  .pending-card button { width: 100%; margin-top: 12px; }
+  .viewer-actions div { display: none; }
+  .viewer-actions button { width: 100%; }
+}

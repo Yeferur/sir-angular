@@ -1,6 +1,6 @@
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Bus, Reserva, Sugerencia } from '../../../interfaces/Programacion/reservas';
 import { ProgramacionViewStop } from './programacion-view.types';
@@ -13,8 +13,23 @@ import { ProgramacionViewStop } from './programacion-view.types';
   styleUrl: './programacion-editor.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProgramacionEditorComponent {
+export class ProgramacionEditorComponent implements OnDestroy {
   readonly newBusDropData: Reserva[] = [];
+  readonly canEnterActiveList = () => this.activeBusIndex() !== -1;
+  readonly phoneReadOnly = signal(false);
+  private readonly phoneMediaQuery = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 660px)')
+    : null;
+  private readonly phoneMediaListener = (event: MediaQueryListEvent) => this.phoneReadOnly.set(event.matches);
+
+  constructor() {
+    this.phoneReadOnly.set(Boolean(this.phoneMediaQuery?.matches));
+    this.phoneMediaQuery?.addEventListener('change', this.phoneMediaListener);
+  }
+
+  ngOnDestroy(): void {
+    this.phoneMediaQuery?.removeEventListener('change', this.phoneMediaListener);
+  }
 
   tourName = input('');
   operationDate = input('');
@@ -33,6 +48,11 @@ export class ProgramacionEditorComponent {
   dragging = input(false);
   saving = input(false);
   routingFallback = input(false);
+  qualitySummary = input<{
+    missingCoordinates: number;
+    missingRoute: number;
+    affectedReservations: number;
+  } | null>(null);
 
   closeRequested = output<void>();
   saveRequested = output<void>();

@@ -179,6 +179,36 @@ test('es determinista para la misma entrada', () => {
   assert.deepEqual(primero.buses, segundo.buses);
 });
 
+test('mantiene separadas rutas no relacionadas cuando la capacidad permite zonificar', () => {
+  const reservas = [
+    crearReserva({ id: 101, pax: 19, ruta: '1', lat: 6.210, lon: -75.590 }),
+    crearReserva({ id: 102, pax: 19, ruta: '1', lat: 6.211, lon: -75.589 }),
+    crearReserva({ id: 201, pax: 19, ruta: '13', lat: 6.270, lon: -75.540 }),
+    crearReserva({ id: 202, pax: 19, ruta: '13', lat: 6.271, lon: -75.539 }),
+  ];
+
+  const plan = generarPlanSombra({ reservas });
+
+  assert.equal(plan.metricas.totalBuses, 2);
+  assert.equal(plan.metricas.penalizacionRutas, 0);
+  assert.ok(plan.buses.every((bus) => new Set(bus.rutas).size === 1));
+  assert.equal(plan.decisiones.recorrido.usaRutasComoZonificacion, true);
+});
+
+test('permite mezclar rutas cuando es necesario para conservar la flota mínima', () => {
+  const reservas = [
+    crearReserva({ id: 301, pax: 20, ruta: '1', lat: 6.210, lon: -75.590 }),
+    crearReserva({ id: 302, pax: 18, ruta: '13', lat: 6.270, lon: -75.540 }),
+  ];
+
+  const plan = generarPlanSombra({ reservas });
+
+  assert.equal(plan.metricas.totalBuses, 1);
+  assert.equal(plan.buses[0].ocupados, 38);
+  assert.ok(plan.metricas.penalizacionRutas > 0);
+  assert.equal(plan.decisiones.recorrido.permiteSalirDeZonaCuandoLaCercaniaCompensa, true);
+});
+
 test('alerta datos incompletos sin ocultarlos', () => {
   const reservas = [
     crearReserva({

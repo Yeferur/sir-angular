@@ -30,6 +30,12 @@ interface LegacyNavbarFacade {
   clearOverlay: () => void;
 }
 
+interface ProgramacionQualitySummary {
+  missingCoordinates: number;
+  missingRoute: number;
+  affectedReservations: number;
+}
+
 @Component({
   selector: 'app-programacion-dashboard',
   standalone: true,
@@ -78,6 +84,7 @@ export class Listado implements OnInit, OnDestroy {
   isPageLoading = true;
   isUpdatingDate = false;
   isSaving = false;
+  editorLoadingMode: 'saved' | 'generating' | null = null;
   loadError = '';
   modoVista: 'dashboard' | 'editor' | 'privados' = 'dashboard';
 
@@ -87,6 +94,7 @@ export class Listado implements OnInit, OnDestroy {
   listadoPersistido = false;
   listadoOrigen: 'nuevo' | 'db' | null = null;
   routingFallback = false;
+  qualitySummary: ProgramacionQualitySummary | null = null;
 
   readonly CAPACIDADES_BUSES = [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b);
 
@@ -167,6 +175,16 @@ export class Listado implements OnInit, OnDestroy {
     }
 
     return '';
+  }
+
+  get pageLoadingLabel(): string {
+    if (this.editorLoadingMode === 'generating') {
+      return 'Generando los listados y optimizando los recorridos…';
+    }
+    if (this.editorLoadingMode === 'saved') {
+      return 'Obteniendo los buses y reservas del listado guardado…';
+    }
+    return 'Cargando la operación del día…';
   }
 
   get totalPaxUnassigned(): number {
@@ -436,6 +454,8 @@ export class Listado implements OnInit, OnDestroy {
     this.busesPrivados = [];
     this.destinoTourActual = null;
     this.routingFallback = false;
+    this.qualitySummary = null;
+    this.editorLoadingMode = null;
   }
 
   markDirty(): void {
@@ -479,12 +499,14 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   generarPlan(tour: TourProgramacion): void {
-    if (!this.canCreateProgramacion) {
+    const isGenerated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+    if (!isGenerated && !this.canCreateProgramacion) {
       this.navbar.warningToast('Acción no permitida', 'No tienes permiso para generar programación.');
       return;
     }
 
     this.isPageLoading = true;
+    this.editorLoadingMode = tour.estado === 'Generado' ? 'saved' : 'generating';
 
     this.tourSeleccionado = tour;
 
@@ -504,9 +526,15 @@ export class Listado implements OnInit, OnDestroy {
       next: (data) => {
         if (data?.exists) {
           const sugerencia = this.construirSugerenciaDesdeListado(data);
-          this.aplicarPlan(tour, sugerencia, data.reservasSinAsignar || [], data.privados || [], data.destinoTour || null);
-          this.mostrarAlertaReservasSinAsignar(tour, data.reservasSinAsignar || []);
           this.isPageLoading = false;
+          this.editorLoadingMode = null;
+          this.abrirVistaListadoGuardado(
+            tour,
+            sugerencia,
+            data.reservasSinAsignar || [],
+            data.privados || [],
+            data.destinoTour || null
+          );
           return;
         }
 
@@ -593,7 +621,6 @@ export class Listado implements OnInit, OnDestroy {
     const ids = this.planSeleccionado.buses.map((_, i) => `busdrop-${i}`);
     ids.push('new-bus');
     ids.push('active-bus');
-    ids.push('unassigned-bus');
     return ids;
   }
 
@@ -649,15 +676,6 @@ export class Listado implements OnInit, OnDestroy {
 
     if (event.previousContainer === event.container) {
       this.cdr.markForCheck();
-      return;
-    }
-
-    if (event.container.id === 'unassigned-bus') {
-      const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
-      if (!moved) return;
-
-      this.reservasSinAsignar.splice(event.currentIndex, 0, moved);
-      this.syncAfterPlanMutation({ updateMap: true });
       return;
     }
 
@@ -735,6 +753,15 @@ export class Listado implements OnInit, OnDestroy {
     }
 
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
+
+    if (this.reservasSinAsignar.length > 0) {
+      this.navbar.showAlert({
+        type: 'warning',
+        title: 'Hay reservas sin asignar',
+        message: 'Asigna todas las reservas pendientes a un bus antes de guardar el listado.',
+      });
+      return;
+    }
 
     this.planSeleccionado.buses = this.planSeleccionado.buses.map((b, i) => {
       const placa = (b.id || '').trim();
@@ -824,7 +851,27 @@ export class Listado implements OnInit, OnDestroy {
 
   descargarTodosLosListados(): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
-    this.planSeleccionado.buses.forEach((_, i) => this.descargarListadoBus(i));
+    const payload = {
+      fecha: this.fechaSeleccionada,
+      idTour: this.tourSeleccionado.Id_Tour,
+      buses: this.planSeleccionado.buses,
+      nombreTour: this.tourSeleccionado.NombreTour,
+    };
+
+    this.programacionService.exportarListadosZip(payload).subscribe({
+      next: (blob) => {
+        const tour = this.tourSeleccionado?.NombreTour?.replace(/\s+/g, '_') || 'Tour';
+        this.downloadBlob(blob, `${this.fechaSeleccionada}_${tour}_listados.zip`);
+      },
+      error: (err) => {
+        console.error('Error al exportar todos los listados', err);
+        this.navbar.showAlert({
+          type: 'error',
+          title: 'No pudimos exportar los listados',
+          message: 'Los archivos individuales siguen disponibles desde cada bus.'
+        });
+      }
+    });
   }
 
   descargarReservaPrivadaExcel(grupo: any): void {
@@ -880,6 +927,7 @@ export class Listado implements OnInit, OnDestroy {
 
   private generarPlanDesdeCero(tour: TourProgramacion): void {
     this.isPageLoading = true;
+    this.editorLoadingMode = 'generating';
 
     this.editorSubscription?.unsubscribe();
     this.editorSubscription = this.programacionService.generarPlanLogistico(
@@ -921,6 +969,7 @@ export class Listado implements OnInit, OnDestroy {
           this.destinoTourActual = destinoTour;
           this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
           renumberGenericBuses(this.planSeleccionado?.buses);
+          this.qualitySummary = this.buildQualitySummary(this.planSeleccionado?.buses || [], reservasSinAsignar);
           this.modoVista = 'editor';
         } else {
           tour.planGenerado = plan;
@@ -931,6 +980,7 @@ export class Listado implements OnInit, OnDestroy {
           this.destinoTourActual = plan?.destinoTour || null;
           this.planSeleccionado = JSON.parse(JSON.stringify(plan?.sugerencias?.[0] || { buses: [] }));
           renumberGenericBuses(this.planSeleccionado?.buses);
+          this.qualitySummary = this.buildQualitySummary(this.planSeleccionado?.buses || [], []);
           this.modoVista = 'editor';
         }
 
@@ -939,11 +989,13 @@ export class Listado implements OnInit, OnDestroy {
         this.rebuildActiveStops();
 
         this.isPageLoading = false;
+        this.editorLoadingMode = null;
         this.cdr.markForCheck();
       },
       error: (err) => {
         console.error(`Error al generar plan para ${tour.NombreTour}`, err);
         this.isPageLoading = false;
+        this.editorLoadingMode = null;
         this.navbar.showAlert({
           type: 'error',
           title: 'No pudimos preparar el listado',
@@ -987,6 +1039,7 @@ export class Listado implements OnInit, OnDestroy {
     this.planSeleccionado = JSON.parse(JSON.stringify(sugerencia));
     renumberGenericBuses(this.planSeleccionado?.buses);
     this.reservasSinAsignar = reservasSinAsignar || [];
+    this.qualitySummary = this.buildQualitySummary(this.planSeleccionado?.buses || [], this.reservasSinAsignar);
     this.busesPrivados = privados || [];
     this.destinoTourActual = destinoTour;
     this.modoVista = 'editor';
@@ -998,12 +1051,80 @@ export class Listado implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  private buildQualitySummary(buses: Bus[], unassigned: Reserva[]): ProgramacionQualitySummary | null {
+    const reservations = [
+      ...buses.flatMap((bus) => bus.reservas || []),
+      ...(unassigned || [])
+    ];
+    const affected = new Set<string>();
+    let missingCoordinates = 0;
+    let missingRoute = 0;
+
+    for (const reservation of reservations) {
+      const points = Array.isArray((reservation as any).puntosReserva) && (reservation as any).puntosReserva.length
+        ? (reservation as any).puntosReserva
+        : [reservation];
+
+      let reservationMissingCoordinates = false;
+      let reservationMissingRoute = false;
+      for (const point of points) {
+        const lat = this.parseCoordinate(point?.Latitud);
+        const lng = this.parseCoordinate(point?.Longitud);
+        if (lat === null || lng === null || Math.abs(lat) < 0.0001 || Math.abs(lng) < 0.0001) {
+          missingCoordinates += 1;
+          reservationMissingCoordinates = true;
+        }
+
+        const route = String(point?.ruta ?? point?.Ruta ?? reservation.ruta ?? '').trim().toUpperCase();
+        if (!route || route === 'PENDIENTE') {
+          missingRoute += 1;
+          reservationMissingRoute = true;
+        }
+      }
+
+      if (reservationMissingCoordinates || reservationMissingRoute) {
+        affected.add(String(reservation.Id_Reserva));
+      }
+    }
+
+    if (!missingCoordinates && !missingRoute) return null;
+    return { missingCoordinates, missingRoute, affectedReservations: affected.size };
+  }
+
+  private abrirVistaListadoGuardado(
+    tour: TourProgramacion,
+    sugerencia: Sugerencia,
+    reservasSinAsignar: Reserva[],
+    privados: any[] = [],
+    destinoTour: DestinoTourProgramacion | null = null
+  ): void {
+    const snapshot = JSON.parse(JSON.stringify(sugerencia)) as Sugerencia;
+    const pendientes = JSON.parse(JSON.stringify(reservasSinAsignar || [])) as Reserva[];
+    const privadosSnapshot = JSON.parse(JSON.stringify(privados || []));
+    const destinoSnapshot = destinoTour ? { ...destinoTour } : null;
+
+    this.drawerService.openProgramacionListado({
+      tourName: tour.NombreTour,
+      operationDate: this.fechaSeleccionada,
+      buses: snapshot.buses,
+      unassigned: pendientes,
+      canEdit: this.canUpdateProgramacion,
+      onEdit: () => {
+        this.aplicarPlan(tour, snapshot, pendientes, privadosSnapshot, destinoSnapshot);
+      },
+      onRegenerate: () => {
+        this.tourSeleccionado = tour;
+        this.generarPlanDesdeCero(tour);
+      }
+    });
+  }
+
   private mostrarAlertaReservasSinAsignar(tour: TourProgramacion, reservas: Reserva[]): void {
     if (!reservas?.length) return;
 
     this.navbar.showConfirm(
       'Reservas sin asignar',
-      `Se encontraron ${reservas.length} reservas nuevas sin asignar.`,
+      `Se encontraron ${reservas.length} reservas nuevas. Puedes regenerar el listado para incluirlas automáticamente o conservarlo y asignarlas manualmente.`,
       [
         {
           text: 'Regenerar listado',
@@ -1124,7 +1245,10 @@ export class Listado implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.activeBusIndex === -1) return;
+    if (this.activeBusIndex === -1) {
+      if (this.reservasSinAsignar.length > 0) return;
+      this.activeBusIndex = 0;
+    }
 
     this.activeBusIndex = Math.min(this.activeBusIndex, this.planSeleccionado.buses.length - 1);
     if (this.activeBusIndex < 0) this.activeBusIndex = 0;
