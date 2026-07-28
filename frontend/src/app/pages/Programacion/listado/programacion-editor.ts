@@ -17,6 +17,7 @@ export class ProgramacionEditorComponent implements OnDestroy {
   readonly newBusDropData: Reserva[] = [];
   readonly canEnterActiveList = () => this.activeBusIndex() !== -1;
   readonly phoneReadOnly = signal(false);
+  readonly routeCollapsed = signal(true);
   private readonly phoneMediaQuery = typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 660px)')
     : null;
@@ -45,14 +46,9 @@ export class ProgramacionEditorComponent implements OnDestroy {
   totalPaxUnassigned = input(0);
   connectedDropLists = input.required<string[]>();
   canUpdate = input(false);
+  canUpdatePoints = input(false);
   dragging = input(false);
   saving = input(false);
-  routingFallback = input(false);
-  qualitySummary = input<{
-    missingCoordinates: number;
-    missingRoute: number;
-    affectedReservations: number;
-  } | null>(null);
 
   closeRequested = output<void>();
   saveRequested = output<void>();
@@ -63,6 +59,7 @@ export class ProgramacionEditorComponent implements OnDestroy {
   busChanged = output<void>();
   mapRequested = output<{ bus: Bus; index: number }>();
   exportBusRequested = output<number>();
+  pointEditRequested = output<ProgramacionViewStop>();
   stopDropped = output<CdkDragDrop<ProgramacionViewStop[]>>();
   reservationDropped = output<CdkDragDrop<Reserva[]>>();
   dragStarted = output<void>();
@@ -97,6 +94,41 @@ export class ProgramacionEditorComponent implements OnDestroy {
 
   reservationPax(reserva: Reserva & { __paxEnEstePunto?: number }): number {
     return reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros;
+  }
+
+  toggleRoutePanel(): void {
+    this.routeCollapsed.update((collapsed) => !collapsed);
+  }
+
+  stopNeedsCoordinates(stop: ProgramacionViewStop): boolean {
+    const lat = Number(stop.Latitud);
+    const lng = Number(stop.Longitud);
+    return !Number.isFinite(lat)
+      || !Number.isFinite(lng)
+      || Math.abs(lat) < 0.0001
+      || Math.abs(lng) < 0.0001;
+  }
+
+  stopNeedsRoute(stop: ProgramacionViewStop): boolean {
+    const route = String(stop.ruta || '').trim().toUpperCase();
+    return !route || route === 'PENDIENTE';
+  }
+
+  stopNeedsAttention(stop: ProgramacionViewStop): boolean {
+    return this.stopNeedsCoordinates(stop) || this.stopNeedsRoute(stop);
+  }
+
+  get activeIssueCount(): number {
+    return this.activeStops().filter((stop) => this.stopNeedsAttention(stop)).length;
+  }
+
+  isEnglish(reserva: Reserva): boolean {
+    const language = String(reserva.Idioma_Reserva || reserva.IdiomaReserva || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return language.includes('INGLES') || language.includes('ENGLISH');
   }
 
   isMultipoint(reserva: Reserva & { __paxEnEstePunto?: number }): boolean {

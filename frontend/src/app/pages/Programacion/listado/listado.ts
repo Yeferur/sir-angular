@@ -1,4 +1,5 @@
 import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Router } from '@angular/router';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -57,6 +58,7 @@ export class Listado implements OnInit, OnDestroy {
   private permisosService = inject(PermisosService);
   private drawerService = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
+  private router = inject(Router);
 
   private mapAlertButtons(buttons?: LegacyButton[]): AlertButton[] | undefined {
     if (!buttons?.length) return undefined;
@@ -197,6 +199,10 @@ export class Listado implements OnInit, OnDestroy {
 
   get canCreateProgramacion(): boolean {
     return this.permisosService.tienePermiso('PROGRAMACION.CREAR');
+  }
+
+  get canUpdatePoints(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
   }
 
   cargarToursDelDia(): void {
@@ -987,6 +993,7 @@ export class Listado implements OnInit, OnDestroy {
         this.activeBusIndex = 0;
         this.stopOrderByBus.clear();
         this.rebuildActiveStops();
+        this.notifyRouteQuality();
 
         this.isPageLoading = false;
         this.editorLoadingMode = null;
@@ -1047,8 +1054,60 @@ export class Listado implements OnInit, OnDestroy {
     this.activeBusIndex = 0;
     this.stopOrderByBus.clear();
     this.rebuildActiveStops();
+    this.notifyRouteQuality();
 
     this.cdr.markForCheck();
+  }
+
+  abrirEdicionPunto(stop: ViewStop): void {
+    if (!this.canUpdatePoints) {
+      this.alerts.warningToast(
+        'No tienes permiso para editar puntos',
+        'Solicita el permiso PUNTOS.ACTUALIZAR a un administrador.'
+      );
+      return;
+    }
+
+    const pointId = stop?.Id_Punto;
+    if (pointId === null || pointId === undefined || String(pointId).trim() === '') {
+      this.alerts.warningToast(
+        'Punto sin identificador',
+        'No es posible abrir este punto desde el recorrido. Búscalo desde Puntos de encuentro.'
+      );
+      return;
+    }
+
+    const url = this.router.serializeUrl(
+      this.router.createUrlTree(['/Puntos/Editar', pointId])
+    );
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  private notifyRouteQuality(): void {
+    const quality = this.qualitySummary;
+    if (!this.routingFallback && !quality) return;
+
+    const details: string[] = [];
+    if (this.routingFallback) {
+      details.push('OSRM no estuvo disponible; se usó distancia directa como respaldo.');
+    }
+    if (quality?.missingCoordinates) {
+      details.push(
+        `${quality.missingCoordinates} ${quality.missingCoordinates === 1 ? 'punto no tiene' : 'puntos no tienen'} coordenadas.`
+      );
+    }
+    if (quality?.missingRoute) {
+      details.push(
+        `${quality.missingRoute} ${quality.missingRoute === 1 ? 'punto no tiene' : 'puntos no tienen'} ruta operativa.`
+      );
+    }
+
+    const affected = quality?.affectedReservations || 0;
+    const title = affected
+      ? `${affected} ${affected === 1 ? 'reserva requiere' : 'reservas requieren'} revisar sus puntos`
+      : 'Ruta estimada con distancia directa';
+
+    this.alerts.warningToast(title, details.join(' '), 9000);
   }
 
   private buildQualitySummary(buses: Bus[], unassigned: Reserva[]): ProgramacionQualitySummary | null {
