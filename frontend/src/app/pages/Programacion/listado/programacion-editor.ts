@@ -1,6 +1,6 @@
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Bus, Reserva, Sugerencia } from '../../../interfaces/Programacion/reservas';
 import { ProgramacionViewStop } from './programacion-view.types';
@@ -10,14 +10,15 @@ import { ProgramacionViewStop } from './programacion-view.types';
   standalone: true,
   imports: [CommonModule, FormsModule, DragDropModule],
   templateUrl: './programacion-editor.html',
-  styleUrl: './programacion-editor.css',
+  styleUrls: ['./programacion-editor.css', './programacion-editor-responsive.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProgramacionEditorComponent implements OnDestroy {
-  readonly newBusDropData: Reserva[] = [];
-  readonly canEnterActiveList = () => this.activeBusIndex() !== -1;
   readonly phoneReadOnly = signal(false);
-  readonly routeCollapsed = signal(true);
+  readonly transferReservation = signal<Reserva | null>(null);
+  readonly transferSourceBusIndex = signal<number | null>(null);
+  readonly recentDestinationId = signal<string | null>(null);
+  private destinationPulseTimer?: ReturnType<typeof setTimeout>;
   private readonly phoneMediaQuery = typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 660px)')
     : null;
@@ -30,6 +31,7 @@ export class ProgramacionEditorComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.phoneMediaQuery?.removeEventListener('change', this.phoneMediaListener);
+    if (this.destinationPulseTimer) clearTimeout(this.destinationPulseTimer);
   }
 
   tourName = input('');
@@ -44,13 +46,13 @@ export class ProgramacionEditorComponent implements OnDestroy {
   activeStops = input.required<ProgramacionViewStop[]>();
   unassigned = input.required<Reserva[]>();
   totalPaxUnassigned = input(0);
-  connectedDropLists = input.required<string[]>();
+  availableCapacities = input<number[]>([]);
   canUpdate = input(false);
-  canUpdatePoints = input(false);
-  dragging = input(false);
+  canRestore = input(false);
   saving = input(false);
 
   closeRequested = output<void>();
+  restoreRequested = output<void>();
   saveRequested = output<void>();
   exportAllRequested = output<void>();
   busSelected = output<number>();
@@ -59,11 +61,12 @@ export class ProgramacionEditorComponent implements OnDestroy {
   busChanged = output<void>();
   mapRequested = output<{ bus: Bus; index: number }>();
   exportBusRequested = output<number>();
-  pointEditRequested = output<ProgramacionViewStop>();
+  reservationMoveRequested = output<{
+    reservationId: string | number;
+    sourceBusIndex: number;
+    targetBusIndex: number | null;
+  }>();
   stopDropped = output<CdkDragDrop<ProgramacionViewStop[]>>();
-  reservationDropped = output<CdkDragDrop<Reserva[]>>();
-  dragStarted = output<void>();
-  dragEnded = output<void>();
 
   get buses(): Bus[] {
     return this.plan()?.buses || [];
@@ -77,6 +80,19 @@ export class ProgramacionEditorComponent implements OnDestroy {
   get totalReservations(): number {
     return this.buses.reduce((total, bus) => total + (bus.reservas?.length || 0), 0)
       + this.unassigned().length;
+  }
+
+  get transferMode(): boolean {
+    return Boolean(this.transferReservation());
+  }
+
+  get transferPax(): number {
+    return Number(this.transferReservation()?.NumeroPasajeros || 0);
+  }
+
+  get canCreateBusForTransfer(): boolean {
+    return this.transferMode
+      && this.availableCapacities().some((capacity) => capacity >= this.transferPax);
   }
 
   occupancy(bus: Bus | null): number {
@@ -96,8 +112,85 @@ export class ProgramacionEditorComponent implements OnDestroy {
     return reserva.__paxEnEstePunto ?? reserva.NumeroPasajeros;
   }
 
-  toggleRoutePanel(): void {
-    this.routeCollapsed.update((collapsed) => !collapsed);
+  beginTransfer(reservation: Reserva): void {
+    if (this.phoneReadOnly() || !this.canUpdate()) return;
+    this.transferReservation.set(reservation);
+    this.transferSourceBusIndex.set(this.activeBusIndex());
+  }
+
+  cancelTransfer(): void {
+    this.transferReservation.set(null);
+    this.transferSourceBusIndex.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  cancelTransferFromKeyboard(): void {
+    if (this.transferMode) this.cancelTransfer();
+  }
+
+  selectOrMoveToBus(index: number): void {
+    if (!this.transferMode) {
+      this.busSelected.emit(index);
+      return;
+    }
+    if (!this.canMoveToBus(index)) return;
+
+    const reservation = this.transferReservation();
+    const sourceBusIndex = this.transferSourceBusIndex();
+    const destination = this.buses[index];
+    if (!reservation || sourceBusIndex === null || !destination) return;
+
+    const destinationId = destination.id || `Bus ${index + 1}`;
+    this.reservationMoveRequested.emit({
+      reservationId: reservation.Id_Reserva,
+      sourceBusIndex,
+      targetBusIndex: index,
+    });
+    this.cancelTransfer();
+    this.pulseDestination(destinationId);
+  }
+
+  moveSelectedToNewBus(): void {
+    const reservation = this.transferReservation();
+    const sourceBusIndex = this.transferSourceBusIndex();
+    if (!reservation || sourceBusIndex === null || !this.canCreateBusForTransfer) return;
+
+    this.reservationMoveRequested.emit({
+      reservationId: reservation.Id_Reserva,
+      sourceBusIndex,
+      targetBusIndex: null,
+    });
+    this.cancelTransfer();
+  }
+
+  projectedLoad(bus: Bus): number {
+    return Number(bus.ocupados || 0) + this.transferPax;
+  }
+
+  projectedCapacity(bus: Bus): number | null {
+    const load = this.projectedLoad(bus);
+    return this.availableCapacities().find((capacity) => capacity >= load) ?? null;
+  }
+
+  canMoveToBus(index: number): boolean {
+    if (!this.transferMode || index === this.transferSourceBusIndex()) return false;
+    const bus = this.buses[index];
+    return Boolean(bus && this.projectedCapacity(bus));
+  }
+
+  projectedOccupancy(bus: Bus): number {
+    const capacity = this.projectedCapacity(bus);
+    return capacity ? Math.min(100, Math.round((this.projectedLoad(bus) / capacity) * 100)) : 100;
+  }
+
+  isTransferSource(index: number): boolean {
+    return this.transferMode && index === this.transferSourceBusIndex();
+  }
+
+  private pulseDestination(destinationId: string): void {
+    if (this.destinationPulseTimer) clearTimeout(this.destinationPulseTimer);
+    this.recentDestinationId.set(destinationId);
+    this.destinationPulseTimer = setTimeout(() => this.recentDestinationId.set(null), 900);
   }
 
   stopNeedsCoordinates(stop: ProgramacionViewStop): boolean {

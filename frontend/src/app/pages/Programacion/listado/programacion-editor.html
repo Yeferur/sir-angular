@@ -1,4 +1,4 @@
-<section class="editor-shell" cdkDropListGroup>
+<section class="editor-shell">
   <header class="editor-command">
     <div class="editor-context">
       <button type="button" class="icon-button back-button" (click)="closeRequested.emit()" aria-label="Volver a servicios">
@@ -17,14 +17,33 @@
             </span>
           }
         </div>
-        <p>{{ operationDate() }} · {{ totalPassengers }} pasajeros · {{ totalReservations }} reservas</p>
       </div>
     </div>
 
+    <div class="editor-summary" aria-label="Resumen del listado">
+      <span><small>Fecha</small><strong>{{ operationDate() }}</strong></span>
+      <span><small>Pasajeros</small><strong>{{ totalPassengers }}</strong></span>
+      <span><small>Reservas</small><strong>{{ totalReservations }}</strong></span>
+    </div>
+
     <div class="command-actions">
-      <button type="button" class="button button--secondary" (click)="exportAllRequested.emit()">
+      @if (canUpdate() && !phoneReadOnly()) {
+        <button
+          type="button"
+          class="button button--quiet restore-button"
+          title="Vuelve al estado con el que inició esta edición"
+          [disabled]="!canRestore() || transferMode || saving()"
+          (click)="restoreRequested.emit()">
+          Restablecer
+        </button>
+      }
+      <button
+        type="button"
+        class="button button--secondary"
+        title="Descarga un ZIP con un archivo Excel por bus"
+        (click)="exportAllRequested.emit()">
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
-        Descargar ZIP
+        Exportar todos
       </button>
       @if (canUpdate() && !phoneReadOnly()) {
         <button
@@ -36,7 +55,7 @@
             <span class="button-spinner" aria-hidden="true"></span>
             Guardando…
           } @else {
-            Guardar listado
+            Guardar cambios
           }
         </button>
       }
@@ -50,32 +69,28 @@
     </div>
   }
 
-  <div class="editor-workspace">
+  <div class="editor-workspace" [class.is-transfer-mode]="transferMode">
     <aside class="fleet-panel" aria-label="Buses del listado">
       <div class="panel-heading">
-        <div>
-          <span class="eyebrow">Flota</span>
-          <h3>{{ buses.length }} {{ buses.length === 1 ? 'bus' : 'buses' }}</h3>
-        </div>
-        <span class="panel-total">{{ totalPassengers - totalPaxUnassigned() }} pax</span>
+        @if (transferReservation(); as reservation) {
+          <div>
+            <span class="eyebrow">Mover reserva</span>
+            <h3>#{{ reservation.Id_Reserva }} · {{ reservation.NumeroPasajeros }} pax</h3>
+          </div>
+          <button type="button" class="cancel-transfer" (click)="cancelTransfer()" aria-label="Cancelar movimiento">
+            Cancelar
+          </button>
+        } @else {
+          <div>
+            <span class="eyebrow">Flota</span>
+            <h3>{{ buses.length }} {{ buses.length === 1 ? 'bus' : 'buses' }}</h3>
+          </div>
+          <span class="panel-total">{{ totalPassengers - totalPaxUnassigned() }} pax</span>
+        }
       </div>
 
-      <div class="fleet-list">
-        @if (!phoneReadOnly()) {
-          <div
-          class="new-bus-target"
-          [class.is-visible]="dragging()"
-          cdkDropList
-          id="new-bus"
-          [cdkDropListData]="newBusDropData"
-          [cdkDropListConnectedTo]="connectedDropLists()"
-          (cdkDropListDropped)="reservationDropped.emit($event)">
-          <span aria-hidden="true">＋</span>
-            Suelta aquí para crear otro bus
-          </div>
-        }
-
-        @if (unassigned().length > 0) {
+      <div class="fleet-list" [class.is-transfer-mode]="transferMode">
+        @if (unassigned().length > 0 && !transferMode) {
           <button
             type="button"
             class="fleet-card fleet-card--unassigned"
@@ -104,31 +119,62 @@
             type="button"
                   class="fleet-card"
             [class.is-active]="i === activeBusIndex()"
+            [class.fleet-card--destination]="transferMode"
+            [class.is-source]="isTransferSource(i)"
+            [class.cannot-receive]="transferMode && !isTransferSource(i) && !canMoveToBus(i)"
+            [class.just-received]="recentDestinationId() === (bus.id || ('Bus ' + (i + 1)))"
             [attr.data-load]="occupancyState(bus)"
-            cdkDropList
-            [id]="'busdrop-' + i"
-            [cdkDropListData]="bus.reservas"
-            [cdkDropListConnectedTo]="connectedDropLists()"
-            (cdkDropListDropped)="reservationDropped.emit($event)"
-            (click)="busSelected.emit(i)">
-            <span class="fleet-card-top">
-              <span class="bus-identity">
+            [attr.aria-disabled]="transferMode && !canMoveToBus(i)"
+            (click)="selectOrMoveToBus(i)">
+            @if (transferMode) {
+              <span class="destination-top">
                 <span class="bus-index">{{ i + 1 }}</span>
-                <span class="bus-label">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
+                <span class="destination-name">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
               </span>
-              <span class="occupancy-chip">{{ pct }}%</span>
-            </span>
-            <span class="capacity-line">
-              <span class="capacity-track"><span [style.width.%]="pct"></span></span>
-              <span>{{ bus.ocupados }} / {{ bus.capacidad }}</span>
-            </span>
-            <span class="fleet-card-bottom">
-              <span>{{ bus.reservas.length }} reservas</span>
-              <span>{{ bus.guia || 'Guía pendiente' }}</span>
-            </span>
+              @if (isTransferSource(i)) {
+                <span class="destination-state destination-state--source">Origen · {{ bus.ocupados }}/{{ bus.capacidad }}</span>
+              } @else if (canMoveToBus(i)) {
+                <span class="destination-state">
+                  <span>{{ bus.ocupados }} + {{ transferPax }} pax</span>
+                  <strong>{{ projectedLoad(bus) }}/{{ projectedCapacity(bus) }}</strong>
+                </span>
+                <span class="destination-track">
+                  <span [style.width.%]="projectedOccupancy(bus)"></span>
+                </span>
+              } @else {
+                <span class="destination-state destination-state--blocked">No cabe</span>
+              }
+            } @else {
+              <span class="fleet-card-top">
+                <span class="bus-identity">
+                  <span class="bus-index">{{ i + 1 }}</span>
+                  <span class="bus-label">{{ bus.id || ('Bus ' + (i + 1)) }}</span>
+                </span>
+                <span class="occupancy-chip">{{ pct }}%</span>
+              </span>
+              <span class="capacity-line">
+                <span class="capacity-track"><span [style.width.%]="pct"></span></span>
+                <span>{{ bus.ocupados }} / {{ bus.capacidad }}</span>
+              </span>
+              <span class="fleet-card-bottom">
+                <span>{{ bus.reservas.length }} reservas</span>
+                <span>{{ bus.guia || 'Guía pendiente' }}</span>
+              </span>
+            }
           </button>
         }
 
+        @if (transferMode && !phoneReadOnly()) {
+          <button
+            type="button"
+            class="new-bus-target is-visible"
+            [class.cannot-receive]="!canCreateBusForTransfer"
+            [attr.aria-disabled]="!canCreateBusForTransfer"
+            (click)="moveSelectedToNewBus()">
+            <span aria-hidden="true">＋</span>
+            {{ canCreateBusForTransfer ? 'Crear otro bus' : 'No hay un bus disponible' }}
+          </button>
+        }
       </div>
     </aside>
 
@@ -138,11 +184,11 @@
           <div class="bus-selector">
             <span>Bus seleccionado</span>
             <div class="bus-navigation">
-              <button type="button" class="icon-button" (click)="previousBusRequested.emit()" aria-label="Bus anterior">
+              <button type="button" class="icon-button" [disabled]="transferMode" (click)="previousBusRequested.emit()" aria-label="Bus anterior">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
               </button>
               <h3>{{ activeBusIndex() === -1 ? 'Sin asignar' : (bus.id || ('Bus ' + (activeBusIndex() + 1))) }}</h3>
-              <button type="button" class="icon-button" (click)="nextBusRequested.emit()" aria-label="Bus siguiente">
+              <button type="button" class="icon-button" [disabled]="transferMode" (click)="nextBusRequested.emit()" aria-label="Bus siguiente">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
               </button>
             </div>
@@ -156,6 +202,7 @@
                 <input
                   class="form-input"
                   type="text"
+                  [disabled]="transferMode"
                   [ngModel]="bus.id"
                   (ngModelChange)="bus.id = $event; busChanged.emit()"
                   placeholder="Bus {{ activeBusIndex() + 1 }}">
@@ -165,6 +212,7 @@
                 <input
                   class="form-input"
                   type="text"
+                  [disabled]="transferMode"
                   [ngModel]="bus.guia"
                   (ngModelChange)="bus.guia = $event; busChanged.emit()"
                   placeholder="Asignar guía">
@@ -173,37 +221,32 @@
             }
 
             <div class="bus-tools">
-              <button type="button" class="button button--quiet" (click)="mapRequested.emit({ bus, index: activeBusIndex() })">
+              <button type="button" class="button button--quiet" [disabled]="transferMode" (click)="mapRequested.emit({ bus, index: activeBusIndex() })">
                 Ver mapa
               </button>
-              <button type="button" class="button button--quiet" (click)="exportBusRequested.emit(activeBusIndex())">
-                Excel del bus
+              <button
+                type="button"
+                class="button button--quiet"
+                title="Descarga el archivo Excel de este bus"
+                [disabled]="transferMode"
+                (click)="exportBusRequested.emit(activeBusIndex())">
+                Exportar bus
               </button>
             </div>
           }
         </div>
 
-        <div
-          class="editing-grid"
-          [class.is-route-collapsed]="routeCollapsed() && !phoneReadOnly()">
+        <div class="editing-grid" [class.is-transfer-mode]="transferMode">
           <section class="reservations-panel">
             <div class="subpanel-heading">
               <div>
                 <span class="eyebrow">Reservas</span>
                 <h4>{{ bus.reservas.length }} reservas · {{ bus.ocupados }} pax</h4>
               </div>
-              <span class="hint">{{ phoneReadOnly() ? 'Solo consulta' : 'Arrastra para mover' }}</span>
+              <span class="hint">{{ phoneReadOnly() || !canUpdate() ? 'Solo consulta' : 'Selecciona una reserva para mover' }}</span>
             </div>
 
-            <div
-              class="reservation-list"
-              cdkDropList
-              id="active-bus"
-              [cdkDropListData]="bus.reservas"
-              [cdkDropListConnectedTo]="connectedDropLists()"
-              [cdkDropListEnterPredicate]="canEnterActiveList"
-              [cdkDropListSortingDisabled]="true"
-              (cdkDropListDropped)="reservationDropped.emit($event)">
+            <div class="reservation-list">
               @for (stop of activeStops(); track stop.key; let position = $index) {
                 <section class="reservation-group">
                   <header>
@@ -216,13 +259,12 @@
 
                   <div class="group-reservations">
                     @for (reserva of stop.reservas; track reserva.Id_Reserva) {
-                      <article
+                      <button
+                        type="button"
                         class="reservation-row"
-                        cdkDrag
-                        [cdkDragDisabled]="phoneReadOnly()"
-                        (cdkDragStarted)="dragStarted.emit()"
-                        (cdkDragEnded)="dragEnded.emit()">
-                        <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+                        [class.is-transfer-selected]="transferReservation()?.Id_Reserva === reserva.Id_Reserva"
+                        [disabled]="phoneReadOnly() || !canUpdate()"
+                        (click)="beginTransfer(reserva)">
                         <span class="reservation-copy">
                           <strong>#{{ reserva.Id_Reserva }}</strong>
                           <span class="reservation-meta">
@@ -235,7 +277,7 @@
                           </span>
                         </span>
                         <span class="reservation-pax">{{ reservationPax(reserva) }} pax</span>
-                      </article>
+                      </button>
                     }
                   </div>
                 </section>
@@ -249,97 +291,65 @@
             </div>
           </section>
 
-          <section
-            class="route-panel"
-            [class.is-collapsed]="routeCollapsed() && !phoneReadOnly()">
-            @if (routeCollapsed() && !phoneReadOnly()) {
-              <button
-                type="button"
-                class="route-rail"
-                (click)="toggleRoutePanel()"
-                aria-label="Mostrar recorrido">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
-                <span class="route-rail__count">{{ activeStops().length }}</span>
-                <span class="route-rail__label">paradas</span>
-                @if (activeIssueCount > 0) {
-                  <span class="route-rail__issues" title="Puntos que requieren revisión">{{ activeIssueCount }}</span>
-                }
-              </button>
-            } @else {
-              <div class="subpanel-heading route-heading">
-                <div>
-                  <span class="eyebrow">Recorrido</span>
-                  <h4>
-                    {{ activeStops().length }} paradas
-                    @if (activeIssueCount > 0) {
-                      <span class="route-issue-count">{{ activeIssueCount }} por revisar</span>
-                    }
-                  </h4>
-                </div>
-                <div class="route-heading__actions">
-                  <span class="hint">{{ phoneReadOnly() ? 'Orden del recorrido' : 'Arrastra para ordenar' }}</span>
-                  @if (!phoneReadOnly()) {
-                    <button
-                      type="button"
-                      class="collapse-button"
-                      (click)="toggleRoutePanel()"
-                      aria-label="Ocultar recorrido"
-                      title="Ocultar recorrido">
-                      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
-                    </button>
+          <section class="route-panel">
+            <div class="subpanel-heading route-heading">
+              <div>
+                <span class="eyebrow">Recorrido</span>
+                <h4>
+                  {{ activeStops().length }} paradas
+                  @if (activeIssueCount > 0) {
+                    <span class="route-issue-count">{{ activeIssueCount }} por revisar</span>
                   }
-                </div>
+                </h4>
               </div>
+              <span class="hint">{{ phoneReadOnly() ? 'Orden del recorrido' : 'Arrastra cualquier parte de la parada' }}</span>
+            </div>
 
-              <div
-                class="route-list"
-                cdkDropList
-                id="route-order"
-                [cdkDropListData]="activeStops()"
-                cdkDropListLockAxis="y"
-                (cdkDropListDropped)="stopDropped.emit($event)">
-                @for (stop of activeStops(); track stop.key; let position = $index) {
-                  <article
-                    class="route-stop"
-                    [class.has-warning]="stopNeedsAttention(stop)"
-                    cdkDrag
-                    cdkDragLockAxis="y"
-                    [cdkDragDisabled]="phoneReadOnly()">
-                    <span class="stop-sequence">{{ position + 1 }}</span>
-                    <span class="stop-copy">
-                      <strong>{{ stop.NombrePunto }}</strong>
-                      <small>
-                        {{ stop.totalPax }} pax · {{ stop.reservas.length }} {{ stop.reservas.length === 1 ? 'reserva' : 'reservas' }}
-                        @if (stopNeedsCoordinates(stop)) {
-                          · Sin coordenadas
-                        } @else if (stopNeedsRoute(stop)) {
-                          · Sin ruta
-                        }
-                      </small>
-                    </span>
-                    <span class="route-stop-actions">
-                      @if (stopNeedsAttention(stop) && stop.Id_Punto && canUpdatePoints()) {
-                        <button
-                          type="button"
-                          class="point-fix-button"
-                          (click)="$event.stopPropagation(); pointEditRequested.emit(stop)"
-                          [attr.aria-label]="'Corregir punto ' + stop.NombrePunto"
-                          title="Abrir punto en otra pestaña">
-                          Corregir
-                        </button>
+            <div
+              class="route-list"
+              cdkDropList
+              id="route-order"
+              [cdkDropListData]="activeStops()"
+              cdkDropListLockAxis="y"
+              (cdkDropListDropped)="stopDropped.emit($event)">
+              @for (stop of activeStops(); track stop.key; let position = $index) {
+                <article
+                  class="route-stop"
+                  [class.has-warning]="stopNeedsAttention(stop)"
+                  cdkDrag
+                  cdkDragLockAxis="y"
+                  [cdkDragDisabled]="phoneReadOnly() || transferMode">
+                  <span class="stop-sequence">{{ position + 1 }}</span>
+                  <span class="stop-copy">
+                    <strong>{{ stop.NombrePunto }}</strong>
+                    <small>
+                      {{ stop.totalPax }} pax · {{ stop.reservas.length }} {{ stop.reservas.length === 1 ? 'reserva' : 'reservas' }}
+                      @if (stopNeedsCoordinates(stop)) {
+                        · Sin coordenadas
+                      } @else if (stopNeedsRoute(stop)) {
+                        · Sin ruta
                       }
-                      <span class="drag-handle" cdkDragHandle aria-hidden="true">⋮⋮</span>
-                    </span>
-                  </article>
-                } @empty {
-                  <div class="subpanel-empty">
-                    <span aria-hidden="true">○</span>
-                    <strong>Sin paradas</strong>
-                    <small>Este bus todavía no tiene reservas asignadas.</small>
-                  </div>
-                }
-              </div>
-            }
+                    </small>
+                  </span>
+                  <span class="drag-handle" aria-hidden="true">
+                    <svg viewBox="0 0 16 16">
+                      <circle cx="5" cy="3.5" r="1"></circle>
+                      <circle cx="11" cy="3.5" r="1"></circle>
+                      <circle cx="5" cy="8" r="1"></circle>
+                      <circle cx="11" cy="8" r="1"></circle>
+                      <circle cx="5" cy="12.5" r="1"></circle>
+                      <circle cx="11" cy="12.5" r="1"></circle>
+                    </svg>
+                  </span>
+                </article>
+              } @empty {
+                <div class="subpanel-empty">
+                  <span aria-hidden="true">○</span>
+                  <strong>Sin paradas</strong>
+                  <small>Este bus todavía no tiene reservas asignadas.</small>
+                </div>
+              }
+            </div>
           </section>
         </div>
       } @else {

@@ -1,0 +1,200 @@
+@media (max-width: 1180px) {
+  .fleet-panel {
+    width: 250px;
+  }
+
+  .editor-workspace.is-transfer-mode .fleet-panel {
+    width: 46%;
+  }
+
+  .bus-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bus-fields {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .reservations-panel {
+    flex-basis: clamp(320px, 30vw, 350px);
+  }
+
+  .editing-grid.is-transfer-mode .reservations-panel {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 860px) {
+  .editor-shell {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .editor-command {
+    position: static;
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .editor-summary {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .command-actions {
+    width: 100%;
+  }
+
+  .command-actions .button {
+    flex: 1;
+  }
+
+  .editor-workspace {
+    height: auto;
+    max-height: none;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .fleet-panel,
+  .editor-workspace.is-transfer-mode .fleet-panel {
+    width: 100%;
+  }
+
+  .fleet-panel {
+    border-right: 0;
+    border-bottom: 1.5px solid var(--separator-color);
+  }
+
+  .fleet-list {
+    overflow-x: auto;
+    flex-direction: row;
+  }
+
+  .fleet-card {
+    width: 210px;
+  }
+
+  .operation-panel {
+    min-height: 720px;
+  }
+}
+
+@media (max-width: 660px) {
+  .editor-shell {
+    overflow: visible;
+  }
+
+  .mobile-readonly-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent-blue) 24%, var(--separator-color));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent-blue) 7%, var(--bg-secondary));
+    color: var(--text-secondary);
+    font-size: .7rem;
+  }
+
+  .mobile-readonly-notice > span {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent-blue) 14%, transparent);
+    color: var(--accent-blue);
+    font-weight: 900;
+  }
+
+  .mobile-readonly-notice strong {
+    display: block;
+    color: var(--text-primary);
+  }
+
+  .title-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .back-button {
+    align-self: flex-start;
+  }
+
+  .bus-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .bus-tools {
+    width: 100%;
+  }
+
+  .bus-tools .button {
+    flex: 1;
+  }
+
+  .bus-fields {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .drag-handle {
+    display: none;
+  }
+
+  .route-stop,
+  .reservation-row {
+    cursor: default;
+  }
+
+  .editing-grid {
+    flex-direction: column;
+  }
+
+  .route-panel,
+  .reservations-panel {
+    width: 100%;
+    flex: 0 0 auto;
+    border-right: 0;
+  }
+
+  .route-panel {
+    max-height: 360px;
+  }
+
+  .reservations-panel {
+    min-height: 480px;
+    border-bottom: 1.5px solid var(--separator-color);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-shell,
+  .new-bus-target.is-visible,
+  .fleet-card--destination,
+  .fleet-card.just-received {
+    animation: none;
+  }
+
+  .fleet-panel,
+  .route-panel,
+  .reservations-panel,
+  .fleet-card,
+  .route-stop,
+  .reservation-row,
+  .button,
+  .icon-button {
+    transition: none;
+  }
+
+  .button-spinner {
+    animation-duration: 1.4s;
+  }
+}

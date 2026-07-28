@@ -55,7 +55,7 @@ interface PuntoSinCoordenadas {
   templateUrl: './mapa.html',
   styleUrls: ['./mapa.css']
 })
-export class Mapa implements OnInit, OnDestroy {
+export class Mapa implements OnInit, OnChanges, OnDestroy {
   @Input() puntos: any[] = [];
   @Input() destino: DestinoTourMapa | null = null;
   @Output() onClose = new EventEmitter<void>();
@@ -65,7 +65,7 @@ export class Mapa implements OnInit, OnDestroy {
   agrupadosConBase: PuntoAgrupado[] = [];
   paradaActivaIndex: number | null = null;
   distanciaKm: string = '—';
-  tiempoMin: string = '—';
+  tiempoEstimado: string = '—';
   totalPax: number = 0;
   puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
   mapTheme: 'dark' | 'light' =
@@ -78,6 +78,7 @@ export class Mapa implements OnInit, OnDestroy {
   private markers: L.Marker[] = [];
   private tileLayer?: L.TileLayer;
   private initRetryHandle: ReturnType<typeof setTimeout> | null = null;
+  private themeObserver?: MutationObserver;
 
   constructor(
     private alerts: SirAlertService,
@@ -90,11 +91,12 @@ export class Mapa implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.observeAppTheme();
     this.scheduleMapInit();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (!changes['puntos']) return;
+    if (!changes['puntos'] && !changes['destino']) return;
     if (!this.mapContainer?.nativeElement) return;
     this.scheduleMapInit({ reset: true });
   }
@@ -104,6 +106,7 @@ export class Mapa implements OnInit, OnDestroy {
       clearTimeout(this.initRetryHandle);
       this.initRetryHandle = null;
     }
+    this.themeObserver?.disconnect();
     this.map?.remove();
   }
 
@@ -124,10 +127,14 @@ export class Mapa implements OnInit, OnDestroy {
     return punto.reservas.reduce((sum, r) => sum + (Number(r.NumeroPasajeros) || 0), 0);
   }
 
-  toggleMapTheme(): void {
-    this.mapTheme = this.mapTheme === 'dark' ? 'light' : 'dark';
-    this.applyTileLayer();
-    this.cdr.markForCheck();
+  get hasTourDestination(): boolean {
+    return this.agrupadosConBase.some((punto) => punto.esDestinoTour);
+  }
+
+  emptyStopLabel(punto: PuntoAgrupado, index: number): string {
+    if (punto.esDestinoTour) return 'Destino del tour';
+    if (index === 0) return 'Punto de inicio';
+    return 'Sin reservas';
   }
 
   // ── Init del mapa ────────────────────────────────────────────
@@ -237,11 +244,16 @@ export class Mapa implements OnInit, OnDestroy {
     const destinoTour = this.normalizarDestinoTour();
     if (destinoTour) {
       const destinoKey = `${destinoTour.lat.toFixed(5)},${destinoTour.lng.toFixed(5)}`;
-      const yaExiste = this.agrupadosConBase.some(
+      const destinoExistenteIndex = this.agrupadosConBase.findIndex(
         p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}` === destinoKey
       );
 
-      if (!yaExiste) {
+      if (destinoExistenteIndex >= 0) {
+        const [destinoExistente] = this.agrupadosConBase.splice(destinoExistenteIndex, 1);
+        destinoExistente.esDestinoTour = true;
+        destinoExistente.NombrePunto = destinoTour.nombre || 'Destino del tour';
+        this.agrupadosConBase.push(destinoExistente);
+      } else {
         this.agrupadosConBase.push({
           lat: destinoTour.lat,
           lng: destinoTour.lng,
@@ -308,10 +320,15 @@ export class Mapa implements OnInit, OnDestroy {
         const esDestinoTour = !!punto?.esDestinoTour;
 
         const marker = L.marker(wp.latLng, {
-          icon: this.crearIconoSvg(i, n, punto?.NombrePunto ?? '')
+          icon: this.crearIconoSvg(i, n, esDestinoTour)
         });
 
         // Popup estilizado dark
+        const emptyLabel = esDestinoTour
+          ? 'Destino del tour'
+          : isStart
+            ? 'Punto de inicio'
+            : 'Sin reservas';
         const reservasHtml = punto?.reservas?.length
           ? punto.reservas.map(r => {
               // Pax en este punto específico (sub-conteo para reservas multi-punto)
@@ -328,7 +345,7 @@ export class Mapa implements OnInit, OnDestroy {
                   <span class="mapa-popup-pax">${paxAqui} pax</span>
                 </div>`;
             }).join('')
-          : '<div class="mapa-popup-empty">Sin reservas</div>';
+          : `<div class="mapa-popup-empty">${emptyLabel}</div>`;
 
         const badgeClass = isStart ? 'badge-start' : isEnd ? 'badge-end' : 'badge-mid';
         const badgeText  = isStart ? 'INICIO' : isEnd ? (esDestinoTour ? 'TOUR' : 'FINAL') : `Parada ${i + 1}`;
@@ -378,7 +395,7 @@ export class Mapa implements OnInit, OnDestroy {
       const distM  = r.summary?.totalDistance ?? 0;
       const timeS  = r.summary?.totalTime ?? 0;
       this.distanciaKm = (distM / 1000).toFixed(1);
-      this.tiempoMin   = Math.round(timeS / 60).toString();
+      this.tiempoEstimado = this.formatDuration(timeS);
       this.cdr.detectChanges();
     });
 
@@ -414,13 +431,13 @@ export class Mapa implements OnInit, OnDestroy {
   }
 
   // ── Icono SVG custom por tipo de parada ─────────────────────
-  private crearIconoSvg(i: number, n: number, nombre: string): L.DivIcon {
+  private crearIconoSvg(i: number, n: number, esDestinoTour: boolean): L.DivIcon {
     const isStart = i === 0;
     const isEnd   = i === n - 1;
 
     const color  = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
     const shadow = isStart ? 'rgba(34,197,94,0.4)' : isEnd ? 'rgba(239,68,68,0.4)' : 'rgba(59,130,246,0.4)';
-    const label  = isStart ? 'S' : isEnd ? 'F' : String(i);
+    const label  = isStart ? 'S' : isEnd ? (esDestinoTour ? 'T' : 'F') : String(i);
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
@@ -474,6 +491,41 @@ export class Mapa implements OnInit, OnDestroy {
       lng,
       nombre: String(this.destino?.nombre || '').trim() || 'Destino del tour'
     };
+  }
+
+  private formatDuration(totalSeconds: number): string {
+    const seconds = Number(totalSeconds || 0);
+    if (!Number.isFinite(seconds) || seconds <= 0) return '—';
+
+    const totalMinutes = Math.max(1, Math.round(seconds / 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (!hours) return `${minutes} min`;
+    if (!minutes) return `${hours} h`;
+    return `${hours} h ${minutes} min`;
+  }
+
+  private observeAppTheme(): void {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+
+    const syncTheme = () => {
+      const nextTheme = document.documentElement.getAttribute('data-theme') === 'light'
+        ? 'light'
+        : 'dark';
+      if (nextTheme === this.mapTheme) return;
+
+      this.mapTheme = nextTheme;
+      this.applyTileLayer();
+      this.cdr.markForCheck();
+    };
+
+    syncTheme();
+    this.themeObserver = new MutationObserver(syncTheme);
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
   }
 
   private applyTileLayer(): void {

@@ -80,12 +80,12 @@
         [activeStops]="activeStops"
         [unassigned]="reservasSinAsignar"
         [totalPaxUnassigned]="totalPaxUnassigned"
-        [connectedDropLists]="connectedDropLists"
+        [availableCapacities]="CAPACIDADES_BUSES"
         [canUpdate]="canUpdateProgramacion"
-        [canUpdatePoints]="canUpdatePoints"
-        [dragging]="isDragging"
+        [canRestore]="canRestoreInitialPlan"
         [saving]="isSaving"
         (closeRequested)="volverAlDashboard()"
+        (restoreRequested)="requestRestoreInitialPlan()"
         (saveRequested)="guardarListadoFinal()"
         (exportAllRequested)="descargarTodosLosListados()"
         (busSelected)="selectBus($event)"
@@ -94,11 +94,8 @@
         (busChanged)="markDirty()"
         (mapRequested)="verMapa($event.bus, $event.index)"
         (exportBusRequested)="descargarListadoBus($event)"
-        (pointEditRequested)="abrirEdicionPunto($event)"
-        (stopDropped)="dropStop($event)"
-        (reservationDropped)="dropReserva($event)"
-        (dragStarted)="onDragStarted()"
-        (dragEnded)="onDragEnded()">
+        (reservationMoveRequested)="moveReservationToDestination($event)"
+        (stopDropped)="dropStop($event)">
       </app-programacion-editor>
     }
 

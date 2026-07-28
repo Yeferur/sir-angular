@@ -21,10 +21,10 @@
   position: relative;
   flex: 0 0 auto;
   z-index: 12;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(250px, auto) minmax(280px, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   margin-bottom: 8px;
   padding: 10px 14px;
   border-radius: 14px;
@@ -47,6 +47,36 @@
 
 .context-copy {
   min-width: 0;
+}
+
+.editor-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.editor-summary > span {
+  display: flex;
+  min-width: 72px;
+  flex-direction: column;
+}
+
+.editor-summary strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: .77rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-summary small {
+  margin-bottom: 2px;
+  color: var(--text-tertiary);
+  font-size: .63rem;
+  font-weight: 750;
 }
 
 .eyebrow {
@@ -77,12 +107,6 @@ h2 {
   letter-spacing: -.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.context-copy p {
-  margin-top: 2px;
-  color: var(--text-secondary);
-  font-size: .78rem;
 }
 
 .status-chip {
@@ -143,7 +167,8 @@ h2 {
   outline-offset: 2px;
 }
 
-.button:disabled {
+.button:disabled,
+.icon-button:disabled {
   opacity: .55;
   cursor: default;
 }
@@ -203,84 +228,27 @@ h2 {
   animation: spin .7s linear infinite;
 }
 
-.unassigned-banner {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  gap: 12px;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 12px;
-  padding: 11px 14px;
-  border-color: color-mix(in srgb, var(--accent-yellow) 28%, var(--separator-color));
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--accent-yellow) 7%, var(--bg-secondary));
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.unassigned-banner.is-active {
-  border-color: var(--accent-yellow);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-yellow) 10%, transparent);
-}
-
-.alert-mark {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--accent-yellow) 17%, transparent);
-  color: var(--accent-yellow);
-  font-weight: 900;
-}
-
-.unassigned-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.unassigned-copy strong {
-  color: var(--text-primary);
-  font-size: .79rem;
-}
-
-.unassigned-copy small {
-  color: var(--text-secondary);
-  font-size: .7rem;
-}
-
-.unassigned-count {
-  color: var(--text-primary);
-  font-size: .75rem;
-  font-weight: 850;
-}
-
-.unassigned-action {
-  color: var(--accent-yellow);
-  font-size: .73rem;
-  font-weight: 800;
-}
-
 .editor-workspace {
-  display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
+  display: flex;
   flex: 1;
   min-height: 0;
-  height: auto;
-  max-height: none;
   overflow: hidden;
   border-radius: 16px;
 }
 
 .fleet-panel {
   display: flex;
+  width: clamp(270px, 22vw, 310px);
   min-height: 0;
+  flex: 0 0 auto;
   flex-direction: column;
   border-right: 1px solid var(--separator-color);
   background: color-mix(in srgb, var(--bg-tertiary) 28%, var(--bg-secondary));
+  transition: width .38s cubic-bezier(.22, 1, .36, 1);
+}
+
+.editor-workspace.is-transfer-mode .fleet-panel {
+  width: 46%;
 }
 
 .panel-heading,
@@ -329,6 +297,14 @@ h2 {
   padding: 7px;
 }
 
+.fleet-list.is-transfer-mode {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 7px;
+  padding: 9px;
+}
+
 .fleet-card {
   position: relative;
   display: flex;
@@ -344,11 +320,10 @@ h2 {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color .18s ease, transform .18s ease, background .18s ease;
+  transition: border-color .18s ease, background .18s ease;
 }
 
 .fleet-card:hover {
-  transform: none;
   border-color: color-mix(in srgb, var(--accent-blue) 18%, transparent);
   background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
 }
@@ -357,6 +332,10 @@ h2 {
   border-color: var(--accent-blue);
   background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
   box-shadow: none;
+}
+
+.fleet-card.just-received {
+  animation: destinationPulse .8s cubic-bezier(.22, 1, .36, 1);
 }
 
 .fleet-card--unassigned {
@@ -502,6 +481,124 @@ h2 {
   white-space: nowrap;
 }
 
+.cancel-transfer {
+  display: inline-flex;
+  width: auto;
+  height: 32px;
+  padding: 0 11px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--separator-color);
+  border-radius: 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: .68rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+
+.cancel-transfer:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--text-secondary) 48%, var(--separator-color));
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.fleet-card--destination {
+  min-height: 67px;
+  gap: 6px;
+  padding: 8px;
+  border-color: var(--separator-color);
+  background: color-mix(in srgb, var(--bg-tertiary) 56%, transparent);
+  animation: destinationEnter .2s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.fleet-card--destination:hover {
+  border-color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 8%, var(--bg-secondary));
+}
+
+.fleet-card--destination.is-source {
+  border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-blue) 7%, var(--bg-secondary));
+  cursor: default;
+}
+
+.fleet-card--destination.cannot-receive {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.fleet-card--destination.cannot-receive:hover {
+  border-color: var(--separator-color);
+  background: color-mix(in srgb, var(--bg-tertiary) 56%, transparent);
+}
+
+.destination-top {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.destination-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: .7rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.destination-state {
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: .63rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.destination-state > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.destination-state strong {
+  flex: 0 0 auto;
+  color: var(--accent-green);
+}
+
+.destination-state--source {
+  color: var(--accent-blue);
+  font-weight: 800;
+}
+
+.destination-state--blocked {
+  color: var(--text-tertiary);
+}
+
+.destination-track {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+}
+
+.destination-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-green);
+  transition: width .2s cubic-bezier(.22, 1, .36, 1);
+}
+
 .new-bus-target {
   display: none;
   place-items: center;
@@ -511,6 +608,7 @@ h2 {
   border-radius: 14px;
   background: color-mix(in srgb, var(--accent-blue) 7%, transparent);
   color: var(--accent-blue);
+  font-family: var(--font-family);
   font-size: .72rem;
   font-weight: 800;
   text-align: center;
@@ -518,13 +616,22 @@ h2 {
 
 .new-bus-target.is-visible {
   display: grid;
+  grid-column: 1 / -1;
   animation: targetEnter .18s ease both;
+}
+
+.new-bus-target.cannot-receive {
+  border-color: var(--separator-color);
+  color: var(--text-tertiary);
+  opacity: .55;
+  cursor: not-allowed;
 }
 
 .operation-panel {
   display: flex;
   min-width: 0;
   min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
 }
 
@@ -587,15 +694,9 @@ h2 {
 }
 
 .editing-grid {
-  display: grid;
-  grid-template-columns: minmax(410px, 1fr) minmax(290px, 330px);
+  display: flex;
   flex: 1;
   min-height: 0;
-  transition: grid-template-columns .24s cubic-bezier(.22, 1, .36, 1);
-}
-
-.editing-grid.is-route-collapsed {
-  grid-template-columns: minmax(0, 1fr) 54px;
 }
 
 .route-panel,
@@ -606,8 +707,28 @@ h2 {
   flex-direction: column;
 }
 
+.route-panel {
+  flex: 1 1 0;
+  transition: flex-grow .38s cubic-bezier(.22, 1, .36, 1), opacity .2s ease, visibility 0s linear;
+}
+
+.editing-grid.is-transfer-mode .route-panel {
+  flex-grow: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .14s ease, visibility 0s linear .14s;
+}
+
 .reservations-panel {
+  flex: 0 0 clamp(340px, 30vw, 380px);
   border-right: 1px solid var(--separator-color);
+  transition: flex-basis .38s cubic-bezier(.22, 1, .36, 1);
+}
+
+.editing-grid.is-transfer-mode .reservations-panel {
+  flex-basis: 100%;
 }
 
 .subpanel-heading {
@@ -647,12 +768,19 @@ h2 {
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg-tertiary) 80%, var(--bg-secondary));
   cursor: grab;
-  transition: border-color .18s ease, transform .18s ease;
+  touch-action: none;
+  user-select: none;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
 }
 
 .route-stop:hover {
-  transform: none;
   border-color: color-mix(in srgb, var(--accent-blue) 26%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--bg-tertiary));
+}
+
+.route-stop:active,
+.route-stop.cdk-drag-dragging {
+  cursor: grabbing;
 }
 
 .route-stop.has-warning {
@@ -681,10 +809,19 @@ h2 {
 }
 
 .drag-handle {
+  display: inline-flex;
+  width: 18px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
   color: var(--text-tertiary);
-  font-size: .85rem;
-  letter-spacing: -3px;
-  cursor: grab;
+  pointer-events: none;
+}
+
+.drag-handle svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 
 .reservation-list {
@@ -750,7 +887,7 @@ h2 {
 
 .reservation-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
   min-height: 38px;
@@ -758,14 +895,28 @@ h2 {
   border: 1px solid transparent;
   border-radius: 8px;
   background: color-mix(in srgb, var(--bg-tertiary) 62%, transparent);
-  cursor: grab;
-  transition: border-color .14s ease, background .14s ease, transform .14s cubic-bezier(.22, 1, .36, 1);
+  width: 100%;
+  box-sizing: border-box;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
 }
 
 .reservation-row:hover {
-  transform: none;
   border-color: color-mix(in srgb, var(--accent-blue) 26%, transparent);
   background: color-mix(in srgb, var(--accent-blue) 5%, var(--bg-tertiary));
+}
+
+.reservation-row.is-transfer-selected {
+  border-color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 9%, var(--bg-secondary));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 8%, transparent);
+}
+
+.reservation-row:disabled {
+  cursor: default;
 }
 
 .reservation-copy {
@@ -808,93 +959,9 @@ h2 {
   color: var(--accent-yellow);
 }
 
-.route-heading__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.collapse-button,
-.point-fix-button,
-.route-rail {
-  border: 1px solid var(--separator-color);
-  font: inherit;
-  cursor: pointer;
-}
-
-.collapse-button {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-
-.collapse-button svg,
-.route-rail svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.route-panel.is-collapsed {
-  background: color-mix(in srgb, var(--bg-tertiary) 24%, transparent);
-}
-
-.route-rail {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 11px 0;
-  align-items: center;
-  flex-direction: column;
-  gap: 7px;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.route-rail:hover {
-  background: color-mix(in srgb, var(--accent-blue) 6%, transparent);
-  color: var(--accent-blue);
-}
-
-.route-rail__count {
-  color: var(--text-primary);
-  font-size: .82rem;
-  font-weight: 900;
-}
-
-.route-rail__label {
-  font-size: .62rem;
-  font-weight: 800;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.route-rail__issues,
 .route-issue-count {
   color: var(--accent-yellow);
   font-weight: 850;
-}
-
-.route-rail__issues {
-  display: grid;
-  min-width: 21px;
-  height: 21px;
-  padding: 0 4px;
-  place-items: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent-yellow) 14%, transparent);
-  font-size: .63rem;
 }
 
 .route-issue-count {
@@ -902,32 +969,9 @@ h2 {
   font-size: .66rem;
 }
 
-.point-fix-button {
-  min-height: 28px;
-  padding: 0 8px;
-  border-color: color-mix(in srgb, var(--accent-yellow) 32%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent-yellow) 9%, transparent);
-  color: var(--accent-yellow);
-  font-size: .65rem;
-  font-weight: 850;
-}
-
-.point-fix-button:hover {
-  border-color: var(--accent-yellow);
-}
-
-.route-stop-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.collapse-button:focus-visible,
-.point-fix-button:focus-visible,
-.route-rail:focus-visible {
+.cancel-transfer:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent-blue) 24%, transparent);
-  outline-offset: -1px;
+  outline-offset: 2px;
 }
 
 .reservation-pax {
@@ -978,11 +1022,6 @@ h2 {
   transform: rotate(.25deg);
 }
 
-.cdk-drag-preview.reservation-row {
-  width: min(320px, calc(100vw - 32px)) !important;
-  min-height: 34px;
-}
-
 .cdk-drag-placeholder {
   opacity: .1;
 }
@@ -991,8 +1030,7 @@ h2 {
   transition: transform 160ms cubic-bezier(.2, 0, 0, 1);
 }
 
-.cdk-drop-list-dragging .route-stop:not(.cdk-drag-placeholder),
-.cdk-drop-list-dragging .reservation-row:not(.cdk-drag-placeholder) {
+.cdk-drop-list-dragging .route-stop:not(.cdk-drag-placeholder) {
   transition: transform 160ms cubic-bezier(.2, 0, 0, 1);
 }
 
@@ -1008,193 +1046,16 @@ h2 {
   from { opacity: 0; transform: scale(.97); }
 }
 
-@media (max-width: 1180px) {
-  .editor-workspace {
-    grid-template-columns: 218px minmax(0, 1fr);
-  }
-
-  .bus-toolbar {
-    grid-template-columns: 1fr auto;
-  }
-
-  .bus-fields {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .editing-grid {
-    grid-template-columns: minmax(350px, 1fr) minmax(270px, 310px);
-  }
-
-  .editing-grid.is-route-collapsed {
-    grid-template-columns: minmax(0, 1fr) 52px;
-  }
+@keyframes destinationEnter {
+  from { opacity: 0; transform: translateY(4px) scale(.97); }
 }
 
-@media (max-width: 860px) {
-  .editor-shell {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
+@keyframes destinationPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-green) 30%, transparent); }
+  45% {
+    border-color: var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green) 10%, var(--bg-secondary));
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-green) 8%, transparent);
   }
-
-  .editor-command {
-    position: static;
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .command-actions {
-    width: 100%;
-  }
-
-  .command-actions .button {
-    flex: 1;
-  }
-
-  .unassigned-banner {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .unassigned-action {
-    display: none;
-  }
-
-  .editor-workspace {
-    display: flex;
-    height: auto;
-    max-height: none;
-    flex-direction: column;
-    overflow: visible;
-  }
-
-  .fleet-panel {
-    border-right: 0;
-    border-bottom: 1.5px solid var(--separator-color);
-  }
-
-  .fleet-list {
-    overflow-x: auto;
-    flex-direction: row;
-  }
-
-  .fleet-card {
-    width: 210px;
-  }
-
-  .operation-panel {
-    min-height: 720px;
-  }
-}
-
-@media (max-width: 660px) {
-  .editor-shell {
-    overflow: visible;
-  }
-
-  .mobile-readonly-notice {
-    display: flex;
-    align-items: flex-start;
-    gap: 9px;
-    margin-bottom: 8px;
-    padding: 10px 12px;
-    border: 1px solid color-mix(in srgb, var(--accent-blue) 24%, var(--separator-color));
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--accent-blue) 7%, var(--bg-secondary));
-    color: var(--text-secondary);
-    font-size: .7rem;
-  }
-
-  .mobile-readonly-notice > span {
-    display: grid;
-    width: 20px;
-    height: 20px;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent-blue) 14%, transparent);
-    color: var(--accent-blue);
-    font-weight: 900;
-  }
-
-  .mobile-readonly-notice strong {
-    display: block;
-    color: var(--text-primary);
-  }
-
-  .title-line {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .back-button {
-    align-self: flex-start;
-  }
-
-  .unassigned-copy small,
-  .unassigned-count {
-    display: none;
-  }
-
-  .bus-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .bus-tools {
-    width: 100%;
-  }
-
-  .bus-tools .button {
-    flex: 1;
-  }
-
-  .bus-fields {
-    grid-column: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .drag-handle {
-    display: none;
-  }
-
-  .route-stop,
-  .reservation-row {
-    cursor: default;
-  }
-
-  .editing-grid {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .route-panel {
-    max-height: 360px;
-    border-right: 0;
-  }
-
-  .reservations-panel {
-    min-height: 480px;
-    border-right: 0;
-    border-bottom: 1.5px solid var(--separator-color);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .editor-shell,
-  .new-bus-target.is-visible {
-    animation: none;
-  }
-
-  .fleet-card,
-  .route-stop,
-  .reservation-row,
-  .button,
-  .icon-button {
-    transition: none;
-  }
-
-  .button-spinner {
-    animation-duration: 1.4s;
-  }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }

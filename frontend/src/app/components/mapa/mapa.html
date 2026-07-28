@@ -16,10 +16,6 @@
       </span>
     </div>
     <div class="mapa-topbar-actions">
-      <button class="mapa-theme-btn" (click)="toggleMapTheme()"
-        [attr.aria-label]="mapTheme === 'dark' ? 'Usar mapa claro' : 'Usar mapa oscuro'">
-        {{ mapTheme === 'dark' ? 'Mapa claro' : 'Mapa oscuro' }}
-      </button>
       <button class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" width="14" height="14">
@@ -48,9 +44,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Tiempo est.</div>
-          <div class="stat-value">
-            {{ tiempoMin }}<span class="stat-unit">min</span>
-          </div>
+          <div class="stat-value stat-value--duration">{{ tiempoEstimado }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Paradas</div>
@@ -90,7 +84,9 @@
               [class.dot-mid]="i !== 0 && i !== agrupadosConBase.length - 1"
               [class.dot-active]="paradaActivaIndex === i">
               <span *ngIf="i === 0">S</span>
-              <span *ngIf="i === agrupadosConBase.length - 1 && i !== 0">F</span>
+              <span *ngIf="i === agrupadosConBase.length - 1 && i !== 0">
+                {{ punto.esDestinoTour ? 'T' : 'F' }}
+              </span>
               <span *ngIf="i !== 0 && i !== agrupadosConBase.length - 1">{{ i }}</span>
             </div>
             <div class="parada-connector" *ngIf="!last"></div>
@@ -104,7 +100,7 @@
               · {{ totalPaxPunto(punto) }} pax
             </div>
             <div class="parada-sub muted" *ngIf="punto.reservas.length === 0">
-              Sin reservas
+              {{ emptyStopLabel(punto, i) }}
             </div>
           </div>
 
@@ -132,7 +128,7 @@
         <span class="legend-dot dot-blue"></span>Parada
       </span>
       <span class="legend-item">
-        <span class="legend-dot dot-red"></span>Final
+        <span class="legend-dot dot-red"></span>{{ hasTourDestination ? 'Tour' : 'Final' }}
       </span>
     </div>
   </div>

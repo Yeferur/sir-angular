@@ -1,5 +1,4 @@
 import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
-import { Router } from '@angular/router';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -37,6 +36,15 @@ interface ProgramacionQualitySummary {
   affectedReservations: number;
 }
 
+interface ProgramacionMoveSnapshot {
+  plan: Sugerencia;
+  unassigned: Reserva[];
+  activeBusIndex: number;
+  stopOrderEntries: Array<[number, string[]]>;
+  dirty: boolean;
+  changedFromBaseline: boolean;
+}
+
 @Component({
   selector: 'app-programacion-dashboard',
   standalone: true,
@@ -58,7 +66,6 @@ export class Listado implements OnInit, OnDestroy {
   private permisosService = inject(PermisosService);
   private drawerService = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
-  private router = inject(Router);
 
   private mapAlertButtons(buttons?: LegacyButton[]): AlertButton[] | undefined {
     if (!buttons?.length) return undefined;
@@ -99,8 +106,6 @@ export class Listado implements OnInit, OnDestroy {
   qualitySummary: ProgramacionQualitySummary | null = null;
 
   readonly CAPACIDADES_BUSES = [18, 23, 25, 27, 38, 39, 40, 41, 43].sort((a, b) => a - b);
-
-  isDragging = false;
 
   reservasSinAsignar: Reserva[] = [];
   busesPrivados: any[] = [];  // buses para reservas privadas del día
@@ -149,6 +154,10 @@ export class Listado implements OnInit, OnDestroy {
   private loadSubscription?: Subscription;
   private editorSubscription?: Subscription;
   private loadSequence = 0;
+  private lastMoveSnapshot: ProgramacionMoveSnapshot | null = null;
+  private lastMoveToastId: string | null = null;
+  private initialEditorSnapshot: ProgramacionMoveSnapshot | null = null;
+  editorChangedFromBaseline = false;
 
   ngOnInit(): void {
     this.cargarToursDelDia();
@@ -201,8 +210,10 @@ export class Listado implements OnInit, OnDestroy {
     return this.permisosService.tienePermiso('PROGRAMACION.CREAR');
   }
 
-  get canUpdatePoints(): boolean {
-    return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
+  get canRestoreInitialPlan(): boolean {
+    return this.canUpdateProgramacion
+      && Boolean(this.initialEditorSnapshot)
+      && this.editorChangedFromBaseline;
   }
 
   cargarToursDelDia(): void {
@@ -449,6 +460,13 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   private resetEditorState(): void {
+    if (this.lastMoveToastId) {
+      this.alerts.dismissToast(this.lastMoveToastId);
+    }
+    this.lastMoveSnapshot = null;
+    this.lastMoveToastId = null;
+    this.initialEditorSnapshot = null;
+    this.editorChangedFromBaseline = false;
     this.planSeleccionado = null;
     this.tourSeleccionado = null;
     this.activeBusIndex = 0;
@@ -466,6 +484,7 @@ export class Listado implements OnInit, OnDestroy {
 
   markDirty(): void {
     this.listadoDirty = true;
+    this.editorChangedFromBaseline = true;
   }
 
   private confirmarPerdidaCambios(continuar: () => void): void {
@@ -621,28 +640,12 @@ export class Listado implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  // Drop lists: destinos (buses) + new-bus + active-bus como fuente
-  get connectedDropLists(): string[] {
-    if (!this.planSeleccionado) return [];
-    const ids = this.planSeleccionado.buses.map((_, i) => `busdrop-${i}`);
-    ids.push('new-bus');
-    ids.push('active-bus');
-    return ids;
-  }
-
-  onDragStarted(): void {
-    this.isDragging = true;
-    this.cdr.markForCheck();
-  }
-
-  onDragEnded(): void {
-    this.isDragging = false;
-    this.cdr.markForCheck();
-  }
-
   // Reordenar paradas: actualiza el array real para que mapa, guardado y Excel vean el mismo orden.
   dropStop(event: CdkDragDrop<ViewStop[]>): void {
-    if (event.previousContainer !== event.container) return;
+    if (
+      event.previousContainer !== event.container
+      || event.previousIndex === event.currentIndex
+    ) return;
 
     moveItemInArray(this.activeStops, event.previousIndex, event.currentIndex);
 
@@ -671,59 +674,202 @@ export class Listado implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  // Mover reservas entre buses (principal)
-  dropReserva(event: CdkDragDrop<Reserva[]>): void {
-    if (!this.planSeleccionado) return;
+  moveReservationToDestination(event: {
+    reservationId: string | number;
+    sourceBusIndex: number;
+    targetBusIndex: number | null;
+  }): void {
+    if (!this.planSeleccionado || event.sourceBusIndex === event.targetBusIndex) return;
 
-    this.isDragging = false;
+    const sourceReservations = event.sourceBusIndex === -1
+      ? this.reservasSinAsignar
+      : this.planSeleccionado.buses[event.sourceBusIndex]?.reservas;
+    if (!sourceReservations) return;
 
-    const reserva = event.previousContainer.data[event.previousIndex];
-    if (!reserva) return;
-
-    if (event.previousContainer === event.container) {
-      this.cdr.markForCheck();
+    const sourcePosition = sourceReservations.findIndex(
+      (reservation) => String(reservation.Id_Reserva) === String(event.reservationId)
+    );
+    if (sourcePosition < 0) {
+      this.alerts.warningToast(
+        'No encontramos la reserva',
+        'Actualiza el listado e intenta moverla nuevamente.'
+      );
       return;
     }
 
-    if (event.container.id === 'new-bus') {
-      const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
-      if (!moved) return;
+    const reservation = sourceReservations[sourcePosition];
+    const snapshot = this.captureMoveSnapshot();
+    let destinationBus: Bus | null = null;
 
-      this.crearNuevoBus(moved);
-      this.activeBusIndex = this.planSeleccionado.buses.length - 1;
-      this.rebuildActiveStops();
-      this.syncAfterPlanMutation({ updateMap: true });
-      this.cdr.markForCheck();
-      return;
+    if (event.targetBusIndex === null) {
+      const capacity = bestBusCapacity(
+        Number(reservation.NumeroPasajeros || 0),
+        this.CAPACIDADES_BUSES
+      );
+      if (!capacity) {
+        this.alerts.errorToast(
+          'No podemos crear un bus para esta reserva',
+          `La capacidad máxima disponible es de ${Math.max(...this.CAPACIDADES_BUSES)} pasajeros.`
+        );
+        return;
+      }
+
+      sourceReservations.splice(sourcePosition, 1);
+      this.crearNuevoBus(reservation);
+      destinationBus = this.planSeleccionado.buses[this.planSeleccionado.buses.length - 1] || null;
+    } else {
+      const targetBus = this.planSeleccionado.buses[event.targetBusIndex];
+      if (!targetBus) return;
+
+      const projectedLoad = Number(targetBus.ocupados || 0) + Number(reservation.NumeroPasajeros || 0);
+      const projectedCapacity = bestBusCapacity(projectedLoad, this.CAPACIDADES_BUSES);
+      if (!projectedCapacity) {
+        this.alerts.errorToast(
+          'La reserva no cabe en este bus',
+          `La capacidad máxima disponible es de ${Math.max(...this.CAPACIDADES_BUSES)} pasajeros.`
+        );
+        return;
+      }
+
+      sourceReservations.splice(sourcePosition, 1);
+      targetBus.capacidad = projectedCapacity;
+      targetBus.reservas.push(reservation);
+      destinationBus = targetBus;
     }
-
-    // Identifica bus destino por id del contenedor
-    const destinoBus = this.findBusByContainerId(event.container.id);
-    if (!destinoBus) return;
-
-    const nuevaCarga = (destinoBus.ocupados || 0) + (reserva.NumeroPasajeros || 0);
-    const mejorCapacidad = bestBusCapacity(nuevaCarga, this.CAPACIDADES_BUSES);
-
-    if (!mejorCapacidad) {
-      this.navbar.showAlert({
-        type: 'error',
-        title: 'Capacidad insuficiente',
-        message: 'No existe un bus con capacidad suficiente.',
-        autoClose: true,
-        autoCloseTime: 2500
-      });
-      return;
-    }
-
-    destinoBus.capacidad = mejorCapacidad;
-
-    const moved = event.previousContainer.data.splice(event.previousIndex, 1)[0];
-    if (!moved) return;
-
-    event.container.data.splice(event.currentIndex, 0, moved);
 
     this.syncAfterPlanMutation({ updateMap: true });
+    const destinationIndex = destinationBus
+      ? this.planSeleccionado.buses.indexOf(destinationBus)
+      : -1;
+    const targetLabel = destinationBus?.id
+      || (destinationIndex >= 0 ? `Bus ${destinationIndex + 1}` : 'el nuevo bus');
+    this.announceReservationMove(reservation, targetLabel, snapshot);
+  }
+
+  private captureMoveSnapshot(): ProgramacionMoveSnapshot {
+    return {
+      plan: JSON.parse(JSON.stringify(this.planSeleccionado)) as Sugerencia,
+      unassigned: JSON.parse(JSON.stringify(this.reservasSinAsignar || [])) as Reserva[],
+      activeBusIndex: this.activeBusIndex,
+      stopOrderEntries: Array.from(this.stopOrderByBus.entries())
+        .map(([index, order]) => [index, [...order]] as [number, string[]]),
+      dirty: this.listadoDirty,
+      changedFromBaseline: this.editorChangedFromBaseline,
+    };
+  }
+
+  private announceReservationMove(
+    reservation: Reserva,
+    targetLabel: string,
+    snapshot: ProgramacionMoveSnapshot
+  ): void {
+    if (this.lastMoveToastId) {
+      this.alerts.dismissToast(this.lastMoveToastId);
+    }
+
+    this.lastMoveSnapshot = snapshot;
+    this.lastMoveToastId = this.alerts.notify({
+      type: 'success',
+      title: `Reserva #${reservation.Id_Reserva} movida`,
+      message: `Ahora está asignada a ${targetLabel}.`,
+      durationMs: 7500,
+      action: {
+        label: 'Deshacer',
+        onClick: () => this.undoLastReservationMove(),
+      },
+    });
+  }
+
+  private undoLastReservationMove(): void {
+    const snapshot = this.lastMoveSnapshot;
+    if (!snapshot) return;
+
+    this.planSeleccionado = JSON.parse(JSON.stringify(snapshot.plan)) as Sugerencia;
+    this.reservasSinAsignar = JSON.parse(JSON.stringify(snapshot.unassigned)) as Reserva[];
+    this.activeBusIndex = snapshot.activeBusIndex;
+    this.stopOrderByBus = new Map(
+      snapshot.stopOrderEntries.map(([index, order]) => [index, [...order]])
+    );
+    this.listadoDirty = snapshot.dirty;
+    this.editorChangedFromBaseline = snapshot.changedFromBaseline;
+    this.lastMoveSnapshot = null;
+    this.lastMoveToastId = null;
+
+    this.rebuildActiveStops();
+    this.updateOpenMapForActiveBus();
+    this.alerts.infoToast('Movimiento deshecho', 'La distribución anterior fue restaurada.');
     this.cdr.markForCheck();
+  }
+
+  requestRestoreInitialPlan(): void {
+    if (!this.canRestoreInitialPlan) return;
+
+    const originLabel = this.listadoOrigen === 'nuevo'
+      ? 'se generó el listado'
+      : 'abriste el editor';
+
+    this.navbar.showConfirm(
+      'Restablecer listado',
+      `Se descartarán los movimientos, recorridos y datos de buses modificados desde que ${originLabel}.`,
+      [
+        {
+          text: 'Restablecer',
+          style: 'danger',
+          onClick: () => {
+            this.navbar.clearOverlay();
+            this.restoreInitialPlan();
+          }
+        },
+        {
+          text: 'Cancelar',
+          style: 'secondary',
+          onClick: () => this.navbar.clearOverlay()
+        }
+      ]
+    );
+  }
+
+  private restoreInitialPlan(): void {
+    const snapshot = this.initialEditorSnapshot;
+    if (!snapshot) return;
+
+    if (this.lastMoveToastId) {
+      this.alerts.dismissToast(this.lastMoveToastId);
+    }
+
+    this.planSeleccionado = JSON.parse(JSON.stringify(snapshot.plan)) as Sugerencia;
+    this.reservasSinAsignar = JSON.parse(JSON.stringify(snapshot.unassigned)) as Reserva[];
+    this.activeBusIndex = snapshot.activeBusIndex;
+    this.stopOrderByBus = new Map(
+      snapshot.stopOrderEntries.map(([index, order]) => [index, [...order]])
+    );
+    this.listadoDirty = snapshot.dirty;
+    this.editorChangedFromBaseline = false;
+    this.lastMoveSnapshot = null;
+    this.lastMoveToastId = null;
+    this.qualitySummary = this.buildQualitySummary(
+      this.planSeleccionado.buses || [],
+      this.reservasSinAsignar
+    );
+
+    this.rebuildActiveStops();
+    this.updateOpenMapForActiveBus();
+    this.alerts.infoToast(
+      'Listado restablecido',
+      'Volvimos a la distribución con la que inició esta edición.'
+    );
+    this.cdr.markForCheck();
+  }
+
+  private captureInitialEditorState(): void {
+    if (!this.planSeleccionado) {
+      this.initialEditorSnapshot = null;
+      this.editorChangedFromBaseline = false;
+      return;
+    }
+
+    this.editorChangedFromBaseline = false;
+    this.initialEditorSnapshot = this.captureMoveSnapshot();
   }
 
   verMapa(bus: any, busIndex?: number): void {
@@ -993,6 +1139,7 @@ export class Listado implements OnInit, OnDestroy {
         this.activeBusIndex = 0;
         this.stopOrderByBus.clear();
         this.rebuildActiveStops();
+        this.captureInitialEditorState();
         this.notifyRouteQuality();
 
         this.isPageLoading = false;
@@ -1054,33 +1201,10 @@ export class Listado implements OnInit, OnDestroy {
     this.activeBusIndex = 0;
     this.stopOrderByBus.clear();
     this.rebuildActiveStops();
+    this.captureInitialEditorState();
     this.notifyRouteQuality();
 
     this.cdr.markForCheck();
-  }
-
-  abrirEdicionPunto(stop: ViewStop): void {
-    if (!this.canUpdatePoints) {
-      this.alerts.warningToast(
-        'No tienes permiso para editar puntos',
-        'Solicita el permiso PUNTOS.ACTUALIZAR a un administrador.'
-      );
-      return;
-    }
-
-    const pointId = stop?.Id_Punto;
-    if (pointId === null || pointId === undefined || String(pointId).trim() === '') {
-      this.alerts.warningToast(
-        'Punto sin identificador',
-        'No es posible abrir este punto desde el recorrido. Búscalo desde Puntos de encuentro.'
-      );
-      return;
-    }
-
-    const url = this.router.serializeUrl(
-      this.router.createUrlTree(['/Puntos/Editar', pointId])
-    );
-    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   private notifyRouteQuality(): void {
@@ -1246,13 +1370,6 @@ export class Listado implements OnInit, OnDestroy {
       const best = bestBusCapacity(needed, this.CAPACIDADES_BUSES);
       if (best && best !== bus.capacidad) bus.capacidad = best;
     });
-  }
-
-  private findBusByContainerId(containerId: string): Bus | undefined {
-    const m = containerId.match(/^busdrop-(\d+)$/);
-    if (!m) return undefined;
-    const idx = Number(m[1]);
-    return this.planSeleccionado?.buses[idx];
   }
 
   private ordenarReservasPorParadas(reservas: Reserva[], busIndex: number): Reserva[] {
