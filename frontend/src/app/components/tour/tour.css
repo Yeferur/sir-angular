@@ -68,8 +68,9 @@
 
 .btn-close:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--text-secondary) 75%, var(--separator-color));
-  background: var(--bg-secondary);
+  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
+  color: var(--accent-red);
 }
 
 .section-kicker {

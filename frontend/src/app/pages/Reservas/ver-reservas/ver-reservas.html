@@ -271,7 +271,7 @@
 
     @if (reservas().length > 0) {
       <div class="results-toolbar">
-        <strong aria-live="polite">{{ reservas().length }} {{ reservas().length === 1 ? 'reserva' : 'reservas' }}</strong>
+        <strong aria-live="polite">{{ resultsRangeLabel() }}</strong>
         @if (isSearching()) {
           <span class="updating-pill" role="status">
             <span aria-hidden="true"></span>
@@ -366,6 +366,22 @@
           </div>
         }
       </div>
+
+      @if (totalPages() > 1) {
+        <nav class="results-pagination" aria-label="Paginación de reservas">
+          <button class="pagination-button" type="button" (click)="prevPage()"
+            [disabled]="page() <= 1 || isSearching()">
+            Anterior
+          </button>
+          <span class="pagination-indicator" aria-live="polite">
+            Página {{ page() }} de {{ totalPages() }}
+          </span>
+          <button class="pagination-button" type="button" (click)="nextPage()"
+            [disabled]="page() >= totalPages() || isSearching()">
+            Siguiente
+          </button>
+        </nav>
+      }
     } @else if (isSearching()) {
       <app-loading-state label="Buscando reservas…"></app-loading-state>
     } @else if (searchError()) {

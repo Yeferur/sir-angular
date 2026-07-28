@@ -23,6 +23,14 @@ export type Plan = { Id_Plan: number; Id_Tour: number; Nombre_Plan: string; };
 export type Horario = { Id_Horario: number; HoraSalida: string };
 export type PrecioMap = Partial<Record<'ADULTO' | 'NINO' | 'INFANTE', number>>;
 
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages?: number;
+}
+
 export interface Punto {
   Id_Punto: number;
   NombrePunto: string;
@@ -112,14 +120,14 @@ export class Reservas {
   }
 
   /** ===== Listas ===== */
-  getReservas(params: any) {
+  getReservas(params: any): Observable<PaginatedResult<any>> {
     let httpParams = new HttpParams();
     Object.keys(params).forEach(k => {
       const v = params[k];
       if (Array.isArray(v)) v.forEach(item => httpParams = httpParams.append(k, String(item)));
       else httpParams = httpParams.set(k, String(v));
     });
-    return this.http.get<any[]>(`${this.apiUrl}/reservas`, { params: httpParams });
+    return this.http.get<PaginatedResult<any>>(`${this.apiUrl}/reservas`, { params: httpParams });
   }
 
   getReserva(Id_Reserva: string) {

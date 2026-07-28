@@ -827,9 +827,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'programacion',
             label: 'Listados de buses',
             icon: 'bx bx-list-check',
-            route: '/Programacion/Listado',
+            route: '/Programacion',
             permission: 'PROGRAMACION.LEER',
-            exact: true,
+            exact: false,
         },
         {
             key: 'seguros',

@@ -124,6 +124,10 @@ export class ProgramacionDashboardService {
     coordinates: number[][];
     distance: number;
     duration: number;
+    legs: Array<{
+      distance: number;
+      duration: number;
+    }>;
   }> {
     return this.http.post<any>(`${this.apiUrl}/ruta-visual`, { coordenadas });
   }

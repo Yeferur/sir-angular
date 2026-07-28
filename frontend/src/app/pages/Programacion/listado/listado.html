@@ -43,9 +43,10 @@
 
   @if (isPageLoading) {
     <app-loading-state
-      [label]="pageLoadingLabel">
+      [label]="pageLoadingLabel"
+      [showSlowMessage]="false">
     </app-loading-state>
-  } @else if (loadError && modoVista === 'dashboard') {
+  } @else if (loadError) {
     <app-loading-state
       mode="error"
       label="No pudimos cargar la programación"
@@ -61,42 +62,50 @@
         [totalReservasPrivadas]="totalReservasPrivadas"
         [totalBusesPrivados]="totalBusesPrivados"
         [totalPaxPrivados]="totalPaxPrivados"
-        (tourSelected)="generarPlan($event)"
+        (tourSelected)="openTourFromDashboard($event)"
         (privadosSelected)="abrirVistaPrivados()">
       </app-programacion-day-dashboard>
     }
 
     @if (modoVista === 'editor' && planSeleccionado) {
-      <app-programacion-editor
-        [tourName]="tourSeleccionado?.NombreTour || ''"
-        [operationDate]="fechaSeleccionada"
-        [statusText]="editorStatusText"
-        [persisted]="listadoPersistido"
-        [dirty]="listadoDirty"
-        [newDraft]="listadoOrigen === 'nuevo' && !listadoPersistido"
-        [plan]="planSeleccionado"
-        [activeBusIndex]="activeBusIndex"
-        [activeBus]="activeBus"
-        [activeStops]="activeStops"
-        [unassigned]="reservasSinAsignar"
-        [totalPaxUnassigned]="totalPaxUnassigned"
-        [availableCapacities]="CAPACIDADES_BUSES"
-        [canUpdate]="canUpdateProgramacion"
-        [canRestore]="canRestoreInitialPlan"
-        [saving]="isSaving"
-        (closeRequested)="volverAlDashboard()"
-        (restoreRequested)="requestRestoreInitialPlan()"
-        (saveRequested)="guardarListadoFinal()"
-        (exportAllRequested)="descargarTodosLosListados()"
-        (busSelected)="selectBus($event)"
-        (previousBusRequested)="prevBus()"
-        (nextBusRequested)="nextBus()"
-        (busChanged)="markDirty()"
-        (mapRequested)="verMapa($event.bus, $event.index)"
-        (exportBusRequested)="descargarListadoBus($event)"
-        (reservationMoveRequested)="moveReservationToDestination($event)"
-        (stopDropped)="dropStop($event)">
-      </app-programacion-editor>
+      @defer {
+        <app-programacion-editor
+          [tourName]="tourSeleccionado?.NombreTour || ''"
+          [operationDate]="fechaSeleccionada"
+          [statusText]="editorStatusText"
+          [persisted]="listadoPersistido"
+          [dirty]="listadoDirty"
+          [newDraft]="listadoOrigen === 'nuevo' && !listadoPersistido"
+          [plan]="planSeleccionado"
+          [activeBusIndex]="activeBusIndex"
+          [activeBus]="activeBus"
+          [activeStops]="activeStops"
+          [unassigned]="reservasSinAsignar"
+          [totalPaxUnassigned]="totalPaxUnassigned"
+          [availableCapacities]="CAPACIDADES_BUSES"
+          [canUpdate]="canUpdateProgramacion"
+          [canRestore]="canRestoreInitialPlan"
+          [saving]="isSaving"
+          (closeRequested)="volverAlDashboard()"
+          (restoreRequested)="requestRestoreInitialPlan()"
+          (saveRequested)="guardarListadoFinal()"
+          (exportAllRequested)="descargarTodosLosListados()"
+          (busSelected)="selectBus($event)"
+          (previousBusRequested)="prevBus()"
+          (nextBusRequested)="nextBus()"
+          (busChanged)="markDirty()"
+          (mapRequested)="verMapa($event.bus, $event.index)"
+          (exportBusRequested)="descargarListadoBus($event)"
+          (reservationViewRequested)="viewReservation($event)"
+          (reservationMoveRequested)="moveReservationToDestination($event)"
+          (stopDropped)="dropStop($event)">
+        </app-programacion-editor>
+      } @placeholder {
+        <app-loading-state
+          label="Preparando el editor del listado…"
+          [showSlowMessage]="false">
+        </app-loading-state>
+      }
     }
 
     @if (modoVista === 'privados') {

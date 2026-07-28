@@ -17,7 +17,7 @@
     <strong>{{ label }}</strong>
     @if (visibleDetail) {
       <span>{{ visibleDetail }}</span>
-    } @else if (mode === 'loading' && slow()) {
+    } @else if (mode === 'loading' && showSlowMessage && slow()) {
       <span>Está tardando un poco más de lo normal.</span>
     }
   </div>

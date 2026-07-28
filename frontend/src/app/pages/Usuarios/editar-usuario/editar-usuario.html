@@ -187,7 +187,7 @@
 
             <div class="form-group full-width">
               <div class="permissions-head">
-                <span class="form-label">Permisos asignables</span>
+                <span class="form-label">Permisos</span>
                 @if (permisos.length > 0) {
                   <span class="permissions-meta">
                     <span class="badge badge--info">{{ selectedPermisos.length }}</span> seleccionados
@@ -198,8 +198,9 @@
               @if (catalogLoading()) {
                 <p class="form-hint">Cargando permisos...</p>
               } @else if (permisos.length === 0) {
-                <p class="form-hint">No hay permisos disponibles para este rol.</p>
+                <p class="form-hint">No hay permisos disponibles.</p>
               } @else {
+                <p class="form-hint">El rol incluye sus permisos base. Selecciona aquí los accesos que quieras asignar directamente al usuario.</p>
                 <div class="permissions-grid">
                   @for (p of permisos; track p.Id_Permiso) {
                     <button type="button" class="permission-option chip"

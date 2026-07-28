@@ -3,7 +3,14 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Bus, Reserva, Sugerencia } from '../../../interfaces/Programacion/reservas';
+import { groupProgramacionStops } from './programacion-editor.utils';
 import { ProgramacionViewStop } from './programacion-view.types';
+
+interface BusQualitySummary {
+  missingCoordinates: number;
+  missingRoute: number;
+  total: number;
+}
 
 @Component({
   selector: 'app-programacion-editor',
@@ -61,6 +68,7 @@ export class ProgramacionEditorComponent implements OnDestroy {
   busChanged = output<void>();
   mapRequested = output<{ bus: Bus; index: number }>();
   exportBusRequested = output<number>();
+  reservationViewRequested = output<string>();
   reservationMoveRequested = output<{
     reservationId: string | number;
     sourceBusIndex: number;
@@ -80,6 +88,24 @@ export class ProgramacionEditorComponent implements OnDestroy {
   get totalReservations(): number {
     return this.buses.reduce((total, bus) => total + (bus.reservas?.length || 0), 0)
       + this.unassigned().length;
+  }
+
+  get naturalOperationDate(): string {
+    const value = String(this.operationDate() || '').trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return value;
+
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    const parts = new Intl.DateTimeFormat('es-CO', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((item) => item.type === type)?.value || '';
+
+    return `${part('weekday')} ${part('day')} de ${part('month')}`.trim();
   }
 
   get transferMode(): boolean {
@@ -116,6 +142,12 @@ export class ProgramacionEditorComponent implements OnDestroy {
     if (this.phoneReadOnly() || !this.canUpdate()) return;
     this.transferReservation.set(reservation);
     this.transferSourceBusIndex.set(this.activeBusIndex());
+  }
+
+  viewReservation(event: Event, reservation: Reserva): void {
+    event.stopPropagation();
+    this.cancelTransfer();
+    this.reservationViewRequested.emit(String(reservation.Id_Reserva));
   }
 
   cancelTransfer(): void {
@@ -209,6 +241,26 @@ export class ProgramacionEditorComponent implements OnDestroy {
 
   stopNeedsAttention(stop: ProgramacionViewStop): boolean {
     return this.stopNeedsCoordinates(stop) || this.stopNeedsRoute(stop);
+  }
+
+  busQualitySummary(bus: Bus): BusQualitySummary {
+    const stops = groupProgramacionStops(bus.reservas || []);
+    const missingCoordinates = stops.filter((stop) => this.stopNeedsCoordinates(stop)).length;
+    const missingRoute = stops.filter((stop) => this.stopNeedsRoute(stop)).length;
+    const total = stops.filter((stop) => this.stopNeedsAttention(stop)).length;
+
+    return { missingCoordinates, missingRoute, total };
+  }
+
+  busQualityLabel(quality: BusQualitySummary): string {
+    const details: string[] = [];
+    if (quality.missingCoordinates) {
+      details.push(`${quality.missingCoordinates} sin coordenadas`);
+    }
+    if (quality.missingRoute) {
+      details.push(`${quality.missingRoute} sin ruta`);
+    }
+    return details.join(' · ');
   }
 
   get activeIssueCount(): number {

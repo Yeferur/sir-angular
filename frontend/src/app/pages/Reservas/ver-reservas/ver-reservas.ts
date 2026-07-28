@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { finalize, forkJoin, firstValueFrom, Subscription } from 'rxjs';
 // Importa tus servicios
@@ -135,6 +135,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
   private uiState = inject(UiStateService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private reservasService = inject(Reservas);
   private cdr = inject(ChangeDetectorRef);
   private permisosService = inject(PermisosService);
@@ -142,10 +143,15 @@ seleccionarPuntoAutocomplete(p: any) {
   private alertService = inject(SirAlertService);
   private hostElement = inject(ElementRef<HTMLElement>);
   private searchRequest?: Subscription;
+  private restoreSearchFromUrl = false;
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
   reservas = signal<any[]>([]);
+  readonly pageSize = 25;
+  readonly page = signal(1);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   isLoading = signal(true);
   isSearching = signal(false);
   loadError = signal('');
@@ -200,6 +206,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
 
   ngOnInit(): void {
+    this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
     this.loadInitialData();
   }
 
@@ -209,7 +216,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
   listar() {
     if (this.filtersApplied()) {
-      this.buscarReservas();
+      this.buscarReservas(false);
     }
   }
 
@@ -218,11 +225,17 @@ seleccionarPuntoAutocomplete(p: any) {
       this.alertService.errorToast('Acceso denegado', 'No tienes permiso para crear reservas.');
       return;
     }
-    this.router.navigate(['/Reservas/NuevaReserva']);
+    this.router.navigate(
+      ['/Reservas/NuevaReserva'],
+      { queryParams: this.buildFilterQueryParams(this.hasSearched()) }
+    );
   }
 
   editarReserva(Id_Reserva: string | number) {
-    this.router.navigate(['/Reservas/EditarReserva', Id_Reserva]);
+    this.router.navigate(
+      ['/Reservas/EditarReserva', Id_Reserva],
+      { queryParams: this.buildFilterQueryParams(this.hasSearched()) }
+    );
   }
 
   confirmCancelarReserva(reserva: any): void {
@@ -292,10 +305,10 @@ seleccionarPuntoAutocomplete(p: any) {
 
     this.reservasService.deleteReserva(id).subscribe({
       next: () => {
-        this.reservas.update((items) => items.filter((item) => String(item?.Id_Reserva) !== String(id)));
         if (String(this.uiState.reservaId() || '') === String(id)) {
           this.uiState.reservaId.set(null);
         }
+        this.buscarReservas(false);
         this.alertService.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
       },
       error: (error) => {
@@ -330,6 +343,8 @@ seleccionarPuntoAutocomplete(p: any) {
       Id_Reserva: '',
       Punto: '',
     }));
+    this.page.set(1);
+    this.syncFiltersToUrl();
   }
 
   loadInitialData() {
@@ -342,6 +357,7 @@ seleccionarPuntoAutocomplete(p: any) {
       finalize(() => {
         this.isLoading.set(false);
         this.cdr.markForCheck();
+        this.runRestoredSearch();
       })
     ).subscribe({
       next: ({ tours, categorias }) => {
@@ -361,6 +377,72 @@ seleccionarPuntoAutocomplete(p: any) {
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update((prev) => ({ ...prev, [key]: value }));
+    this.page.set(1);
+    this.syncFiltersToUrl();
+  }
+
+  private restoreFiltersFromQuery(): boolean {
+    const params = this.route.snapshot.queryParamMap;
+    const toNumbers = (value: string | null): number[] => String(value || '')
+      .split(',')
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0);
+    const toStrings = (value: string | null): string[] => String(value || '')
+      .split('|')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const point = String(params.get('punto') || '').trim();
+    const requestedPage = Number(params.get('pagina') || 1);
+
+    this.filters.set({
+      FechaReserva: String(params.get('fechaTour') || ''),
+      FechaRegistro: String(params.get('fechaRegistro') || ''),
+      CategoriaReserva: toNumbers(params.get('categorias')),
+      tour: toNumbers(params.get('tours')),
+      Id_Reserva: String(params.get('reserva') || ''),
+      NombreApellido: String(params.get('q') || ''),
+      IdPas: String(params.get('documento') || ''),
+      Punto: point,
+      Estado: toStrings(params.get('estado')),
+      Empty: params.get('vacios') === '1',
+    });
+
+    this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+    this.puntoSeleccionado = point ? { NombrePunto: point } : null;
+    return params.get('buscar') === '1';
+  }
+
+  private buildFilterQueryParams(searchApplied: boolean): Record<string, string | number | null> {
+    const filter = this.filters();
+    return {
+      fechaTour: filter.FechaReserva || null,
+      fechaRegistro: filter.FechaRegistro || null,
+      categorias: filter.CategoriaReserva.length ? filter.CategoriaReserva.join(',') : null,
+      tours: filter.tour.length ? filter.tour.join(',') : null,
+      estado: filter.Estado.length ? filter.Estado.join('|') : null,
+      q: filter.NombreApellido.trim() || null,
+      reserva: filter.Id_Reserva.trim() || null,
+      documento: filter.IdPas.trim() || null,
+      punto: filter.Punto.trim() || null,
+      vacios: filter.Empty ? 1 : null,
+      pagina: this.page() > 1 ? this.page() : null,
+      buscar: searchApplied ? 1 : null,
+    };
+  }
+
+  private syncFiltersToUrl(searchApplied = this.hasSearched()): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: this.buildFilterQueryParams(searchApplied),
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private runRestoredSearch(): void {
+    if (!this.restoreSearchFromUrl) return;
+    this.restoreSearchFromUrl = false;
+    this.buscarReservas(false);
   }
 
   toggleDropdown(name: 'tour' | 'categoria' | 'estado') {
@@ -503,7 +585,7 @@ seleccionarPuntoAutocomplete(p: any) {
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  buscarReservas() {
+  buscarReservas(resetPage = true) {
     const filtros = this.buildApiFilters();
     // Si el filtro es por punto, solo buscar si el punto fue seleccionado del autocompletar
     if (filtros.Punto && !this.puntoSeleccionado) {
@@ -528,21 +610,34 @@ seleccionarPuntoAutocomplete(p: any) {
       });
       return;
     }
+    if (resetPage) this.page.set(1);
+    const paginatedFilters = {
+      ...filtros,
+      page: this.page(),
+      limit: this.pageSize,
+    };
     this.searchRequest?.unsubscribe();
     this.hasSearched.set(true);
     this.isSearching.set(true);
     this.searchError.set('');
     this.filtersApplied.set(true);
+    this.syncFiltersToUrl(true);
     this.closeAdvancedFilters();
     this.cdr.markForCheck();
-    this.searchRequest = this.reservasService.getReservas(filtros).pipe(
+    this.searchRequest = this.reservasService.getReservas(paginatedFilters).pipe(
       finalize(() => {
         this.isSearching.set(false);
         this.cdr.markForCheck();
       })
     ).subscribe({
-      next: (data) => {
-        this.reservas.set(data);
+      next: (result) => {
+        const total = Math.max(0, Number(result?.total || 0));
+        const normalizedPage = Math.max(1, Number(result?.page || this.page()) || 1);
+        this.reservas.set(Array.isArray(result?.data) ? result.data : []);
+        this.total.set(total);
+        this.page.set(normalizedPage);
+        this.totalPages.set(Math.max(1, Number(result?.totalPages || Math.ceil(total / this.pageSize)) || 1));
+        this.syncFiltersToUrl(true);
         this.cdr.markForCheck();
       },
       error: (error) => {
@@ -550,6 +645,25 @@ seleccionarPuntoAutocomplete(p: any) {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  prevPage(): void {
+    if (this.page() <= 1 || this.isSearching()) return;
+    this.page.update((value) => value - 1);
+    this.buscarReservas(false);
+  }
+
+  nextPage(): void {
+    if (this.page() >= this.totalPages() || this.isSearching()) return;
+    this.page.update((value) => value + 1);
+    this.buscarReservas(false);
+  }
+
+  resultsRangeLabel(): string {
+    if (!this.total()) return '0 reservas';
+    const first = (this.page() - 1) * this.pageSize + 1;
+    const last = Math.min(this.total(), first + this.reservas().length - 1);
+    return `${first}–${last} de ${this.total()} reservas`;
   }
 
   verReserva(Id_Reserva: string) {

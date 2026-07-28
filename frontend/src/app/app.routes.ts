@@ -111,12 +111,25 @@ export const routes: Routes = [
   },
 
   {
+    path: 'Programacion',
+    pathMatch: 'full',
+    redirectTo: 'Programacion/Listado',
+  },
+  {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
-    data: { preload: true },
+    data: { preload: true, programacionView: 'dashboard' },
     title: 'Programación',
+  },
+  {
+    path: 'Programacion/Editor/:fecha/:servicio',
+    loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    canActivate: [authGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: { programacionView: 'editor' },
+    title: 'Editar programación',
   },
 
   {

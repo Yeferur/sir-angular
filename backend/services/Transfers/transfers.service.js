@@ -641,6 +641,8 @@ async function crearTransferSvc(payload, files = {}) {
 // exports consolidated at end of file
 
 async function filtrarTransfersSvc(q) {
+  const requestedPage = Math.max(1, Number.parseInt(q?.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(q?.limit, 10) || 25));
   const {
     Fecha_Transfer,
     Fecha_Registro,
@@ -710,6 +712,21 @@ async function filtrarTransfersSvc(q) {
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
+  const countSql = `
+    SELECT COUNT(DISTINCT tr.Id_Transfer) AS total
+    FROM transfers tr
+    LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
+    LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
+    LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
+    ${where}
+  `;
+
+  const [countRows] = await db.query(countSql);
+  const total = Math.max(0, Number(countRows?.[0]?.total || 0));
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * limit;
+
   const sql = `
     SELECT
       tr.Id_Transfer,
@@ -738,14 +755,21 @@ async function filtrarTransfersSvc(q) {
     LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
     ${where}
     ORDER BY tr.Fecha_Registro DESC
+    LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await db.query(sql);
-  return rows.map((row) => ({
-    ...row,
-    Estado: normalizarEstadoTransferLegacy(row?.Estado),
-    Estado_Transfer: normalizarEstadoTransferLegacy(row?.Estado_Transfer || row?.Estado),
-  }));
+  const [rows] = await db.query(sql, [limit, offset]);
+  return {
+    data: rows.map((row) => ({
+      ...row,
+      Estado: normalizarEstadoTransferLegacy(row?.Estado),
+      Estado_Transfer: normalizarEstadoTransferLegacy(row?.Estado_Transfer || row?.Estado),
+    })),
+    total,
+    page,
+    limit,
+    totalPages,
+  };
 }
 
 async function getRangosSvc() {

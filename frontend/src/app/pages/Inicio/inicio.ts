@@ -11,6 +11,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { finalize, Subscription } from 'rxjs';
 
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
@@ -38,6 +39,7 @@ export class Inicio implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly alerts = inject(SirAlertService);
   private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
 
   isLoading = true;
   isUpdatingDate = false;
@@ -301,6 +303,31 @@ export class Inicio implements OnInit, OnDestroy {
     return this.LINKED_IDS
       .map((id) => this.tours.find((tour) => tour.Id_Tour === id))
       .filter((tour): tour is Tour => Boolean(tour));
+  }
+
+  irAReservas(tours: Tour | Tour[]): void {
+    const tourIds = (Array.isArray(tours) ? tours : [tours])
+      .map((tour) => Number(tour?.Id_Tour))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!tourIds.length) return;
+
+    void this.router.navigate(['/Reservas/VerReservas'], {
+      queryParams: {
+        fechaTour: this.fecha,
+        tours: tourIds.join(','),
+        buscar: 1,
+      },
+    });
+  }
+
+  irATransfers(): void {
+    void this.router.navigate(['/Transfers/VerTransfers'], {
+      queryParams: {
+        fechaTransfer: this.fecha,
+        buscar: 1,
+      },
+    });
   }
 
   getLinkedTourNames(): string {

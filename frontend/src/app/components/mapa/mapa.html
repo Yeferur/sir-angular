@@ -16,9 +16,9 @@
       </span>
     </div>
     <div class="mapa-topbar-actions">
-      <button class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" width="14" height="14">
+      <button type="button" class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
@@ -37,22 +37,54 @@
       <!-- Stats -->
       <div class="panel-stats">
         <div class="stat-card">
-          <div class="stat-label">Distancia</div>
+          <div class="stat-label">Distancia total</div>
           <div class="stat-value">
             {{ distanciaKm }}<span class="stat-unit">km</span>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Tiempo est.</div>
-          <div class="stat-value stat-value--duration">{{ tiempoEstimado }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Paradas</div>
-          <div class="stat-value">{{ agrupadosConBase.length }}</div>
-        </div>
-        <div class="stat-card">
           <div class="stat-label">Pasajeros</div>
           <div class="stat-value">{{ totalPax }}<span class="stat-unit">pax</span></div>
+        </div>
+
+        <div class="eta-card" *ngIf="ventanaRecogidaBase">
+          <div class="eta-card-heading">
+            <span>Horario estimado</span>
+            <small>Sin tráfico</small>
+          </div>
+          <div class="eta-timeline">
+            <div class="eta-time">
+              <span>Salida Est. Poblado</span>
+              <strong>{{ horaSalidaBase }}</strong>
+            </div>
+            <svg class="eta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14"/><path d="m15 8 4 4-4 4"/>
+            </svg>
+            <div class="eta-time eta-time--arrival">
+              <span>Llegada al tour</span>
+              <strong>{{ llegadaEstimada }}</strong>
+            </div>
+          </div>
+          <p>Recogida en Estación Poblado: {{ ventanaRecogidaBase }}</p>
+        </div>
+
+        <div class="route-stage">
+          <div class="route-stage-copy">
+            <span class="route-stage-kicker">Ruta de recogida</span>
+            <span class="route-stage-detail">Inicio y puntos de encuentro</span>
+          </div>
+          <strong class="route-stage-time">{{ tiempoRecogida }}</strong>
+        </div>
+
+        <div class="route-stage route-stage--tour" *ngIf="hasTourDestination">
+          <div class="route-stage-copy">
+            <span class="route-stage-kicker">Viaje al tour</span>
+            <span class="route-stage-detail" [title]="'Desde ' + ultimoPuntoRecogidaNombre">
+              Desde {{ ultimoPuntoRecogidaNombre }}
+            </span>
+          </div>
+          <strong class="route-stage-time">{{ tiempoAlTour }}</strong>
         </div>
       </div>
 

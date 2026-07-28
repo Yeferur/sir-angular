@@ -748,6 +748,8 @@ async function aplicarCuposReserva({ conn, impacto, excludeReservaId = null }) {
  * =========================== */
 async function filtrarReservas(q) {
   const params = (typeof q === 'object' && q !== null) ? q : { q: String(q || '') };
+  const requestedPage = Math.max(1, Number.parseInt(params.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(params.limit, 10) || 25));
 
   const {
     Fecha_Tour, FechaRegistro, Id_Tour, Id_Canal, Estado,
@@ -846,6 +848,21 @@ async function filtrarReservas(q) {
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
+  const countSql = `
+    SELECT COUNT(DISTINCT r.Id_Reserva) AS total
+    FROM reservas r
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
+    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    ${where}
+  `;
+
+  const [countRows] = await db.query(countSql, values);
+  const total = Math.max(0, Number(countRows?.[0]?.total || 0));
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * limit;
+
   const sql = `
     SELECT
       r.Id_Reserva, r.Fecha_Tour, h.Id_Tour, t.Nombre_Tour,
@@ -860,13 +877,20 @@ async function filtrarReservas(q) {
     ${where}
     GROUP BY r.Id_Reserva
     ORDER BY r.Fecha_Registro DESC
+    LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await db.query(sql, values);
-  return rows.map((row) => ({
-    ...row,
-    Estado: normalizarEstadoReservaLegacy(row?.Estado),
-  }));
+  const [rows] = await db.query(sql, [...values, limit, offset]);
+  return {
+    data: rows.map((row) => ({
+      ...row,
+      Estado: normalizarEstadoReservaLegacy(row?.Estado),
+    })),
+    total,
+    page,
+    limit,
+    totalPages,
+  };
 }
 
 

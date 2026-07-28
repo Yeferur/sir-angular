@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { firstValueFrom } from 'rxjs';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { puntosService, Punto, OrdenPuntoItem, EstadoOperatividadPunto } from '../../../services/Puntos/puntos';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
@@ -20,6 +20,7 @@ export class OrdenarPuntosComponent implements OnInit {
   private puntosSvc = inject(puntosService);
   private alerts = inject(SirAlertService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   rutas = signal<string[]>([]);
   puntos = signal<Punto[]>([]);
@@ -34,6 +35,8 @@ export class OrdenarPuntosComponent implements OnInit {
   loadError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
+    const routeFromQuery = String(this.route.snapshot.queryParamMap.get('ruta') || '').trim();
+    this.rutaSeleccionada = routeFromQuery.toUpperCase() === 'PENDIENTE' ? '' : routeFromQuery;
     await this.loadRutas();
   }
 
@@ -62,10 +65,13 @@ export class OrdenarPuntosComponent implements OnInit {
         this.pendingAssignmentCount.set(0);
       }
 
-      if (!this.rutaSeleccionada && this.rutas().length) {
-        this.rutaSeleccionada = this.rutas()[0];
+      if (this.rutas().length) {
+        const restoredRoute = this.rutas().find(
+          ruta => String(ruta).trim() === this.rutaSeleccionada
+        );
+        this.rutaSeleccionada = restoredRoute || this.rutas()[0];
         await this.loadPuntosByRuta(this.rutaSeleccionada);
-      } else if (!this.rutas().length) {
+      } else {
         this.puntos.set([]);
       }
     } catch (error) {
@@ -100,6 +106,12 @@ export class OrdenarPuntosComponent implements OnInit {
 
     this.rutaSeleccionada = nuevaRuta;
     this.hasPendingOrderChanges.set(false);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { ruta: nuevaRuta || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
     await this.loadPuntosByRuta(nuevaRuta);
   }
 

@@ -4,6 +4,14 @@ import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
+export interface PaginatedTransfersResult {
+  data: any[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransferService {
   private apiUrl = environment.apiUrl;
@@ -68,7 +76,7 @@ export class TransferService {
     );
   }
 
-  getTransfers(params: any) {
+  getTransfers(params: any): Observable<PaginatedTransfersResult> {
     let httpParams = new URLSearchParams();
     Object.keys(params || {}).forEach(k => {
       const v = params[k];
@@ -76,7 +84,7 @@ export class TransferService {
       else if (v !== undefined && v !== null && v !== '') httpParams.set(k, String(v));
     });
     const url = `${this.apiUrl}/Transfer/Buscar` + (httpParams.toString() ? `?${httpParams.toString()}` : '');
-    return this.http.get<any[]>(url);
+    return this.http.get<PaginatedTransfersResult>(url);
   }
 
   getTransfer(Id_Transfer: string | number): Observable<any> {

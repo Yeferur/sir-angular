@@ -9,6 +9,15 @@ const path = require('path');
 
 const backendRoot = path.join(__dirname, '..', '..');
 
+function isStrongPassword(value) {
+  const password = String(value || '');
+  return password.length >= 8
+    && /[a-z]/.test(password)
+    && /[A-Z]/.test(password)
+    && /\d/.test(password)
+    && /[^A-Za-z0-9]/.test(password);
+}
+
 function resolveAvatarAbsolutePath(avatarValue) {
   if (!avatarValue || typeof avatarValue !== 'string') return null;
 
@@ -144,6 +153,7 @@ exports.obtenerMiPerfil = async (req, res) => {
 
 exports.actualizarMiPerfil = async (req, res) => {
   let conn;
+  let closedSessionTokens = [];
   try {
     const userId = req.user?.id;
 
@@ -171,6 +181,7 @@ exports.actualizarMiPerfil = async (req, res) => {
       Telefono_Usuario,
       Correo,
       Contrasena,
+      Contrasena_Actual,
     } = req.body || {};
 
     if (!Nombres_Apellidos || !Correo) {
@@ -185,7 +196,7 @@ exports.actualizarMiPerfil = async (req, res) => {
     await conn.beginTransaction();
 
     const [currentRows] = await conn.query(
-      'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Correo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Correo, Contrasena FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
       [userId]
     );
 
@@ -216,6 +227,24 @@ exports.actualizarMiPerfil = async (req, res) => {
 
     let hash = null;
     if (Contrasena && String(Contrasena).trim().length > 0) {
+      if (!Contrasena_Actual || !await bcrypt.compare(String(Contrasena_Actual), current.Contrasena)) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'La contraseña actual no es correcta',
+          errorCode: 'INVALID_CURRENT_PASSWORD',
+        });
+      }
+
+      if (!isStrongPassword(Contrasena)) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'La nueva contraseña debe incluir mayúscula, minúscula, número, símbolo y mínimo 8 caracteres',
+          errorCode: 'WEAK_PASSWORD',
+        });
+      }
+
       hash = await bcrypt.hash(String(Contrasena), 8);
     }
 
@@ -244,6 +273,21 @@ exports.actualizarMiPerfil = async (req, res) => {
 
     if (hash) {
       detalles.push({ columna: 'Contrasena', anterior: '***', nuevo: 'ACTUALIZADA' });
+
+      const [sessionRows] = await conn.query(
+        'SELECT Token FROM sesiones WHERE Id_Usuario = ? AND Token <> ?',
+        [userId, req.authToken]
+      );
+      closedSessionTokens = sessionRows.map((row) => row.Token).filter(Boolean);
+      await conn.query(
+        'DELETE FROM sesiones WHERE Id_Usuario = ? AND Token <> ?',
+        [userId, req.authToken]
+      );
+      detalles.push({
+        columna: 'Otras_Sesiones_Cerradas',
+        anterior: closedSessionTokens.length,
+        nuevo: 0,
+      });
     }
 
     await recordHistorial({
@@ -256,6 +300,17 @@ exports.actualizarMiPerfil = async (req, res) => {
     });
 
     await conn.commit();
+
+    if (closedSessionTokens.length > 0) {
+      try {
+        for (const token of closedSessionTokens) {
+          wsManager.sendSessionLogout(token, 'password_changed');
+        }
+        await wsManager.broadcastActiveUsers();
+      } catch (socketError) {
+        console.error('actualizarMiPerfil websocket warning:', socketError);
+      }
+    }
 
     const [updatedRows] = await db.query(
       'SELECT Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Avatar FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
@@ -281,6 +336,7 @@ exports.actualizarMiPerfil = async (req, res) => {
 
 exports.actualizarUsuario = async (req, res) => {
   let conn;
+  let shouldForceLogout = false;
   try {
     const { id } = req.params;
     const {
@@ -306,7 +362,11 @@ exports.actualizarUsuario = async (req, res) => {
     await conn.beginTransaction();
 
     const [currentRows] = await conn.query(
-      'SELECT Id_Usuario, Nombres_Apellidos, Usuario, Correo, Activo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+      `SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Usuario, u.Correo, u.Activo, u.Id_Rol, r.Nombre_Rol
+       FROM usuarios u
+       LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+       WHERE u.Id_Usuario = ?
+       LIMIT 1`,
       [id]
     );
 
@@ -320,6 +380,50 @@ exports.actualizarUsuario = async (req, res) => {
     }
 
     const current = currentRows[0];
+
+    if (String(req.user?.id) === String(id) && Number(Activo) === 0) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 400,
+        message: 'No puedes desactivar tu propio usuario',
+        errorCode: 'SELF_DEACTIVATION_FORBIDDEN',
+      });
+    }
+
+    const [targetRoleRows] = await conn.query(
+      'SELECT Nombre_Rol FROM roles WHERE Id_Rol = ? AND Activo = 1 LIMIT 1',
+      [Id_Rol]
+    );
+    if (!targetRoleRows.length) {
+      await conn.rollback();
+      return sendError(res, {
+        status: 400,
+        message: 'El rol seleccionado no está disponible',
+        errorCode: 'INVALID_ROLE',
+      });
+    }
+
+    const currentIsAdmin = String(current.Nombre_Rol || '').trim().toLowerCase() === 'administrador';
+    const targetIsAdmin = String(targetRoleRows[0].Nombre_Rol || '').trim().toLowerCase() === 'administrador';
+    if (currentIsAdmin && (Number(Activo) === 0 || !targetIsAdmin)) {
+      const [adminRows] = await conn.query(
+        `SELECT COUNT(*) AS total
+         FROM usuarios u
+         INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
+         WHERE u.Activo = 1
+           AND u.Id_Usuario <> ?
+           AND LOWER(TRIM(r.Nombre_Rol)) = 'administrador'`,
+        [id]
+      );
+      if (Number(adminRows[0]?.total || 0) === 0) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 409,
+          message: 'Debe permanecer al menos un usuario activo con rol Administrador',
+          errorCode: 'LAST_ADMIN_FORBIDDEN',
+        });
+      }
+    }
 
     const [exists] = await conn.query(
       'SELECT COUNT(*) as total FROM usuarios WHERE (Usuario = ? OR Correo = ?) AND Id_Usuario != ?',
@@ -337,6 +441,14 @@ exports.actualizarUsuario = async (req, res) => {
 
     let hash = null;
     if (Contrasena && Contrasena.trim().length > 0) {
+      if (!isStrongPassword(Contrasena)) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'La contraseña debe incluir mayúscula, minúscula, número, símbolo y mínimo 8 caracteres',
+          errorCode: 'WEAK_PASSWORD',
+        });
+      }
       hash = await bcrypt.hash(Contrasena, 8);
     }
 
@@ -381,6 +493,11 @@ exports.actualizarUsuario = async (req, res) => {
       }
     }
 
+    shouldForceLogout = !!hash || Number(Activo) === 0;
+    if (shouldForceLogout) {
+      await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
+    }
+
     await recordHistorial({
       conexion: conn,
       tabla: 'usuarios',
@@ -395,6 +512,15 @@ exports.actualizarUsuario = async (req, res) => {
     });
 
     await conn.commit();
+
+    if (shouldForceLogout) {
+      try {
+        wsManager.sendForceLogout(Number(id), hash ? 'password_changed_by_admin' : 'user_deactivated');
+        await wsManager.broadcastActiveUsers();
+      } catch (socketError) {
+        console.error('actualizarUsuario websocket warning:', socketError);
+      }
+    }
 
     return sendSuccess(res, {
       data: null,
@@ -449,6 +575,7 @@ exports.eliminarUsuario = async (req, res) => {
     }
 
     const current = currentRows[0];
+
     const roleName = String(current.Nombre_Rol || '').trim().toLowerCase();
 
     if (Number(current.Activo) === 0) {
@@ -551,6 +678,14 @@ exports.crearUsuario = async (req, res) => {
         status: 400,
         message: 'Datos incompletos',
         errorCode: 'MISSING_PARAMS',
+      });
+    }
+
+    if (!isStrongPassword(Contrasena)) {
+      return sendError(res, {
+        status: 400,
+        message: 'La contraseña debe incluir mayúscula, minúscula, número, símbolo y mínimo 8 caracteres',
+        errorCode: 'WEAK_PASSWORD',
       });
     }
 

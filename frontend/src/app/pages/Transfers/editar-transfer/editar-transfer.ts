@@ -795,7 +795,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     const transferId = this.getTransferIdFromRoute();
     if (!transferId) {
       this.navbar.errorToast('Error', 'ID de transfer no encontrado.');
-      this.router.navigate(['/Transfers/VerTransfers']);
+      this.router.navigate(['/Transfers/VerTransfers'], { queryParamsHandling: 'preserve' });
       this.isLoading.set(false);
       return;
     }
@@ -1054,7 +1054,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
                 this.navbar.successToast('Transfer cancelado', `El transfer #${id} quedó en estado Cancelado.`);
                 this.form.markAsPristine();
                 this.isSubmitting.set(false);
-                this.router.navigate(['/Transfers/VerTransfers']);
+                this.router.navigate(['/Transfers/VerTransfers'], { queryParamsHandling: 'preserve' });
               },
               error: (error) => {
                 this.navbar.errorToast('No se pudo cancelar', toUserErrorMessage(error, 'No fue posible cancelar el transfer.'));
@@ -1083,7 +1083,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
             this.navbar.needsRefresh.set('transfers');
             this.navbar.successToast('Transfer eliminado', `El transfer #${id} fue eliminado correctamente.`);
             this.isSubmitting.set(false);
-            this.router.navigate(['/Transfers/VerTransfers']);
+            this.router.navigate(['/Transfers/VerTransfers'], { queryParamsHandling: 'preserve' });
           },
           error: (error) => {
             this.navbar.errorToast('No se pudo eliminar', toUserErrorMessage(error, 'No fue posible eliminar el transfer.'));
@@ -1259,7 +1259,10 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
     if (openDrawer && transferId) {
       this.drawer.openTransfer(transferId);
     }
-    void this.router.navigate(['/Transfers/VerTransfers']);
+    void this.router.navigate(
+      ['/Transfers/VerTransfers'],
+      { queryParamsHandling: 'preserve' }
+    );
   }
 
   ngOnDestroy(): void {

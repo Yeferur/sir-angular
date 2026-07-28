@@ -1,100 +1,133 @@
-<div class="booking-dashboard">
 @if (isLoading()) {
-  <app-loading-state label="Preparando usuarios, roles y permisos…"></app-loading-state>
+  <app-loading-state label="Preparando el formulario de usuario…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos preparar el nuevo usuario"
+    [detail]="loadError()"
+    (action)="loadInitialData()">
+  </app-loading-state>
 } @else {
+  <div class="booking-dashboard">
+    <p class="hint">
+      Los campos marcados con <span class="required-star">*</span> son obligatorios.
+      El rol cargará automáticamente sus permisos por defecto.
+    </p>
+
     <form id="usuarioForm" [formGroup]="form" (ngSubmit)="submit()" autocomplete="off" novalidate>
       <input class="autofill-trap" type="text" name="fake-user" autocomplete="username" tabindex="-1" aria-hidden="true" />
       <input class="autofill-trap" type="password" name="fake-pass" autocomplete="current-password" tabindex="-1" aria-hidden="true" />
 
       <div class="main-content">
         <div class="top-cards-grid">
-          <div class="card">
+          <section class="card" aria-labelledby="identity-title">
             <div class="card-header">
-              <div>
-                <h2>Identidad</h2>
-                <p class="card-subtitle">Datos personales del usuario.</p>
+              <div class="card-heading">
+                <span class="section-icon section-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="4"></circle>
+                    <path d="M4 21a8 8 0 0 1 16 0"></path>
+                  </svg>
+                </span>
+                <div>
+                  <h2 id="identity-title">Identidad</h2>
+                  <p class="card-subtitle">Información personal y de contacto.</p>
+                </div>
               </div>
             </div>
 
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label">Cédula <span class="required-star">*</span></label>
-                <input class="form-input" formControlName="Id_Usuario" autocomplete="off"
-                  autocapitalize="off" spellcheck="false" placeholder="Ej: 1234567890"
-                  [class.errorInput]="form.get('Id_Usuario')?.touched && form.get('Id_Usuario')?.invalid" />
-                @if (form.get('Id_Usuario')?.touched && form.get('Id_Usuario')?.invalid) {
+                <label class="form-label" for="user-document">Cédula <span class="required-star">*</span></label>
+                <input id="user-document" class="form-input" formControlName="Id_Usuario" inputmode="numeric"
+                  autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30"
+                  placeholder="Ej: 1234567890"
+                  [class.errorInput]="c('Id_Usuario').touched && c('Id_Usuario').invalid" />
+                @if (c('Id_Usuario').touched && c('Id_Usuario').invalid) {
                   <div class="errorMessage">{{ msg('Id_Usuario') }}</div>
                 }
               </div>
 
               <div class="form-group">
-                <label class="form-label">Nombre completo <span class="required-star">*</span></label>
-                <input class="form-input" formControlName="Nombres_Apellidos" autocomplete="off"
-                  placeholder="Ej: Juan Pérez"
-                  [class.errorInput]="form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid" />
-                @if (form.get('Nombres_Apellidos')?.touched && form.get('Nombres_Apellidos')?.invalid) {
+                <label class="form-label" for="user-name">Nombre completo <span class="required-star">*</span></label>
+                <input id="user-name" class="form-input" formControlName="Nombres_Apellidos"
+                  autocomplete="off" maxlength="255" placeholder="Ej: Juan Pérez"
+                  [class.errorInput]="c('Nombres_Apellidos').touched && c('Nombres_Apellidos').invalid" />
+                @if (c('Nombres_Apellidos').touched && c('Nombres_Apellidos').invalid) {
                   <div class="errorMessage">{{ msg('Nombres_Apellidos') }}</div>
                 }
               </div>
 
               <div class="form-group">
-                <label class="form-label">Teléfono <span class="required-star">*</span></label>
-                <input class="form-input" formControlName="Telefono_Usuario" inputmode="numeric"
-                  autocomplete="off" placeholder="+57 300 000 0000"
-                  [class.errorInput]="form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid" />
-                @if (form.get('Telefono_Usuario')?.touched && form.get('Telefono_Usuario')?.invalid) {
+                <label class="form-label" for="user-phone">Teléfono <span class="required-star">*</span></label>
+                <input id="user-phone" class="form-input" type="tel" formControlName="Telefono_Usuario"
+                  inputmode="tel" autocomplete="off" placeholder="Ej: 300 000 0000"
+                  [class.errorInput]="c('Telefono_Usuario').touched && c('Telefono_Usuario').invalid" />
+                @if (c('Telefono_Usuario').touched && c('Telefono_Usuario').invalid) {
                   <div class="errorMessage">{{ msg('Telefono_Usuario') }}</div>
                 }
               </div>
             </div>
-          </div>
+          </section>
 
-          <div class="card">
+          <section class="card" aria-labelledby="access-title">
             <div class="card-header">
-              <div>
-                <h2>Acceso</h2>
-                <p class="card-subtitle">Credenciales de inicio de sesión.</p>
+              <div class="card-heading">
+                <span class="section-icon section-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+                  </svg>
+                </span>
+                <div>
+                  <h2 id="access-title">Acceso</h2>
+                  <p class="card-subtitle">Credenciales para ingresar a SIR.</p>
+                </div>
               </div>
             </div>
 
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label">Usuario <span class="required-star">*</span></label>
-                <input class="form-input" formControlName="Usuario" autocomplete="off"
-                  autocapitalize="off" spellcheck="false" placeholder="Ej: jperez"
-                  [class.errorInput]="form.get('Usuario')?.touched && form.get('Usuario')?.invalid" />
-                @if (form.get('Usuario')?.touched && form.get('Usuario')?.invalid) {
+                <label class="form-label" for="user-alias">Usuario <span class="required-star">*</span></label>
+                <input id="user-alias" class="form-input" formControlName="Usuario" autocomplete="off"
+                  autocapitalize="off" spellcheck="false" maxlength="100" placeholder="Ej: jperez"
+                  [class.errorInput]="c('Usuario').touched && c('Usuario').invalid" />
+                @if (c('Usuario').touched && c('Usuario').invalid) {
                   <div class="errorMessage">{{ msg('Usuario') }}</div>
                 }
               </div>
 
               <div class="form-group">
-                <label class="form-label">Correo <span class="required-star">*</span></label>
-                <input class="form-input" formControlName="Correo" autocomplete="off"
-                  autocapitalize="off" spellcheck="false" placeholder="Ej: juan@empresa.com"
-                  [class.errorInput]="form.get('Correo')?.touched && form.get('Correo')?.invalid" />
-                @if (form.get('Correo')?.touched && form.get('Correo')?.invalid) {
+                <label class="form-label" for="user-email">Correo <span class="required-star">*</span></label>
+                <input id="user-email" class="form-input" type="email" formControlName="Correo"
+                  autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="255"
+                  placeholder="Ej: juan@empresa.com"
+                  [class.errorInput]="c('Correo').touched && c('Correo').invalid" />
+                @if (c('Correo').touched && c('Correo').invalid) {
                   <div class="errorMessage">{{ msg('Correo') }}</div>
                 }
               </div>
 
               <div class="form-group">
-                <label class="form-label">Contraseña <span class="required-star">*</span></label>
+                <label class="form-label" for="user-password">Contraseña <span class="required-star">*</span></label>
                 <div class="password-wrapper" #pwdWrap
                   (focusin)="openPasswordStrength()"
                   (focusout)="closePasswordStrengthIfOutside($event, pwdWrap)">
-                  <input class="form-input" [type]="showPassword ? 'text' : 'password'"
+                  <input id="user-password" class="form-input" [type]="showPassword ? 'text' : 'password'"
                     formControlName="Contrasena" autocomplete="new-password"
-                    [class.errorInput]="form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid" />
-                  <button type="button" class="toggle-password" (click)="showPassword = !showPassword" aria-label="Mostrar u ocultar contraseña">
+                    [class.errorInput]="c('Contrasena').touched && c('Contrasena').invalid" />
+                  <button type="button" class="toggle-password" (click)="showPassword = !showPassword"
+                    [attr.aria-label]="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'">
                     @if (!showPassword) {
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
                       </svg>
                     } @else {
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
                       </svg>
                     }
                   </button>
@@ -106,12 +139,9 @@
                         <span class="strength-score">{{ passwordStrength.score }}/6</span>
                       </div>
                       <div class="strength-bars" [attr.data-level]="passwordStrength.label">
-                        <span class="bar" [class.on]="passwordStrength.score >= 1"></span>
-                        <span class="bar" [class.on]="passwordStrength.score >= 2"></span>
-                        <span class="bar" [class.on]="passwordStrength.score >= 3"></span>
-                        <span class="bar" [class.on]="passwordStrength.score >= 4"></span>
-                        <span class="bar" [class.on]="passwordStrength.score >= 5"></span>
-                        <span class="bar" [class.on]="passwordStrength.score >= 6"></span>
+                        @for (bar of [1, 2, 3, 4, 5, 6]; track bar) {
+                          <span class="bar" [class.on]="passwordStrength.score >= bar"></span>
+                        }
                       </div>
                       <ul class="strength-checks">
                         <li [class.ok]="passwordStrength.checks.length8">Mínimo 8 caracteres</li>
@@ -119,36 +149,39 @@
                         <li [class.ok]="passwordStrength.checks.lower">Una minúscula</li>
                         <li [class.ok]="passwordStrength.checks.digit">Un número</li>
                         <li [class.ok]="passwordStrength.checks.symbol">Un símbolo</li>
-                        <li [class.ok]="passwordStrength.checks.length12">Recomendado: 12+ caracteres</li>
+                        <li [class.ok]="passwordStrength.checks.length12">Recomendado: 12+</li>
                       </ul>
                     </div>
                   }
                 </div>
-                @if (form.get('Contrasena')?.touched && form.get('Contrasena')?.invalid) {
+                @if (c('Contrasena').touched && c('Contrasena').invalid) {
                   <div class="errorMessage">{{ msg('Contrasena') }}</div>
                 }
               </div>
 
               <div class="form-group">
-                <label class="form-label">Confirmar contraseña <span class="required-star">*</span></label>
+                <label class="form-label" for="user-password-confirm">Confirmar contraseña <span class="required-star">*</span></label>
                 <div class="password-wrapper">
-                  <input class="form-input" [type]="showConfirm ? 'text' : 'password'"
+                  <input id="user-password-confirm" class="form-input" [type]="showConfirm ? 'text' : 'password'"
                     formControlName="Confirmar" autocomplete="new-password"
-                    [class.errorInput]="(form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) || (form.touched && form.errors?.['passwordMismatch'])" />
-                  <button type="button" class="toggle-password" (click)="showConfirm = !showConfirm" aria-label="Mostrar u ocultar confirmación">
+                    [class.errorInput]="(c('Confirmar').touched && c('Confirmar').invalid) || (form.touched && form.errors?.['passwordMismatch'])" />
+                  <button type="button" class="toggle-password" (click)="showConfirm = !showConfirm"
+                    [attr.aria-label]="showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'">
                     @if (!showConfirm) {
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
                       </svg>
                     } @else {
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
                       </svg>
                     }
                   </button>
                 </div>
-                @if (form.get('Confirmar')?.touched && form.get('Confirmar')?.invalid) {
+                @if (c('Confirmar').touched && c('Confirmar').invalid) {
                   <div class="errorMessage">{{ msg('Confirmar') }}</div>
                 }
                 @if (form.touched && form.errors?.['passwordMismatch']) {
@@ -156,80 +189,180 @@
                 }
               </div>
             </div>
-          </div>
+          </section>
         </div>
 
-        <div class="card permissions-card">
+        <section class="card permissions-card" aria-labelledby="permissions-title">
           <div class="card-header">
-            <div>
-              <h2>Rol y Permisos</h2>
-              <p class="card-subtitle">Define qué puede hacer este usuario en el sistema.</p>
+            <div class="card-heading">
+              <span class="section-icon section-icon--purple" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <path d="m9 12 2 2 4-4"></path>
+                </svg>
+              </span>
+              <div>
+                <h2 id="permissions-title">Rol y permisos</h2>
+                <p class="card-subtitle">Asigna el nivel de acceso con una base clara y ajustable.</p>
+              </div>
             </div>
+
+            @if (selectedRole) {
+              <div class="selection-summary" aria-live="polite">
+                <strong>{{ selectedPermisos.length }}</strong>
+                <span>permisos activos</span>
+              </div>
+            }
           </div>
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Rol <span class="required-star">*</span></label>
-              <select class="form-select" formControlName="Id_Rol" autocomplete="off"
-                (change)="onRolChange()" [disabled]="catalogLoading()"
-                [class.errorInput]="form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid">
-                <option value="" disabled>Seleccionar un rol...</option>
-                @for (r of roles; track r.Id_Rol) {
-                  <option [value]="r.Id_Rol">{{ r.Nombre_Rol }}</option>
-                }
-              </select>
-              @if (form.get('Id_Rol')?.touched && form.get('Id_Rol')?.invalid) {
-                <div class="errorMessage">Selecciona un rol.</div>
-              }
-            </div>
-
-            <div class="form-group full-width">
-              <div class="permissions-head">
-                <span class="form-label">Permisos asignables</span>
-                @if (permisos.length > 0) {
-                  <span class="permissions-meta">
-                    <span class="badge badge--info">{{ selectedPermisos.length }}</span> seleccionados
-                  </span>
+          <div class="role-layout">
+            <div class="role-panel">
+              <div class="form-group">
+                <label class="form-label" for="user-role">Rol <span class="required-star">*</span></label>
+                <select id="user-role" class="form-select" formControlName="Id_Rol" autocomplete="off"
+                  (change)="onRolChange()"
+                  [class.errorInput]="c('Id_Rol').touched && c('Id_Rol').invalid">
+                  <option value="" disabled>Seleccionar un rol...</option>
+                  @for (role of roles; track role.Id_Rol) {
+                    <option [value]="role.Id_Rol">{{ role.Nombre_Rol }}</option>
+                  }
+                </select>
+                @if (c('Id_Rol').touched && c('Id_Rol').invalid) {
+                  <div class="errorMessage">Selecciona un rol.</div>
                 }
               </div>
 
-              @if (catalogLoading()) {
-                <p class="form-hint">Cargando permisos...</p>
-              } @else if (permisos.length === 0) {
-                <p class="form-hint">No hay permisos disponibles para este rol.</p>
+              @if (selectedRole) {
+                <div class="role-summary">
+                  <span class="role-avatar" aria-hidden="true">{{ selectedRole.Nombre_Rol.charAt(0) }}</span>
+                  <div>
+                    <span class="role-eyebrow">Rol seleccionado</span>
+                    <strong>{{ selectedRole.Nombre_Rol }}</strong>
+                    <p>{{ selectedRole.Descripcion || 'Sin descripción registrada.' }}</p>
+                  </div>
+                </div>
+
+                <div class="permission-stats">
+                  <div>
+                    <strong>{{ roleDefaultPermisos.length }}</strong>
+                    <span>Incluidos por rol</span>
+                  </div>
+                  <div>
+                    <strong>{{ additionalPermissionsCount }}</strong>
+                    <span>Adicionales</span>
+                  </div>
+                </div>
               } @else {
-                <div class="permissions-grid">
-                    @for (p of permisos; track p.Id_Permiso) {
-                    <button type="button" class="permission-option chip"
-                      (click)="togglePermiso(+p.Id_Permiso)"
-                      [class.chip--active]="selectedPermisos.includes(+p.Id_Permiso)">
-                        <span class="permission-label">{{ p.Descripcion }}</span>
-                      </button>
-                    }
+                <div class="role-empty">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 8v4m0 4h.01"></path>
+                  </svg>
+                  <p>Selecciona un rol para cargar sus permisos por defecto.</p>
+                </div>
+              }
+            </div>
+
+            <div class="permissions-panel">
+              <div class="permissions-head">
+                <div>
+                  <span class="form-label">Permisos efectivos</span>
+                  <p class="form-hint">
+                    Los marcados como “Rol” vienen incluidos y los demás pueden agregarse o retirarse.
+                  </p>
+                </div>
+                <div class="permission-legend" aria-label="Convenciones de permisos">
+                  <span><i class="legend-dot legend-dot--role"></i> Rol</span>
+                  <span><i class="legend-dot legend-dot--extra"></i> Adicional</span>
+                </div>
+              </div>
+
+              @if (rolePermissionsLoading()) {
+                <div class="permissions-loading" aria-live="polite">
+                  <span class="inline-spinner"></span>
+                  Recuperando permisos del rol…
+                </div>
+              } @else if (!selectedRole) {
+                <div class="permissions-empty">
+                  <span class="permissions-empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                  </span>
+                  <strong>Aún no hay un rol seleccionado</strong>
+                  <p>Cuando elijas uno, verás aquí sus permisos ya marcados.</p>
+                </div>
+              } @else if (permisos.length === 0) {
+                <div class="permissions-empty">
+                  <strong>No hay permisos disponibles</strong>
+                  <p>El catálogo de permisos está vacío.</p>
+                </div>
+              } @else {
+                <div class="permission-modules">
+                  @for (module of permissionsByModule; track module.key) {
+                    <section class="permission-module">
+                      <div class="permission-module-head">
+                        <strong>{{ module.label }}</strong>
+                        <span>{{ module.permisos.length }}</span>
+                      </div>
+                      <div class="permissions-grid">
+                        @for (permission of module.permisos; track permission.Id_Permiso) {
+                          <button type="button" class="permission-option"
+                            (click)="togglePermiso(permission.Id_Permiso)"
+                            [class.permission-option--selected]="isSelected(permission.Id_Permiso)"
+                            [class.permission-option--role]="isRoleDefault(permission.Id_Permiso)"
+                            [disabled]="isRoleDefault(permission.Id_Permiso)"
+                            [attr.aria-pressed]="isSelected(permission.Id_Permiso)"
+                            [attr.title]="isRoleDefault(permission.Id_Permiso) ? 'Incluido por el rol seleccionado' : null">
+                            <span class="permission-check" aria-hidden="true">
+                              @if (isSelected(permission.Id_Permiso)) {
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                  <path d="m5 12 4 4L19 6"></path>
+                                </svg>
+                              }
+                            </span>
+                            <span class="permission-copy">
+                              <strong>{{ permissionAction(permission) }}</strong>
+                              <small>{{ permission.Descripcion }}</small>
+                            </span>
+                            @if (isRoleDefault(permission.Id_Permiso)) {
+                              <span class="permission-source">Rol</span>
+                            } @else if (isSelected(permission.Id_Permiso)) {
+                              <span class="permission-source permission-source--extra">Extra</span>
+                            }
+                          </button>
+                        }
+                      </div>
+                    </section>
+                  }
                 </div>
               }
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </form>
+  </div>
 
-    <!-- FLOATING SAVE BUTTON -->
-  }
-</div>
-<div class="floating-save-bar">
-  <button class="btn-submit btn-submit-floating" type="submit" form="usuarioForm" [disabled]="isSubmitting()">
-    @if (isSubmitting()) {
-      <span class="btn-spinner"></span>
-      Creando...
-    } @else {
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <line x1="19" y1="8" x2="19" y2="14"/>
-        <line x1="22" y1="11" x2="16" y2="11"/>
-      </svg>
-      Crear Usuario
-    }
-  </button>
-</div>
+  <div class="floating-save-bar">
+    <button class="btn-submit btn-submit-floating" type="submit" form="usuarioForm"
+      [disabled]="isSubmitting() || rolePermissionsLoading()">
+      @if (isSubmitting()) {
+        <span class="btn-spinner"></span>
+        Creando…
+      } @else if (rolePermissionsLoading()) {
+        <span class="btn-spinner"></span>
+        Cargando permisos…
+      } @else {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <line x1="19" y1="8" x2="19" y2="14"></line>
+          <line x1="22" y1="11" x2="16" y2="11"></line>
+        </svg>
+        Crear usuario
+      }
+    </button>
+  </div>
+}

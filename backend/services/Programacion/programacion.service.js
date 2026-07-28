@@ -1440,9 +1440,28 @@ async function obtenerCoordenadasTours(tours) {
     // Tours sin coordenadas (ej: Tour de Compras, Tour de Luces) no aparecen en el mapa
     // y el algoritmo de ordenamiento se comporta igual que antes para ellos.
     try {
+        const estacionPobladoId = Number(process.env.PUNTOS_ESTACION_POBLADO_ID || 6);
         const [rows] = await db.query(
-            'SELECT Id_Tour, Nombre_Tour, Latitud, Longitud FROM tours WHERE Id_Tour IN (?) AND Latitud IS NOT NULL AND Longitud IS NOT NULL',
-            [tours]
+            `
+            SELECT
+                t.Id_Tour,
+                t.Nombre_Tour,
+                t.Latitud,
+                t.Longitud,
+                (
+                    SELECT h.Hora_Salida
+                    FROM horarios h
+                    WHERE h.Id_Tour = t.Id_Tour
+                      AND h.Id_Punto = ?
+                    ORDER BY h.Id_Horario DESC
+                    LIMIT 1
+                ) AS Hora_Salida_Base
+            FROM tours t
+            WHERE t.Id_Tour IN (?)
+              AND t.Latitud IS NOT NULL
+              AND t.Longitud IS NOT NULL
+            `,
+            [estacionPobladoId, tours]
         );
         const mapa = {};
         for (const row of rows || []) {
@@ -1453,7 +1472,8 @@ async function obtenerCoordenadasTours(tours) {
                     Id_Tour: Number(row.Id_Tour),
                     Nombre_Tour: row.Nombre_Tour || null,
                     Latitud: lat,
-                    Longitud: lon
+                    Longitud: lon,
+                    Hora_Salida_Base: row.Hora_Salida_Base || null
                 };
             }
         }
@@ -1481,7 +1501,8 @@ function resolverDestinoTour(tours, tourDestinos = {}) {
         idTour: Number(destino.Id_Tour || primaryTourId),
         lat,
         lng,
-        nombre: destino.Nombre_Tour || `Tour ${primaryTourId}`
+        nombre: destino.Nombre_Tour || `Tour ${primaryTourId}`,
+        horaSalidaBase: destino.Hora_Salida_Base || null
     };
 }
 
@@ -2480,7 +2501,13 @@ async function calcularRutaVisualOSRM(coordenadas) {
         source: 'osrm-local',
         coordinates: route.geometry.coordinates,
         distance: Number(route.distance || 0),
-        duration: Number(route.duration || 0)
+        duration: Number(route.duration || 0),
+        legs: Array.isArray(route.legs)
+            ? route.legs.map((leg) => ({
+                distance: Number(leg?.distance || 0),
+                duration: Number(leg?.duration || 0)
+            }))
+            : []
     };
 }
 

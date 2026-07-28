@@ -1,5 +1,6 @@
 import {
   Component,
+  AfterViewInit,
   Input,
   OnInit,
   OnChanges,
@@ -40,6 +41,7 @@ interface DestinoTourMapa {
   lat: number;
   lng: number;
   nombre?: string | null;
+  horaSalidaBase?: string | null;
 }
 
 interface PuntoSinCoordenadas {
@@ -55,7 +57,7 @@ interface PuntoSinCoordenadas {
   templateUrl: './mapa.html',
   styleUrls: ['./mapa.css']
 })
-export class Mapa implements OnInit, OnChanges, OnDestroy {
+export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   @Input() puntos: any[] = [];
   @Input() destino: DestinoTourMapa | null = null;
   @Output() onClose = new EventEmitter<void>();
@@ -65,7 +67,11 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
   agrupadosConBase: PuntoAgrupado[] = [];
   paradaActivaIndex: number | null = null;
   distanciaKm: string = '—';
-  tiempoEstimado: string = '—';
+  tiempoRecogida: string = '—';
+  tiempoAlTour: string = '—';
+  ventanaRecogidaBase: string = '';
+  horaSalidaBase: string = '—';
+  llegadaEstimada: string = '—';
   totalPax: number = 0;
   puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
   mapTheme: 'dark' | 'light' =
@@ -79,6 +85,9 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
   private tileLayer?: L.TileLayer;
   private initRetryHandle: ReturnType<typeof setTimeout> | null = null;
   private themeObserver?: MutationObserver;
+  private mapResizeObserver?: ResizeObserver;
+  private resizeFrame: number | null = null;
+  private salidaBaseMinutos: number | null = null;
 
   constructor(
     private alerts: SirAlertService,
@@ -92,6 +101,10 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
 
   ngOnInit(): void {
     this.observeAppTheme();
+  }
+
+  ngAfterViewInit(): void {
+    this.observeMapSize();
     this.scheduleMapInit();
   }
 
@@ -107,7 +120,26 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
       this.initRetryHandle = null;
     }
     this.themeObserver?.disconnect();
+    this.mapResizeObserver?.disconnect();
+    if (this.resizeFrame !== null) {
+      cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = null;
+    }
     this.map?.remove();
+  }
+
+  private observeMapSize(): void {
+    if (typeof ResizeObserver === 'undefined' || !this.mapContainer?.nativeElement) return;
+
+    this.mapResizeObserver = new ResizeObserver(() => {
+      if (!this.map) return;
+      if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = requestAnimationFrame(() => {
+        this.resizeFrame = null;
+        this.map?.invalidateSize({ animate: false, pan: false });
+      });
+    });
+    this.mapResizeObserver.observe(this.mapContainer.nativeElement);
   }
 
   // ── Seleccionar parada desde el panel ───────────────────────
@@ -131,6 +163,20 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
     return this.agrupadosConBase.some((punto) => punto.esDestinoTour);
   }
 
+  get ultimoPuntoRecogidaNombre(): string {
+    const destinoIndex = this.agrupadosConBase.findIndex((punto) => punto.esDestinoTour);
+    const limite = destinoIndex >= 0 ? destinoIndex : this.agrupadosConBase.length;
+
+    for (let index = limite - 1; index > 0; index--) {
+      const punto = this.agrupadosConBase[index];
+      if (!punto.esDestinoTour && punto.NombrePunto?.trim()) {
+        return punto.NombrePunto.trim();
+      }
+    }
+
+    return 'el último punto de encuentro';
+  }
+
   emptyStopLabel(punto: PuntoAgrupado, index: number): string {
     if (punto.esDestinoTour) return 'Destino del tour';
     if (index === 0) return 'Punto de inicio';
@@ -146,6 +192,11 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
     this.routingControl = undefined;
     this.markers = [];
     this.puntosSinCoordenadas = [];
+    this.distanciaKm = '—';
+    this.tiempoRecogida = '—';
+    this.tiempoAlTour = '—';
+    this.llegadaEstimada = '—';
+    this.configurarHorarioBase();
 
     if (!Array.isArray(this.puntos) || this.puntos.length === 0) return;
 
@@ -392,10 +443,25 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
 
       this.map.fitBounds(L.latLngBounds(r.coordinates), { padding: [32, 32] });
 
-      const distM  = r.summary?.totalDistance ?? 0;
-      const timeS  = r.summary?.totalTime ?? 0;
+      const distM = Number(r.summary?.totalDistance ?? 0);
+      const timeS = Number(r.summary?.totalTime ?? 0);
+      const routeLegs = Array.isArray(r.routeLegs) ? r.routeLegs : [];
+      const ultimoTramo = this.hasTourDestination && routeLegs.length
+        ? routeLegs[routeLegs.length - 1]
+        : null;
+      const tiempoAlTourS = Number(ultimoTramo?.duration ?? 0);
+      const tiempoRecogidaS = this.hasTourDestination && ultimoTramo
+        ? Math.max(0, timeS - tiempoAlTourS)
+        : timeS;
+
       this.distanciaKm = (distM / 1000).toFixed(1);
-      this.tiempoEstimado = this.formatDuration(timeS);
+      this.tiempoRecogida = this.formatDuration(tiempoRecogidaS);
+      this.tiempoAlTour = this.hasTourDestination
+        ? this.formatDuration(tiempoAlTourS)
+        : '—';
+      this.llegadaEstimada = this.salidaBaseMinutos !== null
+        ? this.formatClockMinutes(this.salidaBaseMinutos + Math.round(timeS / 60))
+        : '—';
       this.cdr.detectChanges();
     });
 
@@ -489,8 +555,59 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
     return {
       lat,
       lng,
-      nombre: String(this.destino?.nombre || '').trim() || 'Destino del tour'
+      nombre: String(this.destino?.nombre || '').trim() || 'Destino del tour',
+      horaSalidaBase: this.destino?.horaSalidaBase || null
     };
+  }
+
+  private configurarHorarioBase(): void {
+    const raw = String(this.destino?.horaSalidaBase || '').trim();
+    const matches = this.parseScheduleTimes(raw);
+    this.salidaBaseMinutos = matches.length ? matches[matches.length - 1] : null;
+    this.horaSalidaBase = this.salidaBaseMinutos !== null
+      ? this.formatClockMinutes(this.salidaBaseMinutos)
+      : '—';
+    this.ventanaRecogidaBase = matches.length
+      ? matches.map(minutes => this.formatClockMinutes(minutes)).join(' – ')
+      : '';
+  }
+
+  private parseScheduleTimes(value: string): number[] {
+    if (!value) return [];
+
+    const normalized = value.toUpperCase();
+    const meridiem = [...normalized.matchAll(/[AP]\.?\s*M\.?/g)].at(-1)?.[0] || '';
+    const matches = [...normalized.matchAll(/(\d{1,2})\s*[:.]\s*(\d{2})(?:\s*([AP]\.?\s*M\.?))?/g)];
+
+    return matches
+      .map(match => {
+        let hour = Number(match[1]);
+        const minute = Number(match[2]);
+        const period = String(match[3] || meridiem).replace(/[\s.]/g, '');
+
+        if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute > 59) return null;
+        if (period === 'AM') {
+          if (hour === 12) hour = 0;
+          else if (hour > 12) return null;
+        } else if (period === 'PM') {
+          if (hour < 12) hour += 12;
+          else if (hour > 12) return null;
+        } else if (hour > 23) {
+          return null;
+        }
+
+        return (hour * 60) + minute;
+      })
+      .filter((minutes): minutes is number => minutes !== null);
+  }
+
+  private formatClockMinutes(totalMinutes: number): string {
+    const normalized = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
+    const hours24 = Math.floor(normalized / 60);
+    const minutes = normalized % 60;
+    const hours12 = hours24 % 12 || 12;
+    const period = hours24 < 12 ? 'a. m.' : 'p. m.';
+    return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
   }
 
   private formatDuration(totalSeconds: number): string {
@@ -543,9 +660,8 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
   private osrmRouter() {
     return {
       route: (wps: any[], done: any, ctx?: any) => {
-        const max  = 50;
-        const step = Math.max(1, Math.floor(wps.length / (max - 2)));
-        const slice = wps.filter((_, i) => i === 0 || i === wps.length - 1 || i % step === 0);
+        const max = 50;
+        const slice = this.compactarWaypoints(wps, max);
         const coords = slice.map(wp => ({ lat: wp.latLng.lat, lng: wp.latLng.lng }));
 
         this.programacion.calcularRutaVisual(coords).subscribe({
@@ -559,6 +675,7 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
                 totalDistance: route.distance ?? 0,
                 totalTime: route.duration ?? 0
               },
+              routeLegs: route.legs ?? [],
               inputWaypoints:  wps,
               actualWaypoints: wps
             }]);
@@ -567,5 +684,28 @@ export class Mapa implements OnInit, OnChanges, OnDestroy {
         });
       }
     };
+  }
+
+  private compactarWaypoints(wps: any[], max: number): any[] {
+    if (wps.length <= max) return wps;
+
+    // Cuando existe destino, el último punto es el tour y el penúltimo es la
+    // última recogida. Conservar ambos mantiene exacto ese tramo.
+    const indices = new Set<number>([0, wps.length - 2, wps.length - 1]);
+    const disponibles = Math.max(0, max - indices.size);
+
+    for (let i = 1; i <= disponibles; i++) {
+      indices.add(Math.round((i * (wps.length - 1)) / (disponibles + 1)));
+    }
+
+    // El redondeo puede repetir índices; completamos los cupos sin superar el máximo.
+    for (let i = 1; indices.size < max && i < wps.length - 2; i++) {
+      indices.add(i);
+    }
+
+    return [...indices]
+      .sort((a, b) => a - b)
+      .slice(0, max)
+      .map(index => wps[index]);
   }
 }

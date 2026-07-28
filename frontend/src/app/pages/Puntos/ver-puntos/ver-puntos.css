@@ -199,6 +199,38 @@
   color: var(--accent-blue);
 }
 
+.operational-status {
+  display: inline-flex;
+  min-height: 21px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .69rem;
+  font-weight: 750;
+}
+
+.operational-status__dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.operational-status--coordinates {
+  border-color: color-mix(in srgb, var(--accent-red) 28%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-red) 8%, transparent);
+  color: var(--accent-red);
+}
+
+.operational-status--route {
+  border-color: color-mix(in srgb, #f59e0b 30%, var(--separator-color));
+  background: color-mix(in srgb, #f59e0b 9%, transparent);
+  color: #d97706;
+}
+
 .point-actions {
   display: flex;
   align-items: center;

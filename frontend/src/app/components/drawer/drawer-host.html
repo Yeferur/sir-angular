@@ -13,6 +13,7 @@
        [attr.aria-label]="drawer()!.type === 'reserva' ? 'Detalle de reserva' :
                           drawer()!.type === 'transfer' ? 'Detalle de transfer' :
                           drawer()!.type === 'tour' ? 'Detalle de tour' :
+                          drawer()!.type === 'usuario' ? 'Detalle de usuario' :
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
                           drawer()!.type === 'programacion-listado' ? 'Listado de programación' : 'Novedades de la app'">
@@ -42,6 +43,13 @@
     @if (drawer()!.type === 'tour') {
       <app-tour-detail
         [Id_Tour]="drawer()!.id!"
+        (onClose)="close()"
+      />
+    }
+
+    @if (drawer()!.type === 'usuario') {
+      <app-usuario-detail
+        [Id_Usuario]="drawer()!.id!"
         (onClose)="close()"
       />
     }

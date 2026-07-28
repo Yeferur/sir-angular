@@ -1058,7 +1058,10 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     if (openDrawer && transferId) {
       this.drawer.openTransfer(transferId);
     }
-    void this.router.navigate(['/Transfers/VerTransfers']);
+    void this.router.navigate(
+      ['/Transfers/VerTransfers'],
+      { queryParamsHandling: 'preserve' }
+    );
   }
 
   ngOnDestroy(): void {

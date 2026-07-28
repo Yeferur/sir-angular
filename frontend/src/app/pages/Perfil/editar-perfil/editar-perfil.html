@@ -68,6 +68,31 @@
 
         <div class="form-grid">
           <div class="form-group">
+            <label class="form-label">Contraseña actual</label>
+            <div class="password-wrapper">
+              <input
+                class="form-control"
+                formControlName="ContrasenaActual"
+                [type]="showCurrentPassword() ? 'text' : 'password'"
+                autocomplete="current-password"
+                [ngClass]="form.touched && form.errors?.['currentPasswordRequired'] ? 'errorInput' : ''"
+              />
+              <button
+                type="button"
+                class="toggle-password"
+                (click)="showCurrentPassword.set(!showCurrentPassword())"
+                [attr.aria-label]="showCurrentPassword() ? 'Ocultar contraseña actual' : 'Ver contraseña actual'"
+              >
+                {{ showCurrentPassword() ? 'Ocultar' : 'Ver' }}
+              </button>
+            </div>
+            <div class="form-hint">Solo es necesaria si vas a cambiar tu contraseña.</div>
+            @if (form.touched && form.errors?.['currentPasswordRequired']) {
+            <div class="errorMessage">Escribe tu contraseña actual para confirmar el cambio.</div>
+            }
+          </div>
+
+          <div class="form-group">
             <label class="form-label">Cédula</label>
             <input class="form-control" formControlName="Id_Usuario" readonly />
           </div>

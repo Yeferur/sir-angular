@@ -140,8 +140,16 @@
             </div>
           </div>
 
-          <div class="card-footer" *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false">
+          <div class="card-footer">
             <button
+              type="button"
+              class="btn-open-results"
+              (click)="irAReservas(getLinkedTours())">
+              Ver reservas
+            </button>
+
+            <button
+              *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false"
               type="button"
               class="btn-edit-aforo"
               (click)="abrirDrawerEdicionCompartido()">
@@ -151,8 +159,6 @@
               </svg>
               Editar cupo compartido
             </button>
-
-            <span class="linked-footer-note">Se aplica a ambos tours</span>
           </div>
         </div>
 
@@ -204,8 +210,16 @@
                 </div>
               }
 
-              <div class="card-footer" *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false">
+              <div class="card-footer">
                 <button
+                  type="button"
+                  class="btn-open-results"
+                  (click)="irAReservas(tour)">
+                  Ver reservas
+                </button>
+
+                <button
+                  *appPermiso="['INICIO.ACTUALIZAR_AFORO']; requireAll: false"
                   type="button"
                   class="btn-edit-aforo"
                   (click)="abrirDrawerEdicion(tour)">
@@ -250,6 +264,12 @@
             <span class="transfer-label">Otro</span>
             <strong class="transfer-value" [countUp]="transfersSummary.otros"></strong>
           </div>
+        </div>
+
+        <div class="transfers-footer">
+          <button type="button" class="btn-open-results" (click)="irATransfers()">
+            Ver transfers
+          </button>
         </div>
       </div>
     </div>

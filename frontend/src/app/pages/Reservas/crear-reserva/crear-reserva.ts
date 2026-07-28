@@ -2303,7 +2303,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (openDrawer && reserva) {
       this.drawer.openReserva(reserva);
     }
-    void this.router.navigate(['/Reservas/VerReservas']);
+    void this.router.navigate(
+      ['/Reservas/VerReservas'],
+      { queryParamsHandling: 'preserve' }
+    );
   }
 
   ngOnDestroy(): void {

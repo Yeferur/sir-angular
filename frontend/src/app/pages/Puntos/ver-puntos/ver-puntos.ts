@@ -19,6 +19,10 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 type PuntoHorario = NonNullable<Punto['horarios']>[number];
+type PuntoOperationalIssue = {
+  key: 'missing-coordinates' | 'missing-route';
+  label: 'Sin coordenadas' | 'Sin ruta';
+};
 
 @Component({
   selector: 'app-ver-puntos',
@@ -57,7 +61,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   private deleteRequests = new Subscription();
 
   ngOnInit(): void {
-    this.selectedRoute = String(this.route.snapshot.queryParamMap.get('ruta') || '').trim();
+    this.restoreFiltersFromQuery();
     this.inputSubscription = this.searchInput$.pipe(
       map((value) => String(value || '').trim()),
       debounceTime(300),
@@ -100,7 +104,12 @@ export class VerPuntos implements OnInit, OnDestroy {
 
     this.searchRequest = forkJoin({
       rutas: this.puntosSvc.getRutasPuntos(),
-      result: this.puntosSvc.getPuntos(1, this.limit, '', this.selectedRoute)
+      result: this.puntosSvc.getPuntos(
+        this.page(),
+        this.limit,
+        this.searchTerm,
+        this.selectedRoute
+      )
     }).pipe(
       finalize(() => this.isLoading.set(false))
     ).subscribe({
@@ -118,6 +127,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   buscarPuntos(resetPage = true): void {
     this.searchRequest?.unsubscribe();
     if (resetPage) this.page.set(1);
+    this.syncFiltersToUrl();
 
     this.isSearching.set(true);
     this.searchError.set('');
@@ -147,6 +157,7 @@ export class VerPuntos implements OnInit, OnDestroy {
     this.total.set(total);
     this.page.set(normalizedPage);
     this.totalPages.set(Math.max(1, Math.ceil(total / this.limit)));
+    this.syncFiltersToUrl();
   }
 
   onSearchInput(value: string): void {
@@ -174,7 +185,10 @@ export class VerPuntos implements OnInit, OnDestroy {
       this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear puntos.');
       return;
     }
-    this.router.navigate(['/Puntos/NuevoPunto']);
+    this.router.navigate(
+      ['/Puntos/NuevoPunto'],
+      { queryParams: this.buildFilterQueryParams() }
+    );
   }
 
   irAOrdenarPuntos(): void {
@@ -182,13 +196,47 @@ export class VerPuntos implements OnInit, OnDestroy {
       this.alerts.errorToast('Acceso denegado', 'No tienes permiso para ordenar puntos.');
       return;
     }
-    this.router.navigate(['/Puntos/OrdenarPuntos']);
+    this.router.navigate(
+      ['/Puntos/OrdenarPuntos'],
+      { queryParams: this.buildFilterQueryParams() }
+    );
   }
 
   editarPunto(punto: Punto): void {
     if (!this.canUpdatePunto) return;
     const id = this.getPuntoId(punto);
-    if (id) this.router.navigate(['/Puntos/Editar', id]);
+    if (id) {
+      this.router.navigate(
+        ['/Puntos/Editar', id],
+        { queryParams: this.buildFilterQueryParams() }
+      );
+    }
+  }
+
+  private restoreFiltersFromQuery(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const requestedPage = Number(params.get('pagina') || 1);
+
+    this.searchTerm = String(params.get('q') || '').trim();
+    this.selectedRoute = String(params.get('ruta') || '').trim();
+    this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  }
+
+  private buildFilterQueryParams(): Record<string, string | number | null> {
+    return {
+      q: this.searchTerm.trim() || null,
+      ruta: this.selectedRoute || null,
+      pagina: this.page() > 1 ? this.page() : null
+    };
+  }
+
+  private syncFiltersToUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: this.buildFilterQueryParams(),
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
   }
 
   confirmEliminarPunto(punto: Punto): void {
@@ -319,6 +367,36 @@ export class VerPuntos implements OnInit, OnDestroy {
   routeLabel(route: string | undefined): string {
     const value = String(route || '').trim();
     return value.toUpperCase() === 'PENDIENTE' ? 'Ruta pendiente' : `Ruta ${value}`;
+  }
+
+  getOperationalIssue(punto: Punto): PuntoOperationalIssue | null {
+    if (!this.hasValidCoordinates(punto)) {
+      return { key: 'missing-coordinates', label: 'Sin coordenadas' };
+    }
+
+    if (!this.hasAssignedRoute(punto)) {
+      return { key: 'missing-route', label: 'Sin ruta' };
+    }
+
+    return null;
+  }
+
+  hasAssignedRoute(punto: Punto): boolean {
+    const route = String(punto?.ruta || '').trim();
+    return Boolean(route) && route.toUpperCase() !== 'PENDIENTE';
+  }
+
+  private hasValidCoordinates(punto: Punto): boolean {
+    const lat = Number(punto?.Latitud);
+    const lng = Number(punto?.Longitud);
+    return Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      Math.abs(lat) >= 1e-4 &&
+      Math.abs(lng) >= 1e-4 &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180;
   }
 
   private sortRoutes(routes: string[]): string[] {

@@ -398,8 +398,9 @@
 .btn-secondary:hover,
 .btn-danger:hover,
 .btn-close:hover {
-  background: var(--bg-secondary);
-  border-color: color-mix(in srgb, var(--text-secondary) 75%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
+  color: var(--accent-red);
 }
 
 .btn-cancel-soft:hover {

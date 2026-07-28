@@ -2516,7 +2516,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       await firstValueFrom(this.reservasSvc.cancelarReserva(id));
       this.navbar.successToast('Reserva cancelada', `La reserva #${id} quedó en estado Cancelada.`);
       this.form.markAsPristine();
-      this.router.navigate(['/Reservas/VerReservas']);
+      this.router.navigate(['/Reservas/VerReservas'], { queryParamsHandling: 'preserve' });
     } catch (err) {
       this.showApiError(err, 'No se pudo cancelar la reserva');
     } finally {
@@ -2545,7 +2545,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       await firstValueFrom(this.reservasSvc.deleteReserva(id));
       this.navbar.needsRefresh.set('reservas');
       this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
-      this.router.navigate(['/Reservas/VerReservas']);
+      this.router.navigate(['/Reservas/VerReservas'], { queryParamsHandling: 'preserve' });
     } catch (err) {
       this.showApiError(err, 'No se pudo eliminar la reserva');
     } finally {
@@ -2564,7 +2564,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       await firstValueFrom(this.reservasSvc.deleteReserva(id));
       this.navbar.needsRefresh.set('reservas');
       this.navbar.successToast('Reserva eliminada', `La reserva #${id} fue eliminada correctamente.`);
-      this.router.navigate(['/Reservas/VerReservas']);
+      this.router.navigate(['/Reservas/VerReservas'], { queryParamsHandling: 'preserve' });
     } catch (err) {
       this.showApiError(err, 'No se pudo eliminar la reserva');
     } finally {
@@ -2757,7 +2757,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (reserva) {
       this.drawer.openReserva(reserva);
     }
-    void this.router.navigate(['/Reservas/VerReservas']);
+    void this.router.navigate(
+      ['/Reservas/VerReservas'],
+      { queryParamsHandling: 'preserve' }
+    );
   }
 
   private async handleAutoOpenDuplicateDrawer(): Promise<void> {

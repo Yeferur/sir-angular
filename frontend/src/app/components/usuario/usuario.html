@@ -1,0 +1,117 @@
+<header class="detail-header">
+  <div class="identity">
+    <div class="identity-avatar" aria-hidden="true">{{ initials() }}</div>
+    <div class="identity-copy">
+      <div class="identity-title-row">
+        <h1>{{ usuario()?.Nombres_Apellidos || 'Usuario' }}</h1>
+        @if (usuario()) {
+          <span class="account-chip" [class.account-chip--inactive]="!isActive()">
+            {{ isActive() ? 'Activo' : 'Inactivo' }}
+          </span>
+        }
+      </div>
+      @if (usuario()?.Usuario) {
+        <p>
+          @{{ usuario()!.Usuario }}
+          <span aria-hidden="true">·</span>
+          CC {{ usuario()!.Id_Usuario }}
+        </p>
+      }
+    </div>
+  </div>
+
+  <button type="button" class="btn-close" (click)="onClose.emit()" aria-label="Cerrar detalle del usuario">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</header>
+
+<main class="detail-scroll">
+  @if (isLoading()) {
+    <app-loading-state label="Cargando información del usuario…"></app-loading-state>
+  } @else if (loadError()) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos abrir el usuario"
+      [detail]="loadError()"
+      actionLabel="Reintentar"
+      (action)="loadUsuario()">
+    </app-loading-state>
+  } @else if (usuario(); as currentUser) {
+    <section class="summary-strip" aria-label="Resumen del usuario">
+      <div class="summary-item">
+        <span>Rol</span>
+        <strong>{{ currentUser.Nombre_Rol || 'Sin rol' }}</strong>
+      </div>
+      <div class="summary-item">
+        <span>Sesión</span>
+        <strong
+          [class.value-online]="sessionState() === 'activa'"
+          [class.value-open]="sessionState() === 'inactiva'">
+          {{ sessionLabel() }}
+        </strong>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="section-heading">
+        <h2>Contacto</h2>
+      </div>
+      <dl class="info-list">
+        <div>
+          <dt>Correo</dt>
+          <dd>{{ currentUser.Correo || 'No registrado' }}</dd>
+        </div>
+        <div>
+          <dt>Teléfono</dt>
+          <dd>{{ currentUser.Telefono_Usuario || 'No registrado' }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="detail-card">
+      <div class="section-heading section-heading--inline">
+        <div>
+          <h2>Permisos</h2>
+          <p>Acceso efectivo según el rol y las asignaciones del usuario.</p>
+        </div>
+        <span class="permission-count">{{ effectivePermissionCount() }}</span>
+      </div>
+
+      @if (effectivePermissions().length) {
+        <div class="permission-list">
+          @for (permission of effectivePermissions(); track permission.Id_Permiso) {
+            <span class="permission-item">
+              {{ permission.Descripcion || 'Permiso sin descripción' }}
+            </span>
+          }
+        </div>
+      } @else {
+        <p class="inline-empty">Este usuario no tiene permisos activos.</p>
+      }
+    </section>
+  }
+</main>
+
+@if (usuario() && (canUpdate() || canDeactivate() || hasOpenSession())) {
+  <footer class="detail-footer">
+    @if (hasOpenSession() && (canUpdate() || isCurrentUser())) {
+      <button type="button" class="btn-secondary" [disabled]="activeAction()" (click)="cerrarSesiones()">
+        {{ activeAction() === 'sessions' ? 'Cerrando…' : 'Cerrar sesiones' }}
+      </button>
+    }
+    @if (canDeactivate()) {
+      <button type="button" class="btn-danger" [disabled]="activeAction()" (click)="desactivar()">
+        {{ activeAction() === 'deactivate' ? 'Desactivando…' : 'Desactivar' }}
+      </button>
+    }
+    @if (canUpdate()) {
+      <button type="button" class="btn-primary" [disabled]="activeAction()" (click)="editar()">
+        Editar usuario
+      </button>
+    }
+  </footer>
+}

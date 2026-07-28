@@ -283,7 +283,10 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
         this.form.markAsPristine();
         this.similarityState = 'none';
         this.duplicatePoint = null;
-        this.router.navigate(['/Puntos/VerPuntos']);
+        this.router.navigate(
+          ['/Puntos/VerPuntos'],
+          { queryParamsHandling: 'preserve' }
+        );
       },
       error: (err: any) => {
         this.alerts.errorToast('Error', err?.error?.message || 'Error al crear el punto');

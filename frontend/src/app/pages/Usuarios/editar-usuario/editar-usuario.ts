@@ -9,6 +9,12 @@ import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import {
+    evaluateUserPassword,
+    isUserPasswordStrong,
+    normalizeUserName,
+    USER_PHONE_REGEX,
+} from '../usuario-form.utils';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
     const pass = group.get('Contrasena')?.value;
@@ -30,10 +36,6 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 export class EditarUsuarioComponent implements OnInit, OnDestroy {
     form: FormGroup;
     userId: string | null = null;
-
-    private toUpperText(value: unknown): string {
-        return String(value ?? '').trim().toLocaleUpperCase('es-CO');
-    }
 
     roles: Rol[] = [];
     permisos: any[] = [];
@@ -63,7 +65,6 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     };
 
     private destroy$ = new Subject<void>();
-    private readonly PHONE_REGEX = /^[0-9]{7,15}$/;
 
     constructor(
         private fb: FormBuilder,
@@ -77,7 +78,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         this.form = this.fb.group({
             Id_Usuario: [{ value: '', disabled: true }, [Validators.required]],
             Nombres_Apellidos: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
-            Telefono_Usuario: ['', [Validators.required, Validators.pattern(this.PHONE_REGEX)]],
+            Telefono_Usuario: ['', [Validators.required, Validators.pattern(USER_PHONE_REGEX)]],
             Usuario: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
             Correo: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
             Contrasena: [''], // Optional
@@ -224,28 +225,12 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     // User requirements said "same logic", so changing role -> load role perms.
     onRolChange() {
         const idRol = Number(this.form.value.Id_Rol || 0);
-        if (!idRol) {
-            if (this.form.get('Id_Rol')?.dirty) { // Only clear if user changed it manually
-                this.selectedPermisos = [];
-            }
-            this.cdr.markForCheck();
-            return;
-        }
+        if (!idRol || !this.form.get('Id_Rol')?.dirty) return;
 
-        // Only load defaults if user interaction (dirty)
-        if (this.form.get('Id_Rol')?.dirty) {
-            this.permisosService.obtenerPermisosPorRol(idRol).subscribe({
-                next: (res) => {
-                    const rolePerms: number[] = (res.permisos || []).map((p: any) => Number(p.Id_Permiso));
-                    this.selectedPermisos = Array.from(new Set(rolePerms));
-                    this.cdr.markForCheck();
-                },
-                error: () => {
-                    this.selectedPermisos = [];
-                    this.cdr.markForCheck();
-                }
-            });
-        }
+        // Al cambiar de rol se limpian únicamente las excepciones individuales.
+        // Los permisos propios del rol no se duplican en usuario_permisos.
+        this.selectedPermisos = [];
+        this.cdr.markForCheck();
     }
 
     togglePermiso(idPermiso: number) {
@@ -278,39 +263,12 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             .pipe(startWith(ctrl.value || ''), takeUntil(this.destroy$))
             .subscribe((v) => {
                 if (!v) {
-                    this.passwordStrength = { score: 0, label: 'Sin cambio', checks: { length8: false, lower: false, upper: false, digit: false, symbol: false, length12: false } };
+                    this.passwordStrength = evaluateUserPassword('', true);
                 } else {
-                    this.passwordStrength = this.evaluatePassword(String(v || ''));
+                    this.passwordStrength = evaluateUserPassword(v);
                 }
                 this.cdr.markForCheck();
             });
-    }
-
-    private evaluatePassword(pass: string) {
-        const length8 = pass.length >= 8;
-        const lower = /[a-z]/.test(pass);
-        const upper = /[A-Z]/.test(pass);
-        const digit = /\d/.test(pass);
-        const symbol = /[^A-Za-z0-9]/.test(pass);
-        const length12 = pass.length >= 12;
-
-        const score =
-            (length8 ? 1 : 0) +
-            (lower ? 1 : 0) +
-            (upper ? 1 : 0) +
-            (digit ? 1 : 0) +
-            (symbol ? 1 : 0) +
-            (length12 ? 1 : 0);
-
-        let label = 'Débil';
-        if (score >= 5) label = 'Fuerte';
-        else if (score >= 3) label = 'Media';
-
-        return {
-            score,
-            label,
-            checks: { length8, lower, upper, digit, symbol, length12 }
-        };
     }
 
     canUpdateUsers(): boolean {
@@ -319,14 +277,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
     private isPasswordStrongEnough(): boolean {
         const pass = String(this.form.value.Contrasena || '');
-        if (!pass) return true; // Empty means no change, so it's valid for edit mode
-
-        const length8 = pass.length >= 8;
-        const lower = /[a-z]/.test(pass);
-        const upper = /[A-Z]/.test(pass);
-        const digit = /\d/.test(pass);
-        const symbol = /[^A-Za-z0-9]/.test(pass);
-        return length8 && lower && upper && digit && symbol;
+        return !pass || isUserPasswordStrong(pass);
     }
 
     submit() {
@@ -336,6 +287,9 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
         if (this.form.invalid) {
             const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
+            if (this.form.errors?.['passwordMismatch'] && !invalid.includes('Confirmar')) {
+                invalid.push('Confirmar');
+            }
             const friendly: Record<string, string> = {
                 Id_Usuario: 'Cédula',
                 Nombres_Apellidos: 'Nombre completo',
@@ -370,7 +324,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
         }
 
         const payload = {
-            Nombres_Apellidos: this.toUpperText(this.form.value.Nombres_Apellidos),
+            Nombres_Apellidos: normalizeUserName(this.form.value.Nombres_Apellidos),
             Telefono_Usuario: this.form.value.Telefono_Usuario ? String(this.form.value.Telefono_Usuario) : null,
             Usuario: String(this.form.value.Usuario),
             Correo: String(this.form.value.Correo),
@@ -405,7 +359,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             },
             error: (err: any) => {
                 this.isSubmitting.set(false);
-                this.errorMsg = err?.error?.error || 'Error actualizando usuario';
+                this.errorMsg = err?.error?.message || 'No se pudo actualizar el usuario.';
                 this.alerts.errorToast('Error', this.errorMsg);
                 this.cdr.markForCheck();
             }

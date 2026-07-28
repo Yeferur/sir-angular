@@ -6,6 +6,7 @@ import { ProgramacionDashboardService } from '../../../services/Programacion/pro
 import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
@@ -66,6 +67,8 @@ export class Listado implements OnInit, OnDestroy {
   private permisosService = inject(PermisosService);
   private drawerService = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   private mapAlertButtons(buttons?: LegacyButton[]): AlertButton[] | undefined {
     if (!buttons?.length) return undefined;
@@ -158,14 +161,22 @@ export class Listado implements OnInit, OnDestroy {
   private lastMoveToastId: string | null = null;
   private initialEditorSnapshot: ProgramacionMoveSnapshot | null = null;
   editorChangedFromBaseline = false;
+  private isEditorRoute = false;
+  private editorRouteKey: string | null = null;
+  private forceRegenerateFromRoute = false;
+  private editorRouteOpenTimer?: ReturnType<typeof setTimeout>;
+  private editorNavigationTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
+    this.initializeRouteContext();
     this.cargarToursDelDia();
   }
 
   ngOnDestroy(): void {
     this.loadSubscription?.unsubscribe();
     this.editorSubscription?.unsubscribe();
+    if (this.editorRouteOpenTimer) clearTimeout(this.editorRouteOpenTimer);
+    if (this.editorNavigationTimer) clearTimeout(this.editorNavigationTimer);
   }
 
   hasUnsavedChanges(): boolean {
@@ -214,6 +225,27 @@ export class Listado implements OnInit, OnDestroy {
     return this.canUpdateProgramacion
       && Boolean(this.initialEditorSnapshot)
       && this.editorChangedFromBaseline;
+  }
+
+  private initializeRouteContext(): void {
+    this.isEditorRoute = this.route.snapshot.data['programacionView'] === 'editor';
+
+    if (this.isEditorRoute) {
+      const routeDate = String(this.route.snapshot.paramMap.get('fecha') || '');
+      if (/^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
+        this.fechaSeleccionada = routeDate;
+      }
+      this.editorRouteKey = String(this.route.snapshot.paramMap.get('servicio') || '').trim();
+      this.forceRegenerateFromRoute = this.route.snapshot.queryParamMap.get('regenerar') === '1';
+      this.modoVista = 'editor';
+      this.editorLoadingMode = this.forceRegenerateFromRoute ? 'generating' : 'saved';
+      return;
+    }
+
+    const queryDate = String(this.route.snapshot.queryParamMap.get('fecha') || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(queryDate)) {
+      this.fechaSeleccionada = queryDate;
+    }
   }
 
   cargarToursDelDia(): void {
@@ -390,6 +422,7 @@ export class Listado implements OnInit, OnDestroy {
           return resultado;
         });
 
+        this.openEditorRouteAfterDashboardLoad(requestSequence, listados);
         this.cdr.markForCheck();
       },
       error: (err) => {
@@ -399,6 +432,112 @@ export class Listado implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  private openEditorRouteAfterDashboardLoad(
+    requestSequence: number,
+    loadedListings: Record<string | number, any>
+  ): void {
+    if (!this.isEditorRoute || !this.editorRouteKey) return;
+
+    const tour = this.toursDelDia.find(
+      (candidate) => this.getTourRouteKey(candidate) === this.editorRouteKey
+    );
+    if (!tour) {
+      this.alerts.warningToast(
+        'Servicio no disponible',
+        'No encontramos ese servicio para la fecha indicada.'
+      );
+      void this.navigateToDashboard(true);
+      return;
+    }
+
+    if (this.editorRouteOpenTimer) clearTimeout(this.editorRouteOpenTimer);
+    this.editorRouteOpenTimer = setTimeout(() => {
+      if (requestSequence !== this.loadSequence) return;
+      this.editorRouteOpenTimer = undefined;
+      const forceRegenerate = this.forceRegenerateFromRoute;
+      const loadedListing = loadedListings[tour.Id_Tour];
+      this.forceRegenerateFromRoute = false;
+      if (forceRegenerate) {
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { regenerar: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      }
+
+      if (forceRegenerate) {
+        this.generarPlan(tour, { openInEditor: true, forceRegenerate: true });
+        return;
+      }
+
+      if (loadedListing?.exists) {
+        this.isPageLoading = false;
+        this.editorLoadingMode = null;
+        this.tourSeleccionado = tour;
+        this.aplicarPlan(
+          tour,
+          this.construirSugerenciaDesdeListado(loadedListing),
+          loadedListing.reservasSinAsignar || [],
+          loadedListing.privados || [],
+          loadedListing.destinoTour || null
+        );
+        return;
+      }
+
+      if (!this.canCreateProgramacion) {
+        this.isPageLoading = false;
+        this.editorLoadingMode = null;
+        this.alerts.warningToast(
+          'Acción no permitida',
+          'No tienes permiso para generar programación.'
+        );
+        void this.navigateToDashboard(true);
+        return;
+      }
+
+      this.tourSeleccionado = tour;
+      this.generarPlanDesdeCero(tour);
+    });
+  }
+
+  private getTourRouteKey(tour: TourProgramacion): string {
+    const ids = Array.isArray((tour as any).idsTours)
+      ? [...(tour as any).idsTours].map(Number).sort((a, b) => a - b)
+      : [Number(tour.Id_Tour)];
+    return ids.join('-');
+  }
+
+  private navigateToEditor(tour: TourProgramacion, options?: { regenerate?: boolean }): void {
+    this.drawerService.close(true);
+    this.isPageLoading = true;
+    this.editorLoadingMode = options?.regenerate || tour.estado === 'Pendiente'
+      ? 'generating'
+      : 'saved';
+    this.cdr.detectChanges();
+
+    if (this.editorNavigationTimer) clearTimeout(this.editorNavigationTimer);
+    this.editorNavigationTimer = setTimeout(() => {
+      this.editorNavigationTimer = undefined;
+      void this.router.navigate(
+        ['/Programacion/Editor', this.fechaSeleccionada, this.getTourRouteKey(tour)],
+        {
+          queryParams: options?.regenerate ? { regenerar: 1 } : undefined,
+        }
+      );
+    });
+  }
+
+  private navigateToDashboard(replaceUrl = false): Promise<boolean> {
+    return this.router.navigate(
+      ['/Programacion/Listado'],
+      {
+        queryParams: { fecha: this.fechaSeleccionada },
+        replaceUrl,
+      }
+    );
   }
 
   onFechaOperacionSelected(iso: string | null): void {
@@ -455,6 +594,12 @@ export class Listado implements OnInit, OnDestroy {
       this.fechaSeleccionada = iso;
       this.resetEditorState();
       this.modoVista = 'dashboard';
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { fecha: iso },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
       this.cargarToursDelDia();
     });
   }
@@ -523,17 +668,43 @@ export class Listado implements OnInit, OnDestroy {
     );
   }
 
-  generarPlan(tour: TourProgramacion): void {
+  openTourFromDashboard(tour: TourProgramacion): void {
     const isGenerated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
-    if (!isGenerated && !this.canCreateProgramacion) {
+    if (isGenerated) {
+      this.generarPlan(tour);
+      return;
+    }
+
+    if (!this.canCreateProgramacion) {
       this.navbar.warningToast('Acción no permitida', 'No tienes permiso para generar programación.');
       return;
     }
 
+    this.navigateToEditor(tour);
+  }
+
+  generarPlan(
+    tour: TourProgramacion,
+    options?: { openInEditor?: boolean; forceRegenerate?: boolean }
+  ): void {
+    const isGenerated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+    if ((!isGenerated || options?.forceRegenerate) && !this.canCreateProgramacion) {
+      this.navbar.warningToast('Acción no permitida', 'No tienes permiso para generar programación.');
+      if (this.isEditorRoute) void this.navigateToDashboard(true);
+      return;
+    }
+
     this.isPageLoading = true;
-    this.editorLoadingMode = tour.estado === 'Generado' ? 'saved' : 'generating';
+    this.editorLoadingMode = options?.forceRegenerate || tour.estado !== 'Generado'
+      ? 'generating'
+      : 'saved';
 
     this.tourSeleccionado = tour;
+
+    if (options?.forceRegenerate) {
+      this.generarPlanDesdeCero(tour);
+      return;
+    }
 
     const payload: any = {
       fecha: this.fechaSeleccionada
@@ -553,13 +724,28 @@ export class Listado implements OnInit, OnDestroy {
           const sugerencia = this.construirSugerenciaDesdeListado(data);
           this.isPageLoading = false;
           this.editorLoadingMode = null;
+          if (options?.openInEditor || this.isEditorRoute) {
+            this.aplicarPlan(
+              tour,
+              sugerencia,
+              data.reservasSinAsignar || [],
+              data.privados || [],
+              data.destinoTour || null
+            );
+            return;
+          }
           this.abrirVistaListadoGuardado(
             tour,
             sugerencia,
-            data.reservasSinAsignar || [],
-            data.privados || [],
-            data.destinoTour || null
+            data.reservasSinAsignar || []
           );
+          return;
+        }
+
+        if (!options?.openInEditor && !this.isEditorRoute) {
+          this.isPageLoading = false;
+          this.editorLoadingMode = null;
+          this.navigateToEditor(tour);
           return;
         }
 
@@ -568,6 +754,11 @@ export class Listado implements OnInit, OnDestroy {
       error: (err) => {
         console.error('Error al consultar listados', err);
         this.isPageLoading = false;
+        if (!options?.openInEditor && !this.isEditorRoute) {
+          this.editorLoadingMode = null;
+          this.navigateToEditor(tour);
+          return;
+        }
         this.generarPlanDesdeCero(tour);
       }
     });
@@ -589,6 +780,12 @@ export class Listado implements OnInit, OnDestroy {
 
   volverAlDashboard(): void {
     this.confirmarPerdidaCambios(() => {
+      if (this.isEditorRoute) {
+        this.resetEditorState();
+        void this.navigateToDashboard();
+        return;
+      }
+
       const privadosActuales = Array.isArray(this.busesPrivados)
         ? JSON.parse(JSON.stringify(this.busesPrivados))
         : [];
@@ -898,6 +1095,74 @@ export class Listado implements OnInit, OnDestroy {
     this.drawerService.openMapa(reservasOrdenadas, this.getTourMapDestination());
   }
 
+  viewReservation(reservationId: string): void {
+    this.drawerService.openReserva(String(reservationId));
+  }
+
+  private normalizeBusMetadata(): void {
+    if (!this.planSeleccionado) return;
+
+    this.planSeleccionado.buses = this.planSeleccionado.buses.map((bus, index) => {
+      const identifier = String(bus.id || '').trim();
+      return {
+        ...bus,
+        id: identifier || `Bus ${index + 1}`,
+        guia: String(bus.guia || '').trim()
+      };
+    });
+  }
+
+  private validateRequiredGuides(busIndexes?: number[]): boolean {
+    if (!this.planSeleccionado) return false;
+
+    const indexes = busIndexes
+      ?? this.planSeleccionado.buses.map((_, index) => index);
+    const missing = indexes.filter((index) => {
+      const bus = this.planSeleccionado?.buses[index];
+      return Boolean(bus) && !String(bus.guia || '').trim();
+    });
+
+    if (!missing.length) return true;
+
+    const busNames = missing.map((index) => {
+      const bus = this.planSeleccionado?.buses[index];
+      return bus?.id || `Bus ${index + 1}`;
+    });
+    this.selectBus(missing[0]);
+    this.navbar.showAlert({
+      type: 'warning',
+      title: missing.length === 1 ? 'Falta asignar un guía' : `Faltan guías en ${missing.length} buses`,
+      message: `Asigna un guía antes de continuar: ${busNames.join(', ')}.`
+    });
+    return false;
+  }
+
+  private validateUniqueBusIdentifiers(): boolean {
+    if (!this.planSeleccionado) return false;
+
+    const identifiers = this.planSeleccionado.buses.map((bus) => String(bus.id || '').trim());
+    const normalized = identifiers.map((identifier) => identifier.toLocaleLowerCase('es'));
+    const duplicateKeys = Array.from(new Set(
+      normalized.filter((identifier) => normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier))
+    ));
+    const duplicates = duplicateKeys.map((identifier) => identifiers[normalized.indexOf(identifier)]);
+
+    if (!duplicates.length) return true;
+
+    const firstDuplicateIndex = normalized.findIndex(
+      (identifier, index) => normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier)
+        && index === normalized.lastIndexOf(identifier)
+    );
+    if (firstDuplicateIndex >= 0) this.selectBus(firstDuplicateIndex);
+
+    this.navbar.showAlert({
+      type: 'warning',
+      title: duplicates.length === 1 ? 'Identificador repetido' : 'Identificadores repetidos',
+      message: `Cada bus debe tener un identificador diferente. Corrige: ${duplicates.join(', ')}.`
+    });
+    return false;
+  }
+
   guardarListadoFinal(): void {
     if (!this.canUpdateProgramacion) {
       this.navbar.warningToast('Acción no permitida', 'No tienes permiso para guardar el listado.');
@@ -907,29 +1172,20 @@ export class Listado implements OnInit, OnDestroy {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
 
     if (this.reservasSinAsignar.length > 0) {
+      const pendingReservations = this.reservasSinAsignar.length;
+      const pendingPassengers = this.totalPaxUnassigned;
+      this.selectBus(-1);
       this.navbar.showAlert({
         type: 'warning',
-        title: 'Hay reservas sin asignar',
-        message: 'Asigna todas las reservas pendientes a un bus antes de guardar el listado.',
+        title: `${pendingReservations} ${pendingReservations === 1 ? 'reserva está' : 'reservas están'} sin asignar`,
+        message: `Ubica ${pendingReservations === 1 ? 'la reserva pendiente' : 'las reservas pendientes'} (${pendingPassengers} pax) en un bus antes de guardar el listado.`,
       });
       return;
     }
 
-    this.planSeleccionado.buses = this.planSeleccionado.buses.map((b, i) => {
-      const placa = (b.id || '').trim();
-      return {
-        ...b,
-        id: placa.length ? placa : `Bus ${i + 1}`,
-        guia: b.guia ? String(b.guia).trim() : ''
-      };
-    });
-
-    const placas = this.planSeleccionado.buses.map(b => b.id);
-    const placasUnicas = new Set(placas);
-    if (placasUnicas.size !== placas.length) {
-      this.navbar.showAlert({ type: 'error', title: 'Error', message: 'Las placas de los buses deben ser únicas.', autoClose: true, autoCloseTime: 2000 });
-      return;
-    }
+    this.normalizeBusMetadata();
+    if (!this.validateRequiredGuides()) return;
+    if (!this.validateUniqueBusIdentifiers()) return;
 
     const busesOrdenados = this.planSeleccionado.buses.map((bus) => ({
       ...bus,
@@ -961,6 +1217,10 @@ export class Listado implements OnInit, OnDestroy {
         this.listadoOrigen = 'db';
         this.reservasSinAsignar = [];
         this.resetEditorState();
+        if (this.isEditorRoute) {
+          void this.navigateToDashboard();
+          return;
+        }
         this.modoVista = 'dashboard';
         this.cargarToursDelDia();
       },
@@ -977,6 +1237,9 @@ export class Listado implements OnInit, OnDestroy {
 
   descargarListadoBus(index: number): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
+    this.normalizeBusMetadata();
+    if (!this.validateRequiredGuides([index])) return;
+
     const bus = this.planSeleccionado.buses[index];
     if (!bus) return;
 
@@ -1003,6 +1266,10 @@ export class Listado implements OnInit, OnDestroy {
 
   descargarTodosLosListados(): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
+    this.normalizeBusMetadata();
+    if (!this.validateRequiredGuides()) return;
+    if (!this.validateUniqueBusIdentifiers()) return;
+
     const payload = {
       fecha: this.fechaSeleccionada,
       idTour: this.tourSeleccionado.Id_Tour,
@@ -1277,14 +1544,10 @@ export class Listado implements OnInit, OnDestroy {
   private abrirVistaListadoGuardado(
     tour: TourProgramacion,
     sugerencia: Sugerencia,
-    reservasSinAsignar: Reserva[],
-    privados: any[] = [],
-    destinoTour: DestinoTourProgramacion | null = null
+    reservasSinAsignar: Reserva[]
   ): void {
     const snapshot = JSON.parse(JSON.stringify(sugerencia)) as Sugerencia;
     const pendientes = JSON.parse(JSON.stringify(reservasSinAsignar || [])) as Reserva[];
-    const privadosSnapshot = JSON.parse(JSON.stringify(privados || []));
-    const destinoSnapshot = destinoTour ? { ...destinoTour } : null;
 
     this.drawerService.openProgramacionListado({
       tourName: tour.NombreTour,
@@ -1293,11 +1556,10 @@ export class Listado implements OnInit, OnDestroy {
       unassigned: pendientes,
       canEdit: this.canUpdateProgramacion,
       onEdit: () => {
-        this.aplicarPlan(tour, snapshot, pendientes, privadosSnapshot, destinoSnapshot);
+        this.navigateToEditor(tour);
       },
       onRegenerate: () => {
-        this.tourSeleccionado = tour;
-        this.generarPlanDesdeCero(tour);
+        this.navigateToEditor(tour, { regenerate: true });
       }
     });
   }
@@ -1442,7 +1704,7 @@ export class Listado implements OnInit, OnDestroy {
     this.drawerService.openMapa(reservas, this.getTourMapDestination());
   }
 
-  private getTourMapDestination(): { lat: number; lng: number; nombre?: string } | null {
+  private getTourMapDestination(): { lat: number; lng: number; nombre?: string; horaSalidaBase?: string | null } | null {
     const lat = this.parseCoordinate(this.destinoTourActual?.lat);
     const lng = this.parseCoordinate(this.destinoTourActual?.lng);
 
@@ -1451,7 +1713,8 @@ export class Listado implements OnInit, OnDestroy {
     return {
       lat,
       lng,
-      nombre: this.destinoTourActual?.nombre || this.tourSeleccionado?.NombreTour || 'Destino del tour'
+      nombre: this.destinoTourActual?.nombre || this.tourSeleccionado?.NombreTour || 'Destino del tour',
+      horaSalidaBase: this.destinoTourActual?.horaSalidaBase || null
     };
   }
 

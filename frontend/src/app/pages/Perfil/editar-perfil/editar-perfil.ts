@@ -4,13 +4,19 @@ import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validatio
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService, type AlertButton } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { isUserPasswordStrong, USER_PHONE_REGEX } from '../../Usuarios/usuario-form.utils';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const pass = group.get('Contrasena')?.value;
   const confirm = group.get('ConfirmarContrasena')?.value;
+  const current = group.get('ContrasenaActual')?.value;
 
-  if (!pass && !confirm) return null;
-  return pass === confirm ? null : { passwordMismatch: true };
+  const errors: ValidationErrors = {};
+  if (pass || confirm) {
+    if (pass !== confirm) errors['passwordMismatch'] = true;
+    if (!current) errors['currentPasswordRequired'] = true;
+  }
+  return Object.keys(errors).length ? errors : null;
 }
 
 @Component({
@@ -29,6 +35,7 @@ export class EditarPerfilComponent implements OnInit {
   perfilActual = signal<any | null>(null);
   showPassword = signal(false);
   showConfirm = signal(false);
+  showCurrentPassword = signal(false);
 
   avatarActual = signal<string | null>(null);
   avatarPreview = signal<string | null>(null);
@@ -37,7 +44,6 @@ export class EditarPerfilComponent implements OnInit {
   isDeletingAvatar = signal(false);
 
 
-  private readonly PHONE_REGEX = /^[0-9]{7,15}$/;
   private mapAlertButtons(buttons?: Array<{ text: string; style: string; onClick: () => void }>): AlertButton[] | undefined {
     if (!buttons?.length) return undefined;
     return buttons.map((button) => ({
@@ -59,8 +65,9 @@ export class EditarPerfilComponent implements OnInit {
         Id_Usuario: [{ value: '', disabled: true }],
         Usuario: [{ value: '', disabled: true }],
         Nombres_Apellidos: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
-        Telefono_Usuario: ['', [Validators.required, Validators.pattern(this.PHONE_REGEX)]],
+        Telefono_Usuario: ['', [Validators.required, Validators.pattern(USER_PHONE_REGEX)]],
         Correo: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
+        ContrasenaActual: [''],
         Contrasena: ['', [Validators.minLength(8)]],
         ConfirmarContrasena: [''],
       },
@@ -104,6 +111,7 @@ export class EditarPerfilComponent implements OnInit {
           Nombres_Apellidos: perfil?.Nombres_Apellidos || '',
           Telefono_Usuario: perfil?.Telefono_Usuario || '',
           Correo: perfil?.Correo || '',
+          ContrasenaActual: '',
           Contrasena: '',
           ConfirmarContrasena: '',
         });
@@ -129,10 +137,17 @@ export class EditarPerfilComponent implements OnInit {
       this.form.markAllAsTouched();
 
       const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
+      if (this.form.errors?.['passwordMismatch'] && !invalid.includes('ConfirmarContrasena')) {
+        invalid.push('ConfirmarContrasena');
+      }
+      if (this.form.errors?.['currentPasswordRequired'] && !invalid.includes('ContrasenaActual')) {
+        invalid.push('ContrasenaActual');
+      }
       const friendly: Record<string, string> = {
         Nombres_Apellidos: 'Nombre completo',
         Telefono_Usuario: 'Teléfono',
         Correo: 'Correo',
+        ContrasenaActual: 'Contraseña actual',
         Contrasena: 'Contraseña',
         ConfirmarContrasena: 'Confirmar contraseña',
       };
@@ -160,12 +175,20 @@ export class EditarPerfilComponent implements OnInit {
     };
 
     if (values.Contrasena) {
+      if (!isUserPasswordStrong(values.Contrasena)) {
+        this.alerts.warningToast(
+          'Contraseña débil',
+          'Usa mínimo 8 caracteres e incluye mayúscula, minúscula, número y símbolo.'
+        );
+        return;
+      }
       payload.Contrasena = String(values.Contrasena);
+      payload.Contrasena_Actual = String(values.ContrasenaActual);
     }
 
     const confirmationParts = ['Vas a actualizar tu información de perfil. ¿Deseas continuar?'];
     if (values.Contrasena) {
-      confirmationParts.push('También se actualizará tu contraseña.');
+      confirmationParts.push('También se actualizará tu contraseña y se cerrarán tus otras sesiones.');
     }
     if (this.selectedAvatarFile) {
       confirmationParts.push('También se actualizará tu foto de perfil.');
@@ -195,6 +218,7 @@ export class EditarPerfilComponent implements OnInit {
           Nombres_Apellidos: perfilActualizado?.Nombres_Apellidos ?? payload.Nombres_Apellidos,
           Telefono_Usuario: perfilActualizado?.Telefono_Usuario ?? payload.Telefono_Usuario,
           Correo: perfilActualizado?.Correo ?? payload.Correo,
+          ContrasenaActual: '',
           Contrasena: '',
           ConfirmarContrasena: '',
         });
@@ -356,4 +380,5 @@ export class EditarPerfilComponent implements OnInit {
     const parts = String(perfil.Nombres_Apellidos).trim().split(' ');
     return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
   }
+
 }

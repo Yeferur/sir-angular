@@ -82,7 +82,7 @@ export function groupProgramacionStops(
           NombrePunto: point.NombrePunto || 'Sin punto',
           reservas: [],
           totalPax: 0,
-          ruta: point.ruta ?? null,
+          ruta: point.ruta ?? (point as any).Ruta ?? reservation.ruta ?? null,
           ordenRuta: point.ordenRuta ?? null,
           Latitud: point.Latitud ?? null,
           Longitud: point.Longitud ?? null,

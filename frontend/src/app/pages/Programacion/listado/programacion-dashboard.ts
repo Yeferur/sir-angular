@@ -42,7 +42,8 @@ export class ProgramacionDashboardComponent {
   }
 
   openTour(tour: TourProgramacion): void {
-    if (!this.canCreate() || Number(tour.totalPasajeros || 0) <= 0) return;
+    const generated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+    if ((!generated && !this.canCreate()) || Number(tour.totalPasajeros || 0) <= 0) return;
     this.tourSelected.emit(tour);
   }
 

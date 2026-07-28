@@ -65,17 +65,28 @@
   }
 
   .fleet-panel {
+    min-width: 0;
     border-right: 0;
     border-bottom: 1.5px solid var(--separator-color);
   }
 
-  .fleet-list {
+  .fleet-list,
+  .fleet-list.is-transfer-mode {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     flex-direction: row;
+    gap: 7px;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
   }
 
   .fleet-card {
     width: 210px;
+    flex: 0 0 210px;
+    scroll-snap-align: start;
   }
 
   .operation-panel {
@@ -116,6 +127,16 @@
   .mobile-readonly-notice strong {
     display: block;
     color: var(--text-primary);
+  }
+
+  .fleet-list,
+  .fleet-list.is-transfer-mode {
+    scroll-snap-type: x mandatory;
+  }
+
+  .fleet-card {
+    width: 100%;
+    flex-basis: 100%;
   }
 
   .title-line {

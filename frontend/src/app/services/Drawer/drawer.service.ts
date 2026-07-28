@@ -1,11 +1,12 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado';
+export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado';
 
 export interface DrawerMapDestination {
   lat: number;
   lng: number;
   nombre?: string;
+  horaSalidaBase?: string | null;
 }
 
 export interface DrawerState {
@@ -47,6 +48,10 @@ export class SirDrawerService {
 
   openTour(id: string): void {
     this.open({ type: 'tour', id });
+  }
+
+  openUsuario(id: string): void {
+    this.open({ type: 'usuario', id });
   }
 
   openMapa(puntos: any[], destino?: DrawerMapDestination | null): void {

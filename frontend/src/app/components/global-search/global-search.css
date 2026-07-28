@@ -169,24 +169,25 @@
 }
 
 .gs-close-btn {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: var(--gs-surface-2);
-  color: var(--gs-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 600;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .gs-close-btn:hover {
-  background: rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.15);
-  color: var(--gs-text);
-  transform: scale(1.08);
+  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
+  color: var(--accent-red);
+  transform: translateY(-1px);
 }
 .gs-close-btn:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2px; }
 

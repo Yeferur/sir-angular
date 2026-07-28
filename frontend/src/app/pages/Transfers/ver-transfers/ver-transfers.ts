@@ -1,7 +1,7 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TransferService } from '../../../services/Transfers/transfers';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
@@ -22,17 +22,23 @@ import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 export class VerTransfersComponent implements OnInit, OnDestroy {
   private uiState = inject(UiStateService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private transferService = inject(TransferService);
   private permisosService = inject(PermisosService);
   private alerts = inject(SirAlertService);
   private drawer = inject(SirDrawerService);
   private hostElement = inject(ElementRef<HTMLElement>);
   private searchRequest?: Subscription;
+  private restoreSearchFromUrl = false;
 
   readonly estadoOptions = ['Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completado', 'Cancelado'];
 
   resultsServicios = signal<any[]>([]);
   transfers = signal<any[]>([]);
+  readonly pageSize = 25;
+  readonly page = signal(1);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   isLoading = signal(true);
   isSearching = signal(false);
   loadError = signal('');
@@ -62,13 +68,14 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     const entity = this.uiState.needsRefresh();
     if (entity === 'transfers') {
       if (this.hasSearched()) {
-        this.buscarTransfers();
+        this.buscarTransfers(false);
       }
       this.uiState.needsRefresh.set('');
     }
   });
 
   ngOnInit(): void {
+    this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
     this.loadInitialData();
   }
 
@@ -97,7 +104,10 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
     this.loadError.set('');
     this.transferService.getServicios().pipe(
-      finalize(() => this.isLoading.set(false))
+      finalize(() => {
+        this.isLoading.set(false);
+        this.runRestoredSearch();
+      })
     ).subscribe({
       next: (s) => this.resultsServicios.set(s || []),
       error: (error) => {
@@ -112,11 +122,17 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
       this.alerts.errorToast('Acceso denegado', 'No tienes permiso para crear transfers.');
       return;
     }
-    this.router.navigate(['/Transfers/NuevoTransfer']);
+    this.router.navigate(
+      ['/Transfers/NuevoTransfer'],
+      { queryParams: this.buildFilterQueryParams(this.hasSearched()) }
+    );
   }
 
   editarTransfer(Id_Transfer: string | number) {
-    this.router.navigate(['/Transfers/EditarTransfer', Id_Transfer]);
+    this.router.navigate(
+      ['/Transfers/EditarTransfer', Id_Transfer],
+      { queryParams: this.buildFilterQueryParams(this.hasSearched()) }
+    );
   }
 
   confirmCancelarTransfer(transfer: any): void {
@@ -186,10 +202,10 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
     this.transferService.deleteTransfer(id).subscribe({
       next: () => {
-        this.transfers.update((items) => items.filter((item) => String(item?.Id_Transfer) !== String(id)));
         if (String(this.uiState.transferId() || '') === String(id)) {
           this.uiState.transferId.set(null);
         }
+        this.buscarTransfers(false);
         this.alerts.successToast('Transfer eliminado', `El transfer #${transfer?.Codigo_Transfer || id} fue eliminado correctamente.`);
       },
       error: (error) => {
@@ -205,6 +221,8 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update(p => ({ ...p, [key]: value }));
+    this.page.set(1);
+    this.syncFiltersToUrl();
   }
 
   onMainSearchInput(val: string) {
@@ -214,6 +232,68 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
   clearMainSearch(): void {
     this.updateFilter('Nombre_Titular', '');
+  }
+
+  private restoreFiltersFromQuery(): boolean {
+    const params = this.route.snapshot.queryParamMap;
+    const requestedPage = Number(params.get('pagina') || 1);
+    const toValues = (value: string | null): string[] => String(value || '')
+      .split('|')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    this.filters.set({
+      Fecha_Transfer: String(params.get('fechaTransfer') || ''),
+      Fecha_Registro: String(params.get('fechaRegistro') || ''),
+      Id_Servicio: toValues(params.get('servicios')),
+      Id_Rango: String(params.get('rango') || ''),
+      Id_Transfer: String(params.get('transfer') || ''),
+      Nombre_Titular: String(params.get('q') || ''),
+      Telefono_Titular: String(params.get('telefono') || ''),
+      DNI: String(params.get('documento') || ''),
+      Punto_Salida: String(params.get('salida') || ''),
+      Punto_Destino: String(params.get('destino') || ''),
+      Estado: toValues(params.get('estado')),
+      Empty: params.get('vacios') === '1',
+    });
+
+    this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+    return params.get('buscar') === '1';
+  }
+
+  private buildFilterQueryParams(searchApplied: boolean): Record<string, string | number | null> {
+    const filter = this.filters();
+    return {
+      fechaTransfer: filter.Fecha_Transfer || null,
+      fechaRegistro: filter.Fecha_Registro || null,
+      servicios: filter.Id_Servicio.length ? filter.Id_Servicio.join('|') : null,
+      estado: filter.Estado.length ? filter.Estado.join('|') : null,
+      rango: filter.Id_Rango || null,
+      transfer: filter.Id_Transfer || null,
+      q: filter.Nombre_Titular.trim() || null,
+      telefono: filter.Telefono_Titular.trim() || null,
+      documento: filter.DNI.trim() || null,
+      salida: filter.Punto_Salida.trim() || null,
+      destino: filter.Punto_Destino.trim() || null,
+      vacios: filter.Empty ? 1 : null,
+      pagina: this.page() > 1 ? this.page() : null,
+      buscar: searchApplied ? 1 : null,
+    };
+  }
+
+  private syncFiltersToUrl(searchApplied = this.hasSearched()): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: this.buildFilterQueryParams(searchApplied),
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private runRestoredSearch(): void {
+    if (!this.restoreSearchFromUrl) return;
+    this.restoreSearchFromUrl = false;
+    this.buscarTransfers(false);
   }
 
   // --- Dropdown management ---
@@ -257,6 +337,9 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   isSelected(filterKey: 'Estado' | 'Id_Servicio', value: any): boolean {
     const selectedValues = this.filters()[filterKey] as any[];
     if (!selectedValues?.length) return false;
+    if (filterKey === 'Id_Servicio') {
+      return selectedValues.some((selected) => String(selected) === String(value));
+    }
     return selectedValues.includes(value);
   }
 
@@ -279,7 +362,14 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
       return;
     }
     const current = this.filters()[filterKey] as any[];
-    const updated = current?.includes ? (current.includes(value) ? current.filter(v => v !== value) : [...current, value]) : [value];
+    const selected = filterKey === 'Id_Servicio'
+      ? current?.some((item) => String(item) === String(value))
+      : current?.includes?.(value);
+    const updated = selected
+      ? current.filter((item) => filterKey === 'Id_Servicio'
+        ? String(item) !== String(value)
+        : item !== value)
+      : [...(current || []), value];
     this.updateFilter(filterKey as any, updated);
   }
 
@@ -329,25 +419,59 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     return api;
   }
 
-  buscarTransfers() {
+  buscarTransfers(resetPage = true) {
     const filtros = this.buildApiFilters();
     if (Object.keys(filtros).length === 0) {
       this.alerts.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
       return;
     }
+    if (resetPage) this.page.set(1);
+    const paginatedFilters = {
+      ...filtros,
+      page: this.page(),
+      limit: this.pageSize,
+    };
     this.searchRequest?.unsubscribe();
     this.hasSearched.set(true);
     this.isSearching.set(true);
     this.searchError.set('');
+    this.syncFiltersToUrl(true);
     this.closeAdvancedFilters();
-    this.searchRequest = this.transferService.getTransfers(filtros).pipe(
+    this.searchRequest = this.transferService.getTransfers(paginatedFilters).pipe(
       finalize(() => this.isSearching.set(false))
     ).subscribe({
-      next: (data) => this.transfers.set(data || []),
+      next: (result) => {
+        const total = Math.max(0, Number(result?.total || 0));
+        const normalizedPage = Math.max(1, Number(result?.page || this.page()) || 1);
+        this.transfers.set(Array.isArray(result?.data) ? result.data : []);
+        this.total.set(total);
+        this.page.set(normalizedPage);
+        this.totalPages.set(Math.max(1, Number(result?.totalPages || Math.ceil(total / this.pageSize)) || 1));
+        this.syncFiltersToUrl(true);
+      },
       error: (error) => {
         this.searchError.set(this.getApiErrorMessage(error, 'No fue posible consultar los transfers.'));
       }
     });
+  }
+
+  prevPage(): void {
+    if (this.page() <= 1 || this.isSearching()) return;
+    this.page.update((value) => value - 1);
+    this.buscarTransfers(false);
+  }
+
+  nextPage(): void {
+    if (this.page() >= this.totalPages() || this.isSearching()) return;
+    this.page.update((value) => value + 1);
+    this.buscarTransfers(false);
+  }
+
+  resultsRangeLabel(): string {
+    if (!this.total()) return '0 transfers';
+    const first = (this.page() - 1) * this.pageSize + 1;
+    const last = Math.min(this.total(), first + this.transfers().length - 1);
+    return `${first}–${last} de ${this.total()} transfers`;
   }
 
   verTransfer(Id_Transfer: string) {

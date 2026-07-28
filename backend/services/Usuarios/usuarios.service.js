@@ -5,7 +5,16 @@ const db = require('../../database/db');
  */
 async function getAllUsers() {
   const [rows] = await db.query(
-    'SELECT Id_Usuario, Usuario, Nombres_Apellidos, Correo FROM usuarios WHERE Activo = 1'
+    `SELECT
+       u.Id_Usuario,
+       u.Usuario,
+       u.Nombres_Apellidos,
+       u.Correo,
+       u.Activo,
+       r.Nombre_Rol
+     FROM usuarios u
+     LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+     ORDER BY u.Activo DESC, u.Nombres_Apellidos ASC, u.Id_Usuario ASC`
   );
 
   // Map DB columns to frontend expected shape
@@ -15,6 +24,8 @@ async function getAllUsers() {
     name: String(r.Nombres_Apellidos || ''),
     apellidos: '',
     email: r.Correo || '',
+    activo: Number(r.Activo) === 1,
+    rol: r.Nombre_Rol || 'Sin rol',
   }));
 }
 
@@ -32,7 +43,18 @@ async function getActiveSessions() {
  */
 async function getUserById(id) {
   const [rows] = await db.query(
-    'SELECT Id_Usuario, Usuario, Nombres_Apellidos, Correo, Telefono_Usuario, Id_Rol, Activo FROM usuarios WHERE Id_Usuario = ?',
+    `SELECT
+       u.Id_Usuario,
+       u.Usuario,
+       u.Nombres_Apellidos,
+       u.Correo,
+       u.Telefono_Usuario,
+       u.Id_Rol,
+       u.Activo,
+       r.Nombre_Rol
+     FROM usuarios u
+     LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+     WHERE u.Id_Usuario = ?`,
     [id]
   );
 
@@ -40,9 +62,38 @@ async function getUserById(id) {
 
   const u = rows[0];
 
-  // Obtener permisos
-  const [perms] = await db.query('SELECT Id_Permiso FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
-  const permisos = perms.map(p => p.Id_Permiso);
+  // Permisos individuales: se conservan separados porque los formularios de
+  // edición solo deben persistir las asignaciones que no provienen del rol.
+  const [permisos] = await db.query(
+    `SELECT p.Id_Permiso
+     FROM usuario_permisos up
+     INNER JOIN permisos p ON p.Id_Permiso = up.Id_Permiso
+     WHERE up.Id_Usuario = ?
+       AND up.Tipo = 'ALLOW'
+     ORDER BY p.Descripcion`,
+    [id]
+  );
+
+  // Acceso efectivo: unión de los permisos base del rol y los asignados
+  // directamente al usuario. El detalle lateral usa esta vista completa.
+  const [permisosEfectivos] = await db.query(
+    `SELECT DISTINCT
+       p.Id_Permiso,
+       p.Descripcion
+     FROM usuarios u
+     INNER JOIN permisos p
+     LEFT JOIN rol_permisos rp
+       ON rp.Id_Rol = u.Id_Rol
+      AND rp.Id_Permiso = p.Id_Permiso
+     LEFT JOIN usuario_permisos up
+       ON up.Id_Usuario = u.Id_Usuario
+      AND up.Id_Permiso = p.Id_Permiso
+      AND up.Tipo = 'ALLOW'
+     WHERE u.Id_Usuario = ?
+       AND (rp.Id_Permiso IS NOT NULL OR up.Id_Permiso IS NOT NULL)
+     ORDER BY p.Descripcion`,
+    [id]
+  );
 
   return {
     Id_Usuario: u.Id_Usuario,
@@ -51,22 +102,11 @@ async function getUserById(id) {
     Correo: u.Correo,
     Telefono_Usuario: u.Telefono_Usuario,
     Id_Rol: u.Id_Rol,
+    Nombre_Rol: u.Nombre_Rol || 'Sin rol',
     Activo: u.Activo,
-    permisos
+    permisos,
+    permisosEfectivos,
   };
-}
-
-/**
- * Eliminar usuario (físico o lógico)
- * En este caso intentamos físico. Si falla por FK, el controlador lo manejará.
- */
-async function deleteUser(id) {
-  // Primero borrar permisos
-  await db.query('DELETE FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
-
-  // Luego borrar usuario
-  const [result] = await db.query('DELETE FROM usuarios WHERE Id_Usuario = ?', [id]);
-  return result;
 }
 
 /**
@@ -84,7 +124,6 @@ module.exports = {
   getAllUsers,
   getActiveSessions,
   getUserById,
-  deleteUser,
   getAvatarByUserId,
 };
 

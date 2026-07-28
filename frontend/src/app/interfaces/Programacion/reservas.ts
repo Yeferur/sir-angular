@@ -38,6 +38,7 @@ export interface DestinoTourProgramacion {
   lat: number;
   lng: number;
   nombre?: string | null;
+  horaSalidaBase?: string | null;
 }
 
 /**

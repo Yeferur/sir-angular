@@ -81,6 +81,7 @@
 .sir-drawer-panel app-reserva,
 .sir-drawer-panel app-transfer-dynamic,
 .sir-drawer-panel app-tour-detail,
+.sir-drawer-panel app-usuario-detail,
 .sir-drawer-panel app-mapa,
 .sir-drawer-panel app-duplicar-panel,
 .sir-drawer-panel app-updates-panel,
@@ -89,6 +90,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.sir-drawer-panel:has(app-usuario-detail) {
+  width: clamp(380px, 38vw, 640px);
 }
 
 /* ── Mapa: ancho más generoso ───────────────────────────────── */

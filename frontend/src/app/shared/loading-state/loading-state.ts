@@ -25,6 +25,7 @@ export class LoadingStateComponent implements OnChanges, OnDestroy {
   @Input() label = 'Cargando información…';
   @Input() detail = '';
   @Input() actionLabel = 'Reintentar';
+  @Input() showSlowMessage = true;
   @Output() action = new EventEmitter<void>();
 
   readonly slow = signal(false);
@@ -37,7 +38,7 @@ export class LoadingStateComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (!changes['mode'] && !changes['label']) return;
+    if (!changes['mode'] && !changes['label'] && !changes['showSlowMessage']) return;
     this.resetSlowState();
   }
 
@@ -50,7 +51,7 @@ export class LoadingStateComponent implements OnChanges, OnDestroy {
     this.slowTimer = undefined;
     this.slow.set(false);
 
-    if (this.mode === 'loading') {
+    if (this.mode === 'loading' && this.showSlowMessage) {
       this.slowTimer = setTimeout(() => this.slow.set(true), 4500);
     }
   }

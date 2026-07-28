@@ -379,7 +379,10 @@ private guardarCambiosConfirmado() {
       this.successMsg = 'Punto actualizado correctamente';
       this.alerts.successToast('Punto actualizado', this.successMsg);
       this.form.markAsPristine();
-      this.router.navigate(['/Puntos/VerPuntos']);
+      this.router.navigate(
+        ['/Puntos/VerPuntos'],
+        { queryParamsHandling: 'preserve' }
+      );
     },
     error: (err: any) => {
       this.errorMsg = err?.error?.message || 'Error al actualizar el punto';

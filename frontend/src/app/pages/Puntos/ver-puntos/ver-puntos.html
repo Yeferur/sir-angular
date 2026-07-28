@@ -137,7 +137,17 @@
                   @if (punto.Sector) {
                     <span>{{ punto.Sector }}</span>
                   }
-                  @if (punto.ruta) {
+                  @let operationalIssue = getOperationalIssue(punto);
+                  @if (operationalIssue) {
+                    <span
+                      class="operational-status"
+                      [class.operational-status--coordinates]="operationalIssue.key === 'missing-coordinates'"
+                      [class.operational-status--route]="operationalIssue.key === 'missing-route'">
+                      <span class="operational-status__dot" aria-hidden="true"></span>
+                      {{ operationalIssue.label }}
+                    </span>
+                  }
+                  @if (hasAssignedRoute(punto)) {
                     <span class="route-chip">{{ routeLabel(punto.ruta) }}</span>
                   }
                   @if (punto.EsProtegido) {
