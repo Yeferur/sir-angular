@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -58,13 +58,16 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
   private initialDataRequest?: Subscription;
   private routePointsRequest?: Subscription;
   private addressRequest?: Subscription;
+  private panelAnimationFrame: number | null = null;
+  private panelAnimationTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private fb: FormBuilder,
     private puntos: puntosService,
     private router: Router,
     private reservasSvc: Reservas,
-    private alerts: SirAlertService
+    private alerts: SirAlertService,
+    private cdr: ChangeDetectorRef
   ) {
     this.form = this.fb.group({
       NombrePunto: ['', [Validators.required, Validators.maxLength(255)]],
@@ -84,6 +87,7 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.addrTimer) clearTimeout(this.addrTimer);
+    this.cancelPanelAnimation();
     this.initialDataRequest?.unsubscribe();
     this.routePointsRequest?.unsubscribe();
     this.addressRequest?.unsubscribe();
@@ -201,14 +205,31 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
   }
 
   private animatePanel(): void {
+    this.cancelPanelAnimation();
     this.panelAnimating = false;
-    requestAnimationFrame(() => {
+    this.cdr.markForCheck();
+    this.panelAnimationFrame = requestAnimationFrame(() => {
+      this.panelAnimationFrame = null;
       this.panelAnimating = true;
-      setTimeout(() => {
+      this.cdr.markForCheck();
+      this.panelAnimationTimer = setTimeout(() => {
+        this.panelAnimationTimer = null;
         this.panelAnimating = false;
         this.goingBack = false;
+        this.cdr.markForCheck();
       }, 380);
     });
+  }
+
+  private cancelPanelAnimation(): void {
+    if (this.panelAnimationFrame !== null) {
+      cancelAnimationFrame(this.panelAnimationFrame);
+      this.panelAnimationFrame = null;
+    }
+    if (this.panelAnimationTimer !== null) {
+      clearTimeout(this.panelAnimationTimer);
+      this.panelAnimationTimer = null;
+    }
   }
 
   // ── Coordenadas ──────────────────────────────────────────────────────────────
@@ -237,6 +258,7 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
 
   loadInitialData(): void {
     this.initialDataRequest?.unsubscribe();
+    this.cancelPanelAnimation();
     this.currentStep = 0;
     this.maxReachedStep = 0;
     this.goingBack = false;

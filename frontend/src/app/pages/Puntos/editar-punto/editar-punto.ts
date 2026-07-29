@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -67,8 +67,19 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
   private rutaOriginal = '';
   private posicionOriginal = 0;
   private reubicar = false;
+  private panelAnimationFrame: number | null = null;
+  private panelAnimationTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private fb: FormBuilder, private puntos: puntosService, private route: ActivatedRoute, private router: Router, private reservasSvc: Reservas, private alerts: SirAlertService, private permisosService: PermisosService) {
+  constructor(
+    private fb: FormBuilder,
+    private puntos: puntosService,
+    private route: ActivatedRoute,
+    private router: Router,
+    private reservasSvc: Reservas,
+    private alerts: SirAlertService,
+    private permisosService: PermisosService,
+    private cdr: ChangeDetectorRef
+  ) {
     this.form = this.fb.group({
       NombrePunto: ['', [Validators.required, Validators.maxLength(255)]],
       Sector: ['', [Validators.required, Validators.maxLength(255)]],
@@ -93,6 +104,7 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.addrTimer) clearTimeout(this.addrTimer);
+    this.cancelPanelAnimation();
     this.routePointsRequest?.unsubscribe();
     this.addressRequest?.unsubscribe();
   }
@@ -210,17 +222,35 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
   }
 
   private animatePanel(): void {
+    this.cancelPanelAnimation();
     this.panelAnimating = false;
-    requestAnimationFrame(() => {
+    this.cdr.markForCheck();
+    this.panelAnimationFrame = requestAnimationFrame(() => {
+      this.panelAnimationFrame = null;
       this.panelAnimating = true;
-      setTimeout(() => {
+      this.cdr.markForCheck();
+      this.panelAnimationTimer = setTimeout(() => {
+        this.panelAnimationTimer = null;
         this.panelAnimating = false;
         this.goingBack = false;
+        this.cdr.markForCheck();
       }, 380);
     });
   }
 
+  private cancelPanelAnimation(): void {
+    if (this.panelAnimationFrame !== null) {
+      cancelAnimationFrame(this.panelAnimationFrame);
+      this.panelAnimationFrame = null;
+    }
+    if (this.panelAnimationTimer !== null) {
+      clearTimeout(this.panelAnimationTimer);
+      this.panelAnimationTimer = null;
+    }
+  }
+
   loadInitialData(): void {
+    this.cancelPanelAnimation();
     if (!this.puntoId || !Number.isInteger(this.puntoId) || this.puntoId <= 0) {
       this.isLoading.set(false);
       this.loadError.set('El identificador del punto no es válido.');
