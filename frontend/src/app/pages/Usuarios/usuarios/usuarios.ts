@@ -1,10 +1,11 @@
 import { Component, Signal, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { UsuariosService, type Usuario } from '../../../services/Usuarios/usuarios';
 import { AuthService } from '../../../services/Login/login-service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 
 type AccountFilter = 'todos' | 'activos' | 'inactivos';
@@ -25,6 +26,7 @@ export class Usuarios {
   readonly searchQuery = signal('');
   readonly accountFilter = signal<AccountFilter>('activos');
   readonly currentUserId = signal('');
+  readonly deactivatingId = signal<string | null>(null);
 
   readonly filteredUsuarios = computed(() => {
     const query = this.searchQuery().toLocaleLowerCase('es-CO').trim();
@@ -60,6 +62,8 @@ export class Usuarios {
     private readonly auth: AuthService,
     private readonly permisosService: PermisosService,
     private readonly drawerService: SirDrawerService,
+    private readonly alerts: SirAlertService,
+    private readonly router: Router,
   ) {
     this.usuarios = this.usuariosService.getUsuariosSignal();
     this.estados = this.usuariosService.getEstadosSignal();
@@ -70,6 +74,14 @@ export class Usuarios {
 
   canCreateUsers(): boolean {
     return this.permisosService.tienePermiso('USUARIOS.CREAR');
+  }
+
+  canUpdateUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.ACTUALIZAR');
+  }
+
+  canDeactivateUsers(): boolean {
+    return this.permisosService.tienePermiso('USUARIOS.ELIMINAR');
   }
 
   isCurrentUser(userId: string): boolean {
@@ -96,7 +108,52 @@ export class Usuarios {
     this.drawerService.openUsuario(String(user.id_user));
   }
 
+  editarUsuario(event: Event, user: Usuario): void {
+    event.stopPropagation();
+    if (!this.canUpdateUsers()) return;
+    void this.router.navigate(['/Usuarios/Editar', user.id_user]);
+  }
+
+  desactivarUsuario(event: Event, user: Usuario): void {
+    event.stopPropagation();
+    if (!this.canDeactivateUsers() || !user.activo || this.isCurrentUser(user.id_user)) return;
+
+    this.alerts.confirm(
+      '¿Desactivar usuario?',
+      `${user.name} no podrá iniciar sesión y sus sesiones abiertas se cerrarán. Su información e historial se conservarán.`,
+      () => this.confirmarDesactivacion(user),
+      undefined,
+      { confirmText: 'Desactivar', cancelText: 'Conservar', type: 'warning' }
+    );
+  }
+
+  private confirmarDesactivacion(user: Usuario): void {
+    const id = String(user.id_user);
+    if (this.deactivatingId()) return;
+
+    this.deactivatingId.set(id);
+    const snapshot = this.usuariosService.marcarUsuarioInactivo(id);
+
+    this.usuariosService.eliminarUsuario(id).subscribe({
+      next: () => {
+        this.deactivatingId.set(null);
+        this.alerts.successToast('Usuario desactivado', 'La cuenta quedó inactiva y sus sesiones fueron cerradas.');
+      },
+      error: (error) => {
+        this.deactivatingId.set(null);
+        if (snapshot.user) {
+          this.usuariosService.restoreUsuarioInSignal(snapshot.user, snapshot.estado, snapshot.index);
+        }
+        this.alerts.errorToast(
+          'No se pudo desactivar',
+          error?.error?.message || 'Intenta nuevamente.'
+        );
+      },
+    });
+  }
+
   onCardKeydown(event: KeyboardEvent, user: Usuario): void {
+    if (event.target !== event.currentTarget) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     this.abrirUsuario(user);

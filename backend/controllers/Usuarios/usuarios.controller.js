@@ -18,6 +18,33 @@ function isStrongPassword(value) {
     && /[^A-Za-z0-9]/.test(password);
 }
 
+function parsePermissionIds(value) {
+  let parsed = value;
+
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  if (!Array.isArray(parsed)) return null;
+
+  const ids = [];
+  for (const permission of parsed) {
+    const rawId = permission && typeof permission === 'object'
+      ? permission.Id_Permiso ?? permission.idPermiso ?? permission.id
+      : permission;
+    const id = Number(rawId);
+
+    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    ids.push(id);
+  }
+
+  return [...new Set(ids)];
+}
+
 function resolveAvatarAbsolutePath(avatarValue) {
   if (!avatarValue || typeof avatarValue !== 'string') return null;
 
@@ -348,6 +375,7 @@ exports.actualizarUsuario = async (req, res) => {
       Id_Rol,
       Activo,
       permisos,
+      permisosEfectivos,
     } = req.body;
 
     if (!Nombres_Apellidos || !Usuario || !Correo) {
@@ -355,6 +383,29 @@ exports.actualizarUsuario = async (req, res) => {
         status: 400,
         message: 'Datos incompletos',
         errorCode: 'MISSING_PARAMS',
+      });
+    }
+
+    const usaPermisosEfectivos = Object.prototype.hasOwnProperty.call(
+      req.body || {},
+      'permisosEfectivos'
+    );
+    const usaPermisosAdicionales = Object.prototype.hasOwnProperty.call(
+      req.body || {},
+      'permisos'
+    );
+    const permisosEfectivosArray = usaPermisosEfectivos
+      ? parsePermissionIds(permisosEfectivos)
+      : null;
+    const permisosAdicionalesArray = !usaPermisosEfectivos && usaPermisosAdicionales
+      ? (parsePermissionIds(permisos) || [])
+      : null;
+
+    if (usaPermisosEfectivos && permisosEfectivosArray === null) {
+      return sendError(res, {
+        status: 400,
+        message: 'La lista de permisos efectivos no es válida',
+        errorCode: 'INVALID_PERMISSIONS',
       });
     }
 
@@ -401,6 +452,39 @@ exports.actualizarUsuario = async (req, res) => {
         message: 'El rol seleccionado no está disponible',
         errorCode: 'INVALID_ROLE',
       });
+    }
+
+    let permisosBaseIds = [];
+    if (usaPermisosEfectivos) {
+      const [baseRows] = await conn.query(
+        'SELECT Id_Permiso FROM rol_permisos WHERE Id_Rol = ?',
+        [Id_Rol]
+      );
+      permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
+    }
+
+    const permisosSolicitados = usaPermisosEfectivos
+      ? permisosEfectivosArray
+      : permisosAdicionalesArray;
+
+    if (Array.isArray(permisosSolicitados) && permisosSolicitados.length > 0) {
+      const placeholders = permisosSolicitados.map(() => '?').join(', ');
+      const [validPermissionRows] = await conn.query(
+        `SELECT Id_Permiso FROM permisos WHERE Id_Permiso IN (${placeholders})`,
+        permisosSolicitados
+      );
+      const validPermissionIds = new Set(
+        validPermissionRows.map((row) => Number(row.Id_Permiso))
+      );
+
+      if (validPermissionIds.size !== permisosSolicitados.length) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'La lista contiene permisos que no existen',
+          errorCode: 'INVALID_PERMISSIONS',
+        });
+      }
     }
 
     const currentIsAdmin = String(current.Nombre_Rol || '').trim().toLowerCase() === 'administrador';
@@ -472,20 +556,49 @@ exports.actualizarUsuario = async (req, res) => {
 
     await conn.query(updateQuery, params);
 
-    let permisosArray = permisos;
-    if (typeof permisos === 'string') {
-      try {
-        permisosArray = JSON.parse(permisos);
-      } catch (_err) {
-        permisosArray = [];
-      }
-    }
+    if (usaPermisosEfectivos) {
+      const permisosBase = new Set(permisosBaseIds);
+      const permisosSeleccionados = new Set(permisosEfectivosArray);
+      const permissionOverrides = [
+        ...permisosEfectivosArray
+          .filter((permissionId) => !permisosBase.has(permissionId))
+          .map((permissionId) => ({ id: permissionId, type: 'ALLOW' })),
+        ...permisosBaseIds
+          .filter((permissionId) => !permisosSeleccionados.has(permissionId))
+          .map((permissionId) => ({ id: permissionId, type: 'DENY' })),
+      ];
 
-    if (Array.isArray(permisosArray)) {
       await conn.query('DELETE FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
 
-      if (permisosArray.length > 0) {
-        const rows = permisosArray.map((p) => [id, p, 'ALLOW', new Date()]);
+      if (permissionOverrides.length > 0) {
+        const now = new Date();
+        const rows = permissionOverrides.map(({ id: permissionId, type }) => [
+          id,
+          permissionId,
+          type,
+          now,
+        ]);
+        await conn.query(
+          'INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Tipo, Fecha_Asignacion) VALUES ?',
+          [rows]
+        );
+      }
+    } else if (Array.isArray(permisosAdicionalesArray)) {
+      // El payload histórico representa únicamente permisos adicionales.
+      // No debe borrar DENY creados a partir de una selección efectiva, pues
+      // hacerlo devolvería silenciosamente permisos revocados del rol.
+      await conn.query(
+        "DELETE FROM usuario_permisos WHERE Id_Usuario = ? AND Tipo = 'ALLOW'",
+        [id]
+      );
+
+      if (permisosAdicionalesArray.length > 0) {
+        const rows = permisosAdicionalesArray.map((permissionId) => [
+          id,
+          permissionId,
+          'ALLOW',
+          new Date(),
+        ]);
         await conn.query(
           'INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Tipo, Fecha_Asignacion) VALUES ?',
           [rows]
@@ -671,6 +784,7 @@ exports.crearUsuario = async (req, res) => {
       Activo,
       Avatar,
       permisos,
+      permisosEfectivos,
     } = req.body;
 
     if (!Id_Usuario || !Nombres_Apellidos || !Usuario || !Correo || !Contrasena) {
@@ -689,6 +803,29 @@ exports.crearUsuario = async (req, res) => {
       });
     }
 
+    const usaPermisosEfectivos = Object.prototype.hasOwnProperty.call(
+      req.body || {},
+      'permisosEfectivos'
+    );
+    const permisosEfectivosArray = usaPermisosEfectivos
+      ? parsePermissionIds(permisosEfectivos)
+      : null;
+
+    if (usaPermisosEfectivos && permisosEfectivosArray === null) {
+      return sendError(res, {
+        status: 400,
+        message: 'La lista de permisos efectivos no es válida',
+        errorCode: 'INVALID_PERMISSIONS',
+      });
+    }
+
+    // Compatibilidad: el payload anterior envía solo permisos adicionales.
+    // Conserva su comportamiento ALLOW y tolera una lista ausente o inválida
+    // como lo hacía la implementación previa.
+    const permisosAdicionalesArray = usaPermisosEfectivos
+      ? null
+      : (parsePermissionIds(permisos) || []);
+
     conn = await db.getConnection();
     await conn.beginTransaction();
 
@@ -704,6 +841,53 @@ exports.crearUsuario = async (req, res) => {
         message: 'Id_Usuario, usuario o correo ya existen',
         errorCode: 'DUPLICATE_USER',
       });
+    }
+
+    let permisosBaseIds = [];
+    if (Id_Rol) {
+      const [roleRows] = await conn.query(
+        'SELECT Id_Rol FROM roles WHERE Id_Rol = ? AND Activo = 1 LIMIT 1',
+        [Id_Rol]
+      );
+
+      if (!roleRows.length) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'El rol seleccionado no está disponible',
+          errorCode: 'INVALID_ROLE',
+        });
+      }
+
+      const [baseRows] = await conn.query(
+        'SELECT Id_Permiso FROM rol_permisos WHERE Id_Rol = ?',
+        [Id_Rol]
+      );
+      permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
+    }
+
+    const permisosSolicitados = usaPermisosEfectivos
+      ? permisosEfectivosArray
+      : permisosAdicionalesArray;
+
+    if (permisosSolicitados.length > 0) {
+      const placeholders = permisosSolicitados.map(() => '?').join(', ');
+      const [validPermissionRows] = await conn.query(
+        `SELECT Id_Permiso FROM permisos WHERE Id_Permiso IN (${placeholders})`,
+        permisosSolicitados
+      );
+      const validPermissionIds = new Set(
+        validPermissionRows.map((row) => Number(row.Id_Permiso))
+      );
+
+      if (validPermissionIds.size !== permisosSolicitados.length) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'La lista contiene permisos que no existen',
+          errorCode: 'INVALID_PERMISSIONS',
+        });
+      }
     }
 
     const hash = await bcrypt.hash(Contrasena, 8);
@@ -728,17 +912,34 @@ exports.crearUsuario = async (req, res) => {
       ]
     );
 
-    let permisosArray = permisos;
-    if (typeof permisos === 'string') {
-      try {
-        permisosArray = JSON.parse(permisos);
-      } catch (_err) {
-        permisosArray = [];
-      }
+    let permissionOverrides;
+    if (usaPermisosEfectivos) {
+      const permisosBase = new Set(permisosBaseIds);
+      const permisosSeleccionados = new Set(permisosEfectivosArray);
+
+      permissionOverrides = [
+        ...permisosEfectivosArray
+          .filter((id) => !permisosBase.has(id))
+          .map((id) => ({ id, type: 'ALLOW' })),
+        ...permisosBaseIds
+          .filter((id) => !permisosSeleccionados.has(id))
+          .map((id) => ({ id, type: 'DENY' })),
+      ];
+    } else {
+      permissionOverrides = permisosAdicionalesArray.map((id) => ({
+        id,
+        type: 'ALLOW',
+      }));
     }
 
-    if (Array.isArray(permisosArray) && permisosArray.length > 0) {
-      const rows = permisosArray.map((p) => [Id_Usuario, p, 'ALLOW', new Date()]);
+    if (permissionOverrides.length > 0) {
+      const now = new Date();
+      const rows = permissionOverrides.map(({ id, type }) => [
+        Id_Usuario,
+        id,
+        type,
+        now,
+      ]);
       await conn.query(
         'INSERT INTO usuario_permisos (Id_Usuario, Id_Permiso, Tipo, Fecha_Asignacion) VALUES ? ON DUPLICATE KEY UPDATE Tipo = VALUES(Tipo), Fecha_Asignacion = VALUES(Fecha_Asignacion)',
         [rows]

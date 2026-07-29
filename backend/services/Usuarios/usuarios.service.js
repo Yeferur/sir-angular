@@ -79,19 +79,23 @@ async function getUserById(id) {
   const [permisosEfectivos] = await db.query(
     `SELECT DISTINCT
        p.Id_Permiso,
-       p.Descripcion
+       p.Descripcion,
+       p.Modulo_Permiso
      FROM usuarios u
      INNER JOIN permisos p
+     LEFT JOIN roles rol_activo
+       ON rol_activo.Id_Rol = u.Id_Rol
+      AND rol_activo.Activo = 1
      LEFT JOIN rol_permisos rp
-       ON rp.Id_Rol = u.Id_Rol
+       ON rp.Id_Rol = rol_activo.Id_Rol
       AND rp.Id_Permiso = p.Id_Permiso
      LEFT JOIN usuario_permisos up
        ON up.Id_Usuario = u.Id_Usuario
       AND up.Id_Permiso = p.Id_Permiso
-      AND up.Tipo = 'ALLOW'
      WHERE u.Id_Usuario = ?
-       AND (rp.Id_Permiso IS NOT NULL OR up.Id_Permiso IS NOT NULL)
-     ORDER BY p.Descripcion`,
+       AND COALESCE(up.Tipo, '') <> 'DENY'
+       AND (rp.Id_Permiso IS NOT NULL OR up.Tipo = 'ALLOW')
+     ORDER BY p.Modulo_Permiso, p.Descripcion`,
     [id]
   );
 

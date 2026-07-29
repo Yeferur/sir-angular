@@ -1,6 +1,6 @@
 const pool = require('../../database/db');
 
-async function consultarPermisosBase(executor, userId) {
+async function consultarPermisosEfectivos(executor, userId) {
   const [rows] = await executor.query(`
     SELECT DISTINCT
       p.Id_Permiso,
@@ -8,23 +8,23 @@ async function consultarPermisosBase(executor, userId) {
       p.Descripcion,
       p.Accion
     FROM usuarios u
-    INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
-    INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
-    INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
+    INNER JOIN permisos p
+    LEFT JOIN roles r
+      ON r.Id_Rol = u.Id_Rol
+     AND r.Activo = 1
+    LEFT JOIN rol_permisos rp
+      ON rp.Id_Rol = r.Id_Rol
+     AND rp.Id_Permiso = p.Id_Permiso
+    LEFT JOIN usuario_permisos permiso_individual
+      ON permiso_individual.Id_Usuario = u.Id_Usuario
+     AND permiso_individual.Id_Permiso = p.Id_Permiso
     WHERE u.Id_Usuario = ?
-      AND r.Activo = 1
-
-    UNION
-
-    SELECT DISTINCT
-      p.Id_Permiso,
-      p.Codigo_Permiso,
-      p.Descripcion,
-      p.Accion
-    FROM usuario_permisos up
-    INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
-    WHERE up.Id_Usuario = ?
-  `, [userId, userId]);
+      AND COALESCE(permiso_individual.Tipo, '') <> 'DENY'
+      AND (
+        rp.Id_Permiso IS NOT NULL
+        OR permiso_individual.Tipo = 'ALLOW'
+      )
+  `, [userId]);
 
   return (rows || []).sort((a, b) => {
     const codigoA = String(a?.Codigo_Permiso || '');
@@ -45,7 +45,7 @@ async function consultarPermisosBase(executor, userId) {
 async function obtenerPermisosPorUsuario(userId) {
   const conexion = await pool.getConnection();
   try {
-    return await consultarPermisosBase(conexion, userId);
+    return await consultarPermisosEfectivos(conexion, userId);
   } finally {
     conexion.release();
   }
@@ -55,6 +55,7 @@ async function obtenerPermisosPorUsuario(userId) {
  * Considera:
  * 1. Permisos del rol
  * 2. Permisos individuales adicionales (ALLOW) de usuario_permisos
+ * 3. Permisos individuales revocados (DENY), con precedencia sobre el rol
  * @param {number} userId - ID del usuario
  * @param {string} codigoPermiso - Código del permiso (ej: 'TOURS.CREAR')
  * @returns {Promise<boolean>}
@@ -62,32 +63,29 @@ async function obtenerPermisosPorUsuario(userId) {
 async function verificarPermiso(userId, codigoPermiso) {
   const conexion = await pool.getConnection();
   try {
-    // 1. Verificar si el rol tiene el permiso
-    const [tieneEnRol] = await conexion.query(`
-      SELECT COUNT(*) as tiene_permiso
+    const [rows] = await conexion.query(`
+      SELECT
+        CASE
+          WHEN MAX(up.Tipo = 'DENY') = 1 THEN 0
+          WHEN MAX(up.Tipo = 'ALLOW') = 1 THEN 1
+          WHEN MAX(rp.Id_Permiso IS NOT NULL AND r.Activo = 1) = 1 THEN 1
+          ELSE 0
+        END AS tiene_permiso
       FROM usuarios u
-      INNER JOIN roles r ON u.Id_Rol = r.Id_Rol
-      INNER JOIN rol_permisos rp ON r.Id_Rol = rp.Id_Rol
-      INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
+      INNER JOIN permisos p
+        ON p.Codigo_Permiso = ?
+      LEFT JOIN roles r
+        ON r.Id_Rol = u.Id_Rol
+      LEFT JOIN rol_permisos rp
+        ON rp.Id_Rol = r.Id_Rol
+       AND rp.Id_Permiso = p.Id_Permiso
+      LEFT JOIN usuario_permisos up
+        ON up.Id_Usuario = u.Id_Usuario
+       AND up.Id_Permiso = p.Id_Permiso
       WHERE u.Id_Usuario = ?
-        AND p.Codigo_Permiso = ?
-        AND r.Activo = 1
-    `, [userId, codigoPermiso]);
+    `, [codigoPermiso, userId]);
 
-    if (tieneEnRol[0].tiene_permiso > 0) {
-      return true; // Lo tiene por el rol
-    }
-
-    // 2. Si no está en el rol, verificar si está en permisos individuales (ALLOW)
-    const [tieneIndividual] = await conexion.query(`
-      SELECT COUNT(*) as tiene_permiso
-      FROM usuario_permisos up
-      INNER JOIN permisos p ON up.Id_Permiso = p.Id_Permiso
-      WHERE up.Id_Usuario = ?
-        AND p.Codigo_Permiso = ?
-    `, [userId, codigoPermiso]);
-
-    return tieneIndividual[0].tiene_permiso > 0;
+    return Number(rows[0]?.tiene_permiso || 0) === 1;
   } finally {
     conexion.release();
   }
@@ -116,6 +114,7 @@ async function obtenerRoles() {
     const [rows] = await conexion.query(`
       SELECT Id_Rol, Nombre_Rol, Descripcion, Activo
       FROM roles
+      WHERE Activo = 1
       ORDER BY Nombre_Rol
     `);
     return rows;
@@ -146,10 +145,10 @@ async function obtenerTodosPermisos() {
         p.Accion,
         p.Descripcion,
         NULL AS Id_Modulo,
-        NULL AS Nombre_Modulo,
-        NULL AS Codigo_Modulo
+        p.Modulo_Permiso AS Nombre_Modulo,
+        p.Modulo_Permiso AS Codigo_Modulo
       FROM permisos p
-      ORDER BY p.Codigo_Permiso, p.Accion
+      ORDER BY p.Modulo_Permiso, p.Descripcion
     `);
     return rows;
   } finally {
@@ -171,12 +170,12 @@ async function obtenerPermisosPorRol(idRol) {
         p.Codigo_Permiso,
         p.Accion,
         p.Descripcion,
-        NULL AS Nombre_Modulo,
-        NULL AS Codigo_Modulo
+        p.Modulo_Permiso AS Nombre_Modulo,
+        p.Modulo_Permiso AS Codigo_Modulo
       FROM rol_permisos rp
       INNER JOIN permisos p ON rp.Id_Permiso = p.Id_Permiso
       WHERE rp.Id_Rol = ?
-      ORDER BY p.Codigo_Permiso, p.Accion
+      ORDER BY p.Modulo_Permiso, p.Descripcion
     `, [idRol]);
     return rows;
   } finally {

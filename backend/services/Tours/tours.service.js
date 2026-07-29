@@ -491,7 +491,17 @@ async function obtenerTours() {
 }
 
 async function obtenerTourPorId(Id_Tour) {
-  const [rows] = await db.query('SELECT * FROM tours WHERE Id_Tour = ? AND Activo = 1 LIMIT 1', [Id_Tour]);
+  const [rows] = await db.query(
+    `SELECT
+       t.*,
+       (SELECT COUNT(*) FROM planes_tours pt WHERE pt.Id_Tour = t.Id_Tour) AS Cantidad_Planes,
+       (SELECT COUNT(*) FROM tours_dias td WHERE td.Id_Tour = t.Id_Tour) AS Cantidad_Dias_Base,
+       (SELECT COUNT(*) FROM tours_temporadas tt WHERE tt.Id_Tour = t.Id_Tour) AS Cantidad_Temporadas
+     FROM tours t
+     WHERE t.Id_Tour = ? AND t.Activo = 1
+     LIMIT 1`,
+    [Id_Tour]
+  );
   if (!rows.length) return null;
   const tour = rows[0];
   const comisionesMap = await obtenerComisionesToursMap([Id_Tour]);

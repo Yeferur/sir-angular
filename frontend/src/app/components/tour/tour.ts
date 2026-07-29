@@ -115,6 +115,13 @@ export class TourDetailComponent implements OnChanges {
     }).format(amount);
   }
 
+  isIncomplete(tour: Tour): boolean {
+    const hasPlans = Number(tour.Cantidad_Planes || 0) > 0;
+    const hasOperation = Number(tour.Cantidad_Dias_Base || 0) > 0
+      || Number(tour.Cantidad_Temporadas || 0) > 0;
+    return !hasPlans || !hasOperation;
+  }
+
   formatPrice(value: number | undefined, currency = 'COP'): string {
     return new Intl.NumberFormat('es-CO', {
       minimumFractionDigits: currency === 'COP' ? 0 : 2,

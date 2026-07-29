@@ -34,6 +34,17 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 export class CrearUsuarioComponent implements OnInit, OnDestroy {
   form: FormGroup;
 
+  readonly wizardSteps = [
+    { id: 'identity', label: 'Identidad' },
+    { id: 'access', label: 'Acceso' },
+    { id: 'permissions', label: 'Permisos' },
+    { id: 'review', label: 'Revisar' }
+  ];
+  currentStep = 0;
+  maxReachedStep = 0;
+  goingBack = false;
+  panelAnimating = false;
+
   roles: Rol[] = [];
   permisos: PermisoCompleto[] = [];
   selectedPermisos: number[] = [];
@@ -65,6 +76,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private rolePermissionsRequest?: Subscription;
+  private panelAnimationTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private fb: FormBuilder,
@@ -93,6 +105,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.rolePermissionsRequest?.unsubscribe();
+    if (this.panelAnimationTimer) clearTimeout(this.panelAnimationTimer);
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -193,7 +206,6 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     if (this.rolePermissionsLoading()) return;
 
     const id = Number(idPermiso);
-    if (this.roleDefaultPermisos.includes(id)) return;
 
     if (this.selectedPermisos.includes(id)) {
       this.selectedPermisos = this.selectedPermisos.filter((permisoId) => permisoId !== id);
@@ -217,14 +229,107 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     return this.roles.find((rol) => Number(rol.Id_Rol) === idRol);
   }
 
-  get additionalPermissionsCount(): number {
-    return this.selectedPermisos.filter((id) => !this.roleDefaultPermisos.includes(id)).length;
+  get permissionsByModule(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
+    return this.buildPermissionModules(this.permisos);
   }
 
-  get permissionsByModule(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
+  get selectedPermissionModules(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
+    return this.buildPermissionModules(
+      this.permisos.filter((permiso) => this.isSelected(permiso.Id_Permiso))
+    );
+  }
+
+  get selectedAdditionalPermissions(): PermisoCompleto[] {
+    return this.permisos.filter((permiso) =>
+      !this.isRoleDefault(permiso.Id_Permiso) && this.isSelected(permiso.Id_Permiso)
+    );
+  }
+
+  get removedRoleDefaultPermissions(): PermisoCompleto[] {
+    return this.permisos.filter((permiso) =>
+      this.isRoleDefault(permiso.Id_Permiso) && !this.isSelected(permiso.Id_Permiso)
+    );
+  }
+
+  permissionAction(permiso: PermisoCompleto): string {
+    const codeAction = String(permiso.Codigo_Permiso || '').split('.').pop();
+    return this.formatModuleName(permiso.Accion || codeAction || 'Permiso');
+  }
+
+  goToStep(step: number): void {
+    if (step < 0 || step >= this.wizardSteps.length || step > this.maxReachedStep) return;
+    if (step === this.currentStep) return;
+    this.goingBack = step < this.currentStep;
+    this.currentStep = step;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (!this.validateStep(this.currentStep)) return;
+    if (this.currentStep >= this.wizardSteps.length - 1) return;
+    this.goingBack = false;
+    this.currentStep += 1;
+    this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  prevStep(): void {
+    if (this.currentStep === 0) return;
+    this.goingBack = true;
+    this.currentStep -= 1;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    if (step === 0) {
+      return ['Id_Usuario', 'Nombres_Apellidos', 'Telefono_Usuario', 'Correo']
+        .every((name) => this.c(name).valid);
+    }
+    if (step === 1) {
+      return ['Usuario', 'Contrasena', 'Confirmar']
+        .every((name) => this.c(name).valid)
+        && !this.form.errors?.['passwordMismatch']
+        && this.isPasswordStrongEnough();
+    }
+    if (step === 2) {
+      return Boolean(this.c('Id_Rol').valid && this.c('Id_Rol').value && !this.rolePermissionsLoading());
+    }
+    return true;
+  }
+
+  stepHasError(step: number): boolean {
+    if (step === 0) {
+      return ['Id_Usuario', 'Nombres_Apellidos', 'Telefono_Usuario', 'Correo']
+        .some((name) => Boolean(this.c(name).touched && this.c(name).invalid));
+    }
+    if (step === 1) {
+      return ['Usuario', 'Contrasena', 'Confirmar']
+        .some((name) => Boolean(this.c(name).touched && this.c(name).invalid))
+        || Boolean(this.c('Confirmar').touched && this.form.errors?.['passwordMismatch'])
+        || Boolean(this.c('Contrasena').touched && !this.isPasswordStrongEnough());
+    }
+    if (step === 2) {
+      return Boolean(this.c('Id_Rol').touched && this.c('Id_Rol').invalid);
+    }
+    return false;
+  }
+
+  formatModuleName(value: string): string {
+    return String(value || 'General')
+      .replace(/[_-]+/g, ' ')
+      .toLocaleLowerCase('es-CO')
+      .replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase('es-CO'));
+  }
+
+  private buildPermissionModules(
+    permissions: PermisoCompleto[]
+  ): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
     const groups = new Map<string, PermisoCompleto[]>();
 
-    for (const permiso of this.permisos) {
+    for (const permiso of permissions) {
       const key = permiso.Codigo_Modulo
         || String(permiso.Codigo_Permiso || '').split('.')[0]
         || 'GENERAL';
@@ -236,18 +341,6 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       label: this.formatModuleName(key),
       permisos
     }));
-  }
-
-  permissionAction(permiso: PermisoCompleto): string {
-    const codeAction = String(permiso.Codigo_Permiso || '').split('.').pop();
-    return this.formatModuleName(permiso.Accion || codeAction || 'Permiso');
-  }
-
-  private formatModuleName(value: string): string {
-    return String(value || 'General')
-      .replace(/[_-]+/g, ' ')
-      .toLocaleLowerCase('es-CO')
-      .replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase('es-CO'));
   }
 
   canCreateUsers(): boolean {
@@ -278,7 +371,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       });
   }
 
-  private isPasswordStrongEnough(): boolean {
+  isPasswordStrongEnough(): boolean {
     return isUserPasswordStrong(this.form.value.Contrasena);
   }
 
@@ -289,6 +382,11 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      const targetStep = this.firstInvalidStep();
+      this.goingBack = targetStep < this.currentStep;
+      this.currentStep = targetStep;
+      this.maxReachedStep = Math.max(this.maxReachedStep, targetStep);
+      this.animatePanel();
 
       const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
       if (this.form.errors?.['passwordMismatch'] && !invalid.includes('Confirmar')) {
@@ -341,8 +439,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       Contrasena: String(this.form.value.Contrasena),
       Id_Rol: Number(this.form.value.Id_Rol),
       Activo: 1,
-      // El rol ya otorga sus permisos base. Solo se persisten los adicionales
-      // para que un cambio de rol futuro no conserve accesos heredados.
+      // El backend calcula ALLOW y DENY comparando esta selección completa
+      // con la plantilla del rol. `permisos` mantiene compatibilidad con
+      // versiones anteriores que solo aceptaban accesos adicionales.
+      permisosEfectivos: [...this.selectedPermisos],
       permisos: this.selectedPermisos.filter((id) => !this.roleDefaultPermisos.includes(id))
     };
 
@@ -381,5 +481,49 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   hasUnsavedChanges(): boolean {
     return this.form?.dirty && !this.isSubmitting();
+  }
+
+  private validateStep(step: number): boolean {
+    const controlsByStep: Record<number, string[]> = {
+      0: ['Id_Usuario', 'Nombres_Apellidos', 'Telefono_Usuario', 'Correo'],
+      1: ['Usuario', 'Contrasena', 'Confirmar'],
+      2: ['Id_Rol']
+    };
+
+    (controlsByStep[step] || []).forEach((name) => {
+      this.c(name).markAsTouched();
+      this.c(name).updateValueAndValidity({ emitEvent: false });
+    });
+    this.form.updateValueAndValidity({ emitEvent: false });
+
+    if (this.canAdvanceFromStep(step)) return true;
+
+    const messages: Record<number, string> = {
+      0: 'Revisa los datos personales y de contacto señalados.',
+      1: 'Completa las credenciales y confirma que las contraseñas coincidan.',
+      2: 'Selecciona el rol que tendrá esta persona.'
+    };
+    this.alerts.warningToast('Falta información', messages[step] || 'Revisa los campos señalados.');
+    this.cdr.markForCheck();
+    return false;
+  }
+
+  private firstInvalidStep(): number {
+    if (!this.canAdvanceFromStep(0)) return 0;
+    if (!this.canAdvanceFromStep(1)) return 1;
+    return 2;
+  }
+
+  private animatePanel(): void {
+    this.panelAnimating = false;
+    if (this.panelAnimationTimer) clearTimeout(this.panelAnimationTimer);
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
+      this.cdr.markForCheck();
+      this.panelAnimationTimer = setTimeout(() => {
+        this.panelAnimating = false;
+        this.cdr.markForCheck();
+      }, 340);
+    });
   }
 }

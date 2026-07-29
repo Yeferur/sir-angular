@@ -73,13 +73,6 @@
               (keydown.space)="$event.preventDefault(); verTour(tour)"
               [attr.aria-label]="'Ver información del tour ' + tour.Nombre_Tour">
 
-              <span
-                class="tour-status"
-                [class.tour-status--ready]="configurationStatus(tour) === 'ready'"
-                [class.tour-status--incomplete]="configurationStatus(tour) === 'incomplete'">
-                {{ configurationStatus(tour) === 'ready' ? 'Configurado' : 'Incompleto' }}
-              </span>
-
               <div class="item-main-info">
                 <span class="item-tour">{{ tour.Nombre_Tour }}</span>
                 @if (tour.Abreviacion) {
@@ -92,6 +85,9 @@
                   <span class="sep">·</span>
                   Cupo {{ tour.Cupo_Base || 0 }}
                 </span>
+                @if (configurationStatus(tour) === 'incomplete') {
+                  <span class="tour-status tour-status--incomplete">Incompleto</span>
+                }
               </div>
 
               <div class="item-actions">

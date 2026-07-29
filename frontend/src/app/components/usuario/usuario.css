@@ -244,6 +244,37 @@
   font-weight: 800;
 }
 
+.permission-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.permission-group {
+  min-width: 0;
+}
+
+.permission-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.permission-group-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.permission-group-heading span {
+  color: var(--text-tertiary);
+  font-size: .68rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
 .permission-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -5,6 +5,11 @@
       @if (tour()?.Abreviacion) {
         <span class="tour-code">{{ tour()!.Abreviacion }}</span>
       }
+      @if (tour(); as currentTour) {
+        @if (isIncomplete(currentTour)) {
+          <span class="tour-incomplete">Incompleto</span>
+        }
+      }
     </div>
   </div>
 

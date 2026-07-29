@@ -36,6 +36,12 @@ interface UsuarioDetalle {
 interface UsuarioPermiso {
   Id_Permiso: number;
   Descripcion?: string;
+  Modulo_Permiso?: string;
+}
+
+interface PermissionGroup {
+  module: string;
+  permissions: UsuarioPermiso[];
 }
 
 @Component({
@@ -71,9 +77,18 @@ export class UsuarioDetailComponent implements OnChanges {
     && !this.isCurrentUser()
     && this.isActive()
   );
-  readonly effectivePermissions = computed(() => this.usuario()?.permisosEfectivos || []);
+  readonly permissionGroups = computed<PermissionGroup[]>(() => {
+    const grouped = new Map<string, UsuarioPermiso[]>();
+
+    for (const permission of this.usuario()?.permisosEfectivos || []) {
+      const module = String(permission.Modulo_Permiso || 'Otros').trim() || 'Otros';
+      grouped.set(module, [...(grouped.get(module) || []), permission]);
+    }
+
+    return [...grouped.entries()].map(([module, permissions]) => ({ module, permissions }));
+  });
   readonly effectivePermissionCount = computed(() =>
-    this.effectivePermissions().length
+    this.usuario()?.permisosEfectivos?.length || 0
   );
 
   ngOnChanges(changes: SimpleChanges): void {

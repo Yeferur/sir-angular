@@ -95,6 +95,21 @@
   text-transform: uppercase;
 }
 
+.tour-incomplete {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-orange, #ff9f0a) 28%, var(--separator-color));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent-orange, #ff9f0a) 10%, transparent);
+  color: var(--accent-orange, #ff9f0a);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
 .drawer-edit,
 .drawer-deactivate {
   min-height: 40px;

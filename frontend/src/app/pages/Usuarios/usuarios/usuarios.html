@@ -103,7 +103,6 @@
 
               <div class="user-avatar" [class.user-avatar--inactive]="!user.activo" aria-hidden="true">
                 {{ initials(user) }}
-                <span class="account-dot" [class.account-dot--inactive]="!user.activo"></span>
               </div>
 
               <div class="user-main">
@@ -116,12 +115,13 @@
                     <span class="inactive-chip">Inactivo</span>
                   }
                 </div>
-                <p>{{ user.email || 'Sin correo registrado' }}</p>
-              </div>
-
-              <div class="user-meta">
-                <span class="role-label">{{ user.rol }}</span>
-                <span class="username-label">@{{ user.username }}</span>
+                <div class="user-secondary">
+                  <span>{{ user.email || 'Sin correo registrado' }}</span>
+                  <span class="secondary-separator" aria-hidden="true">·</span>
+                  <span>@{{ user.username }}</span>
+                  <span class="secondary-separator" aria-hidden="true">·</span>
+                  <strong>{{ user.rol }}</strong>
+                </div>
               </div>
 
               @if (user.activo) {
@@ -129,9 +129,32 @@
                   class="session-chip"
                   [class.session-chip--online]="estados().get(user.id_user) === 'activa'"
                   [class.session-chip--open]="estados().get(user.id_user) === 'inactiva'">
-                  <span class="session-dot" aria-hidden="true"></span>
                   {{ sessionLabel(user.id_user) }}
                 </span>
+              }
+
+              @if (canUpdateUsers() || (canDeactivateUsers() && user.activo && !isCurrentUser(user.id_user))) {
+                <div class="item-actions user-actions">
+                  @if (canUpdateUsers()) {
+                    <button
+                      type="button"
+                      class="btn-row-edit"
+                      (click)="editarUsuario($event, user)"
+                      [attr.aria-label]="'Editar usuario ' + user.name">
+                      Editar
+                    </button>
+                  }
+                  @if (canDeactivateUsers() && user.activo && !isCurrentUser(user.id_user)) {
+                    <button
+                      type="button"
+                      class="btn-row-delete"
+                      [disabled]="deactivatingId() === user.id_user"
+                      (click)="desactivarUsuario($event, user)"
+                      [attr.aria-label]="'Desactivar usuario ' + user.name">
+                      {{ deactivatingId() === user.id_user ? 'Desactivando…' : 'Desactivar' }}
+                    </button>
+                  }
+                </div>
               }
 
               <span class="item-arrow card-chevron" aria-hidden="true">

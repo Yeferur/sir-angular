@@ -7543,6 +7543,7 @@ CREATE TABLE IF NOT EXISTS `permisos` (
   `Accion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Codigo_Permiso` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Modulo_Permiso` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Permiso`),
   UNIQUE KEY `ux_permisos_codigo` (`Codigo_Permiso`)
 ) ENGINE=InnoDB AUTO_INCREMENT=108 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -7551,48 +7552,48 @@ CREATE TABLE IF NOT EXISTS `permisos` (
 -- Volcado de datos para la tabla `permisos`
 --
 
-INSERT INTO `permisos` (`Id_Permiso`, `Accion`, `Codigo_Permiso`, `Descripcion`) VALUES
-(1, 'LEER', 'INICIO.LEER', 'Acceder a Inicio'),
-(2, 'ACTUALIZAR_AFORO', 'INICIO.ACTUALIZAR_AFORO', 'Actualizar aforos'),
-(3, 'LEER', 'HISTORIAL.LEER', 'Ver historial'),
-(4, 'LEER', 'INFORMES.LEER', 'Ver informes'),
-(5, 'LEER', 'RESERVAS.LEER', 'Ver reservas'),
-(6, 'CREAR', 'RESERVAS.CREAR', 'Crear reservas'),
-(7, 'ACTUALIZAR', 'RESERVAS.ACTUALIZAR', 'Actualizar reservas'),
-(8, 'ELIMINAR', 'RESERVAS.ELIMINAR', 'Eliminar reservas'),
-(9, 'LEER', 'TRANSFERS.LEER', 'Ver transfers'),
-(10, 'CREAR', 'TRANSFERS.CREAR', 'Crear transfers'),
-(11, 'ACTUALIZAR', 'TRANSFERS.ACTUALIZAR', 'Actualizar transfers'),
-(12, 'ELIMINAR', 'TRANSFERS.ELIMINAR', 'Eliminar transfers'),
-(13, 'LEER', 'TOURS.LEER', 'Ver tours'),
-(14, 'CREAR', 'TOURS.CREAR', 'Crear tours'),
-(15, 'ACTUALIZAR', 'TOURS.ACTUALIZAR', 'Actualizar tours'),
-(16, 'ELIMINAR', 'TOURS.ELIMINAR', 'Eliminar tours'),
-(17, 'LEER', 'PUNTOS.LEER', 'Ver puntos'),
-(18, 'CREAR', 'PUNTOS.CREAR', 'Crear puntos'),
-(19, 'ACTUALIZAR', 'PUNTOS.ACTUALIZAR', 'Actualizar puntos'),
-(20, 'ELIMINAR', 'PUNTOS.ELIMINAR', 'Eliminar puntos'),
-(21, 'LEER', 'PROGRAMACION.LEER', 'Ver listados'),
-(22, 'CREAR', 'PROGRAMACION.CREAR', 'Crear listados'),
-(23, 'ACTUALIZAR', 'PROGRAMACION.ACTUALIZAR', 'Actualizar listados'),
-(24, 'ELIMINAR', 'PROGRAMACION.ELIMINAR', 'Eliminar listados'),
-(25, 'LEER', 'USUARIOS.LEER', 'Ver usuarios'),
-(26, 'CREAR', 'USUARIOS.CREAR', 'Crear usuarios'),
-(27, 'ACTUALIZAR', 'USUARIOS.ACTUALIZAR', 'Actualizar usuarios'),
-(28, 'ELIMINAR', 'USUARIOS.ELIMINAR', 'Eliminar usuarios'),
-(37, 'LEER', 'PAGOS.LEER', 'Ver pagos'),
-(39, 'ACTUALIZAR', 'PAGOS.ACTUALIZAR', 'Actualizar pagos'),
-(40, 'ELIMINAR', 'PAGOS.ELIMINAR', 'Eliminar pagos'),
-(41, 'ORDENAR', 'PUNTOS.ORDENAR', 'Ordenar puntos de encuentro'),
-(42, 'EXPORTAR', 'PUNTOS.EXPORTAR', 'Exportar puntos de encuentro'),
-(43, 'EXPORTAR', 'PROGRAMACION.EXPORTAR', 'Exportar listados'),
-(44, 'LEER', 'CONTROL_VIAJE.LEER', 'Acceder al control de viaje'),
-(45, 'ACTUALIZAR_ASISTENCIA', 'CONTROL_VIAJE.ACTUALIZAR_ASISTENCIA', 'Actualizar asistencia de pasajeros'),
-(48, 'ENVIAR', 'MENSAJES.ENVIAR', 'Enviar mensajes'),
-(96, 'CONFIGURAR', 'PERMISOS.CONFIGURAR', 'Configurar roles y permisos'),
-(97, 'CONFIGURAR', 'DASHBOARD.CONFIGURAR_CATALOGOS', 'Configurar catálogos operativos'),
-(106, 'LEER', 'SEGUROS.LEER', 'Acceder al módulo de seguros'),
-(107, 'LEER', 'COMISIONES.LEER', 'Acceder al módulo de comisiones');
+INSERT INTO `permisos` (`Id_Permiso`, `Accion`, `Codigo_Permiso`, `Descripcion`, `Modulo_Permiso`) VALUES
+(1, 'LEER', 'INICIO.LEER', 'Acceder a Inicio', 'Inicio'),
+(2, 'ACTUALIZAR_AFORO', 'INICIO.ACTUALIZAR_AFORO', 'Actualizar aforos', 'Inicio'),
+(3, 'LEER', 'HISTORIAL.LEER', 'Ver historial', 'Historial'),
+(4, 'LEER', 'INFORMES.LEER', 'Ver informes', 'Informes'),
+(5, 'LEER', 'RESERVAS.LEER', 'Ver reservas', 'Reservas'),
+(6, 'CREAR', 'RESERVAS.CREAR', 'Crear reservas', 'Reservas'),
+(7, 'ACTUALIZAR', 'RESERVAS.ACTUALIZAR', 'Actualizar reservas', 'Reservas'),
+(8, 'ELIMINAR', 'RESERVAS.ELIMINAR', 'Eliminar reservas', 'Reservas'),
+(9, 'LEER', 'TRANSFERS.LEER', 'Ver transfers', 'Transfers'),
+(10, 'CREAR', 'TRANSFERS.CREAR', 'Crear transfers', 'Transfers'),
+(11, 'ACTUALIZAR', 'TRANSFERS.ACTUALIZAR', 'Actualizar transfers', 'Transfers'),
+(12, 'ELIMINAR', 'TRANSFERS.ELIMINAR', 'Eliminar transfers', 'Transfers'),
+(13, 'LEER', 'TOURS.LEER', 'Ver tours', 'Tours'),
+(14, 'CREAR', 'TOURS.CREAR', 'Crear tours', 'Tours'),
+(15, 'ACTUALIZAR', 'TOURS.ACTUALIZAR', 'Actualizar tours', 'Tours'),
+(16, 'ELIMINAR', 'TOURS.ELIMINAR', 'Eliminar tours', 'Tours'),
+(17, 'LEER', 'PUNTOS.LEER', 'Ver puntos', 'Puntos de encuentro'),
+(18, 'CREAR', 'PUNTOS.CREAR', 'Crear puntos', 'Puntos de encuentro'),
+(19, 'ACTUALIZAR', 'PUNTOS.ACTUALIZAR', 'Actualizar puntos', 'Puntos de encuentro'),
+(20, 'ELIMINAR', 'PUNTOS.ELIMINAR', 'Eliminar puntos', 'Puntos de encuentro'),
+(21, 'LEER', 'PROGRAMACION.LEER', 'Ver listados', 'Programación'),
+(22, 'CREAR', 'PROGRAMACION.CREAR', 'Crear listados', 'Programación'),
+(23, 'ACTUALIZAR', 'PROGRAMACION.ACTUALIZAR', 'Actualizar listados', 'Programación'),
+(24, 'ELIMINAR', 'PROGRAMACION.ELIMINAR', 'Eliminar listados', 'Programación'),
+(25, 'LEER', 'USUARIOS.LEER', 'Ver usuarios', 'Usuarios'),
+(26, 'CREAR', 'USUARIOS.CREAR', 'Crear usuarios', 'Usuarios'),
+(27, 'ACTUALIZAR', 'USUARIOS.ACTUALIZAR', 'Actualizar usuarios', 'Usuarios'),
+(28, 'ELIMINAR', 'USUARIOS.ELIMINAR', 'Desactivar usuarios', 'Usuarios'),
+(37, 'LEER', 'PAGOS.LEER', 'Ver pagos', 'Pagos'),
+(39, 'ACTUALIZAR', 'PAGOS.ACTUALIZAR', 'Actualizar pagos', 'Pagos'),
+(40, 'ELIMINAR', 'PAGOS.ELIMINAR', 'Eliminar pagos', 'Pagos'),
+(41, 'ORDENAR', 'PUNTOS.ORDENAR', 'Ordenar puntos de encuentro', 'Puntos de encuentro'),
+(42, 'EXPORTAR', 'PUNTOS.EXPORTAR', 'Exportar puntos de encuentro', 'Puntos de encuentro'),
+(43, 'EXPORTAR', 'PROGRAMACION.EXPORTAR', 'Exportar listados', 'Programación'),
+(44, 'LEER', 'CONTROL_VIAJE.LEER', 'Acceder al control de viaje', 'Control de viaje'),
+(45, 'ACTUALIZAR_ASISTENCIA', 'CONTROL_VIAJE.ACTUALIZAR_ASISTENCIA', 'Actualizar asistencia de pasajeros', 'Control de viaje'),
+(48, 'ENVIAR', 'MENSAJES.ENVIAR', 'Enviar mensajes', 'Mensajería'),
+(96, 'CONFIGURAR', 'PERMISOS.CONFIGURAR', 'Configurar roles y permisos', 'Roles y permisos'),
+(97, 'CONFIGURAR', 'DASHBOARD.CONFIGURAR_CATALOGOS', 'Configurar catálogos operativos', 'Configuración'),
+(106, 'LEER', 'SEGUROS.LEER', 'Acceder al módulo de seguros', 'Seguros'),
+(107, 'LEER', 'COMISIONES.LEER', 'Acceder al módulo de comisiones', 'Comisiones');
 
 -- --------------------------------------------------------
 
@@ -8889,7 +8890,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
   `Fecha_Creacion` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Rol`),
   UNIQUE KEY `ux_roles_nombre` (`Nombre_Rol`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `roles`
@@ -8897,7 +8898,8 @@ CREATE TABLE IF NOT EXISTS `roles` (
 
 INSERT INTO `roles` (`Id_Rol`, `Nombre_Rol`, `Descripcion`, `Activo`, `Fecha_Creacion`) VALUES
 (1, 'Administrador', 'Acceso total', 1, '2026-01-05 04:43:28'),
-(2, 'Asesor', 'Acceso por permisos', 1, '2026-01-05 04:43:28');
+(2, 'Asesor', 'Acceso por permisos', 1, '2026-01-05 04:43:28'),
+(6, 'Cliente', 'Acceso limitado a reservas propias', 1, '2026-07-29 00:00:00');
 
 -- --------------------------------------------------------
 

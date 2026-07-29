@@ -81,12 +81,22 @@
         <span class="permission-count">{{ effectivePermissionCount() }}</span>
       </div>
 
-      @if (effectivePermissions().length) {
-        <div class="permission-list">
-          @for (permission of effectivePermissions(); track permission.Id_Permiso) {
-            <span class="permission-item">
-              {{ permission.Descripcion || 'Permiso sin descripción' }}
-            </span>
+      @if (permissionGroups().length) {
+        <div class="permission-groups">
+          @for (group of permissionGroups(); track group.module) {
+            <section class="permission-group">
+              <div class="permission-group-heading">
+                <h3>{{ group.module }}</h3>
+                <span>{{ group.permissions.length }}</span>
+              </div>
+              <div class="permission-list">
+                @for (permission of group.permissions; track permission.Id_Permiso) {
+                  <span class="permission-item">
+                    {{ permission.Descripcion || 'Permiso sin descripción' }}
+                  </span>
+                }
+              </div>
+            </section>
           }
         </div>
       } @else {
