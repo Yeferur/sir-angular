@@ -273,14 +273,12 @@
               </div>
             </div>
 
-            @if (rolePermissionsLoading()) {
-              <div class="permissions-loading">
-                <span class="inline-spinner"></span>
-                Cargando permisos del rol…
-              </div>
-            } @else {
-              <div class="permissions-workspace" [class.permissions-workspace--disabled]="!selectedRole">
-                <div class="permissions-workspace-head">
+            <div
+              class="permissions-section"
+              [class.permissions-section--disabled]="!selectedRole"
+              [class.permissions-section--syncing]="rolePermissionsLoading()"
+              [attr.aria-busy]="rolePermissionsLoading()">
+                <div class="permissions-section-head">
                   <div>
                     <strong>Permisos asignables</strong>
                     <p>
@@ -304,14 +302,9 @@
                         type="button"
                         class="permission-option"
                         [class.permission-option--selected]="isSelected(permiso.Id_Permiso)"
-                        [disabled]="!selectedRole"
+                        [disabled]="!selectedRole || rolePermissionsLoading()"
                         (click)="togglePermiso(permiso.Id_Permiso)"
                         [attr.aria-pressed]="isSelected(permiso.Id_Permiso)">
-                        <span class="permission-check">
-                          @if (isSelected(permiso.Id_Permiso)) {
-                            <svg viewBox="0 0 14 14" aria-hidden="true"><polyline points="2,7 6,11 12,3"/></svg>
-                          }
-                        </span>
                         <span class="permission-copy">
                           <strong>{{ permiso.Descripcion || permissionAction(permiso) }}</strong>
                           <small>{{ module.label }}</small>
@@ -320,8 +313,7 @@
                     }
                   }
                 </div>
-              </div>
-            }
+            </div>
           </section>
         }
 
@@ -335,66 +327,80 @@
               <span class="review-ready">Listo para crear</span>
             </div>
 
-            <div class="review-hero">
-              <span class="review-avatar">{{ c('Nombres_Apellidos').value?.charAt(0) || 'U' }}</span>
-              <div>
-                <span class="review-kicker">Nuevo usuario</span>
-                <h3>{{ c('Nombres_Apellidos').value }}</h3>
-                <p>{{ c('Correo').value }} · {{ c('Telefono_Usuario').value }}</p>
-              </div>
-              <span class="review-role">{{ selectedRole?.Nombre_Rol }}</span>
-            </div>
+            <div class="review-detail">
+              <header class="review-detail-header">
+                <div class="review-identity">
+                  <span class="review-detail-avatar" aria-hidden="true">{{ userInitials() }}</span>
+                  <div class="review-identity-copy">
+                    <div class="review-identity-title">
+                      <h3>{{ c('Nombres_Apellidos').value }}</h3>
+                      <span class="review-account-chip">Activo</span>
+                    </div>
+                    <p>
+                      &#64;{{ c('Usuario').value }}
+                      <span aria-hidden="true">·</span>
+                      CC {{ c('Id_Usuario').value }}
+                    </p>
+                  </div>
+                </div>
+              </header>
 
-            <div class="review-grid">
-              <article class="review-section">
-                <div class="review-section-head">
-                  <span class="review-section-icon">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.5" r="3"/><path d="M4 17a6 6 0 0 1 12 0"/></svg>
-                  </span>
-                  <div><span>Identidad</span><strong>Datos personales</strong></div>
+              <section class="review-summary-strip" aria-label="Resumen del nuevo usuario">
+                <div class="review-summary-item">
+                  <span>Rol</span>
+                  <strong>{{ selectedRole?.Nombre_Rol }}</strong>
+                </div>
+                <div class="review-summary-item">
+                  <span>Contraseña</span>
+                  <strong class="protected-value">Protegida · {{ passwordStrength.label }}</strong>
+                </div>
+              </section>
+
+              <section class="review-detail-card">
+                <div class="review-detail-card-head">
+                  <h3>Contacto</h3>
                   <button type="button" (click)="goToStep(0)">Editar</button>
                 </div>
-                <dl class="review-list">
-                  <div><dt>Cédula</dt><dd>{{ c('Id_Usuario').value }}</dd></div>
-                  <div><dt>Nombre</dt><dd>{{ c('Nombres_Apellidos').value }}</dd></div>
+                <dl class="review-detail-list">
                   <div><dt>Correo</dt><dd>{{ c('Correo').value }}</dd></div>
                   <div><dt>Teléfono</dt><dd>{{ c('Telefono_Usuario').value }}</dd></div>
                 </dl>
-              </article>
+              </section>
 
-              <article class="review-section">
-                <div class="review-section-head">
-                  <span class="review-section-icon review-section-icon--green">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="8" width="12" height="9" rx="2"/><path d="M7 8V6a3 3 0 0 1 6 0v2"/></svg>
-                  </span>
-                  <div><span>Acceso</span><strong>Credenciales</strong></div>
-                  <button type="button" (click)="goToStep(1)">Editar</button>
+              <section class="review-detail-card">
+                <div class="review-detail-card-head review-detail-card-head--permissions">
+                  <div>
+                    <h3>Permisos</h3>
+                    <p>Acceso efectivo según el rol y los ajustes de este usuario.</p>
+                  </div>
+                  <div class="review-detail-actions">
+                    <span class="review-permission-count">{{ selectedPermisos.length }}</span>
+                    <button type="button" (click)="goToStep(2)">Editar</button>
+                  </div>
                 </div>
-                <dl class="review-list">
-                  <div><dt>Usuario</dt><dd>{{ c('Usuario').value }}</dd></div>
-                  <div><dt>Contraseña</dt><dd class="protected-value">Protegida · {{ passwordStrength.label }}</dd></div>
-                </dl>
-              </article>
-            </div>
 
-            <article class="review-section review-section--access">
-              <div class="review-section-head">
-                <span class="review-section-icon">
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 3.5 5v4.7c0 4.1 2.5 6.8 6.5 8.3 4-1.5 6.5-4.2 6.5-8.3V5L10 2.5Z"/><polyline points="7,10 9,12 13,7.5"/></svg>
-                </span>
-                <div>
-                  <span>Permisos</span>
-                  <strong>{{ selectedRole?.Nombre_Rol }} · {{ selectedPermisos.length }} efectivos</strong>
-                </div>
-                <button type="button" (click)="goToStep(2)">Editar</button>
-              </div>
+                @if (selectedPermissionModules.length) {
+                  <div class="review-permission-groups">
+                    @for (module of selectedPermissionModules; track module.key) {
+                      <section class="review-permission-group">
+                        <div class="review-permission-group-head">
+                          <strong>{{ module.label }}</strong>
+                          <span>{{ module.permisos.length }}</span>
+                        </div>
+                        <div class="review-permission-list">
+                          @for (permiso of module.permisos; track permiso.Id_Permiso) {
+                            <span class="review-permission-item">
+                              {{ permiso.Descripcion || permissionAction(permiso) }}
+                            </span>
+                          }
+                        </div>
+                      </section>
+                    }
+                  </div>
+                } @else {
+                  <p class="review-permission-empty">Este usuario no tiene permisos activos.</p>
+                }
 
-              <div class="review-access-content">
-                <div class="review-modules">
-                  @for (module of selectedPermissionModules; track module.key) {
-                    <span>{{ module.label }} <small>{{ module.permisos.length }}</small></span>
-                  }
-                </div>
                 @if (selectedAdditionalPermissions.length || removedRoleDefaultPermissions.length) {
                   <div class="review-extras">
                     @if (selectedAdditionalPermissions.length) {
@@ -417,8 +423,8 @@
                 } @else {
                   <p class="review-no-extras">Sin excepciones: conserva exactamente la selección base del rol.</p>
                 }
-              </div>
-            </article>
+              </section>
+            </div>
 
             @if (errorMsg) {
               <div class="submit-error">{{ errorMsg }}</div>
@@ -462,15 +468,10 @@
             [class.is-disabled]="!canAdvanceFromStep(currentStep)"
             [disabled]="rolePermissionsLoading()"
             (click)="nextStep()">
-            @if (rolePermissionsLoading()) {
-              <span class="btn-spinner"></span>
-              Cargando
-            } @else {
-              Continuar
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            }
+            Continuar
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
           </button>
         } @else {
           <button

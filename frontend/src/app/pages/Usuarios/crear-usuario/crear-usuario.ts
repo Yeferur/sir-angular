@@ -16,6 +16,48 @@ import {
   USER_PHONE_REGEX,
 } from '../usuario-form.utils';
 
+const PERMISSION_MODULE_ORDER = [
+  'INICIO',
+  'RESERVAS',
+  'TRANSFERS',
+  'TOURS',
+  'PUNTOS DE ENCUENTRO',
+  'PROGRAMACION',
+  'CONTROL DE VIAJE',
+  'PAGOS',
+  'COMISIONES',
+  'HISTORIAL',
+  'INFORMES',
+  'MENSAJERIA',
+  'SEGUROS',
+  'USUARIOS',
+  'ROLES Y PERMISOS',
+  'CONFIGURACION',
+  'GENERAL'
+];
+
+const PERMISSION_ACTION_ORDER: Record<string, number> = {
+  LEER: 10,
+  CREAR: 20,
+  ACTUALIZAR: 30,
+  ACTUALIZAR_AFORO: 35,
+  ACTUALIZAR_ASISTENCIA: 36,
+  ENVIAR: 40,
+  CONFIGURAR: 45,
+  EXPORTAR: 50,
+  ORDENAR: 55,
+  ELIMINAR: 90
+};
+
+function permissionOrderToken(value: unknown): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const pass = group.get('Contrasena')?.value;
   const confirm = group.get('Confirmar')?.value;
@@ -76,6 +118,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private rolePermissionsRequest?: Subscription;
+  private loadedRoleId = 0;
   private panelAnimationTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
@@ -166,10 +209,11 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   onRolChange(): void {
     const idRol = Number(this.form.value.Id_Rol || 0);
     this.rolePermissionsRequest?.unsubscribe();
-    this.roleDefaultPermisos = [];
-    this.selectedPermisos = [];
 
     if (!idRol) {
+      this.loadedRoleId = 0;
+      this.roleDefaultPermisos = [];
+      this.selectedPermisos = [];
       this.rolePermissionsLoading.set(false);
       this.cdr.markForCheck();
       return;
@@ -186,12 +230,12 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
         this.roleDefaultPermisos = [...new Set(defaults)];
         this.selectedPermisos = [...this.roleDefaultPermisos];
+        this.loadedRoleId = idRol;
         this.rolePermissionsLoading.set(false);
         this.cdr.markForCheck();
       },
       error: () => {
-        this.roleDefaultPermisos = [];
-        this.selectedPermisos = [];
+        this.form.get('Id_Rol')?.setValue(this.loadedRoleId || '', { emitEvent: false });
         this.rolePermissionsLoading.set(false);
         this.alerts.errorToast(
           'No pudimos cargar el rol',
@@ -227,6 +271,17 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   get selectedRole(): Rol | undefined {
     const idRol = Number(this.form.value.Id_Rol || 0);
     return this.roles.find((rol) => Number(rol.Id_Rol) === idRol);
+  }
+
+  userInitials(): string {
+    const names = String(this.form.value.Nombres_Apellidos || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!names.length) return 'U';
+    return `${names[0][0] || ''}${names.length > 1 ? names[names.length - 1][0] : ''}`
+      .toLocaleUpperCase('es-CO');
   }
 
   get permissionsByModule(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
@@ -336,11 +391,37 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       groups.set(key, [...(groups.get(key) || []), permiso]);
     }
 
-    return [...groups.entries()].map(([key, permisos]) => ({
-      key,
-      label: this.formatModuleName(key),
-      permisos
-    }));
+    return [...groups.entries()]
+      .sort(([left], [right]) => {
+        const leftToken = permissionOrderToken(left);
+        const rightToken = permissionOrderToken(right);
+        const leftIndex = PERMISSION_MODULE_ORDER.indexOf(leftToken);
+        const rightIndex = PERMISSION_MODULE_ORDER.indexOf(rightToken);
+        const leftRank = leftIndex === -1 ? PERMISSION_MODULE_ORDER.length : leftIndex;
+        const rightRank = rightIndex === -1 ? PERMISSION_MODULE_ORDER.length : rightIndex;
+
+        return leftRank - rightRank
+          || leftToken.localeCompare(rightToken, 'es-CO');
+      })
+      .map(([key, permisos]) => ({
+        key,
+        label: this.formatModuleName(key),
+        permisos: [...permisos].sort((left, right) => {
+          const leftAction = permissionOrderToken(
+            left.Accion || String(left.Codigo_Permiso || '').split('.').pop()
+          ).replace(/ /g, '_');
+          const rightAction = permissionOrderToken(
+            right.Accion || String(right.Codigo_Permiso || '').split('.').pop()
+          ).replace(/ /g, '_');
+
+          return (PERMISSION_ACTION_ORDER[leftAction] ?? 70)
+            - (PERMISSION_ACTION_ORDER[rightAction] ?? 70)
+            || String(left.Descripcion || left.Codigo_Permiso || '').localeCompare(
+              String(right.Descripcion || right.Codigo_Permiso || ''),
+              'es-CO'
+            );
+        })
+      }));
   }
 
   canCreateUsers(): boolean {
@@ -446,13 +527,23 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       permisos: this.selectedPermisos.filter((id) => !this.roleDefaultPermisos.includes(id))
     };
 
+    const roleName = this.selectedRole?.Nombre_Rol || 'Sin rol';
+    const effectivePermissions = this.selectedPermisos.length;
+    const confirmationMessage = [
+      `Vas a crear a ${payload.Nombres_Apellidos} con el rol ${roleName}.`,
+      `Usuario: @${payload.Usuario} · Cédula: ${payload.Id_Usuario}`,
+      `Acceso activo · ${effectivePermissions} ${effectivePermissions === 1 ? 'permiso efectivo' : 'permisos efectivos'}`,
+      '',
+      'Podrá iniciar sesión de inmediato con las credenciales definidas.'
+    ].join('\n');
+
     // Show confirmation using global navbar alert with action buttons
     this.alerts.showConfirm(
-      '¿Crear usuario?',
-      'Se creará el usuario con los datos ingresados. ¿Deseas continuar?',
+      'Confirmar nuevo usuario',
+      confirmationMessage,
       [
         { text: 'Cancelar', style: 'secondary', onClick: () => this.alerts.closeModal() },
-        { text: 'Crear', style: 'primary', onClick: () => { this.alerts.closeModal(); this.confirmCreateUser(payload); } }
+        { text: 'Crear usuario', style: 'primary', onClick: () => { this.alerts.closeModal(); this.confirmCreateUser(payload); } }
       ]
     );
   }
