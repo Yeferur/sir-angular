@@ -8,197 +8,345 @@
     (action)="loadInitialData()">
   </app-loading-state>
 } @else {
-<div class="booking-dashboard">
-  <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
-
-  <form id="puntoForm" [formGroup]="form" (ngSubmit)="onSubmitCrearPunto()">
-    <div class="main-content">
-
-      <!-- =============================================
-           CARD 1: DATOS DEL PUNTO
-           ============================================= -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2>Datos del Punto</h2>
-            <p class="card-subtitle">Información básica de ubicación.</p>
-          </div>
-        </div>
-
-        <div class="form-grid">
-
-          <!-- Nombre del Punto -->
-          <div class="form-group">
-            <label class="form-label">Nombre del Punto <span class="required-star">*</span></label>
-            <input formControlName="NombrePunto" (input)="onNombrePuntoInput()" type="text" class="form-input"
-              maxlength="255" placeholder="Ej: Parque Central"
-              [class.errorInput]="form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid" />
-            @if (form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid) {
-            <div class="errorMessage">Ingresa un nombre válido.</div>
-            }
-          </div>
-
-          <!-- Sector -->
-          <div class="form-group">
-            <label class="form-label">Sector <span class="required-star">*</span></label>
-            <input formControlName="Sector" type="text" class="form-input" placeholder="Ej: Poblado"
-              [class.errorInput]="form.get('Sector')?.touched && form.get('Sector')?.invalid" />
-            @if (form.get('Sector')?.touched && form.get('Sector')?.invalid) {
-            <div class="errorMessage">Ingresa un sector válido.</div>
-            }
-          </div>
-
-          <!-- Dirección -->
-          <div class="form-group">
-            <label class="form-label">Dirección <span class="required-star">*</span></label>
-            <input formControlName="Direccion" (input)="onDireccionInput($any($event.target).value)" type="text"
-              class="form-input" placeholder="Ej: Calle 1 #2-34"
-              [class.errorInput]="(form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) || similarityState === 'exact'"
-              [class.warnInput]="similarityState === 'similar'" />
-            @if (form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) {
-            <div class="errorMessage">La dirección es obligatoria.</div>
-            }
-            @if (similarityState === 'exact') {
-            <div class="errorMessage">Ya existe un punto con este nombre y esta dirección.</div>
-            }
-            @if (similarityState === 'similar') {
-            <div class="warnMessage">
-              Existe un punto similar: {{ duplicatePoint?.Nombre_Punto || duplicatePoint?.NombrePunto || 'Punto' }}
-              ({{ duplicatePoint?.Direccion || 'sin dirección registrada' }}). Puedes crearlo, pero se pedirá
-              confirmación.
-            </div>
-            }
-          </div>
-
-          <!-- Coordenadas (campo único) -->
-          <div class="form-group">
-            <label class="form-label">
-              Coordenadas <span class="required-star">*</span>
-            </label>
-            <input formControlName="Coordenadas" type="text" class="form-input"
-              (input)="onCoordenadasInput()" placeholder="Ej: 6.244747, -75.574756"
-              [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
-            @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
-            @if (form.get('Coordenadas')?.errors?.['required']) {
-            <div class="errorMessage">Las coordenadas son obligatorias.</div>
-            } @else if (form.get('Coordenadas')?.errors?.['coordenadasInvalidas']) {
-            <div class="errorMessage">Formato inválido. Usa: lat, lng — Ej: 6.244747, -75.574756</div>
-            } @else if (form.get('Coordenadas')?.errors?.['latitudInvalida']) {
-            <div class="errorMessage">Latitud fuera de rango (debe estar entre -90 y 90).</div>
-            } @else if (form.get('Coordenadas')?.errors?.['longitudInvalida']) {
-            <div class="errorMessage">Longitud fuera de rango (debe estar entre -180 y 180).</div>
-            }
-            }
-            <p class="form-hint">Busca el punto en Google Maps -> click derecho -> "Copiar coordenadas" y pégalas aquí.
-            </p>
-            @if (coordinateStatus() !== 'idle') {
-            <p class="coordinate-status" [class.coordinate-status--valid]="coordinateStatus() === 'valid'"
-              [class.coordinate-status--invalid]="coordinateStatus() === 'invalid'">
-              {{ coordinateDetail() }}
-            </p>
-            }
-          </div>
-
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2>Ruta y Posición</h2>
-            <p class="card-subtitle">Define la ruta del punto y el lugar que ocupará dentro del recorrido.</p>
-          </div>
-        </div>
-        <div class="route-mode-grid">
-          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'existing'">
-            <input type="radio" formControlName="routeMode" value="existing" (change)="onRouteModeChange()">
-            <span><strong>Ruta existente</strong><small>Ubicar dentro de un recorrido actual</small></span>
-          </label>
-          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'pending'">
-            <input type="radio" formControlName="routeMode" value="pending" (change)="onRouteModeChange()">
-            <span><strong>Dejar pendiente</strong><small>Definir la ruta más adelante</small></span>
-          </label>
-          <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'new'">
-            <input type="radio" formControlName="routeMode" value="new" (change)="onRouteModeChange()">
-            <span><strong>Nueva ruta</strong><small>Crear una referencia flexible</small></span>
-          </label>
-        </div>
-        @if (form.value.routeMode === 'existing') {
-        <div class="form-grid route-fields">
-          <div class="form-group">
-            <label class="form-label" for="rutaExistente">Ruta</label>
-            <select id="rutaExistente" class="form-input" formControlName="rutaExistente"
-              (change)="onRutaExistenteChange($any($event.target).value)">
-              @for (ruta of rutas(); track ruta) {
-              <option [value]="ruta">Ruta {{ ruta }}</option>
-              }
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="puntoAnterior">Posición</label>
-            <select id="puntoAnterior" class="form-input" formControlName="IdPuntoAnterior">
-              <option [ngValue]="null">Al final de la ruta</option>
-              @for (punto of puntosRuta(); track punto.Id_Punto) {
-              <option [ngValue]="punto.Id_Punto">
-                Después de {{ punto.NombrePunto || punto.Nombre_Punto }} · Posición {{ punto.posicion || punto.Posicion }}
-              </option>
-              }
-            </select>
-          </div>
-        </div>
-        } @else if (form.value.routeMode === 'new') {
-        <div class="form-group route-new-field">
-          <label class="form-label" for="rutaNueva">Nombre o número de la nueva ruta</label>
-          <input id="rutaNueva" class="form-input" formControlName="rutaNueva" maxlength="50"
-            placeholder="Ej: 15">
-        </div>
+  <div class="wizard-shell wizard-shell--page-enter" [class.is-panel-animating]="panelAnimating">
+    <div class="wizard-stepper" aria-label="Pasos para crear el punto de encuentro">
+      @for (step of wizardSteps; track step.id; let i = $index) {
+        @if (i > 0) {
+          <div class="step-connector" [class.filled]="currentStep >= i"></div>
         }
-      </div>
-
-      <!-- HORARIOS POR TOUR -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2>Horarios por Tour</h2>
-            <p class="card-subtitle">Si no ingresas horarios, quedarán pendientes. Puedes editarlos después.</p>
-          </div>
-        </div>
-
-        @if (tours().length === 0) {
-        <div class="empty-state">
-          No hay tours disponibles para configurar horarios.
-        </div>
-        } @else {
-        <div class="tour-list">
-          @for (t of tours(); track t.Id_Tour) {
-          <div class="tour-row">
-            <div class="tour-info">
-              <span class="tour-name">{{ t.Nombre_Tour || t.NombreTour || ('Tour ' + t.Id_Tour) }}</span>
-            </div>
-            <div class="tour-time">
-              <input class="form-input time-input" [(ngModel)]="horariosMap[t.Id_Tour]"
-                [ngModelOptions]="{ standalone: true }" placeholder="Pendiente" />
-            </div>
-          </div>
-          }
-        </div>
-        }
-      </div>
-
+        <button
+          type="button"
+          class="step-item"
+          [class.is-active]="currentStep === i"
+          [class.is-done]="currentStep > i"
+          [class.has-error]="stepHasError(i)"
+          [class.is-locked]="i > maxReachedStep"
+          [disabled]="i > maxReachedStep"
+          (click)="goToStep(i)">
+          <span class="step-bubble">
+            @if (currentStep > i && !stepHasError(i)) {
+              <svg viewBox="0 0 14 14" aria-hidden="true"><polyline points="2,7 6,11 12,3"/></svg>
+            } @else if (stepHasError(i)) {
+              <svg class="icon-error" viewBox="0 0 14 14" aria-hidden="true">
+                <line x1="7" y1="2" x2="7" y2="8"/>
+                <circle cx="7" cy="11.5" r=".8" fill="currentColor" stroke="none"/>
+              </svg>
+            } @else {
+              {{ i + 1 }}
+            }
+          </span>
+          <span class="step-label">{{ step.label }}</span>
+        </button>
+      }
     </div>
-  </form>
-</div>
 
-<!-- FLOATING SAVE BUTTON -->
-<div class="floating-save-bar">
-  <button class="btn-submit btn-submit-floating" type="submit" form="puntoForm"
-    [disabled]="isSubmitting() || coordinateStatus() === 'checking' || similarityState === 'exact'">
-    @if (isSubmitting() || coordinateStatus() === 'checking') {
-    <span class="btn-spinner"></span>
-    {{ isSubmitting() ? 'Guardando...' : 'Validando...' }}
-    } @else {
-    Guardar Punto
+    @if (currentStep < 3) {
+      <p class="hint">Los campos marcados con <span class="required-star">*</span> son obligatorios.</p>
     }
-  </button>
-</div>
+
+    <form id="puntoForm" [formGroup]="form" (ngSubmit)="onSubmitCrearPunto()" novalidate>
+      <div class="wizard-step-panel" [class.going-back]="goingBack">
+        @if (currentStep === 0) {
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Información del punto</h2>
+                <p class="card-header-hint">Registra el lugar y las coordenadas exactas del encuentro.</p>
+              </div>
+            </div>
+
+            <div class="form-grid point-form-grid">
+              <div class="form-group">
+                <label class="form-label">Nombre del punto <span class="required-star">*</span></label>
+                <input
+                  formControlName="NombrePunto"
+                  (input)="onNombrePuntoInput()"
+                  type="text"
+                  class="form-input"
+                  maxlength="255"
+                  placeholder="Ej: Parque Central"
+                  [class.errorInput]="form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid" />
+                @if (form.get('NombrePunto')?.touched && form.get('NombrePunto')?.invalid) {
+                  <div class="errorMessage">Ingresa un nombre válido.</div>
+                }
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Sector <span class="required-star">*</span></label>
+                <input
+                  formControlName="Sector"
+                  type="text"
+                  class="form-input"
+                  maxlength="255"
+                  placeholder="Ej: Poblado"
+                  [class.errorInput]="form.get('Sector')?.touched && form.get('Sector')?.invalid" />
+                @if (form.get('Sector')?.touched && form.get('Sector')?.invalid) {
+                  <div class="errorMessage">Ingresa un sector válido.</div>
+                }
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Dirección <span class="required-star">*</span></label>
+                <input
+                  formControlName="Direccion"
+                  (input)="onDireccionInput($any($event.target).value)"
+                  type="text"
+                  class="form-input"
+                  placeholder="Ej: Calle 1 #2-34"
+                  [class.errorInput]="(form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) || similarityState === 'exact'"
+                  [class.warnInput]="similarityState === 'similar'" />
+                @if (form.get('Direccion')?.touched && form.get('Direccion')?.hasError('required')) {
+                  <div class="errorMessage">La dirección es obligatoria.</div>
+                }
+                @if (similarityState === 'exact') {
+                  <div class="errorMessage">Ya existe un punto con este nombre y esta dirección.</div>
+                }
+                @if (similarityState === 'similar') {
+                  <div class="warnMessage">
+                    Encontramos un punto similar: {{ duplicatePoint?.Nombre_Punto || duplicatePoint?.NombrePunto || 'Punto' }}
+                    ({{ duplicatePoint?.Direccion || 'sin dirección registrada' }}).
+                  </div>
+                }
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Coordenadas <span class="required-star">*</span></label>
+                <input
+                  formControlName="Coordenadas"
+                  type="text"
+                  class="form-input"
+                  (input)="onCoordenadasInput()"
+                  placeholder="Ej: 6.244747, -75.574756"
+                  [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
+                @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
+                  @if (form.get('Coordenadas')?.errors?.['required']) {
+                    <div class="errorMessage">Las coordenadas son obligatorias.</div>
+                  } @else if (form.get('Coordenadas')?.errors?.['coordenadasInvalidas']) {
+                    <div class="errorMessage">Usa el formato latitud, longitud.</div>
+                  } @else if (form.get('Coordenadas')?.errors?.['latitudInvalida']) {
+                    <div class="errorMessage">La latitud debe estar entre -90 y 90.</div>
+                  } @else if (form.get('Coordenadas')?.errors?.['longitudInvalida']) {
+                    <div class="errorMessage">La longitud debe estar entre -180 y 180.</div>
+                  }
+                }
+                <p class="form-hint">En Google Maps, haz clic derecho sobre el lugar y copia sus coordenadas.</p>
+                @if (coordinateStatus() !== 'idle') {
+                  <p
+                    class="coordinate-status"
+                    [class.coordinate-status--valid]="coordinateStatus() === 'valid'"
+                    [class.coordinate-status--invalid]="coordinateStatus() === 'invalid'">
+                    {{ coordinateDetail() }}
+                  </p>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
+        @if (currentStep === 1) {
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Ruta y posición</h2>
+                <p class="card-header-hint">Define dónde quedará el punto dentro del recorrido operativo.</p>
+              </div>
+            </div>
+
+            <div class="route-mode-grid">
+              <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'existing'">
+                <input type="radio" formControlName="routeMode" value="existing" (change)="onRouteModeChange()">
+                <span><strong>Ruta existente</strong><small>Ubicarlo dentro de un recorrido actual</small></span>
+              </label>
+              <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'pending'">
+                <input type="radio" formControlName="routeMode" value="pending" (change)="onRouteModeChange()">
+                <span><strong>Dejar pendiente</strong><small>Asignar la ruta más adelante</small></span>
+              </label>
+              <label class="choice-card" [class.choice-card--active]="form.value.routeMode === 'new'">
+                <input type="radio" formControlName="routeMode" value="new" (change)="onRouteModeChange()">
+                <span><strong>Nueva ruta</strong><small>Crear una nueva referencia de recorrido</small></span>
+              </label>
+            </div>
+
+            @if (form.value.routeMode === 'existing') {
+              <div class="form-grid route-fields">
+                <div class="form-group">
+                  <label class="form-label" for="rutaExistente">Ruta <span class="required-star">*</span></label>
+                  <select
+                    id="rutaExistente"
+                    class="form-input"
+                    formControlName="rutaExistente"
+                    [class.errorInput]="routeStepAttempted && !routeSelectionIsValid()"
+                    (change)="onRutaExistenteChange($any($event.target).value)">
+                    @for (ruta of rutas(); track ruta) {
+                      <option [value]="ruta">Ruta {{ ruta }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="puntoAnterior">Posición</label>
+                  <select id="puntoAnterior" class="form-input" formControlName="IdPuntoAnterior">
+                    <option [ngValue]="null">Al final de la ruta</option>
+                    @for (punto of puntosRuta(); track punto.Id_Punto) {
+                      <option [ngValue]="punto.Id_Punto">
+                        Después de {{ punto.NombrePunto || punto.Nombre_Punto }} · Posición {{ punto.posicion || punto.Posicion }}
+                      </option>
+                    }
+                  </select>
+                </div>
+              </div>
+            } @else if (form.value.routeMode === 'new') {
+              <div class="form-group route-new-field">
+                <label class="form-label" for="rutaNueva">Nombre o número de la ruta <span class="required-star">*</span></label>
+                <input
+                  id="rutaNueva"
+                  class="form-input"
+                  formControlName="rutaNueva"
+                  maxlength="50"
+                  placeholder="Ej: 15 u Occidente"
+                  [class.errorInput]="routeStepAttempted && !routeSelectionIsValid()" />
+                @if (routeStepAttempted && !routeSelectionIsValid()) {
+                  <div class="errorMessage">Escribe una referencia para la nueva ruta.</div>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (currentStep === 2) {
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Horarios por tour</h2>
+                <p class="card-header-hint">Este paso es opcional. Los horarios vacíos se guardarán como pendientes.</p>
+              </div>
+              <span class="point-count-badge">{{ configuredSchedulesCount() }} configurados</span>
+            </div>
+
+            @if (tours().length === 0) {
+              <div class="empty-state">No hay tours disponibles para configurar horarios.</div>
+            } @else {
+              <div class="tour-list">
+                @for (tour of tours(); track tour.Id_Tour) {
+                  <div class="tour-row">
+                    <label class="tour-name" [for]="'tour-time-' + tour.Id_Tour">
+                      {{ tour.Nombre_Tour || tour.NombreTour || ('Tour ' + tour.Id_Tour) }}
+                    </label>
+                    <input
+                      [id]="'tour-time-' + tour.Id_Tour"
+                      class="form-input time-input"
+                      [(ngModel)]="horariosMap[tour.Id_Tour]"
+                      (ngModelChange)="onHorarioChange()"
+                      [ngModelOptions]="{ standalone: true }"
+                      placeholder="Pendiente" />
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (currentStep === 3) {
+          <section class="card point-review">
+            <div class="card-header">
+              <div>
+                <h2>Revisa el nuevo punto</h2>
+                <p class="card-header-hint">Confirma la ubicación, la ruta y los horarios antes de crearlo.</p>
+              </div>
+              <span class="review-ready">Listo para crear</span>
+            </div>
+
+            <div class="point-review-heading">
+              <span>Nuevo punto de encuentro</span>
+              <h3>{{ form.get('NombrePunto')?.value || 'Sin nombre' }}</h3>
+              <p>{{ form.get('Sector')?.value }} · {{ form.get('Direccion')?.value }}</p>
+            </div>
+
+            <dl class="point-review-list">
+              <div>
+                <dt>Coordenadas</dt>
+                <dd>{{ form.get('Coordenadas')?.value }}</dd>
+                <button type="button" (click)="goToStep(0)">Editar</button>
+              </div>
+              <div>
+                <dt>Ruta</dt>
+                <dd>{{ routeSummary() }} · {{ positionSummary() }}</dd>
+                <button type="button" (click)="goToStep(1)">Editar</button>
+              </div>
+              <div>
+                <dt>Horarios</dt>
+                <dd>{{ configuredSchedulesCount() }} de {{ tours().length }} configurados</dd>
+                <button type="button" (click)="goToStep(2)">Editar</button>
+              </div>
+            </dl>
+
+            @if (configuredSchedulesCount() > 0) {
+              <div class="review-schedules">
+                @for (tour of tours(); track tour.Id_Tour) {
+                  @if (isScheduleConfigured(tour.Id_Tour)) {
+                    <div>
+                      <span>{{ tour.Nombre_Tour || tour.NombreTour || ('Tour ' + tour.Id_Tour) }}</span>
+                      <strong>{{ horariosMap[tour.Id_Tour] }}</strong>
+                    </div>
+                  }
+                }
+              </div>
+            }
+          </section>
+        }
+      </div>
+    </form>
+  </div>
+
+  <div class="wizard-nav wizard-nav--page-enter">
+    <div class="wizard-nav-row">
+      <div class="wizard-nav-left">
+        @if (currentStep > 0) {
+          <button type="button" class="btn-wizard-back" (click)="prevStep()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Anterior</span>
+          </button>
+        }
+      </div>
+
+      <div class="wizard-nav-center">
+        @if (pointSummaryName()) {
+          <div class="wizard-nav-summary">
+            <span class="wizard-nav-tour">{{ pointSummaryName() }}</span>
+            <span class="nav-sep">•</span>
+            <span class="wizard-nav-item">{{ routeSummary() }}</span>
+            @if (configuredSchedulesCount() > 0) {
+              <span class="nav-sep">•</span>
+              <span class="wizard-nav-item">{{ configuredSchedulesCount() }} horarios</span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="wizard-nav-right">
+        @if (currentStep < wizardSteps.length - 1) {
+          <button type="button" class="btn-wizard-next" (click)="nextStep()" [class.is-disabled]="!canAdvanceFromStep(currentStep)">
+            <span>{{ currentStep === 2 ? 'Revisar' : 'Siguiente' }}</span>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        } @else {
+          <button
+            class="btn-wizard-submit"
+            type="submit"
+            form="puntoForm"
+            [disabled]="isSubmitting() || coordinateStatus() === 'checking' || similarityState === 'exact'">
+            @if (isSubmitting() || coordinateStatus() === 'checking') {
+              <span class="btn-spinner"></span>
+              {{ isSubmitting() ? 'Creando…' : 'Validando…' }}
+            } @else {
+              Crear punto
+            }
+          </button>
+        }
+      </div>
+    </div>
+  </div>
 }

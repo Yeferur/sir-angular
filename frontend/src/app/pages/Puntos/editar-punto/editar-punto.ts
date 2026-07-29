@@ -32,6 +32,18 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
   isLoading = signal(true);
   loadError = signal('');
   isSubmitting = signal(false);
+  readonly wizardSteps = [
+    { id: 'location', label: 'Información' },
+    { id: 'route', label: 'Ruta' },
+    { id: 'schedules', label: 'Horarios' },
+    { id: 'review', label: 'Revisar' },
+  ];
+  currentStep = 0;
+  maxReachedStep = 0;
+  goingBack = false;
+  panelAnimating = false;
+  routeStepAttempted = false;
+  scheduleDirty = false;
   successMsg = '';
   errorMsg = '';
 
@@ -85,6 +97,129 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
     this.addressRequest?.unsubscribe();
   }
 
+  goToStep(step: number): void {
+    if (step < 0 || step >= this.wizardSteps.length || step > this.maxReachedStep) return;
+    if (step === this.currentStep) return;
+    this.goingBack = step < this.currentStep;
+    this.currentStep = step;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep(): void {
+    if (!this.validateStep(this.currentStep)) return;
+    if (this.currentStep >= this.wizardSteps.length - 1) return;
+    this.goingBack = false;
+    this.currentStep += 1;
+    this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  prevStep(): void {
+    if (this.currentStep <= 0) return;
+    this.goingBack = true;
+    this.currentStep -= 1;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  canAdvanceFromStep(step: number): boolean {
+    if (step === 0) {
+      return ['NombrePunto', 'Sector', 'Direccion', 'Coordenadas']
+        .every((name) => this.form.get(name)?.valid)
+        && this.similarityState !== 'exact'
+        && this.coordinateStatus() !== 'invalid'
+        && this.coordinateStatus() !== 'checking';
+    }
+    if (step === 1) return this.routeSelectionIsValid();
+    return true;
+  }
+
+  stepHasError(step: number): boolean {
+    if (step === 0) {
+      return ['NombrePunto', 'Sector', 'Direccion', 'Coordenadas']
+        .some((name) => Boolean(this.form.get(name)?.touched && this.form.get(name)?.invalid))
+        || this.similarityState === 'exact'
+        || this.coordinateStatus() === 'invalid';
+    }
+    return step === 1 && this.routeStepAttempted && !this.routeSelectionIsValid();
+  }
+
+  routeSelectionIsValid(): boolean {
+    if (this.esPuntoProtegido()) return true;
+    const mode = this.form.value.routeMode;
+    if (mode === 'pending') return true;
+    if (mode === 'new') return Boolean(String(this.form.value.rutaNueva || '').trim());
+    return Boolean(String(this.form.value.rutaExistente || '').trim());
+  }
+
+  routeSummary(): string {
+    const route = this.rutaSeleccionada();
+    return route && route !== 'PENDIENTE' ? `Ruta ${route}` : 'Pendiente';
+  }
+
+  pointSummaryName(): string {
+    return String(this.form.get('NombrePunto')?.value || '').trim();
+  }
+
+  positionSummary(): string {
+    return this.descripcionPosicion();
+  }
+
+  configuredSchedulesCount(): number {
+    return this.tours().filter((tour) => this.isScheduleConfigured(tour.Id_Tour)).length;
+  }
+
+  isScheduleConfigured(tourId: number | string): boolean {
+    const value = String(this.horariosMap[tourId] || '').trim();
+    return Boolean(value && value.toLocaleLowerCase('es-CO') !== 'pendiente');
+  }
+
+  onHorarioChange(): void {
+    this.scheduleDirty = true;
+  }
+
+  private validateStep(step: number): boolean {
+    if (step === 0) {
+      const controls = ['NombrePunto', 'Sector', 'Direccion', 'Coordenadas'];
+      controls.forEach((name) => this.form.get(name)?.markAsTouched());
+      if (!this.canAdvanceFromStep(0)) {
+        this.alerts.warningToast('Revisa la ubicación', 'Completa correctamente los datos del punto antes de continuar.');
+        return false;
+      }
+    }
+
+    if (step === 1) {
+      this.routeStepAttempted = true;
+      if (!this.routeSelectionIsValid()) {
+        this.alerts.warningToast('Selecciona una ruta', 'Elige una ruta existente, déjala pendiente o escribe una nueva.');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private navigateToInvalidStep(step: number): void {
+    this.maxReachedStep = Math.max(this.maxReachedStep, step);
+    this.goingBack = step < this.currentStep;
+    this.currentStep = step;
+    this.animatePanel();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  private animatePanel(): void {
+    this.panelAnimating = false;
+    requestAnimationFrame(() => {
+      this.panelAnimating = true;
+      setTimeout(() => {
+        this.panelAnimating = false;
+        this.goingBack = false;
+      }, 380);
+    });
+  }
+
   loadInitialData(): void {
     if (!this.puntoId || !Number.isInteger(this.puntoId) || this.puntoId <= 0) {
       this.isLoading.set(false);
@@ -93,6 +228,12 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
     }
 
     this.loadError.set('');
+    this.currentStep = 0;
+    this.maxReachedStep = 0;
+    this.goingBack = false;
+    this.panelAnimating = false;
+    this.routeStepAttempted = false;
+    this.scheduleDirty = false;
     this.isLoading.set(true);
     this.toursLoaded = false;
     this.rutasLoaded = false;
@@ -285,12 +426,17 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
 
 async onSubmitGuardarCambios() {
   if (this.isSubmitting() || this.coordinateStatus() === 'checking') return;
+  if (this.currentStep < this.wizardSteps.length - 1) {
+    this.nextStep();
+    return;
+  }
 
   // ===== Validación del formulario ANTES de confirmar =====
   this.form.updateValueAndValidity({ emitEvent: false });
 
   if (this.form.invalid) {
     this.form.markAllAsTouched();
+    this.navigateToInvalidStep(0);
     const invalid = Object.keys(this.form.controls).filter(k => this.form.get(k)?.invalid);
     const friendly: Record<string,string> = {
       NombrePunto: 'Nombre del punto',
@@ -317,6 +463,8 @@ async onSubmitGuardarCambios() {
     return;
   }
   if (!this.rutaSeleccionada()) {
+    this.routeStepAttempted = true;
+    this.navigateToInvalidStep(1);
     this.alerts.warningToast('Ruta requerida', 'Selecciona una ruta, déjala pendiente o escribe una nueva.');
     return;
   }
@@ -379,6 +527,7 @@ private guardarCambiosConfirmado() {
       this.successMsg = 'Punto actualizado correctamente';
       this.alerts.successToast('Punto actualizado', this.successMsg);
       this.form.markAsPristine();
+      this.scheduleDirty = false;
       this.router.navigate(
         ['/Puntos/VerPuntos'],
         { queryParamsHandling: 'preserve' }
@@ -537,7 +686,7 @@ private requestSimilarPointConfirmation(): Promise<boolean> {
   }
 
   hasUnsavedChanges(): boolean {
-    return this.form?.dirty && !this.isSubmitting();
+    return Boolean((this.form?.dirty || this.scheduleDirty) && !this.isSubmitting());
   }
 
   private setExactDuplicate(point: any, ctrl: any) {

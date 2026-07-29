@@ -55,20 +55,6 @@
   color: var(--accent-red);
 }
 
-/* =========================================================
-   VALIDACIONES
-   ========================================================= */
-.errorInput {
-  border: 1px solid #e57373 !important;
-  box-shadow: 0px 0px 5px rgba(229, 115, 115, 0.8);
-}
-
-.errorMessage {
-  color: #e57373;
-  font-size: 12px;
-  margin-top: 5px;
-}
-
 .segmented-control {
   display: flex;
   width: 100%;

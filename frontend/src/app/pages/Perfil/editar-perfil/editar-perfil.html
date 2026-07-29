@@ -1,208 +1,314 @@
 @if (isLoading()) {
-  <app-loading-state label="Cargando perfil y seguridad…"></app-loading-state>
+  <app-loading-state label="Preparando tu perfil…"></app-loading-state>
+} @else if (loadError()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos cargar tu perfil"
+    [detail]="loadError()"
+    (action)="cargarPerfil()">
+  </app-loading-state>
 } @else {
-<div class="booking-dashboard">
-  <div class="page-header">
-    <div class="page-header-copy">
-      <h1>Editar Perfil</h1>
-      <p class="subtitle">Actualiza tu información personal y credenciales de acceso.</p>
-    </div>
-  </div>
+  <main class="profile-page">
+    <section class="profile-hero card">
+      <div class="profile-avatar-block">
+        <div class="profile-avatar" [class.has-preview]="avatarPreview()">
+          @if (avatarPreview()) {
+            <img [src]="avatarPreview()" alt="Vista previa de tu nueva foto" />
+          } @else if (avatarActual()) {
+            <img [src]="avatarActual()" alt="Tu foto de perfil" />
+          } @else {
+            <span>{{ getInitials() }}</span>
+          }
 
-  <form [formGroup]="form" (ngSubmit)="guardar()" autocomplete="off" novalidate>
-    <div class="main-content">
-      <div class="card avatar-card">
-        <div class="avatar-container">
-          <div class="avatar-wrapper">
-            @if (avatarPreview()) {
-            <img class="avatar-image preview" [src]="avatarPreview()" alt="Vista previa de foto" />
-            } @else if (avatarActual()) {
-            <img class="avatar-image" [src]="avatarActual()" alt="Foto de perfil" />
-            } @else {
-            <div class="avatar-placeholder">
-              <span class="avatar-initials">{{ getInitials() }}</span>
+          @if (isUploadingAvatar() || isDeletingAvatar()) {
+            <div class="profile-avatar-loading" aria-live="polite">
+              <span class="btn-spinner"></span>
             </div>
-            }
-
-            @if (isUploadingAvatar()) {
-            <div class="avatar-loading-state">Subiendo...</div>
-            }
-          </div>
-        </div>
-
-        <div class="avatar-actions">
-          <label class="btn-avatar btn-change" [class.loading]="isUploadingAvatar()">
-            <input
-              type="file"
-              name="avatarInput"
-              accept="image/*"
-              (change)="onAvatarSelected($event)"
-              [disabled]="isUploadingAvatar()"
-              aria-label="Seleccionar foto de perfil"
-            />
-            <span>{{ isUploadingAvatar() ? 'Subiendo...' : 'Cambiar foto' }}</span>
-          </label>
-
-          @if (avatarActual() && !isUploadingAvatar()) {
-          <button
-            type="button"
-            class="btn-avatar btn-delete"
-            (click)="eliminarAvatar()"
-            [disabled]="isDeletingAvatar()"
-            aria-label="Eliminar foto de perfil"
-          >
-            <span>{{ isDeletingAvatar() ? 'Eliminando...' : 'Eliminar' }}</span>
-          </button>
           }
         </div>
 
         @if (avatarPreview()) {
-        <p class="avatar-note">La nueva foto se guardará al guardar los cambios.</p>
+          <span class="preview-chip">Vista previa</span>
         }
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h2>Datos de la Cuenta</h2>
-        </div>
-
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Contraseña actual</label>
-            <div class="password-wrapper">
-              <input
-                class="form-control"
-                formControlName="ContrasenaActual"
-                [type]="showCurrentPassword() ? 'text' : 'password'"
-                autocomplete="current-password"
-                [ngClass]="form.touched && form.errors?.['currentPasswordRequired'] ? 'errorInput' : ''"
-              />
-              <button
-                type="button"
-                class="toggle-password"
-                (click)="showCurrentPassword.set(!showCurrentPassword())"
-                [attr.aria-label]="showCurrentPassword() ? 'Ocultar contraseña actual' : 'Ver contraseña actual'"
-              >
-                {{ showCurrentPassword() ? 'Ocultar' : 'Ver' }}
-              </button>
-            </div>
-            <div class="form-hint">Solo es necesaria si vas a cambiar tu contraseña.</div>
-            @if (form.touched && form.errors?.['currentPasswordRequired']) {
-            <div class="errorMessage">Escribe tu contraseña actual para confirmar el cambio.</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Cédula</label>
-            <input class="form-control" formControlName="Id_Usuario" readonly />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Usuario</label>
-            <input class="form-control" formControlName="Usuario" readonly />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Nombre completo <span class="required-star">*</span></label>
-            <input
-              class="form-control"
-              formControlName="Nombres_Apellidos"
-              [ngClass]="c('Nombres_Apellidos').touched && c('Nombres_Apellidos').invalid ? 'errorInput' : ''"
-            />
-            @if (c('Nombres_Apellidos').touched && c('Nombres_Apellidos').invalid) {
-            <div class="errorMessage">{{ msg('Nombres_Apellidos') }}</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Teléfono <span class="required-star">*</span></label>
-            <input
-              class="form-control"
-              formControlName="Telefono_Usuario"
-              inputmode="numeric"
-              [ngClass]="c('Telefono_Usuario').touched && c('Telefono_Usuario').invalid ? 'errorInput' : ''"
-            />
-            @if (c('Telefono_Usuario').touched && c('Telefono_Usuario').invalid) {
-            <div class="errorMessage">{{ msg('Telefono_Usuario') }}</div>
-            }
-          </div>
-
-          <div class="form-group full-width">
-            <label class="form-label">Correo <span class="required-star">*</span></label>
-            <input
-              class="form-control"
-              formControlName="Correo"
-              [ngClass]="c('Correo').touched && c('Correo').invalid ? 'errorInput' : ''"
-            />
-            @if (c('Correo').touched && c('Correo').invalid) {
-            <div class="errorMessage">{{ msg('Correo') }}</div>
-            }
-          </div>
-        </div>
+      <div class="profile-hero-copy">
+        <span class="profile-kicker">Tu perfil</span>
+        <h1>{{ profileForm.value.Nombres_Apellidos || perfilActual()?.Nombres_Apellidos }}</h1>
+        <p>
+          &#64;{{ perfilActual()?.Usuario }}
+          <span aria-hidden="true">·</span>
+          CC {{ perfilActual()?.Id_Usuario }}
+        </p>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h2>Seguridad</h2>
-        </div>
+      <div class="profile-photo-actions">
+        <label class="profile-button profile-button--primary" [class.is-disabled]="isUploadingAvatar() || isDeletingAvatar()">
+          <input
+            #avatarInput
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            (change)="onAvatarSelected($event)"
+            [disabled]="isUploadingAvatar() || isDeletingAvatar()"
+            aria-label="Seleccionar una nueva foto de perfil" />
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 6.5h3l1.2-2h5.6l1.2 2h3v9H3v-9Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <circle cx="10" cy="11" r="2.7" stroke="currentColor" stroke-width="1.7"/>
+          </svg>
+          {{ avatarActual() || avatarPreview() ? 'Cambiar foto' : 'Agregar foto' }}
+        </label>
 
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Nueva contraseña (opcional)</label>
-            <div class="password-wrapper">
-              <input
-                class="form-control"
-                formControlName="Contrasena"
-                [type]="showPassword() ? 'text' : 'password'"
-                autocomplete="new-password"
-                [ngClass]="c('Contrasena').touched && c('Contrasena').invalid ? 'errorInput' : ''"
-              />
-              <button
-                type="button"
-                class="toggle-password"
-                (click)="showPassword.set(!showPassword())"
-                [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Ver contraseña'"
-              >
-                {{ showPassword() ? 'Ocultar' : 'Ver' }}
-              </button>
-            </div>
-            @if (c('Contrasena').touched && c('Contrasena').invalid) {
-            <div class="errorMessage">{{ msg('Contrasena') }}</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Confirmar contraseña</label>
-            <div class="password-wrapper">
-              <input
-                class="form-control"
-                formControlName="ConfirmarContrasena"
-                [type]="showConfirm() ? 'text' : 'password'"
-                autocomplete="new-password"
-                [ngClass]="form.touched && form.errors?.['passwordMismatch'] ? 'errorInput' : ''"
-              />
-              <button
-                type="button"
-                class="toggle-password"
-                (click)="showConfirm.set(!showConfirm())"
-                [attr.aria-label]="showConfirm() ? 'Ocultar confirmación' : 'Ver confirmación'"
-              >
-                {{ showConfirm() ? 'Ocultar' : 'Ver' }}
-              </button>
-            </div>
-            @if (form.touched && form.errors?.['passwordMismatch']) {
-            <div class="errorMessage">Las contraseñas no coinciden.</div>
-            }
-          </div>
-        </div>
-
-        <div class="actions-end">
-          <button class="btn-primary" type="submit" [disabled]="isSubmitting() || isUploadingAvatar() || isDeletingAvatar()">
-            {{ isSubmitting() ? 'Guardando...' : 'Guardar cambios' }}
+        @if (!avatarPreview() && avatarActual()) {
+          <button
+            type="button"
+            class="profile-button profile-button--danger"
+            (click)="eliminarAvatar()"
+            [disabled]="isDeletingAvatar() || isUploadingAvatar()">
+            Eliminar
           </button>
-        </div>
+        }
       </div>
+
+      @if (avatarPreview()) {
+        <div class="avatar-pending-panel">
+          <div>
+            <strong>Nueva foto seleccionada</strong>
+            <span>{{ avatarFileName() }}</span>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="profile-button profile-button--secondary"
+              (click)="discardAvatarSelection()"
+              [disabled]="isUploadingAvatar()">
+              Descartar
+            </button>
+            <button
+              type="button"
+              class="profile-button profile-button--primary"
+              (click)="guardarAvatar()"
+              [disabled]="isUploadingAvatar()">
+              @if (isUploadingAvatar()) {
+                <span class="btn-spinner"></span>
+                Guardando…
+              } @else {
+                Guardar foto
+              }
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+
+    <div class="profile-layout">
+      <section class="card profile-section profile-section--details">
+        <header class="profile-section-header">
+          <h2>Información personal</h2>
+        </header>
+
+        <form [formGroup]="profileForm" (ngSubmit)="guardarDatosPersonales()" autocomplete="off" novalidate>
+          <div class="form-grid profile-form-grid">
+            <div class="form-group full-width">
+              <label class="form-label">Nombre completo <span class="required-star">*</span></label>
+              <input
+                class="form-input"
+                formControlName="Nombres_Apellidos"
+                autocomplete="name"
+                maxlength="255"
+                placeholder="Tu nombre completo"
+                [class.errorInput]="profileControl('Nombres_Apellidos').touched && profileControl('Nombres_Apellidos').invalid" />
+              @if (profileControl('Nombres_Apellidos').touched && profileControl('Nombres_Apellidos').invalid) {
+                <span class="errorMessage">{{ profileMessage('Nombres_Apellidos') }}</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Correo <span class="required-star">*</span></label>
+              <input
+                class="form-input"
+                type="email"
+                formControlName="Correo"
+                autocomplete="email"
+                maxlength="255"
+                placeholder="nombre@empresa.com"
+                [class.errorInput]="profileControl('Correo').touched && profileControl('Correo').invalid" />
+              @if (profileControl('Correo').touched && profileControl('Correo').invalid) {
+                <span class="errorMessage">{{ profileMessage('Correo') }}</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Teléfono <span class="required-star">*</span></label>
+              <input
+                class="form-input"
+                formControlName="Telefono_Usuario"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="300 000 0000"
+                [class.errorInput]="profileControl('Telefono_Usuario').touched && profileControl('Telefono_Usuario').invalid" />
+              @if (profileControl('Telefono_Usuario').touched && profileControl('Telefono_Usuario').invalid) {
+                <span class="errorMessage">{{ profileMessage('Telefono_Usuario') }}</span>
+              }
+            </div>
+          </div>
+
+          <footer class="profile-section-footer">
+            <span>
+              @if (profileForm.dirty) {
+                Tienes cambios sin guardar.
+              } @else {
+                Tu información está actualizada.
+              }
+            </span>
+            <button
+              type="submit"
+              class="profile-button profile-button--primary"
+              [disabled]="isProfileSubmitting() || !profileForm.dirty">
+              @if (isProfileSubmitting()) {
+                <span class="btn-spinner"></span>
+                Guardando…
+              } @else {
+                Guardar información
+              }
+            </button>
+          </footer>
+        </form>
+      </section>
+
+      <aside class="card profile-section profile-section--security">
+        <header class="profile-section-header">
+          <h2>Seguridad</h2>
+        </header>
+
+        @if (!passwordChangeOpen()) {
+          <button type="button" class="profile-button profile-button--secondary security-open-button" (click)="openPasswordChange()">
+            Cambiar contraseña
+          </button>
+        } @else {
+          <form class="security-form" [formGroup]="passwordForm" (ngSubmit)="guardarContrasena()" autocomplete="off" novalidate>
+            <div class="security-notice">
+              Confirma tu contraseña actual. Por seguridad permanecerá oculta.
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Contraseña actual <span class="required-star">*</span></label>
+              <input
+                class="form-input"
+                type="password"
+                formControlName="ContrasenaActual"
+                autocomplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-bwignore="true"
+                data-form-type="other"
+                placeholder="Escribe tu contraseña actual"
+                [class.errorInput]="passwordControl('ContrasenaActual').touched && passwordControl('ContrasenaActual').invalid" />
+              @if (passwordControl('ContrasenaActual').touched && passwordControl('ContrasenaActual').invalid) {
+                <span class="errorMessage">Es necesaria para confirmar tu identidad.</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Nueva contraseña <span class="required-star">*</span></label>
+              <div
+                class="password-field"
+                #passwordWrapper
+                (focusin)="openPasswordStrength()"
+                (focusout)="closePasswordStrengthIfOutside($event, passwordWrapper)">
+                <input
+                  class="form-input"
+                  [type]="showNewPassword() ? 'text' : 'password'"
+                  formControlName="NuevaContrasena"
+                  autocomplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-bwignore="true"
+                  data-form-type="other"
+                  placeholder="Crea una contraseña segura"
+                  [class.errorInput]="passwordControl('NuevaContrasena').touched && (!passwordControl('NuevaContrasena').value || passwordStrength.label === 'Débil')" />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  (click)="showNewPassword.set(!showNewPassword())"
+                  [attr.aria-label]="showNewPassword() ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'">
+                  @if (showNewPassword()) {
+                    <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 4.2A10.6 10.6 0 0 1 12 4c5.5 0 9 6 9 6a17 17 0 0 1-2.1 2.8M6.2 6.2C4.1 7.6 3 10 3 10s3.5 6 9 6c1 0 1.9-.2 2.7-.5"/></svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                  }
+                </button>
+
+                @if (passwordStrengthOpen() && passwordControl('NuevaContrasena').value) {
+                  <div class="password-strength-popover">
+                    <div class="strength-heading">
+                      <span>Seguridad: <strong>{{ passwordStrength.label }}</strong></span>
+                      <span>{{ passwordStrength.score }}/6</span>
+                    </div>
+                    <div class="strength-bars" [attr.data-level]="passwordStrength.label">
+                      @for (bar of [1, 2, 3, 4, 5, 6]; track bar) {
+                        <span [class.is-active]="passwordStrength.score >= bar"></span>
+                      }
+                    </div>
+                    <ul>
+                      <li [class.is-valid]="passwordStrength.checks.length8">Mínimo 8 caracteres</li>
+                      <li [class.is-valid]="passwordStrength.checks.upper">Una mayúscula</li>
+                      <li [class.is-valid]="passwordStrength.checks.lower">Una minúscula</li>
+                      <li [class.is-valid]="passwordStrength.checks.digit">Un número</li>
+                      <li [class.is-valid]="passwordStrength.checks.symbol">Un símbolo</li>
+                      <li [class.is-valid]="passwordStrength.checks.length12">Recomendado: 12+</li>
+                    </ul>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Confirmar contraseña <span class="required-star">*</span></label>
+              <div class="password-field">
+                <input
+                  class="form-input"
+                  [type]="showPasswordConfirmation() ? 'text' : 'password'"
+                  formControlName="ConfirmarContrasena"
+                  autocomplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-bwignore="true"
+                  data-form-type="other"
+                  placeholder="Repite la nueva contraseña"
+                  [class.errorInput]="passwordControl('ConfirmarContrasena').touched && passwordForm.hasError('passwordMismatch')" />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  (click)="showPasswordConfirmation.set(!showPasswordConfirmation())"
+                  [attr.aria-label]="showPasswordConfirmation() ? 'Ocultar confirmación' : 'Mostrar confirmación'">
+                  @if (showPasswordConfirmation()) {
+                    <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 4.2A10.6 10.6 0 0 1 12 4c5.5 0 9 6 9 6a17 17 0 0 1-2.1 2.8M6.2 6.2C4.1 7.6 3 10 3 10s3.5 6 9 6c1 0 1.9-.2 2.7-.5"/></svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                  }
+                </button>
+              </div>
+              @if (passwordControl('ConfirmarContrasena').touched && passwordForm.hasError('passwordMismatch')) {
+                <span class="errorMessage">Las contraseñas no coinciden.</span>
+              }
+            </div>
+
+            <div class="security-actions">
+              <button type="button" class="profile-button profile-button--secondary" (click)="cancelPasswordChange()" [disabled]="isPasswordSubmitting()">
+                Cancelar
+              </button>
+              <button type="submit" class="profile-button profile-button--primary" [disabled]="isPasswordSubmitting()">
+                @if (isPasswordSubmitting()) {
+                  <span class="btn-spinner"></span>
+                  Actualizando…
+                } @else {
+                  Cambiar contraseña
+                }
+              </button>
+            </div>
+          </form>
+        }
+      </aside>
     </div>
-  </form>
-</div>
+  </main>
 }

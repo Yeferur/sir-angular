@@ -180,7 +180,7 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/Perfil/editar-perfil/editar-perfil').then((m) => m.EditarPerfilComponent),
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
-    title: 'Editar Perfil',
+    title: 'Mi perfil',
   },
   {
     path: 'Ayuda',

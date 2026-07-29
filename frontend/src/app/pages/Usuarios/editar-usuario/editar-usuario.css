@@ -1,0 +1,90 @@
+.edit-readonly-field {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-tertiary));
+  cursor: not-allowed;
+}
+
+.account-state-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.account-state-option {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1.5px solid var(--separator-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color .22s cubic-bezier(.2, .8, .2, 1),
+    background-color .22s cubic-bezier(.2, .8, .2, 1),
+    transform .22s cubic-bezier(.2, .8, .2, 1);
+}
+
+.account-state-option:hover {
+  transform: translateY(-1px);
+}
+
+.account-state-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-blue) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.account-state-option > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-state-option strong {
+  font-size: .75rem;
+}
+
+.account-state-option small {
+  color: var(--text-secondary);
+  font-size: .66rem;
+}
+
+.account-state-option--active.is-selected {
+  border-color: var(--accent-green);
+  background: color-mix(in srgb, var(--accent-green) 8%, var(--bg-tertiary));
+}
+
+.account-state-option--active.is-selected:focus-visible {
+  outline-color: color-mix(in srgb, var(--accent-green) 68%, transparent);
+}
+
+.account-state-option--inactive.is-selected {
+  border-color: var(--accent-red);
+  background: color-mix(in srgb, var(--accent-red) 7%, var(--bg-tertiary));
+}
+
+.account-state-option--inactive.is-selected:focus-visible {
+  outline-color: color-mix(in srgb, var(--accent-red) 68%, transparent);
+}
+
+.review-account-chip--inactive {
+  border-color: color-mix(in srgb, var(--accent-red) 26%, var(--separator-color));
+  color: var(--accent-red);
+  background: color-mix(in srgb, var(--accent-red) 9%, transparent);
+}
+
+@media (max-width: 700px) {
+  .account-state-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-state-option {
+    transition: none;
+  }
+}

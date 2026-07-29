@@ -1,22 +1,32 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, NgZone, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { startWith, takeUntil } from 'rxjs/operators';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
-import { SirAlertService, type AlertButton } from '../../../services/Alertas/alert.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
-import { isUserPasswordStrong, USER_PHONE_REGEX } from '../../Usuarios/usuario-form.utils';
+import {
+  evaluateUserPassword,
+  isUserPasswordStrong,
+  normalizeUserName,
+  USER_PHONE_REGEX,
+} from '../../Usuarios/usuario-form.utils';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
-  const pass = group.get('Contrasena')?.value;
-  const confirm = group.get('ConfirmarContrasena')?.value;
-  const current = group.get('ContrasenaActual')?.value;
-
-  const errors: ValidationErrors = {};
-  if (pass || confirm) {
-    if (pass !== confirm) errors['passwordMismatch'] = true;
-    if (!current) errors['currentPasswordRequired'] = true;
-  }
-  return Object.keys(errors).length ? errors : null;
+  const password = group.get('NuevaContrasena')?.value;
+  const confirmation = group.get('ConfirmarContrasena')?.value;
+  if (!password && !confirmation) return null;
+  return password === confirmation ? null : { passwordMismatch: true };
 }
 
 @Component({
@@ -25,360 +35,394 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
   imports: [CommonModule, ReactiveFormsModule, LoadingStateComponent],
   templateUrl: './editar-perfil.html',
   styleUrls: ['./editar-perfil.css'],
-  changeDetection: ChangeDetectionStrategy.Default,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class EditarPerfilComponent implements OnInit {
-  form: FormGroup;
+export class EditarPerfilComponent implements OnInit, OnDestroy {
+  @ViewChild('avatarInput') avatarInput?: ElementRef<HTMLInputElement>;
+
+  profileForm: FormGroup;
+  passwordForm: FormGroup;
 
   isLoading = signal(true);
-  isSubmitting = signal(false);
-  perfilActual = signal<any | null>(null);
-  showPassword = signal(false);
-  showConfirm = signal(false);
-  showCurrentPassword = signal(false);
-
-  avatarActual = signal<string | null>(null);
-  avatarPreview = signal<string | null>(null);
-  selectedAvatarFile: File | null = null;
+  loadError = signal('');
+  isProfileSubmitting = signal(false);
+  isPasswordSubmitting = signal(false);
   isUploadingAvatar = signal(false);
   isDeletingAvatar = signal(false);
 
+  perfilActual = signal<any | null>(null);
+  avatarActual = signal<string | null>(null);
+  avatarPreview = signal<string | null>(null);
+  avatarFileName = signal('');
 
-  private mapAlertButtons(buttons?: Array<{ text: string; style: string; onClick: () => void }>): AlertButton[] | undefined {
-    if (!buttons?.length) return undefined;
-    return buttons.map((button) => ({
-      text: button.text,
-      style: button.style === 'delete' || button.style === 'danger' ? 'danger' : button.style === 'secondary' ? 'secondary' : 'primary',
-      onClick: button.onClick,
-    }));
-  }
+  passwordChangeOpen = signal(false);
+  passwordStrengthOpen = signal(false);
+  showNewPassword = signal(false);
+  showPasswordConfirmation = signal(false);
+  passwordStrength = evaluateUserPassword('', true);
+
+  private selectedAvatarFile: File | null = null;
+  private avatarPreviewObjectUrl: string | null = null;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private fb: FormBuilder,
     private usuariosService: UsuariosService,
     private alerts: SirAlertService,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone,
   ) {
-    this.form = this.fb.group(
-      {
-        Id_Usuario: [{ value: '', disabled: true }],
-        Usuario: [{ value: '', disabled: true }],
-        Nombres_Apellidos: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
-        Telefono_Usuario: ['', [Validators.required, Validators.pattern(USER_PHONE_REGEX)]],
-        Correo: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
-        ContrasenaActual: [''],
-        Contrasena: ['', [Validators.minLength(8)]],
-        ConfirmarContrasena: [''],
-      },
-      { validators: passwordMatchValidator }
-    );
+    this.profileForm = this.fb.group({
+      Nombres_Apellidos: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
+      Telefono_Usuario: ['', [Validators.required, Validators.pattern(USER_PHONE_REGEX)]],
+      Correo: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
+    });
+
+    this.passwordForm = this.fb.group({
+      ContrasenaActual: ['', [Validators.required]],
+      NuevaContrasena: ['', [Validators.required]],
+      ConfirmarContrasena: ['', [Validators.required]],
+    }, { validators: passwordMatchValidator });
   }
 
   ngOnInit(): void {
+    this.setupPasswordStrength();
     this.cargarPerfil();
   }
 
-  c(name: string): AbstractControl {
-    return this.form.get(name)!;
+  ngOnDestroy(): void {
+    this.revokeAvatarPreview();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
-  msg(name: string): string {
-    const ctrl = this.c(name);
-    if (!ctrl.errors) return '';
+  hasUnsavedChanges(): boolean {
+    const requestInProgress =
+      this.isProfileSubmitting()
+      || this.isPasswordSubmitting()
+      || this.isUploadingAvatar()
+      || this.isDeletingAvatar();
 
-    if (ctrl.errors['required']) return 'Este campo es obligatorio.';
-    if (ctrl.errors['email']) return 'Correo inválido.';
-    if (ctrl.errors['minlength']) return `Mínimo ${ctrl.errors['minlength'].requiredLength} caracteres.`;
-    if (ctrl.errors['maxlength']) return `Máximo ${ctrl.errors['maxlength'].requiredLength} caracteres.`;
-    if (ctrl.errors['pattern'] && name === 'Telefono_Usuario') return 'Teléfono inválido (7 a 15 dígitos).';
-    return 'Valor inválido.';
+    if (requestInProgress) return false;
+
+    return this.profileForm.dirty
+      || Boolean(this.selectedAvatarFile)
+      || (this.passwordChangeOpen() && this.passwordForm.dirty);
+  }
+
+  profileControl(name: string): AbstractControl {
+    return this.profileForm.get(name)!;
+  }
+
+  passwordControl(name: string): AbstractControl {
+    return this.passwordForm.get(name)!;
+  }
+
+  profileMessage(name: string): string {
+    const control = this.profileControl(name);
+    if (!control.errors) return '';
+    if (control.errors['required']) return 'Este campo es obligatorio.';
+    if (control.errors['email']) return 'Ingresa un correo válido.';
+    if (control.errors['minlength']) return `Mínimo ${control.errors['minlength'].requiredLength} caracteres.`;
+    if (control.errors['maxlength']) return `Máximo ${control.errors['maxlength'].requiredLength} caracteres.`;
+    if (control.errors['pattern'] && name === 'Telefono_Usuario') {
+      return 'Ingresa entre 7 y 15 números.';
+    }
+    return 'Revisa este valor.';
   }
 
   cargarPerfil(): void {
     this.isLoading.set(true);
+    this.loadError.set('');
 
     this.usuariosService.getMiPerfil().subscribe({
       next: (perfil: any) => {
         this.perfilActual.set(perfil || null);
         this.avatarActual.set(perfil?.Avatar || null);
-        this.avatarPreview.set(null);
-        this.selectedAvatarFile = null;
+        this.clearAvatarSelection();
+        this.cancelPasswordChange();
 
-        this.form.patchValue({
-          Id_Usuario: perfil?.Id_Usuario || '',
-          Usuario: perfil?.Usuario || '',
+        this.profileForm.reset({
           Nombres_Apellidos: perfil?.Nombres_Apellidos || '',
           Telefono_Usuario: perfil?.Telefono_Usuario || '',
           Correo: perfil?.Correo || '',
-          ContrasenaActual: '',
-          Contrasena: '',
-          ConfirmarContrasena: '',
         });
-        this.form.markAsPristine();
+        this.profileForm.markAsPristine();
         this.isLoading.set(false);
         this.cdr.markForCheck();
       },
-      error: (err: any) => {
+      error: (error: any) => {
         this.isLoading.set(false);
-        this.alerts.errorToast('Error', err?.error?.message || 'No se pudo cargar tu perfil.');
+        this.loadError.set(error?.error?.message || 'No fue posible cargar tu perfil. Revisa tu conexión e inténtalo de nuevo.');
         this.cdr.markForCheck();
       },
     });
   }
 
-  guardar(): void {
-    if (this.isSubmitting()) {
+  guardarDatosPersonales(): void {
+    if (this.isProfileSubmitting()) return;
+
+    this.profileForm.updateValueAndValidity({ emitEvent: false });
+    if (this.profileForm.invalid) {
+      this.profileForm.markAllAsTouched();
+      this.alerts.warningToast('Revisa tus datos', 'Corrige los campos marcados antes de guardar.');
       return;
     }
 
-    this.form.updateValueAndValidity({ emitEvent: false });
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-
-      const invalid = Object.keys(this.form.controls).filter((k) => this.form.get(k)?.invalid);
-      if (this.form.errors?.['passwordMismatch'] && !invalid.includes('ConfirmarContrasena')) {
-        invalid.push('ConfirmarContrasena');
-      }
-      if (this.form.errors?.['currentPasswordRequired'] && !invalid.includes('ContrasenaActual')) {
-        invalid.push('ContrasenaActual');
-      }
-      const friendly: Record<string, string> = {
-        Nombres_Apellidos: 'Nombre completo',
-        Telefono_Usuario: 'Teléfono',
-        Correo: 'Correo',
-        ContrasenaActual: 'Contraseña actual',
-        Contrasena: 'Contraseña',
-        ConfirmarContrasena: 'Confirmar contraseña',
-      };
-
-      const fields = invalid.map((f) => friendly[f] || f);
-      const msg = fields.length
-        ? `Revisa los siguientes campos: ${fields.join(', ')}`
-        : 'Hay campos inválidos en el formulario.';
-
-      this.alerts.showAlert({
-        type: 'error',
-        title: 'Campos requeridos incompletos',
-        message: msg,
-        autoClose: true,
-        buttons: this.mapAlertButtons([{ text: 'Entendido', style: 'primary', onClick: () => this.alerts.closeModal() }]),
-      });
+    if (!this.profileForm.dirty) {
+      this.alerts.infoToast('Sin cambios', 'Tu información personal ya está actualizada.');
       return;
     }
 
-    const values = this.form.getRawValue();
-    const payload: any = {
-      Nombres_Apellidos: String(values.Nombres_Apellidos || '').trim(),
+    const values = this.profileForm.getRawValue();
+    const payload = {
+      Nombres_Apellidos: normalizeUserName(values.Nombres_Apellidos),
       Telefono_Usuario: values.Telefono_Usuario ? String(values.Telefono_Usuario).trim() : null,
       Correo: String(values.Correo || '').trim(),
     };
 
-    if (values.Contrasena) {
-      if (!isUserPasswordStrong(values.Contrasena)) {
-        this.alerts.warningToast(
-          'Contraseña débil',
-          'Usa mínimo 8 caracteres e incluye mayúscula, minúscula, número y símbolo.'
-        );
-        return;
-      }
-      payload.Contrasena = String(values.Contrasena);
-      payload.Contrasena_Actual = String(values.ContrasenaActual);
-    }
-
-    const confirmationParts = ['Vas a actualizar tu información de perfil. ¿Deseas continuar?'];
-    if (values.Contrasena) {
-      confirmationParts.push('También se actualizará tu contraseña y se cerrarán tus otras sesiones.');
-    }
-    if (this.selectedAvatarFile) {
-      confirmationParts.push('También se actualizará tu foto de perfil.');
-    }
-
     this.alerts.confirm(
-      '¿Guardar cambios?',
-      confirmationParts.join(' '),
-      () => this.ejecutarGuardado(payload),
+      'Guardar información personal',
+      `Se actualizarán tu nombre y tus datos de contacto.\nCorreo: ${payload.Correo}`,
+      () => this.ejecutarGuardadoDatos(payload),
       undefined,
-      { type: 'info' }
+      { type: 'info', confirmText: 'Guardar cambios' }
     );
   }
 
-  private ejecutarGuardado(payload: any): void {
-    if (this.isSubmitting()) {
-      return;
-    }
-
-    this.isSubmitting.set(true);
+  private ejecutarGuardadoDatos(payload: {
+    Nombres_Apellidos: string;
+    Telefono_Usuario: string | null;
+    Correo: string;
+  }): void {
+    this.isProfileSubmitting.set(true);
+    this.cdr.markForCheck();
 
     this.usuariosService.actualizarMiPerfil(payload).subscribe({
       next: (perfilActualizado: any) => {
-        this.perfilActual.set(perfilActualizado || { ...this.perfilActual(), ...payload });
-
-        this.form.patchValue({
-          Nombres_Apellidos: perfilActualizado?.Nombres_Apellidos ?? payload.Nombres_Apellidos,
-          Telefono_Usuario: perfilActualizado?.Telefono_Usuario ?? payload.Telefono_Usuario,
-          Correo: perfilActualizado?.Correo ?? payload.Correo,
-          ContrasenaActual: '',
-          Contrasena: '',
-          ConfirmarContrasena: '',
+        const nextProfile = perfilActualizado || { ...this.perfilActual(), ...payload };
+        this.perfilActual.set(nextProfile);
+        this.profileForm.reset({
+          Nombres_Apellidos: nextProfile.Nombres_Apellidos ?? payload.Nombres_Apellidos,
+          Telefono_Usuario: nextProfile.Telefono_Usuario ?? payload.Telefono_Usuario,
+          Correo: nextProfile.Correo ?? payload.Correo,
         });
-        this.form.markAsPristine();
-
-        if (this.selectedAvatarFile) {
-            this.subirAvatar(
-              this.selectedAvatarFile,
-              () => {
-                this.isSubmitting.set(false);
-                this.alerts.successToast('Perfil actualizado', 'Tus datos y tu foto se guardaron correctamente.');
-                this.cdr.markForCheck();
-              },
-            () => {
-              this.isSubmitting.set(false);
-              this.cdr.markForCheck();
-            }
-          );
-          return;
-        }
-
-        this.isSubmitting.set(false);
-        this.alerts.successToast('Perfil actualizado', 'Tus datos se guardaron correctamente.');
+        this.profileForm.markAsPristine();
+        this.isProfileSubmitting.set(false);
+        this.alerts.successToast('Perfil actualizado', 'Tu información personal se guardó correctamente.');
         this.cdr.markForCheck();
       },
-      error: (err: any) => {
-        this.isSubmitting.set(false);
-        this.alerts.errorToast('Error', err?.error?.message || 'No se pudo actualizar tu perfil.');
+      error: (error: any) => {
+        this.isProfileSubmitting.set(false);
+        this.alerts.errorToast('No pudimos guardar', error?.error?.message || 'No fue posible actualizar tu información.');
         this.cdr.markForCheck();
       },
     });
+  }
+
+  openPasswordChange(): void {
+    this.passwordChangeOpen.set(true);
+    this.passwordForm.reset();
+    this.showNewPassword.set(false);
+    this.showPasswordConfirmation.set(false);
+    this.cdr.markForCheck();
+  }
+
+  cancelPasswordChange(): void {
+    this.passwordChangeOpen.set(false);
+    this.passwordStrengthOpen.set(false);
+    this.showNewPassword.set(false);
+    this.showPasswordConfirmation.set(false);
+    this.passwordForm.reset();
+    this.cdr.markForCheck();
+  }
+
+  guardarContrasena(): void {
+    if (this.isPasswordSubmitting()) return;
+
+    this.passwordForm.updateValueAndValidity({ emitEvent: false });
+    this.passwordForm.markAllAsTouched();
+
+    const values = this.passwordForm.getRawValue();
+    if (this.passwordForm.invalid) {
+      this.alerts.warningToast('Revisa la contraseña', 'Completa los campos y confirma que ambas contraseñas coincidan.');
+      return;
+    }
+
+    if (!isUserPasswordStrong(values.NuevaContrasena)) {
+      this.alerts.warningToast(
+        'Contraseña todavía débil',
+        'Incluye mayúscula, minúscula, número, símbolo y mínimo 8 caracteres.'
+      );
+      return;
+    }
+
+    this.alerts.confirm(
+      'Actualizar contraseña',
+      'Tu contraseña será reemplazada y las demás sesiones abiertas se cerrarán por seguridad.',
+      () => this.ejecutarCambioContrasena(values),
+      undefined,
+      { type: 'warning', confirmText: 'Cambiar contraseña' }
+    );
+  }
+
+  private ejecutarCambioContrasena(values: any): void {
+    const savedProfile = this.perfilActual();
+    if (!savedProfile) return;
+
+    this.isPasswordSubmitting.set(true);
+    this.cdr.markForCheck();
+
+    this.usuariosService.actualizarMiPerfil({
+      Nombres_Apellidos: String(savedProfile.Nombres_Apellidos || '').trim(),
+      Telefono_Usuario: savedProfile.Telefono_Usuario ? String(savedProfile.Telefono_Usuario).trim() : null,
+      Correo: String(savedProfile.Correo || '').trim(),
+      Contrasena: String(values.NuevaContrasena),
+      Contrasena_Actual: String(values.ContrasenaActual),
+    }).subscribe({
+      next: (perfilActualizado: any) => {
+        if (perfilActualizado) this.perfilActual.set(perfilActualizado);
+        this.isPasswordSubmitting.set(false);
+        this.cancelPasswordChange();
+        this.alerts.successToast('Contraseña actualizada', 'Tu nueva contraseña ya está activa.');
+        this.cdr.markForCheck();
+      },
+      error: (error: any) => {
+        this.isPasswordSubmitting.set(false);
+        this.alerts.errorToast('No pudimos cambiarla', error?.error?.message || 'No fue posible actualizar la contraseña.');
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  openPasswordStrength(): void {
+    this.passwordStrengthOpen.set(true);
+  }
+
+  closePasswordStrengthIfOutside(event: FocusEvent, wrapper: HTMLElement): void {
+    const next = event.relatedTarget as HTMLElement | null;
+    if (next && wrapper.contains(next)) return;
+    this.passwordStrengthOpen.set(false);
+  }
+
+  private setupPasswordStrength(): void {
+    this.passwordControl('NuevaContrasena').valueChanges
+      .pipe(startWith(''), takeUntil(this.destroy$))
+      .subscribe((value) => {
+        this.passwordStrength = evaluateUserPassword(value || '', true);
+        this.cdr.markForCheck();
+      });
   }
 
   onAvatarSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
-      this.alerts.errorToast('Tipo inválido', 'Solo se aceptan imágenes JPEG, PNG, WEBP o GIF');
+      this.alerts.errorToast('Formato no compatible', 'Usa una imagen JPEG, PNG, WEBP o GIF.');
       input.value = '';
       return;
     }
 
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      this.alerts.errorToast('Archivo muy grande', 'El archivo no puede ser mayor a 5MB');
+    if (file.size > 5 * 1024 * 1024) {
+      this.alerts.errorToast('Imagen demasiado grande', 'La foto debe pesar máximo 5 MB.');
       input.value = '';
       return;
     }
 
+    this.revokeAvatarPreview();
     this.selectedAvatarFile = file;
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      this.ngZone.run(() => {
-        const previewBase64 = loadEvent.target?.result as string;
-        this.avatarPreview.set(previewBase64);
-        this.cdr.detectChanges();
-      });
-    };
-
-    reader.readAsDataURL(file);
+    this.avatarFileName.set(file.name);
+    this.avatarPreviewObjectUrl = URL.createObjectURL(file);
+    this.avatarPreview.set(this.avatarPreviewObjectUrl);
+    input.value = '';
+    this.cdr.markForCheck();
   }
 
-  subirAvatar(file: File, onSuccess?: () => void, onError?: () => void): void {
-    if (this.isUploadingAvatar()) {
-      return;
-    }
+  guardarAvatar(): void {
+    if (!this.selectedAvatarFile || this.isUploadingAvatar()) return;
 
     this.isUploadingAvatar.set(true);
-
     const formData = new FormData();
-    formData.append('avatar', file);
+    formData.append('avatar', this.selectedAvatarFile);
 
     this.usuariosService.uploadAvatar(formData).subscribe({
       next: (response: any) => {
         const newAvatarUrl = response?.Avatar || response?.data?.Avatar;
-
-        this.avatarActual.set(newAvatarUrl);
-        if (this.perfilActual()) {
-          this.perfilActual.set({
-            ...this.perfilActual(),
-            Avatar: newAvatarUrl,
-          });
-        }
-
-        this.avatarPreview.set(null);
-        this.selectedAvatarFile = null;
-
+        this.avatarActual.set(newAvatarUrl || null);
+        this.perfilActual.update((profile) => profile ? { ...profile, Avatar: newAvatarUrl || null } : profile);
+        this.clearAvatarSelection();
         this.isUploadingAvatar.set(false);
-        this.cdr.detectChanges();
-
-        if (!onSuccess) {
-          this.alerts.successToast('Foto subida', 'Tu avatar se actualizó correctamente.');
-        }
-        onSuccess?.();
-
-        const input = document.querySelector('input[type="file"][name="avatarInput"]') as HTMLInputElement;
-        if (input) input.value = '';
+        this.alerts.successToast('Foto actualizada', 'Tu nueva foto de perfil ya está visible.');
+        this.cdr.markForCheck();
       },
-      error: (err: any) => {
+      error: (error: any) => {
         this.isUploadingAvatar.set(false);
-        this.alerts.errorToast('Error en carga', err?.error?.message || 'No se pudo subir la foto');
-        onError?.();
-
-        const input = document.querySelector('input[type="file"][name="avatarInput"]') as HTMLInputElement;
-        if (input) {
-          input.value = '';
-        }
+        this.alerts.errorToast('No pudimos subirla', error?.error?.message || 'No fue posible actualizar tu foto.');
+        this.cdr.markForCheck();
       },
     });
   }
 
-  eliminarAvatar(): void {
-    if (this.isDeletingAvatar() || !this.avatarActual()) {
-      return;
-    }
+  discardAvatarSelection(): void {
+    this.clearAvatarSelection();
+    this.cdr.markForCheck();
+  }
 
+  eliminarAvatar(): void {
+    if (this.isDeletingAvatar() || !this.avatarActual()) return;
     this.alerts.confirm(
       'Eliminar foto de perfil',
-      '¿Estás seguro de que deseas eliminar tu foto de perfil? Esta acción no se puede deshacer.',
+      'Se eliminará tu foto actual y volverán a mostrarse tus iniciales.',
       () => this.ejecutarEliminacionAvatar(),
       undefined,
-      { type: 'warning' }
+      { type: 'warning', confirmText: 'Eliminar foto' }
     );
   }
 
   private ejecutarEliminacionAvatar(): void {
     this.isDeletingAvatar.set(true);
-
     this.usuariosService.deleteAvatar().subscribe({
       next: () => {
-        this.isDeletingAvatar.set(false);
         this.avatarActual.set(null);
-        this.avatarPreview.set(null);
-        this.selectedAvatarFile = null;
-        this.alerts.successToast('Foto eliminada', 'Tu foto de perfil fue eliminada.');
+        this.perfilActual.update((profile) => profile ? { ...profile, Avatar: null } : profile);
+        this.clearAvatarSelection();
+        this.isDeletingAvatar.set(false);
+        this.alerts.successToast('Foto eliminada', 'Ahora mostraremos tus iniciales.');
         this.cdr.markForCheck();
       },
-      error: (err: any) => {
+      error: (error: any) => {
         this.isDeletingAvatar.set(false);
-        this.alerts.errorToast('Error', err?.error?.message || 'No se pudo eliminar la foto');
+        this.alerts.errorToast('No pudimos eliminarla', error?.error?.message || 'No fue posible eliminar tu foto.');
         this.cdr.markForCheck();
       },
     });
   }
 
   getInitials(): string {
-    const perfil = this.perfilActual();
-    if (!perfil?.Nombres_Apellidos) {
-      return '?';
-    }
-
-    const parts = String(perfil.Nombres_Apellidos).trim().split(' ');
-    return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
+    const name = String(
+      this.profileForm?.value?.Nombres_Apellidos
+      || this.perfilActual()?.Nombres_Apellidos
+      || ''
+    ).trim();
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'U';
+    return `${parts[0][0] || ''}${parts.length > 1 ? parts[parts.length - 1][0] : ''}`
+      .toLocaleUpperCase('es-CO');
   }
 
+  private clearAvatarSelection(): void {
+    this.revokeAvatarPreview();
+    this.selectedAvatarFile = null;
+    this.avatarPreview.set(null);
+    this.avatarFileName.set('');
+    if (this.avatarInput?.nativeElement) this.avatarInput.nativeElement.value = '';
+  }
+
+  private revokeAvatarPreview(): void {
+    if (!this.avatarPreviewObjectUrl) return;
+    URL.revokeObjectURL(this.avatarPreviewObjectUrl);
+    this.avatarPreviewObjectUrl = null;
+  }
 }

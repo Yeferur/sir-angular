@@ -1026,19 +1026,6 @@
 .cupos-dot.red    { background-color: var(--accent-red); }
 
 /* =========================================================
-   VALIDACIONES
-   ========================================================= */
-.errorMessage {
-  font-size: .8rem;
-  color: var(--accent-red);
-  margin-top: 2px;
-}
-
-.errorInput {
-  border-color: var(--accent-red) !important;
-}
-
-/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 640px) {

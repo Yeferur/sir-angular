@@ -70,7 +70,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective, LoadingStateComponent],
   templateUrl: './crear-usuario.html',
-  styleUrls: ['../usuario-shared.css', './crear-usuario.css'],
+  styleUrls: ['../usuario-shared.css', '../usuario-wizard.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CrearUsuarioComponent implements OnInit, OnDestroy {
