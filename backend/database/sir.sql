@@ -70,6 +70,32 @@ INSERT INTO `canales_reservas` (`Id_Canal`, `Nombre_Canal`, `Tiene_Comision`) VA
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `beneficiarios_comision`
+--
+
+DROP TABLE IF EXISTS `beneficiarios_comision`;
+CREATE TABLE IF NOT EXISTS `beneficiarios_comision` (
+  `Id_Beneficiario` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Canal` bigint UNSIGNED NOT NULL,
+  `Tipo_Beneficiario` enum('HOTEL','AGENCIA','FREELANCE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Telefono` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Forma_Pago` enum('TRANSFERENCIA_BANCOLOMBIA','NEQUI','EFECTIVO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Numero_Cuenta` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Activo` tinyint(1) NOT NULL DEFAULT '1',
+  `Creado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Actualizado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Beneficiario`),
+  KEY `idx_beneficiarios_canal_activo_nombre` (`Id_Canal`,`Activo`,`Nombre`),
+  KEY `idx_beneficiarios_creado_por` (`Creado_Por`),
+  KEY `idx_beneficiarios_actualizado_por` (`Actualizado_Por`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `detalle_historial`
 --
 
@@ -101,6 +127,28 @@ CREATE TABLE IF NOT EXISTS `disponibilidad` (
   PRIMARY KEY (`Id_Disponibilidad`),
   UNIQUE KEY `ux_disponibilidad_tour_fecha` (`Id_Tour`,`Fecha_Tour`)
 ) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `confirmaciones_jornada`
+--
+
+DROP TABLE IF EXISTS `confirmaciones_jornada`;
+CREATE TABLE IF NOT EXISTS `confirmaciones_jornada` (
+  `Id_Confirmacion` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Tour` bigint UNSIGNED NOT NULL,
+  `Fecha_Tour` date NOT NULL,
+  `Total_Pasajeros` int UNSIGNED NOT NULL DEFAULT '0',
+  `Total_Viajaron` int UNSIGNED NOT NULL DEFAULT '0',
+  `Total_No_Viajaron` int UNSIGNED NOT NULL DEFAULT '0',
+  `Confirmada_En` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Confirmada_Por` bigint UNSIGNED DEFAULT NULL,
+  PRIMARY KEY (`Id_Confirmacion`),
+  UNIQUE KEY `ux_confirmaciones_jornada_tour_fecha` (`Id_Tour`,`Fecha_Tour`),
+  KEY `idx_confirmaciones_jornada_fecha` (`Fecha_Tour`),
+  KEY `idx_confirmaciones_jornada_usuario` (`Confirmada_Por`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -5958,13 +6006,18 @@ DROP TABLE IF EXISTS `liquidaciones`;
 CREATE TABLE IF NOT EXISTS `liquidaciones` (
   `Id_Liquidacion` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Reserva` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Id_Beneficiario_Comision` bigint UNSIGNED DEFAULT NULL,
+  `Nombre_Beneficiario_Snap` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Forma_Pago` enum('TRANSFERENCIA_BANCOLOMBIA','NEQUI','EFECTIVO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Cuenta_Bancaria` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Estado` enum('PENDIENTE','PAGADO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDIENTE',
   `Fecha_Pago` date DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Liquidacion`),
-  UNIQUE KEY `ux_liquidacion_reserva` (`Id_Reserva`)
+  UNIQUE KEY `ux_liquidacion_reserva` (`Id_Reserva`),
+  KEY `idx_liquidaciones_beneficiario` (`Id_Beneficiario_Comision`),
+  KEY `idx_liquidaciones_estado_fecha` (`Estado`,`Fecha_Pago`,`Id_Reserva`)
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -8457,6 +8510,7 @@ CREATE TABLE IF NOT EXISTS `reservas` (
   `Fecha_Tour` date DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   `Id_Canal` bigint UNSIGNED DEFAULT NULL,
+  `Id_Beneficiario_Comision` bigint UNSIGNED DEFAULT NULL,
   `Idioma_Reserva` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Telefono_Reportante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Nombre_Reportante` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -8465,6 +8519,7 @@ CREATE TABLE IF NOT EXISTS `reservas` (
   PRIMARY KEY (`Id_Reserva`),
   KEY `Id_Horario` (`Id_Horario`),
   KEY `Id_Canal` (`Id_Canal`),
+  KEY `idx_reservas_beneficiario_comision` (`Id_Beneficiario_Comision`),
   KEY `idx_reservas_fecha_tour` (`Fecha_Tour`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -9894,10 +9949,19 @@ ALTER TABLE `horarios`
   ADD CONSTRAINT `fk_horarios_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
+-- Filtros para la tabla `beneficiarios_comision`
+--
+ALTER TABLE `beneficiarios_comision`
+  ADD CONSTRAINT `fk_beneficiarios_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_beneficiarios_creado_por` FOREIGN KEY (`Creado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_beneficiarios_actualizado_por` FOREIGN KEY (`Actualizado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
 -- Filtros para la tabla `liquidaciones`
 --
 ALTER TABLE `liquidaciones`
-  ADD CONSTRAINT `fk_liquidacion_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_liquidacion_reserva` FOREIGN KEY (`Id_Reserva`) REFERENCES `reservas` (`Id_Reserva`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_liquidaciones_beneficiario_comision` FOREIGN KEY (`Id_Beneficiario_Comision`) REFERENCES `beneficiarios_comision` (`Id_Beneficiario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `logs_sistema`
@@ -9999,7 +10063,8 @@ ALTER TABLE `recordatorios`
 --
 ALTER TABLE `reservas`
   ADD CONSTRAINT `fk_reservas_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_reservas_beneficiario_comision` FOREIGN KEY (`Id_Beneficiario_Comision`) REFERENCES `beneficiarios_comision` (`Id_Beneficiario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `rol_permisos`

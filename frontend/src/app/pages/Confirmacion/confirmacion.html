@@ -1,173 +1,204 @@
-<div class="page-container">
-  <!-- FILTERS -->
-  <div class="card filters-card">
-    <div class="filters-row">
-      <div class="filter-group">
-        <label class="form-label" for="fecha">Fecha del Tour</label>
-        <app-datepicker
-          [(ngModel)]="filters.Fecha"
-          (dateChange)="onFechaChange($event)"
-          placeholder="Seleccionar fecha...">
-        </app-datepicker>
+<main class="trip-control-page" [class.trip-control-page--with-footer]="pasajeros.length && canUpdateAsistencia">
+  @if (catalogLoading) {
+    <app-loading-state mode="loading" label="Preparando Control de viaje" detail="Cargando los tours disponibles…" />
+  } @else if (catalogError) {
+    <app-loading-state mode="error" label="No pudimos preparar el módulo" [detail]="catalogError"
+      actionLabel="Reintentar" (action)="loadTours()" />
+  } @else {
+    <section class="filters-card" aria-label="Seleccionar jornada">
+      <div class="filters-grid">
+        <div class="field-group">
+          <label class="form-label">Fecha del tour</label>
+          <app-datepicker [ngModel]="filters.Fecha" (dateChange)="updateSearchFilter('Fecha', $event)"
+            [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
+        </div>
+        <div class="field-group field-group--tour">
+          <label class="form-label" for="trip-tour">Tour</label>
+          <select id="trip-tour" [ngModel]="filters.Id_Tour"
+            (ngModelChange)="updateSearchFilter('Id_Tour', $event)" class="form-select">
+            <option value="" disabled>Seleccionar tour</option>
+            @for (tour of toursList; track tour.Id_Tour) {
+              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
+            }
+          </select>
+        </div>
+        <button type="button" class="action-button action-button--primary" (click)="search()"
+          [disabled]="isLoading || isSubmitting || !filters.Fecha || !filters.Id_Tour">
+          @if (isLoading) { <span class="button-spinner button-spinner--light"></span> }
+          {{ isLoading ? 'Actualizando…' : 'Consultar pasajeros' }}
+        </button>
       </div>
+    </section>
 
-      <div class="filter-group">
-        <label class="form-label" for="tour">Tour</label>
-        <select id="tour" [(ngModel)]="filters.Id_Tour" class="form-select">
-          <option value="" selected disabled>Seleccionar tour...</option>
-          @for (t of toursList; track t.Id_Tour) {
-            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
+    @if (loadError) {
+      <app-loading-state mode="error" label="No pudimos cargar la jornada" [detail]="loadError"
+        actionLabel="Reintentar" (action)="search()" />
+    } @else if (!hasSearched) {
+      <section class="search-state" aria-labelledby="search-ready-title">
+        <div class="search-state-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+          </svg>
+        </div>
+        <strong id="search-ready-title">Listo para buscar</strong>
+        <span>Selecciona una fecha y un tour, y presiona “Consultar pasajeros” para cargar la jornada.</span>
+      </section>
+    } @else if (!pasajeros.length && isLoading) {
+      <app-loading-state mode="loading" label="Cargando pasajeros" detail="Consultando reservas activas…" />
+    } @else if (!pasajeros.length) {
+      <section class="search-state" aria-labelledby="search-empty-title">
+        <div class="search-state-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+          </svg>
+        </div>
+        <strong id="search-empty-title">Sin resultados</strong>
+        <span>No encontramos pasajeros activos para el tour y la fecha seleccionados. Revisa los filtros e intenta nuevamente.</span>
+      </section>
+    } @else {
+      <section class="control-card" aria-live="polite">
+        <div class="list-tools">
+          <div class="search-field">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+            </svg>
+            <input class="form-input" [(ngModel)]="busqueda" placeholder="Buscar pasajero, reserva o reportante"
+              aria-label="Buscar en los pasajeros cargados" />
+          </div>
+
+          <div class="status-filters" role="group" aria-label="Filtrar por asistencia">
+            <button type="button" [class.active]="filtroEstado === 'TODOS'" [attr.aria-pressed]="filtroEstado === 'TODOS'"
+              (click)="setFiltroEstado('TODOS')">Todos <span>{{ pasajeros.length }}</span></button>
+            <button type="button" [class.active]="filtroEstado === 'VIAJARON'" [attr.aria-pressed]="filtroEstado === 'VIAJARON'"
+              (click)="setFiltroEstado('VIAJARON')">Viajaron <span>{{ totalConfirmados }}</span></button>
+            <button type="button" [class.active]="filtroEstado === 'NO_VIAJARON'" [attr.aria-pressed]="filtroEstado === 'NO_VIAJARON'"
+              (click)="setFiltroEstado('NO_VIAJARON')">No viajaron <span>{{ totalNoViajaron }}</span></button>
+            <button type="button" [class.active]="filtroEstado === 'CAMBIOS'" [attr.aria-pressed]="filtroEstado === 'CAMBIOS'"
+              (click)="setFiltroEstado('CAMBIOS')">Cambios <span>{{ totalCambios }}</span></button>
+          </div>
+
+          @if (canUpdateAsistencia) {
+            <button type="button" class="bulk-control" [class.bulk-control--all]="todosVisiblesViajaron"
+              [attr.aria-pressed]="todosVisiblesViajaron"
+              [attr.aria-label]="todosVisiblesViajaron ? 'Marcar que ninguno de los pasajeros visibles viajó' : 'Marcar que todos los pasajeros visibles viajaron'"
+              (click)="toggleTodosVisibles()"
+              [disabled]="isSubmitting || !pasajerosFiltrados.length">
+              {{ todosVisiblesViajaron ? 'Marcar ninguno' : 'Marcar todos' }}
+            </button>
           }
-        </select>
+        </div>
+
+        @if (!pasajerosFiltrados.length) {
+          <div class="search-state search-state--compact">
+            <div class="search-state-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-4-4"></path>
+              </svg>
+            </div>
+            <strong>Sin coincidencias</strong>
+            <span>Cambia la búsqueda o el filtro de asistencia.</span>
+          </div>
+        } @else {
+          <div class="reservation-list">
+            @for (reserva of reservasAgrupadas; track trackByReserva($index, reserva)) {
+              <article class="reservation-group">
+                <header class="reservation-header">
+                  <div class="reservation-identity">
+                    <strong>#{{ reserva.id }}</strong>
+                    <span class="reporter-name">{{ reserva.reportante || 'Sin reportante' }}</span>
+                    @if (reserva.canal) { <span class="channel-name">{{ reserva.canal }}</span> }
+                  </div>
+                  <span class="reservation-count">
+                    {{ reserva.pasajeros.length }} {{ reserva.pasajeros.length === 1 ? 'pasajero' : 'pasajeros' }}
+                  </span>
+                </header>
+
+                <div class="passenger-list">
+                  @for (pasajero of reserva.pasajeros; track trackByPasajero($index, pasajero)) {
+                    <div class="passenger-row">
+                      <div class="passenger-cell">
+                        <strong class="passenger-name">{{ pasajero.Nombre_Pasajero }}</strong>
+                        <span class="type-chip" [class.type-chip--child]="pasajero.Tipo_Pasajero === 'NINO'"
+                          [class.type-chip--infant]="pasajero.Tipo_Pasajero === 'INFANTE'">
+                          {{ tipoPasajeroLabel(pasajero.Tipo_Pasajero) }}
+                        </span>
+                        <span class="document-value">{{ pasajero.DNI || 'Sin documento' }}</span>
+                      </div>
+
+                      <div class="contact-cell">
+                        <strong>{{ pasajero.Telefono_Pasajero || pasajero.Telefono_Reportante || 'Sin teléfono' }}</strong>
+                        @if (!pasajero.Telefono_Pasajero && pasajero.Telefono_Reportante) {
+                          <span>Teléfono del reportante</span>
+                        } @else {
+                          <span>Contacto</span>
+                        }
+                      </div>
+
+                      <div class="status-cell">
+                        @if (canUpdateAsistencia) {
+                          <button type="button" class="attendance-control"
+                            [class.attendance-control--yes]="pasajero.Confirmacion === 1"
+                            [attr.aria-pressed]="pasajero.Confirmacion === 1"
+                            [attr.aria-label]="(pasajero.Confirmacion === 1 ? 'Marcar que no viajó: ' : 'Marcar que viajó: ') + pasajero.Nombre_Pasajero"
+                            (click)="togglePasajero(pasajero)" [disabled]="isSubmitting">
+                            {{ pasajero.Confirmacion === 1 ? 'Viajó' : 'No viajó' }}
+                          </button>
+                        } @else {
+                          <span class="readonly-status" [class.readonly-status--yes]="pasajero.Confirmacion === 1">
+                            {{ pasajero.Confirmacion === 1 ? 'Viajó' : 'No viajó' }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+</main>
+
+@if (pasajeros.length && canUpdateAsistencia) {
+  <div class="wizard-nav wizard-nav--page-enter control-wizard-nav" role="region" aria-label="Guardar confirmación de pasajeros">
+    <div class="wizard-nav-row">
+      <div class="wizard-nav-left">
+        <button type="button" class="btn-wizard-back" (click)="restaurarCambios()"
+          [disabled]="isSubmitting || totalCambios === 0">
+          <span>Deshacer</span>
+        </button>
       </div>
 
-      <button (click)="search()" [disabled]="isLoading || isSubmitting" class="btn-primary btn-search">
-        @if (isLoading) {
-          Buscando...
-        } @else {
-          Buscar Pasajeros
-        }
-      </button>
+      <div class="wizard-nav-center">
+        <div class="wizard-nav-summary control-nav-summary" aria-live="polite">
+          <span class="wizard-nav-tour">{{ pasajeros.length }} pasajeros</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ totalReservas }} reservas</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item control-nav-yes">{{ totalConfirmados }} viajaron</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ totalNoViajaron }} no viajaron</span>
+          @if (totalCambios > 0) {
+            <span class="nav-sep">•</span>
+            <span class="wizard-nav-item control-nav-changes">
+              {{ totalCambios }} {{ totalCambios === 1 ? 'cambio' : 'cambios' }}
+            </span>
+          }
+        </div>
+      </div>
+
+      <div class="wizard-nav-right">
+        <button type="button" class="btn-wizard-next" (click)="save()"
+          [disabled]="isSubmitting || (totalCambios === 0 && jornadaConfirmada)">
+          @if (isSubmitting) { <span class="button-spinner button-spinner--light"></span> }
+          <span>{{ isSubmitting ? 'Guardando…' : jornadaConfirmada && totalCambios === 0 ? 'Confirmación guardada' : 'Guardar confirmación' }}</span>
+        </button>
+      </div>
     </div>
   </div>
-
-  <!-- RESULTS -->
-  @if (isLoading) {
-    <app-loading-state label="Cargando pasajeros y confirmaciones…"></app-loading-state>
-  } @else if (!hasSearched) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
-        <div class="empty-copy">
-          <h3>Listo para confirmar</h3>
-          <p>Selecciona una fecha y un tour para cargar los pasajeros.</p>
-        </div>
-      </div>
-    </div>
-
-  } @else if (pasajeros.length === 0) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            <line x1="12" y1="9" x2="12" y2="13"></line>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-        </div>
-        <div class="empty-copy">
-          <h3>Sin pasajeros</h3>
-          <p>No hay pasajeros registrados para los filtros seleccionados.</p>
-        </div>
-      </div>
-    </div>
-
-  } @else {
-    <div class="card results-card">
-
-      <!-- RESULTS HEADER -->
-      <div class="results-header">
-        <div class="summary-block">
-          <div class="summary-stat">
-            <span class="summary-number">{{ pasajeros.length }}</span>
-            <span class="summary-label">Total pasajeros</span>
-          </div>
-          <div class="summary-stat summary-success">
-            <span class="summary-number">{{ totalConfirmados }}</span>
-            <span class="summary-label">Confirmados</span>
-          </div>
-          <div class="summary-stat summary-warning">
-            <span class="summary-number">{{ totalPendientes }}</span>
-            <span class="summary-label">No confirmados</span>
-          </div>
-        </div>
-
-        @if (canUpdateAsistencia) {
-          <label class="toggle-all-label">
-            <span class="toggle-all-text">Marcar todos</span>
-            <label class="toggle-switch">
-              <input type="checkbox" [checked]="allChecked" (change)="toggleAll($event)" class="toggle-checkbox sr-only">
-              <div class="toggle-bg"><div class="toggle-dot"></div></div>
-            </label>
-          </label>
-        }
-      </div>
-
-      <!-- TABLE -->
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead class="thead">
-            <tr>
-              <th class="th">Reserva</th>
-              <th class="th">Pasajero</th>
-              <th class="th">Documento</th>
-              <th class="th">Contacto</th>
-              <th class="th">Punto de Encuentro</th>
-              <th class="th th-center">¿Viajó?</th>
-            </tr>
-          </thead>
-          <tbody class="tbody">
-            @for (p of pasajeros; track p.Id_Pasajero; let i = $index) {
-              <tr [class.reservation-separator]="i > 0 && p.Id_Reserva !== pasajeros[i-1].Id_Reserva">
-                <td class="td">
-                  <span class="reserva-id">#{{ p.Id_Reserva }}</span>
-                  <div class="reporter-name">{{ p.Nombre_Reportante }}</div>
-                </td>
-                <td class="td">
-                  <div class="passenger-name">{{ p.Nombre_Pasajero }}</div>
-                  <span class="badge" [ngClass]="{
-                    'badge-adulto':  p.Tipo_Pasajero === 'ADULTO',
-                    'badge-nino':    p.Tipo_Pasajero === 'NINO',
-                    'badge-infante': p.Tipo_Pasajero === 'INFANTE'
-                  }">{{ p.Tipo_Pasajero }}</span>
-                </td>
-                <td class="td td-mono">{{ p.DNI || '—' }}</td>
-                <td class="td">
-                  <div>{{ p.Telefono_Pasajero || '—' }}</div>
-                  @if (!p.Telefono_Pasajero && p.Telefono_Reportante) {
-                    <div class="contact-sub">Rep: {{ p.Telefono_Reportante }}</div>
-                  }
-                </td>
-                <td class="td">{{ p.PuntoEncuentro || '—' }}</td>
-                <td class="td td-center">
-                  @if (canUpdateAsistencia) {
-                    <label class="toggle-switch">
-                      <input type="checkbox" [(ngModel)]="p.Confirmacion" (change)="checkAllStatus()" class="toggle-checkbox sr-only">
-                      <div class="toggle-bg"><div class="toggle-dot"></div></div>
-                    </label>
-                  } @else {
-                    <span>{{ isConfirmado(p) ? 'Sí' : 'No' }}</span>
-                  }
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  }
-
-</div>
-
-<!-- FLOATING SAVE -->
-@if (pasajeros.length > 0 && canUpdateAsistencia) {
-  <button (click)="save()" [disabled]="isSubmitting || isLoading" class="floating-save-btn">
-    @if (isSubmitting) {
-      <span class="btn-spinner"></span>
-      Guardando...
-    } @else {
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-        <polyline points="17 21 17 13 7 13 7 21"/>
-        <polyline points="7 3 7 8 15 8"/>
-      </svg>
-      Guardar Confirmación
-    }
-  </button>
 }

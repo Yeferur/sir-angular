@@ -22,12 +22,28 @@ router.put(
     comisionesController.actualizarLiquidacion
 );
 
+// Actualización atómica de varias liquidaciones con destinos de pago distintos.
+router.put(
+    '/liquidacion/lote',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.actualizarLiquidacionesLote
+);
+
 // Actualizar solo Forma_Pago / Cuenta_Bancaria, sin tocar Estado ni Fecha_Pago
 router.put(
     '/liquidacion/pago',
     authMiddleware,
     checkPermission(PERM),
     comisionesController.actualizarDatosPago
+);
+
+// Centralización opcional desde el flujo de comisiones.
+router.post(
+    '/beneficiarios',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.guardarBeneficiario
 );
 
 // Exportar Excel

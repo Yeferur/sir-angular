@@ -1,430 +1,363 @@
-<div class="page-container">
-
-  <!-- HEADER / FILTROS -->
-  <div class="page-header">
-    <div class="filters-row">
-      <div class="filter-group">
-        <label class="form-label">Fecha del Tour</label>
-        <div class="date-picker-wrap">
-          <app-datepicker [(ngModel)]="fecha" placeholder="Seleccionar fecha"></app-datepicker>
-        </div>
-      </div>
-      <div class="filter-group">
-        <label class="form-label">Tour</label>
-        <select class="form-select" [(ngModel)]="idTour">
-          <option value="">Todos los tours</option>
-          @for (t of tours; track t.Id_Tour) {
-            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-          }
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="form-label">Canal</label>
-        <select class="form-select" [(ngModel)]="idCanal">
-          <option value="">Todos los canales</option>
-          @for (canal of canalesDisponibles; track canal.Id_Canal) {
-            <option [value]="canal.Id_Canal">{{ canal.Nombre_Canal }}</option>
-          }
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="form-label">Estado</label>
-        <select class="form-select" [(ngModel)]="filtroEstado">
-          <option value="">Todos</option>
-          <option value="PENDIENTE">Pendiente</option>
-          <option value="PAGADO">Pagado</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="form-label">Reportante</label>
-        <input type="text" class="form-input" [(ngModel)]="filtroReportante" placeholder="Buscar reportante..." />
-      </div>
-      <button class="btn-primary" (click)="buscar()" [disabled]="isSearching">
-        @if (isSearching) { Buscando... } @else { Buscar }
-      </button>
-    </div>
-  </div>
-
-  <!-- CONTENIDO -->
-  @if (isSearching) {
-    <div class="card">
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Cargando comisiones...</p>
-      </div>
-    </div>
-
-  } @else if (!hasSearched) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h3>Listo para buscar</h3>
-        <p>Aplica los filtros y presiona "Buscar" para cargar las comisiones.</p>
-      </div>
-    </div>
-
-  } @else if (canales.length === 0) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </div>
-        <h3>Sin comisiones</h3>
-        <p>No hay reservas con comisión para los filtros seleccionados.</p>
-      </div>
-    </div>
-
+<main class="commissions-page">
+  @if (catalogLoading) {
+    <app-loading-state mode="loading" label="Preparando comisiones" detail="Cargando tours y canales…" />
+  } @else if (catalogError) {
+    <app-loading-state mode="error" label="No pudimos preparar el módulo" [detail]="catalogError"
+      actionLabel="Reintentar" (action)="cargarCatalogos()" />
   } @else {
-
-    <!-- SUMMARY BAR -->
-    <div class="summary-bar">
-      <div class="summary-stat">
-        <span class="summary-number">{{ totalReservas }}</span>
-        <span class="summary-label">Reservas</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">{{ canales.length }}</span>
-        <span class="summary-label">Canales</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number summary-number--total">{{ formatCOP(totalGlobal) }}</span>
-        <span class="summary-label">Total comisiones</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number summary-number--pending">{{ formatCOP(totalPendiente) }}</span>
-        <span class="summary-label">Pendiente</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number summary-number--paid">{{ formatCOP(totalPagado) }}</span>
-        <span class="summary-label">Pagado</span>
+    <section class="filter-card" aria-labelledby="filter-title">
+      <div class="filter-heading">
+        <div>
+          <h2 id="filter-title">Jornada de liquidación</h2>
+          <p>La fecha es obligatoria; los demás filtros son opcionales.</p>
+        </div>
+        <button type="button" class="text-button" (click)="limpiarFiltros()">Restablecer</button>
       </div>
 
-      <div class="summary-actions">
-        <!-- Pagar todo global -->
-        @if (totalPendientesGlobal > 0) {
-          <button class="btn-pagar-global" (click)="pagarTodoGlobal()" [disabled]="isSavingGlobal">
-            @if (isSavingGlobal) {
-              <span class="btn-spinner btn-spinner--dark"></span>
-              Pagando...
-            } @else {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Pagar todo ({{ totalPendientesGlobal }})
+      <div class="filter-grid">
+        <div class="field-group field-group--date">
+          <label class="form-label">Fecha del tour</label>
+          <app-datepicker [(ngModel)]="fecha" [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="commission-tour">Tour</label>
+          <select id="commission-tour" class="form-select" [(ngModel)]="idTour">
+            <option value="">Todos los tours</option>
+            @for (tour of tours; track tour.Id_Tour) {
+              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
             }
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="commission-channel">Canal</label>
+          <select id="commission-channel" class="form-select" [(ngModel)]="idCanal">
+            <option value="">Todos los canales</option>
+            @for (canal of canalesDisponibles; track canal.Id_Canal) {
+              <option [value]="canal.Id_Canal">{{ canal.Nombre_Canal }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="commission-status">Estado</label>
+          <select id="commission-status" class="form-select" [(ngModel)]="filtroEstado">
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="PAGADO">Pagadas</option>
+          </select>
+        </div>
+        <div class="field-group field-group--search">
+          <label class="form-label" for="commission-beneficiary">Nombre del reportante</label>
+          <div class="search-field">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+            </svg>
+            <input id="commission-beneficiary" class="form-input" [(ngModel)]="filtroReportante"
+              placeholder="Buscar por nombre" (keyup.enter)="buscar()" />
+          </div>
+        </div>
+        <button type="button" class="action-button action-button--primary search-button" (click)="buscar()"
+          [disabled]="!fecha || isSearching">
+          @if (isSearching) { <span class="button-spinner button-spinner--light"></span> }
+          {{ isSearching ? 'Actualizando…' : 'Consultar' }}
+        </button>
+      </div>
+    </section>
+
+    @if (hasSearched && !isSearching && jornadasPorConfirmar.length) {
+      <section class="workflow-card" role="status" aria-live="polite">
+        <div class="workflow-icon" aria-hidden="true">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3v5m0 4v.01M5.6 19h12.8a2 2 0 0 0 1.73-3L13.73 5a2 2 0 0 0-3.46 0L3.87 16a2 2 0 0 0 1.73 3Z"/>
+          </svg>
+        </div>
+        <div class="workflow-copy">
+          <strong>La confirmación de pasajeros está pendiente</strong>
+          <span>
+            Hay {{ pasajerosPorConfirmar }} pasajero(s) con comisión en {{ jornadasPorConfirmar.length }} jornada(s) que todavía no están listas para liquidar.
+            Confirma quiénes viajaron y vuelve aquí para continuar.
+          </span>
+        </div>
+        @if (canOpenConfirmation) {
+          <button type="button" class="action-button action-button--primary" (click)="irAConfirmacion()">
+            {{ jornadasPorConfirmar.length === 1 ? 'Confirmar pasajeros' : 'Ir a confirmación' }}
           </button>
+        } @else {
+          <span class="workflow-permission">Requiere acceso a Control de viaje</span>
         }
-
-        <!-- Exportar Excel -->
-        <button class="btn-export" (click)="descargarExcel()" [disabled]="isExporting">
-          @if (isExporting) {
-            <span class="btn-spinner btn-spinner--dark"></span>
-            Generando...
-          } @else {
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Exportar Excel
-          }
-        </button>
-      </div>
-    </div>
-
-    <!-- CANAL CARDS -->
-    @for (canal of canales; track canal.Id_Canal) {
-      <div class="canal-card">
-
-        <button class="canal-header" (click)="toggleCanal(canal.Id_Canal)">
-          <div class="canal-header-left">
-            <span class="canal-badge">{{ canal.Nombre_Canal }}</span>
-            <span class="canal-reservas-count">{{ canal.reportantes.length }} reportante(s)</span>
-          </div>
-          <div class="canal-header-right">
-            <div class="canal-totales">
-              <span class="canal-total-item canal-total-item--pending">
-                <span class="dot dot--pending"></span>
-                Pendiente: <strong>{{ formatCOP(canal.Pendiente_Canal) }}</strong>
-              </span>
-              <span class="canal-total-item canal-total-item--paid">
-                <span class="dot dot--paid"></span>
-                Pagado: <strong>{{ formatCOP(canal.Pagado_Canal) }}</strong>
-              </span>
-              <span class="canal-total-item canal-total-item--total">
-                Total: <strong>{{ formatCOP(canal.Total_Canal) }}</strong>
-              </span>
-            </div>
-            <svg class="chevron" [class.chevron--open]="!isCollapsed(canal.Id_Canal)"
-              width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
-        </button>
-
-        @if (!isCollapsed(canal.Id_Canal)) {
-          <div class="canal-body">
-            @for (rep of canal.reportantes; track rep.Nombre_Reportante) {
-              <div class="reportante-block">
-
-                <!-- REPORTANTE HEADER -->
-                <div class="reportante-header">
-                  <div class="reportante-header-left">
-                    <span class="reportante-name">{{ rep.Nombre_Reportante }}</span>
-                    <span class="rep-badge">{{ rep.reservas.length }} reserva(s)</span>
-                    <span class="rep-total">{{ formatCOP(rep.Total_Reportante) }}</span>
-                    @if (isDirtyReportante(rep.Nombre_Reportante)) {
-                      <span class="rep-dirty-badge">Pago sin guardar</span>
-                    }
-                  </div>
-                  <div class="reportante-header-right">
-                    <!-- Pagar todas (2+ reservas con pendientes) -->
-                    @if (mostrarBotonPagarReportante(rep)) {
-                      <button class="btn-pagar-bloque"
-                        (click)="abrirModalPagarReportante(rep)"
-                        [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal">
-                        @if (isSavingReportante(rep.Nombre_Reportante)) {
-                          <span class="btn-spinner"></span>
-                        } @else {
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        }
-                        Pagar todas ({{ cantidadPendientes(rep) }})
-                      </button>
-                    }
-                  </div>
-                </div>
-
-                <!-- FORMA DE PAGO -->
-                <div class="pago-config">
-                  <div class="pago-config-group">
-                    <label class="form-label">Forma de pago</label>
-                    <select class="form-select form-select--sm"
-                      [(ngModel)]="rep.Forma_Pago"
-                      [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal"
-                      (ngModelChange)="onFormaPagoChange(rep)">
-                      <option value="BANCOLOMBIA">Bancolombia</option>
-                      <option value="NEQUI">Nequi</option>
-                      <option value="EFECTIVO">Efectivo</option>
-                    </select>
-                  </div>
-                  @if (requiereCuenta(rep)) {
-                    <div class="pago-config-group">
-                      <label class="form-label">{{ pagoLabel(rep) }}</label>
-                      <input type="text" class="form-input form-input--sm"
-                        [class.form-input--invalid]="mostrarErrorPago(rep)"
-                        [(ngModel)]="rep.Cuenta_Bancaria"
-                        [disabled]="isSavingReportante(rep.Nombre_Reportante) || isSavingGlobal"
-                        (ngModelChange)="onCuentaChange(rep)"
-                        [placeholder]="cuentaPlaceholder(rep)" />
-                    </div>
-                  }
-                </div>
-                @if (mostrarErrorPago(rep)) {
-                  <div class="pago-error">{{ pagoError(rep) }}</div>
-                }
-
-                <!-- TABLA -->
-                <div class="table-scroll">
-                  <table class="data-table">
-                    <thead class="thead">
-                      <tr>
-                        <th class="th">Reserva</th>
-                        <th class="th">Tour</th>
-                        <th class="th th-center">Pasajeros</th>
-                        <th class="th th-right">Com. unitaria</th>
-                        <th class="th th-right">Total comisión</th>
-                        <th class="th th-center">Estado</th>
-                        <th class="th th-center">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody class="tbody">
-                      @for (r of rep.reservas; track r.Id_Reserva) {
-                        <tr [class.row--paid]="r.Estado_Liquidacion === 'PAGADO'"
-                            [class.row--saving]="isSavingReportante(rep.Nombre_Reportante)">
-                          <td class="td">
-                            <span class="reserva-id">#{{ r.Id_Reserva }}</span>
-                          </td>
-                          <td class="td">{{ r.Nombre_Tour }}</td>
-                          <td class="td td-center">
-                            <span class="count-pill">{{ r.Num_Pasajeros }}</span>
-                          </td>
-                          <td class="td td-right">
-                            <span class="amount">{{ formatCOP(r.Comision_Unitaria) }}</span>
-                          </td>
-                          <td class="td td-right">
-                            <span class="amount amount--commission">{{ formatCOP(r.Total_Comision) }}</span>
-                          </td>
-                          <td class="td td-center">
-                            <!-- Badge de estado (solo visual, no clickeable) -->
-                            <span class="estado-badge"
-                              [class.estado-badge--paid]="r.Estado_Liquidacion === 'PAGADO'"
-                              [class.estado-badge--pending]="r.Estado_Liquidacion !== 'PAGADO'">
-                              @if (r.Estado_Liquidacion === 'PAGADO') {
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                              }
-                              {{ r.Estado_Liquidacion === 'PAGADO' ? 'Pagado' : 'Pendiente' }}
-                            </span>
-                          </td>
-                          <td class="td td-center">
-                            @if (isSavingReportante(rep.Nombre_Reportante)) {
-                              <span class="btn-spinner btn-spinner--inline"></span>
-                            } @else if (r.Estado_Liquidacion !== 'PAGADO') {
-                              <!-- Botón Pagar (reserva pendiente) -->
-                              <button class="btn-pagar-reserva"
-                                (click)="abrirModalPagarReserva(r, rep)"
-                                [disabled]="isSavingGlobal">
-                                Pagar
-                              </button>
-                            } @else {
-                              <!-- Botón Revertir (reserva ya pagada) -->
-                              <button class="btn-revertir"
-                                (click)="revertirReserva(r, rep)"
-                                [disabled]="isSavingGlobal">
-                                Revertir
-                              </button>
-                            }
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                    @if (rep.reservas.length >= 2) {
-                      <tfoot>
-                        <tr class="tfoot-row">
-                          <td class="td-foot" colspan="4">
-                            <span class="tfoot-label">Subtotal {{ rep.Nombre_Reportante }}</span>
-                          </td>
-                          <td class="td-foot td-right">
-                            <span class="amount amount--commission">{{ formatCOP(rep.Total_Reportante) }}</span>
-                          </td>
-                          <td class="td-foot" colspan="2"></td>
-                        </tr>
-                      </tfoot>
-                    }
-                  </table>
-                </div>
-
-              </div>
-            }
-          </div>
-        }
-
-      </div>
+      </section>
     }
 
-  }
-
-</div>
-
-<!-- FLOATING SAVE BUTTON — solo para datos de pago sin guardar (reportantes en PENDIENTE) -->
-@if (hasDirty) {
-  <button class="floating-save-btn" (click)="guardarCambios()">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-      <polyline points="17 21 17 13 7 13 7 21"/>
-      <polyline points="7 3 7 8 15 8"/>
-    </svg>
-    Guardar datos de pago ({{ dirtyCount }})
-  </button>
-}
-
-<!-- MODAL DE CONFIRMACIÓN DE PAGO -->
-@if (modal.visible) {
-  <div class="modal-backdrop" (click)="cerrarModal()"></div>
-  <div class="modal-pago" role="dialog" aria-modal="true">
-
-    <div class="modal-header">
-      <h2 class="modal-title">{{ modalTitulo }}</h2>
-      <button class="modal-close" (click)="cerrarModal()" [disabled]="modal.saving">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="modal-body">
-
-      <!-- Resumen de lo que se va a pagar -->
-      <div class="modal-resumen">
-        <div class="modal-resumen-row">
-          <span class="modal-resumen-label">Reportante</span>
-          <span class="modal-resumen-value">{{ modal.reportante?.Nombre_Reportante }}</span>
-        </div>
-        <div class="modal-resumen-row">
-          <span class="modal-resumen-label">
-            {{ modal.reservas.length === 1 ? 'Reserva' : 'Reservas' }}
-          </span>
-          <span class="modal-resumen-value">
-            @if (modal.reservas.length === 1) {
-              #{{ modal.reservas[0].Id_Reserva }}
-            } @else {
-              {{ modal.reservas.length }} reservas
+    @if (searchError) {
+      <app-loading-state mode="error" label="No pudimos cargar las comisiones" [detail]="searchError"
+        actionLabel="Reintentar" (action)="buscar()" />
+    } @else if (!hasSearched) {
+      <app-loading-state mode="empty" label="Selecciona una jornada"
+        detail="Consulta una fecha para revisar las comisiones disponibles." [showSlowMessage]="false" />
+    } @else if (!canales.length && !isSearching) {
+      <app-loading-state mode="empty" label="No hay comisiones disponibles"
+        detail="No existen pasajeros confirmados con comisión para estos filtros." [showSlowMessage]="false" />
+    } @else if (canales.length) {
+      <section class="results" aria-live="polite">
+        <div class="results-heading">
+          <div>
+            <h2>Resumen de la jornada</h2>
+            <p>{{ totalReservas }} reservas · {{ totalPasajeros }} pasajeros confirmados</p>
+          </div>
+          <div class="results-actions">
+            @if (isSearching) {
+              <span class="refresh-indicator"><span class="button-spinner"></span> Actualizando datos</span>
             }
-          </span>
+            <button type="button" class="action-button action-button--secondary" (click)="exportar()" [disabled]="isExporting">
+              @if (isExporting) { <span class="button-spinner"></span> }
+              <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 19h14"/>
+              </svg>
+              {{ isExporting ? 'Exportando…' : 'Exportar Excel' }}
+            </button>
+            <button type="button" class="action-button action-button--primary" (click)="pagarTodo()"
+              [disabled]="!reservasPendientes || isSavingGlobal">
+              @if (isSavingGlobal) { <span class="button-spinner button-spinner--light"></span> }
+              {{ isSavingGlobal ? 'Registrando…' : 'Registrar todo' }}
+            </button>
+          </div>
         </div>
-        <div class="modal-resumen-row modal-resumen-row--total">
-          <span class="modal-resumen-label">Total a pagar</span>
-          <span class="modal-resumen-value modal-resumen-total">{{ modalTotalLabel }}</span>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span class="metric-label">Reportantes</span>
+            <strong>{{ totalBeneficiarios }}</strong>
+            <small>En {{ canales.length }} canal(es)</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Pasajeros que viajaron</span>
+            <strong>{{ totalPasajeros }}</strong>
+            <small>Con comisión mayor a cero</small>
+          </article>
+          <article class="metric-card metric-card--total">
+            <span class="metric-label">Total de la jornada</span>
+            <strong>{{ formatCOP(totalGlobal) }}</strong>
+            <small>Valor tomado de cada pasajero</small>
+          </article>
+          <article class="metric-card metric-card--pending">
+            <span class="metric-label">Pendiente</span>
+            <strong>{{ formatCOP(totalPendiente) }}</strong>
+            <small>{{ reservasPendientes }} reserva(s)</small>
+          </article>
+          <article class="metric-card metric-card--paid">
+            <span class="metric-label">Pagado</span>
+            <strong>{{ formatCOP(totalPagado) }}</strong>
+            <small>Registrado en la aplicación</small>
+          </article>
         </div>
-      </div>
 
-      <!-- Forma de pago -->
-      <div class="modal-field">
-        <label class="form-label">Forma de pago</label>
-        <select class="form-select"
-          [(ngModel)]="modal.Forma_Pago"
-          [disabled]="modal.saving"
-          (ngModelChange)="onModalFormaPagoChange()">
-          <option value="BANCOLOMBIA">Bancolombia</option>
-          <option value="NEQUI">Nequi</option>
-          <option value="EFECTIVO">Efectivo</option>
-        </select>
-      </div>
+        <div class="notice" role="note">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-9h.01"/>
+          </svg>
+          <span>Exportar genera el reporte; solo <strong>Registrar pago</strong> modifica el estado.</span>
+        </div>
 
-      @if (modalRequiereCuenta) {
-        <div class="modal-field">
-          <label class="form-label">{{ modalCuentaLabel }}</label>
-          <input type="text" class="form-input"
-            [class.form-input--invalid]="modal.Cuenta_Bancaria && modalError"
-            [(ngModel)]="modal.Cuenta_Bancaria"
-            [disabled]="modal.saving"
-            [placeholder]="modalCuentaPlaceholder" />
-          @if (modal.Cuenta_Bancaria && modalError) {
-            <span class="pago-error">{{ modalError }}</span>
+        <div class="channel-list">
+          @for (canal of canales; track canal.Id_Canal) {
+            <article class="channel-card">
+              <button type="button" class="channel-header" (click)="toggleCanal(canal.Id_Canal)"
+                [attr.aria-expanded]="!canalColapsado(canal.Id_Canal)">
+                <span class="channel-icon" aria-hidden="true">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 21V7l8-4 8 4v14M8 10h1m6 0h1M8 14h1m6 0h1M9 21v-3h6v3"/>
+                  </svg>
+                </span>
+                <span class="channel-title">
+                  <strong>{{ canal.Nombre_Canal }}</strong>
+                  <small>{{ canal.reportantes.length }} reportante(s)</small>
+                </span>
+                <span class="channel-amounts">
+                  <small>Pendiente {{ formatCOP(canal.Pendiente_Canal) }}</small>
+                  <strong>{{ formatCOP(canal.Total_Canal) }}</strong>
+                </span>
+                <svg class="chevron" [class.chevron--open]="!canalColapsado(canal.Id_Canal)" aria-hidden="true"
+                  width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="m9 6 6 6-6 6"/>
+                </svg>
+              </button>
+
+              @if (!canalColapsado(canal.Id_Canal)) {
+                <div class="beneficiary-list">
+                  @for (reportante of canal.reportantes; track trackBeneficiario($index, reportante)) {
+                    <section class="beneficiary-row" [class.beneficiary-row--open]="beneficiarioExpandido(reportante.Key_Beneficiario)">
+                      <div class="beneficiary-summary">
+                        <button type="button" class="beneficiary-toggle" (click)="toggleBeneficiario(reportante.Key_Beneficiario)"
+                          [attr.aria-expanded]="beneficiarioExpandido(reportante.Key_Beneficiario)">
+                          <span class="avatar" aria-hidden="true">{{ reportante.Nombre_Reportante.slice(0, 1).toUpperCase() }}</span>
+                          <span class="beneficiary-identity">
+                            <span class="identity-line">
+                              <strong>{{ reportante.Nombre_Reportante }}</strong>
+                              @if (reportante.Centralizado) {
+                                <span class="status-chip status-chip--central">Centralizado</span>
+                              } @else {
+                                <span class="status-chip">Dato de reserva</span>
+                              }
+                            </span>
+                            <small>{{ reportante.reservas.length }} reserva(s) · {{ etiquetaPago(reportante.Forma_Pago) }} · {{ cuentaOculta(reportante.Cuenta_Bancaria, reportante.Forma_Pago) }}</small>
+                          </span>
+                        </button>
+                        <div class="beneficiary-values">
+                          <span>
+                            <small>Pendiente</small>
+                            <strong>{{ formatCOP(reportante.Pendiente_Reportante) }}</strong>
+                          </span>
+                          <span>
+                            <small>Total</small>
+                            <strong>{{ formatCOP(reportante.Total_Reportante) }}</strong>
+                          </span>
+                        </div>
+                        <button type="button" class="action-button action-button--small action-button--primary"
+                          (click)="abrirPagoBeneficiario(reportante)" [disabled]="!pendientesDe(reportante)">
+                          {{ pendientesDe(reportante) ? 'Pagar pendientes' : 'Todo pagado' }}
+                        </button>
+                      </div>
+
+                      @if (beneficiarioExpandido(reportante.Key_Beneficiario)) {
+                        <div class="reservation-list">
+                          @for (reserva of reportante.reservas; track reserva.Id_Reserva) {
+                            <article class="reservation-card">
+                              <div class="reservation-main">
+                                <button type="button" class="reservation-toggle" (click)="toggleReserva(reserva.Id_Reserva)"
+                                  [attr.aria-expanded]="reservaExpandida(reserva.Id_Reserva)">
+                                  <span class="reservation-id">#{{ reserva.Id_Reserva }}</span>
+                                  <span class="reservation-tour">
+                                    <strong>{{ reserva.Nombre_Tour }}</strong>
+                                    <small>{{ reserva.Num_Pasajeros }} pasajero(s) confirmado(s)</small>
+                                  </span>
+                                  <svg class="chevron" [class.chevron--open]="reservaExpandida(reserva.Id_Reserva)" aria-hidden="true"
+                                    width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                    <path d="m9 6 6 6-6 6"/>
+                                  </svg>
+                                </button>
+                                <span class="commission-value">{{ formatCOP(reserva.Total_Comision) }}</span>
+                                <span class="status-chip" [class.status-chip--paid]="reserva.Estado_Liquidacion === 'PAGADO'"
+                                  [class.status-chip--pending]="reserva.Estado_Liquidacion !== 'PAGADO'">
+                                  {{ reserva.Estado_Liquidacion === 'PAGADO' ? 'Pagado' : 'Pendiente' }}
+                                </span>
+                                @if (reserva.Estado_Liquidacion === 'PAGADO') {
+                                  <button type="button" class="icon-action" title="Volver a pendiente" aria-label="Volver reserva a pendiente"
+                                    (click)="reabrirReserva(reserva, reportante)">
+                                    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                      <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
+                                    </svg>
+                                  </button>
+                                } @else {
+                                  <button type="button" class="action-button action-button--small action-button--secondary"
+                                    (click)="abrirPagoReserva(reserva, reportante)">Registrar pago</button>
+                                }
+                              </div>
+
+                              @if (reservaExpandida(reserva.Id_Reserva)) {
+                                <div class="passenger-table-wrap">
+                                  <table class="passenger-table">
+                                    <thead><tr><th>Pasajero confirmado</th><th>Documento</th><th>Tipo</th><th>Comisión</th></tr></thead>
+                                    <tbody>
+                                      @for (pasajero of reserva.pasajeros; track pasajero.Id_Pasajero) {
+                                        <tr>
+                                          <td>{{ pasajero.Nombre_Pasajero }}</td>
+                                          <td>{{ pasajero.DNI || '—' }}</td>
+                                          <td>{{ pasajero.Tipo_Pasajero === 'NINO' ? 'Niño' : pasajero.Tipo_Pasajero === 'ADULTO' ? 'Adulto' : pasajero.Tipo_Pasajero === 'INFANTE' ? 'Infante' : '—' }}</td>
+                                          <td>{{ formatCOP(pasajero.Comision) }}</td>
+                                        </tr>
+                                      }
+                                    </tbody>
+                                  </table>
+                                </div>
+                              }
+                            </article>
+                          }
+                        </div>
+                      }
+                    </section>
+                  }
+                </div>
+              }
+            </article>
           }
         </div>
-      }
+      </section>
+    }
+  }
+</main>
 
-    </div>
+@if (panel.visible && panel.reportante) {
+  <div class="sheet-backdrop" (mousedown)="cerrarPanel()">
+    <aside class="payment-sheet" role="dialog" aria-modal="true" aria-labelledby="payment-title"
+      (mousedown)="$event.stopPropagation()">
+      <header class="sheet-header">
+        <div>
+          <span class="eyebrow">Datos de liquidación</span>
+          <h2 id="payment-title">{{ panel.reportante.Nombre_Reportante }}</h2>
+          <p>{{ panel.reservas.length }} reserva(s) · {{ formatCOP(panelTotal) }}</p>
+        </div>
+        <button type="button" class="sheet-close" (click)="cerrarPanel()" [disabled]="panel.saving" aria-label="Cerrar">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
 
-    <div class="modal-footer">
-      <button class="btn-secondary" (click)="cerrarModal()" [disabled]="modal.saving">
-        Cancelar
-      </button>
-      <button class="btn-confirmar-pago" (click)="confirmarPago()"
-        [disabled]="!modalEsValido || modal.saving">
-        @if (modal.saving) {
-          <span class="btn-spinner"></span>
-          Registrando...
-        } @else {
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Confirmar pago
+      <div class="sheet-body">
+        <div class="selection-summary">
+          <span>Reservas seleccionadas</span>
+          <strong>{{ panel.reservas.length }}</strong>
+          <small>Solo se incluyen pasajeros que viajaron y tienen comisión.</small>
+        </div>
+
+        <div class="field-group">
+          <label class="form-label" for="payment-method">Forma de pago</label>
+          <select id="payment-method" class="form-select" [(ngModel)]="panel.formaPago" (ngModelChange)="onFormaPagoChange()">
+            <option value="TRANSFERENCIA_BANCOLOMBIA">Bancolombia</option>
+            <option value="NEQUI">Nequi</option>
+            <option value="EFECTIVO">Efectivo</option>
+          </select>
+        </div>
+
+        @if (panelRequiereCuenta) {
+          <div class="field-group">
+            <label class="form-label" for="payment-account">{{ panelCuentaLabel }}</label>
+            <input id="payment-account" class="form-input" inputmode="numeric" autocomplete="off"
+              [(ngModel)]="panel.cuenta" (ngModelChange)="panel.touched = true" [placeholder]="panelCuentaPlaceholder"
+              [class.input-error]="panel.touched && panelError" />
+            @if (panel.touched && panelError) { <small class="field-error">{{ panelError }}</small> }
+          </div>
         }
-      </button>
-    </div>
 
+        @if (panel.reportante.Centralizado) {
+          <div class="central-note central-note--active">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>
+            <span>Este reportante ya está centralizado. Los datos se actualizarán para próximas comisiones.</span>
+          </div>
+        } @else {
+          <label class="central-option">
+            <input type="checkbox" [(ngModel)]="panel.guardarCentral" />
+            <span>
+              <strong>Guardar reportante para próximas comisiones</strong>
+              <small>Crea su ficha centralizada y vincula estas reservas. Es opcional.</small>
+            </span>
+          </label>
+        }
+
+        <div class="central-note">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-9h.01"/></svg>
+          <span>La aplicación registra el estado para el reporte; no realiza una transferencia bancaria.</span>
+        </div>
+      </div>
+
+      <footer class="sheet-footer">
+        <button type="button" class="action-button action-button--secondary" (click)="guardarDatosPago()"
+          [disabled]="panel.saving">
+          {{ panel.saving ? 'Guardando…' : 'Guardar datos' }}
+        </button>
+        <button type="button" class="action-button action-button--primary" (click)="confirmarPago()"
+          [disabled]="panel.saving">
+          @if (panel.saving) { <span class="button-spinner button-spinner--light"></span> }
+          Registrar pago
+        </button>
+      </footer>
+    </aside>
   </div>
 }

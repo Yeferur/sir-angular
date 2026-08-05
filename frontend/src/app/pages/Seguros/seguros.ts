@@ -1,11 +1,15 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
 
 import { SegurosService } from '../../services/Seguros/seguros.service';
 import { Tours } from '../../services/Tours/tours';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { ConfirmacionService, EstadoConfirmacion, JornadaConfirmacion } from '../../services/confirmacion.service';
+import { PermisosService } from '../../services/Permisos/permisos.service';
 
 @Component({
     selector: 'app-seguros',
@@ -19,6 +23,10 @@ export class SegurosComponent implements OnInit {
     private toursService   = inject(Tours);
     private alerts         = inject(SirAlertService);
     private cdr            = inject(ChangeDetectorRef);
+    private confirmacionService = inject(ConfirmacionService);
+    private permisosService = inject(PermisosService);
+    private route = inject(ActivatedRoute);
+    private router = inject(Router);
 
     // Filters
     fecha: string = '';
@@ -32,6 +40,9 @@ export class SegurosComponent implements OnInit {
     hasSearched   = false;
     isSearching   = false;
     isExporting   = false;
+    estadoConfirmacion: EstadoConfirmacion | null = null;
+
+    private restoreSearchFromUrl = false;
 
     // Dirty & saving tracking per bus
     private dirtyBuses  = new Set<number>();
@@ -42,6 +53,7 @@ export class SegurosComponent implements OnInit {
         const hoy = new Date();
         hoy.setDate(hoy.getDate() - 1);
         this.fecha = hoy.toISOString().split('T')[0];
+        this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
         this.loadTours();
     }
 
@@ -50,6 +62,10 @@ export class SegurosComponent implements OnInit {
         this.toursService.getTours().subscribe({
             next: (data: any[]) => {
                 this.tours = data || [];
+                if (this.restoreSearchFromUrl) {
+                    this.restoreSearchFromUrl = false;
+                    this.buscar();
+                }
                 this.cdr.detectChanges();
             },
             error: (err: any) => console.error('Error cargando tours', err)
@@ -64,20 +80,51 @@ export class SegurosComponent implements OnInit {
         this.isSearching  = true;
         this.buses        = [];
         this.dirtyBuses.clear();
+        this.syncFiltersToUrl(true);
         this.cdr.detectChanges();
 
-        this.segurosService.listarSeguros({ Fecha: this.fecha, Id_Tour: this.idTour }).subscribe({
-            next: (data: any[]) => {
-                this.buses = data || [];
+        forkJoin({
+            buses: this.segurosService.listarSeguros({ Fecha: this.fecha, Id_Tour: this.idTour }),
+            estado: this.confirmacionService.getEstado(this.fecha, this.idTour).pipe(
+                catchError(() => of(null)),
+            ),
+        }).pipe(
+            finalize(() => {
                 this.isSearching = false;
+                this.cdr.detectChanges();
+            }),
+        ).subscribe({
+            next: ({ buses, estado }) => {
+                this.buses = buses || [];
+                this.estadoConfirmacion = estado;
                 this.cdr.detectChanges();
             },
             error: (err: any) => {
                 console.error('Error buscando seguros', err);
                 this.alerts.errorToast('Error', 'No se pudo cargar la información de seguros.');
-                this.isSearching = false;
                 this.cdr.detectChanges();
             }
+        });
+    }
+
+    get jornadasPorConfirmar(): JornadaConfirmacion[] {
+        if (!this.buses.length) return [];
+        return this.estadoConfirmacion?.jornadas?.filter((jornada) => jornada.Requiere_Confirmacion) || [];
+    }
+
+    get canOpenConfirmation(): boolean {
+        return this.permisosService.tienePermiso('CONTROL_VIAJE.LEER');
+    }
+
+    irAConfirmacion(): void {
+        if (!this.canOpenConfirmation || !this.fecha || !this.idTour) return;
+        void this.router.navigate(['/Reservas/Confirmacion'], {
+            queryParams: {
+                fechaTour: this.fecha,
+                tour: this.idTour,
+                buscar: 1,
+                origen: 'seguros',
+            },
         });
     }
 
@@ -170,5 +217,29 @@ export class SegurosComponent implements OnInit {
 
     get busesConConductor(): number {
         return this.buses.filter(b => !!b.Conductor).length;
+    }
+
+    private restoreFiltersFromQuery(): boolean {
+        const params = this.route.snapshot.queryParamMap;
+        const fecha = String(params.get('fechaTour') || '').trim();
+        const tour = Number(params.get('tour'));
+        const hasValidFecha = /^\d{4}-\d{2}-\d{2}$/.test(fecha);
+        const hasValidTour = Number.isInteger(tour) && tour > 0;
+        if (hasValidFecha) this.fecha = fecha;
+        if (hasValidTour) this.idTour = String(tour);
+        return params.get('buscar') === '1' && hasValidFecha && hasValidTour;
+    }
+
+    private syncFiltersToUrl(searchApplied: boolean): void {
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {
+                fechaTour: this.fecha || null,
+                tour: this.idTour || null,
+                buscar: searchApplied ? 1 : null,
+            },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+        });
     }
 }

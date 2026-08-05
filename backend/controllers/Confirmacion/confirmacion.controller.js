@@ -1,8 +1,19 @@
 const {
     obtenerPasajerosPorTour,
+    obtenerEstadoConfirmacion,
     actualizarConfirmacion
 } = require('../../services/Confirmacion/confirmacion.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+
+function handleError(res, error, fallbackMessage) {
+    const status = Number(error?.status) || 500;
+    return sendError(res, {
+        status,
+        message: status >= 500 ? fallbackMessage : error.message,
+        errorCode: error?.errorCode || 'INTERNAL_ERROR',
+        details: error?.details || null,
+    });
+}
 
 exports.getPasajeros = async (req, res) => {
     try {
@@ -14,21 +25,26 @@ exports.getPasajeros = async (req, res) => {
         return sendSuccess(res, { data: pasajeros, message: 'Pasajeros obtenidos correctamente' });
     } catch (error) {
         console.error('Error al obtener pasajeros para confirmación:', error);
-        return sendError(res, { status: 500, message: 'Error al obtener pasajeros', errorCode: 'INTERNAL_ERROR' });
+        return handleError(res, error, 'Error al obtener pasajeros');
+    }
+};
+
+exports.getEstado = async (req, res) => {
+    try {
+        const estado = await obtenerEstadoConfirmacion(req.query.Fecha, req.query.Id_Tour);
+        return sendSuccess(res, { data: estado, message: 'Estado de confirmación obtenido correctamente' });
+    } catch (error) {
+        console.error('Error al obtener el estado de confirmación:', error);
+        return handleError(res, error, 'Error al comprobar la confirmación de la jornada');
     }
 };
 
 exports.saveConfirmacion = async (req, res) => {
     try {
-        const { pasajeros } = req.body;
-        if (!pasajeros || !Array.isArray(pasajeros)) {
-            return sendError(res, { status: 400, message: 'Formato de datos invalido', errorCode: 'BAD_REQUEST' });
-        }
-
-        await actualizarConfirmacion(pasajeros);
-        return sendSuccess(res, { data: null, message: 'Confirmacion guardada correctamente' });
+        const result = await actualizarConfirmacion(req.body, req.user?.id || null);
+        return sendSuccess(res, { data: result, message: 'Confirmación guardada correctamente' });
     } catch (error) {
         console.error('Error al guardar confirmación:', error);
-        return sendError(res, { status: 500, message: 'Error al guardar confirmacion', errorCode: 'INTERNAL_ERROR' });
+        return handleError(res, error, 'Error al guardar la confirmación');
     }
 };

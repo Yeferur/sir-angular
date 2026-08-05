@@ -34,6 +34,28 @@
     </div>
   </div>
 
+  @if (hasSearched && !isSearching && jornadasPorConfirmar.length) {
+    <section class="workflow-card" role="status" aria-live="polite">
+      <div class="workflow-icon" aria-hidden="true">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 3v5m0 4v.01M5.6 19h12.8a2 2 0 0 0 1.73-3L13.73 5a2 2 0 0 0-3.46 0L3.87 16a2 2 0 0 0 1.73 3Z"/>
+        </svg>
+      </div>
+      <div class="workflow-copy">
+        <strong>Falta confirmar quiénes viajaron</strong>
+        <span>
+          Esta jornada tiene {{ jornadasPorConfirmar[0].Total_Pasajeros }} pasajero(s), pero la confirmación todavía no está lista.
+          Confírmalos para completar correctamente el listado de asegurados.
+        </span>
+      </div>
+      @if (canOpenConfirmation) {
+        <button type="button" class="btn-primary workflow-action" (click)="irAConfirmacion()">Confirmar pasajeros</button>
+      } @else {
+        <span class="workflow-permission">Requiere acceso a Control de viaje</span>
+      }
+    </section>
+  }
+
   <!-- CONTENT -->
   @if (isSearching) {
     <div class="card">
@@ -195,7 +217,7 @@
                       'badge-adulto':  p.Tipo_Pasajero === 'ADULTO',
                       'badge-nino':    p.Tipo_Pasajero === 'NINO',
                       'badge-infante': p.Tipo_Pasajero === 'INFANTE'
-                    }">{{ p.Tipo_Pasajero }}</span>
+                    }">{{ p.Tipo_Pasajero === 'NINO' ? 'Niño' : p.Tipo_Pasajero === 'ADULTO' ? 'Adulto' : p.Tipo_Pasajero === 'INFANTE' ? 'Infante' : '—' }}</span>
                   </td>
                   <td class="td td-mono">{{ p.DNI || '—' }}</td>
                   <td class="td">

@@ -1,92 +1,135 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+
+export type FormaPagoComision = 'TRANSFERENCIA_BANCOLOMBIA' | 'NEQUI' | 'EFECTIVO';
+export type EstadoLiquidacion = 'PENDIENTE' | 'PAGADO';
+export type TipoBeneficiario = 'HOTEL' | 'AGENCIA' | 'FREELANCE';
+
+export interface ComisionPasajero {
+  Id_Pasajero: number;
+  Nombre_Pasajero: string;
+  DNI: string | null;
+  Tipo_Pasajero: string | null;
+  Comision: number;
+}
+
+export interface ComisionReserva {
+  Id_Reserva: string;
+  Fecha_Tour: string;
+  Id_Tour: number;
+  Nombre_Tour: string;
+  Num_Pasajeros: number;
+  Total_Comision: number;
+  Comision_Minima: number | null;
+  Comision_Maxima: number | null;
+  Estado_Liquidacion: EstadoLiquidacion;
+  Forma_Pago: FormaPagoComision | null;
+  Cuenta_Bancaria: string | null;
+  Fecha_Pago: string | null;
+  pasajeros: ComisionPasajero[];
+}
+
+export interface ComisionBeneficiario {
+  Key_Beneficiario: string;
+  Id_Beneficiario: number | null;
+  Id_Canal: number;
+  Tipo_Beneficiario: TipoBeneficiario | null;
+  Nombre_Reportante: string;
+  Telefono: string | null;
+  Centralizado: boolean;
+  Forma_Pago: FormaPagoComision | null;
+  Cuenta_Bancaria: string | null;
+  Origen_Datos_Pago: 'CENTRALIZADO' | 'HISTORICO' | 'SIN_DATOS';
+  Total_Reportante: number;
+  Pendiente_Reportante: number;
+  Pagado_Reportante: number;
+  reservas: ComisionReserva[];
+}
+
+export interface ComisionCanal {
+  Id_Canal: number;
+  Nombre_Canal: string;
+  Total_Canal: number;
+  Pendiente_Canal: number;
+  Pagado_Canal: number;
+  reportantes: ComisionBeneficiario[];
+}
+
+export interface FiltrosComisiones {
+  Fecha: string;
+  Id_Tour?: string;
+  Id_Canal?: string;
+  Estado?: EstadoLiquidacion | '';
+  Nombre_Reportante?: string;
+}
+
+export interface GrupoPagoComision {
+  reservas: string[];
+  Forma_Pago: FormaPagoComision;
+  Cuenta_Bancaria: string | null;
+}
+
+export interface BeneficiarioComisionPayload {
+  Id_Beneficiario?: number | null;
+  Id_Canal: number;
+  Tipo_Beneficiario: TipoBeneficiario;
+  Nombre: string;
+  Telefono?: string | null;
+  Forma_Pago: FormaPagoComision;
+  Numero_Cuenta: string | null;
+  reservas: string[];
+}
 
 @Injectable({ providedIn: 'root' })
 export class ComisionesService {
-    private apiUrl = `${environment.apiUrl}/comisiones`;
+  private readonly http = inject(HttpClient);
+  private readonly apiUrl = `${environment.apiUrl}/comisiones`;
 
-    constructor(private http: HttpClient) {}
+  listarComisiones(filtros: FiltrosComisiones): Observable<ComisionCanal[]> {
+    return this.http.get<unknown>(this.apiUrl, { params: this.params(filtros) }).pipe(
+      map((response: any) => response?.data ?? response ?? []),
+    );
+  }
 
-    listarComisiones(filtros: {
-        Fecha?:             string;
-        Id_Tour?:           string;
-        Id_Canal?:          string;
-        Estado?:            string;
-        Nombre_Reportante?: string;
-    }): Observable<any[]> {
-        let params = new HttpParams();
-        if (filtros.Fecha)             params = params.set('Fecha',             filtros.Fecha);
-        if (filtros.Id_Tour)           params = params.set('Id_Tour',           filtros.Id_Tour);
-        if (filtros.Id_Canal)          params = params.set('Id_Canal',          filtros.Id_Canal);
-        if (filtros.Estado)            params = params.set('Estado',            filtros.Estado);
-        if (filtros.Nombre_Reportante) params = params.set('Nombre_Reportante', filtros.Nombre_Reportante);
+  actualizarLiquidacion(payload: GrupoPagoComision & { Estado: EstadoLiquidacion }): Observable<{ updated: number }> {
+    return this.http.put<unknown>(`${this.apiUrl}/liquidacion/estado`, payload).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
 
-        return this.http.get<any>(this.apiUrl, { params }).pipe(
-            map(res => res?.data ?? res ?? [])
-        );
+  actualizarLiquidacionesLote(payload: { Estado: EstadoLiquidacion; pagos: GrupoPagoComision[] }): Observable<{ updated: number }> {
+    return this.http.put<unknown>(`${this.apiUrl}/liquidacion/lote`, payload).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  actualizarDatosPago(payload: GrupoPagoComision): Observable<{ updated: number }> {
+    return this.http.put<unknown>(`${this.apiUrl}/liquidacion/pago`, payload).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  guardarBeneficiario(payload: BeneficiarioComisionPayload): Observable<any> {
+    return this.http.post<unknown>(`${this.apiUrl}/beneficiarios`, payload).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  exportarExcel(filtros: FiltrosComisiones): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/exportar`, {
+      params: this.params(filtros),
+      responseType: 'blob',
+    });
+  }
+
+  private params(filtros: FiltrosComisiones): HttpParams {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(filtros)) {
+      const normalized = String(value ?? '').trim();
+      if (normalized) params = params.set(key, normalized);
     }
-
-    /**
-     * Actualiza el Estado_Liquidacion de un conjunto de reservas.
-     * También persiste Forma_Pago y Cuenta_Bancaria si se suministran,
-     * para el caso en que se marque como PAGADO por primera vez.
-     *
-     * PUT /comisiones/liquidacion/estado
-     */
-    actualizarLiquidacion(payload: {
-        reservas:         string[];
-        Estado:           'PENDIENTE' | 'PAGADO';
-        Forma_Pago?:      string | null;
-        Cuenta_Bancaria?: string | null;
-    }): Observable<any> {
-        return this.http.put<any>(`${this.apiUrl}/liquidacion/estado`, payload).pipe(
-            map(res => res?.data ?? res)
-        );
-    }
-
-    /**
-     * Actualiza SOLO los datos de pago (Forma_Pago / Cuenta_Bancaria)
-     * sin tocar el Estado_Liquidacion.
-     *
-     * PUT /comisiones/liquidacion/pago
-     */
-    actualizarDatosPago(payload: {
-        reservas:         string[];
-        Forma_Pago:       string;
-        Cuenta_Bancaria:  string | null;
-    }): Observable<any> {
-        return this.http.put<any>(`${this.apiUrl}/liquidacion/pago`, payload).pipe(
-            map(res => res?.data ?? res)
-        );
-    }
-
-    exportarExcel(filtros: {
-        Fecha?:    string;
-        Id_Tour?:  string;
-        Id_Canal?: string;
-        Estado?:   string;
-    }): void {
-        let params = new HttpParams();
-        if (filtros.Fecha)    params = params.set('Fecha',    filtros.Fecha);
-        if (filtros.Id_Tour)  params = params.set('Id_Tour',  filtros.Id_Tour);
-        if (filtros.Id_Canal) params = params.set('Id_Canal', filtros.Id_Canal);
-        if (filtros.Estado)   params = params.set('Estado',   filtros.Estado);
-
-        this.http.get(`${this.apiUrl}/exportar`, { params, responseType: 'blob' }).subscribe({
-            next: (blob) => {
-                const url  = window.URL.createObjectURL(blob);
-                const a    = document.createElement('a');
-                a.href     = url;
-                a.download = `Comisiones_${filtros.Fecha || 'todas'}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            },
-            error: (err) => console.error('Error al descargar Excel', err)
-        });
-    }
+    return params;
+  }
 }
