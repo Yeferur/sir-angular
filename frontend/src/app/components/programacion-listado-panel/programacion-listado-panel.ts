@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { Bus, Reserva } from '../../interfaces/Programacion/reservas';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
@@ -23,6 +23,7 @@ interface ProgramacionListadoPanelProps {
 })
 export class ProgramacionListadoPanelComponent {
   private readonly drawer = inject(SirDrawerService);
+  readonly expandedBusIndex = signal<number | null>(null);
 
   readonly props = computed(() =>
     (this.drawer.drawer()?.props || {}) as ProgramacionListadoPanelProps
@@ -44,6 +45,10 @@ export class ProgramacionListadoPanelComponent {
 
   occupancy(bus: Bus): number {
     return bus.capacidad > 0 ? Math.min(100, Math.round((bus.ocupados / bus.capacidad) * 100)) : 0;
+  }
+
+  toggleBus(index: number): void {
+    this.expandedBusIndex.update((current) => current === index ? null : index);
   }
 
   edit(): void {

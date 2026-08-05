@@ -109,67 +109,14 @@
     }
 
     @if (modoVista === 'privados') {
-      <section class="private-workspace">
-        <header class="private-command">
-          <div class="private-title">
-            <button type="button" class="icon-button" (click)="volverAlDashboard()" aria-label="Volver a servicios">←</button>
-            <div>
-              <span class="module-eyebrow">Servicios privados</span>
-              <h2>Vehículos y guías</h2>
-              <p>{{ fechaSeleccionada }} · {{ totalReservasPrivadas }} reservas · {{ totalPaxPrivados }} pasajeros</p>
-            </div>
-          </div>
-          <div class="private-actions">
-            <button type="button" class="button button--secondary" (click)="descargarTodosLosPrivadosExcel()">
-              Exportar todos
-            </button>
-          </div>
-        </header>
-
-        <div class="private-list">
-          <div class="private-export-note" role="note">
-            <span aria-hidden="true">i</span>
-            <p><strong>Preparación para exportación</strong> La placa y el guía se aplican a los archivos que descargues en esta sesión.</p>
-          </div>
-
-          @for (grupo of gruposPrivados; track grupo.Id_Reserva) {
-            <article class="private-card">
-              <header>
-                <div>
-                  <span class="private-code">#{{ grupo.Id_Reserva }}</span>
-                  <h3>{{ grupo.Nombre_Reportante || 'Sin responsable' }}</h3>
-                  <p>{{ grupo.Nombre_Tour }} · {{ grupo.totalPax }} pasajeros</p>
-                </div>
-                <button type="button" class="button button--quiet" (click)="descargarReservaPrivadaExcel(grupo)">
-                  Descargar
-                </button>
-              </header>
-
-              <div class="private-buses">
-                @for (bus of grupo.buses; track bus) {
-                  <div class="private-bus">
-                    <span class="private-bus-number">{{ bus.indice || $index + 1 }}</span>
-                    <div class="private-bus-summary">
-                      <strong>Bus {{ bus.indice || $index + 1 }} de {{ bus.totalBuses || grupo.buses.length }}</strong>
-                      <span>{{ bus.ocupados }} pasajeros</span>
-                    </div>
-                    <label>
-                      <span>Placa o identificación</span>
-                      <input [(ngModel)]="bus.id" placeholder="Asignar vehículo">
-                    </label>
-                    <label>
-                      <span>Guía</span>
-                      <input [(ngModel)]="bus.guia" placeholder="Asignar guía">
-                    </label>
-                  </div>
-                }
-              </div>
-            </article>
-          } @empty {
-            <div class="private-empty">No hay servicios privados para esta fecha.</div>
-          }
-        </div>
-      </section>
+      <app-programacion-privados
+        [operationDate]="fechaSeleccionada"
+        [buses]="busesPrivados"
+        [canUpdate]="canUpdateProgramacion"
+        (busesChange)="updatePrivateBuses($event)"
+        (dirtyChange)="onPrivateDirtyChange($event)"
+        (closeRequested)="volverAlDashboard()">
+      </app-programacion-privados>
     }
   }
 </div>

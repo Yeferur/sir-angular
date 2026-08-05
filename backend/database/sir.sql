@@ -7696,11 +7696,13 @@ CREATE TABLE IF NOT EXISTS `programaciones` (
   `Confirmado_En` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Confirmado_Por` bigint UNSIGNED DEFAULT NULL,
   `Estado` enum('activa','anulada') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'activa',
+  `Tipo_Programacion` enum('grupal','privada') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'grupal',
   `Anulada_En` datetime DEFAULT NULL,
   `Anulada_Por` bigint UNSIGNED DEFAULT NULL,
   `Motivo_Anulacion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`Id_Programacion`),
   KEY `idx_programaciones_fecha_tour_estado` (`Fecha_Tour`,`Id_Tour`,`Estado`),
+  KEY `idx_programaciones_fecha_tipo_estado` (`Fecha_Tour`,`Tipo_Programacion`,`Estado`),
   KEY `idx_programaciones_confirmado_por` (`Confirmado_Por`),
   KEY `fk_programaciones_tour` (`Id_Tour`),
   KEY `fk_programaciones_anulada_por` (`Anulada_Por`)

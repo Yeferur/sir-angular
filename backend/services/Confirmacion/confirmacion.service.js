@@ -76,6 +76,7 @@ async function obtenerPasajerosPorTour(idTourValue, fechaValue) {
        P.Confirmacion,
        R.Telefono_Reportante,
        R.Nombre_Reportante,
+       R.Tipo_Reserva,
        C.Nombre_Canal,
        COALESCE(PP.Nombre_Punto, PH.Nombre_Punto) AS PuntoEncuentro
      FROM pasajeros P

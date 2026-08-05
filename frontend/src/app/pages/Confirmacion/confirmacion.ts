@@ -27,6 +27,7 @@ interface ReservaControlViaje {
   id: string;
   reportante: string | null;
   canal: string | null;
+  tipoReserva: string | null;
   pasajeros: PasajeroControlViaje[];
 }
 
@@ -128,6 +129,7 @@ export class ConfirmacionComponent implements OnInit {
         id,
         reportante: pasajero.Nombre_Reportante,
         canal: pasajero.Nombre_Canal,
+        tipoReserva: pasajero.Tipo_Reserva,
         pasajeros: [pasajero],
       });
     }

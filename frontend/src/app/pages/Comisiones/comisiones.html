@@ -1,4 +1,4 @@
-<main class="commissions-page">
+<main class="commissions-page" [class.commissions-page--with-footer]="canales.length">
   @if (catalogLoading) {
     <app-loading-state mode="loading" label="Preparando comisiones" detail="Cargando tours y canales…" />
   } @else if (catalogError) {
@@ -117,36 +117,6 @@
       </section>
     } @else if (canales.length) {
       <section class="results" aria-live="polite">
-        <div class="summary-bar">
-          <div class="summary-item summary-item--main">
-            <span>Total</span>
-            <strong>{{ formatCOP(totalGlobal) }}</strong>
-            <small>{{ textoCantidad(totalReservas, 'reserva', 'reservas') }} · {{ textoCantidad(totalBeneficiarios, 'reportante', 'reportantes') }}</small>
-          </div>
-          <div class="summary-item summary-item--pending">
-            <span>Pendiente</span>
-            <strong>{{ formatCOP(totalPendiente) }}</strong>
-            <small>{{ textoCantidad(reservasPendientes, 'reserva', 'reservas') }}</small>
-          </div>
-          <div class="summary-item summary-item--paid">
-            <span>Pagado</span>
-            <strong>{{ formatCOP(totalPagado) }}</strong>
-            <small>Registrado en la aplicación</small>
-          </div>
-          <div class="summary-actions">
-            @if (isSearching) { <span class="refresh-state"><span class="spinner"></span> Actualizando</span> }
-            <button type="button" class="button button--secondary" (click)="exportar()" [disabled]="isExporting">
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 19h14"/>
-              </svg>
-              {{ isExporting ? 'Exportando…' : 'Exportar' }}
-            </button>
-            <button type="button" class="button button--primary" (click)="iniciarColaPagos()" [disabled]="!reservasPendientes">
-              Registrar pagos
-            </button>
-          </div>
-        </div>
-
         <div class="list-search">
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
@@ -209,7 +179,12 @@
                             [attr.aria-label]="'Abrir reserva ' + reserva.Id_Reserva">
                             <span class="reservation-id">#{{ reserva.Id_Reserva }}</span>
                             <span class="reservation-tour">
-                              <strong>{{ reserva.Nombre_Tour }}</strong>
+                              <span class="reservation-tour-title">
+                                <strong>{{ reserva.Nombre_Tour }}</strong>
+                                @if (reserva.Tipo_Reserva?.toUpperCase() === 'PRIVADA') {
+                                  <span class="private-pill">Privada</span>
+                                }
+                              </span>
                               <small>{{ textoCantidad(reserva.Num_Pasajeros, 'pasajero confirmado', 'pasajeros confirmados') }}</small>
                             </span>
                             <strong class="reservation-value">{{ formatCOP(reserva.Total_Comision) }}</strong>
@@ -233,6 +208,40 @@
     }
   }
 </main>
+
+@if (canales.length) {
+  <div class="wizard-nav wizard-nav--page-enter module-footer" role="region" aria-label="Resumen y acciones de comisiones">
+    <div class="wizard-nav-row">
+      <div class="wizard-nav-left">
+        <button type="button" class="btn-wizard-back" (click)="exportar()" [disabled]="isExporting">
+          @if (isExporting) { <span class="spinner"></span> }
+          <span>{{ isExporting ? 'Exportando…' : 'Exportar' }}</span>
+        </button>
+      </div>
+      <div class="wizard-nav-center">
+        <div class="wizard-nav-summary module-footer-summary-desktop" aria-live="polite">
+          <span class="wizard-nav-tour">{{ formatCOP(totalGlobal) }} total</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item module-footer-pending">{{ formatCOP(totalPendiente) }} pendiente</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item module-footer-ready">{{ formatCOP(totalPagado) }} pagado</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ textoCantidad(totalReservas, 'reserva', 'reservas') }}</span>
+        </div>
+        <div class="wizard-nav-summary module-footer-summary-mobile" aria-live="polite">
+          <span class="wizard-nav-tour module-footer-pending">{{ formatCOP(totalPendiente) }} pendiente</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ textoCantidad(reservasPendientes, 'reserva', 'reservas') }}</span>
+        </div>
+      </div>
+      <div class="wizard-nav-right">
+        <button type="button" class="btn-wizard-next" (click)="iniciarColaPagos()" [disabled]="!reservasPendientes">
+          <span>Registrar pagos</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 @if (panel.visible && panel.reportante) {
   <div class="sheet-backdrop" (mousedown)="cerrarPanel()">
@@ -309,10 +318,6 @@
       </div>
 
       <footer class="sheet-footer">
-        <div class="footer-copy">
-          <strong>{{ panel.modoCola ? 'Revisión guiada' : 'Registro por reportante' }}</strong>
-          <span>{{ panel.modoCola ? 'Puedes omitir este pago y continuar.' : 'Incluye todas sus reservas pendientes.' }}</span>
-        </div>
         <button type="button" class="button button--secondary" (click)="omitirPagoActual()" [disabled]="panel.saving">
           {{ panel.modoCola ? 'Omitir' : 'Cancelar' }}
         </button>

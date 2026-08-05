@@ -20,6 +20,7 @@ export interface ComisionReserva {
   Fecha_Tour: string;
   Id_Tour: number;
   Nombre_Tour: string;
+  Tipo_Reserva: string | null;
   Num_Pasajeros: number;
   Total_Comision: number;
   Comision_Minima: number | null;

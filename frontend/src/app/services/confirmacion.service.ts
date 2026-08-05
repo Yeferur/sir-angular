@@ -13,6 +13,7 @@ export interface PasajeroControlViaje {
   Confirmacion: 0 | 1;
   Telefono_Reportante: string | null;
   Nombre_Reportante: string | null;
+  Tipo_Reserva: string | null;
   Nombre_Canal: string | null;
   PuntoEncuentro: string | null;
 }

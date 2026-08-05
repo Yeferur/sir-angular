@@ -108,6 +108,9 @@
                 <header class="reservation-header">
                   <div class="reservation-identity">
                     <strong>#{{ reserva.id }}</strong>
+                    @if (reserva.tipoReserva?.toUpperCase() === 'PRIVADA') {
+                      <span class="private-pill">Privada</span>
+                    }
                     <span class="reporter-name">{{ reserva.reportante || 'Sin reportante' }}</span>
                     @if (reserva.canal) { <span class="channel-name">{{ reserva.canal }}</span> }
                   </div>
@@ -188,6 +191,15 @@
             <span class="wizard-nav-item control-nav-changes">
               {{ totalCambios }} {{ totalCambios === 1 ? 'cambio' : 'cambios' }}
             </span>
+          }
+        </div>
+        <div class="wizard-nav-summary control-nav-summary-mobile" aria-live="polite">
+          <span class="wizard-nav-tour">{{ totalConfirmados }} viajaron</span>
+          <span class="nav-sep">•</span>
+          @if (totalCambios > 0) {
+            <span class="wizard-nav-item control-nav-changes">{{ totalCambios }} {{ totalCambios === 1 ? 'cambio' : 'cambios' }}</span>
+          } @else {
+            <span class="wizard-nav-item">{{ totalNoViajaron }} no viajaron</span>
           }
         </div>
       </div>

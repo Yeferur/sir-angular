@@ -1,79 +1,117 @@
-<header class="viewer-header">
-  <div>
-    <span class="viewer-eyebrow">Listado guardado</span>
-    <h2>{{ props().tourName }}</h2>
-    <p>{{ props().operationDate | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}</p>
+<header class="detail-header">
+  <div class="header-copy">
+    <span class="header-kicker">Listado guardado</span>
+    <div class="header-title-row">
+      <h1>{{ props().tourName }}</h1>
+      <span class="status-tag">Generado</span>
+    </div>
+    <div class="header-subline">
+      {{ props().operationDate | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+    </div>
   </div>
-  <button type="button" class="close-button" (click)="close()" aria-label="Cerrar listado">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18"/>
+
+  <button type="button" class="btn-close" (click)="close()" aria-label="Cerrar listado">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
   </button>
 </header>
 
-<div class="viewer-summary">
-  <span><strong>{{ props().buses?.length || 0 }}</strong>buses</span>
-  <span><strong>{{ totalPax() }}</strong>pasajeros</span>
-  <span><strong>{{ totalReservations() }}</strong>reservas asignadas</span>
-</div>
+<main class="detail-scroll">
+  <section class="summary-grid" aria-label="Resumen del listado">
+    <article>
+      <span>Buses</span>
+      <strong>{{ props().buses?.length || 0 }}</strong>
+    </article>
+    <article>
+      <span>Pasajeros</span>
+      <strong>{{ totalPax() }}</strong>
+    </article>
+    <article>
+      <span>Reservas</span>
+      <strong>{{ totalReservations() }}</strong>
+    </article>
+  </section>
 
-<main class="viewer-body">
   @if (props().unassigned?.length) {
     <section class="pending-card">
       <div>
-        <span class="pending-label">Nuevas reservas</span>
+        <span class="pending-label">Reservas nuevas</span>
         <strong>{{ props().unassigned!.length }} sin asignar</strong>
-        <p>Puedes regenerar la distribución para incluirlas automáticamente o editar los buses y asignarlas manualmente.</p>
+        <p>Regenera la distribución o abre el editor para asignarlas manualmente.</p>
       </div>
-      <button type="button" (click)="regenerate()">Regenerar listado</button>
+      <button type="button" class="btn-secondary" (click)="regenerate()">Regenerar listado</button>
     </section>
   }
 
-  <section class="bus-list" aria-label="Buses del listado">
-    @for (bus of props().buses || []; track $index) {
-      <article class="bus-card">
-        <header>
-          <span class="bus-number">{{ $index + 1 }}</span>
-          <div>
-            <h3>{{ bus.id || 'Bus ' + ($index + 1) }}</h3>
-            <p>{{ bus.guia || 'Guía pendiente' }}</p>
+  <section class="buses-section" aria-labelledby="buses-heading">
+    <div class="section-heading">
+      <div>
+        <span class="section-kicker">Flota</span>
+        <h2 id="buses-heading">Buses del listado</h2>
+      </div>
+      <span>{{ props().buses?.length || 0 }} buses</span>
+    </div>
+
+    <div class="bus-list">
+      @for (bus of props().buses || []; track $index; let busIndex = $index) {
+        <article class="bus-card" [class.is-expanded]="expandedBusIndex() === busIndex">
+          <button type="button" class="bus-toggle"
+            [attr.aria-expanded]="expandedBusIndex() === busIndex"
+            [attr.aria-controls]="'bus-details-' + busIndex"
+            (click)="toggleBus(busIndex)">
+            <span class="bus-number">{{ busIndex + 1 }}</span>
+
+            <span class="bus-copy">
+              <strong>{{ bus.id || 'Bus ' + (busIndex + 1) }}</strong>
+              <small [class.is-pending]="!bus.guia">{{ bus.guia || 'Guía pendiente' }}</small>
+            </span>
+
+            <span class="bus-overview">
+              <small>{{ bus.reservas?.length || 0 }} reservas · {{ busStops(bus) }} paradas</small>
+              <strong>{{ bus.ocupados }} / {{ bus.capacidad }}</strong>
+            </span>
+
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
+
+          <div class="progress" aria-hidden="true">
+            <span [style.width.%]="occupancy(bus)"></span>
           </div>
-          <span class="occupancy">{{ bus.ocupados }} / {{ bus.capacidad }}</span>
-        </header>
 
-        <div class="progress" aria-hidden="true">
-          <span [style.width.%]="occupancy(bus)"></span>
-        </div>
-
-        <div class="bus-meta">
-          <span>{{ bus.reservas?.length || 0 }} reservas</span>
-          <span>{{ busStops(bus) }} paradas</span>
-          <span>{{ occupancy(bus) }}% ocupado</span>
-        </div>
-
-        <ol>
-          @for (reservation of bus.reservas || []; track reservation.Id_Reserva) {
-            <li>
-              <span>{{ $index + 1 }}</span>
-              <div>
-                <strong>{{ reservation.NombrePunto || 'Punto sin nombre' }}</strong>
-                <small>#{{ reservation.Id_Reserva }} · {{ reservation.NumeroPasajeros }} pax</small>
+          <div class="bus-details" [id]="'bus-details-' + busIndex">
+            <div class="bus-details-inner">
+              <div class="details-heading">
+                <span>Orden de recogida</span>
+                <strong>{{ occupancy(bus) }}% ocupado</strong>
               </div>
-            </li>
-          }
-        </ol>
-      </article>
-    }
+
+              <ol>
+                @for (reservation of bus.reservas || []; track reservation.Id_Reserva; let stopIndex = $index) {
+                  <li>
+                    <span>{{ stopIndex + 1 }}</span>
+                    <div>
+                      <strong>{{ reservation.NombrePunto || 'Punto sin nombre' }}</strong>
+                      <small>#{{ reservation.Id_Reserva }} · {{ reservation.NumeroPasajeros }} pax</small>
+                    </div>
+                  </li>
+                }
+              </ol>
+            </div>
+          </div>
+        </article>
+      }
+    </div>
   </section>
 </main>
 
 @if (props().canEdit) {
-  <footer class="viewer-actions">
-    <div>
-      <strong>Modo consulta</strong>
-      <span>El listado no cambia hasta que abras la edición.</span>
-    </div>
-    <button type="button" (click)="edit()">Editar listado</button>
+  <footer class="detail-footer">
+    <button type="button" class="btn-primary" (click)="edit()">Editar listado</button>
   </footer>
 }

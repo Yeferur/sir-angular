@@ -1,264 +1,281 @@
-<div class="page-container">
-
-  <!-- HEADER -->
-  <div class="page-header">
-
-
-    <!-- FILTERS -->
-    <div class="filters-row">
-      <div class="filter-group">
-        <label class="form-label" for="seg-fecha">Fecha del Tour</label>
-        <app-datepicker
-          [(ngModel)]="fecha"
-          placeholder="Seleccionar fecha...">
-        </app-datepicker>
-      </div>
-
-      <div class="filter-group">
-        <label class="form-label" for="seg-tour">Tour</label>
-        <select id="seg-tour" [(ngModel)]="idTour" class="form-select">
-          <option value="" disabled selected>Seleccionar tour...</option>
-          @for (t of tours; track t.Id_Tour) {
-            <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-          }
-        </select>
-      </div>
-
-      <button (click)="buscar()" [disabled]="isSearching || !fecha || !idTour" class="btn-primary btn-search">
-        @if (isSearching) {
-          Buscando...
-        } @else {
-          Buscar
-        }
-      </button>
-    </div>
-  </div>
-
-  @if (hasSearched && !isSearching && jornadasPorConfirmar.length) {
-    <section class="workflow-card" role="status" aria-live="polite">
-      <div class="workflow-icon" aria-hidden="true">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 3v5m0 4v.01M5.6 19h12.8a2 2 0 0 0 1.73-3L13.73 5a2 2 0 0 0-3.46 0L3.87 16a2 2 0 0 0 1.73 3Z"/>
-        </svg>
-      </div>
-      <div class="workflow-copy">
-        <strong>Falta confirmar quiénes viajaron</strong>
-        <span>
-          Esta jornada tiene {{ jornadasPorConfirmar[0].Total_Pasajeros }} pasajero(s), pero la confirmación todavía no está lista.
-          Confírmalos para completar correctamente el listado de asegurados.
-        </span>
-      </div>
-      @if (canOpenConfirmation) {
-        <button type="button" class="btn-primary workflow-action" (click)="irAConfirmacion()">Confirmar pasajeros</button>
-      } @else {
-        <span class="workflow-permission">Requiere acceso a Control de viaje</span>
-      }
-    </section>
-  }
-
-  <!-- CONTENT -->
-  @if (isSearching) {
-    <div class="card">
-      <div class="loading-state" aria-live="polite">
-        <div class="spinner"></div>
-        <p>Cargando programación de buses...</p>
-      </div>
-    </div>
-  } @else if (!hasSearched) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h3>Listo para buscar</h3>
-        <p>Selecciona una fecha y un tour para cargar los buses y sus asegurados.</p>
-      </div>
-    </div>
-  } @else if (buses.length === 0) {
-    <div class="results-area">
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </div>
-        <h3>Sin programación</h3>
-        <p>No hay listados de bus generados para la fecha y tour seleccionados.</p>
-      </div>
-    </div>
+<main class="insurance-page" [class.insurance-page--with-footer]="buses.length">
+  @if (catalogLoading) {
+    <app-loading-state mode="loading" label="Preparando seguros" detail="Cargando los tours disponibles…" />
+  } @else if (catalogError) {
+    <app-loading-state mode="error" label="No pudimos preparar el módulo" [detail]="catalogError"
+      actionLabel="Reintentar" (action)="cargarTours()" />
   } @else {
+    <section class="search-card" aria-label="Buscar seguros">
+      <div class="search-primary">
+        <div class="field-group field-group--date">
+          <label class="form-label">Fecha del tour</label>
+          <app-datepicker [ngModel]="fecha" (dateChange)="actualizarFecha($event)"
+            [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
+        </div>
 
-    <!-- SUMMARY BAR -->
-    <div class="summary-bar">
-      <div class="summary-stat">
-        <span class="summary-number">{{ totalAsegurados }}</span>
-        <span class="summary-label">Asegurados totales</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">{{ buses.length }}</span>
-        <span class="summary-label">Buses</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">{{ totalPasajeros }}</span>
-        <span class="summary-label">Pasajeros</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">{{ busesConConductor }}</span>
-        <span class="summary-label">Con conductor</span>
-      </div>
-
-      <button class="btn-export" (click)="descargarExcel()" [disabled]="isExporting">
-        @if (isExporting) {
-          <span class="btn-spinner btn-spinner--dark"></span>
-          Generando...
-        } @else {
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Descargar Excel
-        }
-      </button>
-    </div>
-
-    <!-- BUS CARDS -->
-    @for (bus of buses; track bus.Id_Bus_Prog) {
-      <div class="bus-card" [class.bus-card--dirty]="isDirty(bus.Id_Bus_Prog)">
-
-        <!-- BUS HEADER -->
-        <div class="bus-header">
-          <div class="bus-header-left">
-            <span class="bus-number">Bus {{ bus.Orden_Bus }}</span>
-            <span class="bus-plate">{{ bus.Placa_Display }}</span>
-            <span class="bus-count-badge">
-              {{ bus.pasajeros.length + 2 }} asegurados
-            </span>
-          </div>
-
-          <button
-            class="btn-save-bus"
-            (click)="guardarBus(bus)"
-            [disabled]="isSavingBus(bus.Id_Bus_Prog) || !isDirty(bus.Id_Bus_Prog)"
-          >
-            @if (isSavingBus(bus.Id_Bus_Prog)) {
-              <span class="btn-spinner btn-spinner--sm"></span>
+        <div class="field-group field-group--tour">
+          <label class="form-label" for="insurance-tour">Tour</label>
+          <select id="insurance-tour" class="form-control" [ngModel]="idTour"
+            (ngModelChange)="actualizarTour($event)">
+            <option value="">Seleccionar tour</option>
+            @for (tour of tours; track tour.Id_Tour) {
+              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
             }
-            Guardar
-          </button>
+          </select>
         </div>
 
-        <!-- STAFF FIELDS -->
-        <div class="staff-fields">
-          <div class="staff-field">
-            <span class="staff-role staff-role--guia">Guía</span>
-            <input
-              type="text"
-              class="staff-input"
-              [value]="bus.Guia || ''"
-              placeholder="Sin guía asignado"
-              disabled
-              title="El guía se asigna desde el listado de programación"
-            />
-            <input
-              type="text"
-              class="staff-input staff-input--dni"
-              [(ngModel)]="bus.DNI_Guia"
-              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
-              placeholder="Cédula guía"
-            />
-          </div>
-
-          <div class="staff-field">
-            <span class="staff-role staff-role--conductor">Conductor</span>
-            <input
-              type="text"
-              class="staff-input"
-              [(ngModel)]="bus.Conductor"
-              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
-              placeholder="Nombre del conductor..."
-            />
-            <input
-              type="text"
-              class="staff-input staff-input--dni"
-              [(ngModel)]="bus.DNI_Conductor"
-              (ngModelChange)="markDirty(bus.Id_Bus_Prog)"
-              placeholder="Cédula conductor"
-            />
-          </div>
-        </div>
-
-        <!-- PASSENGERS TABLE -->
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead class="thead">
-              <tr>
-                <th class="th">#</th>
-                <th class="th">Pasajero</th>
-                <th class="th">Tipo</th>
-                <th class="th">DNI / Pasaporte</th>
-                <th class="th">Reserva</th>
-              </tr>
-            </thead>
-            <tbody class="tbody">
-              @for (p of bus.pasajeros; track p.Id_Pasajero; let idx = $index) {
-                <tr>
-                  <td class="td td-num">{{ idx + 1 }}</td>
-                  <td class="td">
-                    <span class="passenger-name">{{ p.Nombre_Pasajero || '—' }}</span>
-                    @if (p.Nombre_Reportante) {
-                      <span class="sub-text">Rep: {{ p.Nombre_Reportante }}</span>
-                    }
-                  </td>
-                  <td class="td">
-                    <span class="badge" [ngClass]="{
-                      'badge-adulto':  p.Tipo_Pasajero === 'ADULTO',
-                      'badge-nino':    p.Tipo_Pasajero === 'NINO',
-                      'badge-infante': p.Tipo_Pasajero === 'INFANTE'
-                    }">{{ p.Tipo_Pasajero === 'NINO' ? 'Niño' : p.Tipo_Pasajero === 'ADULTO' ? 'Adulto' : p.Tipo_Pasajero === 'INFANTE' ? 'Infante' : '—' }}</span>
-                  </td>
-                  <td class="td td-mono">{{ p.DNI || '—' }}</td>
-                  <td class="td">
-                    <span class="reserva-id">#{{ p.Id_Reserva }}</span>
-                  </td>
-                </tr>
-              }
-
-              <!-- GUÍA ROW -->
-              <tr class="staff-row staff-row--guia">
-                <td class="td td-num">{{ bus.pasajeros.length + 1 }}</td>
-                <td class="td">
-                  <span class="passenger-name">{{ bus.Guia || '—' }}</span>
-                  <span class="sub-text">Guía de turismo</span>
-                </td>
-                <td class="td">
-                  <span class="badge badge-staff">GUÍA</span>
-                </td>
-                <td class="td td-mono">{{ bus.DNI_Guia || '—' }}</td>
-                <td class="td">—</td>
-              </tr>
-
-              <!-- CONDUCTOR ROW -->
-              <tr class="staff-row staff-row--conductor">
-                <td class="td td-num">{{ bus.pasajeros.length + 2 }}</td>
-                <td class="td">
-                  <span class="passenger-name">{{ bus.Conductor || 'Sin asignar' }}</span>
-                  <span class="sub-text">Conductor</span>
-                </td>
-                <td class="td">
-                  <span class="badge badge-conductor">CONDUCTOR</span>
-                </td>
-                <td class="td td-mono">{{ bus.DNI_Conductor || '—' }}</td>
-                <td class="td">—</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
+        <button type="button" class="button button--primary search-button" (click)="buscar()"
+          [disabled]="!fecha || !idTour || isSearching">
+          @if (isSearching) { <span class="spinner spinner--light"></span> }
+          {{ isSearching ? 'Buscando…' : 'Buscar' }}
+        </button>
       </div>
+    </section>
+
+    @if (hasSearched && !isSearching && jornadasPorConfirmar.length) {
+      <section class="workflow-card" role="status" aria-live="polite">
+        <span class="workflow-icon workflow-icon--warning" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 8v4m0 4h.01"/><circle cx="12" cy="12" r="9"/>
+          </svg>
+        </span>
+        <div class="workflow-copy">
+          <strong>Hay pasajeros por confirmar</strong>
+          <span>Solo quienes viajaron pueden incluirse en el archivo de seguros.</span>
+        </div>
+        @if (canOpenConfirmation) {
+          <button type="button" class="button button--primary" (click)="irAConfirmacion()">Ir a confirmación</button>
+        } @else {
+          <span class="workflow-permission">Requiere acceso a Confirmación</span>
+        }
+      </section>
+    }
+
+    @if (searchError) {
+      <app-loading-state mode="error" label="No pudimos cargar los seguros" [detail]="searchError"
+        actionLabel="Reintentar" (action)="buscar()" />
+    } @else if (isSearching && !buses.length) {
+      <app-loading-state mode="loading" label="Consultando seguros" detail="Reuniendo pasajeros y personal por bus…" />
+    } @else if (!hasSearched) {
+      <section class="empty-state" aria-labelledby="insurance-ready-title">
+        <span class="empty-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </span>
+        <h2 id="insurance-ready-title">Listo para buscar</h2>
+        <p>Selecciona la fecha y el tour para cargar sus buses y preparar el listado de seguros.</p>
+      </section>
+    } @else if (!buses.length && !isSearching) {
+      <section class="empty-state" aria-labelledby="insurance-empty-title">
+        <span class="empty-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/>
+          </svg>
+        </span>
+        <h2 id="insurance-empty-title">Sin programación</h2>
+        <p>No encontramos buses guardados para la fecha y el tour seleccionados.</p>
+      </section>
+    } @else if (buses.length) {
+      <section class="results" aria-live="polite">
+        <div class="list-toolbar">
+          <div class="status-filter" role="group" aria-label="Filtrar buses por estado">
+            <button type="button" [class.active]="estadoLista === 'todos'" (click)="seleccionarEstado('todos')">
+              Todos <span>{{ buses.length }}</span>
+            </button>
+            <button type="button" [class.active]="estadoLista === 'pendientes'" (click)="seleccionarEstado('pendientes')">
+              Por completar <span>{{ busesPendientes }}</span>
+            </button>
+            <button type="button" [class.active]="estadoLista === 'listos'" (click)="seleccionarEstado('listos')">
+              Listos <span>{{ busesListos }}</span>
+            </button>
+          </div>
+          <p>El archivo se genera en una hoja independiente por bus.</p>
+        </div>
+
+        @if (!busesVisibles.length) {
+          <section class="empty-state empty-state--compact">
+            <h2>Sin buses en este estado</h2>
+            <p>Selecciona otro estado para continuar.</p>
+          </section>
+        } @else {
+          <div class="bus-list">
+            @for (bus of busesVisibles; track bus.Id_Bus_Prog) {
+              <button type="button" class="bus-row" (click)="abrirBus(bus)"
+                [attr.aria-label]="'Revisar datos de ' + etiquetaBus(bus)">
+                <span class="bus-identity">
+                  <span class="bus-title">
+                    <strong>{{ etiquetaBus(bus) }}</strong>
+                    @if (bus.Tipo_Bus === 'privado') { <span class="type-pill">Privado</span> }
+                  </span>
+                  <small>{{ bus.Placa_Display || 'Sin placa registrada' }}</small>
+                </span>
+
+                <span class="bus-metric">
+                  <small>Pasajeros</small>
+                  <strong>{{ bus.pasajeros.length }}</strong>
+                </span>
+
+                <span class="staff-summary">
+                  <span><small>Guía</small><strong>{{ bus.Guia || 'Sin asignar' }}</strong></span>
+                  <span><small>Conductor</small><strong>{{ bus.Conductor || 'Por completar' }}</strong></span>
+                </span>
+
+                <span class="status-pill" [class.status-pill--ready]="bus.Datos_Completos">
+                  {{ bus.Datos_Completos ? 'Listo' : textoCantidad(bus.Faltantes.length, 'pendiente', 'pendientes') }}
+                </span>
+
+                <svg class="row-chevron" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m9 6 6 6-6 6"/>
+                </svg>
+              </button>
+            }
+          </div>
+        }
+      </section>
     }
   }
+</main>
 
-</div>
+@if (buses.length) {
+  <div class="wizard-nav wizard-nav--page-enter module-footer" role="region" aria-label="Resumen y acciones de seguros">
+    <div class="wizard-nav-row">
+      <div class="wizard-nav-center">
+        <div class="wizard-nav-summary module-footer-summary-desktop" aria-live="polite">
+          <span class="wizard-nav-tour">{{ totalAsegurados }} asegurados</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ textoCantidad(buses.length, 'bus', 'buses') }}</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item module-footer-pending">{{ busesPendientes }} por completar</span>
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item module-footer-ready">{{ busesListos }} listos</span>
+        </div>
+        <div class="wizard-nav-summary module-footer-summary-mobile" aria-live="polite">
+          @if (busesPendientes) {
+            <span class="wizard-nav-tour module-footer-pending">{{ busesPendientes }} por completar</span>
+          } @else {
+            <span class="wizard-nav-tour module-footer-ready">{{ busesListos }} listos para descargar</span>
+          }
+          <span class="nav-sep">•</span>
+          <span class="wizard-nav-item">{{ totalAsegurados }} asegurados</span>
+        </div>
+      </div>
+      <div class="wizard-nav-right">
+        @if (busesPendientes) {
+          <button type="button" class="btn-wizard-next" (click)="iniciarCompletarDatos()">
+            <span>Completar datos</span>
+          </button>
+        } @else {
+          <button type="button" class="btn-wizard-next" (click)="descargarExcel()" [disabled]="isExporting">
+            @if (isExporting) { <span class="spinner spinner--light"></span> }
+            <span>{{ isExporting ? 'Generando…' : 'Descargar seguros' }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (panel.visible && panel.bus) {
+  <div class="sheet-backdrop" (mousedown)="cerrarPanel()">
+    <aside class="insurance-sheet" role="dialog" aria-modal="true" aria-labelledby="insurance-sheet-title"
+      (mousedown)="$event.stopPropagation()">
+      <header class="sheet-header">
+        <div>
+          @if (panel.modoCola) { <span class="sheet-step">Bus {{ pasoCola }}</span> }
+          <h1 id="insurance-sheet-title">{{ etiquetaBus(panel.bus) }}</h1>
+          <p>{{ panel.placa || 'Sin placa' }} · {{ textoCantidad(panel.bus.Total_Asegurados, 'asegurado', 'asegurados') }}</p>
+        </div>
+        <button type="button" class="sheet-close" (click)="cerrarPanel()" [disabled]="panel.saving" aria-label="Cerrar">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+
+      @if (panel.modoCola) {
+        <div class="queue-progress" aria-hidden="true">
+          <span [style.width.%]="((panel.indiceCola + 1) / panel.cola.length) * 100"></span>
+        </div>
+      }
+
+      <div class="sheet-body">
+        <section class="bus-overview">
+          <div>
+            <span>Pasajeros confirmados</span>
+            <strong>{{ panel.bus.pasajeros.length }}</strong>
+          </div>
+          <div>
+            <span>Personal del bus</span>
+            <strong>2</strong>
+          </div>
+          <p>El seguro incluye únicamente a quienes viajaron, al guía y al conductor de este bus.</p>
+        </section>
+
+        <section class="form-section">
+          <header>
+            <strong>Personal del bus</strong>
+            <span>Actualiza la identificación del vehículo y su personal.</span>
+          </header>
+
+          <div class="field-group">
+            <label class="form-label" for="insurance-bus-plate">Placa o identificador</label>
+            <input id="insurance-bus-plate" class="form-control" [(ngModel)]="panel.placa"
+              (ngModelChange)="panel.touched = true" autocomplete="off" placeholder="Opcional · placa o nombre interno" maxlength="20" />
+          </div>
+          <div class="field-group">
+            <label class="form-label" for="insurance-guide-name">Guía</label>
+            <input id="insurance-guide-name" class="form-control" [(ngModel)]="panel.guia"
+              (ngModelChange)="panel.touched = true" autocomplete="off" placeholder="Nombre completo" maxlength="100" />
+          </div>
+          <div class="field-group">
+            <label class="form-label" for="insurance-guide-id">Documento del guía</label>
+            <input id="insurance-guide-id" class="form-control" [(ngModel)]="panel.dniGuia"
+              (ngModelChange)="panel.touched = true" autocomplete="off" placeholder="Cédula o pasaporte" maxlength="20" />
+          </div>
+          <div class="field-group">
+            <label class="form-label" for="insurance-driver-name">Conductor</label>
+            <input id="insurance-driver-name" class="form-control" [(ngModel)]="panel.conductor"
+              (ngModelChange)="panel.touched = true" autocomplete="off" placeholder="Nombre completo" maxlength="100" />
+          </div>
+          <div class="field-group">
+            <label class="form-label" for="insurance-driver-id">Documento del conductor</label>
+            <input id="insurance-driver-id" class="form-control" [(ngModel)]="panel.dniConductor"
+              (ngModelChange)="panel.touched = true" autocomplete="off" placeholder="Cédula o pasaporte" maxlength="20" />
+          </div>
+
+          @if (panelError) { <p class="field-error">{{ panelError }}</p> }
+        </section>
+
+        @if (pasajerosSinDocumentoPanel.length) {
+          <section class="passenger-issues">
+            <header>
+              <strong>Documentos de pasajeros</strong>
+              <span>Abre la reserva para completar la información faltante.</span>
+            </header>
+            <div class="passenger-list">
+              @for (pasajero of pasajerosSinDocumentoPanel; track pasajero.Id_Pasajero) {
+                <button type="button" class="passenger-row" (click)="verReserva(pasajero)">
+                  <span>
+                    <strong>{{ pasajero.Nombre_Pasajero }}</strong>
+                    <small>Reserva #{{ pasajero.Id_Reserva }}</small>
+                  </span>
+                  <span class="missing-label">Sin documento</span>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+                </button>
+              }
+            </div>
+          </section>
+        }
+      </div>
+
+      <footer class="sheet-footer">
+        <button type="button" class="button button--secondary" (click)="omitirBusActual()" [disabled]="panel.saving">
+          {{ panel.modoCola ? 'Omitir' : 'Cancelar' }}
+        </button>
+        <button type="button" class="button button--primary" (click)="guardarBusActual()" [disabled]="panel.saving">
+          @if (panel.saving) { <span class="spinner spinner--light"></span> }
+          {{ panel.saving ? 'Guardando…' : (panel.modoCola && !pasajerosSinDocumentoPanel.length && panel.bus.Guia ? 'Guardar y continuar' : 'Guardar datos') }}
+        </button>
+      </footer>
+    </aside>
+  </div>
+}

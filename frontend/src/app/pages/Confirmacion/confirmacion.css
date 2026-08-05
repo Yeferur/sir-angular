@@ -276,6 +276,18 @@
   font-size: .68rem;
 }
 
+.private-pill {
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 28%, transparent);
+  border-radius: var(--radius-pill, 999px);
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 9%, transparent);
+  font-size: .59rem;
+  font-weight: 750;
+  letter-spacing: .025em;
+}
+
 .channel-name {
   text-transform: uppercase;
   letter-spacing: .035em;
@@ -423,6 +435,7 @@
 }
 
 .control-nav-summary { justify-content: center; }
+.control-nav-summary-mobile { display: none; }
 
 .control-nav-yes {
   color: var(--accent-green);
@@ -448,7 +461,8 @@
   .filters-grid { grid-template-columns: 1fr 1.3fr; }
   .filters-grid > .action-button { grid-column: 1 / -1; width: 100%; }
   .list-tools { grid-template-columns: 1fr; }
-  .status-filters { overflow-x: auto; }
+  .status-filters { overflow-x: auto; scrollbar-width: none; }
+  .status-filters::-webkit-scrollbar { display: none; }
   .status-filters button { flex: 1 0 auto; }
   .bulk-control { grid-column: auto; }
 }
@@ -472,20 +486,43 @@
 @media (max-width: 430px) {
   .reservation-header { align-items: flex-start; flex-direction: column; gap: 5px; }
   .passenger-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "passenger"
-      "contact"
-      "status";
+      "passenger passenger"
+      "contact status";
+    padding: 10px 12px;
   }
-  .status-cell { width: 100%; justify-content: flex-start; }
+  .passenger-name { min-width: 0; }
+  .contact-cell { min-width: 0; flex-wrap: nowrap; }
+  .contact-cell strong { font-size: .73rem; }
+  .contact-cell span { display: none; }
+  .status-cell { width: auto; justify-content: flex-end; }
+  .attendance-control { width: 92px; min-height: 32px; }
+  .status-filters { gap: 1px; padding: 2px; }
+  .status-filters button { padding: 0 6px; font-size: .65rem; }
 }
 
 @media (max-width: 640px) {
-  .trip-control-page--with-footer { padding-bottom: 92px; }
-  .control-wizard-nav .wizard-nav-center { display: none; }
+  .trip-control-page--with-footer { padding-bottom: 132px; }
+  .control-wizard-nav .wizard-nav-row {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 9px 10px;
+    padding: 10px 12px;
+  }
+  .control-wizard-nav .wizard-nav-center {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .control-nav-summary { display: none; }
+  .control-nav-summary-mobile {
+    display: flex;
+    justify-content: flex-start;
+    gap: 7px;
+  }
   .control-wizard-nav .wizard-nav-left,
-  .control-wizard-nav .wizard-nav-right { flex: 1; }
+  .control-wizard-nav .wizard-nav-right { width: 100%; }
   .control-wizard-nav .btn-wizard-back,
   .control-wizard-nav .btn-wizard-next { width: 100%; justify-content: center; }
   .control-wizard-nav .btn-wizard-back span { display: inline; }

@@ -15,6 +15,10 @@ const {
 const {
     obtenerReservasSinAsignar,
 } = require('./programacion-reconciliation');
+const {
+    reconcilePrivateBuses,
+    validatePrivateAssignments,
+} = require('./programacion-private');
 
 // =================================================================
 // --- CONFIGURACIÓN Y CACHÉ GLOBAL ---
@@ -1730,8 +1734,6 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
     };
 }
 
-
-
 function toNullableNumber(value) {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
@@ -1832,6 +1834,7 @@ async function guardarSnapshotProgramacion(conn, { fecha, tours, primaryTourId, 
             p.Motivo_Anulacion = 'Reemplazada por una nueva confirmación del listado.'
         WHERE p.Fecha_Tour = ?
           AND p.Estado = 'activa'
+          AND p.Tipo_Programacion = 'grupal'
           AND pt.Id_Tour IN (?)
         `,
         [userId || null, fecha, tours]
@@ -1840,8 +1843,8 @@ async function guardarSnapshotProgramacion(conn, { fecha, tours, primaryTourId, 
     const [programacionResult] = await conn.query(
         `
         INSERT INTO programaciones
-        (Fecha_Tour, Id_Tour, Confirmado_Por, Estado)
-        VALUES (?, ?, ?, 'activa')
+        (Fecha_Tour, Id_Tour, Confirmado_Por, Estado, Tipo_Programacion)
+        VALUES (?, ?, ?, 'activa', 'grupal')
         `,
         [fecha, primaryTourId, userId || null]
     );
@@ -1982,6 +1985,7 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
         INNER JOIN programacion_tours pt ON pt.Id_Programacion = p.Id_Programacion
         WHERE p.Fecha_Tour = ?
           AND p.Estado = 'activa'
+          AND p.Tipo_Programacion = 'grupal'
           AND pt.Id_Tour IN (?)
         ORDER BY p.Confirmado_En DESC, p.Id_Programacion DESC
         LIMIT 1
@@ -2369,62 +2373,211 @@ async function obtenerListadoFinal({ fecha, idsTours }) {
 }
 
 
-async function resumenPrivadosDia(fecha, idsTours) {
-    // Devuelve un resumen ligero de las reservas privadas del día:
-    // cuántas reservas, cuántos buses necesarios y cuántos pax totales.
-    // Se llama desde el dashboard al cargar la fecha, sin necesidad de
-    // abrir ningún tour grupal primero.
+async function obtenerReservasPrivadasActivas(fecha, idsTours = null, connection = db) {
     const tours = Array.isArray(idsTours) ? idsTours : (idsTours ? [idsTours] : null);
+    const params = [fecha];
+    let tourFilter = '';
+    if (tours?.length) {
+        tourFilter = 'AND h.Id_Tour IN (?) ';
+        params.push(tours);
+    }
 
+    const sql = `
+        SELECT
+            r.Id_Reserva,
+            h.Id_Tour,
+            t.Nombre_Tour,
+            r.Nombre_Reportante,
+            r.Idioma_Reserva,
+            r.Observaciones,
+            COUNT(p.Id_Pasajero) AS NumeroPasajeros
+        FROM reservas r
+        INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
+        LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+        WHERE r.Fecha_Tour = ?
+          ${tourFilter}
+          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_RESERVA_ACTIVOS.map(() => '?').join(',')})
+        GROUP BY r.Id_Reserva, h.Id_Tour, t.Nombre_Tour,
+                 r.Nombre_Reportante, r.Idioma_Reserva, r.Observaciones
+        ORDER BY h.Id_Tour ASC, r.Id_Reserva ASC
+    `;
+    params.push(...ESTADOS_RESERVA_ACTIVOS);
+
+    const [rows] = await connection.query(sql, params);
+    return rows || [];
+}
+
+async function obtenerAsignacionesPrivadasGuardadas(fecha, connection = db) {
+    const [programaciones] = await connection.query(
+        `
+        SELECT Id_Programacion, Confirmado_En
+        FROM programaciones
+        WHERE Fecha_Tour = ?
+          AND Estado = 'activa'
+          AND Tipo_Programacion = 'privada'
+        ORDER BY Confirmado_En DESC, Id_Programacion DESC
+        LIMIT 1
+        `,
+        [fecha]
+    );
+
+    const programacion = programaciones?.[0];
+    if (!programacion) return { idProgramacion: null, confirmadoEn: null, buses: [] };
+
+    const [buses] = await connection.query(
+        `
+        SELECT Id_Bus_Prog, Placa_Display, Capacidad, Pasajeros_Total, Guia,
+               Orden_Bus, Id_Reserva_Privada
+        FROM programacion_buses
+        WHERE Id_Programacion = ?
+          AND Tipo_Bus = 'privado'
+        ORDER BY Orden_Bus ASC, Id_Bus_Prog ASC
+        `,
+        [programacion.Id_Programacion]
+    );
+
+    return {
+        idProgramacion: programacion.Id_Programacion,
+        confirmadoEn: programacion.Confirmado_En,
+        buses: buses || []
+    };
+}
+
+async function construirResumenPrivados(fecha, idsTours = null, connection = db) {
+    const reservas = await obtenerReservasPrivadasActivas(fecha, idsTours, connection);
+    const generatedBuses = generarBusesPrivados(reservas);
+    const saved = await obtenerAsignacionesPrivadasGuardadas(fecha, connection);
+    const buses = reconcilePrivateBuses(generatedBuses, saved.buses);
+
+    return {
+        totalReservas: reservas.length,
+        totalBuses: buses.length,
+        totalPax: buses.reduce((sum, bus) => sum + Number(bus.ocupados || 0), 0),
+        idProgramacion: saved.idProgramacion,
+        confirmadoEn: saved.confirmadoEn,
+        privados: buses
+    };
+}
+
+async function resumenPrivadosDia(fecha, idsTours) {
     try {
-        const params = [fecha];
-        let tourFilter = '';
-        if (tours && tours.length > 0) {
-            tourFilter = 'AND h.Id_Tour IN (?) ';
-            params.push(tours);
-        }
-
-        const sql = `
-            SELECT
-                r.Id_Reserva,
-                h.Id_Tour,
-                t.Nombre_Tour,
-                r.Nombre_Reportante,
-                r.Idioma_Reserva,
-                r.Observaciones,
-                COUNT(p.Id_Pasajero) AS NumeroPasajeros
-            FROM reservas r
-            INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
-            INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
-            LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-            WHERE r.Fecha_Tour = ?
-              ${tourFilter}
-              AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
-              AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_RESERVA_ACTIVOS.map(() => '?').join(',')})
-            GROUP BY r.Id_Reserva, h.Id_Tour, t.Nombre_Tour,
-                     r.Nombre_Reportante, r.Idioma_Reserva, r.Observaciones
-            ORDER BY h.Id_Tour ASC, r.Id_Reserva ASC
-        `;
-        params.push(...ESTADOS_RESERVA_ACTIVOS);
-
-        const [rows] = await db.query(sql, params);
-        const reservas = rows || [];
-
-        // Generar los buses (misma lógica que generarBusesPrivados)
-        // para tener la lista completa disponible en el dashboard.
-        const buses = generarBusesPrivados(reservas);
-
-        return {
-            totalReservas: reservas.length,
-            totalBuses: buses.length,
-            totalPax: buses.reduce((s, b) => s + (b.ocupados || 0), 0),
-            privados: buses
-        };
+        return await construirResumenPrivados(fecha, idsTours);
     } catch (error) {
         console.error('Error en resumenPrivadosDia:', error);
-        // No es crítico para el dashboard: devolver vacío en vez de romper la carga
-        return { totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] };
+        return {
+            totalReservas: 0,
+            totalBuses: 0,
+            totalPax: 0,
+            idProgramacion: null,
+            confirmadoEn: null,
+            privados: []
+        };
     }
+}
+
+async function guardarProgramacionPrivada({ fecha, buses, userId = null }) {
+    if (!fecha || !Array.isArray(buses)) {
+        throw createValidationError('Datos inválidos para guardar la programación privada.', [
+            'Se requiere fecha y la lista completa de vehículos privados.'
+        ]);
+    }
+
+    const conn = await db.getConnection();
+    let committed = false;
+    try {
+        await conn.beginTransaction();
+
+        const reservas = await obtenerReservasPrivadasActivas(fecha, null, conn);
+        const expectedBuses = generarBusesPrivados(reservas);
+        if (!expectedBuses.length) {
+            throw createValidationError('No hay reservas privadas activas para esta fecha.');
+        }
+
+        const normalizedBuses = validatePrivateAssignments(buses, expectedBuses);
+        const tourIds = [...new Set(reservas.map((reserva) => Number(reserva.Id_Tour)).filter(Number.isFinite))];
+        const primaryTourId = tourIds[0];
+        if (!primaryTourId) {
+            throw createValidationError('No fue posible identificar el tour de las reservas privadas.');
+        }
+
+        await conn.query(
+            `
+            UPDATE programaciones
+            SET Estado = 'anulada',
+                Anulada_En = NOW(),
+                Anulada_Por = ?,
+                Motivo_Anulacion = 'Reemplazada por una nueva asignación privada.'
+            WHERE Fecha_Tour = ?
+              AND Estado = 'activa'
+              AND Tipo_Programacion = 'privada'
+            `,
+            [userId || null, fecha]
+        );
+
+        const [programacionResult] = await conn.query(
+            `
+            INSERT INTO programaciones
+            (Fecha_Tour, Id_Tour, Confirmado_Por, Estado, Tipo_Programacion)
+            VALUES (?, ?, ?, 'activa', 'privada')
+            `,
+            [fecha, primaryTourId, userId || null]
+        );
+        const idProgramacion = programacionResult.insertId;
+
+        for (const idTour of tourIds) {
+            await conn.query(
+                'INSERT INTO programacion_tours (Id_Programacion, Id_Tour) VALUES (?, ?)',
+                [idProgramacion, idTour]
+            );
+        }
+
+        for (let index = 0; index < normalizedBuses.length; index += 1) {
+            const bus = normalizedBuses[index];
+            await conn.query(
+                `
+                INSERT INTO programacion_buses
+                (Id_Programacion, Placa_Display, Capacidad, Pasajeros_Total, Guia,
+                 Recorrido_Km, Orden_Bus, Tipo_Bus, Id_Reserva_Privada)
+                VALUES (?, ?, ?, ?, ?, NULL, ?, 'privado', ?)
+                `,
+                [
+                    idProgramacion,
+                    bus.placa,
+                    bus.capacidad,
+                    bus.ocupados,
+                    bus.guia,
+                    index + 1,
+                    bus.idReserva
+                ]
+            );
+        }
+
+        await recordHistorial({
+            conexion: conn,
+            tabla: 'programacion',
+            id_registro: `${fecha}|privados`,
+            accion: 'GUARDAR_PROGRAMACION_PRIVADA',
+            id_usuario: userId,
+            detalles: [
+                { columna: 'Fecha', anterior: null, nuevo: fecha },
+                { columna: 'Reservas', anterior: null, nuevo: String(reservas.length) },
+                { columna: 'Vehiculos', anterior: null, nuevo: String(normalizedBuses.length) },
+                { columna: 'Id_Programacion', anterior: null, nuevo: String(idProgramacion) }
+            ]
+        });
+
+        await conn.commit();
+        committed = true;
+    } catch (error) {
+        if (!committed) await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+
+    return construirResumenPrivados(fecha);
 }
 
 async function calcularRutaVisualOSRM(coordenadas) {
@@ -2554,22 +2707,96 @@ async function generarZipListados({ fecha, idTour, buses, nombreTour }) {
     };
 }
 
+function safeExportName(value, fallback) {
+    const normalized = String(value || fallback)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return normalized || fallback;
+}
+
+async function generarZipPrivados({ fecha, buses }) {
+    if (!fecha || !Array.isArray(buses) || buses.length === 0) {
+        const error = new Error('Se requiere fecha y al menos un vehículo privado para exportar.');
+        error.statusCode = 400;
+        error.errorCode = 'MISSING_PARAMS';
+        throw error;
+    }
+
+    const reservas = await obtenerReservasPrivadasActivas(fecha);
+    const expectedBuses = generarBusesPrivados(reservas);
+    const normalizedBuses = validatePrivateAssignments(buses, expectedBuses);
+    const busesByReservation = new Map();
+
+    for (const bus of normalizedBuses) {
+        if (!busesByReservation.has(bus.idReserva)) busesByReservation.set(bus.idReserva, []);
+        busesByReservation.get(bus.idReserva).push(bus);
+    }
+
+    const reservationById = new Map(reservas.map((reserva) => [String(reserva.Id_Reserva), reserva]));
+    const zip = new JSZip();
+    const usedNames = new Set();
+    let fileIndex = 1;
+
+    for (const [idReserva, reservationBuses] of busesByReservation.entries()) {
+        const reserva = reservationById.get(String(idReserva)) || {};
+        const buffer = await generarExcelReservaPrivada({
+            fecha,
+            idReserva,
+            idTour: reserva.Id_Tour,
+            nombreTour: reserva.Nombre_Tour || 'Privado',
+            nombreReportante: reserva.Nombre_Reportante || '',
+            buses: reservationBuses,
+        });
+
+        const baseName = `${String(fileIndex).padStart(2, '0')}_${safeExportName(idReserva, `Reserva_${fileIndex}`)}_${safeExportName(reserva.Nombre_Tour, 'Privado')}`;
+        let fileName = `${baseName}.xlsx`;
+        let suffix = 2;
+        while (usedNames.has(fileName.toLowerCase())) {
+            fileName = `${baseName}_${suffix}.xlsx`;
+            suffix += 1;
+        }
+        usedNames.add(fileName.toLowerCase());
+        zip.file(fileName, buffer);
+        fileIndex += 1;
+    }
+
+    return {
+        buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }),
+        fileName: `${fecha}_programacion_privada.zip`
+    };
+}
+
 module.exports = {
     generarPlanLogistico,
     generarPlanLogisticoOptimizado,
     generarComparacionLogisticaShadow,
     resumenPrivadosDia,
+    guardarProgramacionPrivada,
     generarExcelReservaPrivada,
     generarExcelListadoBus,
     guardarListadoFinal,
     obtenerListadoFinal,
     calcularRutaVisualOSRM,
-    generarZipListados
+    generarZipListados,
+    generarZipPrivados
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {
     if (!idReserva) {
         throw new Error('Se requiere el Id_Reserva para exportar la reserva privada.');
+    }
+    if (!Array.isArray(buses) || buses.length === 0) {
+        throw createValidationError('La reserva privada no tiene vehículos para exportar.');
+    }
+    const missingGuides = buses.filter((bus) => !String(bus?.guia || '').trim());
+    if (missingGuides.length) {
+        throw createValidationError('Asigna una guía antes de exportar la reserva privada.', [
+            `La reserva ${idReserva} tiene ${missingGuides.length} vehículo${missingGuides.length === 1 ? '' : 's'} sin guía.`
+        ]);
     }
 
     const workbook = new ExcelJS.Workbook();

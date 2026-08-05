@@ -15,8 +15,10 @@ const {
     guardarListadoFinalController,
     obtenerListadoFinalController,
     resumenPrivadosDiaController,
+    guardarProgramacionPrivadaController,
     calcularRutaVisualController,
-    exportarListadosZipController
+    exportarListadosZipController,
+    exportarPrivadosZipController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -82,6 +84,20 @@ router.post(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     exportarReservaPrivadaController
+);
+
+router.post(
+    '/guardar-programacion-privada',
+    authMiddleware,
+    checkPermission('PROGRAMACION.ACTUALIZAR'),
+    guardarProgramacionPrivadaController
+);
+
+router.post(
+    '/exportar-privados-zip',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    exportarPrivadosZipController
 );
 
 /**

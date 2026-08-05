@@ -12,6 +12,15 @@ interface ListadoPayload {
   buses?: any[];
 }
 
+export interface ProgramacionPrivadaResponse {
+  totalReservas: number;
+  totalBuses: number;
+  totalPax: number;
+  idProgramacion?: number | null;
+  confirmadoEn?: string | null;
+  privados: any[];
+}
+
 export interface ListadoProgramacionResponse {
   exists: boolean;
   fromSnapshot?: boolean;
@@ -93,15 +102,14 @@ export class ProgramacionDashboardService {
    * Consulta el resumen de reservas privadas para una fecha dada.
    * Se llama desde el dashboard al cargar, sin necesidad de abrir un tour.
    */
-  resumenPrivadosDia(fecha: string, idsTours?: number[]): Observable<{
-    totalReservas: number;
-    totalBuses: number;
-    totalPax: number;
-    privados: any[];
-  }> {
+  resumenPrivadosDia(fecha: string, idsTours?: number[]): Observable<ProgramacionPrivadaResponse> {
     const payload: any = { fecha };
     if (idsTours && idsTours.length > 0) payload.idsTours = idsTours;
     return this.http.post<any>(`${this.apiUrl}/privados-del-dia`, payload);
+  }
+
+  guardarProgramacionPrivada(payload: { fecha: string; buses: any[] }): Observable<ProgramacionPrivadaResponse> {
+    return this.http.post<ProgramacionPrivadaResponse>(`${this.apiUrl}/guardar-programacion-privada`, payload);
   }
 
   exportarReservaPrivada(payload: {
@@ -113,6 +121,10 @@ export class ProgramacionDashboardService {
     buses: any[];
   }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-reserva-privada`, payload, { responseType: 'blob' });
+  }
+
+  exportarPrivadosZip(payload: { fecha: string; buses: any[] }): Observable<Blob> {
+    return this.http.post(`${this.apiUrl}/exportar-privados-zip`, payload, { responseType: 'blob' });
   }
 
   exportarListadoBus(payload: { fecha: string; idTour: number; bus: any; nombreTour?: string }): Observable<Blob> {

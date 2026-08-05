@@ -197,7 +197,12 @@ exports.exportarReservaPrivadaController = async (req, res) => {
         res.send(buffer);
     } catch (error) {
         console.error('Error al exportar reserva privada:', error);
-        return sendError(res, { status: 500, message: 'Error al generar el archivo de la reserva privada.', errorCode: 'EXPORT_PRIVATE_FAILED' });
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'Error al generar el archivo de la reserva privada.',
+            errorCode: error.errorCode || 'EXPORT_PRIVATE_FAILED',
+            details: error.details || undefined
+        });
     }
 };
 
@@ -320,6 +325,37 @@ exports.resumenPrivadosDiaController = async (req, res) => {
     }
 };
 
+exports.guardarProgramacionPrivadaController = async (req, res) => {
+    const { fecha, buses } = req.body || {};
+    if (!fecha || !Array.isArray(buses)) {
+        return sendError(res, {
+            status: 400,
+            message: 'Se requiere fecha y la lista de vehículos privados.',
+            errorCode: 'MISSING_PARAMS'
+        });
+    }
+
+    try {
+        const resultado = await cerebro.guardarProgramacionPrivada({
+            fecha,
+            buses,
+            userId: req.user?.id || null
+        });
+        return sendSuccess(res, {
+            data: resultado,
+            message: 'Programación privada guardada correctamente'
+        });
+    } catch (error) {
+        console.error('Error al guardar programación privada:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible guardar la programación privada.',
+            errorCode: error.errorCode || 'PRIVATE_PROGRAM_SAVE_FAILED',
+            details: error.details || undefined
+        });
+    }
+};
+
 exports.calcularRutaVisualController = async (req, res) => {
     try {
         const resultado = await cerebro.calcularRutaVisualOSRM(req.body?.coordenadas);
@@ -347,6 +383,24 @@ exports.exportarListadosZipController = async (req, res) => {
             status: error.statusCode || 500,
             message: error.message || 'No fue posible generar el archivo comprimido.',
             errorCode: error.errorCode || 'ZIP_EXPORT_FAILED'
+        });
+    }
+};
+
+exports.exportarPrivadosZipController = async (req, res) => {
+    const { fecha, buses } = req.body || {};
+    try {
+        const resultado = await cerebro.generarZipPrivados({ fecha, buses });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${resultado.fileName}"`);
+        res.send(resultado.buffer);
+    } catch (error) {
+        console.error('Error al exportar ZIP de programación privada:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible exportar la programación privada.',
+            errorCode: error.errorCode || 'PRIVATE_ZIP_EXPORT_FAILED',
+            details: error.details || undefined
         });
     }
 };

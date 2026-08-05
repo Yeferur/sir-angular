@@ -1,0 +1,183 @@
+<section class="private-editor-shell">
+  <header class="editor-command">
+    <div class="editor-context">
+      <button type="button" class="icon-button back-button" (click)="requestClose()" aria-label="Volver a servicios">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="context-copy">
+        <span class="eyebrow">Servicios privados</span>
+        <div class="title-line">
+          <h2>Programación privada</h2>
+          @if (dirty) {
+            <span class="status-chip status-chip--dirty">Cambios sin guardar</span>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-summary" aria-label="Resumen de la programación privada">
+      <span><small>Fecha</small><strong>{{ naturalOperationDate | titlecase }}</strong></span>
+      <span><small>Reservas</small><strong>{{ groups.length }}</strong></span>
+      <span><small>Vehículos</small><strong>{{ editableBuses.length }}</strong></span>
+      <span><small>Pasajeros</small><strong>{{ totalPassengers }}</strong></span>
+    </div>
+
+    <div class="command-actions">
+      @if (canUpdate && !phoneReadOnly) {
+        <button type="button" class="button button--quiet" title="Restaura las asignaciones guardadas"
+          [disabled]="!dirty || saving" (click)="discardChanges()">
+          Restablecer
+        </button>
+      }
+      <button type="button" class="button button--secondary" title="Descarga un ZIP con un Excel por reserva"
+        [disabled]="exportingAll || !groups.length" (click)="exportAll()">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+        {{ exportingAll ? 'Preparando…' : 'Exportar todos' }}
+      </button>
+      @if (canUpdate && !phoneReadOnly) {
+        <button type="button" class="button button--primary" [disabled]="saving || !dirty" (click)="save()">
+          @if (saving) {
+            <span class="button-spinner" aria-hidden="true"></span>
+            Guardando…
+          } @else {
+            Guardar cambios
+          }
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (phoneReadOnly) {
+    <div class="mobile-readonly-notice" role="note">
+      <span aria-hidden="true">i</span>
+      <p><strong>Vista de consulta</strong> Para asignar vehículos o guías, abre Programación desde una tablet horizontal o un computador.</p>
+    </div>
+  }
+
+  <div class="private-workspace">
+    <aside class="services-panel" aria-label="Reservas privadas">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">Reservas privadas</span>
+          <h3>{{ groups.length }} reservas</h3>
+        </div>
+        <span class="panel-total">{{ totalPassengers }} pax</span>
+      </div>
+
+      <div class="services-list">
+        @for (group of groups; track group.Id_Reserva; let index = $index) {
+          <button type="button" class="service-card"
+            [class.is-active]="selectedGroup?.Id_Reserva === group.Id_Reserva"
+            (click)="selectGroup(group.Id_Reserva)">
+            <span class="service-card-top">
+              <span class="service-identity">
+                <span class="service-index">{{ index + 1 }}</span>
+                <span class="service-code">#{{ group.Id_Reserva }}</span>
+              </span>
+              @if (isEnglish(group.Idioma_Reserva)) {
+                <span class="language-tag">Inglés</span>
+              }
+            </span>
+            <strong class="service-tour">{{ group.Nombre_Tour }}</strong>
+            <span class="service-card-bottom">
+              <span>{{ group.totalPax }} pax · {{ group.buses.length }} vehículo{{ group.buses.length === 1 ? '' : 's' }}</span>
+              <span class="guide-name">{{ group.pendingGuides > 0 ? 'Guía pendiente' : guideSummary(group) }}</span>
+            </span>
+          </button>
+        } @empty {
+          <div class="panel-empty">
+            <strong>No encontramos reservas</strong>
+            <small>Prueba otra búsqueda o cambia el filtro.</small>
+          </div>
+        }
+      </div>
+    </aside>
+
+    <main class="operation-panel">
+      @if (selectedGroup; as group) {
+        <div class="reservation-toolbar">
+          <div class="reservation-selector">
+            <span>Reserva seleccionada</span>
+            <div class="reservation-navigation">
+              <button type="button" class="icon-button" [disabled]="groups.length < 2"
+                (click)="selectAdjacentGroup(-1)" aria-label="Reserva anterior">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <h3>#{{ group.Id_Reserva }}</h3>
+              <button type="button" class="icon-button" [disabled]="groups.length < 2"
+                (click)="selectAdjacentGroup(1)" aria-label="Reserva siguiente">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="reservation-facts">
+            <span><small>Tour</small><strong>{{ group.Nombre_Tour }}</strong></span>
+            <span>
+              <small>Servicio</small>
+              <strong>{{ group.totalPax }} pax · {{ group.buses.length }} vehículo{{ group.buses.length === 1 ? '' : 's' }}</strong>
+            </span>
+            @if (isEnglish(group.Idioma_Reserva)) {
+              <span class="language-fact"><small>Idioma</small><strong>Inglés</strong></span>
+            }
+          </div>
+
+          <div class="reservation-tools">
+            <button type="button" class="button button--quiet" (click)="viewReservation(group.Id_Reserva)">
+              Ver reserva
+            </button>
+            <button type="button" class="button button--quiet" title="Descarga el Excel de esta reserva"
+              [disabled]="!!exportingReservationId" (click)="exportSelected(group)">
+              {{ exportingReservationId === group.Id_Reserva ? 'Preparando…' : 'Exportar reserva' }}
+            </button>
+          </div>
+        </div>
+
+        <section class="assignment-panel">
+          <div class="subpanel-heading">
+            <div>
+              <span class="eyebrow">Asignación</span>
+              <h4>{{ group.buses.length }} vehículo{{ group.buses.length === 1 ? '' : 's' }} · {{ group.totalPax }} pax</h4>
+            </div>
+            @if (phoneReadOnly || !canUpdate) {
+              <span class="hint">Solo consulta</span>
+            }
+          </div>
+
+          <div class="vehicle-list">
+            @for (bus of group.buses; track bus.Id_Reserva_Privada + ':' + bus.indice; let index = $index) {
+              <article class="vehicle-row" [class.has-pending-guide]="!bus.guia">
+                <div class="vehicle-identity">
+                  <span class="vehicle-index">{{ index + 1 }}</span>
+                  <span class="vehicle-copy">
+                    <strong>{{ vehicleTitle(group, index) }}</strong>
+                    <small>{{ bus.ocupados }} pasajeros</small>
+                  </span>
+                </div>
+
+                <label>
+                  <span class="field-label">Identificador del vehículo <em>Opcional</em></span>
+                  <input type="text" [(ngModel)]="bus.id" (ngModelChange)="onFieldChanged()"
+                    [disabled]="phoneReadOnly || !canUpdate" [placeholder]="'Bus ' + (bus.indice || index + 1)"
+                    maxlength="20" autocomplete="off">
+                </label>
+
+                <label>
+                  <span>Guía</span>
+                  <input type="text" [(ngModel)]="bus.guia" (ngModelChange)="onFieldChanged()"
+                    [disabled]="phoneReadOnly || !canUpdate" placeholder="Asignar guía"
+                    maxlength="100" autocomplete="off" required aria-required="true">
+                </label>
+              </article>
+            }
+          </div>
+        </section>
+      } @else {
+        <div class="workspace-empty">
+          <strong>No hay servicios privados</strong>
+          <p>Cuando existan reservas para esta fecha aparecerán aquí.</p>
+        </div>
+      }
+    </main>
+  </div>
+</section>

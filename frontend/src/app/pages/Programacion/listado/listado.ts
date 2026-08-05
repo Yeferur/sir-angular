@@ -14,6 +14,7 @@ import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { ProgramacionDashboardComponent } from './programacion-dashboard';
 import { ProgramacionEditorComponent } from './programacion-editor';
+import { ProgramacionPrivadosComponent } from './programacion-privados';
 import { ProgramacionViewStop as ViewStop } from './programacion-view.types';
 import {
   bestBusCapacity,
@@ -56,6 +57,7 @@ interface ProgramacionMoveSnapshot {
     LoadingStateComponent,
     ProgramacionDashboardComponent,
     ProgramacionEditorComponent,
+    ProgramacionPrivadosComponent,
   ],
   templateUrl: './listado.html',
   styleUrls: ['./listado.css']
@@ -112,6 +114,7 @@ export class Listado implements OnInit, OnDestroy {
 
   reservasSinAsignar: Reserva[] = [];
   busesPrivados: any[] = [];  // buses para reservas privadas del día
+  privateDirty = false;
   destinoTourActual: DestinoTourProgramacion | null = null;
 
   // Buses privados agrupados por reserva para la vista de privados
@@ -180,7 +183,7 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   hasUnsavedChanges(): boolean {
-    return this.listadoDirty && !this.isSaving;
+    return (this.listadoDirty || this.privateDirty) && !this.isSaving;
   }
 
   get editorStatusText(): string {
@@ -579,6 +582,18 @@ export class Listado implements OnInit, OnDestroy {
     return local.toISOString().slice(0, 10);
   }
 
+  private formatOperationDate(value: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+    if (!match) return value;
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return new Intl.DateTimeFormat('es-CO', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(date);
+  }
+
   private shiftDate(isoDate: string, days: number): string {
     const [year, month, day] = isoDate.split('-').map(Number);
     const date = new Date(year, month - 1, day);
@@ -621,6 +636,7 @@ export class Listado implements OnInit, OnDestroy {
     this.listadoPersistido = false;
     this.listadoOrigen = null;
     this.busesPrivados = [];
+    this.privateDirty = false;
     this.destinoTourActual = null;
     this.routingFallback = false;
     this.qualitySummary = null;
@@ -647,7 +663,7 @@ export class Listado implements OnInit, OnDestroy {
           style: 'primary',
           onClick: () => {
             this.navbar.clearOverlay();
-            this.guardarListadoFinal();
+            void this.guardarListadoFinal({ skipConfirmation: true });
           }
         },
         {
@@ -773,9 +789,19 @@ export class Listado implements OnInit, OnDestroy {
       this.resetEditorState();
       this.busesPrivados = privadosActuales;
       this.modoVista = 'privados';
+      this.privateDirty = false;
       this.listadoOrigen = privadosActuales.length > 0 ? 'db' : 'nuevo';
       this.cdr.markForCheck();
     });
+  }
+
+  updatePrivateBuses(buses: any[]): void {
+    this.busesPrivados = Array.isArray(buses) ? JSON.parse(JSON.stringify(buses)) : [];
+    this.cdr.markForCheck();
+  }
+
+  onPrivateDirtyChange(dirty: boolean): void {
+    this.privateDirty = dirty;
   }
 
   volverAlDashboard(): void {
@@ -1163,7 +1189,7 @@ export class Listado implements OnInit, OnDestroy {
     return false;
   }
 
-  guardarListadoFinal(): void {
+  async guardarListadoFinal(options: { skipConfirmation?: boolean } = {}): Promise<void> {
     if (!this.canUpdateProgramacion) {
       this.navbar.warningToast('Acción no permitida', 'No tienes permiso para guardar el listado.');
       return;
@@ -1191,6 +1217,33 @@ export class Listado implements OnInit, OnDestroy {
       ...bus,
       reservas: bus.reservas || []
     }));
+
+    if (!options.skipConfirmation) {
+      const totalReservas = busesOrdenados.reduce(
+        (total, bus) => total + (bus.reservas?.length || 0),
+        0
+      );
+      const totalPasajeros = busesOrdenados.reduce(
+        (total, bus) => total + Number(bus.ocupados || 0),
+        0
+      );
+      const nombreTour = this.tourSeleccionado.NombreTour || 'el tour seleccionado';
+      const destino = this.listadoPersistido
+        ? 'Esto reemplazará el listado guardado actualmente.'
+        : 'Este será el listado operativo disponible para consulta.';
+      const confirmed = await this.alerts.confirmDecision(
+        '¿Guardar este listado?',
+        `Se guardarán ${busesOrdenados.length} buses, ${totalReservas} reservas y ${totalPasajeros} pasajeros para ${nombreTour}, ${this.formatOperationDate(this.fechaSeleccionada)}. ${destino}`,
+        {
+          type: 'info',
+          confirmText: 'Guardar listado',
+          cancelText: 'Seguir revisando',
+        }
+      );
+      if (!confirmed) return;
+    }
+
+    if (this.isSaving || !this.planSeleccionado || !this.tourSeleccionado) return;
 
     const payload: any = {
       fecha: this.fechaSeleccionada,
@@ -1290,46 +1343,6 @@ export class Listado implements OnInit, OnDestroy {
           message: 'Los archivos individuales siguen disponibles desde cada bus.'
         });
       }
-    });
-  }
-
-  descargarReservaPrivadaExcel(grupo: any): void {
-    if (!grupo?.Id_Reserva || !Array.isArray(grupo?.buses) || grupo.buses.length === 0) return;
-
-    const payload = {
-      fecha: this.fechaSeleccionada,
-      idReserva: grupo.Id_Reserva,
-      idTour: Number(grupo.buses[0]?.Id_Tour || 0) || undefined,
-      nombreTour: grupo.Nombre_Tour || 'Privado',
-      nombreReportante: grupo.Nombre_Reportante || '',
-      buses: grupo.buses.map((bus: any, index: number) => ({
-        id: bus.id || `Bus ${index + 1}`,
-        guia: bus.guia || '',
-        ocupados: Number(bus.ocupados || 0),
-        capacidad: Number(bus.capacidad || 0),
-        indice: Number(bus.indice || index + 1),
-        totalBuses: Number(bus.totalBuses || grupo.buses.length || 1),
-      })),
-    };
-
-    this.programacionService.exportarReservaPrivada(payload).subscribe({
-      next: (blob) => {
-        const reserva = String(grupo.Id_Reserva).replace(/\s+/g, '_');
-        const nombre = String(grupo.Nombre_Tour || 'Privado').replace(/\s+/g, '_');
-        const filename = `${this.fechaSeleccionada}_${nombre}_${reserva}.xlsx`;
-        this.downloadBlob(blob, filename);
-      },
-      error: (err) => {
-        console.error('Error al exportar reserva privada', err);
-        this.navbar.showAlert({ type: 'error', title: 'Error', message: 'No se pudo exportar la reserva privada.' });
-      }
-    });
-  }
-
-  descargarTodosLosPrivadosExcel(): void {
-    if (!this.gruposPrivados.length) return;
-    this.gruposPrivados.forEach((grupo, index) => {
-      window.setTimeout(() => this.descargarReservaPrivadaExcel(grupo), index * 250);
     });
   }
 
