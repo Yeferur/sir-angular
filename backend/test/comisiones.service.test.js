@@ -67,6 +67,24 @@ test('acepta únicamente los tres medios definidos y normaliza el alias históri
   });
 });
 
+test('permite registrar una liquidación sin datos bancarios cuando el flujo lo solicita', () => {
+  assert.deepEqual(validarDatosPago(null, null, {
+    permitirVacio: true,
+    permitirCuentaVacia: true,
+  }), {
+    Forma_Pago: null,
+    Numero_Cuenta: null,
+  });
+
+  assert.deepEqual(validarDatosPago('BANCOLOMBIA', null, {
+    permitirVacio: true,
+    permitirCuentaVacia: true,
+  }), {
+    Forma_Pago: 'TRANSFERENCIA_BANCOLOMBIA',
+    Numero_Cuenta: null,
+  });
+});
+
 test('rechaza números de Bancolombia y Nequi que no cumplen la regla acordada', () => {
   assert.throws(() => validarDatosPago('BANCOLOMBIA', '123'), /11 dígitos/);
   assert.throws(() => validarDatosPago('NEQUI', '2001234567'), /iniciar en 3/);

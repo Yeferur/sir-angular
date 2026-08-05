@@ -67,7 +67,7 @@ export interface FiltrosComisiones {
 
 export interface GrupoPagoComision {
   reservas: string[];
-  Forma_Pago: FormaPagoComision;
+  Forma_Pago: FormaPagoComision | null;
   Cuenta_Bancaria: string | null;
 }
 

@@ -21,23 +21,37 @@ function normalizarFormaPago(value) {
   return normalized;
 }
 
-function validarDatosPago(formaPago, numeroCuenta) {
+function validarDatosPago(formaPago, numeroCuenta, opciones = {}) {
+  const { permitirVacio = false, permitirCuentaVacia = false } = opciones;
   const forma = normalizarFormaPago(formaPago);
   const cuenta = String(numeroCuenta || '').trim();
+
+  if (permitirVacio && !forma && !cuenta) {
+    return { Forma_Pago: null, Numero_Cuenta: null };
+  }
 
   if (!FORMAS_PAGO.has(forma)) {
     throw createServiceError('Selecciona Bancolombia, Nequi o efectivo.', 400, 'INVALID_PAYMENT_METHOD');
   }
-  if (forma === 'TRANSFERENCIA_BANCOLOMBIA' && !/^\d{11}$/.test(cuenta)) {
+  if (forma === 'TRANSFERENCIA_BANCOLOMBIA' && cuenta && !/^\d{11}$/.test(cuenta)) {
     throw createServiceError('La cuenta Bancolombia debe tener exactamente 11 dígitos.', 400, 'INVALID_ACCOUNT');
   }
-  if (forma === 'NEQUI' && !/^3\d{9}$/.test(cuenta)) {
+  if (forma === 'NEQUI' && cuenta && !/^3\d{9}$/.test(cuenta)) {
     throw createServiceError('El número Nequi debe tener 10 dígitos e iniciar en 3.', 400, 'INVALID_ACCOUNT');
+  }
+  if (!permitirCuentaVacia && forma !== 'EFECTIVO' && !cuenta) {
+    throw createServiceError(
+      forma === 'NEQUI'
+        ? 'Ingresa el número asociado a Nequi.'
+        : 'Ingresa el número de cuenta Bancolombia.',
+      400,
+      'INVALID_ACCOUNT',
+    );
   }
 
   return {
     Forma_Pago: forma,
-    Numero_Cuenta: forma === 'EFECTIVO' ? null : cuenta,
+    Numero_Cuenta: forma === 'EFECTIVO' || !cuenta ? null : cuenta,
   };
 }
 
@@ -297,7 +311,10 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
 
   const grupos = payload.pagos.map((grupo) => {
     const reservas = normalizarIdsReservas(grupo.reservas);
-    const pago = validarDatosPago(grupo.Forma_Pago, grupo.Cuenta_Bancaria);
+    const pago = validarDatosPago(grupo.Forma_Pago, grupo.Cuenta_Bancaria, {
+      permitirVacio: true,
+      permitirCuentaVacia: true,
+    });
     return { ...pago, reservas };
   });
   const allIds = grupos.flatMap((grupo) => grupo.reservas);
