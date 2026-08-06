@@ -4,6 +4,7 @@ import { FormsModule }          from '@angular/forms';
 import { forkJoin, finalize, catchError, of } from 'rxjs';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { CountUpDirective } from '../Inicio/count-up.directive';
 
 import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
@@ -44,6 +45,10 @@ const FONT  = 'Inter, sans-serif';
 const BG    = 'transparent';
 const AXIS  = '#8b93a1';
 const GRID  = 'rgba(139, 147, 161, .16)';
+// Apex solo admite curvas nominales; `easeout` es la equivalencia más cercana
+// al movimiento de salida suave definido por --ease-panel/--ease-soft.
+const APEX_EASING: 'easeout' = 'easeout';
+const UPDATE_FEEDBACK_MS = 1100;
 
 const C_GOLD   = '#ffd700';
 const C_GREEN  = '#34c759';
@@ -75,7 +80,7 @@ function axisStyle(): any {
 @Component({
   selector:    'app-dashboard',
   standalone:  true,
-  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent, CountUpDirective],
   templateUrl: './dashboard.html',
   styleUrls:   ['./dashboard.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -150,6 +155,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Flags ─────────────────────────────────────────────────────────────────
   isInitialLoading = true;
   isRefreshing     = false;
+  metricsUpdated   = false;
+  chartsUpdated    = false;
   hasIncomeData    = false;
   hasNetIncomeData = false;
   hasDailyData     = false;
@@ -166,6 +173,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private viewReady          = false;
   private lastResponse: any  = null;
   private refreshTimer:   ReturnType<typeof setTimeout> | null = null;
+  private metricsFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private chartsFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private feedbackStartTimer: ReturnType<typeof setTimeout> | null = null;
   private reqId              = 0;
   private tourMetaReqId      = 0;
   private sectionObserver: IntersectionObserver | null = null;
@@ -191,6 +201,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    if (this.metricsFeedbackTimer) clearTimeout(this.metricsFeedbackTimer);
+    if (this.chartsFeedbackTimer) clearTimeout(this.chartsFeedbackTimer);
+    if (this.feedbackStartTimer) clearTimeout(this.feedbackStartTimer);
     this.sectionObserver?.disconnect();
   }
 
@@ -205,6 +218,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onTourChange(tourId: number | null) {
     this.selectedTourId = tourId;
+    this.beginRefreshTransition();
     this.loadSelectedTourMeta();
   }
 
@@ -263,7 +277,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'income-bruto', type: 'area', height: 300, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
         redrawOnParentResize: true, redrawOnWindowResize: true,
       },
       dataLabels: { enabled: false },
@@ -297,7 +311,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'income-neto', type: 'area', height: 300, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
         redrawOnParentResize: true, redrawOnWindowResize: true,
       },
       dataLabels: { enabled: false },
@@ -332,7 +346,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'daily-income', type: 'line', height: 280, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
@@ -360,7 +374,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'daily-pax', type: 'bar', height: 280, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
@@ -391,7 +405,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'channel-pax', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       colors: [C_BLUE],
@@ -416,7 +430,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'attendance-pax', type: 'donut', height: 310,
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        animations: { enabled: true, easing: APEX_EASING, speed: 600 },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       labels: ['Viajaron', 'No viajaron', 'Pendientes'],
@@ -459,7 +473,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'reservation-type', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 500, dynamicAnimation: { enabled: true, speed: 400 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 500, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
@@ -469,7 +483,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       dataLabels: { enabled: false },
       stroke: { show: true, width: 2, colors: ['transparent'] },
       xaxis: { categories: ['Grupales', 'Privadas'], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
-      yaxis: { labels: { ...axisStyle(), formatter: (v: number) => Math.round(v).toString() } },
+      yaxis: { labels: { style: { colors: AXIS, fontSize: '12px', fontFamily: FONT }, maxWidth: 170 } },
       fill: { opacity: .9 },
       grid: grid(),
       legend: {
@@ -485,7 +499,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'occupancy', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
+        animations: { enabled: true, easing: APEX_EASING, speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
@@ -542,6 +556,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     .subscribe({
       next: res => {
         if (id !== this.reqId) return;
+        const previousResponse = this.lastResponse;
         this.lastResponse = res;
 
         this.totalReservas      = Number(res.stats?.totalReservas      || 0);
@@ -566,6 +581,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.updatedAt = new Date();
 
         if (this.viewReady) { this.applyAll(res); this.reflow(); }
+        this.triggerUpdateFeedback(previousResponse, res);
 
         if (partial) this.alert.showModal({
           type: 'warning', title: 'Dashboard parcialmente cargado',
@@ -587,6 +603,64 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private triggerUpdateFeedback(previous: any, current: any): void {
+    if (!previous) return;
+
+    const metricsChanged = this.payloadChanged(
+      { stats: previous.stats, attendance: previous.attendance },
+      { stats: current.stats, attendance: current.attendance },
+    );
+    const chartsChanged = this.payloadChanged(
+      {
+        income: previous.income,
+        daily: previous.daily,
+        dailyPax: previous.dailyPax,
+        channels: previous.channels,
+        attendance: previous.attendance,
+        reservationTypes: previous.reservationTypes,
+        occupancy: previous.occupancy,
+      },
+      {
+        income: current.income,
+        daily: current.daily,
+        dailyPax: current.dailyPax,
+        channels: current.channels,
+        attendance: current.attendance,
+        reservationTypes: current.reservationTypes,
+        occupancy: current.occupancy,
+      },
+    );
+
+    if (!metricsChanged && !chartsChanged) return;
+
+    this.metricsUpdated = false;
+    this.chartsUpdated = false;
+    if (this.feedbackStartTimer) clearTimeout(this.feedbackStartTimer);
+    this.feedbackStartTimer = setTimeout(() => {
+      if (metricsChanged) {
+        this.metricsUpdated = true;
+        if (this.metricsFeedbackTimer) clearTimeout(this.metricsFeedbackTimer);
+        this.metricsFeedbackTimer = setTimeout(() => {
+          this.metricsUpdated = false;
+          this.cdr.markForCheck();
+        }, UPDATE_FEEDBACK_MS);
+      }
+      if (chartsChanged) {
+        this.chartsUpdated = true;
+        if (this.chartsFeedbackTimer) clearTimeout(this.chartsFeedbackTimer);
+        this.chartsFeedbackTimer = setTimeout(() => {
+          this.chartsUpdated = false;
+          this.cdr.markForCheck();
+        }, UPDATE_FEEDBACK_MS);
+      }
+      this.cdr.markForCheck();
+    }, 0);
+  }
+
+  private payloadChanged(previous: unknown, current: unknown): boolean {
+    return JSON.stringify(previous) !== JSON.stringify(current);
   }
 
   // ── Apply chart data ──────────────────────────────────────────────────────
@@ -764,7 +838,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private scheduleRefresh() {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.beginRefreshTransition();
     this.refreshTimer = setTimeout(() => this.loadData(false), 180);
+  }
+
+  private beginRefreshTransition(): void {
+    if (this.isInitialLoading || this.isRefreshing) return;
+    this.isRefreshing = true;
+    this.cdr.markForCheck();
   }
 
   setTodayRange() {

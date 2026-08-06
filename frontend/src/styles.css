@@ -88,6 +88,9 @@
   --accent-green: #30D158;
   --accent-red: #FF453A;
   --accent-yellow: #FFD60A;
+  --accent-orange: #FF9F0A;
+  --accent-purple: #BF5AF2;
+  --text-on-accent: #FFFFFF;
 
   --separator-color: #38383a;
   --shadow-color: rgba(0, 0, 0, 0.2);
@@ -193,6 +196,9 @@
   --accent-green: #34C759;
   --accent-red: #FF3B30;
   --accent-yellow: #FF9500;
+  --accent-orange: #F97316;
+  --accent-purple: #AF52DE;
+  --text-on-accent: #FFFFFF;
 
   --separator-color: #e5e5ea;
   /* Color para bordes y líneas divisorias */
@@ -1031,8 +1037,8 @@ input[type=number] {
   min-height: 22px;
   padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(10, 132, 255, .18);
-  background: rgba(10, 132, 255, .08);
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 18%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
   color: var(--accent-blue);
   font-size: .75rem;
   font-weight: 700;
@@ -1041,12 +1047,12 @@ input[type=number] {
   flex-shrink: 0;
 }
 
-.badge--success { background: rgba(52, 199, 89, 0.15); color: var(--accent-green); border-color: rgba(52, 199, 89, 0.22); }
-.badge--info { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); border-color: rgba(10, 132, 255, 0.22); }
-.badge--pending { background: rgba(255, 159, 10, 0.15); color: var(--accent-yellow, #ff9f0a); border-color: rgba(255, 159, 10, 0.22); }
-.badge--danger { background: rgba(255, 59, 48, 0.15); color: var(--accent-red); border-color: rgba(255, 59, 48, 0.22); }
-.badge--privada { background: rgba(255, 159, 10, 0.15); color: var(--accent-yellow, #ff9f0a); border-color: rgba(255, 159, 10, 0.22); }
-.badge--grupal { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); border-color: rgba(10, 132, 255, 0.22); }
+.badge--success { background: color-mix(in srgb, var(--accent-green) 15%, transparent); color: var(--accent-green); border-color: color-mix(in srgb, var(--accent-green) 22%, transparent); }
+.badge--info { background: color-mix(in srgb, var(--accent-blue) 15%, transparent); color: var(--accent-blue); border-color: color-mix(in srgb, var(--accent-blue) 22%, transparent); }
+.badge--pending { background: color-mix(in srgb, var(--accent-orange) 15%, transparent); color: var(--accent-orange); border-color: color-mix(in srgb, var(--accent-orange) 22%, transparent); }
+.badge--danger { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); border-color: color-mix(in srgb, var(--accent-red) 22%, transparent); }
+.badge--privada { background: color-mix(in srgb, var(--accent-orange) 15%, transparent); color: var(--accent-orange); border-color: color-mix(in srgb, var(--accent-orange) 22%, transparent); }
+.badge--grupal { background: color-mix(in srgb, var(--accent-blue) 15%, transparent); color: var(--accent-blue); border-color: color-mix(in srgb, var(--accent-blue) 22%, transparent); }
 
 .chip {
   display: inline-flex;

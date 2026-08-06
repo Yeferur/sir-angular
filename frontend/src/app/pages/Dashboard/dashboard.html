@@ -74,7 +74,13 @@
       </div>
     </section>
 
-    <div class="report-content" [class.is-refreshing]="isRefreshing">
+    <div
+      class="report-content"
+      [class.is-refreshing]="isRefreshing"
+      [class.metrics-updated]="metricsUpdated"
+      [class.charts-updated]="chartsUpdated"
+      [attr.aria-busy]="isRefreshing"
+    >
       <span class="refresh-line" [class.visible]="isRefreshing" aria-hidden="true"></span>
 
       @if (mixedCurrencies) {
@@ -99,29 +105,33 @@
         <div class="primary-metrics">
           <article class="metric-card metric-card--company">
             <div class="metric-label"><span>Ingreso de empresa</span><small>{{ primaryCurrency }}</small></div>
-            <strong>{{ companyRevenue | currency:primaryCurrency:'symbol-narrow':'1.0-0' }}</strong>
+            <strong [countUp]="companyRevenue" [countUpCurrency]="primaryCurrency"></strong>
             <span class="metric-context">Tours + transfers</span>
             <span class="metric-change" [attr.data-tone]="comparisonClass(companyRevenueComparison)">{{ comparisonText(companyRevenueComparison) }} vs. periodo anterior</span>
           </article>
 
           <article class="metric-card">
             <div class="metric-label"><span>Neto de tours</span></div>
-            <strong>{{ totalIngresosNetos | currency:primaryCurrency:'symbol-narrow':'1.0-0' }}</strong>
+            <strong [countUp]="totalIngresosNetos" [countUpCurrency]="primaryCurrency"></strong>
             <span class="metric-context">{{ marginPct === null ? 'Sin margen calculable' : (marginPct | number:'1.1-1') + '% del ingreso de tours' }}</span>
           </article>
 
           <article class="metric-card">
             <div class="metric-label"><span>Pasajeros</span></div>
-            <strong>{{ totalPasajeros }}</strong>
-            <span class="metric-context">{{ totalReservas }} reservas activas</span>
+            <strong [countUp]="totalPasajeros"></strong>
+            <span class="metric-context"><span [countUp]="totalReservas"></span> reservas activas</span>
             <span class="metric-change" [attr.data-tone]="comparisonClass(passengerComparison)">{{ comparisonText(passengerComparison) }} vs. periodo anterior</span>
           </article>
 
           <article class="metric-card">
             <div class="metric-label"><span>Cumplimiento de viaje</span></div>
-            <strong>{{ travelRate === null ? '—' : (travelRate | number:'1.1-1') + '%' }}</strong>
-            <span class="metric-context">{{ totalViajaron }} viajaron · {{ totalNoViajaron }} no viajaron</span>
-            <span class="metric-change neutral">{{ totalPendientes }} por confirmar</span>
+            @if (travelRate === null) {
+              <strong>—</strong>
+            } @else {
+              <strong [countUp]="travelRate" [countUpDecimals]="1" countUpSuffix="%"></strong>
+            }
+            <span class="metric-context"><span [countUp]="totalViajaron"></span> viajaron · <span [countUp]="totalNoViajaron"></span> no viajaron</span>
+            <span class="metric-change neutral"><span [countUp]="totalPendientes"></span> por confirmar</span>
           </article>
         </div>
 
@@ -144,8 +154,8 @@
           <article class="followup-panel">
             <header><h3>Seguimiento operativo</h3><span>{{ closedJourneys }} jornadas cerradas</span></header>
             <div class="operation-summary">
-              <div><span>Reservas</span><strong>{{ totalReservas }}</strong></div>
-              <div><span>Transfers</span><strong>{{ totalTransfers }}</strong><small>{{ totalTransferPassengers }} pasajeros</small></div>
+              <div><span>Reservas</span><strong [countUp]="totalReservas"></strong></div>
+              <div><span>Transfers</span><strong [countUp]="totalTransfers"></strong><small><span [countUp]="totalTransferPassengers"></span> pasajeros</small></div>
               <div><span>Recaudo previo</span><strong>{{ paymentCoverage === null ? '—' : (paymentCoverage | number:'1.0-0') + '%' }}</strong></div>
             </div>
 
@@ -179,7 +189,11 @@
           <article class="attendance-panel">
             <header class="panel-header">
               <div><h3>Estado de los pasajeros</h3><span>{{ attendanceCoverage === null ? 'Sin pasajeros' : (attendanceCoverage | number:'1.0-0') + '% de la asistencia confirmada' }}</span></div>
-              <strong>{{ travelRate === null ? '—' : (travelRate | number:'1.1-1') + '%' }}</strong>
+              @if (travelRate === null) {
+                <strong>—</strong>
+              } @else {
+                <strong [countUp]="travelRate" [countUpDecimals]="1" countUpSuffix="%"></strong>
+              }
             </header>
 
             @if (hasAttendanceData) {
@@ -189,9 +203,9 @@
                 @if (totalPendientes > 0) { <span class="pending" [style.flex-grow]="totalPendientes"></span> }
               </div>
               <div class="attendance-breakdown">
-                <div><span><i class="legend-dot traveled"></i>Viajaron</span><strong>{{ totalViajaron }}</strong></div>
-                <div><span><i class="legend-dot not-traveled"></i>No viajaron</span><strong>{{ totalNoViajaron }}</strong></div>
-                <div><span><i class="legend-dot pending"></i>Pendientes</span><strong>{{ totalPendientes }}</strong></div>
+                <div><span><i class="legend-dot traveled"></i>Viajaron</span><strong [countUp]="totalViajaron"></strong></div>
+                <div><span><i class="legend-dot not-traveled"></i>No viajaron</span><strong [countUp]="totalNoViajaron"></strong></div>
+                <div><span><i class="legend-dot pending"></i>Pendientes</span><strong [countUp]="totalPendientes"></strong></div>
               </div>
             } @else {
               <div class="chart-empty"><strong>Sin pasajeros en el alcance</strong><span>La confirmación aparecerá cuando existan reservas.</span></div>
@@ -208,8 +222,8 @@
               } @else { <div class="chart-empty"><strong>Sin reservas para comparar</strong><span>Cambia el alcance del informe.</span></div> }
             </div>
             <div class="type-summary">
-              <span><strong>{{ groupPassengers }}</strong> pasajeros grupales</span>
-              <span><strong>{{ privatePassengers }}</strong> pasajeros privados</span>
+              <span><strong [countUp]="groupPassengers"></strong> pasajeros grupales</span>
+              <span><strong [countUp]="privatePassengers"></strong> pasajeros privados</span>
             </div>
           </article>
         </div>

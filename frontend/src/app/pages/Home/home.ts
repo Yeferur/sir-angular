@@ -23,6 +23,9 @@ import {
 } from '../../services/Home/home.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { CountUpDirective } from '../Inicio/count-up.directive';
+
+const UPDATE_FEEDBACK_MS = 1100;
 
 interface QuickAction {
   label: string;
@@ -36,7 +39,7 @@ interface QuickAction {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, CountUpDirective],
   templateUrl: './home.html',
   styleUrl: './home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,8 +54,11 @@ export class HomeComponent implements OnInit {
   summary: HomeSummary | null = null;
   loading = true;
   refreshing = false;
+  dataUpdated = false;
   error = '';
   private refreshTimer?: ReturnType<typeof setTimeout>;
+  private updateFeedbackTimer?: ReturnType<typeof setTimeout>;
+  private updateFeedbackStartTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
     this.loadSummary();
@@ -153,8 +159,10 @@ export class HomeComponent implements OnInit {
       )
       .subscribe({
         next: (summary) => {
+          const changed = !!this.summary && this.summaryChanged(this.summary, summary);
           this.summary = summary;
           this.error = '';
+          if (changed) this.showUpdateFeedback();
         },
         error: () => {
           if (!this.summary) {
@@ -184,9 +192,9 @@ export class HomeComponent implements OnInit {
     this.navigate('/Transfers/VerTransfers');
   }
 
-  overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail: string; icon: string }> {
+  overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail: string; detailValue?: number; icon: string }> {
     return [
-      { label: 'Reservas', value: day.reservations, detail: `${day.privateReservations} privadas`, icon: 'bx bx-calendar-check' },
+      { label: 'Reservas', value: day.reservations, detail: 'privadas', detailValue: day.privateReservations, icon: 'bx bx-calendar-check' },
       { label: 'Pasajeros', value: day.passengers, detail: 'en tours', icon: 'bx bx-group' },
       { label: 'Transfers', value: day.transfers, detail: 'servicios', icon: 'bx bx-car' },
       { label: 'Pasajeros', value: day.transferPassengers, detail: 'en transfers', icon: 'bx bx-user-voice' },
@@ -247,6 +255,10 @@ export class HomeComponent implements OnInit {
     return `${alert.percentage}% ocupado`;
   }
 
+  isCriticalAlert(alert: HomeCapacityAlert): boolean {
+    return alert.status === 'critical' || alert.status === 'full' || alert.status === 'missing';
+  }
+
   trackById(_: number, item: HomeReservation | HomeTransfer | HomeProcess | HomeCapacityAlert): number | string {
     if ('Id_Reserva' in item) return item.Id_Reserva;
     if ('Id_Transfer' in item) return item.Id_Transfer;
@@ -276,7 +288,37 @@ export class HomeComponent implements OnInit {
 
     this.destroyRef.onDestroy(() => {
       if (this.refreshTimer) clearTimeout(this.refreshTimer);
+      if (this.updateFeedbackTimer) clearTimeout(this.updateFeedbackTimer);
+      if (this.updateFeedbackStartTimer) clearTimeout(this.updateFeedbackStartTimer);
     });
+  }
+
+  private showUpdateFeedback(): void {
+    this.dataUpdated = false;
+    if (this.updateFeedbackTimer) clearTimeout(this.updateFeedbackTimer);
+    if (this.updateFeedbackStartTimer) clearTimeout(this.updateFeedbackStartTimer);
+    this.cdr.detectChanges();
+
+    this.updateFeedbackStartTimer = setTimeout(() => {
+      this.dataUpdated = true;
+      this.cdr.markForCheck();
+      this.updateFeedbackTimer = setTimeout(() => {
+        this.dataUpdated = false;
+        this.cdr.markForCheck();
+      }, UPDATE_FEEDBACK_MS);
+    }, 0);
+  }
+
+  private summaryChanged(previous: HomeSummary, current: HomeSummary): boolean {
+    const comparable = (summary: HomeSummary) => ({
+      dates: summary.dates,
+      profile: summary.profile,
+      capabilities: summary.capabilities,
+      overview: summary.overview,
+      personalWork: summary.personalWork,
+      operations: summary.operations,
+    });
+    return JSON.stringify(comparable(previous)) !== JSON.stringify(comparable(current));
   }
 
   private entityLabel(value: string): string {

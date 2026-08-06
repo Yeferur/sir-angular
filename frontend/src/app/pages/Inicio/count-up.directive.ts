@@ -18,6 +18,11 @@ export class CountUpDirective implements OnChanges, OnDestroy {
 
   @Input('countUp') value = 0;
   @Input('countUpDuration') duration = 600;
+  @Input() countUpLocale = 'es-CO';
+  @Input() countUpCurrency: string | null = null;
+  @Input() countUpDecimals = 0;
+  @Input() countUpPrefix = '';
+  @Input() countUpSuffix = '';
 
   private displayed = 0;
   private rafId: number | null = null;
@@ -36,6 +41,17 @@ export class CountUpDirective implements OnChanges, OnDestroy {
     const change = changes['value'];
     if (change && !change.firstChange && change.previousValue !== change.currentValue) {
       this.animateTo(next);
+      return;
+    }
+
+    if (
+      changes['countUpLocale'] ||
+      changes['countUpCurrency'] ||
+      changes['countUpDecimals'] ||
+      changes['countUpPrefix'] ||
+      changes['countUpSuffix']
+    ) {
+      this.render(this.displayed);
     }
   }
 
@@ -70,7 +86,8 @@ export class CountUpDirective implements OnChanges, OnDestroy {
       const elapsed = now - startTime;
       const t = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      const current = Math.round(start + delta * eased);
+      const precision = 10 ** Math.max(0, this.countUpDecimals);
+      const current = Math.round((start + delta * eased) * precision) / precision;
 
       this.displayed = current;
       this.render(current);
@@ -86,6 +103,21 @@ export class CountUpDirective implements OnChanges, OnDestroy {
   }
 
   private render(value: number): void {
-    this.el.nativeElement.textContent = String(value);
+    const decimals = Math.max(0, this.countUpDecimals);
+    let formatted: string;
+
+    try {
+      formatted = new Intl.NumberFormat(this.countUpLocale, {
+        ...(this.countUpCurrency
+          ? { style: 'currency' as const, currency: this.countUpCurrency }
+          : {}),
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(value);
+    } catch {
+      formatted = value.toFixed(decimals);
+    }
+
+    this.el.nativeElement.textContent = `${this.countUpPrefix}${formatted}${this.countUpSuffix}`;
   }
 }

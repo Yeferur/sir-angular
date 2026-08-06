@@ -1,4 +1,9 @@
-<main class="home-page">
+<main
+  class="home-page"
+  [class.is-refreshing]="refreshing && !!summary"
+  [class.data-updated]="dataUpdated"
+  [attr.aria-busy]="refreshing"
+>
   @if (loading) {
     <app-loading-state
       mode="loading"
@@ -89,16 +94,19 @@
               <span class="day-kicker">Hoy</span>
               <h3>{{ dayLabel(summary.overview.today.date) }}</h3>
             </div>
-            <span class="live-badge"><span aria-hidden="true"></span> En curso</span>
+            <span class="badge badge--info home-badge home-badge--live"><span aria-hidden="true"></span> En curso</span>
           </header>
           <div class="metric-grid">
             @for (metric of overviewMetrics(summary.overview.today); track metric.label + metric.detail) {
               <div class="metric">
                 <span class="metric-icon"><i [class]="metric.icon" aria-hidden="true"></i></span>
                 <div>
-                  <strong>{{ metric.value }}</strong>
+                  <strong [countUp]="metric.value"></strong>
                   <span>{{ metric.label }}</span>
-                  <small>{{ metric.detail }}</small>
+                  <small>
+                    @if (metric.detailValue !== undefined) { <span [countUp]="metric.detailValue"></span> }
+                    {{ metric.detail }}
+                  </small>
                 </div>
               </div>
             }
@@ -111,16 +119,19 @@
               <span class="day-kicker">Mañana</span>
               <h3>{{ dayLabel(summary.overview.tomorrow.date) }}</h3>
             </div>
-            <span class="date-badge"><i class="bx bx-calendar" aria-hidden="true"></i> Próxima jornada</span>
+            <span class="badge home-badge home-badge--neutral home-badge--date"><i class="bx bx-calendar" aria-hidden="true"></i> Próxima jornada</span>
           </header>
           <div class="metric-grid">
             @for (metric of overviewMetrics(summary.overview.tomorrow); track metric.label + metric.detail) {
               <div class="metric">
                 <span class="metric-icon"><i [class]="metric.icon" aria-hidden="true"></i></span>
                 <div>
-                  <strong>{{ metric.value }}</strong>
+                  <strong [countUp]="metric.value"></strong>
                   <span>{{ metric.label }}</span>
-                  <small>{{ metric.detail }}</small>
+                  <small>
+                    @if (metric.detailValue !== undefined) { <span [countUp]="metric.detailValue"></span> }
+                    {{ metric.detail }}
+                  </small>
                 </div>
               </div>
             }
@@ -138,18 +149,18 @@
             <p>Reservas y transfers creados por ti durante los próximos 14 días.</p>
           </div>
           @if (summary.personalWork.pendingReservations > 0) {
-            <span class="pending-pill">
-              {{ summary.personalWork.pendingReservations }}
+            <span class="badge badge--pending home-badge">
+              <span [countUp]="summary.personalWork.pendingReservations"></span>
               {{ summary.personalWork.pendingReservations === 1 ? 'reserva pendiente' : 'reservas pendientes' }}
             </span>
           } @else {
-            <span class="ready-pill"><i class="bx bx-check" aria-hidden="true"></i> Sin pendientes</span>
+            <span class="badge badge--success home-badge"><i class="bx bx-check" aria-hidden="true"></i> Sin pendientes</span>
           }
         </header>
 
         <div class="work-grid">
           <article class="list-card">
-            <header class="card-heading">
+            <header class="card-header">
               <div>
                 <span class="card-icon card-icon--blue"><i class="bx bx-calendar-check" aria-hidden="true"></i></span>
                 <div><h3>Reservas</h3><p>Próximas salidas</p></div>
@@ -170,11 +181,11 @@
                     <span class="work-copy">
                       <strong>{{ reservation.Nombre_Tour || 'Tour por definir' }}</strong>
                       <small>
-                        {{ reservation.Pasajeros }} {{ reservation.Pasajeros === 1 ? 'pasajero' : 'pasajeros' }}
+                        <span [countUp]="reservation.Pasajeros"></span> {{ reservation.Pasajeros === 1 ? 'pasajero' : 'pasajeros' }}
                         · {{ reservation.Tipo_Reserva || 'Grupal' }}
                       </small>
                     </span>
-                    <span class="status-chip">{{ reservation.Estado || 'Registrada' }}</span>
+                    <span class="badge home-badge home-badge--neutral home-badge--status">{{ reservation.Estado || 'Registrada' }}</span>
                     <i class="bx bx-chevron-right" aria-hidden="true"></i>
                   </button>
                 }
@@ -189,7 +200,7 @@
           </article>
 
           <article class="list-card">
-            <header class="card-heading">
+            <header class="card-header">
               <div>
                 <span class="card-icon card-icon--violet"><i class="bx bx-car" aria-hidden="true"></i></span>
                 <div><h3>Transfers</h3><p>Próximos traslados</p></div>
@@ -211,7 +222,7 @@
                       <strong>{{ transfer.Nombre_Servicio || 'Transfer' }}</strong>
                       <small>{{ transfer.Punto_Salida || 'Origen por definir' }} → {{ transfer.Punto_Destino || 'Destino por definir' }}</small>
                     </span>
-                    <span class="status-chip">{{ transfer.Cantidad_Personas || 0 }} pax</span>
+                    <span class="badge home-badge home-badge--neutral home-badge--status"><span [countUp]="transfer.Cantidad_Personas || 0"></span>&nbsp;pax</span>
                     <i class="bx bx-chevron-right" aria-hidden="true"></i>
                   </button>
                 }
@@ -261,7 +272,7 @@
                   <small>{{ process.description }}</small>
                 </span>
                 <span class="process-count">
-                  <strong>{{ process.count }}</strong>
+                  <strong [countUp]="process.count"></strong>
                   <small>{{ process.count === 1 ? 'pendiente' : 'pendientes' }}</small>
                 </span>
                 <i class="bx bx-chevron-right process-arrow" aria-hidden="true"></i>
@@ -292,7 +303,7 @@
       <div class="detail-grid" [class.detail-grid--single]="!summary.capabilities.management">
         @if (summary.capabilities.management) {
           <article class="list-card">
-            <header class="card-heading">
+            <header class="card-header">
               <div>
                 <span class="card-icon card-icon--orange"><i class="bx bx-error-circle" aria-hidden="true"></i></span>
                 <div><h3>Alertas de aforo</h3><p>Próximos 7 días</p></div>
@@ -311,9 +322,23 @@
                     </span>
                     <span class="work-copy">
                       <strong>{{ alert.tourName }}</strong>
-                      <small>{{ shortDate(alert.date) }} · {{ alert.occupied }} de {{ alert.capacity || '—' }} cupos</small>
+                      <small>
+                        {{ shortDate(alert.date) }} · <span [countUp]="alert.occupied"></span> de
+                        @if (alert.capacity) { <span [countUp]="alert.capacity"></span> } @else { — }
+                        cupos
+                      </small>
                     </span>
-                    <span class="alert-chip" [attr.data-status]="alert.status">{{ alertLabel(alert) }}</span>
+                    <span
+                      class="badge home-badge"
+                      [class.badge--pending]="!isCriticalAlert(alert)"
+                      [class.badge--danger]="isCriticalAlert(alert)"
+                    >
+                      @if (isCriticalAlert(alert)) {
+                        {{ alertLabel(alert) }}
+                      } @else {
+                        <span [countUp]="alert.percentage" countUpSuffix="% ocupado"></span>
+                      }
+                    </span>
                   </button>
                 }
               </div>
@@ -328,7 +353,7 @@
         }
 
         <article class="list-card">
-          <header class="card-heading">
+          <header class="card-header">
             <div>
               <span class="card-icon card-icon--green"><i class="bx bx-pulse" aria-hidden="true"></i></span>
               <div><h3>Actividad reciente</h3><p>{{ summary.capabilities.management ? 'Cambios en la empresa' : 'Tus últimos cambios' }}</p></div>
