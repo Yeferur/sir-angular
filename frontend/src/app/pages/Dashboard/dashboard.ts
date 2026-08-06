@@ -1,5 +1,5 @@
 import { CommonModule }         from '@angular/common';
-import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
+import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule }          from '@angular/forms';
 import { forkJoin, finalize, catchError, of } from 'rxjs';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
@@ -8,6 +8,8 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state'
 import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
 import { Tours } from '../../services/Tours/tours';
+import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import {
   NgApexchartsModule, ChartComponent,
@@ -40,8 +42,8 @@ export type ChartOptions = {
 // ─── Tokens de diseño ─────────────────────────────────────────────────────────
 const FONT  = 'Inter, sans-serif';
 const BG    = 'transparent';
-const AXIS  = '#6b7280';
-const GRID  = '#1f2937';
+const AXIS  = '#8b93a1';
+const GRID  = 'rgba(139, 147, 161, .16)';
 
 const C_GOLD   = '#ffd700';
 const C_GREEN  = '#34c759';
@@ -62,7 +64,7 @@ const COP_COMPACT = (v: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
 function grid(showX = false, showY = true): any {
-  return { borderColor: GRID, strokeDashArray: 4, xaxis: { lines: { show: showX } }, yaxis: { lines: { show: showY } } };
+  return { borderColor: GRID, strokeDashArray: 3, padding: { left: 6, right: 10 }, xaxis: { lines: { show: showX } }, yaxis: { lines: { show: showY } } };
 }
 
 function axisStyle(): any {
@@ -75,7 +77,8 @@ function axisStyle(): any {
   standalone:  true,
   imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './dashboard.html',
-  styleUrls:   ['./dashboard.css']
+  styleUrls:   ['./dashboard.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
@@ -83,6 +86,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private toursSvc = inject(Tours);
   private alert = inject(SirAlertService);
   private cdr   = inject(ChangeDetectorRef);
+  private ws    = inject(WebSocketService);
+  private destroyRef = inject(DestroyRef);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   totalReservas       = 0;
@@ -90,6 +95,24 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   totalIngresos       = 0;    // bruto
   totalIngresosNetos  = 0;    // neto
   totalTransfers      = 0;
+  totalTransferPassengers = 0;
+  companyRevenue = 0;
+  transferRevenue = 0;
+  scheduledTourRevenue = 0;
+  tourCommission = 0;
+  collectedRevenue = 0;
+  pendingCollection = 0;
+  noShowAdjustment = 0;
+  closedJourneys = 0;
+  pendingJourneys = 0;
+  primaryCurrency = 'COP';
+  mixedCurrencies = false;
+  financialByCurrency: any[] = [];
+  comparison: any = null;
+  updatedAt: Date | null = null;
+  connectionState: WebSocketConnectionState = 'connecting';
+  activeSection: 'resumen' | 'viaje' | 'ingresos' | 'comercial' = 'resumen';
+  reservationTypeRows: any[] = [];
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   startDate  = '';
@@ -145,24 +168,31 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private refreshTimer:   ReturnType<typeof setTimeout> | null = null;
   private reqId              = 0;
   private tourMetaReqId      = 0;
+  private sectionObserver: IntersectionObserver | null = null;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
-    const tomorrow = this.tomorrowValue();
-    this.startDate = tomorrow;
-    this.endDate   = tomorrow;
+    const today = new Date();
+    this.startDate = this.toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+    this.endDate   = this.toDateStr(today);
     this.initCharts();
     this.loadTours();
     this.loadData(true);
+    this.listenForRealtimeChanges();
+    this.listenForConnectionState();
   }
 
   ngAfterViewInit() {
     this.viewReady = true;
     this.syncPickers();
     if (this.lastResponse) { this.applyAll(this.lastResponse); this.reflow(); }
+    this.observeSections();
   }
 
-  ngOnDestroy() { if (this.refreshTimer) clearTimeout(this.refreshTimer); }
+  ngOnDestroy() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.sectionObserver?.disconnect();
+  }
 
   // ── Tours ─────────────────────────────────────────────────────────────────
   private loadTours() {
@@ -225,48 +255,53 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // ── 1. Ingresos Totales (bruto) — área anual ─────────────────────────
     this.incomeChartOptions = {
-      series: [{ name: 'Ingresos brutos', data: Array(12).fill(0) }],
+      series: [
+        { name: 'Empresa', data: Array(12).fill(0) },
+        { name: 'Tours', data: Array(12).fill(0) },
+        { name: 'Transfers', data: Array(12).fill(0) },
+      ],
       chart: {
         id: 'income-bruto', type: 'area', height: 300, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
         redrawOnParentResize: true, redrawOnWindowResize: true,
-        dropShadow: { enabled: true, color: C_GOLD, top: 8, blur: 14, opacity: 0.1 }
       },
       dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 2.5, colors: [C_GOLD] },
+      stroke: { curve: 'smooth', width: [3, 2, 2], colors: [C_BLUE, C_PURPLE, C_TEAL] },
       xaxis: {
         categories: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
         labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false },
-        crosshairs: { stroke: { color: C_GOLD, width: 1, dashArray: 3 } }
+        crosshairs: { stroke: { color: C_BLUE, width: 1, dashArray: 3 } }
       },
       yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
       fill: {
         type: 'gradient',
-        gradient: { colorStops: [
-          { offset: 0, color: C_GOLD, opacity: 0.28 },
-          { offset: 65, color: C_GOLD, opacity: 0.05 },
-          { offset: 100, color: C_GOLD, opacity: 0 }
-        ]}
+        gradient: { shadeIntensity: .6, opacityFrom: .2, opacityTo: .015, stops: [0, 76, 100] }
       },
-      colors: [C_GOLD],
+      colors: [C_BLUE, C_PURPLE, C_TEAL],
       grid: grid(),
+      legend: {
+        position: 'top', horizontalAlign: 'right', labels: { colors: AXIS },
+        fontSize: '12px', fontFamily: FONT, markers: { size: 6 }
+      },
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: COP } },
       markers: { size: 0, hover: { size: 5 } }
     };
 
     // ── 2. Ingresos Netos — área anual, verde ────────────────────────────
     this.netIncomeChartOptions = {
-      series: [{ name: 'Ingresos netos', data: Array(12).fill(0) }],
+      series: [
+        { name: 'Ingreso tours', data: Array(12).fill(0) },
+        { name: 'Neto tras comisión', data: Array(12).fill(0) },
+      ],
       chart: {
         id: 'income-neto', type: 'area', height: 300, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 420 } },
         redrawOnParentResize: true, redrawOnWindowResize: true,
-        dropShadow: { enabled: true, color: C_GREEN, top: 8, blur: 14, opacity: 0.1 }
       },
       dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 2.5, colors: [C_GREEN] },
+      stroke: { curve: 'smooth', width: [2, 3], colors: [C_GOLD, C_GREEN] },
       xaxis: {
         categories: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
         labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false },
@@ -275,14 +310,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
       fill: {
         type: 'gradient',
-        gradient: { colorStops: [
-          { offset: 0, color: C_GREEN, opacity: 0.28 },
-          { offset: 65, color: C_GREEN, opacity: 0.05 },
-          { offset: 100, color: C_GREEN, opacity: 0 }
-        ]}
+        gradient: { shadeIntensity: 1, opacityFrom: .24, opacityTo: .02, stops: [0, 72, 100] }
       },
-      colors: [C_GREEN],
+      colors: [C_PURPLE, C_GREEN],
       grid: grid(),
+      legend: {
+        position: 'top', horizontalAlign: 'right', labels: { colors: AXIS },
+        fontSize: '12px', fontFamily: FONT, markers: { size: 6 }
+      },
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: COP } },
       markers: { size: 0, hover: { size: 5 } }
     };
@@ -290,29 +325,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // ── 3. Ingresos bruto vs neto por día (rango) — columnas agrupadas ───
     this.dailyChartOptions = {
       series: [
-        { name: 'Bruto', data: [] },
-        { name: 'Neto',  data: [] }
+        { name: 'Tours', data: [] },
+        { name: 'Transfers', data: [] },
+        { name: 'Empresa', data: [] }
       ],
       chart: {
-        id: 'daily-income', type: 'bar', height: 280, toolbar: { show: false },
+        id: 'daily-income', type: 'line', height: 280, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 500 },
+        animations: { enabled: true, easing: 'easeinout', speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
-        bar: { horizontal: false, borderRadius: 4, borderRadiusApplication: 'end', columnWidth: '55%', grouped: true }
+        bar: { horizontal: false, borderRadius: 4, borderRadiusApplication: 'end', columnWidth: '58%', grouped: true }
       },
-      colors: [C_GOLD, C_GREEN],
+      colors: [C_PURPLE, C_TEAL, C_BLUE],
       dataLabels: { enabled: false },
-      stroke: { show: true, width: 2, colors: ['transparent'] },
+      stroke: { curve: 'smooth', width: [0, 0, 3] },
       xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
       yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
-      fill: { opacity: 0.88 },
+      fill: { opacity: [.82, .82, 1] },
       grid: grid(),
       legend: {
         position: 'top', horizontalAlign: 'right',
-        labels: { colors: '#9ca3af' }, fontSize: '12px', fontFamily: FONT,
-        markers: { size: 7 }
+        labels: { colors: AXIS }, fontSize: '12px', fontFamily: FONT,
+        markers: { size: 6 }
       },
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false,
         y: { formatter: COP } }
@@ -324,11 +360,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'daily-pax', type: 'bar', height: 280, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 500 },
+        animations: { enabled: true, easing: 'easeinout', speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
-        bar: { horizontal: false, borderRadius: 4, borderRadiusApplication: 'end', columnWidth: '48%' }
+        bar: { horizontal: false, borderRadius: 5, borderRadiusApplication: 'end', columnWidth: '44%' }
       },
       colors: [C_BLUE],
       dataLabels: {
@@ -349,45 +385,29 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pax` } }
     };
 
-    // ── 5. Pasajeros por canal — donut ────────────────────────────────────
+    // ── 5. Pasajeros por canal — ranking horizontal ──────────────────────
     this.channelChartOptions = {
-      series: [],
+      series: [{ name: 'Pasajeros', data: [] }],
       chart: {
-        id: 'channel-pax', type: 'donut', height: 310,
+        id: 'channel-pax', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
-      labels: [],
-      colors: DIST_PALETTE,
-      legend: {
-        position: 'bottom', labels: { colors: '#9ca3af' },
-        fontSize: '12px', fontFamily: FONT, itemMargin: { horizontal: 8 }
-      },
+      colors: [C_BLUE],
       dataLabels: {
-        enabled: true,
-        style: { fontSize: '12px', fontFamily: FONT, fontWeight: 600, colors: ['#fff'] },
-        dropShadow: { enabled: true, blur: 4, opacity: 0.4 }
+        enabled: true, textAnchor: 'start', offsetX: 5,
+        style: { fontSize: '11px', fontFamily: FONT, fontWeight: 700, colors: ['#fff'] },
+        formatter: (value: number) => value ? String(value) : ''
       },
       plotOptions: {
-        pie: {
-          donut: {
-            size: '68%',
-            labels: {
-              show: true,
-              name:  { show: true, color: '#9ca3af', fontSize: '13px' },
-              value: { show: true, color: '#fff', fontSize: '22px', fontWeight: 700,
-                       formatter: (v: string) => v },
-              total: {
-                show: true, label: 'Total pax', color: '#9ca3af', fontSize: '13px', fontWeight: 600,
-                formatter: (w: any) => w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0)
-              }
-            }
-          }
-        }
+        bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '58%' }
       },
-      stroke: { show: false },
-      tooltip: { theme: 'dark', style: { fontFamily: FONT } }
+      xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { style: { colors: AXIS, fontSize: '12px', fontFamily: FONT }, maxWidth: 170 } },
+      grid: grid(true, false),
+      legend: { show: false },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pasajeros` } }
     };
 
     // ── 6. Confirmación de viaje — donut ────────────────────────────────
@@ -439,11 +459,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'reservation-type', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 550 },
+        animations: { enabled: true, easing: 'easeinout', speed: 500, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
-        bar: { horizontal: false, borderRadius: 5, borderRadiusApplication: 'end', columnWidth: '48%' }
+        bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '58%' }
       },
       colors: [C_PURPLE, C_BLUE],
       dataLabels: { enabled: false },
@@ -453,8 +473,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       fill: { opacity: .9 },
       grid: grid(),
       legend: {
-        position: 'top', horizontalAlign: 'right', labels: { colors: '#9ca3af' },
-        fontSize: '12px', fontFamily: FONT, markers: { size: 7 }
+        position: 'top', horizontalAlign: 'right', labels: { colors: AXIS },
+        fontSize: '12px', fontFamily: FONT, markers: { size: 6 }
       },
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false }
     };
@@ -465,19 +485,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       chart: {
         id: 'occupancy', type: 'bar', height: 310, toolbar: { show: false },
         fontFamily: FONT, background: BG,
-        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        animations: { enabled: true, easing: 'easeinout', speed: 520, dynamicAnimation: { enabled: true, speed: 400 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
       },
       plotOptions: {
-        bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '62%', distributed: true }
+        bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '58%', distributed: false }
       },
-      colors: DIST_PALETTE,
+      colors: [C_TEAL],
       dataLabels: {
         enabled: true, textAnchor: 'start', offsetX: 4,
         style: { fontSize: '11px', fontFamily: FONT, fontWeight: 600, colors: ['#fff'] }
       },
       xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
-      yaxis: { labels: { style: { colors: '#d1d5db', fontSize: '12px', fontFamily: FONT }, maxWidth: 160 } },
+      yaxis: { labels: { style: { colors: AXIS, fontSize: '12px', fontFamily: FONT }, maxWidth: 170 } },
       grid: grid(true, false),
       legend: { show: false },
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pax` } }
@@ -529,6 +549,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.totalIngresos      = Number(res.stats?.totalIngresos      || 0);
         this.totalIngresosNetos = Number(res.stats?.totalIngresosNetos || 0);
         this.totalTransfers     = Number(res.stats?.totalTransfers     || 0);
+        this.totalTransferPassengers = Number(res.stats?.totalTransferPassengers || 0);
+        this.companyRevenue = Number(res.stats?.companyRevenue || 0);
+        this.transferRevenue = Number(res.stats?.transferRevenue || 0);
+        this.scheduledTourRevenue = Number(res.stats?.scheduledTourRevenue || 0);
+        this.tourCommission = Number(res.stats?.tourCommission || 0);
+        this.collectedRevenue = Number(res.stats?.collectedRevenue || 0);
+        this.pendingCollection = Number(res.stats?.pendingCollection || 0);
+        this.noShowAdjustment = Number(res.stats?.noShowAdjustment || 0);
+        this.closedJourneys = Number(res.stats?.closedJourneys || 0);
+        this.pendingJourneys = Number(res.stats?.pendingJourneys || 0);
+        this.primaryCurrency = String(res.stats?.primaryCurrency || 'COP');
+        this.mixedCurrencies = !!res.stats?.mixedCurrencies;
+        this.financialByCurrency = Array.isArray(res.stats?.financialByCurrency) ? res.stats.financialByCurrency : [];
+        this.comparison = res.stats?.comparison || null;
+        this.updatedAt = new Date();
 
         if (this.viewReady) { this.applyAll(res); this.reflow(); }
 
@@ -560,11 +595,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // 1 + 2. Ingresos bruto / neto mensual
     const brutoArr = Array.isArray(res.income?.bruto) ? res.income.bruto : Array(12).fill(0);
     const netoArr  = Array.isArray(res.income?.neto)  ? res.income.neto  : Array(12).fill(0);
-    this.hasIncomeData    = brutoArr.some((v: number) => v > 0);
+    const transferArr = Array.isArray(res.income?.transfers) ? res.income.transfers : Array(12).fill(0);
+    const companyArr = Array.isArray(res.income?.empresa) ? res.income.empresa : brutoArr.map((v: number, i: number) => v + Number(transferArr[i] || 0));
+    this.hasIncomeData    = companyArr.some((v: number) => v > 0);
     this.hasNetIncomeData = netoArr.some( (v: number) => v > 0);
 
-    const bSeries = [{ name: 'Ingresos brutos', data: brutoArr }];
-    const nSeries = [{ name: 'Ingresos netos',  data: netoArr  }];
+    const bSeries = [
+      { name: 'Empresa', data: companyArr },
+      { name: 'Tours', data: brutoArr },
+      { name: 'Transfers', data: transferArr },
+    ];
+    const nSeries = [
+      { name: 'Ingreso tours', data: brutoArr },
+      { name: 'Neto tras comisión', data: netoArr },
+    ];
     this.incomeChartOptions    = { ...this.incomeChartOptions,    series: bSeries };
     this.netIncomeChartOptions = { ...this.netIncomeChartOptions, series: nSeries };
     this.chartIncome?.updateSeries(bSeries, true);
@@ -574,10 +618,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const daily = Array.isArray(res.daily) ? res.daily : [];
     const dailyLabels = daily.map((d: any) => this.fmtDate(d.fecha));
     const dailyBruto  = daily.map((d: any) => Number(d.bruto || 0));
-    const dailyNeto   = daily.map((d: any) => Number(d.neto  || 0));
-    this.hasDailyData = dailyBruto.some((v: number) => v > 0) || dailyNeto.some((v: number) => v > 0);
+    const dailyTransfer = daily.map((d: any) => Number(d.transfer || 0));
+    const dailyCompany = daily.map((d: any) => Number(d.empresa || (Number(d.bruto || 0) + Number(d.transfer || 0))));
+    this.hasDailyData = dailyCompany.some((v: number) => v > 0);
 
-    const dSeries = [{ name: 'Bruto', data: dailyBruto }, { name: 'Neto', data: dailyNeto }];
+    const dSeries = [
+      { name: 'Tours', type: 'column', data: dailyBruto },
+      { name: 'Transfers', type: 'column', data: dailyTransfer },
+      { name: 'Empresa', type: 'line', data: dailyCompany },
+    ];
     this.dailyChartOptions = {
       ...this.dailyChartOptions,
       xaxis: { ...this.dailyChartOptions.xaxis, categories: dailyLabels },
@@ -607,10 +656,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const chData   = ch.map((d: any) => Number(d.cantidad || 0));
     this.hasChannelData = chData.some((v: number) => v > 0);
 
-    this.channelChartOptions = { ...this.channelChartOptions, labels: chLabels, series: this.hasChannelData ? chData : [] };
+    const channelSeries = [{ name: 'Pasajeros', data: this.hasChannelData ? chData : [] }];
+    this.channelChartOptions = {
+      ...this.channelChartOptions,
+      xaxis: { ...this.channelChartOptions.xaxis, categories: chLabels },
+      series: channelSeries
+    };
     if (this.chartChannel) {
-      this.chartChannel.updateOptions({ labels: chLabels }, false, false);
-      this.chartChannel.updateSeries(this.hasChannelData ? chData : [], true);
+      this.chartChannel.updateOptions({ xaxis: { ...this.channelChartOptions.xaxis, categories: chLabels } }, false, false);
+      this.chartChannel.updateSeries(channelSeries, true);
     }
 
     // 6. Confirmación de viaje
@@ -631,6 +685,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // 7. Reservas grupales vs. privadas
     const typeRows = Array.isArray(res.reservationTypes) ? res.reservationTypes : [];
+    this.reservationTypeRows = typeRows;
     const typeMap = new Map<string, any>(
       typeRows.map((item: any): [string, any] => [String(item.tipo), item])
     );
@@ -783,5 +838,113 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   get attendanceCoverage(): number | null {
     if (!this.totalPasajeros) return null;
     return ((this.totalViajaron + this.totalNoViajaron) / this.totalPasajeros) * 100;
+  }
+
+  get paymentCoverage(): number | null {
+    const expected = this.scheduledTourRevenue + this.transferRevenue;
+    return expected > 0 ? Math.min(100, (this.collectedRevenue / expected) * 100) : null;
+  }
+
+  get companyRevenueComparison(): number | null {
+    return this.comparison?.companyRevenuePct ?? null;
+  }
+
+  get passengerComparison(): number | null {
+    return this.comparison?.passengersPct ?? null;
+  }
+
+  get bookingComparison(): number | null {
+    return this.comparison?.reservationsPct ?? null;
+  }
+
+  get transfersIncluded(): boolean {
+    return !this.selectedTourId && !this.selectedReservationType;
+  }
+
+  get groupReservations(): number {
+    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Grupales')?.reservas || 0);
+  }
+
+  get privateReservations(): number {
+    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Privadas')?.reservas || 0);
+  }
+
+  get groupPassengers(): number {
+    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Grupales')?.pasajeros || 0);
+  }
+
+  get privatePassengers(): number {
+    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Privadas')?.pasajeros || 0);
+  }
+
+  comparisonClass(value: number | null): string {
+    if (value === null || Math.abs(value) < .05) return 'neutral';
+    return value > 0 ? 'positive' : 'negative';
+  }
+
+  comparisonText(value: number | null, unit = '%'): string {
+    if (value === null) return 'Sin base comparable';
+    if (Math.abs(value) < .05) return `Sin cambio${unit === '%' ? '' : ` ${unit}`}`;
+    return `${value > 0 ? '+' : ''}${value.toFixed(1)}${unit}`;
+  }
+
+  scrollToSection(id: string): void {
+    if (id === 'resumen' || id === 'viaje' || id === 'ingresos' || id === 'comercial') {
+      this.activeSection = id;
+      this.cdr.markForCheck();
+    }
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  printReport(): void {
+    window.print();
+  }
+
+  private listenForRealtimeChanges(): void {
+    const relevant = new Set([
+      'reservaCreada',
+      'reservaActualizada',
+      'reservaEliminada',
+      'transferCreado',
+      'transferActualizado',
+      'transferEliminado',
+      'listadoActualizado',
+    ]);
+    this.ws.events$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => {
+        if (!relevant.has(String(event.type))) return;
+        if (this.refreshTimer) clearTimeout(this.refreshTimer);
+        this.refreshTimer = setTimeout(() => this.loadData(false), 500);
+      });
+  }
+
+  private listenForConnectionState(): void {
+    this.ws.connectionState$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((state) => {
+        this.connectionState = state;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private observeSections(): void {
+    if (typeof IntersectionObserver === 'undefined') return;
+    this.sectionObserver?.disconnect();
+    this.sectionObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      const id = visible?.target.id;
+      if (id === 'resumen' || id === 'viaje' || id === 'ingresos' || id === 'comercial') {
+        this.activeSection = id;
+        this.cdr.markForCheck();
+      }
+    }, { rootMargin: '-18% 0px -68% 0px', threshold: [0, .15, .35] });
+
+    for (const id of ['resumen', 'viaje', 'ingresos', 'comercial']) {
+      const element = document.getElementById(id);
+      if (element) this.sectionObserver.observe(element);
+    }
   }
 }

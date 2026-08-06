@@ -1,5 +1,7 @@
 import { Injectable, NgZone } from '@angular/core';
-import { Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
+
+export type WebSocketConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
 export type WebSocketEventType =
   | 'forceLogout'
@@ -43,6 +45,9 @@ export class WebSocketService {
 
   private eventsSubject = new Subject<WebSocketEvent>();
   public events$: Observable<WebSocketEvent> = this.eventsSubject.asObservable();
+
+  private connectionStateSubject = new BehaviorSubject<WebSocketConnectionState>('disconnected');
+  public connectionState$: Observable<WebSocketConnectionState> = this.connectionStateSubject.asObservable();
 
   public readonly systemEvents$ = this.streamForTypes([
     'forceLogout',
@@ -115,10 +120,12 @@ export class WebSocketService {
       ? `${proto}://localhost:4000/ws`
       : `${proto}://${window.location.host}/ws`;
 
+    this.connectionStateSubject.next(this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
+      this.connectionStateSubject.next('connected');
       this.send({ type: 'auth', token });
     };
 
@@ -155,7 +162,10 @@ export class WebSocketService {
       this.ws = null;
 
       if (!this.manualClose) {
+        this.connectionStateSubject.next('reconnecting');
         this.attemptReconnect();
+      } else {
+        this.connectionStateSubject.next('disconnected');
       }
     };
 
@@ -166,15 +176,18 @@ export class WebSocketService {
 
   private attemptReconnect() {
     if (!this.currentToken) {
+      this.connectionStateSubject.next('disconnected');
       console.log('🛑 Token invalidado - reconexión detenida');
       return;
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.connectionStateSubject.next('disconnected');
       console.error('❌ No se pudo reconectar después de varios intentos');
       return;
     }
 
+    this.connectionStateSubject.next('reconnecting');
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * this.reconnectAttempts;
 
@@ -203,6 +216,7 @@ export class WebSocketService {
 
     this.currentToken = null;
     this.reconnectAttempts = 0;
+    this.connectionStateSubject.next('disconnected');
 
     if (this.ws) {
       try { this.ws.close(1000, 'manual_disconnect'); } catch {}

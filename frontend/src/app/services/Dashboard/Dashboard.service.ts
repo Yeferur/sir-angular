@@ -18,17 +18,62 @@ export interface DashboardStats {
   totalIngresos:      number;   // bruto
   totalIngresosNetos: number;   // neto
   totalTransfers:     number;
+  totalTransferPassengers: number;
+  totalViajaron: number;
+  totalNoViajaron: number;
+  totalPendientes: number;
+  closedJourneys: number;
+  pendingJourneys: number;
+  primaryCurrency: string;
+  mixedCurrencies: boolean;
+  companyRevenue: number;
+  transferRevenue: number;
+  scheduledTourRevenue: number;
+  tourCommission: number;
+  collectedRevenue: number;
+  pendingCollection: number;
+  noShowAdjustment: number;
+  financialByCurrency: FinancialCurrencySummary[];
+  comparison: DashboardComparison | null;
+}
+
+export interface FinancialCurrencySummary {
+  currency: string;
+  scheduledTours: number;
+  tourRevenue: number;
+  tourCommission: number;
+  tourNetRevenue: number;
+  transferRevenue: number;
+  companyRevenue: number;
+  collectedFull: number;
+  collectedAbonos: number;
+  collectedTotal: number;
+  pendingCollection: number;
+  noShowAdjustment: number;
+}
+
+export interface DashboardComparison {
+  period: { startDate: string; endDate: string };
+  reservationsPct: number | null;
+  passengersPct: number | null;
+  companyRevenuePct: number | null;
+  transferRevenuePct: number | null;
+  travelRateDelta: number | null;
 }
 
 export interface IncomeHistory {
   bruto: number[];   // 12 valores, uno por mes
   neto:  number[];   // 12 valores, uno por mes
+  transfers: number[];
+  empresa: number[];
 }
 
 export interface DailyIncome {
   fecha: string;   // 'YYYY-MM-DD'
   bruto: number;
   neto:  number;
+  transfer: number;
+  empresa: number;
 }
 
 export interface DailyPassengers {
