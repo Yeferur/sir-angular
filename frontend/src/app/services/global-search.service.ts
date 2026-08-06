@@ -4,12 +4,12 @@ import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 import { PermisosService } from './Permisos/permisos.service';
 import { SirAlertService } from './Alertas/alert.service';
-import { UiStateService } from './ui-state.service';
+import { SirDrawerService } from './Drawer/drawer.service';
 import { SILENT_APP_ACTIVITY } from '../interceptors/app-activity.interceptor';
 
 export interface GlobalSearchAction {
   label: string;
-  kind: 'navigate' | 'open-reserva' | 'open-transfer' | 'filter' | 'dashboard' | 'aforo';
+  kind: 'navigate' | 'open-reserva' | 'open-transfer' | 'open-tour' | 'open-usuario' | 'filter' | 'dashboard' | 'aforo';
   route?: string;
   entityId?: string | number;
   permission?: string;
@@ -43,7 +43,7 @@ export class GlobalSearchService {
   private readonly router = inject(Router);
   private readonly permisosService = inject(PermisosService);
   private readonly alerts = inject(SirAlertService);
-  private readonly uiState = inject(UiStateService);
+  private readonly drawer = inject(SirDrawerService);
   private globalSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private globalSearchRequestId = 0;
 
@@ -170,6 +170,26 @@ export class GlobalSearchService {
       };
     }
 
+    if (result.type === 'tour' && result.entityId != null) {
+      return {
+        label: 'Ver tour',
+        kind: 'open-tour',
+        entityId: result.entityId,
+        permission: result.permission,
+      };
+    }
+
+    if (result.type === 'punto') {
+      return {
+        label: 'Ver punto',
+        kind: 'filter',
+        route: '/Puntos/VerPuntos',
+        entityId: result.entityId,
+        permission: result.permission,
+        params: { queryParams: { q: result.title } },
+      };
+    }
+
     return null;
   }
 
@@ -183,7 +203,7 @@ export class GlobalSearchService {
     if (action.kind === 'open-reserva') {
       if (action.entityId != null) {
         this.closeSearch();
-        this.uiState.reservaId.set(String(action.entityId));
+        this.drawer.openReserva(String(action.entityId));
       }
       return;
     }
@@ -191,7 +211,23 @@ export class GlobalSearchService {
     if (action.kind === 'open-transfer') {
       if (action.entityId != null) {
         this.closeSearch();
-        this.uiState.transferId.set(String(action.entityId));
+        this.drawer.openTransfer(String(action.entityId));
+      }
+      return;
+    }
+
+    if (action.kind === 'open-tour') {
+      if (action.entityId != null) {
+        this.closeSearch();
+        this.drawer.openTour(String(action.entityId));
+      }
+      return;
+    }
+
+    if (action.kind === 'open-usuario') {
+      if (action.entityId != null) {
+        this.closeSearch();
+        this.drawer.openUsuario(String(action.entityId));
       }
       return;
     }

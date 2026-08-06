@@ -120,7 +120,13 @@ function buildTourActions(row, permisos) {
 
   if (hasPermission(permisos, 'TOURS.LEER')) {
     actions.push({
-      label: 'Ver tours',
+      label: 'Ver tour',
+      kind: 'open-tour',
+      entityId: id,
+      permission: 'TOURS.LEER',
+    });
+    actions.push({
+      label: 'Ir a Ver Tours',
       kind: 'navigate',
       route: '/Tours/VerTours',
       permission: 'TOURS.LEER',
@@ -196,7 +202,6 @@ function buildPuntoActions(row, permisos) {
       permission: 'PUNTOS.LEER',
       params: {
         queryParams: { q: nombre },
-        pendingReason: 'Ver Puntos todavía no hidrata filtros desde la URL; se navega al módulo sin seleccionar el punto automáticamente.',
       },
     });
   }

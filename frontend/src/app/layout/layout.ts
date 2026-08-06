@@ -33,7 +33,6 @@ import { SirDrawerService } from '../services/Drawer/drawer.service';
 import { PermisosService } from '../services/Permisos/permisos.service';
 import { UsuariosService } from '../services/Usuarios/usuarios';
 import { SirAlertService } from '../services/Alertas/alert.service';
-import { environment } from '../../environments/environment';
 
 import { GlobalSearchComponent } from '../components/global-search/global-search';
 import { TopbarTransitionService } from '../components/login/topbar-transition.service';
@@ -84,8 +83,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private router = inject(Router);
     private activatedRoute = inject(ActivatedRoute);
     private activity = inject(AppActivityService);
-
-    readonly aiEnabled = !!environment.aiEnabled;
 
     // ── Señales del servicio global ──────────────────────────────
     globalSearchOpen = this.search.open;

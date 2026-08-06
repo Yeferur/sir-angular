@@ -238,7 +238,8 @@
   line-height: 1.2;
   border: 1px solid var(--separator-translucent, rgba(255, 255, 255, 0.1));
   color: var(--text-secondary);
-  background: transparent;
+  background: var(--body-color, #121212);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--body-color, #121212) 72%, transparent);
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
@@ -617,7 +618,15 @@
 }
 
 .topbar-expanded--search {
-  height: min(80vh, 760px);
+  /* Replica la reticula del contenido principal: offset del sidebar a la
+     izquierda, gutter de 24px a la derecha y el mismo max-width de pagina. */
+  width: min(1350px, calc(100% - 105px));
+  translate: 28.5px 0;
+
+  /* El panel crece con los resultados y solo toma altura de dialogo cuando
+     realmente la necesita. Evita el gran bloque vacio con 1 o 2 coincidencias. */
+  min-height: 150px;
+  max-height: min(70vh, 640px);
   display: flex;
   flex-direction: column;
 }
@@ -677,6 +686,11 @@
        incluir zonas desbordadas durante la apertura del drawer. */
     width: 100% !important;
     max-width: none;
+  }
+
+  .topbar-expanded--search {
+    width: calc(100% - 48px);
+    translate: 0;
   }
 
   .topbar-island-content { width: 100%; }

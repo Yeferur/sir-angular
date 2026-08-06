@@ -4,17 +4,14 @@ import {
   Input,
   OnDestroy, ViewChild, computed, effect, inject, signal
 } from '@angular/core';
-import { Router } from '@angular/router';
-import { environment } from '../../../environments/environment';
 import { GlobalSearchResult, GlobalSearchService } from '../../services/global-search.service';
-import { IaService, IaAccion } from '../../services/IA/ia';
+import { PermisosService } from '../../services/Permisos/permisos.service';
 
-interface GlobalSearchConversationMessage {
-  id: number;
-  role: 'user' | 'assistant';
-  content: string;
-  accion?: IaAccion;
-  acciones?: Array<{ accion: string; label?: string; datos: Record<string, any> }>;
+interface SearchShortcut {
+  label: string;
+  route: string;
+  permission: string;
+  icon: string;
 }
 
 @Component({
@@ -26,48 +23,27 @@ interface GlobalSearchConversationMessage {
 })
 export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   private readonly search = inject(GlobalSearchService);
-  private readonly iaService = inject(IaService);
-  private readonly router = inject(Router);
+  private readonly permissions = inject(PermisosService);
   private readonly zone = inject(NgZone);
-  readonly aiEnabled = !!environment.aiEnabled;
-  @Input() mode: 'search' | 'maxi' = 'maxi';
   @Input() integrated = false;
-  get isMaxiMode(): boolean { return this.mode === 'maxi' && this.aiEnabled; }
 
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
   query    = this.search.query;
   results  = this.search.results;
   loading  = this.search.loading;
-  conversationHistory = signal<GlobalSearchConversationMessage[]>([]);
   isClosing = signal(false);
-
-  // ─── IA state ──────────────────────────────────────────────────
-  iaRespuesta = signal<string | null>(null);
-  iaAccion    = signal<IaAccion | null>(null);
-  iaLoading   = signal(false);
-  iaActivada  = signal(false);
   inputFocused = signal(false);
-  private conversationSequence = 0;
-  private iaQuery = '';
 
-  suggestions = [
-    'Reserva TG10146',
-    'Buscar reserva por nombre',
-    'Buscar transfer por titular',
-    'Ver transfers de hoy',
-    'Puntos de encuentro',
-    'Tours disponibles hoy',
+  readonly shortcuts: SearchShortcut[] = [
+    { label: 'Ver reservas', route: '/Reservas/VerReservas', permission: 'RESERVAS.LEER', icon: 'bx bx-calendar-check' },
+    { label: 'Ver transfers', route: '/Transfers/VerTransfers', permission: 'TRANSFERS.LEER', icon: 'bx bx-car' },
+    { label: 'Ver tours', route: '/Tours/VerTours', permission: 'TOURS.LEER', icon: 'bx bx-map-alt' },
+    { label: 'Ver puntos', route: '/Puntos/VerPuntos', permission: 'PUNTOS.LEER', icon: 'bx bx-map-pin' },
   ];
 
-  // ─── Limpieza markdown ─────────────────────────────────────────
-  private cleanText(t: string): string {
-    return t
-      .replace(/\*\*(.*?)\*\*/g, '$1')
-      .replace(/\*(.*?)\*/g, '$1')
-      .replace(/#{1,6}\s/g, '')
-      .replace(/`(.*?)`/g, '$1')
-      .trim();
+  get availableShortcuts(): SearchShortcut[] {
+    return this.shortcuts.filter((shortcut) => this.permissions.tienePermiso(shortcut.permission));
   }
 
   // ─── Computed ──────────────────────────────────────────────────
@@ -89,12 +65,10 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
 
   flatResults   = computed(() => this.groupedResults().flatMap(g => g.items));
   hasQuery      = computed(() => this.query().trim().length > 0);
-  hasIa         = computed(() => !!this.iaRespuesta() || this.iaLoading() || this.iaActivada());
-  showInitialState = computed(() => !this.hasQuery() && !this.loading() && !this.hasIa());
-  showWelcome   = computed(() => this.conversationHistory().length === 0 && this.showInitialState() && !this.isClosing());
+  showInitialState = computed(() => !this.hasQuery() && !this.loading());
+  showWelcome   = computed(() => this.showInitialState() && !this.isClosing());
   showNoResults    = computed(() =>
-    this.hasQuery() && !this.loading() && !this.iaLoading() &&
-    !this.iaRespuesta() && this.flatResults().length === 0
+    this.hasQuery() && !this.loading() && this.flatResults().length === 0
   );
 
   // ─── Comet animation ───────────────────────────────────────────
@@ -123,18 +97,6 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
       setTimeout(() => this.searchInput?.nativeElement?.focus(), 50);
     });
 
-    effect(() => {
-      if (!this.isMaxiMode) return;
-      const isLoading  = this.loading();
-      const hasResults = this.flatResults().length > 0;
-      const q          = this.query().trim();
-      if (!isLoading && !hasResults && q.length >= 3 && !this.iaActivada()) {
-        this.callIa(q);
-      }
-      if (hasResults && !this.iaQuery.endsWith('?') && !this.iaLoading()) {
-        this.resetIa();
-      }
-    });
   }
 
   ngAfterViewInit(): void {
@@ -152,81 +114,21 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   onInput(event: Event): void {
     const val = (event.target as HTMLInputElement).value;
     this.search.query.set(val);
-    this.resetIa();
-    // No busca — espera que el usuario presione Buscar o Enter
   }
 
   onEnterSearch(): void {
     const q = this.query().trim();
-    if (!q || this.iaLoading() || this.loading()) return;
-    this.resetIa();
-    this.addConversationMessage({ role: 'user', content: q });
-    // Si termina en ? → IA directa
-    if (this.isMaxiMode && q.endsWith('?')) {
-      this.search.results.set([]);
-      this.callIa(q);
-      return;
-    }
+    if (!q || this.loading()) return;
     this.search.searchGlobal(q);
   }
 
-  setSuggestion(text: string): void {
-    this.search.query.set(text);
-    this.resetIa();
-    this.addConversationMessage({ role: 'user', content: text });
-    if (this.isMaxiMode && text.endsWith('?')) {
-      this.search.results.set([]);
-      this.callIa(text);
-    } else {
-      this.search.searchGlobal(text);
-    }
-    setTimeout(() => this.searchInput?.nativeElement?.focus(), 0);
-  }
-
-  // ─── IA ────────────────────────────────────────────────────────
-  private callIa(q: string): void {
-    if (!this.isMaxiMode || !q || this.iaLoading()) return;
-    this.iaQuery = q;
-    this.iaActivada.set(true);
-    this.iaLoading.set(true);
-    this.iaRespuesta.set(null);
-    this.iaAccion.set(null);
-
-    this.iaService.chat(q).then(res => {
-      this.iaRespuesta.set(this.cleanText(res.texto || 'Sin respuesta.'));
-      this.iaAccion.set(res.accion);
-      this.addConversationMessage({
-        role: 'assistant',
-        content: this.cleanText(res.texto || 'Sin respuesta.'),
-        accion: res.accion || undefined,
-        acciones: res.accion?.acciones,
-      });
-      // Limpiar el input una vez que la IA responde
-      this.search.query.set('');
-      if (this.searchInput) this.searchInput.nativeElement.value = '';
-    }).catch(() => {
-      this.iaRespuesta.set('La función de IA no está disponible temporalmente.');
-      this.addConversationMessage({
-        role: 'assistant',
-        content: 'La función de IA no está disponible temporalmente.',
-      });
-    }).finally(() => {
-      this.iaLoading.set(false);
+  openShortcut(shortcut: SearchShortcut): void {
+    this.search.executeAction({
+      label: shortcut.label,
+      kind: 'navigate',
+      route: shortcut.route,
+      permission: shortcut.permission,
     });
-  }
-
-  private resetIa(): void {
-    this.iaActivada.set(false);
-    this.iaRespuesta.set(null);
-    this.iaAccion.set(null);
-    this.iaQuery = '';
-  }
-
-  private addConversationMessage(message: Omit<GlobalSearchConversationMessage, 'id'>): void {
-    this.conversationHistory.update((history) => [
-      ...history,
-      { id: ++this.conversationSequence, ...message },
-    ]);
   }
 
   closeFromButton(event: MouseEvent): void {
@@ -237,29 +139,6 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
       this.close();
       this.isClosing.set(false);
     }, 140);
-  }
-
-  ejecutarAccion(accion: IaAccion): void {
-    const map: Record<string, string> = {
-      buscar_reservas: '/Reservas/VerReservas',
-      ver_aforos:      '/',
-      ver_transfers:   '/Transfers/VerTransfers',
-      crear_reserva:   '/Reservas/NuevaReserva',
-      ver_tours:       '/Tours/VerTours',
-      ver_puntos:      '/Puntos/VerPuntos',
-      ver_listados:    '/Programacion/Listado',
-    };
-    const route = map[accion.accion];
-    this.close();
-    if (route) {
-      const params = accion.accion === 'buscar_reservas' && accion.datos['query']
-        ? { queryParams: { q: accion.datos['query'] } } : {};
-      this.router.navigate([route], params);
-    }
-  }
-
-  ejecutarAccionDirecta(accion: string, datos: Record<string, any>): void {
-    this.ejecutarAccion({ accion, datos, label: '' });
   }
 
   // ─── Comet border (RAF, fuera de Angular) ──────────────────────
@@ -333,19 +212,24 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
 
   // ─── Navigation helpers ────────────────────────────────────────
   close(): void {
-    this.resetIa();
     this.isClosing.set(false);
-    this.conversationHistory.set([]);
-    this.iaService.clearHistorial();
-    this.iaService.clearContext();
     this.search.closeSearch();
   }
 
   execute(result: GlobalSearchResult): void { this.search.executeAction(result); }
 
-  executeAction(event: Event, action: any): void {
-    event.stopPropagation();
-    this.search.executeAction(action);
+  primaryActionLabel(result: GlobalSearchResult): string {
+    const explicitLabel = result.actions?.[0]?.label?.trim();
+    if (explicitLabel) return explicitLabel;
+
+    const labels: Partial<Record<GlobalSearchResult['type'], string>> = {
+      reserva: 'Ver detalle',
+      transfer: 'Ver detalle',
+      tour: 'Ver tour',
+      punto: 'Ver punto',
+      usuario: 'Ver usuario',
+    };
+    return labels[result.type] || 'Abrir';
   }
 
   getFlatIndex(gi: number, ii: number): number {

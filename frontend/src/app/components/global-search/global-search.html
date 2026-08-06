@@ -1,14 +1,12 @@
 <section class="gs-shell" [class.is-closing]="isClosing()" (click)="$event.stopPropagation()">
-
-  <!-- HEADER -->
   <div class="gs-header">
     <div class="gs-brand">
       <div class="gs-brand-orb" aria-hidden="true">
         <span class="gs-brand-star">✦</span>
       </div>
       <div class="gs-brand-info">
-        <span class="gs-brand-name">{{ isMaxiMode ? 'Maxi' : 'Buscador global' }}</span>
-        <span class="gs-brand-badge">{{ isMaxiMode ? 'Beta' : 'SIR' }}</span>
+        <span class="gs-brand-name">Buscador global</span>
+        <span class="gs-brand-badge">SIR</span>
       </div>
     </div>
     <button type="button" class="gs-close-btn" (click)="closeFromButton($event)" aria-label="Cerrar">
@@ -20,36 +18,37 @@
     </button>
   </div>
 
-  <!-- CONVERSATION BODY -->
-  <div class="gs-body" #conversationContainer>
-
-    <!-- Estado inicial: sin historial ni query activo -->
+  <div class="gs-body">
     @if (showWelcome()) {
-      <div class="gs-welcome" role="region" aria-label="Bienvenida">
-        <div class="gs-welcome-orb" aria-hidden="true">✦</div>
-        <h2 class="gs-welcome-title">{{ isMaxiMode ? '¿En qué te ayudo hoy?' : 'Busca en SIR' }}</h2>
-        <p class="gs-welcome-sub">
-          {{ isMaxiMode ? 'Consulta reservas, cupos, transfers y operación diaria en lenguaje natural.' : 'Busca reservas, transfers, tours, puntos y accesos rápidos del sistema.' }}
-        </p>
-        <div class="gs-chips" role="list" aria-label="Sugerencias">
-          @for (s of suggestions; track s) {
-            <button type="button" class="gs-chip" role="listitem" (click)="setSuggestion(s)">{{ s }}</button>
-          }
-        </div>
+      <div class="gs-welcome" role="region" aria-label="Ayuda de búsqueda">
+        <div class="gs-welcome-orb" aria-hidden="true">⌕</div>
+        <h2 class="gs-welcome-title">Busca en SIR</h2>
+        <p class="gs-welcome-sub">Utiliza la barra de búsqueda para encontrar rápidamente una reserva o un trasnfer. Puedes buscar por ID, nombre del pasajero, número de documento o nombre del titular. También puedes ingresar el nombre de un tour o de un punto de encuentro.</p>
+        @if (availableShortcuts.length > 0) {
+          <span class="gs-shortcuts-label">O abre directamente un módulo</span>
+          <div class="gs-chips" role="list" aria-label="Accesos rápidos">
+            @for (shortcut of availableShortcuts; track shortcut.route) {
+              <button type="button" class="gs-chip" role="listitem" (click)="openShortcut(shortcut)">
+                <i [class]="shortcut.icon" aria-hidden="true"></i>
+                {{ shortcut.label }}
+              </button>
+            }
+          </div>
+        }
       </div>
     }
 
-    @if (!isMaxiMode && flatResults().length > 0) {
+    @if (flatResults().length > 0) {
       <div class="gs-results" role="list" aria-label="Resultados de búsqueda">
-        @for (group of groupedResults(); track group.label; let gi = $index) {
+        @for (group of groupedResults(); track group.label; let groupIndex = $index) {
           <section class="gs-result-group">
             <h3>{{ group.label }}</h3>
-            @for (result of group.items; track result.id; let ii = $index) {
+            @for (result of group.items; track result.id; let itemIndex = $index) {
               <button
                 type="button"
                 class="gs-result-item"
-                [class.is-selected]="isSelected(getFlatIndex(gi, ii))"
-                (mouseenter)="onResultHover(getFlatIndex(gi, ii))"
+                [class.is-selected]="isSelected(getFlatIndex(groupIndex, itemIndex))"
+                (mouseenter)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
                 (click)="execute(result)"
               >
                 <span class="gs-result-copy">
@@ -57,6 +56,7 @@
                   @if (result.subtitle) { <small>{{ result.subtitle }}</small> }
                 </span>
                 @if (result.badge) { <span class="gs-result-badge">{{ result.badge }}</span> }
+                <span class="gs-result-cta">{{ primaryActionLabel(result) }}</span>
                 <i class="bx bx-chevron-right" aria-hidden="true"></i>
               </button>
             }
@@ -65,107 +65,49 @@
       </div>
     }
 
-    @if (!isMaxiMode && showNoResults()) {
+    @if (showNoResults()) {
       <div class="gs-search-empty" role="status">
         <i class="bx bx-search-alt" aria-hidden="true"></i>
-        <strong>Sin resultados todavía</strong>
-        <span>Presiona Enter para buscar en todo SIR.</span>
+        <strong>No encontramos coincidencias</strong>
+        <span>Prueba con otro código, nombre, documento o palabra clave.</span>
       </div>
     }
-
-    <!-- Historial de mensajes -->
-    @for (msg of conversationHistory(); track msg.id) {
-      @if (msg.role === 'user') {
-        <div class="gs-msg gs-msg--user" [attr.aria-label]="'Tu mensaje: ' + msg.content">
-          <div class="gs-bubble gs-bubble--user">{{ msg.content }}</div>
-        </div>
-      } @else {
-        <div class="gs-msg gs-msg--ia" [attr.aria-label]="isMaxiMode ? 'Respuesta de Maxi' : 'Respuesta del buscador'">
-          <div class="gs-ia-avatar" aria-hidden="true">✦</div>
-          <div class="gs-ia-content">
-            <div class="gs-bubble gs-bubble--ia">{{ msg.content }}</div>
-            @if (msg.acciones && msg.acciones!.length > 1) {
-              <div class="gs-actions-row">
-                @for (a of msg.acciones!; track a.accion) {
-                  <button type="button" class="gs-action-btn" (click)="ejecutarAccionDirecta(a.accion, a.datos)">
-                    {{ a.label }}
-                  </button>
-                }
-              </div>
-            } @else if (msg.accion) {
-              <div class="gs-actions-row">
-                <button type="button" class="gs-action-btn" (click)="ejecutarAccion(msg.accion!)">
-                  @switch (msg.accion!.accion) {
-                    @case ('crear_reserva') { + Crear reserva }
-                    @case ('buscar_reservas') { {{ msg.accion!.label || 'Ver reservas' }} }
-                    @case ('ver_aforos') { Ver cupos }
-                    @case ('ver_transfers') { Ver transfers }
-                    @case ('ver_tours') { Ver tours }
-                    @case ('ver_puntos') { Ver puntos }
-                    @case ('ver_listados') { Ver listados }
-                    @default { {{ msg.accion!.label || 'Ver' }} }
-                  }
-                </button>
-              </div>
-            }
-          </div>
-        </div>
-      }
-    }
-
-    <!-- Burbuja de "pensando..." -->
-    @if (iaLoading()) {
-      <div class="gs-msg gs-msg--ia gs-msg--thinking" role="status" aria-live="polite" aria-label="Maxi está analizando">
-        <div class="gs-ia-avatar" aria-hidden="true">✦</div>
-        <div class="gs-bubble gs-bubble--ia gs-bubble--thinking">
-          <span class="gs-thinking-dots" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
-        </div>
-      </div>
-    }
-
   </div>
 
-  <!-- FOOTER: INPUT (en modo integrado vive dentro del topbar) -->
   @if (!integrated) {
-  <div class="gs-footer">
-    <div class="gs-input-wrap" [class.focused]="inputFocused()">
-      <span class="gs-input-icon" aria-hidden="true">⌕</span>
-      <input
-        #searchInput
-        class="gs-input"
-        type="text"
-        [value]="query()"
-        (input)="onInput($event)"
-        (keydown.enter)="onEnterSearch()"
-        (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); close()"
-        (focus)="inputFocused.set(true)"
-        (blur)="inputFocused.set(false)"
-        [placeholder]="isMaxiMode ? 'Pregúntale a Maxi...' : 'Buscar reservas, transfers, tours o puntos'"
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Escribe tu consulta"
-      />
-      <button
-        type="button"
-        class="gs-send-btn"
-        [class.gs-send-btn--active]="query().trim().length > 0 && !iaLoading()"
-        [disabled]="!query().trim() || iaLoading()"
-        (click)="onEnterSearch()"
-        aria-label="Enviar"
-      >
-        @if (iaLoading()) {
-          <span class="gs-send-spinner" aria-hidden="true"></span>
-        } @else {
-          <span aria-hidden="true">↑</span>
-        }
-      </button>
+    <div class="gs-footer">
+      <div class="gs-input-wrap" [class.focused]="inputFocused()">
+        <span class="gs-input-icon" aria-hidden="true">⌕</span>
+        <input
+          #searchInput
+          class="gs-input"
+          type="search"
+          [value]="query()"
+          (input)="onInput($event)"
+          (keydown.enter)="onEnterSearch()"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); close()"
+          (focus)="inputFocused.set(true)"
+          (blur)="inputFocused.set(false)"
+          placeholder="Buscar reservas, transfers, tours o puntos"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Búsqueda global"
+        />
+        <button
+          type="button"
+          class="gs-send-btn"
+          [class.gs-send-btn--active]="query().trim().length > 0 && !loading()"
+          [disabled]="!query().trim() || loading()"
+          (click)="onEnterSearch()"
+          aria-label="Buscar"
+        >
+          @if (loading()) {
+            <span class="gs-send-spinner" aria-hidden="true"></span>
+          } @else {
+            <i class="bx bx-search" aria-hidden="true"></i>
+          }
+        </button>
+      </div>
     </div>
-    @if (isMaxiMode) {
-    <p class="gs-disclaimer">Maxi puede cometer errores. Verifica información crítica.</p>
-    }
-  </div>
   }
-
 </section>
