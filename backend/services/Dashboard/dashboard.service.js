@@ -5,6 +5,7 @@
  *   startDate  : string  'YYYY-MM-DD'   (opcional)
  *   endDate    : string  'YYYY-MM-DD'   (opcional)
  *   tourId     : number | null          (opcional — null = todos los tours)
+ *   reservationType : 'Grupal' | 'Privada' | null
  *
  * Aclaración de terminología de negocio:
  *   Precio_Pasajero = precio bruto cobrado al cliente
@@ -16,14 +17,24 @@
 const db = require('../../database/db');
 
 // ─── Helper: construye cláusulas WHERE para filtros estándar ────────────────
+function normalizeReservationType(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return ['GRUPAL', 'PRIVADA'].includes(normalized) ? normalized : null;
+}
+
 function buildFilters(filters = {}) {
   const { startDate, endDate, tourId } = filters;
+  const reservationType = normalizeReservationType(filters.reservationType);
   const conds  = [];
   const params = [];
 
   if (startDate) { conds.push('r.Fecha_Tour >= ?'); params.push(startDate); }
   if (endDate)   { conds.push('r.Fecha_Tour <= ?'); params.push(endDate);   }
   if (tourId)    { conds.push('h.Id_Tour = ?');     params.push(tourId);    }
+  if (reservationType) {
+    conds.push("UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'Grupal'))) = ?");
+    params.push(reservationType);
+  }
 
   return { conds, params };
 }
@@ -232,27 +243,79 @@ async function getPassengersByChannelSvc(filters = {}) {
 // ─── 6. Distribución de pasajeros por estado ──────────────────────────────────
 async function getPassengerDistributionSvc(filters = {}) {
   const { conds, params } = buildFilters(filters);
-  const needsTourJoin = !!filters.tourId;
-  const tourJoin = needsTourJoin ? 'JOIN horarios h ON r.Id_Horario = h.Id_Horario' : '';
   const andConds = conds.length ? `AND ${conds.join(' AND ')}` : '';
 
   const sql = `
     SELECT
-      CASE WHEN p.Confirmacion = 1 THEN 'Confirmado' ELSE 'Pendiente' END AS estado,
+      CASE
+        WHEN p.Confirmacion = 1 THEN 'Viajaron'
+        WHEN cj.Id_Confirmacion IS NOT NULL
+         AND cj.Total_Pasajeros = jornada.Total_Pasajeros THEN 'No viajaron'
+        ELSE 'Pendientes'
+      END AS estado,
       COUNT(*) AS cantidad
     FROM pasajeros p
     JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
-    ${tourJoin}
+    LEFT JOIN horarios h ON r.Id_Horario = h.Id_Horario
+    LEFT JOIN (
+      SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
+      FROM pasajeros p2
+      JOIN reservas r2 ON p2.Id_Reserva = r2.Id_Reserva
+      JOIN horarios h2 ON r2.Id_Horario = h2.Id_Horario
+      WHERE UPPER(TRIM(COALESCE(r2.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')
+      GROUP BY h2.Id_Tour, r2.Fecha_Tour
+    ) jornada ON jornada.Id_Tour = h.Id_Tour AND jornada.Fecha_Tour = r.Fecha_Tour
+    LEFT JOIN confirmaciones_jornada cj
+      ON cj.Id_Tour = h.Id_Tour AND cj.Fecha_Tour = r.Fecha_Tour
     WHERE (r.Estado IS NULL OR r.Estado != 'Cancelada')
     ${andConds}
     GROUP BY estado
   `;
 
   const [rows] = await db.query(sql, params);
-  return rows;
+  return rows.map((row) => ({
+    estado: row.estado,
+    cantidad: Number(row.cantidad || 0)
+  }));
 }
 
-// ─── 7. Top destinos por pasajeros ────────────────────────────────────────────
+// ─── 7. Comparativo entre reservas grupales y privadas ───────────────────────
+async function getReservationBreakdownSvc(filters = {}) {
+  const { conds, params } = buildFilters(filters);
+  const needsTourJoin = !!filters.tourId;
+  const tourJoin = needsTourJoin ? 'JOIN horarios h ON r.Id_Horario = h.Id_Horario' : '';
+  const andConds = conds.length ? `AND ${conds.join(' AND ')}` : '';
+
+  const sql = `
+    SELECT
+      CASE
+        WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'Grupal'))) = 'PRIVADA' THEN 'Privadas'
+        ELSE 'Grupales'
+      END AS tipo,
+      COUNT(DISTINCT r.Id_Reserva) AS reservas,
+      COUNT(p.Id_Pasajero) AS pasajeros,
+      COALESCE(SUM(p.Precio_Pasajero), 0) AS bruto,
+      COALESCE(SUM(p.Precio_Pasajero - COALESCE(p.Comision, 0)), 0) AS neto
+    FROM reservas r
+    LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+    ${tourJoin}
+    WHERE (r.Estado IS NULL OR r.Estado != 'Cancelada')
+    ${andConds}
+    GROUP BY tipo
+    ORDER BY FIELD(tipo, 'Grupales', 'Privadas')
+  `;
+
+  const [rows] = await db.query(sql, params);
+  return rows.map((row) => ({
+    tipo: row.tipo,
+    reservas: Number(row.reservas || 0),
+    pasajeros: Number(row.pasajeros || 0),
+    bruto: Number(row.bruto || 0),
+    neto: Number(row.neto || 0)
+  }));
+}
+
+// ─── 8. Top destinos por pasajeros ────────────────────────────────────────────
 async function getTourOccupancySvc(filters = {}) {
   if (filters.tourId) {
     const [planRows] = await db.query(
@@ -272,6 +335,11 @@ async function getTourOccupancySvc(filters = {}) {
 
     if (filters.startDate) { rangeConds.push('r.Fecha_Tour >= ?'); rangeParams.push(filters.startDate); }
     if (filters.endDate) { rangeConds.push('r.Fecha_Tour <= ?'); rangeParams.push(filters.endDate); }
+    const reservationType = normalizeReservationType(filters.reservationType);
+    if (reservationType) {
+      rangeConds.push("UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'Grupal'))) = ?");
+      rangeParams.push(reservationType);
+    }
 
     const andRangeConds = rangeConds.length ? `AND ${rangeConds.join(' AND ')}` : '';
 
@@ -361,5 +429,6 @@ module.exports = {
   getDailyPassengersSvc,
   getPassengersByChannelSvc,
   getPassengerDistributionSvc,
+  getReservationBreakdownSvc,
   getTourOccupancySvc
 };

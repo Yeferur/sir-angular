@@ -1,13 +1,18 @@
 const dashboardService = require('../../services/Dashboard/dashboard.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
+function readFilters(req) {
+    return {
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        tourId: req.query.tourId,
+        reservationType: req.query.reservationType
+    };
+}
+
 async function getDashboardStats(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const stats = await dashboardService.getDashboardStatsSvc(filters);
         return sendSuccess(res, { data: stats, message: 'Dashboard obtenido correctamente' });
     } catch (error) {
@@ -19,11 +24,7 @@ async function getDashboardStats(req, res) {
 async function getIncomeHistory(req, res) {
     try {
         const year = req.query.year || new Date().getFullYear();
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getIncomeHistorySvc(year, filters);
         return sendSuccess(res, { data, message: 'Historial de ingresos obtenido correctamente' });
     } catch (error) {
@@ -34,11 +35,7 @@ async function getIncomeHistory(req, res) {
 
 async function getDailyIncome(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getDailyIncomeSvc(filters);
         return sendSuccess(res, { data, message: 'Ingresos diarios obtenidos correctamente' });
     } catch (error) {
@@ -49,11 +46,7 @@ async function getDailyIncome(req, res) {
 
 async function getDailyPassengers(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getDailyPassengersSvc(filters);
         return sendSuccess(res, { data, message: 'Pasajeros diarios obtenidos correctamente' });
     } catch (error) {
@@ -64,11 +57,7 @@ async function getDailyPassengers(req, res) {
 
 async function getPassengersByChannel(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getPassengersByChannelSvc(filters);
         return sendSuccess(res, { data, message: 'Pasajeros por canal obtenidos correctamente' });
     } catch (error) {
@@ -79,11 +68,7 @@ async function getPassengersByChannel(req, res) {
 
 async function getPassengerDistribution(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getPassengerDistributionSvc(filters);
         return sendSuccess(res, { data, message: 'Distribucion de pasajeros obtenida correctamente' });
     } catch (error) {
@@ -92,13 +77,19 @@ async function getPassengerDistribution(req, res) {
     }
 }
 
+async function getReservationBreakdown(req, res) {
+    try {
+        const data = await dashboardService.getReservationBreakdownSvc(readFilters(req));
+        return sendSuccess(res, { data, message: 'Comparativo de reservas obtenido correctamente' });
+    } catch (error) {
+        console.error('Error fetching reservation breakdown:', error);
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+    }
+}
+
 async function getTourOccupancy(req, res) {
     try {
-        const filters = {
-            startDate: req.query.startDate,
-            endDate: req.query.endDate,
-            tourId: req.query.tourId
-        };
+        const filters = readFilters(req);
         const data = await dashboardService.getTourOccupancySvc(filters);
         return sendSuccess(res, { data, message: 'Ocupacion por tour obtenida correctamente' });
     } catch (error) {
@@ -114,5 +105,6 @@ module.exports = {
     getDailyPassengers,
     getPassengersByChannel,
     getPassengerDistribution,
+    getReservationBreakdown,
     getTourOccupancy
 };

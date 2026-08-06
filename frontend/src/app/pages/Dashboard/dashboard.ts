@@ -96,6 +96,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   endDate    = '';
   tours:      TourOption[] = [];
   selectedTourId: number | null = null;
+  selectedReservationType: '' | 'Grupal' | 'Privada' = '';
   selectedTourPlanCount = 0;
 
   get tourLabel(): string {
@@ -109,6 +110,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartDaily')     chartDaily?:     ChartComponent;
   @ViewChild('chartPax')       chartPax?:       ChartComponent;
   @ViewChild('chartChannel')   chartChannel?:   ChartComponent;
+  @ViewChild('chartAttendance') chartAttendance?: ChartComponent;
+  @ViewChild('chartReservationType') chartReservationType?: ChartComponent;
   @ViewChild('chartOccupancy') chartOccupancy?: ChartComponent;
 
   // ── Chart options ─────────────────────────────────────────────────────────
@@ -117,6 +120,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   dailyChartOptions:     Partial<ChartOptions> | any = {};
   paxChartOptions:       Partial<ChartOptions> | any = {};
   channelChartOptions:   Partial<ChartOptions> | any = {};
+  attendanceChartOptions: Partial<ChartOptions> | any = {};
+  reservationTypeChartOptions: Partial<ChartOptions> | any = {};
   occupancyChartOptions: Partial<ChartOptions> | any = {};
 
   // ── Flags ─────────────────────────────────────────────────────────────────
@@ -127,7 +132,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   hasDailyData     = false;
   hasPaxData       = false;
   hasChannelData   = false;
+  hasAttendanceData = false;
+  hasReservationTypeData = false;
   hasOccupancyData = false;
+
+  totalViajaron = 0;
+  totalNoViajaron = 0;
+  totalPendientes = 0;
 
   private viewReady          = false;
   private lastResponse: any  = null;
@@ -165,6 +176,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   onTourChange(tourId: number | null) {
     this.selectedTourId = tourId;
     this.loadSelectedTourMeta();
+  }
+
+  onReservationTypeChange(type: '' | 'Grupal' | 'Privada') {
+    this.selectedReservationType = type;
+    this.scheduleRefresh();
   }
 
   get shouldShowOccupancyCard(): boolean {
@@ -374,7 +390,76 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       tooltip: { theme: 'dark', style: { fontFamily: FONT } }
     };
 
-    // ── 6. Top destinos — barras horizontales ─────────────────────────────
+    // ── 6. Confirmación de viaje — donut ────────────────────────────────
+    this.attendanceChartOptions = {
+      series: [],
+      chart: {
+        id: 'attendance-pax', type: 'donut', height: 310,
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 600 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
+      },
+      labels: ['Viajaron', 'No viajaron', 'Pendientes'],
+      colors: [C_GREEN, C_RED, C_ORANGE],
+      legend: {
+        position: 'bottom', labels: { colors: '#9ca3af' },
+        fontSize: '12px', fontFamily: FONT, itemMargin: { horizontal: 8 }
+      },
+      dataLabels: {
+        enabled: true,
+        style: { fontSize: '12px', fontFamily: FONT, fontWeight: 700, colors: ['#fff'] },
+        dropShadow: { enabled: true, blur: 4, opacity: 0.35 }
+      },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '68%',
+            labels: {
+              show: true,
+              name: { show: true, color: '#9ca3af', fontSize: '13px' },
+              value: { show: true, color: '#fff', fontSize: '22px', fontWeight: 700 },
+              total: {
+                show: true, label: 'Tasa de viaje', color: '#9ca3af', fontSize: '13px', fontWeight: 600,
+                formatter: () => this.travelRate === null ? '—' : `${this.travelRate.toFixed(1)}%`
+              }
+            }
+          }
+        }
+      },
+      stroke: { show: false },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pasajeros` } }
+    };
+
+    // ── 7. Reservas grupales vs. privadas — barras agrupadas ────────────
+    this.reservationTypeChartOptions = {
+      series: [
+        { name: 'Reservas', data: [] },
+        { name: 'Pasajeros', data: [] }
+      ],
+      chart: {
+        id: 'reservation-type', type: 'bar', height: 310, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: 'easeinout', speed: 550 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
+      },
+      plotOptions: {
+        bar: { horizontal: false, borderRadius: 5, borderRadiusApplication: 'end', columnWidth: '48%' }
+      },
+      colors: [C_PURPLE, C_BLUE],
+      dataLabels: { enabled: false },
+      stroke: { show: true, width: 2, colors: ['transparent'] },
+      xaxis: { categories: ['Grupales', 'Privadas'], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { ...axisStyle(), formatter: (v: number) => Math.round(v).toString() } },
+      fill: { opacity: .9 },
+      grid: grid(),
+      legend: {
+        position: 'top', horizontalAlign: 'right', labels: { colors: '#9ca3af' },
+        fontSize: '12px', fontFamily: FONT, markers: { size: 7 }
+      },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false }
+    };
+
+    // ── 8. Top destinos — barras horizontales ─────────────────────────────
     this.occupancyChartOptions = {
       series: [{ name: 'Pasajeros', data: [] }],
       chart: {
@@ -405,6 +490,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.startDate) f.startDate = this.startDate;
     if (this.endDate)   f.endDate   = this.endDate;
     if (this.selectedTourId) f.tourId = this.selectedTourId;
+    if (this.selectedReservationType) f.reservationType = this.selectedReservationType;
     return f;
   }
 
@@ -419,10 +505,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     forkJoin({
       stats:    this.svc.getStats(f).pipe(catchError(e => { console.error(e); partial = true; return of(null); })),
-      income:   this.svc.getIncomeHistory(new Date().getFullYear(), f).pipe(catchError(() => { partial = true; return of({ bruto: Array(12).fill(0), neto: Array(12).fill(0) }); })),
+      income:   this.svc.getIncomeHistory(Number(this.startDate.slice(0, 4)) || new Date().getFullYear(), f).pipe(catchError(() => { partial = true; return of({ bruto: Array(12).fill(0), neto: Array(12).fill(0) }); })),
       daily:    this.svc.getDailyIncome(f).pipe(catchError(() => { partial = true; return of([]); })),
       dailyPax: this.svc.getDailyPassengers(f).pipe(catchError(() => { partial = true; return of([]); })),
       channels: this.svc.getPassengersByChannel(f).pipe(catchError(() => { partial = true; return of([]); })),
+      attendance: this.svc.getPassengerDistribution(f).pipe(catchError(() => { partial = true; return of([]); })),
+      reservationTypes: this.svc.getReservationBreakdown(f).pipe(catchError(() => { partial = true; return of([]); })),
       occupancy:this.svc.getTourOccupancy(f).pipe(catchError(() => { partial = true; return of([]); }))
     })
     .pipe(finalize(() => {
@@ -457,7 +545,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.totalReservas = this.totalPasajeros = this.totalIngresos =
           this.totalIngresosNetos = this.totalTransfers = 0;
         this.hasIncomeData = this.hasNetIncomeData = this.hasDailyData =
-          this.hasPaxData = this.hasChannelData = this.hasOccupancyData = false;
+          this.hasPaxData = this.hasChannelData = this.hasAttendanceData =
+          this.hasReservationTypeData = this.hasOccupancyData = false;
         this.alert.showModal({ type: 'error', title: 'Error al cargar el dashboard',
           message: 'No se pudo obtener la información.' });
         this.cdr.detectChanges();
@@ -524,7 +613,46 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.chartChannel.updateSeries(this.hasChannelData ? chData : [], true);
     }
 
-    // 6. Top destinos
+    // 6. Confirmación de viaje
+    const attendance = Array.isArray(res.attendance) ? res.attendance : [];
+    const attendanceMap = new Map<string, number>(
+      attendance.map((item: any): [string, number] => [String(item.estado), Number(item.cantidad || 0)])
+    );
+    this.totalViajaron = attendanceMap.get('Viajaron') || 0;
+    this.totalNoViajaron = attendanceMap.get('No viajaron') || 0;
+    this.totalPendientes = attendanceMap.get('Pendientes') || 0;
+    const attendanceData = [this.totalViajaron, this.totalNoViajaron, this.totalPendientes];
+    this.hasAttendanceData = attendanceData.some((value) => value > 0);
+    this.attendanceChartOptions = {
+      ...this.attendanceChartOptions,
+      series: this.hasAttendanceData ? attendanceData : []
+    };
+    this.chartAttendance?.updateSeries(this.hasAttendanceData ? attendanceData : [], true);
+
+    // 7. Reservas grupales vs. privadas
+    const typeRows = Array.isArray(res.reservationTypes) ? res.reservationTypes : [];
+    const typeMap = new Map<string, any>(
+      typeRows.map((item: any): [string, any] => [String(item.tipo), item])
+    );
+    const typeCategories = this.selectedReservationType
+      ? [this.selectedReservationType === 'Grupal' ? 'Grupales' : 'Privadas']
+      : ['Grupales', 'Privadas'];
+    const bookingData = typeCategories.map((type) => Number(typeMap.get(type)?.reservas || 0));
+    const passengerData = typeCategories.map((type) => Number(typeMap.get(type)?.pasajeros || 0));
+    this.hasReservationTypeData = bookingData.some((value) => value > 0) || passengerData.some((value) => value > 0);
+    const typeSeries = [
+      { name: 'Reservas', data: bookingData },
+      { name: 'Pasajeros', data: passengerData }
+    ];
+    this.reservationTypeChartOptions = {
+      ...this.reservationTypeChartOptions,
+      xaxis: { ...this.reservationTypeChartOptions.xaxis, categories: typeCategories },
+      series: typeSeries
+    };
+    this.chartReservationType?.updateOptions({ xaxis: { ...this.reservationTypeChartOptions.xaxis, categories: typeCategories } }, false, false);
+    this.chartReservationType?.updateSeries(typeSeries, true);
+
+    // 8. Top destinos
     const occ = Array.isArray(res.occupancy) ? res.occupancy : [];
     const occCats = occ.map((d: any) => d.nombre);
     const occData = occ.map((d: any) => Number(d.pasajeros || 0));
@@ -598,9 +726,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncPickers(); this.loadData(false);
   }
 
+  setNextSevenDaysRange() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    const start = new Date();
+    const end = new Date();
+    end.setDate(end.getDate() + 6);
+    this.startDate = this.toDateStr(start);
+    this.endDate = this.toDateStr(end);
+    this.syncPickers();
+    this.loadData(false);
+  }
+
   // ── Computed ──────────────────────────────────────────────────────────────
   isTodayRange(): boolean    { const t = this.toDateStr(new Date()); return this.startDate === t && this.endDate === t; }
   isTomorrowRange(): boolean { const t = this.tomorrowValue(); return this.startDate === t && this.endDate === t; }
+  isNextSevenDaysRange(): boolean {
+    const start = new Date();
+    const end = new Date();
+    end.setDate(end.getDate() + 6);
+    return this.startDate === this.toDateStr(start) && this.endDate === this.toDateStr(end);
+  }
   hasAnyActivity(): boolean  { return this.totalReservas > 0 || this.totalPasajeros > 0 || this.totalIngresos > 0; }
 
   getOperationVolumeLabel(): string {
@@ -628,5 +773,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   get marginPct(): number | null {
     if (!this.totalIngresos) return null;
     return ((this.totalIngresosNetos / this.totalIngresos) * 100);
+  }
+
+  get travelRate(): number | null {
+    const closedPassengers = this.totalViajaron + this.totalNoViajaron;
+    return closedPassengers ? (this.totalViajaron / closedPassengers) * 100 : null;
+  }
+
+  get attendanceCoverage(): number | null {
+    if (!this.totalPasajeros) return null;
+    return ((this.totalViajaron + this.totalNoViajaron) / this.totalPasajeros) * 100;
   }
 }

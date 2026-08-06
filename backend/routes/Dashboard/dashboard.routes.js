@@ -13,6 +13,7 @@ router.get('/daily-passengers', authMiddleware, dashboardReadPermission, dashboa
 router.get('/passengers-by-channel', authMiddleware, dashboardReadPermission, dashboardController.getPassengersByChannel);
 router.get('/passenger-distribution', authMiddleware, dashboardReadPermission, dashboardController.getPassengerDistribution);
 router.get('/passengers-distribution', authMiddleware, dashboardReadPermission, dashboardController.getPassengerDistribution);
+router.get('/reservation-breakdown', authMiddleware, dashboardReadPermission, dashboardController.getReservationBreakdown);
 router.get('/tour-occupancy', authMiddleware, dashboardReadPermission, dashboardController.getTourOccupancy);
 
 module.exports = router;

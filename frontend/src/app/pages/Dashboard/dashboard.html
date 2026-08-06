@@ -6,13 +6,22 @@
 <div class="dashboard-page">
 
   <header class="page-header">
-    <div class="range-chip">
-      @if (startDate && endDate && startDate === endDate) {
-        Operación: {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
-      } @else {
-        {{ startDate | date:'d MMM':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
-      }
-      @if (selectedTourId) { &nbsp;·&nbsp; {{ tourLabel }} }
+    <div>
+      <div class="eyebrow"><span class="live-dot"></span>Información operativa</div>
+      <h1>Resumen de la operación</h1>
+      <p class="subtitle">Indicadores comerciales, pasajeros y cumplimiento de viaje en una sola vista.</p>
+    </div>
+    <div class="range-chip" aria-label="Alcance actual del informe">
+      <i class="bx bx-calendar"></i>
+      <span>
+        @if (startDate && endDate && startDate === endDate) {
+          {{ startDate | date:'d MMM yyyy':'':'es-CO' }}
+        } @else {
+          {{ startDate | date:'d MMM':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}
+        }
+        &nbsp;·&nbsp; {{ tourLabel }}
+        @if (selectedReservationType) { &nbsp;·&nbsp; {{ selectedReservationType }} }
+      </span>
     </div>
   </header>
 
@@ -52,12 +61,24 @@
           </select>
         </div>
 
+        <!-- Tipo de reserva -->
+        <div class="form-group">
+          <label class="form-label">Tipo de reserva</label>
+          <select class="form-input form-select" [ngModel]="selectedReservationType"
+            (ngModelChange)="onReservationTypeChange($event)">
+            <option value="">Grupales y privadas</option>
+            <option value="Grupal">Solo grupales</option>
+            <option value="Privada">Solo privadas</option>
+          </select>
+        </div>
+
         <!-- Acciones rápidas -->
         <div class="form-group toolbar-actions">
           <label class="form-label">Accesos rápidos</label>
           <div class="quick-actions">
             <button class="btn-quick" [class.active]="isTodayRange()"    (click)="setTodayRange()"    [disabled]="isRefreshing">Hoy</button>
             <button class="btn-quick" [class.active]="isTomorrowRange()" (click)="setTomorrowRange()" [disabled]="isRefreshing">Mañana</button>
+            <button class="btn-quick" [class.active]="isNextSevenDaysRange()" (click)="setNextSevenDaysRange()" [disabled]="isRefreshing">7 días</button>
           </div>
         </div>
 
@@ -119,12 +140,24 @@
           </div>
         </div>
 
-        <div class="card kpi-card transfers">
-          <div class="icon-box"><i class="bx bx-car"></i></div>
+        <div class="card kpi-card travelers">
+          <div class="icon-box"><i class="bx bx-check-circle"></i></div>
           <div class="kpi-info">
-            <span class="form-label">Transfers</span>
-            <span class="kpi-value">{{ totalTransfers }}</span>
-            <span class="kpi-sub">Registrados en el rango</span>
+            <span class="form-label">Viajaron</span>
+            <span class="kpi-value">{{ totalViajaron }}</span>
+            <span class="kpi-sub">{{ totalNoViajaron }} no viajaron</span>
+          </div>
+        </div>
+
+        <div class="card kpi-card travel-rate">
+          <div class="icon-box"><i class="bx bx-pulse"></i></div>
+          <div class="kpi-info">
+            <span class="form-label">Tasa de viaje</span>
+            <span class="kpi-value">{{ travelRate === null ? '—' : (travelRate | number:'1.1-1') + '%' }}</span>
+            <span class="kpi-sub">
+              @if (attendanceCoverage !== null) { {{ attendanceCoverage | number:'1.0-0' }}% del rango ya cerrado }
+              @else { Sin jornadas cerradas }
+            </span>
           </div>
         </div>
 
@@ -140,7 +173,67 @@
       </section>
       }
 
-      <!-- ── ROW 1: Ingresos Brutos + Ingresos Netos (área anual) ─────────── -->
+      <!-- ── ROW 1: Confirmación de viaje + tipos de reserva ─────────────── -->
+      <div class="charts-grid-2 charts-grid-2--priority">
+
+        <section class="card chart-card priority-chart">
+          <div class="card-header card-header--split">
+            <div>
+              <h2>Confirmación de viaje <span class="chart-badge badge-green">Pasajeros</span></h2>
+              <span class="card-subtitle">Viajaron, no viajaron y jornadas aún pendientes de cierre.</span>
+            </div>
+            @if (travelRate !== null) {
+              <span class="headline-metric">{{ travelRate | number:'1.1-1' }}%</span>
+            }
+          </div>
+          <div class="chart-body donut-container">
+            @if (hasAttendanceData) {
+              <apx-chart #chartAttendance
+                [series]="attendanceChartOptions.series" [chart]="attendanceChartOptions.chart"
+                [labels]="attendanceChartOptions.labels" [colors]="attendanceChartOptions.colors"
+                [legend]="attendanceChartOptions.legend" [plotOptions]="attendanceChartOptions.plotOptions"
+                [dataLabels]="attendanceChartOptions.dataLabels" [stroke]="attendanceChartOptions.stroke"
+                [tooltip]="attendanceChartOptions.tooltip">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-check-shield chart-empty-icon"></i>
+                <h4>Sin pasajeros en el alcance</h4>
+                <p>Cuando haya jornadas, aquí verás quién viajó y qué falta por confirmar.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card chart-card priority-chart">
+          <div class="card-header">
+            <h2>Grupales vs. privadas <span class="chart-badge badge-blue">Comparativo</span></h2>
+            <span class="card-subtitle">Cantidad de reservas y pasajeros según el tipo de servicio.</span>
+          </div>
+          <div class="chart-body">
+            @if (hasReservationTypeData) {
+              <apx-chart #chartReservationType
+                [series]="reservationTypeChartOptions.series" [chart]="reservationTypeChartOptions.chart"
+                [plotOptions]="reservationTypeChartOptions.plotOptions"
+                [xaxis]="reservationTypeChartOptions.xaxis" [yaxis]="reservationTypeChartOptions.yaxis"
+                [colors]="reservationTypeChartOptions.colors" [dataLabels]="reservationTypeChartOptions.dataLabels"
+                [stroke]="reservationTypeChartOptions.stroke" [fill]="reservationTypeChartOptions.fill"
+                [grid]="reservationTypeChartOptions.grid" [legend]="reservationTypeChartOptions.legend"
+                [tooltip]="reservationTypeChartOptions.tooltip">
+              </apx-chart>
+            } @else {
+              <div class="chart-empty">
+                <i class="bx bx-git-compare chart-empty-icon"></i>
+                <h4>Sin reservas para comparar</h4>
+                <p>Cambia el rango, el tour o el tipo de reserva.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ── ROW 2: Ingresos Brutos + Ingresos Netos (área anual) ─────────── -->
       <div class="charts-grid-2">
 
         <section class="card chart-card">
@@ -195,7 +288,7 @@
 
       </div>
 
-      <!-- ── ROW 2: Ingresos diarios Bruto vs Neto + Pasajeros por día ────── -->
+      <!-- ── ROW 3: Ingresos diarios Bruto vs Neto + Pasajeros por día ────── -->
       <div class="charts-grid-2">
 
         <section class="card chart-card">
@@ -251,7 +344,7 @@
 
       </div>
 
-      <!-- ── ROW 3: Pasajeros por canal + Top destinos ─────────────────────── -->
+      <!-- ── ROW 4: Pasajeros por canal + Top destinos ─────────────────────── -->
       <div class="charts-grid-2">
 
         <section class="card chart-card">
@@ -306,20 +399,6 @@
         }
 
       </div>
-
-      <!-- ── Gestión operativa ─────────────────────────────────────────────── -->
-      <section class="card admin-preview-card">
-        <div class="card-header">
-          <h2>Gestión operativa</h2>
-          <span class="card-subtitle">Accesos administrativos que se integrarán progresivamente.</span>
-        </div>
-        <div class="admin-preview-grid">
-          <div class="admin-preview-item"><strong>Monedas</strong><span>Crear, editar y eliminar.</span><em>Próximamente</em></div>
-          <div class="admin-preview-item"><strong>Canales</strong><span>Administrar canales de venta.</span><em>Próximamente</em></div>
-          <div class="admin-preview-item"><strong>Rangos de transfer</strong><span>Configurar rangos y precios.</span><em>Próximamente</em></div>
-          <div class="admin-preview-item"><strong>Catálogos</strong><span>Centralizar datos operativos.</span><em>Próximamente</em></div>
-        </div>
-      </section>
 
     </div><!-- /dashboard-content -->
   </div><!-- /main-content -->

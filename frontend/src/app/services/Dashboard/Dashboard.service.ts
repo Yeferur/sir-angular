@@ -9,6 +9,7 @@ export interface DashboardFilters {
   startDate?: string;   // 'YYYY-MM-DD'
   endDate?:   string;   // 'YYYY-MM-DD'
   tourId?:    number;   // null | undefined = todos los tours
+  reservationType?: 'Grupal' | 'Privada';
 }
 
 export interface DashboardStats {
@@ -45,6 +46,14 @@ export interface PassengerDistribution {
   cantidad: number;
 }
 
+export interface ReservationBreakdown {
+  tipo: 'Grupales' | 'Privadas';
+  reservas: number;
+  pasajeros: number;
+  bruto: number;
+  neto: number;
+}
+
 export interface TourOccupancy {
   nombre: string;
   pasajeros: number;
@@ -57,6 +66,7 @@ function toParams(filters: DashboardFilters): HttpParams {
   if (filters.startDate) p = p.set('startDate', filters.startDate);
   if (filters.endDate)   p = p.set('endDate',   filters.endDate);
   if (filters.tourId)    p = p.set('tourId',    String(filters.tourId));
+  if (filters.reservationType) p = p.set('reservationType', filters.reservationType);
   return p;
 }
 
@@ -103,9 +113,14 @@ export class DashboardService {
     return this.http.get<ChannelPassengers[]>(`${this.base}/passengers-by-channel`, { params: toParams(filters) });
   }
 
-  /** Distribución por estado (Confirmado / Pendiente) */
+  /** Viajeros, no viajeros y pendientes según el cierre de cada jornada. */
   getPassengerDistribution(filters: DashboardFilters = {}): Observable<PassengerDistribution[]> {
     return this.http.get<PassengerDistribution[]>(`${this.base}/passenger-distribution`, { params: toParams(filters) });
+  }
+
+  /** Comparativo operativo y financiero de reservas grupales y privadas. */
+  getReservationBreakdown(filters: DashboardFilters = {}): Observable<ReservationBreakdown[]> {
+    return this.http.get<ReservationBreakdown[]>(`${this.base}/reservation-breakdown`, { params: toParams(filters) });
   }
 
   /** Top 10 destinos por pasajeros */
