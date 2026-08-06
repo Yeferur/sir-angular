@@ -67,7 +67,7 @@
           (input)="onTopbarSearchInput($event)"
           (keydown.enter)="submitTopbarSearch()"
           (keydown.escape)="$event.stopPropagation(); closeGlobalSearch()"
-          placeholder="Buscar reservas, transfers, tours o puntos"
+          placeholder="ej: TG1234, Juan Pérez, 12345678..."
           autocomplete="off"
           aria-label="Búsqueda global"
         />
@@ -89,7 +89,7 @@
       <!-- Zona derecha — búsqueda, novedades, tema, avatar -->
       <div class="topbar-right">
 
-        <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openGlobalSearch()" aria-label="Buscar" title="Buscar (Ctrl/Cmd+K)">
+        <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" data-global-search-trigger (click)="openGlobalSearch()" aria-label="Buscar" title="Buscar (Ctrl/Cmd+K)">
           <i class="bx bx-search" aria-hidden="true"></i>
         </button>
 
@@ -157,7 +157,7 @@
               <div class="profile-dropdown-sep"></div>
 
               <!-- Solo en mobile: acciones que en desktop viven en el topbar -->
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openGlobalSearch(); closeProfileMenu()">
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" data-global-search-trigger (click)="openGlobalSearch(); closeProfileMenu()">
                 <i class="bx bx-search" aria-hidden="true"></i>
                 Buscar
               </button>

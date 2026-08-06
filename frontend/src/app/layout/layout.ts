@@ -585,7 +585,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     closeGlobalSearch(): void { this.search.closeSearch(); }
     onTopbarSearchInput(event: Event): void {
-        this.search.query.set((event.target as HTMLInputElement).value);
+        this.search.updateQuery((event.target as HTMLInputElement).value);
     }
     submitTopbarSearch(): void {
         const query = this.searchQuery().trim();
@@ -628,6 +628,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         const target = event.target as HTMLElement | null;
         if (this.profileMenuOpen() && !target?.closest('.topbar-profile')) {
             this.closeProfileMenu();
+        }
+        if (
+            this.globalSearchOpen()
+            && !target?.closest('.topbar-search-mode')
+            && !target?.closest('.topbar-expanded--search')
+            && !target?.closest('[data-global-search-trigger]')
+        ) {
+            this.closeGlobalSearch();
         }
     }
 

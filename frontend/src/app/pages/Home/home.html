@@ -22,34 +22,30 @@
     <section class="welcome-card" aria-labelledby="home-title">
       <div class="profile-mark" aria-hidden="true">{{ initials }}</div>
       <div class="welcome-copy">
-        <span class="eyebrow">{{ summary.profile.role }}</span>
         <h1 id="home-title">{{ greeting }}, {{ firstName }}</h1>
-        <p>
-          @if (summary.capabilities.management) {
-            Este es el pulso operativo de la empresa para hoy y mañana.
-          } @else {
-            Aquí tienes tu jornada, tus pendientes y los próximos servicios que gestionas.
-          }
-        </p>
+        <p>{{ dayLabel(summary.dates.today) }}</p>
       </div>
-      <button
-        type="button"
-        class="refresh-button"
-        [disabled]="refreshing"
-        (click)="loadSummary(true)"
-        aria-label="Actualizar información"
-      >
-        <i class="bx bx-refresh" [class.is-spinning]="refreshing" aria-hidden="true"></i>
-        <span>{{ refreshing ? 'Actualizando' : 'Actualizar' }}</span>
-      </button>
+      <span class="live-indicator" [attr.data-state]="refreshing ? 'updating' : connectionState" aria-live="polite">
+        <span class="live-indicator-dot" aria-hidden="true"></span>
+        @if (refreshing) {
+          Actualizando
+        } @else if (connectionState === 'connected') {
+          En vivo
+        } @else if (connectionState === 'connecting') {
+          Conectando
+        } @else if (connectionState === 'reconnecting') {
+          Reconectando
+        } @else {
+          Sin conexión
+        }
+      </span>
     </section>
 
     @if (quickActions.length) {
       <section class="home-section" aria-labelledby="quick-title">
         <header class="section-heading section-heading--compact">
           <div>
-            <span class="eyebrow">Accesos rápidos</span>
-            <h2 id="quick-title">¿Qué necesitas hacer?</h2>
+            <h2 id="quick-title">Accesos rápidos</h2>
           </div>
         </header>
 
@@ -76,9 +72,7 @@
     <section class="home-section" aria-labelledby="overview-title">
       <header class="section-heading">
         <div>
-          <span class="eyebrow">{{ summary.capabilities.management ? 'Operación general' : 'Mi operación' }}</span>
           <h2 id="overview-title">Hoy y mañana</h2>
-          <p>Reservas y transfers separados para leer la jornada sin mezclar servicios.</p>
         </div>
         @if (summary.capabilities.canReadAforos) {
           <button type="button" class="text-action" (click)="navigate('/Aforos')">
@@ -144,7 +138,6 @@
       <section class="home-section" aria-labelledby="agenda-title">
         <header class="section-heading">
           <div>
-            <span class="eyebrow">Mi trabajo</span>
             <h2 id="agenda-title">Próximos servicios</h2>
             <p>Reservas y transfers creados por ti durante los próximos 14 días.</p>
           </div>
@@ -202,7 +195,7 @@
           <article class="list-card">
             <header class="card-header">
               <div>
-                <span class="card-icon card-icon--violet"><i class="bx bx-car" aria-hidden="true"></i></span>
+                <span class="card-icon card-icon--teal"><i class="bx bx-car" aria-hidden="true"></i></span>
                 <div><h3>Transfers</h3><p>Próximos traslados</p></div>
               </div>
               @if (summary.capabilities.canReadTransfers) {
@@ -214,7 +207,7 @@
               <div class="item-list">
                 @for (transfer of summary.personalWork.upcomingTransfers; track transfer.Id_Transfer) {
                   <button type="button" class="work-item" (click)="openTransfer(transfer)">
-                    <span class="date-block date-block--violet">
+                    <span class="date-block date-block--teal">
                       <strong>{{ relativeDay(transfer.Fecha) }}</strong>
                       <small>{{ timeLabel(transfer.Hora_Recogida) }}</small>
                     </span>
@@ -243,9 +236,7 @@
       <section class="home-section" aria-labelledby="attention-title">
         <header class="section-heading">
           <div>
-            <span class="eyebrow">Seguimiento</span>
             <h2 id="attention-title">Procesos que requieren atención</h2>
-            <p>Alertas operativas accionables; cada tarjeta abre el módulo responsable.</p>
           </div>
         </header>
 
@@ -288,7 +279,6 @@
     <section class="home-section home-section--last" aria-labelledby="detail-title">
       <header class="section-heading">
         <div>
-          <span class="eyebrow">Contexto</span>
           <h2 id="detail-title">
             {{ summary.capabilities.management ? 'Alertas y actividad reciente' : 'Mi actividad reciente' }}
           </h2>

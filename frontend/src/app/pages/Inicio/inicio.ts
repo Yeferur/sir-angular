@@ -11,7 +11,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, Subscription } from 'rxjs';
 
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
@@ -40,6 +40,7 @@ export class Inicio implements OnInit, OnDestroy {
   private readonly alerts = inject(SirAlertService);
   private readonly injector = inject(Injector);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   isLoading = true;
   isUpdatingDate = false;
@@ -133,6 +134,9 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const routeDate = this.normalizeYmd(this.route.snapshot.queryParamMap.get('fecha'));
+    if (routeDate) this.fecha = routeDate;
+    this.syncDateToUrl();
     this.loadData();
   }
 
@@ -180,7 +184,17 @@ export class Inicio implements OnInit, OnDestroy {
     this.dateAnimDirection = iso > this.fecha ? 'next' : 'prev';
     this.dateAnimKey++;
     this.fecha = iso;
+    this.syncDateToUrl();
     this.loadData();
+  }
+
+  private syncDateToUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { fecha: this.fecha },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   loadData(options: { silent?: boolean } = {}): void {
@@ -728,6 +742,24 @@ export class Inicio implements OnInit, OnDestroy {
       aeropuertoHotel,
       otros,
     };
+  }
+
+  private normalizeYmd(value: unknown): string | null {
+    const safe = String(value || '').trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(safe);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day, 12));
+    if (
+      date.getUTCFullYear() !== year
+      || date.getUTCMonth() + 1 !== month
+      || date.getUTCDate() !== day
+    ) return null;
+
+    return safe;
   }
 
   private extractLoadError(error: any): string {

@@ -21,7 +21,7 @@ export interface GlobalSearchAction {
 
 export interface GlobalSearchResult {
   id: string;
-  type: 'reserva' | 'transfer' | 'tour' | 'punto' | 'usuario' | 'module' | 'action';
+  type: 'reserva' | 'transfer' | 'tour' | 'punto' | 'servicio' | 'date' | 'usuario' | 'module' | 'action';
   title: string;
   subtitle?: string;
   badge?: string;
@@ -51,6 +51,7 @@ export class GlobalSearchService {
 
   readonly open = signal(false);
   readonly query = signal('');
+  readonly submittedQuery = signal('');
   readonly results = signal<GlobalSearchResult[]>([]);
   readonly loading = signal(false);
 
@@ -79,6 +80,21 @@ export class GlobalSearchService {
   closeSearch(): void {
     this.open.set(false);
     this.query.set('');
+    this.submittedQuery.set('');
+    this.results.set([]);
+    this.loading.set(false);
+    this.globalSearchRequestId++;
+    if (this.globalSearchDebounceTimer) {
+      clearTimeout(this.globalSearchDebounceTimer);
+      this.globalSearchDebounceTimer = null;
+    }
+  }
+
+  updateQuery(query: string): void {
+    const value = query ?? '';
+    this.query.set(value);
+    if (value.trim() === this.submittedQuery()) return;
+
     this.results.set([]);
     this.loading.set(false);
     this.globalSearchRequestId++;
@@ -91,6 +107,7 @@ export class GlobalSearchService {
   searchGlobal(query: string): void {
     const safeQuery = String(query || '').trim();
     this.query.set(query ?? '');
+    this.submittedQuery.set(safeQuery);
 
     if (this.globalSearchDebounceTimer) {
       clearTimeout(this.globalSearchDebounceTimer);
@@ -98,6 +115,7 @@ export class GlobalSearchService {
     }
 
     if (!safeQuery) {
+      this.submittedQuery.set('');
       this.loading.set(false);
       this.results.set([]);
       return;

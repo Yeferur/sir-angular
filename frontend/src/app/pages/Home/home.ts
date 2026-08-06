@@ -21,7 +21,7 @@ import {
   HomeSummary,
   HomeTransfer,
 } from '../../services/Home/home.service';
-import { WebSocketService } from '../../services/WebSocket/web-socket';
+import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { CountUpDirective } from '../Inicio/count-up.directive';
 
@@ -56,6 +56,7 @@ export class HomeComponent implements OnInit {
   refreshing = false;
   dataUpdated = false;
   error = '';
+  connectionState: WebSocketConnectionState = 'connecting';
   private refreshTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackStartTimer?: ReturnType<typeof setTimeout>;
@@ -63,6 +64,7 @@ export class HomeComponent implements OnInit {
   ngOnInit(): void {
     this.loadSummary();
     this.listenForChanges();
+    this.listenForConnectionState();
   }
 
   get firstName(): string {
@@ -307,6 +309,15 @@ export class HomeComponent implements OnInit {
         this.cdr.markForCheck();
       }, UPDATE_FEEDBACK_MS);
     }, 0);
+  }
+
+  private listenForConnectionState(): void {
+    this.webSocket.connectionState$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((state) => {
+        this.connectionState = state;
+        this.cdr.markForCheck();
+      });
   }
 
   private summaryChanged(previous: HomeSummary, current: HomeSummary): boolean {

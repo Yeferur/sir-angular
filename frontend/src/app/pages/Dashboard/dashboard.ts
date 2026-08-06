@@ -10,6 +10,7 @@ import { SirAlertService }      from '../../services/Alertas/alert.service';
 import { Tours } from '../../services/Tours/tours';
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import {
   NgApexchartsModule, ChartComponent,
@@ -111,6 +112,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private cdr   = inject(ChangeDetectorRef);
   private ws    = inject(WebSocketService);
   private destroyRef = inject(DestroyRef);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   totalReservas       = 0;
@@ -202,8 +205,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const today = new Date();
     this.startDate = this.toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
     this.endDate   = this.toDateStr(today);
+    this.restoreFiltersFromUrl();
+    this.syncFiltersToUrl();
     this.initCharts();
     this.loadTours();
+    if (this.selectedTourId) this.loadSelectedTourMeta(false);
     this.loadData(true);
     this.listenForRealtimeChanges();
     this.listenForConnectionState();
@@ -231,7 +237,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onTourChange(tourId: number | null) {
-    this.selectedTourId = tourId;
+    const parsed = Number(tourId);
+    this.selectedTourId = Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    this.syncFiltersToUrl();
     this.loadSelectedTourMeta();
   }
 
@@ -256,12 +264,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'Qué tours están moviendo más pasajeros en el rango seleccionado.';
   }
 
-  private loadSelectedTourMeta(): void {
+  private loadSelectedTourMeta(refreshAfterLoad = true): void {
     const requestId = ++this.tourMetaReqId;
 
     if (!this.selectedTourId) {
       this.selectedTourPlanCount = 0;
-      this.scheduleRefresh();
+      if (refreshAfterLoad) this.scheduleRefresh();
       return;
     }
 
@@ -273,7 +281,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ).subscribe((tour: any) => {
       if (requestId !== this.tourMetaReqId) return;
       this.selectedTourPlanCount = Array.isArray(tour?.Planes) ? tour.Planes.length : 0;
-      this.scheduleRefresh();
+      if (refreshAfterLoad) this.scheduleRefresh();
     });
   }
 
@@ -777,6 +785,54 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const t = new Date(); t.setDate(t.getDate() + 1); return this.toDateStr(t);
   }
 
+  private normalizeYmd(value: unknown): string | null {
+    const safe = String(value || '').trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(safe);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day, 12));
+    if (
+      date.getUTCFullYear() !== year
+      || date.getUTCMonth() + 1 !== month
+      || date.getUTCDate() !== day
+    ) return null;
+
+    return safe;
+  }
+
+  private restoreFiltersFromUrl(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const startDate = this.normalizeYmd(params.get('startDate'));
+    const endDate = this.normalizeYmd(params.get('endDate'));
+    const tourId = Number(params.get('tourId'));
+    const reservationType = String(params.get('reservationType') || '');
+
+    if (startDate) this.startDate = startDate;
+    if (endDate) this.endDate = endDate;
+    if (this.startDate > this.endDate) this.endDate = this.startDate;
+    this.selectedTourId = Number.isInteger(tourId) && tourId > 0 ? tourId : null;
+    this.selectedReservationType = reservationType === 'Grupal' || reservationType === 'Privada'
+      ? reservationType
+      : '';
+  }
+
+  private syncFiltersToUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        startDate: this.startDate || null,
+        endDate: this.endDate || null,
+        tourId: this.selectedTourId || null,
+        reservationType: this.selectedReservationType || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
   private syncPickers() {
     this.cdr.markForCheck();
   }
@@ -793,6 +849,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private scheduleRefresh() {
+    this.syncFiltersToUrl();
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     this.refreshTimer = setTimeout(() => this.loadData(false), 180);
   }
@@ -801,14 +858,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     const t = this.toDateStr(new Date());
     this.startDate = t; this.endDate = t;
-    this.syncPickers(); this.loadData(false);
+    this.syncPickers(); this.syncFiltersToUrl(); this.loadData(false);
   }
 
   setTomorrowRange() {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     const t = this.tomorrowValue();
     this.startDate = t; this.endDate = t;
-    this.syncPickers(); this.loadData(false);
+    this.syncPickers(); this.syncFiltersToUrl(); this.loadData(false);
   }
 
   setNextSevenDaysRange() {
@@ -819,6 +876,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.startDate = this.toDateStr(start);
     this.endDate = this.toDateStr(end);
     this.syncPickers();
+    this.syncFiltersToUrl();
     this.loadData(false);
   }
 

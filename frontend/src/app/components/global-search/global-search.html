@@ -23,7 +23,7 @@
       <div class="gs-welcome" role="region" aria-label="Ayuda de búsqueda">
         <div class="gs-welcome-orb" aria-hidden="true">⌕</div>
         <h2 class="gs-welcome-title">Busca en SIR</h2>
-        <p class="gs-welcome-sub">Utiliza la barra de búsqueda para encontrar rápidamente una reserva o un trasnfer. Puedes buscar por ID, nombre del pasajero, número de documento o nombre del titular. También puedes ingresar el nombre de un tour o de un punto de encuentro.</p>
+        <p class="gs-welcome-sub">Busca reservas y transfers por ID, pasajero, titular o documento. También puedes escribir un tour, un punto de encuentro, un servicio de transfer o una fecha como “mañana”, “2026-08-07” o “7 de agosto”.</p>
         @if (availableShortcuts.length > 0) {
           <span class="gs-shortcuts-label">O abre directamente un módulo</span>
           <div class="gs-chips" role="list" aria-label="Accesos rápidos">
@@ -38,27 +38,43 @@
       </div>
     }
 
-    @if (flatResults().length > 0) {
+    @if (showAwaitingSubmit()) {
+      <div class="gs-search-empty gs-search-prompt" role="status">
+        <kbd class="gs-enter-key">Enter</kbd>
+        <strong>Presiona Enter para buscar</strong>
+        <span>La búsqueda se ejecutará únicamente cuando la confirmes.</span>
+      </div>
+    }
+
+    @if (showResults()) {
       <div class="gs-results" role="list" aria-label="Resultados de búsqueda">
         @for (group of groupedResults(); track group.label; let groupIndex = $index) {
           <section class="gs-result-group">
             <h3>{{ group.label }}</h3>
             @for (result of group.items; track result.id; let itemIndex = $index) {
-              <button
-                type="button"
+              <div
                 class="gs-result-item"
                 [class.is-selected]="isSelected(getFlatIndex(groupIndex, itemIndex))"
                 (mouseenter)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
-                (click)="execute(result)"
               >
                 <span class="gs-result-copy">
                   <strong>{{ result.title }}</strong>
                   @if (result.subtitle) { <small>{{ result.subtitle }}</small> }
                 </span>
-                @if (result.badge) { <span class="gs-result-badge">{{ result.badge }}</span> }
-                <span class="gs-result-cta">{{ primaryActionLabel(result) }}</span>
-                <i class="bx bx-chevron-right" aria-hidden="true"></i>
-              </button>
+                <div class="gs-result-controls">
+                  @if (result.badge) { <span class="gs-result-badge">{{ result.badge }}</span> }
+                  <div class="gs-result-actions" aria-label="Más acciones">
+                    <button type="button" class="gs-result-action" (click)="execute(result)">
+                      {{ primaryActionLabel(result) }}
+                    </button>
+                    @for (action of secondaryActions(result); track action.label + (action.route || '')) {
+                      <button type="button" class="gs-result-action" (click)="executeSecondary(action, $event)">
+                        {{ action.label }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              </div>
             }
           </section>
         }
@@ -88,7 +104,7 @@
           (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); close()"
           (focus)="inputFocused.set(true)"
           (blur)="inputFocused.set(false)"
-          placeholder="Buscar reservas, transfers, tours o puntos"
+          placeholder="ej: TG1234, Juan Pérez, 12345678..."
           autocomplete="off"
           spellcheck="false"
           aria-label="Búsqueda global"

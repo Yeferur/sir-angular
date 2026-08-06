@@ -5,6 +5,7 @@ const LIMITS = {
   transfers: 5,
   tours: 5,
   puntos: 5,
+  servicios: 5,
   usuarios: 5,
   modules: 8,
 };
@@ -43,10 +44,134 @@ function hasPermission(permisos, ...codes) {
   return codes.some((code) => permisos.includes(code));
 }
 
-function tomorrowYmd() {
-  const now = new Date();
-  now.setDate(now.getDate() + 1);
-  return now.toISOString().slice(0, 10);
+function currentYmd() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function shiftYmd(ymd, days) {
+  const [year, month, day] = String(ymd).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days, 12));
+  return date.toISOString().slice(0, 10);
+}
+
+function validYmd(year, month, day) {
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+  if (
+    date.getUTCFullYear() !== Number(year)
+    || date.getUTCMonth() + 1 !== Number(month)
+    || date.getUTCDate() !== Number(day)
+  ) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function parseDateQuery(query) {
+  const normalized = normalizeText(query);
+  const today = currentYmd();
+
+  if (/\bpasado manana\b/.test(normalized)) return shiftYmd(today, 2);
+  if (/\bmanana\b/.test(normalized)) return shiftYmd(today, 1);
+  if (/\bhoy\b/.test(normalized)) return today;
+
+  let match = normalized.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
+  if (match) return validYmd(match[1], match[2], match[3]);
+
+  match = normalized.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b/);
+  if (match) return validYmd(match[3], match[2], match[1]);
+
+  const months = {
+    enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+    julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10,
+    noviembre: 11, diciembre: 12,
+  };
+  const monthPattern = Object.keys(months).join('|');
+  match = normalized.match(new RegExp(`\\b(\\d{1,2})(?:\\s+de)?\\s+(${monthPattern})(?:(?:\\s+de)?\\s+(20\\d{2}))?\\b`));
+  if (!match) return null;
+
+  const month = months[match[2]];
+  const year = Number(match[3] || today.slice(0, 4));
+  return validYmd(year, month, match[1]);
+}
+
+function formatNaturalDate(ymd) {
+  const [year, month, day] = ymd.split('-').map(Number);
+  const formatted = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function buildDateResult(query, permisos) {
+  const date = parseDateQuery(query);
+  if (!date) return [];
+
+  const actions = [];
+  if (hasPermission(permisos, 'RESERVAS.LEER')) {
+    actions.push({
+      label: 'Ver reservas',
+      kind: 'filter',
+      route: '/Reservas/VerReservas',
+      permission: 'RESERVAS.LEER',
+      params: { queryParams: { fechaTour: date, buscar: 1 } },
+    });
+  }
+  if (hasPermission(permisos, 'TRANSFERS.LEER')) {
+    actions.push({
+      label: 'Ver transfers',
+      kind: 'filter',
+      route: '/Transfers/VerTransfers',
+      permission: 'TRANSFERS.LEER',
+      params: { queryParams: { fechaTransfer: date, buscar: 1 } },
+    });
+  }
+  if (hasPermission(permisos, 'AFOROS.LEER', 'INICIO.LEER')) {
+    const permission = hasPermission(permisos, 'AFOROS.LEER') ? 'AFOROS.LEER' : 'INICIO.LEER';
+    actions.push({
+      label: 'Ver aforos',
+      kind: 'aforo',
+      route: '/Aforos',
+      permission,
+      params: { queryParams: { fecha: date } },
+    });
+  }
+  if (hasPermission(permisos, 'PROGRAMACION.LEER')) {
+    actions.push({
+      label: 'Ver programación',
+      kind: 'filter',
+      route: '/Programacion/Listado',
+      permission: 'PROGRAMACION.LEER',
+      params: { queryParams: { fecha: date } },
+    });
+  }
+  if (hasPermission(permisos, 'INFORMES.LEER')) {
+    actions.push({
+      label: 'Ver informes',
+      kind: 'dashboard',
+      route: '/Informes',
+      permission: 'INFORMES.LEER',
+      params: { queryParams: { startDate: date, endDate: date } },
+    });
+  }
+
+  if (!actions.length) return [];
+  return [{
+    id: `date:${date}`,
+    type: 'date',
+    title: formatNaturalDate(date),
+    subtitle: 'Consulta los módulos disponibles con esta fecha aplicada',
+    badge: date,
+    actions,
+  }];
 }
 
 function buildReservaActions(row, permisos) {
@@ -116,7 +241,6 @@ function buildTransferActions(row, permisos) {
 function buildTourActions(row, permisos) {
   const actions = [];
   const id = Number(row.Id_Tour);
-  const nombre = String(row.Nombre_Tour || '').trim();
 
   if (hasPermission(permisos, 'TOURS.LEER')) {
     actions.push({
@@ -151,37 +275,19 @@ function buildTourActions(row, permisos) {
       entityId: id,
       permission: 'RESERVAS.LEER',
       params: {
-        queryParams: { Id_Tour: id, q: nombre },
-        pendingReason: 'El módulo Ver Reservas todavía no hidrata filtros desde la URL; se navega al módulo sin aplicar el tour automáticamente.',
+        queryParams: { tours: id, buscar: 1 },
       },
     });
   }
 
-  if (hasPermission(permisos, 'AFOROS.LEER', 'INICIO.LEER')) {
+  if (hasPermission(permisos, 'INFORMES.LEER')) {
     actions.push({
-      label: 'Ver aforo mañana',
-      kind: 'aforo',
-      route: '/Aforos',
-      entityId: id,
-      permission: hasPermission(permisos, 'AFOROS.LEER') ? 'AFOROS.LEER' : 'INICIO.LEER',
-      params: {
-        queryParams: { tour: id, fecha: tomorrowYmd() },
-        pendingReason: 'Aforos todavía no hidrata tour y fecha desde query params; se navega al módulo para revisión manual.',
-      },
-    });
-  }
-
-  if (hasPermission(permisos, 'INFORMES.LEER', 'DASHBOARD.LEER')) {
-    actions.push({
-      label: 'Ver informes filtrados',
+      label: 'Ver informes del tour',
       kind: 'dashboard',
       route: '/Informes',
       entityId: id,
-      permission: hasPermission(permisos, 'INFORMES.LEER') ? 'INFORMES.LEER' : 'DASHBOARD.LEER',
-      params: {
-        queryParams: { tour: id },
-        pendingReason: 'Informes todavía no hidrata filtros por tour desde la URL; se navega al módulo sin filtro automático.',
-      },
+      permission: 'INFORMES.LEER',
+      params: { queryParams: { tourId: id } },
     });
   }
 
@@ -224,8 +330,7 @@ function buildPuntoActions(row, permisos) {
       entityId: id,
       permission: 'RESERVAS.LEER',
       params: {
-        queryParams: { Punto: nombre },
-        pendingReason: 'Ver Reservas exige seleccionar el punto desde su autocompletado; se navega al módulo sin aplicar el punto automáticamente.',
+        queryParams: { punto: nombre, buscar: 1 },
       },
     });
   }
@@ -372,7 +477,7 @@ async function searchTransfers(query, permisos) {
 }
 
 async function searchTours(query, permisos) {
-  if (!hasPermission(permisos, 'TOURS.LEER')) return [];
+  if (!hasPermission(permisos, 'TOURS.LEER', 'TOURS.ACTUALIZAR', 'RESERVAS.LEER', 'INFORMES.LEER')) return [];
 
   const exact = sanitizeQuery(query);
   const like = `%${exact}%`;
@@ -398,13 +503,12 @@ async function searchTours(query, permisos) {
     subtitle: row.Abreviacion ? `Abreviación: ${row.Abreviacion}` : 'Tour',
     badge: row.Cupo_Base != null ? `Cupo ${row.Cupo_Base}` : undefined,
     entityId: Number(row.Id_Tour),
-    permission: 'TOURS.LEER',
     actions: buildTourActions(row, permisos),
   }));
 }
 
 async function searchPuntos(query, permisos) {
-  if (!hasPermission(permisos, 'PUNTOS.LEER')) return [];
+  if (!hasPermission(permisos, 'PUNTOS.LEER', 'PUNTOS.ACTUALIZAR', 'RESERVAS.LEER')) return [];
 
   const exact = sanitizeQuery(query);
   const like = `%${exact}%`;
@@ -430,8 +534,40 @@ async function searchPuntos(query, permisos) {
     subtitle: [row.ruta, row.Direccion].filter(Boolean).join(' · '),
     badge: row.ruta || undefined,
     entityId: Number(row.Id_Punto),
-    permission: 'PUNTOS.LEER',
     actions: buildPuntoActions(row, permisos),
+  }));
+}
+
+async function searchServicios(query, permisos) {
+  if (!hasPermission(permisos, 'TRANSFERS.LEER')) return [];
+
+  const exact = sanitizeQuery(query);
+  const like = `%${exact}%`;
+  const sql = `
+    SELECT Id_Servicio, Nombre_Servicio
+    FROM servicios_transfer
+    WHERE Nombre_Servicio LIKE ?
+    ORDER BY
+      CASE WHEN Nombre_Servicio = ? THEN 0 ELSE 1 END,
+      Nombre_Servicio ASC
+    LIMIT ?
+  `;
+
+  const [rows] = await db.query(sql, [like, exact, LIMITS.servicios]);
+  return rows.map((row) => ({
+    id: `servicio:${row.Id_Servicio}`,
+    type: 'servicio',
+    title: row.Nombre_Servicio,
+    subtitle: 'Servicio de transfer',
+    entityId: Number(row.Id_Servicio),
+    actions: [{
+      label: 'Ver transfers del servicio',
+      kind: 'filter',
+      route: '/Transfers/VerTransfers',
+      entityId: Number(row.Id_Servicio),
+      permission: 'TRANSFERS.LEER',
+      params: { queryParams: { servicios: row.Id_Servicio, buscar: 1 } },
+    }],
   }));
 }
 
@@ -531,7 +667,7 @@ function buildModuleResults(query, permisos) {
       title: 'Informes',
       subtitle: 'Indicadores e informes',
       route: '/Informes',
-      permission: hasPermission(permisos, 'INFORMES.LEER') ? 'INFORMES.LEER' : 'DASHBOARD.LEER',
+      permission: 'INFORMES.LEER',
       keywords: ['dashboard', 'informes', 'reporte', 'reportes'],
     },
     {
@@ -630,23 +766,27 @@ async function searchGlobal(query, permisos = []) {
     };
   }
 
-  const [reservas, transfers, tours, puntos, usuarios] = await Promise.all([
+  const [reservas, transfers, tours, puntos, servicios, usuarios] = await Promise.all([
     searchReservas(safeQuery, permisos),
     searchTransfers(safeQuery, permisos),
     searchTours(safeQuery, permisos),
     searchPuntos(safeQuery, permisos),
+    searchServicios(safeQuery, permisos),
     searchUsuarios(safeQuery, permisos),
   ]);
 
+  const dates = buildDateResult(safeQuery, permisos);
   const modules = buildModuleResults(safeQuery, permisos);
 
   return {
     query: safeQuery,
     results: [
+      ...dates,
       ...reservas,
       ...transfers,
       ...tours,
       ...puntos,
+      ...servicios,
       ...usuarios,
       ...modules,
     ],

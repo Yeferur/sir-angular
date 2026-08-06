@@ -4,7 +4,7 @@ import {
   Input,
   OnDestroy, ViewChild, computed, effect, inject, signal
 } from '@angular/core';
-import { GlobalSearchResult, GlobalSearchService } from '../../services/global-search.service';
+import { GlobalSearchAction, GlobalSearchResult, GlobalSearchService } from '../../services/global-search.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 
 interface SearchShortcut {
@@ -30,6 +30,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
   query    = this.search.query;
+  submittedQuery = this.search.submittedQuery;
   results  = this.search.results;
   loading  = this.search.loading;
   isClosing = signal(false);
@@ -53,7 +54,8 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     const groups = new Map<string, GlobalSearchResult[]>();
     const labels: Record<GlobalSearchResult['type'], string> = {
       reserva: 'Reservas', transfer: 'Transfers', tour: 'Tours',
-      punto: 'Puntos', usuario: 'Usuarios', module: 'Acciones', action: 'Acciones',
+      punto: 'Puntos', servicio: 'Servicios de transfer', date: 'Consultas por fecha',
+      usuario: 'Usuarios', module: 'Acciones', action: 'Acciones',
     };
     for (const item of this.results()) {
       const key = labels[item.type] || 'Resultados';
@@ -65,10 +67,19 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
 
   flatResults   = computed(() => this.groupedResults().flatMap(g => g.items));
   hasQuery      = computed(() => this.query().trim().length > 0);
+  isCurrentQuerySubmitted = computed(() =>
+    this.hasQuery() && this.submittedQuery() === this.query().trim()
+  );
   showInitialState = computed(() => !this.hasQuery() && !this.loading());
   showWelcome   = computed(() => this.showInitialState() && !this.isClosing());
+  showAwaitingSubmit = computed(() =>
+    this.hasQuery() && !this.loading() && !this.isCurrentQuerySubmitted()
+  );
+  showResults = computed(() =>
+    this.isCurrentQuerySubmitted() && this.flatResults().length > 0
+  );
   showNoResults    = computed(() =>
-    this.hasQuery() && !this.loading() && this.flatResults().length === 0
+    this.isCurrentQuerySubmitted() && !this.loading() && this.flatResults().length === 0
   );
 
   // ─── Comet animation ───────────────────────────────────────────
@@ -113,7 +124,7 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   // ─── Input ─────────────────────────────────────────────────────
   onInput(event: Event): void {
     const val = (event.target as HTMLInputElement).value;
-    this.search.query.set(val);
+    this.search.updateQuery(val);
   }
 
   onEnterSearch(): void {
@@ -218,6 +229,16 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
 
   execute(result: GlobalSearchResult): void { this.search.executeAction(result); }
 
+  executeSecondary(action: GlobalSearchAction, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.search.executeAction(action);
+  }
+
+  secondaryActions(result: GlobalSearchResult): GlobalSearchAction[] {
+    return Array.isArray(result.actions) ? result.actions.slice(1) : [];
+  }
+
   primaryActionLabel(result: GlobalSearchResult): string {
     const explicitLabel = result.actions?.[0]?.label?.trim();
     if (explicitLabel) return explicitLabel;
@@ -227,6 +248,8 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
       transfer: 'Ver detalle',
       tour: 'Ver tour',
       punto: 'Ver punto',
+      servicio: 'Ver transfers',
+      date: 'Consultar fecha',
       usuario: 'Ver usuario',
     };
     return labels[result.type] || 'Abrir';
