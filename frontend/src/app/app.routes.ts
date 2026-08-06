@@ -13,21 +13,39 @@ export const routes: Routes = [
   },
   {
     path: '',
-    loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    loadComponent: () => import('./pages/Home/home').then((m) => m.HomeComponent),
     canActivate: [authGuard],
     data: { preload: true },
+    title: 'Inicio',
+  },
+  {
+    path: 'Aforos',
+    loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    canActivate: [authGuard, permisoGuard],
+    data: {
+      preload: true,
+      permisos: ['AFOROS.LEER', 'INICIO.LEER'],
+      redirectTo: '/Ayuda',
+    },
     title: 'Aforos',
   },
   {
-    path: 'Dashboard',
+    path: 'Informes',
     loadComponent: () => import('./pages/Dashboard/dashboard').then((m) => m.DashboardComponent),
-    canActivate: [authGuard],
-    title: 'Dashboard',
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'INFORMES.LEER', redirectTo: '/Aforos' },
+    title: 'Informes',
+  },
+  {
+    path: 'Dashboard',
+    pathMatch: 'full',
+    redirectTo: 'Informes',
   },
   {
     path: 'Historial',
     loadComponent: () => import('./pages/Historial/ver-historial').then((m) => m.VerHistorialComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'HISTORIAL.LEER', redirectTo: '/Aforos' },
     title: 'Historial',
   },
 
@@ -42,8 +60,8 @@ export const routes: Routes = [
   {
     path: 'Reservas/VerReservas',
     loadComponent: () => import('./pages/Reservas/ver-reservas/ver-reservas').then((m) => m.VerReservasComponent),
-    canActivate: [authGuard],
-    data: { preload: true },
+    canActivate: [authGuard, permisoGuard],
+    data: { preload: true, permiso: 'RESERVAS.LEER', redirectTo: '/Aforos' },
     title: 'Ver Reservas',
   },
   {
@@ -74,15 +92,16 @@ export const routes: Routes = [
   {
     path: 'Transfers/VerTransfers',
     loadComponent: () => import('./pages/Transfers/ver-transfers/ver-transfers').then((m) => m.VerTransfersComponent),
-    canActivate: [authGuard],
-    data: { preload: true },
+    canActivate: [authGuard, permisoGuard],
+    data: { preload: true, permiso: 'TRANSFERS.LEER', redirectTo: '/Aforos' },
     title: 'Ver Transfers',
   },
 
   {
     path: 'Puntos/VerPuntos',
     loadComponent: () => import('./pages/Puntos/ver-puntos/ver-puntos').then((m) => m.VerPuntos),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'PUNTOS.LEER', redirectTo: '/Aforos' },
     title: 'Puntos de Encuentro',
   },
   {
@@ -118,17 +137,17 @@ export const routes: Routes = [
   {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
-    data: { preload: true, programacionView: 'dashboard' },
+    data: { preload: true, programacionView: 'dashboard', permiso: 'PROGRAMACION.LEER', redirectTo: '/Aforos' },
     title: 'Programación',
   },
   {
     path: 'Programacion/Editor/:fecha/:servicio',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
-    data: { programacionView: 'editor' },
+    data: { programacionView: 'editor', permiso: 'PROGRAMACION.ACTUALIZAR', redirectTo: '/Programacion/Listado' },
     title: 'Editar programación',
   },
 
@@ -143,20 +162,23 @@ export const routes: Routes = [
   {
     path: 'Comisiones',
     loadComponent: () => import('./pages/Comisiones/comisiones').then((m) => m.ComisionesComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'COMISIONES.LEER', redirectTo: '/Aforos' },
     title: 'Comisiones',
   },
   {
     path: 'Seguros',
     loadComponent: () => import('./pages/Seguros/seguros').then((m) => m.SegurosComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'SEGUROS.LEER', redirectTo: '/Aforos' },
     title: 'Seguros',
   },
 
   {
     path: 'Usuarios',
     loadComponent: () => import('./pages/Usuarios/usuarios/usuarios').then((m) => m.Usuarios),
-    canActivate: [authGuard],
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'USUARIOS.LEER', redirectTo: '/Aforos' },
     title: 'Usuarios',
   },
   {
@@ -200,8 +222,8 @@ export const routes: Routes = [
   {
     path: 'Tours/VerTours',
     loadComponent: () => import('./pages/Tours/ver-tours/ver-tours').then((m) => m.VerToursComponent),
-    canActivate: [authGuard],
-    data: { preload: true },
+    canActivate: [authGuard, permisoGuard],
+    data: { preload: true, permiso: 'TOURS.LEER', redirectTo: '/Aforos' },
     title: 'Ver Tours',
   },
   {

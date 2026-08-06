@@ -151,30 +151,30 @@ function buildTourActions(row, permisos) {
     });
   }
 
-  if (hasPermission(permisos, 'INICIO.LEER')) {
+  if (hasPermission(permisos, 'AFOROS.LEER', 'INICIO.LEER')) {
     actions.push({
       label: 'Ver aforo mañana',
       kind: 'aforo',
-      route: '/',
+      route: '/Aforos',
       entityId: id,
-      permission: 'INICIO.LEER',
+      permission: hasPermission(permisos, 'AFOROS.LEER') ? 'AFOROS.LEER' : 'INICIO.LEER',
       params: {
         queryParams: { tour: id, fecha: tomorrowYmd() },
-        pendingReason: 'Inicio todavía no hidrata tour y fecha desde query params; se navega al módulo para revisión manual.',
+        pendingReason: 'Aforos todavía no hidrata tour y fecha desde query params; se navega al módulo para revisión manual.',
       },
     });
   }
 
   if (hasPermission(permisos, 'INFORMES.LEER', 'DASHBOARD.LEER')) {
     actions.push({
-      label: 'Ver dashboard filtrado',
+      label: 'Ver informes filtrados',
       kind: 'dashboard',
-      route: '/Dashboard',
+      route: '/Informes',
       entityId: id,
       permission: hasPermission(permisos, 'INFORMES.LEER') ? 'INFORMES.LEER' : 'DASHBOARD.LEER',
       params: {
         queryParams: { tour: id },
-        pendingReason: 'Dashboard todavía no hidrata filtros por tour desde la URL; se navega al módulo sin filtro automático.',
+        pendingReason: 'Informes todavía no hidrata filtros por tour desde la URL; se navega al módulo sin filtro automático.',
       },
     });
   }
@@ -476,6 +476,15 @@ function buildModuleResults(query, permisos) {
   const normalizedQuery = normalizeText(query);
   const catalog = [
     {
+      id: 'module:home',
+      type: 'module',
+      title: 'Inicio',
+      subtitle: 'Resumen de trabajo personalizado',
+      route: '/',
+      permission: null,
+      keywords: ['inicio', 'home', 'resumen', 'mi jornada'],
+    },
+    {
       id: 'module:reservas-list',
       type: 'module',
       title: 'Ver Reservas',
@@ -512,11 +521,11 @@ function buildModuleResults(query, permisos) {
       keywords: ['crear transfer', 'nuevo transfer', 'transfer nuevo'],
     },
     {
-      id: 'module:dashboard',
+      id: 'module:informes',
       type: 'module',
-      title: 'Dashboard',
+      title: 'Informes',
       subtitle: 'Indicadores e informes',
-      route: '/Dashboard',
+      route: '/Informes',
       permission: hasPermission(permisos, 'INFORMES.LEER') ? 'INFORMES.LEER' : 'DASHBOARD.LEER',
       keywords: ['dashboard', 'informes', 'reporte', 'reportes'],
     },
@@ -577,7 +586,7 @@ function buildModuleResults(query, permisos) {
   ];
 
   return catalog
-    .filter((item) => hasPermission(permisos, item.permission))
+    .filter((item) => !item.permission || hasPermission(permisos, item.permission))
     .map((item) => ({ item, score: scoreModuleMatch(normalizedQuery, item.keywords) }))
     .filter(({ score }) => score >= 0)
     .sort((a, b) => b.score - a.score || a.item.title.localeCompare(b.item.title))

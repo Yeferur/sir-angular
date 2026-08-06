@@ -7599,7 +7599,7 @@ CREATE TABLE IF NOT EXISTS `permisos` (
   `Modulo_Permiso` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Permiso`),
   UNIQUE KEY `ux_permisos_codigo` (`Codigo_Permiso`)
-) ENGINE=InnoDB AUTO_INCREMENT=108 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=110 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `permisos`
@@ -7646,7 +7646,9 @@ INSERT INTO `permisos` (`Id_Permiso`, `Accion`, `Codigo_Permiso`, `Descripcion`,
 (96, 'CONFIGURAR', 'PERMISOS.CONFIGURAR', 'Configurar roles y permisos', 'Roles y permisos'),
 (97, 'CONFIGURAR', 'DASHBOARD.CONFIGURAR_CATALOGOS', 'Configurar catálogos operativos', 'Configuración'),
 (106, 'LEER', 'SEGUROS.LEER', 'Acceder al módulo de seguros', 'Seguros'),
-(107, 'LEER', 'COMISIONES.LEER', 'Acceder al módulo de comisiones', 'Comisiones');
+(107, 'LEER', 'COMISIONES.LEER', 'Acceder al módulo de comisiones', 'Comisiones'),
+(108, 'LEER', 'AFOROS.LEER', 'Ver aforos y capacidad operativa', 'Aforos'),
+(109, 'ACTUALIZAR', 'AFOROS.ACTUALIZAR', 'Actualizar aforos', 'Aforos');
 
 -- --------------------------------------------------------
 
@@ -8512,15 +8514,21 @@ CREATE TABLE IF NOT EXISTS `reservas` (
   `Fecha_Tour` date DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   `Id_Canal` bigint UNSIGNED DEFAULT NULL,
+  `Id_Moneda` bigint UNSIGNED DEFAULT NULL,
   `Id_Beneficiario_Comision` bigint UNSIGNED DEFAULT NULL,
   `Idioma_Reserva` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Telefono_Reportante` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Nombre_Reportante` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Creado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Actualizado_Por` bigint UNSIGNED DEFAULT NULL,
   PRIMARY KEY (`Id_Reserva`),
   KEY `Id_Horario` (`Id_Horario`),
   KEY `Id_Canal` (`Id_Canal`),
+  KEY `idx_reservas_moneda` (`Id_Moneda`),
+  KEY `idx_reservas_creado_por` (`Creado_Por`),
+  KEY `idx_reservas_actualizado_por` (`Actualizado_Por`),
   KEY `idx_reservas_beneficiario_comision` (`Id_Beneficiario_Comision`),
   KEY `idx_reservas_fecha_tour` (`Fecha_Tour`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -8973,7 +8981,7 @@ CREATE TABLE IF NOT EXISTS `rol_permisos` (
   PRIMARY KEY (`Id_Rol_Permiso`),
   UNIQUE KEY `ux_rol_permisos` (`Id_Rol`,`Id_Permiso`),
   KEY `idx_rol_permisos_permiso` (`Id_Permiso`)
-) ENGINE=InnoDB AUTO_INCREMENT=111 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `rol_permisos`
@@ -9029,7 +9037,10 @@ INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asi
 (93, 1, 42, '2026-05-13 11:59:53'),
 (94, 1, 41, '2026-05-13 11:59:53'),
 (109, 1, 107, '2026-06-14 03:24:04'),
-(110, 1, 106, '2026-06-14 03:24:04');
+(110, 1, 106, '2026-06-14 03:24:04'),
+(111, 1, 108, '2026-08-05 00:00:00'),
+(112, 1, 109, '2026-08-05 00:00:00'),
+(113, 2, 108, '2026-08-05 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -9490,10 +9501,14 @@ CREATE TABLE IF NOT EXISTS `transfers` (
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
   `Estado` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `Creado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Actualizado_Por` bigint UNSIGNED DEFAULT NULL,
   PRIMARY KEY (`Id_Transfer`),
   KEY `Id_Rango` (`Id_Rango`),
   KEY `Id_Servicio` (`Id_Servicio`),
-  KEY `Id_Moneda` (`Id_Moneda`)
+  KEY `Id_Moneda` (`Id_Moneda`),
+  KEY `idx_transfers_creado_por` (`Creado_Por`),
+  KEY `idx_transfers_actualizado_por` (`Actualizado_Por`)
 ) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -10066,7 +10081,10 @@ ALTER TABLE `recordatorios`
 ALTER TABLE `reservas`
   ADD CONSTRAINT `fk_reservas_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_reservas_horario` FOREIGN KEY (`Id_Horario`) REFERENCES `horarios` (`Id_Horario`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_reservas_beneficiario_comision` FOREIGN KEY (`Id_Beneficiario_Comision`) REFERENCES `beneficiarios_comision` (`Id_Beneficiario`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_reservas_beneficiario_comision` FOREIGN KEY (`Id_Beneficiario_Comision`) REFERENCES `beneficiarios_comision` (`Id_Beneficiario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_reservas_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_reservas_creado_por` FOREIGN KEY (`Creado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_reservas_actualizado_por` FOREIGN KEY (`Actualizado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `rol_permisos`
@@ -10113,7 +10131,9 @@ ALTER TABLE `tour_precios`
 ALTER TABLE `transfers`
   ADD CONSTRAINT `fk_transfers_moneda` FOREIGN KEY (`Id_Moneda`) REFERENCES `monedas` (`Id_Moneda`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_transfers_rango` FOREIGN KEY (`Id_Rango`) REFERENCES `transfers_rangos` (`Id_Rango`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_transfers_servicio` FOREIGN KEY (`Id_Servicio`) REFERENCES `servicios_transfer` (`Id_Servicio`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_transfers_creado_por` FOREIGN KEY (`Creado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_transfers_actualizado_por` FOREIGN KEY (`Actualizado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `transfers_precios`

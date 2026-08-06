@@ -62,6 +62,7 @@ const transfersRoutes = require('./routes/Transfers/transfers.routes');
 const historialNewRoutes = require('./routes/Historial/historial.routes');
 const permisosRoutes = require('./routes/Permisos/permisos.routes');
 const searchRoutes = require('./routes/Search/search.routes');
+const homeRoutes = require('./routes/Home/home.routes');
 const { iniciarVencimientosJob } = require('./jobs/vencimientos.job');
 
 app.use(cors(corsOptions));
@@ -79,6 +80,7 @@ app.use('/api/tours', toursRoutes);
 app.use('/api/historial', historialNewRoutes);
 app.use('/api', permisosRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/home', homeRoutes);
 const dashboardRoutes = require('./routes/Dashboard/dashboard.routes');
 app.use('/api/dashboard', dashboardRoutes);
 

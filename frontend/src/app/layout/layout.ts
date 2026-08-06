@@ -48,7 +48,7 @@ interface SidebarItem {
     label: string;
     icon: string;
     route?: string;
-    permission?: string;
+    permission?: string | string[];
     exact?: boolean;
     children?: SidebarItem[];
 }
@@ -702,16 +702,23 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         {
             key: 'inicio',
             label: 'Inicio',
-            icon: 'bx bxs-dashboard',
+            icon: 'bx bxs-home',
             route: '/',
-            permission: 'INICIO.LEER',
             exact: true,
         },
         {
-            key: 'dashboard',
-            label: 'Dashboard',
+            key: 'aforos',
+            label: 'Aforos',
+            icon: 'bx bxs-dashboard',
+            route: '/Aforos',
+            permission: ['AFOROS.LEER', 'INICIO.LEER'],
+            exact: true,
+        },
+        {
+            key: 'informes',
+            label: 'Informes',
             icon: 'bx bx-line-chart',
-            route: '/Dashboard',
+            route: '/Informes',
             permission: 'INFORMES.LEER',
             exact: true,
         },
@@ -895,9 +902,11 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return child ?? null;
     }
 
-    tienePermiso(permission?: string): boolean {
+    tienePermiso(permission?: string | string[]): boolean {
         if (!permission) return true;
-        return this.permisosService.tienePermiso(permission);
+        return Array.isArray(permission)
+            ? this.permisosService.tieneAlgunPermiso(permission)
+            : this.permisosService.tienePermiso(permission);
     }
 
     isVisibleItem(item: SidebarItem): boolean {

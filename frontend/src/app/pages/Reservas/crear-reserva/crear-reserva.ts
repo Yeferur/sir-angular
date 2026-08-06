@@ -2013,6 +2013,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         Id_Horario: this.form.get('Id_Horario')?.value || null,
         Fecha_Tour: this.form.get('Fecha_Tour')?.value,
         Id_Canal: this.form.get('Id_Canal')?.value,
+        Id_Moneda: this.form.get('Id_Moneda')?.value,
         Idioma_Reserva: this.toUpperText(this.form.get('Idioma_Reserva')?.value),
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,
         Nombre_Reportante: this.toUpperText(this.form.get('Nombre_Reportante')?.value),

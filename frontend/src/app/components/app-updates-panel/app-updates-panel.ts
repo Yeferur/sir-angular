@@ -23,6 +23,7 @@ export class AppUpdatesPanelComponent {
     'Si encuentras errores o inconsistencias en la app, repórtalos indicando el módulo, la acción realizada, el mensaje mostrado y, si es posible, una captura de pantalla.';
 
   readonly keyHighlights = [
+    'Nuevo Inicio personalizado según el perfil y sus permisos.',
     'Flujos guiados por pasos para reservas y transfers.',
     'Nuevo resumen visible durante la operación.',
     'Programación de buses con soporte multipunto y reservas privadas.',
@@ -30,6 +31,14 @@ export class AppUpdatesPanelComponent {
   ];
 
   readonly sections = [
+    {
+      title: 'Inicio personalizado',
+      items: [
+        'El acceso principal ahora muestra una jornada personal para asesores y un centro operativo para los perfiles de gestión.',
+        'El nuevo Inicio reúne accesos rápidos, reservas y transfers de hoy y mañana, próximos servicios, pendientes, alertas de aforo y actividad reciente según los permisos de cada usuario.',
+        'Aforos conserva su propia sección y los indicadores de empresa continúan en Informes, evitando mezclar trabajo diario con análisis gerencial.',
+      ],
+    },
     {
       title: 'Operación de reservas y transfers',
       items: [
@@ -63,9 +72,9 @@ export class AppUpdatesPanelComponent {
       ],
     },
     {
-      title: 'Dashboard, aforos y consulta de información',
+      title: 'Informes, aforos y consulta de información',
       items: [
-        'Se amplió el Dashboard con nuevos indicadores, gráficos y resúmenes para consultar ingresos, pasajeros y comportamiento operativo por periodo y tour.',
+        'Se ampliaron los Informes con nuevos indicadores, gráficos y resúmenes para consultar ingresos, pasajeros y comportamiento operativo por periodo y tour.',
         'La vista de Aforos fue renovada para facilitar el monitoreo diario de disponibilidad y ocupación.',
         'Se mejoró la búsqueda global para encontrar reservas, transfers, tours y puntos de forma más rápida.',
       ],

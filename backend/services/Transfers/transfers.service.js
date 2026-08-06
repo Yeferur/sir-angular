@@ -502,8 +502,10 @@ async function crearTransferSvc(payload, files = {}) {
       Vuelo,
       TipoVuelo,
       Estado,
-      Observaciones
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+      Observaciones,
+      Creado_Por,
+      Actualizado_Por
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
     const params = [
       idTransfer,
@@ -524,7 +526,9 @@ async function crearTransferSvc(payload, files = {}) {
       payload.Vuelo || null,
       payload.TipoVuelo || null,
       estadoCalculado,
-      payload.Observaciones || null
+      payload.Observaciones || null,
+      historialUserId || null,
+      historialUserId || null
     ];
 
     await conn.query(sql, params);
@@ -1014,6 +1018,10 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
       'UPDATE pagos_transfers SET Pago_Comprobante = ? WHERE Id_Pago = ?',
       [rutaComprobante, Id_Pago]
     );
+    await conn.query(
+      'UPDATE transfers SET Actualizado_Por = COALESCE(?, Actualizado_Por) WHERE Id_Transfer = ?',
+      [userId || null, Id_Transfer]
+    );
 
     await recordHistorial({
       conexion: conn,
@@ -1141,7 +1149,8 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       Vuelo = ?,
       TipoVuelo = ?,
       Estado = ?,
-      Observaciones = ?
+      Observaciones = ?,
+      Actualizado_Por = COALESCE(?, Actualizado_Por)
     WHERE Id_Transfer = ?`;
 
     const params = [
@@ -1163,6 +1172,7 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       payload.TipoVuelo || null,
       estadoCalculado,
       payload.Observaciones || null,
+      historialUserId || null,
       Id_Transfer
     ];
 
@@ -1308,8 +1318,8 @@ async function cancelarTransferSvc(Id_Transfer, userId = null) {
 
     const estadoAnterior = rows[0].Estado || null;
     await conn.query(
-      'UPDATE transfers SET Estado = ? WHERE Id_Transfer = ?',
-      ['Cancelado', Id_Transfer]
+      'UPDATE transfers SET Estado = ?, Actualizado_Por = COALESCE(?, Actualizado_Por) WHERE Id_Transfer = ?',
+      ['Cancelado', historialUserId || null, Id_Transfer]
     );
 
     await recordHistorial({

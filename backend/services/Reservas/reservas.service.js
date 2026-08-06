@@ -146,6 +146,31 @@ function normalizarTipoPasajero(tipo) {
   return String(tipo || '').trim().toUpperCase();
 }
 
+async function resolverMonedaReserva(connection, idMonedaValue, { required = false } = {}) {
+  const idMoneda = Number(idMonedaValue);
+  if (!Number.isInteger(idMoneda) || idMoneda <= 0) {
+    if (!required && (idMonedaValue === null || idMonedaValue === undefined || idMonedaValue === '')) {
+      return null;
+    }
+    const error = new Error('Selecciona una moneda válida para la reserva.');
+    error.status = 400;
+    error.errorCode = 'INVALID_CURRENCY';
+    throw error;
+  }
+
+  const [rows] = await connection.query(
+    'SELECT Id_Moneda FROM monedas WHERE Id_Moneda = ? LIMIT 1',
+    [idMoneda],
+  );
+  if (!rows?.length) {
+    const error = new Error('La moneda seleccionada no existe o ya no está disponible.');
+    error.status = 400;
+    error.errorCode = 'CURRENCY_NOT_FOUND';
+    throw error;
+  }
+  return idMoneda;
+}
+
 function contarCuposSolicitados(pasajerosArray = []) {
   return (pasajerosArray || []).reduce((acc, p) => {
     const tipo = normalizarTipoPasajero(p?.Tipo_Pasajero);
@@ -603,6 +628,7 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
         r.Fecha_Tour,
         r.Nombre_Reportante,
         r.Id_Horario,
+        r.Id_Moneda,
         h.Id_Tour,
         h.Id_Tour AS Id_Tour_Actual
        FROM reservas r
@@ -866,13 +892,14 @@ async function filtrarReservas(q) {
   const sql = `
     SELECT
       r.Id_Reserva, r.Fecha_Tour, h.Id_Tour, t.Nombre_Tour,
-      r.Tipo_Reserva,
+      r.Tipo_Reserva, r.Id_Moneda, m.Codigo AS Moneda_Codigo,
       r.Estado, r.Idioma_Reserva, r.Telefono_Reportante, r.Nombre_Reportante,
       COUNT(p.Id_Pasajero) AS Pasajeros
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     ${where}
     GROUP BY r.Id_Reserva
@@ -900,6 +927,8 @@ async function obtenerReserva(Id_Reserva) {
     SELECT 
       r.Id_Reserva,
       r.Tipo_Reserva,
+      r.Id_Moneda,
+      m.Codigo AS Moneda_Codigo,
       r.Fecha_Tour,
       r.Fecha_Registro,
       r.Estado,
@@ -934,6 +963,7 @@ async function obtenerReserva(Id_Reserva) {
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN puntos pto ON pto.Id_Punto = h.Id_Punto
     WHERE r.Id_Reserva = ?
     LIMIT 1
@@ -1362,6 +1392,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
     await conn.beginTransaction();
 
     const r = payload.cabeceraReserva;
+    const idMoneda = await resolverMonedaReserva(conn, r.Id_Moneda, { required: true });
     const tipoReserva = r.Tipo_Reserva || 'Grupal';
     const pasajerosArray = Array.isArray(payload.pasajeros) ? payload.pasajeros : [];
     const cantidadSolicitada = contarCuposSolicitados(pasajerosArray);
@@ -1389,20 +1420,23 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
 
     await conn.query(
       `INSERT INTO reservas
-       (Id_Reserva, Tipo_Reserva, Id_Horario, Fecha_Tour, Id_Canal, Idioma_Reserva,
-        Telefono_Reportante, Nombre_Reportante, Estado, Observaciones)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (Id_Reserva, Tipo_Reserva, Id_Horario, Fecha_Tour, Id_Canal, Id_Moneda, Idioma_Reserva,
+        Telefono_Reportante, Nombre_Reportante, Estado, Observaciones, Creado_Por, Actualizado_Por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         idReserva,
         r.Tipo_Reserva || 'Grupal',
         r.Id_Horario || null,
         r.Fecha_Tour,
         r.Id_Canal || null,
+        idMoneda,
         r.Idioma_Reserva || 'ESPAÑOL',
         r.Telefono_Reportante || null,
         r.Nombre_Reportante || null,
         estadoCalculado,
         r.Observaciones || null,
+        userId || null,
+        userId || null,
       ]
     );
 
@@ -1491,6 +1525,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
       id_usuario: userId,
       detalles: [
         { columna: 'Id_Tour', anterior: null, nuevo: r.Id_Tour },
+        { columna: 'Id_Moneda', anterior: null, nuevo: idMoneda },
         { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour },
         { columna: 'Estado', anterior: null, nuevo: estadoCalculado },
         ...(esDuplicado ? [
@@ -1548,7 +1583,8 @@ async function obtenerComisiones(Id_Tour, Id_Canal) {
  * DETALLE PARA EDICIÓN
  * =========================== */
 async function obtenerReservaDetalle(Id_Reserva) {
-  // Cabecera (sin r.Id_Moneda). Se deriva una moneda sugerida desde tour_precios.
+  // Las reservas históricas pueden no tener moneda persistida. En ese caso se
+  // conserva una sugerencia para que el usuario la revise al editar.
   const [cabRows] = await db.query(
     `
     SELECT
@@ -1557,6 +1593,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
       r.Id_Horario,
       r.Fecha_Tour,
       r.Id_Canal,
+      r.Id_Moneda,
       r.Idioma_Reserva,
       r.Estado,
       r.Observaciones,
@@ -1626,6 +1663,8 @@ async function obtenerReservaDetalle(Id_Reserva) {
     Id_Horario: cab.Id_Horario,
     Fecha_Tour: cab.Fecha_Tour.toISOString().slice(0, 10),
     Id_Canal: cab.Id_Canal,
+    Id_Moneda: cab.Id_Moneda || cab.Id_Moneda_Sugerida || null,
+    Moneda_Persistida: Boolean(cab.Id_Moneda),
     Idioma_Reserva: cab.Idioma_Reserva,
     Estado: normalizarEstadoReservaLegacy(cab.Estado || 'Pendiente'),
     Observaciones: cab.Observaciones || null,
@@ -1633,7 +1672,7 @@ async function obtenerReservaDetalle(Id_Reserva) {
     Nombre_Reportante: cab.Nombre_Reportante || '',
     Telefono_Reportante: cab.Telefono_Reportante || '',
     Id_Punto: cab.Id_Punto || null,
-    Id_Moneda_Sugerida: cab.Id_Moneda_Sugerida || null, // para inicializar selector en front
+    Id_Moneda_Sugerida: cab.Id_Moneda_Sugerida || null,
   };
 
   const Pasajeros = paxRows.map(r => ({
@@ -1743,12 +1782,16 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       if (r.Id_Horario !== undefined) setIf('Id_Horario', r.Id_Horario || null);
       if (r.Fecha_Tour !== undefined) setIf('Fecha_Tour', r.Fecha_Tour);
       if (r.Id_Canal !== undefined) setIf('Id_Canal', r.Id_Canal);
+      if (r.Id_Moneda !== undefined) {
+        setIf('Id_Moneda', await resolverMonedaReserva(conn, r.Id_Moneda, { required: true }));
+      }
       if (r.Idioma_Reserva !== undefined) setIf('Idioma_Reserva', r.Idioma_Reserva);
       if (r.Telefono_Reportante !== undefined) setIf('Telefono_Reportante', r.Telefono_Reportante);
       if (r.Nombre_Reportante !== undefined) setIf('Nombre_Reportante', r.Nombre_Reportante);
       if (r.Observaciones !== undefined) setIf('Observaciones', r.Observaciones);
       // Estado calculado desde el backend
       setIf('Estado', estadoCalculado);
+      if (userId) setIf('Actualizado_Por', userId);
 
       if (fields.length) {
         const sql = `UPDATE reservas SET ${fields.join(', ')} WHERE Id_Reserva = ?`;
@@ -1916,7 +1959,10 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
 
     const estadoAnterior = impactoActual.estado || null;
     const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
-    await conn.query('UPDATE reservas SET Estado = ? WHERE Id_Reserva = ?', ['Cancelada', Id_Reserva]);
+    await conn.query(
+      'UPDATE reservas SET Estado = ?, Actualizado_Por = COALESCE(?, Actualizado_Por) WHERE Id_Reserva = ?',
+      ['Cancelada', userId || null, Id_Reserva]
+    );
 
     if (estadoAnterior !== 'Cancelada') {
       const detalles = [{ columna: 'Estado', anterior: estadoAnterior, nuevo: 'Cancelada' }];
@@ -2054,6 +2100,10 @@ async function eliminarComprobantePagoReserva(Id_Reserva, Id_Pago, userId = null
         WHERE Id_Reserva = ?
           AND Id_Pago = ?`,
       [Id_Reserva, Id_Pago]
+    );
+    await conn.query(
+      'UPDATE reservas SET Actualizado_Por = COALESCE(?, Actualizado_Por) WHERE Id_Reserva = ?',
+      [userId || null, Id_Reserva]
     );
 
     await recordHistorial({
@@ -2248,6 +2298,7 @@ module.exports = {
   // verificación
   verificarDniDuplicado,
   obtenerHistorialCambiosReserva,
+  resolverMonedaReserva,
   actualizarEstadosReservasVencidas,
   normalizarEstadosReservasExistentes,
 };

@@ -6,14 +6,25 @@ export const permisoGuard: CanActivateFn = async (route: ActivatedRouteSnapshot,
   const permisosService = inject(PermisosService);
   const router = inject(Router);
 
-  const requiredPermission = String(route.data?.['permiso'] || '').trim();
-  if (!requiredPermission) {
+  const singlePermission = String(route.data?.['permiso'] || '').trim();
+  const multiplePermissions = Array.isArray(route.data?.['permisos'])
+    ? route.data['permisos'].map((value: unknown) => String(value || '').trim()).filter(Boolean)
+    : [];
+  const requiredPermissions = multiplePermissions.length
+    ? multiplePermissions
+    : (singlePermission ? [singlePermission] : []);
+  if (!requiredPermissions.length) {
     return true;
   }
 
   const permisosDisponibles = await permisosService.asegurarPermisosCargados();
 
-  if (permisosDisponibles && permisosService.tienePermiso(requiredPermission)) {
+  const requireAll = Boolean(route.data?.['requireAll']);
+  const authorized = requireAll
+    ? permisosService.tieneTodosPermisos(requiredPermissions)
+    : permisosService.tieneAlgunPermiso(requiredPermissions);
+
+  if (permisosDisponibles && authorized) {
     return true;
   }
 
