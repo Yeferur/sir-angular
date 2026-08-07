@@ -30,6 +30,14 @@ function getFriendlyErrorMessage(errorCode?: string, fallback?: string): string 
     PUNTO_DUPLICATE_EXACT: 'Ya existe un punto con ese nombre y esa direccion.',
     AUDIT_REQUIRED: 'No fue posible registrar la auditoria del cambio. Intenta nuevamente.',
     BAD_REQUEST: 'La solicitud tiene datos invalidos. Revisa el formulario.',
+    ADVISOR_NOT_FOUND: 'El usuario no existe o ya no tiene el rol Asesor.',
+    ADVISOR_ONLY: 'Esta información está disponible únicamente para asesores.',
+    ADMIN_ONLY: 'Solo los administradores autorizados pueden gestionar turnos.',
+    INVALID_SCHEDULE: 'La jornada debe incluir los siete días de la semana.',
+    INVALID_SCHEDULE_DAY: 'La jornada contiene días inválidos o repetidos.',
+    INVALID_SCHEDULE_TIME: 'Revisa las horas de entrada y salida.',
+    INVALID_SCHEDULE_RANGE: 'La salida debe ser posterior a la entrada.',
+    SCHEDULE_AFTER_11PM: 'La salida máxima permitida es a las 11:00 p. m.',
     INTERNAL_ERROR: 'Ocurrio un error del servidor. Intenta de nuevo en unos minutos.',
   };
 

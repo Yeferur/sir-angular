@@ -1,4 +1,5 @@
 const db = require('./database/db');
+const { isClientRoleName } = require('./utils/clientAccess');
 
 // userId -> Map(token -> Set<WebSocket>)
 const clientsByUser = new Map();
@@ -82,7 +83,7 @@ function detachSocket(ws) {
   return { userId: uid, token: safeToken };
 }
 
-function trackSocket(userId, token, ws) {
+function trackSocket(userId, token, ws, metadata = {}) {
   const uid = Number(userId);
   const safeToken = String(token || '');
   const userMap = getOrCreateUserMap(uid);
@@ -92,10 +93,15 @@ function trackSocket(userId, token, ws) {
 
   const tokenEntry = getOrCreateTokenEntry(safeToken, uid);
   tokenEntry.sockets.add(ws);
-  wsMeta.set(ws, { userId: uid, token: safeToken });
+  wsMeta.set(ws, {
+    userId: uid,
+    token: safeToken,
+    role: metadata.role || null,
+    isClient: isClientRoleName(metadata.role),
+  });
 }
 
-async function addClient(userId, token, ws) {
+async function addClient(userId, token, ws, metadata = {}) {
   const uid = Number(userId);
   const safeToken = String(token || '');
 
@@ -103,7 +109,7 @@ async function addClient(userId, token, ws) {
     return 0;
   }
 
-  trackSocket(uid, safeToken, ws);
+  trackSocket(uid, safeToken, ws, metadata);
 
   const userMap = clientsByUser.get(uid);
   const tokenSet = userMap?.get(safeToken);
@@ -195,7 +201,7 @@ async function broadcastActiveUsers() {
     for (const userMap of clientsByUser.values()) {
       for (const set of userMap.values()) {
         for (const ws of set) {
-          if (isOpen(ws)) ws.send(payload);
+          if (isOpen(ws) && !wsMeta.get(ws)?.isClient) ws.send(payload);
         }
       }
     }
@@ -222,6 +228,7 @@ function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId = n
       for (const set of userMap.values()) {
         for (const ws of set) {
           if (isOpen(ws)) {
+            if (wsMeta.get(ws)?.isClient) continue;
             ws.send(payload);
             enviados++;
           }
@@ -237,13 +244,16 @@ function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId = n
 
 function broadcastReservaEvento(evento) {
   try {
-    const payload = JSON.stringify(evento);
+    const { ownerUserId = null, ...publicEvent } = evento || {};
+    const payload = JSON.stringify(publicEvent);
 
     let enviados = 0;
-    for (const userMap of clientsByUser.values()) {
+    for (const [uid, userMap] of clientsByUser.entries()) {
       for (const set of userMap.values()) {
         for (const ws of set) {
           if (isOpen(ws)) {
+            const metadata = wsMeta.get(ws);
+            if (metadata?.isClient && Number(ownerUserId) !== Number(uid)) continue;
             ws.send(payload);
             enviados++;
           }
@@ -251,7 +261,7 @@ function broadcastReservaEvento(evento) {
       }
     }
 
-    console.log(`📡 Broadcast Reserva: Enviado a ${enviados} sockets (Tipo: ${evento.type})`);
+    console.log(`📡 Broadcast Reserva: Enviado a ${enviados} sockets (Tipo: ${publicEvent.type})`);
   } catch (err) {
     console.error('Error en broadcastReservaEvento:', err.message);
   }

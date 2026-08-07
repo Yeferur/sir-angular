@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { CLIENT_RESERVATION_PERMISSION_CODES, isClientRoleName } = require('../../utils/clientAccess');
 
 /**
  * Obtiene todos los usuarios
@@ -61,6 +62,29 @@ async function getUserById(id) {
   if (!rows.length) return null;
 
   const u = rows[0];
+
+  if (isClientRoleName(u.Nombre_Rol)) {
+    const [fixedPermissions] = await db.query(
+      `SELECT Id_Permiso, Descripcion, Modulo_Permiso
+         FROM permisos
+        WHERE Codigo_Permiso IN (?)
+        ORDER BY Modulo_Permiso, Descripcion`,
+      [CLIENT_RESERVATION_PERMISSION_CODES]
+    );
+
+    return {
+      Id_Usuario: u.Id_Usuario,
+      Usuario: u.Usuario,
+      Nombres_Apellidos: u.Nombres_Apellidos,
+      Correo: u.Correo,
+      Telefono_Usuario: u.Telefono_Usuario,
+      Id_Rol: u.Id_Rol,
+      Nombre_Rol: u.Nombre_Rol,
+      Activo: u.Activo,
+      permisos: [],
+      permisosEfectivos: fixedPermissions || [],
+    };
+  }
 
   // Permisos individuales: se conservan separados porque los formularios de
   // edición solo deben persistir las asignaciones que no provienen del rol.

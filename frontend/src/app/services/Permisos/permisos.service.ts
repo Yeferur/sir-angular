@@ -61,6 +61,9 @@ export class PermisosService {
   private permisosSubject = new BehaviorSubject<string[]>([]);
   public permisos$ = this.permisosSubject.asObservable();
 
+  private roleSubject = new BehaviorSubject<string | null>(null);
+  public role$ = this.roleSubject.asObservable();
+
   // menú dinámico
   private menuSubject = new BehaviorSubject<MenuItem[]>([]);
   public menu$ = this.menuSubject.asObservable();
@@ -87,12 +90,16 @@ export class PermisosService {
   // ENDPOINTS USUARIO ACTUAL
   // =====================================================
 
-  obtenerMisPermisos(): Observable<{ permisos: Permiso[] }> {
-    return this.http.get<{ permisos: Permiso[] }>(`${this.baseUrl}/me/permisos`).pipe(
+  obtenerMisPermisos(): Observable<{ permisos: Permiso[]; role?: string | null }> {
+    return this.http.get<{ permisos: Permiso[]; role?: string | null }>(`${this.baseUrl}/me/permisos`).pipe(
       tap(response => {
         const codigosPermisos = (response.permisos || []).map(p => p.codigo);
+        const role = String(response.role || '').trim() || null;
         this.permisosSubject.next(codigosPermisos);
+        this.roleSubject.next(role);
         localStorage.setItem('user_permissions', JSON.stringify(codigosPermisos));
+        if (role) localStorage.setItem('user_role', role);
+        else localStorage.removeItem('user_role');
         this.permisosHydrated = true;
         this.readySubject.next(true);
       })
@@ -115,15 +122,18 @@ export class PermisosService {
   /**
    * Se llama justo después del /login para hidratar al instante.
    */
-  setSessionData(permisos: string[] = [], menu: MenuItem[] = []): void {
+  setSessionData(permisos: string[] = [], menu: MenuItem[] = [], role: string | null = null): void {
     const safePermisos = Array.isArray(permisos) ? permisos : [];
     const safeMenu = Array.isArray(menu) ? menu : [];
 
     this.permisosSubject.next(safePermisos);
     this.menuSubject.next(safeMenu);
+    this.roleSubject.next(String(role || '').trim() || null);
 
     localStorage.setItem('user_permissions', JSON.stringify(safePermisos));
     localStorage.setItem('user_menu', JSON.stringify(safeMenu));
+    if (role) localStorage.setItem('user_role', String(role));
+    else localStorage.removeItem('user_role');
 
     this.permisosHydrated = true;
     this.readySubject.next(true);
@@ -155,6 +165,14 @@ export class PermisosService {
     return this.readySubject.value;
   }
 
+  esCliente(): boolean {
+    return String(this.roleSubject.value || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
+  }
+
+  getRoleSnapshot(): string | null {
+    return this.roleSubject.value;
+  }
+
   // =====================================================
   // LOCALSTORAGE
   // =====================================================
@@ -162,7 +180,9 @@ export class PermisosService {
   cargarPermisosDesdeLocalStorage(): boolean {
     const permisos = localStorage.getItem('user_permissions');
     const menu = localStorage.getItem('user_menu');
+    const role = localStorage.getItem('user_role');
     const hasPermisosCache = permisos !== null;
+    const hasCompleteCache = hasPermisosCache && role !== null;
 
     if (permisos) {
       try { this.permisosSubject.next(JSON.parse(permisos)); } catch {}
@@ -174,22 +194,26 @@ export class PermisosService {
       try { this.menuSubject.next(JSON.parse(menu)); } catch {}
     }
 
-    if (hasPermisosCache) {
+    this.roleSubject.next(role ? String(role) : null);
+
+    if (hasCompleteCache) {
       this.permisosHydrated = true;
       this.readySubject.next(true);
     }
 
-    return hasPermisosCache;
+    return hasCompleteCache;
   }
 
   limpiarPermisos(): void {
     this.permisosSubject.next([]);
     this.menuSubject.next([]);
+    this.roleSubject.next(null);
     this.permisosHydrated = false;
     this.loadingPermisosPromise = null;
     this.readySubject.next(false);
     localStorage.removeItem('user_permissions');
     localStorage.removeItem('user_menu');
+    localStorage.removeItem('user_role');
   }
 
   async asegurarPermisosCargados(options?: { token?: string | null; forceBackend?: boolean }): Promise<boolean> {

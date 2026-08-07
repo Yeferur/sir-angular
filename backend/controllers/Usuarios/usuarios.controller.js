@@ -6,6 +6,8 @@ const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 const wsManager = require('../../websocketManager');
 const fs = require('fs');
 const path = require('path');
+const { isClientRoleName } = require('../../utils/clientAccess');
+const { invalidarCacheUsuario } = require('../../middlewares/permissionsMiddleware');
 
 const backendRoot = path.join(__dirname, '..', '..');
 
@@ -454,8 +456,9 @@ exports.actualizarUsuario = async (req, res) => {
       });
     }
 
+    const targetIsClient = isClientRoleName(targetRoleRows[0].Nombre_Rol);
     let permisosBaseIds = [];
-    if (usaPermisosEfectivos) {
+    if (usaPermisosEfectivos && !targetIsClient) {
       const [baseRows] = await conn.query(
         'SELECT Id_Permiso FROM rol_permisos WHERE Id_Rol = ?',
         [Id_Rol]
@@ -463,7 +466,9 @@ exports.actualizarUsuario = async (req, res) => {
       permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
     }
 
-    const permisosSolicitados = usaPermisosEfectivos
+    const permisosSolicitados = targetIsClient
+      ? []
+      : usaPermisosEfectivos
       ? permisosEfectivosArray
       : permisosAdicionalesArray;
 
@@ -556,7 +561,11 @@ exports.actualizarUsuario = async (req, res) => {
 
     await conn.query(updateQuery, params);
 
-    if (usaPermisosEfectivos) {
+    if (targetIsClient) {
+      // Cliente siempre usa únicamente la plantilla fija resuelta por el
+      // servicio de permisos; no se persisten ALLOW/DENY individuales.
+      await conn.query('DELETE FROM usuario_permisos WHERE Id_Usuario = ?', [id]);
+    } else if (usaPermisosEfectivos) {
       const permisosBase = new Set(permisosBaseIds);
       const permisosSeleccionados = new Set(permisosEfectivosArray);
       const permissionOverrides = [
@@ -606,7 +615,9 @@ exports.actualizarUsuario = async (req, res) => {
       }
     }
 
-    shouldForceLogout = !!hash || Number(Activo) === 0;
+    shouldForceLogout = !!hash
+      || Number(Activo) === 0
+      || Number(current.Id_Rol || 0) !== Number(Id_Rol || 0);
     if (shouldForceLogout) {
       await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
     }
@@ -625,10 +636,16 @@ exports.actualizarUsuario = async (req, res) => {
     });
 
     await conn.commit();
+    invalidarCacheUsuario(Number(id));
 
     if (shouldForceLogout) {
       try {
-        wsManager.sendForceLogout(Number(id), hash ? 'password_changed_by_admin' : 'user_deactivated');
+        const logoutReason = hash
+          ? 'password_changed_by_admin'
+          : Number(Activo) === 0
+            ? 'user_deactivated'
+            : 'role_changed';
+        wsManager.sendForceLogout(Number(id), logoutReason);
         await wsManager.broadcastActiveUsers();
       } catch (socketError) {
         console.error('actualizarUsuario websocket warning:', socketError);
@@ -744,6 +761,7 @@ exports.eliminarUsuario = async (req, res) => {
     });
 
     await conn.commit();
+    invalidarCacheUsuario(Number(id));
     deactivatedUserId = Number(id);
 
     try {
@@ -844,9 +862,10 @@ exports.crearUsuario = async (req, res) => {
     }
 
     let permisosBaseIds = [];
+    let targetIsClient = false;
     if (Id_Rol) {
       const [roleRows] = await conn.query(
-        'SELECT Id_Rol FROM roles WHERE Id_Rol = ? AND Activo = 1 LIMIT 1',
+        'SELECT Id_Rol, Nombre_Rol FROM roles WHERE Id_Rol = ? AND Activo = 1 LIMIT 1',
         [Id_Rol]
       );
 
@@ -859,14 +878,20 @@ exports.crearUsuario = async (req, res) => {
         });
       }
 
-      const [baseRows] = await conn.query(
-        'SELECT Id_Permiso FROM rol_permisos WHERE Id_Rol = ?',
-        [Id_Rol]
-      );
-      permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
+      targetIsClient = isClientRoleName(roleRows[0].Nombre_Rol);
+
+      if (!targetIsClient) {
+        const [baseRows] = await conn.query(
+          'SELECT Id_Permiso FROM rol_permisos WHERE Id_Rol = ?',
+          [Id_Rol]
+        );
+        permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
+      }
     }
 
-    const permisosSolicitados = usaPermisosEfectivos
+    const permisosSolicitados = targetIsClient
+      ? []
+      : usaPermisosEfectivos
       ? permisosEfectivosArray
       : permisosAdicionalesArray;
 
@@ -913,7 +938,9 @@ exports.crearUsuario = async (req, res) => {
     );
 
     let permissionOverrides;
-    if (usaPermisosEfectivos) {
+    if (targetIsClient) {
+      permissionOverrides = [];
+    } else if (usaPermisosEfectivos) {
       const permisosBase = new Set(permisosBaseIds);
       const permisosSeleccionados = new Set(permisosEfectivosArray);
 
@@ -962,6 +989,8 @@ exports.crearUsuario = async (req, res) => {
     });
 
     await conn.commit();
+
+    invalidarCacheUsuario(Number(Id_Usuario));
 
     return sendSuccess(res, {
       data: { id: Id_Usuario },

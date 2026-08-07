@@ -41,6 +41,33 @@
       </span>
     </section>
 
+    @if (summary.profile.mode === 'advisor') {
+      <section class="home-section advisor-shift-section" aria-labelledby="my-shift-title">
+        <article class="advisor-shift-card" [attr.data-status]="mySchedule?.estadoActual || 'sin_configurar'">
+          <span class="advisor-shift-icon"><i class="bx bx-time-five" aria-hidden="true"></i></span>
+          <div class="advisor-shift-copy">
+            <span>Mi jornada de hoy</span>
+            @if (scheduleLoading) {
+              <strong>Cargando horario…</strong>
+            } @else if (scheduleError) {
+              <strong>{{ scheduleError }}</strong>
+            } @else {
+              <h2 id="my-shift-title">{{ todayShiftLabel }}</h2>
+              <small>Horario de Bogotá · Administrado por tu equipo autorizado</small>
+            }
+          </div>
+          @if (!scheduleLoading && !scheduleError) {
+            <span class="advisor-shift-status" [attr.data-status]="mySchedule?.estadoActual || 'sin_configurar'">
+              <span aria-hidden="true"></span>{{ scheduleStatusLabel }}
+            </span>
+          }
+          <button type="button" class="advisor-shift-action" (click)="navigate('/MiHorario')">
+            Ver semana <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+          </button>
+        </article>
+      </section>
+    }
+
     @if (quickActions.length) {
       <section class="home-section" aria-labelledby="quick-title">
         <header class="section-heading section-heading--compact">
@@ -138,8 +165,12 @@
       <section class="home-section" aria-labelledby="agenda-title">
         <header class="section-heading">
           <div>
-            <h2 id="agenda-title">Próximos servicios</h2>
-            <p>Reservas y transfers creados por ti durante los próximos 14 días.</p>
+            <h2 id="agenda-title">{{ summary.capabilities.clientMode ? 'Mis próximas reservas' : 'Próximos servicios' }}</h2>
+            <p>
+              {{ summary.capabilities.clientMode
+                ? 'Tus reservas de los próximos 14 días.'
+                : 'Reservas y transfers creados por ti durante los próximos 14 días.' }}
+            </p>
           </div>
           @if (summary.personalWork.pendingReservations > 0) {
             <span class="badge badge--pending home-badge">
@@ -151,7 +182,8 @@
           }
         </header>
 
-        <div class="work-grid">
+        <div class="work-grid" [class.work-grid--single]="summary.capabilities.clientMode">
+          @if (summary.capabilities.canReadTransfers) {
           <article class="list-card">
             <header class="card-header">
               <div>
@@ -228,6 +260,7 @@
               </div>
             }
           </article>
+          }
         </div>
       </section>
     }
@@ -276,6 +309,7 @@
       </section>
     }
 
+    @if (!summary.capabilities.clientMode) {
     <section class="home-section home-section--last" aria-labelledby="detail-title">
       <header class="section-heading">
         <div>
@@ -346,7 +380,7 @@
           <header class="card-header">
             <div>
               <span class="card-icon card-icon--green"><i class="bx bx-pulse" aria-hidden="true"></i></span>
-              <div><h3>Actividad reciente</h3><p>{{ summary.capabilities.management ? 'Cambios en la empresa' : 'Tus últimos cambios' }}</p></div>
+              <div><h3>Actividad reciente</h3><p>{{ summary.capabilities.management ? 'Últimas acciones realizadas por el equipo' : 'Tus acciones más recientes' }}</p></div>
             </div>
             @if (summary.capabilities.management && summary.operations.recentActivity.length) {
               <button type="button" (click)="navigate('/Historial')">Ver historial</button>
@@ -361,8 +395,8 @@
                   <span class="activity-copy">
                     <strong>{{ activityLabel(activity) }}</strong>
                     <small>
-                      @if (activity.Usuario) { {{ activity.Usuario }} · }
-                      {{ activity.Fecha_Hora_Registro | date:'d MMM, h:mm a' }}
+                      @if (activity.Usuario) { {{ activityUserName(activity.Usuario) }} · }
+                      {{ activityDate(activity.Fecha_Hora_Registro) }}
                     </small>
                   </span>
                 </div>
@@ -378,5 +412,6 @@
         </article>
       </div>
     </section>
+    }
   }
 </main>

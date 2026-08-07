@@ -19,18 +19,19 @@ function limpiarCacheExpirado() {
   }
 }
 
-// Limpiar cache cada 10 minutos
-setInterval(limpiarCacheExpirado, 10 * 60 * 1000);
+// Limpiar cache cada 10 minutos sin mantener vivo el proceso por este timer.
+const cacheCleanupTimer = setInterval(limpiarCacheExpirado, 10 * 60 * 1000);
+cacheCleanupTimer.unref?.();
 
 /**
  * Obtener permisos de usuario (con cache)
  * @param {number} userId
  * @returns {Promise<Array>} Lista de códigos de permisos
  */
-async function obtenerPermisosUsuario(userId) {
+async function obtenerPermisosUsuario(userId, { forceRefresh = false } = {}) {
   // Verificar cache
   const cached = permisosCache.get(userId);
-  if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+  if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
     return cached.permisos;
   }
 
@@ -74,7 +75,15 @@ function checkPermission(codigoPermiso) {
       const userId = req.user.id;
 
       // Obtener permisos del usuario
-      const permisos = await obtenerPermisosUsuario(userId);
+      let permisos = req.user?.isClient && Array.isArray(req.userPermissions)
+        ? req.userPermissions
+        : await obtenerPermisosUsuario(userId);
+
+      // Si el permiso fue concedido recientemente, el caché puede contener
+      // todavía la versión anterior. Refrescar una vez antes de responder 403.
+      if (!req.user?.isClient && !permisos.includes(codigoPermiso)) {
+        permisos = await obtenerPermisosUsuario(userId, { forceRefresh: true });
+      }
 
       // Verificar si tiene el permiso
       if (!permisos.includes(codigoPermiso)) {
@@ -115,10 +124,16 @@ function checkAnyPermission(codigosPermisos) {
       }
 
       const userId = req.user.id;
-      const permisos = await obtenerPermisosUsuario(userId);
+      let permisos = req.user?.isClient && Array.isArray(req.userPermissions)
+        ? req.userPermissions
+        : await obtenerPermisosUsuario(userId);
 
       // Verificar si tiene al menos uno de los permisos
-      const tienePermiso = codigosPermisos.some(codigo => permisos.includes(codigo));
+      let tienePermiso = codigosPermisos.some(codigo => permisos.includes(codigo));
+      if (!req.user?.isClient && !tienePermiso) {
+        permisos = await obtenerPermisosUsuario(userId, { forceRefresh: true });
+        tienePermiso = codigosPermisos.some(codigo => permisos.includes(codigo));
+      }
 
       if (!tienePermiso) {
         return res.status(403).json({
@@ -154,7 +169,13 @@ function requireAdmin() {
       }
 
       // Los administradores tienen permisos sobre USUARIOS.LEER
-      const permisos = await obtenerPermisosUsuario(req.user.id);
+      let permisos = req.user?.isClient && Array.isArray(req.userPermissions)
+        ? req.userPermissions
+        : await obtenerPermisosUsuario(req.user.id);
+
+      if (!req.user?.isClient && !permisos.includes('USUARIOS.LEER')) {
+        permisos = await obtenerPermisosUsuario(req.user.id, { forceRefresh: true });
+      }
 
       if (!permisos.includes('USUARIOS.LEER')) {
         return res.status(403).json({

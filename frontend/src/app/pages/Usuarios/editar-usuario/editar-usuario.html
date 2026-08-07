@@ -296,8 +296,14 @@
               [attr.aria-busy]="rolePermissionsLoading()">
               <div class="permissions-section-head">
                 <div>
-                  <strong>Permisos asignables</strong>
-                  <p>Los incluidos por el rol ya están seleccionados; puedes activar o retirar cualquiera.</p>
+                  <strong>{{ isClientRole ? 'Permisos fijos del Cliente' : 'Permisos asignables' }}</strong>
+                  <p>
+                    @if (isClientRole) {
+                      Este rol solo puede crear, consultar, editar, duplicar y cancelar sus propias reservas.
+                    } @else {
+                      Los incluidos por el rol ya están seleccionados; puedes activar o retirar cualquiera.
+                    }
+                  </p>
                 </div>
                 <span class="permission-selection-count">
                   <strong>{{ selectedPermisos.length }}</strong>
@@ -312,7 +318,7 @@
                       type="button"
                       class="permission-option"
                       [class.permission-option--selected]="isSelected(permission.Id_Permiso)"
-                      [disabled]="!selectedRole || rolePermissionsLoading()"
+                      [disabled]="!selectedRole || rolePermissionsLoading() || isClientRole"
                       (click)="togglePermiso(permission.Id_Permiso)"
                       [attr.aria-pressed]="isSelected(permission.Id_Permiso)">
                       <span class="permission-copy">

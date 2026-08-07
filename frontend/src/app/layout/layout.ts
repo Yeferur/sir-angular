@@ -49,6 +49,9 @@ interface SidebarItem {
     route?: string;
     permission?: string | string[];
     exact?: boolean;
+    clientVisible?: boolean;
+    advisorVisible?: boolean;
+    adminVisible?: boolean;
     children?: SidebarItem[];
 }
 
@@ -597,6 +600,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── Novedades ────────────────────────────────────────────────
     openAppUpdates(): void { this.drawer.openAppUpdates(); }
 
+    isClientUser(): boolean {
+        return this.permisosService.esCliente();
+    }
+
+    isAdvisorUser(): boolean {
+        return String(this.permisosService.getRoleSnapshot() || '').trim().toLocaleLowerCase('es-CO') === 'asesor';
+    }
+
+    isAdministratorUser(): boolean {
+        return String(this.permisosService.getRoleSnapshot() || '').trim().toLocaleLowerCase('es-CO') === 'administrador';
+    }
+
     // ── Overlay / alertas ────────────────────────────────────────
 
     // ── Atajos de teclado globales ───────────────────────────────
@@ -710,6 +725,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             icon: 'bx bxs-home',
             route: '/',
             exact: true,
+            clientVisible: true,
+        },
+        {
+            key: 'mi-horario',
+            label: 'Mi horario',
+            icon: 'bx bx-time-five',
+            route: '/MiHorario',
+            exact: true,
+            advisorVisible: true,
         },
         {
             key: 'aforos',
@@ -739,6 +763,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'reservas',
             label: 'Reservas',
             icon: 'bx bx-calendar-plus',
+            clientVisible: true,
             children: [
                 {
                     key: 'reservas-nueva',
@@ -747,6 +772,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     route: '/Reservas/NuevaReserva',
                     permission: 'RESERVAS.CREAR',
                     exact: true,
+                    clientVisible: true,
                 },
                 {
                     key: 'reservas-ver',
@@ -755,6 +781,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     route: '/Reservas/VerReservas',
                     permission: 'RESERVAS.LEER',
                     exact: true,
+                    clientVisible: true,
                 },
                 {
                     key: 'reservas-control',
@@ -881,6 +908,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     exact: true,
                 },
                 {
+                    key: 'turnos-asesores',
+                    label: 'Turnos de asesores',
+                    icon: 'bx bx-time-five',
+                    route: '/Turnos',
+                    permission: 'TURNOS.LEER',
+                    exact: true,
+                    adminVisible: true,
+                },
+                {
                     key: 'ayuda',
                     label: 'Ayuda',
                     icon: 'bx bx-help-circle',
@@ -915,6 +951,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     isVisibleItem(item: SidebarItem): boolean {
+        if (this.isClientUser() && !item.clientVisible) return false;
+        if (item.advisorVisible && !this.isAdvisorUser()) return false;
+        if (item.adminVisible && !this.isAdministratorUser()) return false;
         if (item.children?.length) {
             return this.tienePermiso(item.permission) &&
                 this.getVisibleChildren(item).length > 0;

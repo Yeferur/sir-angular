@@ -2,6 +2,9 @@ import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 import { authGuard } from './guards/auth.guard';
 import { permisoGuard } from './guards/permission.guard';
+import { nonClientGuard } from './guards/non-client.guard';
+import { advisorGuard } from './guards/advisor.guard';
+import { administratorGuard } from './guards/administrator.guard';
 import { LoginContentComponent } from './components/login/login';
 import { EditarTourComponent } from './pages/Tours/editar-tour/editar-tour';
 
@@ -198,6 +201,19 @@ export const routes: Routes = [
     title: 'Editar Usuario',
   },
   {
+    path: 'Turnos',
+    loadComponent: () => import('./pages/Turnos/turnos').then((m) => m.TurnosComponent),
+    canActivate: [authGuard, administratorGuard, permisoGuard],
+    data: { permiso: 'TURNOS.LEER', redirectTo: '/Usuarios' },
+    title: 'Turnos de asesores',
+  },
+  {
+    path: 'MiHorario',
+    loadComponent: () => import('./pages/Turnos/mi-turno').then((m) => m.MiTurnoComponent),
+    canActivate: [authGuard, advisorGuard],
+    title: 'Mi horario',
+  },
+  {
     path: 'Perfil/Editar',
     loadComponent: () => import('./pages/Perfil/editar-perfil/editar-perfil').then((m) => m.EditarPerfilComponent),
     canActivate: [authGuard],
@@ -207,7 +223,7 @@ export const routes: Routes = [
   {
     path: 'Ayuda',
     loadComponent: () => import('./pages/ayuda/ayuda').then((m) => m.AyudaComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, nonClientGuard],
     title: 'Ayuda',
   },
 

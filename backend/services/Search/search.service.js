@@ -365,11 +365,12 @@ function buildUsuarioActions(row, permisos) {
   return actions;
 }
 
-async function searchReservas(query, permisos) {
+async function searchReservas(query, permisos, ownerUserId = null) {
   if (!hasPermission(permisos, 'RESERVAS.LEER')) return [];
 
   const exact = sanitizeQuery(query);
   const like = `%${exact}%`;
+  const ownerCondition = ownerUserId == null ? '' : 'AND r.Creado_Por = ?';
   const sql = `
     SELECT
       r.Id_Reserva,
@@ -399,6 +400,7 @@ async function searchReservas(query, permisos) {
           )
       )
     )
+    ${ownerCondition}
     GROUP BY
       r.Id_Reserva,
       r.Fecha_Tour,
@@ -413,7 +415,10 @@ async function searchReservas(query, permisos) {
     LIMIT ?
   `;
 
-  const [rows] = await db.query(sql, [exact, like, like, like, like, like, like, exact, LIMITS.reservas]);
+  const params = [exact, like, like, like, like, like, like];
+  if (ownerUserId != null) params.push(ownerUserId);
+  params.push(exact, LIMITS.reservas);
+  const [rows] = await db.query(sql, params);
   return rows.map((row) => ({
     id: `reserva:${row.Id_Reserva}`,
     type: 'reserva',
@@ -750,7 +755,7 @@ function buildModuleResults(query, permisos) {
     }));
 }
 
-async function searchGlobal(query, permisos = []) {
+async function searchGlobal(query, permisos = [], options = {}) {
   const safeQuery = sanitizeQuery(query);
   if (!canSearchQuery(safeQuery)) {
     return {
@@ -766,13 +771,15 @@ async function searchGlobal(query, permisos = []) {
     };
   }
 
+  const clientMode = Boolean(options?.clientMode);
+  const ownerUserId = clientMode ? options?.ownerUserId : null;
   const [reservas, transfers, tours, puntos, servicios, usuarios] = await Promise.all([
-    searchReservas(safeQuery, permisos),
-    searchTransfers(safeQuery, permisos),
-    searchTours(safeQuery, permisos),
-    searchPuntos(safeQuery, permisos),
-    searchServicios(safeQuery, permisos),
-    searchUsuarios(safeQuery, permisos),
+    searchReservas(safeQuery, permisos, ownerUserId),
+    clientMode ? Promise.resolve([]) : searchTransfers(safeQuery, permisos),
+    clientMode ? Promise.resolve([]) : searchTours(safeQuery, permisos),
+    clientMode ? Promise.resolve([]) : searchPuntos(safeQuery, permisos),
+    clientMode ? Promise.resolve([]) : searchServicios(safeQuery, permisos),
+    clientMode ? Promise.resolve([]) : searchUsuarios(safeQuery, permisos),
   ]);
 
   const dates = buildDateResult(safeQuery, permisos);

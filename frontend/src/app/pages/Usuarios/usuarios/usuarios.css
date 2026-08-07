@@ -13,6 +13,16 @@
   text-decoration: none;
 }
 
+.turns-button {
+  min-width: 104px;
+  min-height: 42px;
+  justify-content: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.turns-button i { font-size: 1rem; }
+
 .account-filters {
   display: inline-flex;
   flex: 0 0 auto;
@@ -262,6 +272,8 @@
     flex: 1;
   }
 
+  .turns-button { flex: 1; }
+
   .user-card {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
@@ -322,6 +334,8 @@
   .new-user-button {
     width: 100%;
   }
+
+  .turns-button { width: 100%; }
 
   .account-filters {
     overflow-x: auto;

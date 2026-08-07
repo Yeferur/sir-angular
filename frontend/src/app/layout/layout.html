@@ -93,6 +93,7 @@
           <i class="bx bx-search" aria-hidden="true"></i>
         </button>
 
+        @if (!isClientUser()) {
         <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openAppUpdates()" aria-label="Novedades de la app">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" stroke-width="2"
@@ -102,6 +103,7 @@
             <circle cx="18" cy="6" r="3" fill="currentColor" stroke="none" class="topbar-dot"/>
           </svg>
         </button>
+        }
 
         <button
           class="topbar-icon-btn topbar-icon-btn--secondary topbar-theme-btn"
@@ -161,10 +163,12 @@
                 <i class="bx bx-search" aria-hidden="true"></i>
                 Buscar
               </button>
+              @if (!isClientUser()) {
               <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
                 <i class="bx bx-bell" aria-hidden="true"></i>
                 Novedades
               </button>
+              }
               <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme($event); closeProfileMenu()">
                 <i class="bx" [class.bx-sun]="!isDarkMode" [class.bx-moon]="isDarkMode" aria-hidden="true"></i>
                 {{ isDarkMode ? 'Tema claro' : 'Tema oscuro' }}

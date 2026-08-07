@@ -119,6 +119,72 @@ button { font: inherit; }
 .home-section:nth-of-type(5) { animation-delay: .14s; }
 .home-section--last { padding-bottom: 8px; }
 
+.advisor-shift-section { margin-top: 16px; }
+
+.advisor-shift-card {
+  min-height: 82px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 22%, var(--separator-color));
+  border-radius: var(--radius-lg, 16px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent-blue) 8%, var(--bg-secondary)), var(--bg-secondary) 52%);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--shadow-color) 20%, transparent);
+}
+
+.advisor-shift-icon {
+  width: 43px;
+  height: 43px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-secondary));
+  font-size: 1.25rem;
+}
+
+.advisor-shift-copy { min-width: 0; }
+.advisor-shift-copy > span { display: block; color: var(--text-tertiary); font-size: .62rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.advisor-shift-copy h2,
+.advisor-shift-copy strong { display: block; margin-top: 4px; color: var(--text-primary); font-size: .94rem; font-weight: 820; }
+.advisor-shift-copy small { display: block; margin-top: 3px; color: var(--text-tertiary); font-size: .61rem; }
+
+.advisor-shift-status {
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  font-size: .65rem;
+  font-weight: 790;
+}
+
+.advisor-shift-status > span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); }
+.advisor-shift-status[data-status='en_turno'] { color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 10%, transparent); }
+.advisor-shift-status[data-status='en_turno'] > span { background: var(--accent-green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 12%, transparent); }
+.advisor-shift-status[data-status='fuera_turno'] { color: color-mix(in srgb, var(--accent-yellow) 78%, var(--text-primary)); }
+.advisor-shift-status[data-status='fuera_turno'] > span { background: var(--accent-yellow); }
+
+.advisor-shift-action {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-blue);
+  background: transparent;
+  font-size: .69rem;
+  font-weight: 790;
+  cursor: pointer;
+}
+.advisor-shift-action i { font-size: 1rem; }
+
 .section-heading {
   margin-bottom: 12px;
   display: flex;
@@ -227,6 +293,7 @@ button { font: inherit; }
 }
 
 .detail-grid--single { grid-template-columns: minmax(0, 1fr); }
+.work-grid--single { grid-template-columns: minmax(0, 1fr); }
 
 .day-card,
 .list-card {
@@ -541,6 +608,10 @@ button:focus-visible {
   .capacity-item { padding: 10px 11px; }
   .home-badge--status { display: none; }
   .work-copy small { white-space: normal; line-height: 1.35; }
+  .advisor-shift-card { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
+  .advisor-shift-status { grid-column: 2; justify-self: start; }
+  .advisor-shift-action { grid-column: 3; grid-row: 1 / span 2; font-size: 0; }
+  .advisor-shift-action i { font-size: 1.15rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

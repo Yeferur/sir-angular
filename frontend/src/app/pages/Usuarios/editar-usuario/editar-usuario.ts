@@ -274,7 +274,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
   }
 
   togglePermiso(idPermiso: number): void {
-    if (this.rolePermissionsLoading()) return;
+    if (this.rolePermissionsLoading() || this.isClientRole) return;
     const id = Number(idPermiso);
     this.selectedPermisos = this.selectedPermisos.includes(id)
       ? this.selectedPermisos.filter((permissionId) => permissionId !== id)
@@ -294,6 +294,10 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
   get selectedRole(): Rol | undefined {
     const idRol = Number(this.form.value.Id_Rol || 0);
     return this.roles.find((role) => Number(role.Id_Rol) === idRol);
+  }
+
+  get isClientRole(): boolean {
+    return String(this.selectedRole?.Nombre_Rol || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
   }
 
   get permissionsByModule(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {

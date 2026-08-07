@@ -1,0 +1,68 @@
+@if (loading()) {
+  <app-loading-state label="Consultando tu horario…"></app-loading-state>
+} @else if (error()) {
+  <app-loading-state
+    mode="error"
+    label="No pudimos consultar tu horario"
+    [detail]="error()"
+    actionLabel="Reintentar"
+    (action)="load()">
+  </app-loading-state>
+} @else if (jornada(); as schedule) {
+  <main class="my-schedule-page">
+    <a routerLink="/" class="back-link"><i class="bx bx-left-arrow-alt" aria-hidden="true"></i> Volver al inicio</a>
+
+    <header class="my-schedule-hero">
+      <div>
+        <span class="eyebrow">Mi jornada laboral</span>
+        <h1>Mi horario</h1>
+        <p>Consulta las horas configuradas para tu semana. Este horario es de solo lectura.</p>
+      </div>
+      <span class="current-status" [attr.data-status]="currentStatus()">
+        <span aria-hidden="true"></span>{{ statusLabel() }}
+      </span>
+    </header>
+
+    @if (!schedule.configurado) {
+      <section class="unconfigured-card">
+        <i class="bx bx-calendar-exclamation" aria-hidden="true"></i>
+        <div>
+          <h2>Tu horario aún no está configurado</h2>
+          <p>Un administrador con permiso de turnos debe definir tu jornada semanal.</p>
+        </div>
+      </section>
+    } @else {
+      <section class="schedule-overview">
+        <div><span>Días laborables</span><strong>{{ workingDays() }}</strong></div>
+        <div><span>Horas semanales</span><strong>{{ weeklyHoursLabel() }}</strong></div>
+        <div><span>Zona horaria</span><strong>Bogotá</strong></div>
+      </section>
+
+      <section class="week-card" aria-label="Horario semanal">
+        <div class="week-heading" aria-hidden="true">
+          <span>Día</span><span>Entrada</span><span>Salida</span><span>Duración</span>
+        </div>
+        @for (day of schedule.turnos; track day.diaSemana) {
+          <article class="readonly-day" [class.is-today]="isToday(day)" [class.is-off]="!day.esLaborable">
+            <div class="day-name">
+              <strong>{{ day.nombreDia }}</strong>
+              @if (isToday(day)) { <small>Hoy</small> }
+            </div>
+            @if (day.esLaborable) {
+              <span class="time-value"><small>Entrada</small>{{ timeLabel(day.horaInicio) }}</span>
+              <span class="time-value"><small>Salida</small>{{ timeLabel(day.horaFin) }}</span>
+              <span class="duration-value">{{ durationLabel(day) }}</span>
+            } @else {
+              <span class="rest-value"><i class="bx bx-coffee" aria-hidden="true"></i> Día de descanso</span>
+            }
+          </article>
+        }
+      </section>
+
+      <aside class="readonly-note">
+        <i class="bx bx-lock-alt" aria-hidden="true"></i>
+        <span>Tu horario solo puede ser modificado por administradores que tengan el permiso <strong>TURNOS.ACTUALIZAR</strong>.</span>
+      </aside>
+    }
+  </main>
+}

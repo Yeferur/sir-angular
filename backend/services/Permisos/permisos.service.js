@@ -1,6 +1,49 @@
 const pool = require('../../database/db');
+const {
+  CLIENT_RESERVATION_PERMISSION_CODES,
+  isClientRoleName,
+} = require('../../utils/clientAccess');
+
+async function obtenerRol(executor, userId) {
+  const [rows] = await executor.query(
+    `SELECT r.Id_Rol, r.Nombre_Rol
+       FROM usuarios u
+       LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol AND r.Activo = 1
+      WHERE u.Id_Usuario = ?
+      LIMIT 1`,
+    [userId]
+  );
+  return rows?.[0] || null;
+}
+
+async function consultarPermisosFijosCliente(executor) {
+  const [rows] = await executor.query(
+    `SELECT
+       p.Id_Permiso,
+       p.Codigo_Permiso,
+       p.Descripcion,
+       p.Accion
+     FROM permisos p
+     WHERE p.Codigo_Permiso IN (?)`,
+    [CLIENT_RESERVATION_PERMISSION_CODES]
+  );
+  return rows || [];
+}
+
+async function esRolClientePorId(executor, roleId) {
+  const [rows] = await executor.query(
+    'SELECT Nombre_Rol FROM roles WHERE Id_Rol = ? LIMIT 1',
+    [roleId]
+  );
+  return isClientRoleName(rows?.[0]?.Nombre_Rol);
+}
 
 async function consultarPermisosEfectivos(executor, userId) {
+  const role = await obtenerRol(executor, userId);
+  if (isClientRoleName(role?.Nombre_Rol)) {
+    return consultarPermisosFijosCliente(executor);
+  }
+
   const [rows] = await executor.query(`
     SELECT DISTINCT
       p.Id_Permiso,
@@ -63,6 +106,11 @@ async function obtenerPermisosPorUsuario(userId) {
 async function verificarPermiso(userId, codigoPermiso) {
   const conexion = await pool.getConnection();
   try {
+    const role = await obtenerRol(conexion, userId);
+    if (isClientRoleName(role?.Nombre_Rol)) {
+      return CLIENT_RESERVATION_PERMISSION_CODES.includes(String(codigoPermiso || ''));
+    }
+
     const [rows] = await conexion.query(`
       SELECT
         CASE
@@ -164,6 +212,11 @@ async function obtenerTodosPermisos() {
 async function obtenerPermisosPorRol(idRol) {
   const conexion = await pool.getConnection();
   try {
+    if (await esRolClientePorId(conexion, idRol)) {
+      const permisos = await consultarPermisosFijosCliente(conexion);
+      return permisos.sort((a, b) => String(a.Codigo_Permiso).localeCompare(String(b.Codigo_Permiso)));
+    }
+
     const [rows] = await conexion.query(`
       SELECT
         p.Id_Permiso,
@@ -192,6 +245,13 @@ async function obtenerPermisosPorRol(idRol) {
 async function asignarPermisoARol(idRol, idPermiso) {
   const conexion = await pool.getConnection();
   try {
+    if (await esRolClientePorId(conexion, idRol)) {
+      const error = new Error('Los permisos del rol Cliente son fijos y no se pueden modificar.');
+      error.status = 409;
+      error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
+      throw error;
+    }
+
     await conexion.query(`
       INSERT INTO rol_permisos (Id_Rol, Id_Permiso)
       VALUES (?, ?)
@@ -211,6 +271,13 @@ async function asignarPermisoARol(idRol, idPermiso) {
 async function revocarPermisoDeRol(idRol, idPermiso) {
   const conexion = await pool.getConnection();
   try {
+    if (await esRolClientePorId(conexion, idRol)) {
+      const error = new Error('Los permisos del rol Cliente son fijos y no se pueden modificar.');
+      error.status = 409;
+      error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
+      throw error;
+    }
+
     await conexion.query(`
       DELETE FROM rol_permisos
       WHERE Id_Rol = ? AND Id_Permiso = ?
@@ -247,6 +314,13 @@ async function crearRol(rol) {
 async function actualizarRol(idRol, rol) {
   const conexion = await pool.getConnection();
   try {
+    if (await esRolClientePorId(conexion, idRol)) {
+      const error = new Error('El rol Cliente es un rol del sistema y no se puede modificar.');
+      error.status = 409;
+      error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
+      throw error;
+    }
+
     await conexion.query(`
       UPDATE roles
       SET Nombre_Rol = ?,
@@ -267,6 +341,13 @@ async function actualizarRol(idRol, rol) {
 async function eliminarRol(idRol) {
   const conexion = await pool.getConnection();
   try {
+    if (await esRolClientePorId(conexion, idRol)) {
+      const error = new Error('El rol Cliente es un rol del sistema y no se puede eliminar.');
+      error.status = 409;
+      error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
+      throw error;
+    }
+
     // Verificar que no haya usuarios con este rol
     const [usuarios] = await conexion.query(`
       SELECT COUNT(*) as total FROM usuarios WHERE Id_Rol = ?

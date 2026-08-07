@@ -17,6 +17,7 @@ async function obtenerMisPermisos(req, res) {
     
     return sendSuccess(res, {
       data: {
+        role: req.user?.role || null,
         permisos: permisos.map(p => ({
           codigo: p.Codigo_Permiso,
           accion: p.Accion,
@@ -134,7 +135,11 @@ async function asignarPermiso(req, res) {
     return sendSuccess(res, { data: null, message: 'Permiso asignado correctamente' });
   } catch (error) {
     console.error('Error asignando permiso:', error);
-    return sendError(res, { status: 500, message: 'Error al asignar permiso', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, {
+      status: error.status || 500,
+      message: error.message || 'Error al asignar permiso',
+      errorCode: error.errorCode || 'INTERNAL_ERROR'
+    });
   }
 }
 
@@ -154,7 +159,11 @@ async function revocarPermiso(req, res) {
     return sendSuccess(res, { data: null, message: 'Permiso revocado correctamente' });
   } catch (error) {
     console.error('Error revocando permiso:', error);
-    return sendError(res, { status: 500, message: 'Error al revocar permiso', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, {
+      status: error.status || 500,
+      message: error.message || 'Error al revocar permiso',
+      errorCode: error.errorCode || 'INTERNAL_ERROR'
+    });
   }
 }
 
@@ -202,7 +211,11 @@ async function actualizarRol(req, res) {
     return sendSuccess(res, { data: null, message: 'Rol actualizado correctamente' });
   } catch (error) {
     console.error('Error actualizando rol:', error);
-    return sendError(res, { status: 500, message: 'Error al actualizar rol', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, {
+      status: error.status || 500,
+      message: error.message || 'Error al actualizar rol',
+      errorCode: error.errorCode || 'INTERNAL_ERROR'
+    });
   }
 }
 
@@ -218,6 +231,10 @@ async function eliminarRol(req, res) {
     return sendSuccess(res, { data: null, message: 'Rol eliminado correctamente' });
   } catch (error) {
     console.error('Error eliminando rol:', error);
+
+    if (error.errorCode === 'CLIENT_ROLE_IMMUTABLE') {
+      return sendError(res, { status: 409, message: error.message, errorCode: error.errorCode });
+    }
     
     if (error.message.includes('usuarios asignados')) {
       return sendError(res, { status: 400, message: error.message, errorCode: 'ROLE_IN_USE' });

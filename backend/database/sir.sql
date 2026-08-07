@@ -8981,7 +8981,7 @@ CREATE TABLE IF NOT EXISTS `rol_permisos` (
   PRIMARY KEY (`Id_Rol_Permiso`),
   UNIQUE KEY `ux_rol_permisos` (`Id_Rol`,`Id_Permiso`),
   KEY `idx_rol_permisos_permiso` (`Id_Permiso`)
-) ENGINE=InnoDB AUTO_INCREMENT=114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `rol_permisos`
@@ -9040,7 +9040,10 @@ INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asi
 (110, 1, 106, '2026-06-14 03:24:04'),
 (111, 1, 108, '2026-08-05 00:00:00'),
 (112, 1, 109, '2026-08-05 00:00:00'),
-(113, 2, 108, '2026-08-05 00:00:00');
+(113, 2, 108, '2026-08-05 00:00:00'),
+(114, 6, 5, '2026-08-06 00:00:00'),
+(115, 6, 6, '2026-08-06 00:00:00'),
+(116, 6, 7, '2026-08-06 00:00:00');
 
 -- --------------------------------------------------------
 

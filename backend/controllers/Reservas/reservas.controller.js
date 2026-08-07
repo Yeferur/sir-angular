@@ -26,6 +26,7 @@ const {
   resolverComprobanteSeguroPorNombre,
   eliminarComprobantePagoReserva,
 } = require('../../services/Reservas/reservas.service');
+const { clientOwnerIdFromRequest } = require('../../utils/clientAccess');
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -83,11 +84,16 @@ const asyncHandler = fn => (req, res, next) => {
 
 // --------- LISTADOS / CATÁLOGOS ----------
 exports.getReservas = asyncHandler(async (req, res) => {
-  return sendSuccess(res, { data: await filtrarReservas(req.query), message: 'Reservas obtenidas correctamente' });
+  return sendSuccess(res, {
+    data: await filtrarReservas(req.query, clientOwnerIdFromRequest(req)),
+    message: 'Reservas obtenidas correctamente'
+  });
 });
 
 exports.getReserva = asyncHandler(async (req, res) => {
-  return sendSuccess(res, { data: await obtenerReserva(req.query.Id_Reserva), message: 'Reserva obtenida correctamente' });
+  const data = await obtenerReserva(req.query.Id_Reserva, clientOwnerIdFromRequest(req));
+  if (!data) return sendError(res, { status: 404, message: 'Reserva no encontrada', errorCode: 'RESERVA_NOT_FOUND' });
+  return sendSuccess(res, { data, message: 'Reserva obtenida correctamente' });
 });
 
 exports.getCupos = asyncHandler(async (req, res) => {
@@ -131,7 +137,7 @@ exports.getComisiones = asyncHandler(async (req, res) => {
 
 exports.getReservaDetalle = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const data = await obtenerReservaDetalle(id);
+  const data = await obtenerReservaDetalle(id, clientOwnerIdFromRequest(req));
   if (!data) return sendError(res, { status: 404, message: 'Reserva no encontrada', errorCode: 'RESERVA_NOT_FOUND' });
   return sendSuccess(res, { data, message: 'Detalle de reserva obtenido correctamente' });
 });
@@ -148,7 +154,12 @@ exports.checkDniDuplicado = asyncHandler(async (req, res) => {
   if (!dni || !fecha) {
     return sendError(res, { status: 400, message: 'Se requieren DNI y fecha', errorCode: 'MISSING_PARAMS' });
   }
-  const resultado = await verificarDniDuplicado(dni, fecha, excludeReservaId);
+  const resultado = await verificarDniDuplicado(
+    dni,
+    fecha,
+    excludeReservaId,
+    clientOwnerIdFromRequest(req)
+  );
   return sendSuccess(res, { data: resultado, message: 'Validación de DNI completada' });
 });
 
@@ -156,14 +167,17 @@ exports.getReservaHistorialCambios = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { limit } = req.query;
   return sendSuccess(res, {
-    data: await obtenerHistorialCambiosReserva(id, limit),
+    data: await obtenerHistorialCambiosReserva(id, limit, clientOwnerIdFromRequest(req)),
     message: 'Historial forense obtenido correctamente'
   });
 });
 
 exports.getComprobanteSeguro = asyncHandler(async (req, res) => {
   const { nombreArchivo } = req.params;
-  const resolved = await resolverComprobanteSeguroPorNombre(nombreArchivo);
+  const resolved = await resolverComprobanteSeguroPorNombre(
+    nombreArchivo,
+    clientOwnerIdFromRequest(req)
+  );
   if (!resolved) {
     return sendError(res, { status: 404, message: 'Comprobante no encontrado', errorCode: 'FILE_NOT_FOUND' });
   }
@@ -175,7 +189,13 @@ exports.deleteComprobantePagoReserva = asyncHandler(async (req, res) => {
   const userId = req.user?.id || null;
   const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
 
-  const data = await eliminarComprobantePagoReserva(id, idPago, userId, clientIp);
+  const data = await eliminarComprobantePagoReserva(
+    id,
+    idPago,
+    userId,
+    clientIp,
+    clientOwnerIdFromRequest(req)
+  );
   return sendSuccess(res, { data, message: 'Comprobante eliminado correctamente' });
 });
 
@@ -196,11 +216,32 @@ exports.saveReserva = [
       const err = new Error('Payload JSON inválido'); err.status = 400; throw err;
     }
 
+    const ownerUserId = clientOwnerIdFromRequest(req);
+    const sourceReservationId = payload?.Id_Reserva_Origen
+      || payload?.reservaOrigen
+      || payload?.reservaOrigenId
+      || null;
+    if (ownerUserId != null && payload?.esDuplicado && sourceReservationId) {
+      const source = await obtenerReservaDetalle(sourceReservationId, ownerUserId);
+      if (!source) {
+        const err = new Error('Reserva no encontrada');
+        err.status = 404;
+        err.errorCode = 'RESERVA_NOT_FOUND';
+        throw err;
+      }
+    }
+
     const filesMap = buildFilesMap(Array.isArray(req.files) ? req.files : []);
 
     const userId = req.user?.id || null;
     const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
-    const result = await crearReservaConPasajerosYPagos(payload, filesMap, userId, clientIp);
+    const result = await crearReservaConPasajerosYPagos(
+      payload,
+      filesMap,
+      userId,
+      clientIp,
+      ownerUserId
+    );
 
     return sendSuccess(res, { data: result, message: 'Reserva creada correctamente', status: 201 });
   })
@@ -227,7 +268,14 @@ exports.updateReserva = [
 
     const userId = req.user?.id || null;
     const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
-    const result = await actualizarReservaConPasajerosYPagos(id, payload, filesMap, userId, clientIp);
+    const result = await actualizarReservaConPasajerosYPagos(
+      id,
+      payload,
+      filesMap,
+      userId,
+      clientIp,
+      clientOwnerIdFromRequest(req)
+    );
 
     return sendSuccess(res, { data: result, message: 'Reserva actualizada correctamente' });
   })
@@ -237,7 +285,7 @@ exports.cancelReserva = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user?.id || null;
   const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
-  const data = await cancelarReservaSvc(id, userId, clientIp);
+  const data = await cancelarReservaSvc(id, userId, clientIp, clientOwnerIdFromRequest(req));
   return sendSuccess(res, { data, message: 'Reserva cancelada correctamente' });
 });
 
@@ -245,6 +293,6 @@ exports.deleteReserva = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user?.id || null;
   const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
-  const data = await eliminarReservaSvc(id, userId, clientIp);
+  const data = await eliminarReservaSvc(id, userId, clientIp, clientOwnerIdFromRequest(req));
   return sendSuccess(res, { data, message: 'Reserva eliminada correctamente' });
 });

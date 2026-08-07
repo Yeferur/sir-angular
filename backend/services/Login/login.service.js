@@ -14,7 +14,11 @@ const PASSWORD_RESET_TOKEN_TTL_MINUTES = 10;
  */
 async function findUserByUsername(username) {
   const [rows] = await db.query(
-    'SELECT * FROM usuarios WHERE Activo = 1 AND (Id_Usuario = ? OR Usuario = ? OR Correo = ?)',
+    `SELECT u.*, r.Nombre_Rol AS Rol
+       FROM usuarios u
+       LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+      WHERE u.Activo = 1
+        AND (u.Id_Usuario = ? OR u.Usuario = ? OR u.Correo = ?)`,
     [username, username, username]
   );
   return rows[0];

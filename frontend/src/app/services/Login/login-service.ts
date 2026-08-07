@@ -11,11 +11,13 @@ interface JwtPayload {
   name: string;
   apellidos: string;
   email: string;
+  role?: string | null;
   exp: number;
 }
 
 interface LoginResponse {
   token: string;
+  user?: { role?: string | null };
   permisos?: string[];
   menu?: MenuItem[];
 }
@@ -101,7 +103,8 @@ private setSession(token: string) {
 
       this.permisosService.setSessionData(
         response.permisos || [],
-        response.menu || []
+        response.menu || [],
+        response.user?.role || this.decodeToken(token)?.role || null
       );
 
       const loaded = await this.permisosService.loadSessionData({ token });
@@ -215,7 +218,9 @@ private setSession(token: string) {
 
     try {
       this.setSession(token);
-      const loaded = await this.permisosService.loadSessionData({ token });
+      // Al reconstruir la sesión se consulta el backend para recoger permisos
+      // nuevos o revocados; el caché local no debe ocultar cambios administrativos.
+      const loaded = await this.permisosService.asegurarPermisosCargados({ token, forceBackend: true });
       if (!loaded) {
         throw new Error('SESSION_PREPARATION_FAILED');
       }

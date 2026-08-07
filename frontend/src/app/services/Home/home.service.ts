@@ -10,12 +10,13 @@ export interface HomeProfile {
   name: string;
   avatar: string | null;
   role: string;
-  mode: 'management' | 'advisor';
+  mode: 'management' | 'advisor' | 'client';
 }
 
 export interface HomeCapabilities {
   management: boolean;
   operations: boolean;
+  clientMode: boolean;
   canCreateReservations: boolean;
   canReadReservations: boolean;
   canUpdateReservations: boolean;

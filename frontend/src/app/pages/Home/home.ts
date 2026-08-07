@@ -24,8 +24,37 @@ import {
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { CountUpDirective } from '../Inicio/count-up.directive';
+import { AsesorTurnos, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 
 const UPDATE_FEEDBACK_MS = 1100;
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  GUARDAR_LISTADO: 'Guardó la programación de buses',
+  GUARDAR_PROGRAMACION_PRIVADA: 'Guardó la programación de un servicio privado',
+  PAGAR_COMISIONES: 'Marcó comisiones como pagadas',
+  REABRIR_COMISIONES: 'Reabrió comisiones para revisión',
+  ACTUALIZAR_DATOS_PAGO_COMISION: 'Actualizó los datos de pago de comisiones',
+  CREAR_BENEFICIARIO_COMISION: 'Agregó un beneficiario de comisión',
+  ACTUALIZAR_BENEFICIARIO_COMISION: 'Actualizó un beneficiario de comisión',
+  ACTUALIZAR_ASISTENCIA: 'Actualizó la asistencia de pasajeros',
+  CAMBIAR_AFORO_TOUR: 'Actualizó el aforo de un tour',
+  REORDENAR_RUTA: 'Reordenó una ruta de recogida',
+  CREAR_HORARIOS: 'Configuró horarios de puntos de encuentro',
+  UPSERT_PRECIOS: 'Actualizó los precios de un tour',
+  EXPORTAR_EXCEL_LISTADO: 'Descargó un listado de programación',
+  EXPORTAR_EXCEL_PRIVADO: 'Descargó el listado de un servicio privado',
+  ACTUALIZAR_PERFIL: 'Actualizó su información personal',
+  ACTUALIZAR_AVATAR: 'Cambió su foto de perfil',
+  ELIMINAR_AVATAR: 'Eliminó su foto de perfil',
+  AGREGAR_COMPROBANTE_TRANSFER: 'Agregó un comprobante a un transfer',
+  ELIMINAR_COMPROBANTE_RESERVA: 'Eliminó un comprobante de una reserva',
+  LOGIN: 'Inició sesión',
+  LOGOUT: 'Cerró sesión',
+  LOGOUT_ALL_SESSIONS: 'Cerró todas sus sesiones',
+  PASSWORD_RESET_REQUEST: 'Solicitó restablecer su contraseña',
+  PASSWORD_CHANGED_BY_RESET: 'Cambió su contraseña',
+  FORCE_LOGOUT_USER: 'Cerró las sesiones de un usuario',
+};
 
 interface QuickAction {
   label: string;
@@ -50,6 +79,7 @@ export class HomeComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly turnosService = inject(TurnosService);
 
   summary: HomeSummary | null = null;
   loading = true;
@@ -57,6 +87,9 @@ export class HomeComponent implements OnInit {
   dataUpdated = false;
   error = '';
   connectionState: WebSocketConnectionState = 'connecting';
+  mySchedule: AsesorTurnos | null = null;
+  scheduleLoading = false;
+  scheduleError = '';
   private refreshTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackStartTimer?: ReturnType<typeof setTimeout>;
@@ -97,7 +130,7 @@ export class HomeComponent implements OnInit {
     return [
       {
         label: 'Nueva reserva',
-        detail: 'Registrar una venta',
+        detail: capabilities.clientMode ? 'Crear una reserva' : 'Registrar una venta',
         icon: 'bx bx-calendar-plus',
         route: '/Reservas/NuevaReserva',
         visible: capabilities.canCreateReservations,
@@ -138,6 +171,20 @@ export class HomeComponent implements OnInit {
         route: '/Informes',
         visible: capabilities.canReadReports,
       },
+      {
+        label: 'Mi perfil',
+        detail: 'Actualizar mis datos',
+        icon: 'bx bx-user-circle',
+        route: '/Perfil/Editar',
+        visible: capabilities.clientMode,
+      },
+      {
+        label: 'Mi horario',
+        detail: 'Consultar mi jornada',
+        icon: 'bx bx-time-five',
+        route: '/MiHorario',
+        visible: this.summary?.profile.mode === 'advisor',
+      },
     ].filter((action) => action.visible);
   }
 
@@ -164,6 +211,9 @@ export class HomeComponent implements OnInit {
           const changed = !!this.summary && this.summaryChanged(this.summary, summary);
           this.summary = summary;
           this.error = '';
+          if (summary.profile.mode === 'advisor' && !this.mySchedule && !this.scheduleLoading) {
+            this.loadMySchedule();
+          }
           if (changed) this.showUpdateFeedback();
         },
         error: () => {
@@ -195,12 +245,13 @@ export class HomeComponent implements OnInit {
   }
 
   overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail: string; detailValue?: number; icon: string }> {
-    return [
+    const metrics = [
       { label: 'Reservas', value: day.reservations, detail: 'privadas', detailValue: day.privateReservations, icon: 'bx bx-calendar-check' },
       { label: 'Pasajeros', value: day.passengers, detail: 'en tours', icon: 'bx bx-group' },
       { label: 'Transfers', value: day.transfers, detail: 'servicios', icon: 'bx bx-car' },
       { label: 'Pasajeros', value: day.transferPassengers, detail: 'en transfers', icon: 'bx bx-user-voice' },
     ];
+    return this.summary?.capabilities.canReadTransfers ? metrics : metrics.slice(0, 2);
   }
 
   dayLabel(date: string): string {
@@ -231,20 +282,87 @@ export class HomeComponent implements OnInit {
     return String(value).slice(0, 5);
   }
 
+  get todayShift(): TurnoDia | null {
+    if (!this.mySchedule?.configurado) return null;
+    const weekday = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Bogota',
+      weekday: 'short',
+    }).format(new Date());
+    const dayNumber: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+    return this.mySchedule.turnos.find((day) => day.diaSemana === dayNumber[weekday]) || null;
+  }
+
+  get scheduleStatusLabel(): string {
+    if (!this.mySchedule?.configurado) return 'Sin configurar';
+    return this.mySchedule.estadoActual === 'en_turno' ? 'En turno' : 'Fuera de turno';
+  }
+
+  get todayShiftLabel(): string {
+    if (!this.mySchedule?.configurado) return 'Tu jornada aún no ha sido configurada';
+    const shift = this.todayShift;
+    if (!shift?.esLaborable) return 'Hoy es tu día de descanso';
+    return `${this.shiftTimeLabel(shift.horaInicio)} – ${this.shiftTimeLabel(shift.horaFin)}`;
+  }
+
+  shiftTimeLabel(value: string | null): string {
+    if (!value) return '—';
+    const [hours, minutes] = value.split(':').map(Number);
+    const period = hours >= 12 ? 'p. m.' : 'a. m.';
+    const displayHour = hours % 12 || 12;
+    return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
+  }
+
   activityLabel(activity: HomeActivity): string {
-    const action = String(activity.Accion || '').toLowerCase();
-    const table = this.entityLabel(activity.Tabla);
-    if (action.includes('cre')) return `Creó ${table}`;
-    if (action.includes('actual') || action.includes('edit')) return `Actualizó ${table}`;
-    if (action.includes('elimin') || action.includes('anul')) return `Eliminó ${table}`;
-    return `${activity.Accion || 'Actividad'} · ${table}`;
+    const action = this.normalizeActivityCode(activity.Accion);
+    const explicitLabel = ACTIVITY_LABELS[action];
+    if (explicitLabel) return explicitLabel;
+
+    const entity = this.entityLabel(activity);
+    if (action === 'ACTUALIZAR_ESTADO_AUTOMATICO') return `Se actualizó automáticamente ${entity}`;
+    if (action.includes('CREAR_O_ACTUALIZAR')) return `Guardó ${entity}`;
+    if (action.includes('CREAR')) return `Creó ${entity}`;
+    if (action.includes('AGREGAR')) return `Agregó ${entity}`;
+    if (action.includes('ACTUALIZAR') || action.includes('EDITAR') || action.includes('CAMBIAR')) return `Actualizó ${entity}`;
+    if (action.includes('ELIMINAR') || action.includes('ANULAR')) return `Eliminó ${entity}`;
+    if (action.includes('CANCELAR')) return `Canceló ${entity}`;
+    if (action.includes('DESACTIVAR')) return `Desactivó ${entity}`;
+    if (action.includes('EXPORTAR')) return `Descargó información de ${entity}`;
+    if (action.includes('GUARDAR')) return `Guardó ${entity}`;
+    return `Actualizó ${entity}`;
   }
 
   activityIcon(activity: HomeActivity): string {
-    const action = String(activity.Accion || '').toLowerCase();
-    if (action.includes('cre')) return 'bx bx-plus';
-    if (action.includes('elimin') || action.includes('anul')) return 'bx bx-trash';
+    const action = this.normalizeActivityCode(activity.Accion);
+    if (action.includes('PAGAR')) return 'bx bx-wallet';
+    if (action.includes('REABRIR')) return 'bx bx-refresh';
+    if (action.includes('GUARDAR')) return 'bx bx-save';
+    if (action.includes('EXPORTAR')) return 'bx bx-download';
+    if (action.includes('LOGIN')) return 'bx bx-log-in';
+    if (action.includes('LOGOUT')) return 'bx bx-log-out';
+    if (action.includes('CREAR') || action.includes('AGREGAR')) return 'bx bx-plus';
+    if (action.includes('ELIMINAR') || action.includes('ANULAR')) return 'bx bx-trash';
+    if (action.includes('CANCELAR') || action.includes('DESACTIVAR')) return 'bx bx-x-circle';
     return 'bx bx-edit-alt';
+  }
+
+  activityUserName(value: string | null | undefined): string {
+    const safe = String(value || '').trim();
+    if (!safe || safe !== safe.toLocaleUpperCase('es')) return safe;
+    return safe
+      .toLocaleLowerCase('es')
+      .replace(/(^|[\s'-])(\p{L})/gu, (_, separator: string, letter: string) => `${separator}${letter.toLocaleUpperCase('es')}`);
+  }
+
+  activityDate(value: string): string {
+    const raw = String(value || '').trim();
+    const date = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
+    return new Intl.DateTimeFormat('es-CO', {
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
   }
 
   processTone(process: HomeProcess): string {
@@ -295,6 +413,29 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  private loadMySchedule(): void {
+    this.scheduleLoading = true;
+    this.scheduleError = '';
+    this.cdr.markForCheck();
+    this.turnosService.obtenerMiJornada()
+      .pipe(
+        finalize(() => {
+          this.scheduleLoading = false;
+          this.cdr.markForCheck();
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (response) => {
+          this.mySchedule = response.jornada;
+          this.scheduleError = '';
+        },
+        error: () => {
+          this.scheduleError = 'No pudimos consultar tu jornada en este momento.';
+        },
+      });
+  }
+
   private showUpdateFeedback(): void {
     this.dataUpdated = false;
     if (this.updateFeedbackTimer) clearTimeout(this.updateFeedbackTimer);
@@ -332,13 +473,26 @@ export class HomeComponent implements OnInit {
     return JSON.stringify(comparable(previous)) !== JSON.stringify(comparable(current));
   }
 
-  private entityLabel(value: string): string {
-    const normalized = String(value || '').toLowerCase();
-    if (normalized.includes('reserva')) return 'una reserva';
-    if (normalized.includes('transfer')) return 'un transfer';
-    if (normalized.includes('pasaj')) return 'un pasajero';
-    if (normalized.includes('tour')) return 'un tour';
-    if (normalized.includes('usuario')) return 'un usuario';
-    return 'un registro';
+  private normalizeActivityCode(value: string): string {
+    return String(value || '').trim().toLocaleUpperCase('es').replace(/[\s-]+/g, '_');
+  }
+
+  private entityLabel(activity: HomeActivity): string {
+    const table = String(activity.Tabla || '').trim().toLocaleLowerCase('es');
+    const id = String(activity.Id_Registro || '').trim();
+    if (table.includes('reserva')) return id ? `la reserva #${id}` : 'una reserva';
+    if (table.includes('transfer')) return id ? `el transfer #${id}` : 'un transfer';
+    if (table.includes('pasaj')) return 'los datos de un pasajero';
+    if (table === 'tours' || table === 'tour') return 'un tour';
+    if (table.includes('tour_precios') || table.includes('precio')) return 'los precios de un tour';
+    if (table.includes('punto')) return 'un punto de encuentro';
+    if (table.includes('horario')) return 'los horarios de recogida';
+    if (table.includes('usuario')) return 'un usuario';
+    if (table.includes('aforo')) return 'el aforo de un tour';
+    if (table.includes('liquidacion') || table.includes('comision')) return 'las comisiones';
+    if (table.includes('programacion') || table.includes('listado')) return 'la programación de buses';
+    if (table.includes('seguro')) return 'la información de seguros';
+    if (table.includes('confirmacion') || table.includes('asistencia')) return 'la asistencia de pasajeros';
+    return 'la información operativa';
   }
 }

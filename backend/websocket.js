@@ -57,7 +57,12 @@ function initWebSocket(httpServer) {
             const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
 
             const [rows] = await db.query(
-              'SELECT 1 FROM sesiones WHERE Token = ? LIMIT 1',
+              `SELECT s.Id_Usuario, r.Nombre_Rol
+                 FROM sesiones s
+                 INNER JOIN usuarios u ON u.Id_Usuario = s.Id_Usuario AND u.Activo = 1
+                 LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+                WHERE s.Token = ?
+                LIMIT 1`,
               [data.token]
             );
 
@@ -70,9 +75,11 @@ function initWebSocket(httpServer) {
               return;
             }
 
-            userId = Number(decoded.id);
+            userId = Number(rows[0].Id_Usuario || decoded.id);
             sessionToken = String(data.token || '');
-            await websocketManager.addClient(userId, sessionToken, ws);
+            await websocketManager.addClient(userId, sessionToken, ws, {
+              role: rows[0].Nombre_Rol || null,
+            });
 
             ws.send(JSON.stringify({ type: 'success', message: 'Autenticado' }));
             return;

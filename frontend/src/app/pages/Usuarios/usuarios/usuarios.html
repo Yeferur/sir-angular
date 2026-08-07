@@ -51,6 +51,13 @@
           </button>
         </div>
 
+        @if (canViewAdvisorSchedules()) {
+          <a class="btn-secondary turns-button" routerLink="/Turnos">
+            <i class="bx bx-time-five" aria-hidden="true"></i>
+            Turnos
+          </a>
+        }
+
         @if (canCreateUsers()) {
           <a class="btn-primary new-user-button" routerLink="/Usuarios/NuevoUsuario">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"

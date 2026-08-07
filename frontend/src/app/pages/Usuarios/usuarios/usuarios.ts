@@ -76,6 +76,11 @@ export class Usuarios {
     return this.permisosService.tienePermiso('USUARIOS.CREAR');
   }
 
+  canViewAdvisorSchedules(): boolean {
+    const role = String(this.permisosService.getRoleSnapshot() || '').trim().toLocaleLowerCase('es-CO');
+    return role === 'administrador' && this.permisosService.tienePermiso('TURNOS.LEER');
+  }
+
   canUpdateUsers(): boolean {
     return this.permisosService.tienePermiso('USUARIOS.ACTUALIZAR');
   }

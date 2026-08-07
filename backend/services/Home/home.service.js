@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { isClientRoleName } = require('../../utils/clientAccess');
 
 const ACTIVE_RESERVATION_SQL = "UPPER(TRIM(COALESCE(r.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO')";
 const ACTIVE_TRANSFER_SQL = "UPPER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ANULADA','ANULADO','ELIMINADA','ELIMINADO')";
@@ -57,7 +58,7 @@ async function getProfile(userId) {
   return rows?.[0] || null;
 }
 
-async function getOverview(userId, dates, personalScope) {
+async function getOverview(userId, dates, personalScope, includeTransfers = true) {
   const reservationScope = personalScope ? 'AND r.Creado_Por = ?' : '';
   const transferScope = personalScope ? 'AND tr.Creado_Por = ?' : '';
   const reservationParams = personalScope
@@ -84,7 +85,7 @@ async function getOverview(userId, dates, personalScope) {
     reservationParams,
   );
 
-  const [transferRows] = await db.query(
+  const [transferRows] = includeTransfers ? await db.query(
     `SELECT
        DATE_FORMAT(tr.Fecha_Transfer, '%Y-%m-%d') AS Fecha,
        COUNT(*) AS Transfers,
@@ -95,7 +96,7 @@ async function getOverview(userId, dates, personalScope) {
        ${transferScope}
      GROUP BY tr.Fecha_Transfer`,
     transferParams,
-  );
+  ) : [[]];
 
   const combined = new Map();
   for (const row of reservationRows || []) {
@@ -109,7 +110,7 @@ async function getOverview(userId, dates, personalScope) {
   return normalizeOverview(Array.from(combined.values()), dates);
 }
 
-async function getPersonalWork(userId, dates, permissions) {
+async function getPersonalWork(userId, dates, permissions, clientMode = false) {
   const canReadReservations = hasAnyPermission(permissions, 'RESERVAS.LEER');
   const canReadTransfers = hasAnyPermission(permissions, 'TRANSFERS.LEER');
   const upcomingEnd = bogotaDate(14);
@@ -170,7 +171,7 @@ async function getPersonalWork(userId, dates, permissions) {
     )
     : Promise.resolve([[{ Total: 0 }]]);
 
-  const activityPromise = db.query(
+  const activityPromise = clientMode ? Promise.resolve([[]]) : db.query(
     `SELECT h.Accion, h.Tabla, h.Id_Registro, h.Fecha_Hora_Registro
        FROM historial h
       WHERE h.Id_Usuario = ?
@@ -378,6 +379,7 @@ async function getHomeSummary(userId, permissions = []) {
   }
 
   const dates = { today: bogotaDate(0), tomorrow: bogotaDate(1) };
+  const clientMode = isClientRoleName(profile.Nombre_Rol);
   const management = hasAnyPermission(permissions, 'INFORMES.LEER', 'USUARIOS.LEER');
   const operations = hasAnyPermission(
     permissions,
@@ -391,8 +393,8 @@ async function getHomeSummary(userId, permissions = []) {
   const personalScope = !management;
 
   const [overview, personalWork, processes, capacityAlerts, recentActivity] = await Promise.all([
-    getOverview(userId, dates, personalScope),
-    getPersonalWork(userId, dates, permissions),
+    getOverview(userId, dates, personalScope, !clientMode && hasAnyPermission(permissions, 'TRANSFERS.LEER')),
+    getPersonalWork(userId, dates, permissions, clientMode),
     operations ? getOperationalProcesses(dates, permissions) : Promise.resolve([]),
     operations && hasAnyPermission(permissions, 'AFOROS.LEER', 'INICIO.LEER')
       ? getCapacityAlerts(dates)
@@ -408,11 +410,12 @@ async function getHomeSummary(userId, permissions = []) {
       name: profile.Nombres_Apellidos,
       avatar: profile.Avatar || null,
       role: profile.Nombre_Rol || 'Usuario',
-      mode: management ? 'management' : 'advisor',
+      mode: clientMode ? 'client' : management ? 'management' : 'advisor',
     },
     capabilities: {
       management,
       operations,
+      clientMode,
       canCreateReservations: hasAnyPermission(permissions, 'RESERVAS.CREAR'),
       canReadReservations: hasAnyPermission(permissions, 'RESERVAS.LEER'),
       canUpdateReservations: hasAnyPermission(permissions, 'RESERVAS.ACTUALIZAR'),

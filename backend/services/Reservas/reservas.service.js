@@ -5,6 +5,7 @@ const path = require('path');
 const websocketManager = require('../../websocketManager');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
+const { assertReservationOwner } = require('../../utils/clientAccess');
 const fsp = fs.promises;
 
 /* ===========================
@@ -108,17 +109,23 @@ async function eliminarArchivoComprobanteFisico(relativePath) {
   }
 }
 
-async function resolverComprobanteSeguroPorNombre(nombreArchivo) {
+async function resolverComprobanteSeguroPorNombre(nombreArchivo, ownerUserId = null) {
   const fileName = String(nombreArchivo || '').trim();
   if (!COMPROBANTE_FILE_RE.test(fileName)) return null;
 
+  const ownerCondition = ownerUserId == null ? '' : 'AND r.Creado_Por = ?';
+  const params = [`%/${fileName}`];
+  if (ownerUserId != null) params.push(ownerUserId);
+
   const [rows] = await db.query(
-    `SELECT Ruta_Comprobante
-       FROM pagos_reservas
-      WHERE Ruta_Comprobante LIKE ?
+    `SELECT pr.Ruta_Comprobante
+       FROM pagos_reservas pr
+       INNER JOIN reservas r ON r.Id_Reserva = pr.Id_Reserva
+      WHERE pr.Ruta_Comprobante LIKE ?
+        ${ownerCondition}
       ORDER BY Id_Pago DESC
       LIMIT 1`,
-    [`%/${fileName}`]
+    params
   );
 
   if (!rows?.length) return null;
@@ -187,7 +194,13 @@ function normalizarNacionalidad(value) {
   return normalized ? normalized.slice(0, 80) : null;
 }
 
-async function validarDnisUnicosPorFecha(connection, pasajeros, fechaTour, idReservaExcluir = null) {
+async function validarDnisUnicosPorFecha(
+  connection,
+  pasajeros,
+  fechaTour,
+  idReservaExcluir = null,
+  privacyOwnerUserId = null
+) {
   const lista = Array.isArray(pasajeros) ? pasajeros : [];
   const dnis = [...new Set(
     lista
@@ -215,7 +228,8 @@ async function validarDnisUnicosPorFecha(connection, pasajeros, fechaTour, idRes
   let sql = `
     SELECT
       UPPER(REPLACE(TRIM(P.DNI), ' ', '')) AS DNI,
-      R.Id_Reserva
+      R.Id_Reserva,
+      R.Creado_Por
     FROM pasajeros P
     INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
     WHERE DATE(R.Fecha_Tour) = DATE(?)
@@ -233,7 +247,11 @@ async function validarDnisUnicosPorFecha(connection, pasajeros, fechaTour, idRes
   if (rows?.length) {
     const first = rows[0];
     const dni = normalizarDni(first.DNI);
-    const error = new Error(`El pasajero con DNI ${dni} ya tiene una reserva para la fecha ${normalizarFechaYMD(fechaTour)}: ${first.Id_Reserva}.`);
+    const canRevealReservationId = privacyOwnerUserId == null
+      || Number(first.Creado_Por) === Number(privacyOwnerUserId);
+    const error = new Error(canRevealReservationId
+      ? `El pasajero con DNI ${dni} ya tiene una reserva para la fecha ${normalizarFechaYMD(fechaTour)}: ${first.Id_Reserva}.`
+      : `El pasajero con DNI ${dni} ya tiene una reserva para la fecha ${normalizarFechaYMD(fechaTour)}.`);
     error.status = 409;
     error.errorCode = 'DNI_DUPLICADO_EN_FECHA';
     throw error;
@@ -629,6 +647,7 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
         r.Nombre_Reportante,
         r.Id_Horario,
         r.Id_Moneda,
+        r.Creado_Por,
         h.Id_Tour,
         h.Id_Tour AS Id_Tour_Actual
        FROM reservas r
@@ -772,7 +791,7 @@ async function aplicarCuposReserva({ conn, impacto, excludeReservaId = null }) {
 /* ===========================
  * LISTADOS / LECTURA
  * =========================== */
-async function filtrarReservas(q) {
+async function filtrarReservas(q, ownerUserId = null) {
   const params = (typeof q === 'object' && q !== null) ? q : { q: String(q || '') };
   const requestedPage = Math.max(1, Number.parseInt(params.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(params.limit, 10) || 25));
@@ -789,6 +808,11 @@ async function filtrarReservas(q) {
   const values = [];
 
   const like = (v) => `%${v}%`;
+
+  if (ownerUserId != null) {
+    conds.push('r.Creado_Por = ?');
+    values.push(ownerUserId);
+  }
 
   if (Fecha_Tour) { conds.push(`r.Fecha_Tour = ?`); values.push(Fecha_Tour); }
 
@@ -921,7 +945,10 @@ async function filtrarReservas(q) {
 }
 
 
-async function obtenerReserva(Id_Reserva) {
+async function obtenerReserva(Id_Reserva, ownerUserId = null) {
+  const ownerCondition = ownerUserId == null ? '' : 'AND r.Creado_Por = ?';
+  const params = [Id_Reserva];
+  if (ownerUserId != null) params.push(ownerUserId);
   const [cabRows] = await db.query(
     `
     SELECT 
@@ -966,9 +993,10 @@ async function obtenerReserva(Id_Reserva) {
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN puntos pto ON pto.Id_Punto = h.Id_Punto
     WHERE r.Id_Reserva = ?
+      ${ownerCondition}
     LIMIT 1
     `,
-    [Id_Reserva]
+    params
   );
 
   if (!cabRows.length) return null;
@@ -1368,7 +1396,13 @@ async function verificarCupos(Fecha, Id_Tour, Cantidad, Id_Reserva) {
 /* ===========================
  * CREACIÓN (TRANSACCIÓN)
  * =========================== */
-async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = null, clientIp = null) {
+async function crearReservaConPasajerosYPagos(
+  payload,
+  filesMap = {},
+  userId = null,
+  clientIp = null,
+  privacyOwnerUserId = null
+) {
   let conn;
   try {
     if (!payload || !payload.cabeceraReserva) {
@@ -1396,7 +1430,13 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
     const tipoReserva = r.Tipo_Reserva || 'Grupal';
     const pasajerosArray = Array.isArray(payload.pasajeros) ? payload.pasajeros : [];
     const cantidadSolicitada = contarCuposSolicitados(pasajerosArray);
-    await validarDnisUnicosPorFecha(conn, pasajerosArray, normalizarFechaYMD(r.Fecha_Tour));
+    await validarDnisUnicosPorFecha(
+      conn,
+      pasajerosArray,
+      normalizarFechaYMD(r.Fecha_Tour),
+      null,
+      privacyOwnerUserId
+    );
 
     const pagosArray = Array.isArray(payload.pagos) ? payload.pagos : [];
     const estadoCalculado = resolverEstadoReserva({
@@ -1543,6 +1583,7 @@ async function crearReservaConPasajerosYPagos(payload, filesMap = {}, userId = n
         Fecha_Tour: payload.cabeceraReserva.Fecha_Tour,
         Id_Tour: payload.cabeceraReserva.Id_Tour,
         Id_Reserva: idReserva || null,
+        ownerUserId: userId || null,
       });
     }
     
@@ -1582,7 +1623,10 @@ async function obtenerComisiones(Id_Tour, Id_Canal) {
 /* ===========================
  * DETALLE PARA EDICIÓN
  * =========================== */
-async function obtenerReservaDetalle(Id_Reserva) {
+async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
+  const ownerCondition = ownerUserId == null ? '' : 'AND r.Creado_Por = ?';
+  const params = [Id_Reserva];
+  if (ownerUserId != null) params.push(ownerUserId);
   // Las reservas históricas pueden no tener moneda persistida. En ese caso se
   // conserva una sugerencia para que el usuario la revise al editar.
   const [cabRows] = await db.query(
@@ -1611,9 +1655,10 @@ async function obtenerReservaDetalle(Id_Reserva) {
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE r.Id_Reserva = ?
+      ${ownerCondition}
     LIMIT 1
     `,
-    [Id_Reserva]
+    params
   );
   if (!cabRows.length) return null;
   const cab = cabRows[0];
@@ -1706,7 +1751,14 @@ async function obtenerReservaDetalle(Id_Reserva) {
 /* ===========================
  * ACTUALIZACIÓN (TRANSACCIÓN)
  * =========================== */
-async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap = {}, userId = null, clientIp = null) {
+async function actualizarReservaConPasajerosYPagos(
+  Id_Reserva,
+  payload,
+  filesMap = {},
+  userId = null,
+  clientIp = null,
+  ownerUserId = null
+) {
   let conn;
   let rutasPendientesEliminar = [];
   try {
@@ -1726,6 +1778,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       err.errorCode = 'RESERVA_NOT_FOUND';
       throw err;
     }
+    assertReservationOwner(impactoActual.reserva, ownerUserId);
 
     const r = payload?.cabeceraReserva || {};
     const currentReserva = impactoActual.reserva;
@@ -1743,7 +1796,13 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
       throw err;
     }
 
-    await validarDnisUnicosPorFecha(conn, pasajerosArray, fechaTourFinal, Id_Reserva);
+    await validarDnisUnicosPorFecha(
+      conn,
+      pasajerosArray,
+      fechaTourFinal,
+      Id_Reserva,
+      ownerUserId
+    );
 
     const estadoAnterior = currentReserva.Estado || null;
     const cantidadFinal = payload?.pasajeros !== undefined
@@ -1930,6 +1989,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
         Fecha_Tour: payload.cabeceraReserva.Fecha_Tour,
         Id_Tour: idTourFinal,
         Id_Reserva,
+        ownerUserId: currentReserva.Creado_Por || null,
       });
     }
 
@@ -1943,7 +2003,7 @@ async function actualizarReservaConPasajerosYPagos(Id_Reserva, payload, filesMap
   }
 }
 
-async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
+async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null, ownerUserId = null) {
   let conn;
   try {
     conn = await db.getConnection();
@@ -1956,6 +2016,7 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
       err.errorCode = 'RESERVA_NOT_FOUND';
       throw err;
     }
+    assertReservationOwner(impactoActual.reserva, ownerUserId);
 
     const estadoAnterior = impactoActual.estado || null;
     const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
@@ -1980,6 +2041,13 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
     }
 
     await conn.commit();
+    websocketManager.broadcastReservaEvento({
+      type: 'reservaActualizada',
+      Fecha_Tour: normalizarFechaYMD(impactoActual.fechaTour),
+      Id_Tour: impactoActual.idTour,
+      Id_Reserva,
+      ownerUserId: impactoActual.reserva.Creado_Por || null,
+    });
     return { Id_Reserva, Estado: 'Cancelada' };
   } catch (error) {
     if (conn) await conn.rollback();
@@ -1990,7 +2058,7 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
   }
 }
 
-async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
+async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ownerUserId = null) {
   let conn;
   try {
     conn = await db.getConnection();
@@ -2003,6 +2071,7 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
       err.errorCode = 'RESERVA_NOT_FOUND';
       throw err;
     }
+    assertReservationOwner(impactoActual.reserva, ownerUserId);
 
     const reserva = impactoActual.reserva;
 
@@ -2047,6 +2116,14 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
 
     await conn.commit();
 
+    websocketManager.broadcastReservaEvento({
+      type: 'reservaEliminada',
+      Fecha_Tour: normalizarFechaYMD(impactoActual.fechaTour),
+      Id_Tour: impactoActual.idTour,
+      Id_Reserva,
+      ownerUserId: reserva.Creado_Por || null,
+    });
+
     return {
       Id_Reserva: String(Id_Reserva),
       dependenciasEliminadas: {
@@ -2066,13 +2143,27 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null) {
   }
 }
 
-async function eliminarComprobantePagoReserva(Id_Reserva, Id_Pago, userId = null, clientIp = null) {
+async function eliminarComprobantePagoReserva(
+  Id_Reserva,
+  Id_Pago,
+  userId = null,
+  clientIp = null,
+  ownerUserId = null
+) {
   let conn;
   let rutaEliminar = null;
 
   try {
     conn = await db.getConnection();
     await conn.beginTransaction();
+
+    if (ownerUserId != null) {
+      const [reservationRows] = await conn.query(
+        'SELECT Creado_Por FROM reservas WHERE Id_Reserva = ? LIMIT 1 FOR UPDATE',
+        [Id_Reserva]
+      );
+      assertReservationOwner(reservationRows?.[0], ownerUserId);
+    }
 
     const [rows] = await conn.query(
       `SELECT Id_Pago, Ruta_Comprobante
@@ -2157,7 +2248,7 @@ async function getPuntoByIdSvc(Id_Punto) {
 /* ===========================
  * VERIFICACIÓN DNI DUPLICADO
  * =========================== */
-async function verificarDniDuplicado(dni, fecha, excludeReservaId) {
+async function verificarDniDuplicado(dni, fecha, excludeReservaId, ownerUserId = null) {
   if (!dni || !fecha) return { exists: false };
   
   const queryStr = `SELECT 
@@ -2166,6 +2257,7 @@ async function verificarDniDuplicado(dni, fecha, excludeReservaId) {
       r.Estado,
       r.Nombre_Reportante,
       r.Telefono_Reportante,
+      r.Creado_Por,
       p.Nombre_Pasajero,
       p.DNI,
       t.Nombre_Tour
@@ -2181,17 +2273,29 @@ async function verificarDniDuplicado(dni, fecha, excludeReservaId) {
   const [rows] = await db.query(queryStr, params);
   
   if (rows.length > 0) {
+    const reserva = rows[0];
+    if (ownerUserId != null && Number(reserva.Creado_Por) !== Number(ownerUserId)) {
+      return { exists: true };
+    }
     return {
       exists: true,
-      reserva: rows[0]
+      reserva
     };
   }
   
   return { exists: false };
 }
 
-async function obtenerHistorialCambiosReserva(Id_Reserva, limit = 25) {
+async function obtenerHistorialCambiosReserva(Id_Reserva, limit = 25, ownerUserId = null) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 25, 100));
+
+  if (ownerUserId != null) {
+    const [reservationRows] = await db.query(
+      'SELECT Creado_Por FROM reservas WHERE Id_Reserva = ? LIMIT 1',
+      [Id_Reserva]
+    );
+    assertReservationOwner(reservationRows?.[0], ownerUserId);
+  }
 
   const [rows] = await db.query(
     `SELECT

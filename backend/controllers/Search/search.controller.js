@@ -19,7 +19,10 @@ async function globalSearch(req, res) {
       });
     }
 
-    const data = await searchGlobal(query, permisos);
+    const data = await searchGlobal(query, permisos, {
+      clientMode: Boolean(req.user?.isClient),
+      ownerUserId: req.user?.isClient ? userId : null,
+    });
     return sendSuccess(res, { data, message: 'Búsqueda global completada correctamente' });
   } catch (error) {
     console.error('globalSearch error:', error);
