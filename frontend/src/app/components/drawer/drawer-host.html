@@ -1,6 +1,8 @@
 @if (drawer()) {
   <!-- Backdrop -->
-  <div class="sir-drawer-backdrop" [class.is-closing]="drawerSvc.closing()" (click)="close()" aria-hidden="true"></div>
+  @if (!drawerSvc.closing()) {
+    <div class="sir-drawer-backdrop" (click)="close()" aria-hidden="true"></div>
+  }
 
   <!-- Panel -->
   <div class="sir-drawer-panel"
@@ -16,6 +18,7 @@
                           drawer()!.type === 'usuario' ? 'Detalle de usuario' :
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
+                          drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
                           drawer()!.type === 'programacion-listado' ? 'Listado de programación' : 'Novedades de la app'">
 
     @if (drawer()!.type === 'reserva') {
@@ -64,6 +67,10 @@
 
     @if (drawer()!.type === 'programacion-listado') {
       <app-programacion-listado-panel />
+    }
+
+    @if (drawer()!.type === 'turnos-vacaciones') {
+      <app-turnos-vacaciones-panel />
     }
 
   </div>

@@ -81,6 +81,16 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
     return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
   }
 
+  weeklyDurationLabel(): string {
+    const minutes = (this.jornada()?.turnos || []).reduce((total, day) => {
+      if (!day.esLaborable || !day.horaInicio || !day.horaFin) return total;
+      return total + this.toMinutes(day.horaFin) - this.toMinutes(day.horaInicio);
+    }, 0);
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
+  }
+
   timeLabel(value: string | null): string {
     if (!value) return '—';
     const [hours, minutes] = value.split(':').map(Number);
@@ -93,8 +103,8 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
     if (!schedule) return 'Semana actual';
     const start = this.parseDate(schedule.semana.fechaInicio);
     const end = this.parseDate(schedule.semana.fechaFin);
-    const startMonth = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'UTC' }).format(start).replace('.', '');
-    const endMonth = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'UTC' }).format(end).replace('.', '');
+    const startMonth = new Intl.DateTimeFormat('es-CO', { month: 'long', timeZone: 'UTC' }).format(start);
+    const endMonth = new Intl.DateTimeFormat('es-CO', { month: 'long', timeZone: 'UTC' }).format(end);
     if (startMonth === endMonth) return `${start.getUTCDate()} al ${end.getUTCDate()} de ${endMonth}`;
     return `${start.getUTCDate()} de ${startMonth} al ${end.getUTCDate()} de ${endMonth}`;
   }
@@ -105,8 +115,29 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
       .replace('.', '');
   }
 
+  dayNumber(value: string): number {
+    return this.parseDate(value).getUTCDate();
+  }
+
+  monthLabel(value: string): string {
+    return new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'UTC' })
+      .format(this.parseDate(value))
+      .replace('.', '');
+  }
+
   isToday(day: TurnoDia): boolean {
     return day.diaSemana === this.clockParts(this.now()).day;
+  }
+
+  isVacationDay(day: TurnoDia): boolean {
+    const vacation = this.jornada()?.vacacion;
+    return !!vacation && day.fecha >= vacation.fechaInicio && day.fecha <= vacation.fechaFin;
+  }
+
+  vacationLabel(): string {
+    const vacation = this.jornada()?.vacacion;
+    if (!vacation) return '';
+    return `${this.shortDate(vacation.fechaInicio)} al ${this.shortDate(vacation.fechaFin)} · regreso ${this.shortDate(vacation.fechaRegreso)}`;
   }
 
   private clockParts(date: Date): { day: number; time: string } {

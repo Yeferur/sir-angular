@@ -230,6 +230,132 @@
   overflow-wrap: anywhere;
 }
 
+.schedule-card {
+  background: var(--bg-secondary);
+}
+
+.schedule-edit-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color));
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 7%, transparent);
+  font: 750 .72rem var(--font-family);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .16s var(--ease-soft), background-color .16s var(--ease-soft);
+}
+
+.schedule-edit-button:hover {
+  border-color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+}
+
+.schedule-state {
+  min-height: 62px;
+  padding: 14px;
+  border: 1px dashed var(--separator-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: .76rem;
+  text-align: center;
+}
+
+.schedule-state--error { color: var(--accent-red); }
+
+.schedule-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--separator-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: scheduleSpin .7s linear infinite;
+}
+
+.schedule-summary {
+  display: grid;
+  grid-template-columns: 1.2fr .75fr .9fr;
+  overflow: hidden;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.schedule-summary > div {
+  min-width: 0;
+  padding: 10px 11px;
+  border-left: 1px solid var(--separator-color);
+}
+
+.schedule-summary > div:first-child { border-left: 0; }
+.schedule-summary span, .schedule-summary strong { display: block; }
+.schedule-summary span { color: var(--text-tertiary); font-size: .62rem; }
+.schedule-summary strong { margin-top: 4px; overflow: hidden; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.vacation-summary {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent-purple) 25%, var(--separator-color));
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--accent-purple);
+  background: color-mix(in srgb, var(--accent-purple) 7%, transparent);
+}
+
+.vacation-summary i { flex: 0 0 auto; font-size: 1.05rem; }
+.vacation-summary span { color: var(--text-secondary); font-size: .7rem; line-height: 1.4; }
+.vacation-summary strong { display: block; margin-bottom: 2px; color: var(--text-primary); }
+
+.schedule-week {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.schedule-week article {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  text-align: left;
+}
+
+.schedule-week article > span {
+  color: var(--text-tertiary);
+  font-size: .61rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.schedule-week article > strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: .65rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-week article.is-off > strong { color: var(--text-tertiary); }
+.schedule-week article.is-vacation { border-color: color-mix(in srgb, var(--accent-purple) 24%, var(--separator-color)); background: color-mix(in srgb, var(--accent-purple) 7%, var(--bg-tertiary)); }
+.schedule-week article.is-vacation > strong { color: var(--accent-purple); }
+
 .permission-count {
   display: inline-grid;
   place-items: center;
@@ -369,6 +495,8 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes scheduleSpin { to { transform: rotate(360deg); } }
+
 @media (max-width: 600px) {
   .detail-header {
     padding: 18px;
@@ -385,6 +513,11 @@
   .permission-list {
     grid-template-columns: 1fr;
   }
+
+  .schedule-summary { grid-template-columns: 1fr; }
+  .schedule-summary > div { border-top: 1px solid var(--separator-color); border-left: 0; }
+  .schedule-summary > div:first-child { border-top: 0; }
+  .schedule-week { grid-template-columns: 1fr; }
 
   .detail-footer {
     align-items: stretch;

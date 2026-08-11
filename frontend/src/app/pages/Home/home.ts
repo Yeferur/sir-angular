@@ -293,11 +293,30 @@ export class HomeComponent implements OnInit {
   }
 
   get scheduleStatusLabel(): string {
+    if (this.isOnVacationToday) return 'Vacaciones';
     if (!this.mySchedule?.configurado) return 'Sin configurar';
     return this.mySchedule.estadoActual === 'en_turno' ? 'En turno' : 'Fuera de turno';
   }
 
+  get scheduleVisualStatus(): string {
+    return this.isOnVacationToday ? 'vacaciones' : (this.mySchedule?.estadoActual || 'sin_configurar');
+  }
+
+  get isOnVacationToday(): boolean {
+    const vacation = this.mySchedule?.vacacion;
+    if (!vacation) return false;
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const today = `${values['year']}-${values['month']}-${values['day']}`;
+    return today >= vacation.fechaInicio && today <= vacation.fechaFin;
+  }
+
   get todayShiftLabel(): string {
+    if (this.isOnVacationToday && this.mySchedule?.vacacion) {
+      return `Hoy estás de vacaciones · regreso ${this.shortDate(this.mySchedule.vacacion.fechaRegreso)}`;
+    }
     if (!this.mySchedule?.configurado) return 'Tu jornada aún no ha sido configurada';
     const shift = this.todayShift;
     if (!shift?.esLaborable) return 'Hoy es tu día de descanso';

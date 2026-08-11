@@ -17,6 +17,7 @@ import { PermisosService } from '../../services/Permisos/permisos.service';
 import { AuthService } from '../../services/Login/login-service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { AsesorSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 
 interface UsuarioDetalle {
   Id_Usuario: string | number;
@@ -61,17 +62,29 @@ export class UsuarioDetailComponent implements OnChanges {
   private readonly auth = inject(AuthService);
   private readonly alerts = inject(SirAlertService);
   private readonly router = inject(Router);
+  private readonly turnosService = inject(TurnosService);
 
   readonly usuario = signal<UsuarioDetalle | null>(null);
   readonly isLoading = signal(true);
   readonly loadError = signal('');
   readonly activeAction = signal<'sessions' | 'deactivate' | null>(null);
+  readonly advisorSchedule = signal<AsesorSemana | null>(null);
+  readonly scheduleLoading = signal(false);
+  readonly scheduleError = signal('');
   readonly estados = this.usuariosService.getEstadosSignal();
 
   readonly sessionState = computed(() => this.estados().get(String(this.Id_Usuario)) || 'cerrada');
   readonly hasOpenSession = computed(() => this.sessionState() !== 'cerrada');
   readonly isCurrentUser = computed(() => String(this.auth.getUser()?.id || '') === String(this.Id_Usuario));
   readonly canUpdate = computed(() => this.permisosService.tienePermiso('USUARIOS.ACTUALIZAR'));
+  readonly canViewSchedule = computed(() =>
+    this.permisosService.tienePermiso('TURNOS.LEER')
+    || this.permisosService.tienePermiso('TURNOS.ACTUALIZAR')
+  );
+  readonly canEditSchedule = computed(() => this.permisosService.tienePermiso('TURNOS.ACTUALIZAR'));
+  readonly isAdvisor = computed(() =>
+    String(this.usuario()?.Nombre_Rol || '').toLocaleLowerCase('es-CO').includes('asesor')
+  );
   readonly canDeactivate = computed(() =>
     this.permisosService.tienePermiso('USUARIOS.ELIMINAR')
     && !this.isCurrentUser()
@@ -99,11 +112,14 @@ export class UsuarioDetailComponent implements OnChanges {
     if (!this.Id_Usuario) return;
     this.isLoading.set(true);
     this.loadError.set('');
+    this.advisorSchedule.set(null);
+    this.scheduleError.set('');
 
     this.usuariosService.obtenerUsuario(String(this.Id_Usuario)).subscribe({
       next: (usuario) => {
         this.usuario.set(usuario);
         this.isLoading.set(false);
+        if (this.isAdvisor() && this.canViewSchedule()) this.loadSchedule();
       },
       error: (error) => {
         this.loadError.set(error?.error?.message || 'No se pudo cargar la información del usuario.');
@@ -135,6 +151,68 @@ export class UsuarioDetailComponent implements OnChanges {
     if (!this.canUpdate()) return;
     this.onClose.emit();
     void this.router.navigate(['/Usuarios/Editar', this.Id_Usuario]);
+  }
+
+  editarTurnos(): void {
+    if (!this.canEditSchedule()) return;
+    this.onClose.emit();
+    void this.router.navigate(['/Turnos'], { queryParams: { asesor: this.Id_Usuario } });
+  }
+
+  workingDays(): number {
+    return this.advisorSchedule()?.turnos.filter((day) => day.esLaborable).length || 0;
+  }
+
+  weeklyHours(): string {
+    const minutes = (this.advisorSchedule()?.turnos || []).reduce((total, day) => {
+      if (!day.esLaborable || !day.horaInicio || !day.horaFin) return total;
+      return total + this.timeMinutes(day.horaFin) - this.timeMinutes(day.horaInicio);
+    }, 0);
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
+  }
+
+  isVacationDay(day: TurnoDia): boolean {
+    const vacation = this.advisorSchedule()?.vacacion;
+    return !!vacation && day.fecha >= vacation.fechaInicio && day.fecha <= vacation.fechaFin;
+  }
+
+  shiftLabel(day: TurnoDia): string {
+    if (this.isVacationDay(day)) return 'Vacaciones';
+    if (!day.esLaborable) return 'Descanso';
+    return `${this.shortTime(day.horaInicio)}–${this.shortTime(day.horaFin)}`;
+  }
+
+  shortDate(value: string): string {
+    return new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+      .format(new Date(`${value}T12:00:00Z`)).replace('.', '');
+  }
+
+  private loadSchedule(): void {
+    this.scheduleLoading.set(true);
+    this.scheduleError.set('');
+    this.turnosService.obtenerSemana().subscribe({
+      next: (response) => {
+        this.advisorSchedule.set(response.asesores.find((advisor) => String(advisor.idUsuario) === String(this.Id_Usuario)) || null);
+        this.scheduleLoading.set(false);
+      },
+      error: (error) => {
+        this.scheduleError.set(error?.error?.message || 'No se pudo consultar el horario de esta semana.');
+        this.scheduleLoading.set(false);
+      },
+    });
+  }
+
+  private timeMinutes(value: string): number {
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private shortTime(value: string | null): string {
+    if (!value) return '—';
+    const [hours, minutes] = value.split(':').map(Number);
+    return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'p. m.' : 'a. m.'}`;
   }
 
   cerrarSesiones(): void {

@@ -797,7 +797,7 @@ async function filtrarReservas(q, ownerUserId = null) {
   const limit = Math.min(100, Math.max(1, Number.parseInt(params.limit, 10) || 25));
 
   const {
-    Fecha_Tour, FechaRegistro, Id_Tour, Id_Canal, Estado,
+    Fecha_Tour, FechaRegistro, Id_Tour, Id_Canal, Estado, Tipo_Reserva,
     Id_Reserva, Idioma_Reserva, Telefono_Reportante,
     Nombre_Reportante, DNI, Punto
   } = params;
@@ -815,6 +815,14 @@ async function filtrarReservas(q, ownerUserId = null) {
   }
 
   if (Fecha_Tour) { conds.push(`r.Fecha_Tour = ?`); values.push(Fecha_Tour); }
+
+  if (Tipo_Reserva) {
+    const normalizedType = String(Tipo_Reserva).trim().toLowerCase();
+    if (normalizedType === 'grupal' || normalizedType === 'privada') {
+      conds.push(`LOWER(COALESCE(r.Tipo_Reserva, 'Grupal')) = ?`);
+      values.push(normalizedType);
+    }
+  }
 
   if (Id_Tour) {
     if (Array.isArray(Id_Tour)) {

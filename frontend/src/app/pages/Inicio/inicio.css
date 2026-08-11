@@ -955,6 +955,23 @@
   white-space: nowrap;
 }
 
+.btn-view-private-reservations {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 6px;
+  border: 1px solid var(--accent-blue);
+  border-radius: var(--radius-sm, 10px);
+  color: var(--text-on-accent);
+  background: var(--accent-blue);
+  font-size: .78rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: filter .16s var(--ease-soft, ease), transform .16s var(--ease-soft, ease);
+}
+
+.btn-view-private-reservations:hover { filter: brightness(1.06); }
+.btn-view-private-reservations:active { transform: scale(.99); }
+
 /* ── UTILITIES ─────────────────────────────────────────────── */
 .sr-only {
   position: absolute;

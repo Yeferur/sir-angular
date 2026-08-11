@@ -56,6 +56,51 @@
       </div>
     </section>
 
+    @if (isAdvisor() && canViewSchedule()) {
+      <section class="detail-card schedule-card">
+        <div class="section-heading section-heading--inline">
+          <div>
+            <h2>Horario</h2>
+          </div>
+          @if (canEditSchedule()) {
+            <button type="button" class="schedule-edit-button" (click)="editarTurnos()">
+              Editar turnos
+            </button>
+          }
+        </div>
+
+        @if (scheduleLoading()) {
+          <div class="schedule-state"><span class="schedule-spinner" aria-hidden="true"></span>Consultando horario…</div>
+        } @else if (scheduleError()) {
+          <div class="schedule-state schedule-state--error">{{ scheduleError() }}</div>
+        } @else if (advisorSchedule(); as schedule) {
+          <div class="schedule-summary">
+            <div><span>Canal</span><strong>{{ schedule.canal?.nombreCanal || 'Sin canal' }}</strong></div>
+            <div><span>Jornadas</span><strong>{{ workingDays() }} días</strong></div>
+            <div><span>Horas programadas</span><strong>{{ weeklyHours() }}</strong></div>
+          </div>
+
+          @if (schedule.vacacion) {
+            <div class="vacation-summary">
+              <i class="bx bx-sun" aria-hidden="true"></i>
+              <span><strong>Vacaciones programadas</strong>{{ shortDate(schedule.vacacion.fechaInicio) }}–{{ shortDate(schedule.vacacion.fechaFin) }} · regreso {{ shortDate(schedule.vacacion.fechaRegreso) }}</span>
+            </div>
+          }
+
+          <div class="schedule-week" aria-label="Horario semanal del asesor">
+            @for (day of schedule.turnos; track day.diaSemana) {
+              <article [class.is-off]="!day.esLaborable" [class.is-vacation]="isVacationDay(day)">
+                <span>{{ day.nombreDia.slice(0, 3) }}</span>
+                <strong>{{ shiftLabel(day) }}</strong>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="schedule-state">Este asesor todavía no tiene una jornada para la semana actual.</div>
+        }
+      </section>
+    }
+
     <section class="detail-card">
       <div class="section-heading">
         <h2>Contacto</h2>

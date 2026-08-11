@@ -9,23 +9,13 @@
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-modal, 1500) - 2);
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
+  background: color-mix(in srgb, var(--bg-primary) 62%, transparent);
   animation: drawerFadeIn 0.25s ease forwards;
 }
 
 @keyframes drawerFadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-
-.sir-drawer-backdrop.is-closing {
-  pointer-events: none;
-  animation: drawerFadeOut 0.2s ease forwards;
-}
-
-@keyframes drawerFadeOut {
-  to { opacity: 0; }
 }
 
 /* ── Panel ──────────────────────────────────────────────────── */
@@ -92,6 +82,17 @@
   flex-direction: column;
 }
 
+.sir-drawer-panel app-turnos-vacaciones-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sir-drawer-panel:has(app-turnos-vacaciones-panel) {
+  width: clamp(390px, 38vw, 580px);
+}
+
 .sir-drawer-panel:has(app-usuario-detail) {
   width: clamp(380px, 38vw, 640px);
 }
@@ -121,7 +122,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sir-drawer-backdrop,
-  .sir-drawer-backdrop.is-closing,
   .sir-drawer-panel,
   .sir-drawer-panel.is-closing {
     animation: none;

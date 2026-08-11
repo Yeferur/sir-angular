@@ -12,25 +12,54 @@ import { SirDrawerService } from '../../services/Drawer/drawer.service';
 export class AppUpdatesPanelComponent {
   private drawer = inject(SirDrawerService);
 
-  readonly version = 'v1.1.0-beta';
+  readonly version = 'v1.2.0-beta';
   readonly status = 'Fase beta';
-  readonly date = 'Junio 2026';
+  readonly date = 'Agosto 2026';
 
   readonly mainNotice =
-    'SIR fue renovado para ofrecer una operación más clara, rápida y segura en reservas, transfers, programación y control comercial. Aun se encuentra en fase beta, por lo que pueden presentarse errores o inconsistencias que deben ser reportados.';
+    'SIR incorpora una nueva planificación semanal de turnos y vacaciones, mejoras en la consulta de reservas y una experiencia más consistente para asesores y perfiles de gestión. Aún se encuentra en fase beta, por lo que pueden presentarse errores o inconsistencias que deben ser reportados.';
 
   readonly reportInstructions =
     'Si encuentras errores o inconsistencias en la app, repórtalos indicando el módulo, la acción realizada, el mensaje mostrado y, si es posible, una captura de pantalla.';
 
   readonly keyHighlights = [
-    'Nuevo Inicio personalizado según el perfil y sus permisos.',
-    'Flujos guiados por pasos para reservas y transfers.',
-    'Nuevo resumen visible durante la operación.',
-    'Programación de buses con soporte multipunto y reservas privadas.',
-    'Módulos nuevos de Seguros y Comisiones.',
+    'Nueva planificación semanal de turnos por asesor y canal.',
+    'Programación de vacaciones integrada con los horarios.',
+    'Nueva vista personal “Mi horario” para asesores.',
+    'Horarios y vacaciones visibles desde la gestión de usuarios.',
+    'Consulta diferenciada de reservas privadas y grupales.',
   ];
 
   readonly sections = [
+    {
+      title: 'Turnos y vacaciones',
+      items: [
+        'Se agregó la planificación semanal de turnos con jornadas concretas para cada asesor, organizadas por canal de ventas.',
+        'Los horarios se configuran en bloques de 30 minutos, permiten definir días de trabajo o descanso y muestran el total semanal programado.',
+        'La publicación se realiza para toda la semana e incluye una confirmación previa antes de hacer visibles los cambios.',
+        'Las jornadas sin horario y las semanas con siete días programados se identifican claramente antes de publicar.',
+        'Se puede copiar la semana anterior, cambiar temporalmente el canal del asesor y asignar el rol semanal de supernumerario.',
+        'Las vacaciones pueden programarse con fechas sugeridas, ajustarse manualmente y excluir automáticamente esos días de la jornada.',
+      ],
+    },
+    {
+      title: 'Experiencia del asesor',
+      items: [
+        'Se agregó “Mi horario” para consultar la semana publicada, los días de trabajo y descanso, las horas de entrada y salida y el tiempo total programado.',
+        'El día actual y el estado dentro o fuera del horario se muestran de forma destacada para facilitar la consulta diaria.',
+        'Las vacaciones programadas y la fecha de regreso aparecen dentro de la misma vista semanal.',
+        'El Inicio del asesor ahora presenta su información laboral de forma separada de las herramientas de gestión.',
+      ],
+    },
+    {
+      title: 'Usuarios, canales y permisos',
+      items: [
+        'La ficha de cada asesor ahora muestra su horario vigente y sus vacaciones después de la información de contacto.',
+        'Desde el usuario se puede abrir directamente la planificación de Turnos con el asesor ya seleccionado.',
+        'La administración de turnos quedó integrada en Usuarios sin mezclarla con la creación de cuentas ni con la configuración de permisos.',
+        'Se conciliaron los usuarios vigentes y los roles de asesor para trabajar con la estructura actual de permisos.',
+      ],
+    },
     {
       title: 'Inicio personalizado',
       items: [
@@ -46,6 +75,8 @@ export class AppUpdatesPanelComponent {
         'Se agregó un resumen visible durante el proceso para consultar servicio, fecha, pasajeros, moneda, valor total y disponibilidad sin perder el contexto.',
         'Se mejoraron las validaciones de cupos, fechas, puntos de encuentro, datos duplicados, precios y configuraciones faltantes.',
         'Los documentos PDF de reservas y transfers fueron actualizados con una presentación más limpia, ordenada y consistente.',
+        'El listado de reservas ahora permite consultar grupales y privadas juntas o filtrar únicamente uno de los dos tipos.',
+        'Solo las reservas privadas llevan una identificación especial, reduciendo elementos repetidos en las reservas grupales.',
       ],
     },
     {
@@ -76,6 +107,7 @@ export class AppUpdatesPanelComponent {
       items: [
         'Se ampliaron los Informes con nuevos indicadores, gráficos y resúmenes para consultar ingresos, pasajeros y comportamiento operativo por periodo y tour.',
         'La vista de Aforos fue renovada para facilitar el monitoreo diario de disponibilidad y ocupación.',
+        'Desde el detalle de privadas en Aforos ahora se puede abrir el listado de reservas conservando la fecha, el tour y el tipo de consulta.',
         'Se mejoró la búsqueda global para encontrar reservas, transfers, tours y puntos de forma más rápida.',
       ],
     },
@@ -87,6 +119,8 @@ export class AppUpdatesPanelComponent {
         'La navegación lateral ahora muestra las opciones disponibles según los permisos asignados a cada usuario.',
         'Se agregaron paneles laterales para consultar información y realizar acciones rápidas sin salir del flujo principal.',
         'El sistema de alertas fue unificado con mensajes más claros para confirmaciones, errores, advertencias, validaciones y acciones sensibles.',
+        'Se alinearon formularios, selectores de fecha y hora, controles, colores y estados con los componentes globales de la aplicación.',
+        'Se corrigió la adaptación visual del inicio de sesión entre tema claro y oscuro.',
       ],
     },
     {

@@ -7,7 +7,7 @@
       <div>
         <span class="eyebrow">Semana actual</span>
         <h2>Tu horario aún no ha sido publicado</h2>
-        <p>Cuando el equipo responsable lo publique, podrás consultar aquí cada jornada. También recibirás una notificación.</p>
+        <p>Cuando se publique la semana, podrás consultar aquí cada jornada.</p>
       </div>
     </section>
   </main>
@@ -44,13 +44,20 @@
       </div>
     </header>
 
-    @if (!schedule.configurado) {
+    @if (schedule.vacacion) {
+      <aside class="readonly-note vacation-note">
+        <i class="bx bx-sun" aria-hidden="true"></i>
+        <span><strong>Vacaciones programadas</strong><br>{{ vacationLabel() }}</span>
+      </aside>
+    }
+
+    @if (!schedule.configurado && !schedule.vacacion) {
       <section class="empty-schedule-card">
         <span class="empty-icon"><i class="bx bx-calendar-exclamation" aria-hidden="true"></i></span>
         <div>
           <span class="eyebrow">Jornada pendiente</span>
           <h2>Tu horario aún no está configurado</h2>
-          <p>El equipo autorizado de Turnos debe definir tu jornada para esta semana.</p>
+          <p>Tu jornada todavía debe definirse para esta semana.</p>
         </div>
       </section>
     } @else {
@@ -60,8 +67,8 @@
           <div><small>Días de trabajo</small><strong [countUp]="workingDays()" countUpSuffix=" días"></strong></div>
         </article>
         <article>
-          <span class="overview-icon overview-icon--purple"><i class="bx bx-world" aria-hidden="true"></i></span>
-          <div><small>Zona horaria</small><strong>Bogotá</strong></div>
+          <span class="overview-icon overview-icon--green"><i class="bx bx-time-five" aria-hidden="true"></i></span>
+          <div><small>Tiempo programado</small><strong>{{ weeklyDurationLabel() }}</strong></div>
         </article>
       </section>
 
@@ -74,15 +81,17 @@
           <span>Día</span><span>Entrada</span><span>Salida</span><span>Duración</span>
         </div>
         @for (day of schedule.turnos; track day.diaSemana) {
-          <article class="readonly-day" [class.is-today]="isToday(day)" [class.is-off]="!day.esLaborable">
+          <article class="readonly-day" [class.is-today]="isToday(day)" [class.is-off]="!day.esLaborable" [class.is-vacation]="isVacationDay(day)">
             <div class="day-name">
-              <span class="day-date"><strong>{{ day.nombreDia.slice(0, 3) }}</strong><small>{{ shortDate(day.fecha) }}</small></span>
+              <span class="day-date"><strong>{{ dayNumber(day.fecha) }}</strong><small>{{ monthLabel(day.fecha) }}</small></span>
               <div><strong>{{ day.nombreDia }}</strong>@if (isToday(day)) { <span class="badge badge--info schedule-badge">Hoy</span> }</div>
             </div>
             @if (day.esLaborable) {
               <span class="time-value"><small>Entrada</small>{{ timeLabel(day.horaInicio) }}</span>
               <span class="time-value"><small>Salida</small>{{ timeLabel(day.horaFin) }}</span>
               <span class="duration-value">{{ durationLabel(day) }}</span>
+            } @else if (isVacationDay(day)) {
+              <span class="rest-value"><i class="bx bx-sun" aria-hidden="true"></i> Vacaciones</span>
             } @else {
               <span class="rest-value"><i class="bx bx-coffee" aria-hidden="true"></i> Día de descanso</span>
             }
@@ -90,10 +99,6 @@
         }
       </section>
 
-      <aside class="readonly-note">
-        <i class="bx bx-info-circle" aria-hidden="true"></i>
-        <span>Este estado indica si estás dentro de tu horario programado; no representa todavía un registro de presencia. Si necesitas un ajuste, comunícate con el equipo autorizado de Turnos.</span>
-      </aside>
     }
   </main>
 }

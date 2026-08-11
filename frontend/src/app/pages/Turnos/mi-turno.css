@@ -67,9 +67,9 @@
 .day-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .day-name > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .day-name > div > strong { overflow: hidden; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
-.day-date { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-content: center; border: 1px solid var(--separator-color); border-radius: 10px; background: var(--bg-primary); text-align: center; }
-.day-date strong { color: var(--accent-blue); font-size: .57rem; line-height: 1; text-transform: uppercase; }
-.day-date small { margin-top: 3px; color: var(--text-secondary); font-size: .53rem; font-weight: 720; line-height: 1; }
+.day-date { display: grid; width: 48px; height: 46px; flex: 0 0 auto; place-content: center; border: 1px solid var(--separator-color); border-radius: var(--radius-sm, 10px); background: var(--bg-primary); text-align: center; }
+.day-date strong { color: var(--text-primary); font-size: 1rem; font-weight: 780; line-height: 1; font-variant-numeric: tabular-nums; }
+.day-date small { margin-top: 4px; color: var(--accent-blue); font-size: .56rem; font-weight: 800; line-height: 1; letter-spacing: .04em; text-transform: uppercase; }
 .time-value { font-size: .74rem; font-weight: 770; font-variant-numeric: tabular-nums; }
 .time-value small { display: none; }
 .duration-value { color: var(--text-secondary); font-size: .67rem; font-weight: 720; text-align: right; }
@@ -79,6 +79,9 @@
 .readonly-note, .empty-schedule-card { display: flex; align-items: center; gap: 13px; margin-top: 14px; border: 1px solid var(--separator-color); border-radius: var(--radius-md, 12px); background: var(--bg-secondary); }
 .readonly-note { padding: 12px 14px; color: var(--text-secondary); font-size: .67rem; line-height: 1.45; }
 .readonly-note i { flex: 0 0 auto; color: var(--accent-blue); font-size: 1.05rem; }
+.vacation-note { border-color: color-mix(in srgb, var(--accent-purple) 24%, var(--separator-color)); background: color-mix(in srgb, var(--accent-purple) 6%, var(--bg-secondary)); }
+.vacation-note i, .readonly-day.is-vacation .rest-value { color: var(--accent-purple); }
+.readonly-day.is-vacation { background: color-mix(in srgb, var(--accent-purple) 5%, var(--bg-secondary)); }
 .empty-schedule-card { min-height: 180px; padding: 28px; }
 .empty-schedule-card .empty-icon { color: var(--accent-orange); background: color-mix(in srgb, var(--accent-orange) 12%, transparent); }
 .empty-schedule-card h2 { margin: 4px 0 6px; font-size: 1.02rem; }

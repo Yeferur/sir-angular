@@ -176,6 +176,7 @@ seleccionarPuntoAutocomplete(p: any) {
     IdPas: '',
     Punto: '',
     Estado: [] as string[],
+    TipoReserva: '' as '' | 'Grupal' | 'Privada',
     Empty: false,
   });
 
@@ -404,6 +405,9 @@ seleccionarPuntoAutocomplete(p: any) {
       IdPas: String(params.get('documento') || ''),
       Punto: point,
       Estado: toStrings(params.get('estado')),
+      TipoReserva: ['Grupal', 'Privada'].includes(String(params.get('tipoReserva')))
+        ? String(params.get('tipoReserva')) as 'Grupal' | 'Privada'
+        : '',
       Empty: params.get('vacios') === '1',
     });
 
@@ -420,6 +424,7 @@ seleccionarPuntoAutocomplete(p: any) {
       categorias: filter.CategoriaReserva.length ? filter.CategoriaReserva.join(',') : null,
       tours: filter.tour.length ? filter.tour.join(',') : null,
       estado: filter.Estado.length ? filter.Estado.join('|') : null,
+      tipoReserva: filter.TipoReserva || null,
       q: filter.NombreApellido.trim() || null,
       reserva: filter.Id_Reserva.trim() || null,
       documento: filter.IdPas.trim() || null,
@@ -539,6 +544,7 @@ seleccionarPuntoAutocomplete(p: any) {
     if (f.CategoriaReserva?.length) count++;
     if (f.tour?.length) count++;
     if (f.Estado?.length) count++;
+    if (f.TipoReserva) count++;
 
     return count;
   }
@@ -558,6 +564,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
     // ESTADO
     if (f.Estado?.length) api.Estado = f.Estado;
+    if (f.TipoReserva) api.Tipo_Reserva = f.TipoReserva;
 
     // BÚSQUEDA PRINCIPAL
     if (f.NombreApellido?.trim()) api.q = f.NombreApellido.trim(); // o Nombre_Reportante, según tu API
@@ -600,7 +607,7 @@ seleccionarPuntoAutocomplete(p: any) {
     }
     // Si no hay ningún filtro relevante, no buscar
     if (Object.keys(filtros).length === 0 ||
-      (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal)) {
+      (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal && !filtros.Tipo_Reserva)) {
       this.alertService.showAlert({
         type: 'info',
         title: 'Sin filtros',

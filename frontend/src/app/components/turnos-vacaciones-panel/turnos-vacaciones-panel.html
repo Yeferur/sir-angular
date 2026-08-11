@@ -1,0 +1,24 @@
+<section class="vacation-panel">
+  <header class="panel-header">
+    <div><span class="eyebrow">Planificación del asesor</span><h2>Vacaciones</h2><p>{{ props.advisorName }}</p></div>
+    <button type="button" class="close-button" (click)="close()" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+  </header>
+
+  @if (draft(); as vacation) {
+    <div class="panel-scroll">
+      <div class="recommendation"><strong>Sugerencia de 15 días hábiles</strong><p>Cuenta lunes a sábado y excluye domingos y festivos colombianos. Las fechas se pueden ajustar según el acuerdo de la empresa.</p></div>
+      <div class="form-fields">
+        <label><span>Salida a vacaciones</span><app-datepicker [ngModel]="vacation.fechaInicio" placeholder="Seleccionar fecha de salida" (dateChange)="updateStart($event || '')" /></label>
+        <label><span>Último día de vacaciones</span><app-datepicker [ngModel]="vacation.fechaFin" [minDate]="vacation.fechaInicio" placeholder="Seleccionar último día" (dateChange)="update('fechaFin', $event || '')" /></label>
+        <label><span>Regreso al trabajo</span><app-datepicker [ngModel]="vacation.fechaRegreso" [minDate]="vacation.fechaFin" placeholder="Seleccionar fecha de regreso" (dateChange)="update('fechaRegreso', $event || '')" /></label>
+        <label><span>Nota opcional</span><textarea rows="3" [ngModel]="vacation.observaciones" (ngModelChange)="update('observaciones', $event)"></textarea></label>
+      </div>
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+    </div>
+    <footer class="panel-actions">
+      @if (props.hasVacation) { <button type="button" class="danger-button" (click)="remove()">Quitar vacaciones</button> }
+      <button type="button" class="secondary-button" (click)="close()">Cancelar</button>
+      <button type="button" class="primary-button" (click)="apply()">Aplicar al borrador</button>
+    </footer>
+  }
+</section>

@@ -10,11 +10,12 @@ import { AppUpdatesPanelComponent } from '../app-updates-panel/app-updates-panel
 import { TourDetailComponent } from '../tour/tour';
 import { ProgramacionListadoPanelComponent } from '../programacion-listado-panel/programacion-listado-panel';
 import { UsuarioDetailComponent } from '../usuario/usuario';
+import { TurnosVacacionesPanelComponent } from '../turnos-vacaciones-panel/turnos-vacaciones-panel';
 
 @Component({
   selector: 'app-sir-drawer',
   standalone: true,
-  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent],
+  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent],
   templateUrl: './drawer-host.html',
   styleUrls: ['./drawer-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

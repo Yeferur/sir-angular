@@ -374,6 +374,26 @@
   color: var(--accent-blue);
 }
 
+.type-filter-select {
+  width: 100%;
+  min-height: 41px;
+  padding: 9px 36px 9px 12px;
+  border: 1.5px solid var(--separator-color);
+  border-radius: 11px;
+  outline: 0;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  font: inherit;
+  font-size: .92rem;
+  cursor: pointer;
+  transition: border-color .18s var(--ease-soft, ease), box-shadow .18s var(--ease-soft, ease);
+}
+
+.type-filter-select:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent);
+}
+
 .multi-filter-menu {
   position: absolute;
   top: calc(100% + 6px);

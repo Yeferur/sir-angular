@@ -133,6 +133,49 @@ function addDays(dateOnly, amount) {
   return result;
 }
 
+function datesOverlap(startA, endA, startB, endB) {
+  return startA <= endB && endA >= startB;
+}
+
+function validateVacation(value) {
+  if (value == null) return null;
+  const fechaInicio = parseDateOnly(value.fechaInicio);
+  const fechaFin = parseDateOnly(value.fechaFin);
+  const fechaRegreso = parseDateOnly(value.fechaRegreso);
+  const diasHabiles = Number(value.diasHabiles || 15);
+  if (!fechaInicio || !fechaFin || !fechaRegreso || fechaInicio > fechaFin || fechaRegreso <= fechaFin) {
+    const error = new Error('Las fechas de vacaciones o de regreso no son válidas.');
+    error.code = 'INVALID_VACATION';
+    throw error;
+  }
+  if (!Number.isInteger(diasHabiles) || diasHabiles < 1 || diasHabiles > 60) {
+    const error = new Error('La cantidad de días hábiles de vacaciones no es válida.');
+    error.code = 'INVALID_VACATION';
+    throw error;
+  }
+  return {
+    idVacacion: /^\d+$/.test(String(value.idVacacion || '')) ? String(value.idVacacion) : null,
+    fechaInicio: formatDateOnly(fechaInicio),
+    fechaFin: formatDateOnly(fechaFin),
+    fechaRegreso: formatDateOnly(fechaRegreso),
+    diasHabiles,
+    observaciones: String(value.observaciones || '').trim().slice(0, 500) || null,
+  };
+}
+
+function mapVacationRow(row) {
+  if (!row?.Id_Vacacion) return null;
+  return {
+    idVacacion: String(row.Id_Vacacion),
+    fechaInicio: formatDateOnly(parseDateOnly(row.Vacacion_Inicio)),
+    fechaFin: formatDateOnly(parseDateOnly(row.Vacacion_Fin)),
+    fechaRegreso: formatDateOnly(parseDateOnly(row.Vacacion_Regreso)),
+    diasHabiles: Number(row.Vacacion_Dias_Habiles),
+    estado: row.Vacacion_Estado || 'programada',
+    observaciones: row.Vacacion_Observaciones || null,
+  };
+}
+
 function mondayOf(dateOnly) {
   const weekday = dateOnly.getUTCDay(); // 0=domingo ... 6=sábado
   const diff = weekday === 0 ? -6 : 1 - weekday;
@@ -226,6 +269,16 @@ async function ensureAdvisorRows(idSemana, fechaInicio, connection = db) {
        )`,
     [idSemana, fechaInicio, fechaInicio]
   );
+
+  await connection.query(
+    `INSERT INTO turnos_asesores_semana (Id_Semana, Id_Usuario, Id_Canal)
+     SELECT ?, u.Id_Usuario, u.Id_Canal
+     FROM usuarios u
+     INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
+     WHERE LOWER(TRIM(r.Nombre_Rol)) = 'asesor'
+     ON DUPLICATE KEY UPDATE Id_Asignacion = Id_Asignacion`,
+    [idSemana]
+  );
 }
 
 async function listWeekSchedule(fechaReferencia, actorId) {
@@ -234,15 +287,27 @@ async function listWeekSchedule(fechaReferencia, actorId) {
   const [rows] = await db.query(
     `SELECT
        u.Id_Usuario, u.Nombres_Apellidos, u.Usuario, u.Correo, u.Activo,
-       c.Id_Canal, c.Nombre_Canal,
+       cb.Id_Canal AS Id_Canal_Base, cb.Nombre_Canal AS Nombre_Canal_Base,
+       cs.Id_Canal AS Id_Canal_Semanal, cs.Nombre_Canal AS Nombre_Canal_Semanal,
+       COALESCE(cs.Id_Canal, cb.Id_Canal) AS Id_Canal,
+       COALESCE(cs.Nombre_Canal, cb.Nombre_Canal) AS Nombre_Canal,
+       tas.Es_Supernumerario AS Supernumerario_Semana,
+       v.Id_Vacacion, v.Fecha_Inicio AS Vacacion_Inicio, v.Fecha_Fin AS Vacacion_Fin,
+       v.Fecha_Regreso AS Vacacion_Regreso, v.Dias_Habiles AS Vacacion_Dias_Habiles,
+       v.Estado AS Vacacion_Estado, v.Observaciones AS Vacacion_Observaciones,
        td.Id_Turno_Dia, td.Fecha, td.Dia_Semana, td.Es_Laborable, td.Hora_Inicio, td.Hora_Fin, td.Es_Supernumerario
      FROM usuarios u
      INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
-     LEFT JOIN canales_turno c ON c.Id_Canal = u.Id_Canal
+     LEFT JOIN canales_turno cb ON cb.Id_Canal = u.Id_Canal
+     LEFT JOIN turnos_asesores_semana tas ON tas.Id_Usuario = u.Id_Usuario AND tas.Id_Semana = ?
+     LEFT JOIN canales_turno cs ON cs.Id_Canal = tas.Id_Canal
+     LEFT JOIN turnos_vacaciones v ON v.Id_Usuario = u.Id_Usuario AND v.Estado = 'programada'
+       AND v.Fecha_Inicio <= ? AND v.Fecha_Fin >= ?
      LEFT JOIN turnos_dias td ON td.Id_Usuario = u.Id_Usuario AND td.Id_Semana = ?
      WHERE LOWER(TRIM(r.Nombre_Rol)) = 'asesor'
-     ORDER BY (c.Nombre_Canal IS NULL), c.Nombre_Canal ASC, u.Activo DESC, u.Nombres_Apellidos ASC, td.Dia_Semana ASC`,
-    [semana.idSemana]
+     ORDER BY (COALESCE(cs.Nombre_Canal, cb.Nombre_Canal) IS NULL), COALESCE(cs.Nombre_Canal, cb.Nombre_Canal) ASC,
+       u.Activo DESC, u.Nombres_Apellidos ASC, td.Dia_Semana ASC`,
+    [semana.idSemana, semana.fechaFin, semana.fechaInicio, semana.idSemana]
   );
 
   const advisors = new Map();
@@ -256,7 +321,10 @@ async function listWeekSchedule(fechaReferencia, actorId) {
         correo: row.Correo || '',
         activo: Number(row.Activo) === 1,
         canal: row.Id_Canal != null ? { idCanal: String(row.Id_Canal), nombreCanal: row.Nombre_Canal } : null,
-        esSupernumerario: false,
+        canalBase: row.Id_Canal_Base != null ? { idCanal: String(row.Id_Canal_Base), nombreCanal: row.Nombre_Canal_Base } : null,
+        canalSemanal: row.Id_Canal_Semanal != null ? { idCanal: String(row.Id_Canal_Semanal), nombreCanal: row.Nombre_Canal_Semanal } : null,
+        vacacion: mapVacationRow(row),
+        esSupernumerario: Number(row.Supernumerario_Semana) === 1,
         configurado: false,
         estadoActual: 'sin_configurar',
         turnos: [],
@@ -267,7 +335,7 @@ async function listWeekSchedule(fechaReferencia, actorId) {
 
   const asesores = [...advisors.values()].map((advisor) => {
     advisor.configurado = advisor.turnos.some((dia) => dia.esLaborable);
-    advisor.esSupernumerario = advisor.turnos.some((dia) => dia.esSupernumerario);
+    advisor.esSupernumerario = advisor.esSupernumerario || advisor.turnos.some((dia) => dia.esSupernumerario);
     advisor.estadoActual = getCurrentScheduleStatus(advisor.turnos);
     return advisor;
   });
@@ -290,15 +358,24 @@ async function getAdvisorWeekSchedule(userId, fechaReferencia) {
   const [rows] = await db.query(
     `SELECT
        u.Id_Usuario, u.Nombres_Apellidos, u.Usuario, u.Correo, u.Activo,
-       c.Id_Canal, c.Nombre_Canal,
+       COALESCE(cs.Id_Canal, cb.Id_Canal) AS Id_Canal,
+       COALESCE(cs.Nombre_Canal, cb.Nombre_Canal) AS Nombre_Canal,
+       tas.Es_Supernumerario AS Supernumerario_Semana,
+       v.Id_Vacacion, v.Fecha_Inicio AS Vacacion_Inicio, v.Fecha_Fin AS Vacacion_Fin,
+       v.Fecha_Regreso AS Vacacion_Regreso, v.Dias_Habiles AS Vacacion_Dias_Habiles,
+       v.Estado AS Vacacion_Estado, v.Observaciones AS Vacacion_Observaciones,
        td.Id_Turno_Dia, td.Fecha, td.Dia_Semana, td.Es_Laborable, td.Hora_Inicio, td.Hora_Fin, td.Es_Supernumerario
      FROM usuarios u
      INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
-     LEFT JOIN canales_turno c ON c.Id_Canal = u.Id_Canal
+     LEFT JOIN canales_turno cb ON cb.Id_Canal = u.Id_Canal
+     LEFT JOIN turnos_asesores_semana tas ON tas.Id_Usuario = u.Id_Usuario AND tas.Id_Semana = ?
+     LEFT JOIN canales_turno cs ON cs.Id_Canal = tas.Id_Canal
+     LEFT JOIN turnos_vacaciones v ON v.Id_Usuario = u.Id_Usuario AND v.Estado = 'programada'
+       AND v.Fecha_Inicio <= ? AND v.Fecha_Fin >= ?
      LEFT JOIN turnos_dias td ON td.Id_Usuario = u.Id_Usuario AND td.Id_Semana = ?
      WHERE u.Id_Usuario = ? AND LOWER(TRIM(r.Nombre_Rol)) = 'asesor'
      ORDER BY td.Dia_Semana ASC`,
-    [semana.Id_Semana, userId]
+    [semana.Id_Semana, fechaFin, fechaInicio, semana.Id_Semana, userId]
   );
   if (!rows.length) return null;
 
@@ -315,13 +392,14 @@ async function getAdvisorWeekSchedule(userId, fechaReferencia) {
     correo: first.Correo || '',
     activo: Number(first.Activo) === 1,
     canal: first.Id_Canal != null ? { idCanal: String(first.Id_Canal), nombreCanal: first.Nombre_Canal } : null,
+    vacacion: mapVacationRow(first),
     semana: {
       idSemana: String(semana.Id_Semana),
       fechaInicio,
       fechaFin,
       estado: semana.Estado,
     },
-    esSupernumerario: turnos.some((dia) => dia.esSupernumerario),
+    esSupernumerario: Number(first.Supernumerario_Semana) === 1 || turnos.some((dia) => dia.esSupernumerario),
     configurado: turnos.some((dia) => dia.esLaborable),
     estadoActual: getCurrentScheduleStatus(turnos),
     turnos,
@@ -528,12 +606,35 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
         throw error;
       }
       seenUsers.add(idUsuario);
-      const turnos = validateWeeklySchedule(item?.turnos);
+      let turnos = validateWeeklySchedule(item?.turnos);
+      const vacation = validateVacation(item?.vacacion);
+      if (vacation) {
+        const weekStart = parseDateOnly(semana.Fecha_Inicio);
+        turnos = turnos.map((day) => {
+          const dayDate = formatDateOnly(addDays(weekStart, day.diaSemana - 1));
+          return dayDate >= vacation.fechaInicio && dayDate <= vacation.fechaFin
+            ? { ...day, esLaborable: false, horaInicio: null, horaFin: null }
+            : day;
+        });
+      }
+      const idCanalSemanal = item?.idCanalSemanal == null || item?.idCanalSemanal === ''
+        ? null
+        : String(item.idCanalSemanal);
+      if (idCanalSemanal != null && !/^\d+$/.test(idCanalSemanal)) {
+        const error = new Error('Uno de los canales semanales no es válido.');
+        error.code = 'INVALID_WEEK_CHANNEL';
+        throw error;
+      }
       return {
         idUsuario,
         turnos,
         esSupernumerario: item?.esSupernumerario === true || item?.esSupernumerario === 1,
-        advertencias: getScheduleWarnings(turnos),
+        idCanalSemanal,
+        vacation,
+        advertencias: vacation
+          && vacation.fechaInicio <= formatDateOnly(parseDateOnly(semana.Fecha_Inicio))
+          && vacation.fechaFin >= formatDateOnly(addDays(parseDateOnly(semana.Fecha_Inicio), 6))
+          ? [] : getScheduleWarnings(turnos),
       };
     });
 
@@ -547,6 +648,77 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
 
     await ensureAdvisorRows(semana.Id_Semana, semana.Fecha_Inicio, conn);
     for (const item of prepared) {
+      if (item.idCanalSemanal != null) {
+        const [channels] = await conn.query(
+          `SELECT Id_Canal FROM canales_turno WHERE Id_Canal = ? AND Activo = 1 LIMIT 1`,
+          [item.idCanalSemanal]
+        );
+        if (!channels.length) {
+          const error = new Error('Uno de los canales semanales ya no está disponible.');
+          error.code = 'INVALID_WEEK_CHANNEL';
+          throw error;
+        }
+      }
+
+      await conn.query(
+        `INSERT INTO turnos_asesores_semana
+           (Id_Semana, Id_Usuario, Id_Canal, Es_Supernumerario, Creado_Por, Actualizado_Por)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE Id_Canal = VALUES(Id_Canal),
+           Es_Supernumerario = VALUES(Es_Supernumerario), Actualizado_Por = VALUES(Actualizado_Por)`,
+        [semana.Id_Semana, item.idUsuario, item.idCanalSemanal, item.esSupernumerario ? 1 : 0,
+          actorId || null, actorId || null]
+      );
+
+      const [overlappingVacations] = await conn.query(
+        `SELECT Id_Vacacion FROM turnos_vacaciones
+         WHERE Id_Usuario = ? AND Estado = 'programada' AND Fecha_Inicio <= ? AND Fecha_Fin >= ?
+         FOR UPDATE`,
+        [item.idUsuario, semana.Fecha_Inicio instanceof Date
+          ? formatDateOnly(addDays(parseDateOnly(semana.Fecha_Inicio), 6))
+          : formatDateOnly(addDays(parseDateOnly(String(semana.Fecha_Inicio)), 6)),
+        semana.Fecha_Inicio instanceof Date ? formatDateOnly(parseDateOnly(semana.Fecha_Inicio)) : String(semana.Fecha_Inicio)]
+      );
+      if (item.vacation) {
+        const conflicting = await conn.query(
+          `SELECT Id_Vacacion FROM turnos_vacaciones
+           WHERE Id_Usuario = ? AND Estado = 'programada' AND Fecha_Inicio <= ? AND Fecha_Fin >= ?
+             AND (? IS NULL OR Id_Vacacion <> ?) LIMIT 1`,
+          [item.idUsuario, item.vacation.fechaFin, item.vacation.fechaInicio,
+            item.vacation.idVacacion, item.vacation.idVacacion]
+        );
+        if (conflicting[0].length) {
+          const error = new Error('El asesor ya tiene otro periodo de vacaciones en esas fechas.');
+          error.code = 'VACATION_OVERLAP';
+          throw error;
+        }
+        if (item.vacation.idVacacion) {
+          await conn.query(
+            `UPDATE turnos_vacaciones SET Fecha_Inicio = ?, Fecha_Fin = ?, Fecha_Regreso = ?,
+               Dias_Habiles = ?, Observaciones = ?, Estado = 'programada', Actualizado_Por = ?
+             WHERE Id_Vacacion = ? AND Id_Usuario = ?`,
+            [item.vacation.fechaInicio, item.vacation.fechaFin, item.vacation.fechaRegreso,
+              item.vacation.diasHabiles, item.vacation.observaciones, actorId || null,
+              item.vacation.idVacacion, item.idUsuario]
+          );
+        } else {
+          await conn.query(
+            `INSERT INTO turnos_vacaciones
+               (Id_Usuario, Fecha_Inicio, Fecha_Fin, Fecha_Regreso, Dias_Habiles, Observaciones, Creado_Por, Actualizado_Por)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.idUsuario, item.vacation.fechaInicio, item.vacation.fechaFin,
+              item.vacation.fechaRegreso, item.vacation.diasHabiles, item.vacation.observaciones,
+              actorId || null, actorId || null]
+          );
+        }
+      } else if (overlappingVacations.length) {
+        await conn.query(
+          `UPDATE turnos_vacaciones SET Estado = 'cancelada', Actualizado_Por = ?
+           WHERE Id_Vacacion IN (?)`,
+          [actorId || null, overlappingVacations.map((row) => row.Id_Vacacion)]
+        );
+      }
+
       const [dayRows] = await conn.query(
         `SELECT Id_Turno_Dia, Dia_Semana FROM turnos_dias
          WHERE Id_Semana = ? AND Id_Usuario = ? ORDER BY Dia_Semana FOR UPDATE`,
@@ -630,6 +802,7 @@ module.exports = {
   DAY_NAMES,
   normalizeTime,
   validateWeeklySchedule,
+  validateVacation,
   getScheduleWarnings,
   getBogotaClock,
   getWeekBounds,

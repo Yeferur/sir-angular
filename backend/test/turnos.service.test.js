@@ -7,6 +7,7 @@ const {
   getCurrentScheduleStatus,
   getWeekBounds,
   getAdvisorWeekSchedule,
+  validateVacation,
 } = require('../services/Turnos/turnos.service');
 const db = require('../database/db');
 
@@ -83,6 +84,21 @@ test('getWeekBounds siempre resuelve al lunes-domingo de la semana de referencia
   assert.deepEqual(getWeekBounds('2026-08-06'), { fechaInicio: '2026-08-03', fechaFin: '2026-08-09' });
   assert.deepEqual(getWeekBounds('2026-08-03'), { fechaInicio: '2026-08-03', fechaFin: '2026-08-09' });
   assert.deepEqual(getWeekBounds('2026-08-09'), { fechaInicio: '2026-08-03', fechaFin: '2026-08-09' });
+});
+
+test('valida un periodo de vacaciones con regreso posterior', () => {
+  assert.deepEqual(validateVacation({
+    fechaInicio: '2026-08-10', fechaFin: '2026-08-26', fechaRegreso: '2026-08-27', diasHabiles: 15,
+  }), {
+    idVacacion: null, fechaInicio: '2026-08-10', fechaFin: '2026-08-26', fechaRegreso: '2026-08-27',
+    diasHabiles: 15, observaciones: null,
+  });
+});
+
+test('rechaza vacaciones cuyo regreso no sea posterior al disfrute', () => {
+  assert.throws(() => validateVacation({
+    fechaInicio: '2026-08-10', fechaFin: '2026-08-26', fechaRegreso: '2026-08-26', diasHabiles: 15,
+  }), (error) => error.code === 'INVALID_VACATION');
 });
 
 test('calcula el estado actual comparando contra la fecha concreta del día', () => {

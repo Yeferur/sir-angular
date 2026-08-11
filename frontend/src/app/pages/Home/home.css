@@ -169,6 +169,8 @@ button { font: inherit; }
 .advisor-shift-status[data-status='en_turno'] > span { background: var(--accent-green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 12%, transparent); }
 .advisor-shift-status[data-status='fuera_turno'] { color: color-mix(in srgb, var(--accent-yellow) 78%, var(--text-primary)); }
 .advisor-shift-status[data-status='fuera_turno'] > span { background: var(--accent-yellow); }
+.advisor-shift-status[data-status='vacaciones'] { color: var(--accent-purple); background: color-mix(in srgb, var(--accent-purple) 10%, transparent); }
+.advisor-shift-status[data-status='vacaciones'] > span { background: var(--accent-purple); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-purple) 12%, transparent); }
 
 .advisor-shift-action {
   min-height: 36px;

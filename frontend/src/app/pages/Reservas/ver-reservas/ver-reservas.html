@@ -79,7 +79,7 @@
     </div>
 
     <!-- ACTIVE FILTER TOKENS -->
-    @if (filters().FechaReserva || filters().FechaRegistro || filters().Estado?.length > 0 || filters().tour?.length > 0 || filters().CategoriaReserva?.length > 0) {
+    @if (filters().FechaReserva || filters().FechaRegistro || filters().Estado?.length > 0 || filters().tour?.length > 0 || filters().CategoriaReserva?.length > 0 || filters().TipoReserva) {
       <div class="active-filters">
         @if (filters().FechaReserva) {
           <div class="filter-token">
@@ -101,6 +101,14 @@
           <div class="filter-token">
             Estado: {{ filters().Estado.join(', ') }}
             <button class="remove-token-btn" (click)="updateFilter('Estado', [])">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filters().TipoReserva) {
+          <div class="filter-token">
+            Tipo: {{ filters().TipoReserva }}
+            <button class="remove-token-btn" (click)="updateFilter('TipoReserva', '')" aria-label="Quitar filtro de tipo">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -256,6 +264,18 @@
             }
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="reservation-type-filter">Tipo de reserva</label>
+          <select
+            id="reservation-type-filter"
+            class="type-filter-select"
+            [ngModel]="filters().TipoReserva"
+            (ngModelChange)="updateFilter('TipoReserva', $event)">
+            <option value="">Grupales y privadas</option>
+            <option value="Grupal">Solo grupales</option>
+            <option value="Privada">Solo privadas</option>
+          </select>
+        </div>
       </div>
     </div>
   }
@@ -297,12 +317,9 @@
             <div class="item-main-info">
               <span class="item-id">#{{ r.Id_Reserva }}</span>
               <span class="item-tour">{{ r.Nombre_Tour }}</span>
-              <span
-                class="badge"
-                [class.badge--privada]="getTipoReservaLabel(r) === 'Privada'"
-                [class.badge--grupal]="getTipoReservaLabel(r) !== 'Privada'">
-                {{ getTipoReservaLabel(r) }}
-              </span>
+              @if (getTipoReservaLabel(r) === 'Privada') {
+                <span class="badge badge--privada">Privada</span>
+              }
               <span class="item-meta">
                 {{ r.Fecha_Tour | date:'d MMM yyyy':'':'es-CO' }}
                 <span class="sep">·</span>

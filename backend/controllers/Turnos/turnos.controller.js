@@ -116,7 +116,8 @@ exports.publicarSemana = async (req, res) => {
     }
     if (['INVALID_WEEK_PAYLOAD', 'WEEK_ROWS_MISSING', 'INVALID_SCHEDULE', 'INVALID_SCHEDULE_DAY',
       'INVALID_SCHEDULE_TIME', 'INVALID_SCHEDULE_STEP', 'INVALID_SCHEDULE_RANGE',
-      'SCHEDULE_AFTER_11PM'].includes(error.code)) {
+      'SCHEDULE_AFTER_11PM', 'INVALID_VACATION', 'VACATION_OVERLAP',
+      'INVALID_WEEK_CHANNEL'].includes(error.code)) {
       return sendError(res, { status: 400, message: error.message, errorCode: error.code });
     }
     if (error.code === 'WEEK_NOT_FOUND') {

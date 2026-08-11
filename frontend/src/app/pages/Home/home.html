@@ -43,7 +43,7 @@
 
     @if (summary.profile.mode === 'advisor') {
       <section class="home-section advisor-shift-section" aria-labelledby="my-shift-title">
-        <article class="advisor-shift-card" [attr.data-status]="mySchedule?.estadoActual || 'sin_configurar'">
+        <article class="advisor-shift-card" [attr.data-status]="scheduleVisualStatus">
           <span class="advisor-shift-icon"><i class="bx bx-time-five" aria-hidden="true"></i></span>
           <div class="advisor-shift-copy">
             <span>Mi jornada de hoy</span>
@@ -57,7 +57,7 @@
             }
           </div>
           @if (!scheduleLoading && !scheduleError) {
-            <span class="advisor-shift-status" [attr.data-status]="mySchedule?.estadoActual || 'sin_configurar'">
+            <span class="advisor-shift-status" [attr.data-status]="scheduleVisualStatus">
               <span aria-hidden="true"></span>{{ scheduleStatusLabel }}
             </span>
           }

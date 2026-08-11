@@ -11,6 +11,16 @@ export interface CanalTurno {
   nombreCanal: string;
 }
 
+export interface VacacionTurno {
+  idVacacion: string | null;
+  fechaInicio: string;
+  fechaFin: string;
+  fechaRegreso: string;
+  diasHabiles: number;
+  estado: 'programada' | 'cancelada';
+  observaciones?: string | null;
+}
+
 export interface TurnoDia {
   idTurnoDia: string | null;
   diaSemana: number;
@@ -37,6 +47,9 @@ export interface AsesorSemana {
   correo: string;
   activo: boolean;
   canal: CanalTurno | null;
+  canalBase: CanalTurno | null;
+  canalSemanal: CanalTurno | null;
+  vacacion: VacacionTurno | null;
   esSupernumerario: boolean;
   configurado: boolean;
   estadoActual: EstadoTurno;
@@ -65,6 +78,7 @@ export interface MiJornadaSemana {
   correo: string;
   activo: boolean;
   canal: CanalTurno | null;
+  vacacion: VacacionTurno | null;
   semana: { idSemana: string; fechaInicio: string; fechaFin: string; estado: EstadoSemana };
   esSupernumerario: boolean;
   configurado: boolean;
@@ -81,6 +95,8 @@ export interface MiJornadaResponse {
 export interface ActualizarAsesorSemanaPayload {
   turnos: Array<{ diaSemana: number; esLaborable: boolean; horaInicio: string | null; horaFin: string | null }>;
   esSupernumerario: boolean;
+  idCanalSemanal: string | null;
+  vacacion: Omit<VacacionTurno, 'estado'> | null;
 }
 
 export interface PublicarSemanaPayload {

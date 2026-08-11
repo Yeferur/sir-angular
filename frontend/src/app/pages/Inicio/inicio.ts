@@ -319,7 +319,7 @@ export class Inicio implements OnInit, OnDestroy {
       .filter((tour): tour is Tour => Boolean(tour));
   }
 
-  irAReservas(tours: Tour | Tour[]): void {
+  irAReservas(tours: Tour | Tour[], tipoReserva: '' | 'Grupal' | 'Privada' = ''): void {
     const tourIds = (Array.isArray(tours) ? tours : [tours])
       .map((tour) => Number(tour?.Id_Tour))
       .filter((id) => Number.isFinite(id) && id > 0);
@@ -330,6 +330,7 @@ export class Inicio implements OnInit, OnDestroy {
       queryParams: {
         fechaTour: this.fecha,
         tours: tourIds.join(','),
+        tipoReserva: tipoReserva || null,
         buscar: 1,
       },
     });
