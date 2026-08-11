@@ -1,6 +1,17 @@
-@if (loading()) {
+@if (loading() && !jornada()) {
   <app-loading-state label="Consultando tu horario…"></app-loading-state>
-} @else if (error()) {
+} @else if (notPublished()) {
+  <main class="my-schedule-page page-enter">
+    <section class="empty-schedule-card">
+      <span class="empty-icon"><i class="bx bx-calendar-exclamation" aria-hidden="true"></i></span>
+      <div>
+        <span class="eyebrow">Semana actual</span>
+        <h2>Tu horario aún no ha sido publicado</h2>
+        <p>Cuando el equipo responsable lo publique, podrás consultar aquí cada jornada. También recibirás una notificación.</p>
+      </div>
+    </section>
+  </main>
+} @else if (error() && !jornada()) {
   <app-loading-state
     mode="error"
     label="No pudimos consultar tu horario"
@@ -9,44 +20,64 @@
     (action)="load()">
   </app-loading-state>
 } @else if (jornada(); as schedule) {
-  <main class="my-schedule-page">
-    <a routerLink="/" class="back-link"><i class="bx bx-left-arrow-alt" aria-hidden="true"></i> Volver al inicio</a>
-
-    <header class="my-schedule-hero">
-      <div>
-        <span class="eyebrow">Mi jornada laboral</span>
-        <h1>Mi horario</h1>
-        <p>Consulta las horas configuradas para tu semana. Este horario es de solo lectura.</p>
+  <main class="my-schedule-page page-enter" [class.is-refreshing]="loading()" [attr.aria-busy]="loading()">
+    <header class="schedule-context">
+      <div class="context-main">
+        <span class="context-icon"><i class="bx bx-calendar-week" aria-hidden="true"></i></span>
+        <div>
+          <span class="eyebrow">Semana publicada</span>
+          <h2>{{ weekRangeLabel() }}</h2>
+          <div class="schedule-tags">
+            @if (schedule.canal) { <span class="badge schedule-badge schedule-badge--neutral">{{ schedule.canal.nombreCanal }}</span> }
+            @if (schedule.esSupernumerario) { <span class="badge badge--info schedule-badge"><i class="bx bx-shuffle"></i> Supernumerario</span> }
+          </div>
+        </div>
       </div>
-      <span class="current-status" [attr.data-status]="currentStatus()">
-        <span aria-hidden="true"></span>{{ statusLabel() }}
-      </span>
+      <div class="status-block">
+        <span
+          class="badge schedule-status"
+          [class.badge--success]="currentStatus() === 'en_turno'"
+          [class.schedule-badge--neutral]="currentStatus() === 'fuera_turno'"
+          [class.badge--pending]="currentStatus() === 'sin_configurar'"
+        ><i class="bx bx-time-five" aria-hidden="true"></i>{{ statusLabel() }}</span>
+        <small>Según el horario publicado</small>
+      </div>
     </header>
 
     @if (!schedule.configurado) {
-      <section class="unconfigured-card">
-        <i class="bx bx-calendar-exclamation" aria-hidden="true"></i>
+      <section class="empty-schedule-card">
+        <span class="empty-icon"><i class="bx bx-calendar-exclamation" aria-hidden="true"></i></span>
         <div>
+          <span class="eyebrow">Jornada pendiente</span>
           <h2>Tu horario aún no está configurado</h2>
-          <p>Un administrador con permiso de turnos debe definir tu jornada semanal.</p>
+          <p>El equipo autorizado de Turnos debe definir tu jornada para esta semana.</p>
         </div>
       </section>
     } @else {
-      <section class="schedule-overview">
-        <div><span>Días laborables</span><strong>{{ workingDays() }}</strong></div>
-        <div><span>Horas semanales</span><strong>{{ weeklyHoursLabel() }}</strong></div>
-        <div><span>Zona horaria</span><strong>Bogotá</strong></div>
+      <section class="schedule-overview" aria-label="Resumen semanal">
+        <article>
+          <span class="overview-icon overview-icon--blue"><i class="bx bx-calendar-check" aria-hidden="true"></i></span>
+          <div><small>Días de trabajo</small><strong [countUp]="workingDays()" countUpSuffix=" días"></strong></div>
+        </article>
+        <article>
+          <span class="overview-icon overview-icon--purple"><i class="bx bx-world" aria-hidden="true"></i></span>
+          <div><small>Zona horaria</small><strong>Bogotá</strong></div>
+        </article>
       </section>
 
       <section class="week-card" aria-label="Horario semanal">
+        <div class="week-card-title">
+          <div><span class="eyebrow">Detalle diario</span><h3>Tu semana</h3></div>
+          <span>{{ workingDays() }} {{ workingDays() === 1 ? 'jornada programada' : 'jornadas programadas' }}</span>
+        </div>
         <div class="week-heading" aria-hidden="true">
           <span>Día</span><span>Entrada</span><span>Salida</span><span>Duración</span>
         </div>
         @for (day of schedule.turnos; track day.diaSemana) {
           <article class="readonly-day" [class.is-today]="isToday(day)" [class.is-off]="!day.esLaborable">
             <div class="day-name">
-              <strong>{{ day.nombreDia }}</strong>
-              @if (isToday(day)) { <small>Hoy</small> }
+              <span class="day-date"><strong>{{ day.nombreDia.slice(0, 3) }}</strong><small>{{ shortDate(day.fecha) }}</small></span>
+              <div><strong>{{ day.nombreDia }}</strong>@if (isToday(day)) { <span class="badge badge--info schedule-badge">Hoy</span> }</div>
             </div>
             @if (day.esLaborable) {
               <span class="time-value"><small>Entrada</small>{{ timeLabel(day.horaInicio) }}</span>
@@ -60,8 +91,8 @@
       </section>
 
       <aside class="readonly-note">
-        <i class="bx bx-lock-alt" aria-hidden="true"></i>
-        <span>Tu horario solo puede ser modificado por administradores que tengan el permiso <strong>TURNOS.ACTUALIZAR</strong>.</span>
+        <i class="bx bx-info-circle" aria-hidden="true"></i>
+        <span>Este estado indica si estás dentro de tu horario programado; no representa todavía un registro de presencia. Si necesitas un ajuste, comunícate con el equipo autorizado de Turnos.</span>
       </aside>
     }
   </main>

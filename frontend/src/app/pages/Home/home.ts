@@ -24,7 +24,7 @@ import {
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { CountUpDirective } from '../Inicio/count-up.directive';
-import { AsesorTurnos, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
+import { MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 
 const UPDATE_FEEDBACK_MS = 1100;
 
@@ -87,7 +87,7 @@ export class HomeComponent implements OnInit {
   dataUpdated = false;
   error = '';
   connectionState: WebSocketConnectionState = 'connecting';
-  mySchedule: AsesorTurnos | null = null;
+  mySchedule: MiJornadaSemana | null = null;
   scheduleLoading = false;
   scheduleError = '';
   private refreshTimer?: ReturnType<typeof setTimeout>;

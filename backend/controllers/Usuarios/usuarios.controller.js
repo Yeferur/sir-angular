@@ -11,6 +11,10 @@ const { invalidarCacheUsuario } = require('../../middlewares/permissionsMiddlewa
 
 const backendRoot = path.join(__dirname, '..', '..');
 
+function isAdvisorRoleName(value) {
+  return String(value || '').trim().toLowerCase() === 'asesor';
+}
+
 function isStrongPassword(value) {
   const password = String(value || '');
   return password.length >= 8
@@ -194,7 +198,7 @@ exports.actualizarMiPerfil = async (req, res) => {
       });
     }
 
-    const forbiddenKeys = ['Id_Usuario', 'Id_Rol', 'permisos', 'Activo', 'Usuario'];
+    const forbiddenKeys = ['Id_Usuario', 'Id_Rol', 'Id_Canal', 'permisos', 'Activo', 'Usuario'];
     const attemptedForbidden = forbiddenKeys.filter((k) => Object.prototype.hasOwnProperty.call(req.body || {}, k));
     if (attemptedForbidden.length > 0) {
       return sendError(res, {
@@ -375,6 +379,7 @@ exports.actualizarUsuario = async (req, res) => {
       Correo,
       Contrasena,
       Id_Rol,
+      Id_Canal,
       Activo,
       permisos,
       permisosEfectivos,
@@ -457,6 +462,27 @@ exports.actualizarUsuario = async (req, res) => {
     }
 
     const targetIsClient = isClientRoleName(targetRoleRows[0].Nombre_Rol);
+    const targetIsAdvisor = isAdvisorRoleName(targetRoleRows[0].Nombre_Rol);
+
+    // El canal de ventas solo aplica a Asesores; si el rol cambia a otro
+    // distinto, se limpia en vez de dejar un canal huérfano.
+    let canalIdToPersist = null;
+    if (targetIsAdvisor && Id_Canal) {
+      const [canalRows] = await conn.query(
+        'SELECT Id_Canal FROM canales_turno WHERE Id_Canal = ? AND Activo = 1 LIMIT 1',
+        [Id_Canal]
+      );
+      if (!canalRows.length) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'El canal de ventas seleccionado no está disponible',
+          errorCode: 'INVALID_CHANNEL',
+        });
+      }
+      canalIdToPersist = canalRows[0].Id_Canal;
+    }
+
     let permisosBaseIds = [];
     if (usaPermisosEfectivos && !targetIsClient) {
       const [baseRows] = await conn.query(
@@ -541,13 +567,14 @@ exports.actualizarUsuario = async (req, res) => {
       hash = await bcrypt.hash(Contrasena, 8);
     }
 
-    let updateQuery = 'UPDATE usuarios SET Nombres_Apellidos=?, Telefono_Usuario=?, Usuario=?, Correo=?, Id_Rol=?, Activo=?';
+    let updateQuery = 'UPDATE usuarios SET Nombres_Apellidos=?, Telefono_Usuario=?, Usuario=?, Correo=?, Id_Rol=?, Id_Canal=?, Activo=?';
     const params = [
       Nombres_Apellidos,
       Telefono_Usuario || null,
       Usuario,
       Correo,
       Id_Rol || null,
+      canalIdToPersist,
       typeof Activo !== 'undefined' ? Activo : current.Activo,
     ];
 
@@ -799,6 +826,7 @@ exports.crearUsuario = async (req, res) => {
       Correo,
       Contrasena,
       Id_Rol,
+      Id_Canal,
       Activo,
       Avatar,
       permisos,
@@ -863,6 +891,7 @@ exports.crearUsuario = async (req, res) => {
 
     let permisosBaseIds = [];
     let targetIsClient = false;
+    let targetIsAdvisor = false;
     if (Id_Rol) {
       const [roleRows] = await conn.query(
         'SELECT Id_Rol, Nombre_Rol FROM roles WHERE Id_Rol = ? AND Activo = 1 LIMIT 1',
@@ -879,6 +908,7 @@ exports.crearUsuario = async (req, res) => {
       }
 
       targetIsClient = isClientRoleName(roleRows[0].Nombre_Rol);
+      targetIsAdvisor = isAdvisorRoleName(roleRows[0].Nombre_Rol);
 
       if (!targetIsClient) {
         const [baseRows] = await conn.query(
@@ -887,6 +917,25 @@ exports.crearUsuario = async (req, res) => {
         );
         permisosBaseIds = baseRows.map((row) => Number(row.Id_Permiso));
       }
+    }
+
+    // El canal de ventas solo aplica a Asesores; para cualquier otro rol se
+    // ignora lo que venga en el body en vez de persistirlo por error.
+    let canalIdToPersist = null;
+    if (targetIsAdvisor && Id_Canal) {
+      const [canalRows] = await conn.query(
+        'SELECT Id_Canal FROM canales_turno WHERE Id_Canal = ? AND Activo = 1 LIMIT 1',
+        [Id_Canal]
+      );
+      if (!canalRows.length) {
+        await conn.rollback();
+        return sendError(res, {
+          status: 400,
+          message: 'El canal de ventas seleccionado no está disponible',
+          errorCode: 'INVALID_CHANNEL',
+        });
+      }
+      canalIdToPersist = canalRows[0].Id_Canal;
     }
 
     const permisosSolicitados = targetIsClient
@@ -923,7 +972,7 @@ exports.crearUsuario = async (req, res) => {
     }
 
     await conn.query(
-      'INSERT INTO usuarios (Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Activo, Fecha_Creacion, Avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
+      'INSERT INTO usuarios (Id_Usuario, Nombres_Apellidos, Telefono_Usuario, Usuario, Correo, Contrasena, Id_Rol, Id_Canal, Activo, Fecha_Creacion, Avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
       [
         Id_Usuario,
         Nombres_Apellidos,
@@ -932,6 +981,7 @@ exports.crearUsuario = async (req, res) => {
         Correo,
         hash,
         Id_Rol || null,
+        canalIdToPersist,
         typeof Activo !== 'undefined' ? Activo : 1,
         avatarPath,
       ]

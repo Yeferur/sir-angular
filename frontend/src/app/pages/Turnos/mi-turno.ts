@@ -1,23 +1,25 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { AsesorTurnos, EstadoTurno, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
+import { EstadoTurno, MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { CountUpDirective } from '../Inicio/count-up.directive';
 
 @Component({
   selector: 'app-mi-turno',
   standalone: true,
-  imports: [CommonModule, RouterLink, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, CountUpDirective],
   templateUrl: './mi-turno.html',
   styleUrl: './mi-turno.css',
 })
 export class MiTurnoComponent implements OnInit, OnDestroy {
-  readonly jornada = signal<AsesorTurnos | null>(null);
+  readonly jornada = signal<MiJornadaSemana | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  readonly notPublished = signal(false);
   readonly now = signal(new Date());
   readonly zone = signal('America/Bogota');
   private timer?: number;
+  private loadRequestId = 0;
 
   readonly currentStatus = computed<EstadoTurno>(() => {
     const schedule = this.jornada();
@@ -28,10 +30,6 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
       && clock.time >= today.horaInicio && clock.time < today.horaFin ? 'en_turno' : 'fuera_turno';
   });
 
-  readonly weeklyMinutes = computed(() => (this.jornada()?.turnos || []).reduce((total, day) => {
-    if (!day.esLaborable || !day.horaInicio || !day.horaFin) return total;
-    return total + this.toMinutes(day.horaFin) - this.toMinutes(day.horaInicio);
-  }, 0));
   readonly workingDays = computed(() => (this.jornada()?.turnos || []).filter((day) => day.esLaborable).length);
 
   constructor(private readonly turnosService: TurnosService) {}
@@ -46,25 +44,33 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
   }
 
   load(): void {
+    const requestId = ++this.loadRequestId;
     this.loading.set(true);
     this.error.set('');
+    this.notPublished.set(false);
     this.turnosService.obtenerMiJornada().subscribe({
       next: (response) => {
+        if (requestId !== this.loadRequestId) return;
         this.jornada.set(response.jornada);
         this.zone.set(response.zonaHoraria || 'America/Bogota');
         this.loading.set(false);
       },
       error: (error) => {
-        this.error.set(error?.error?.message || 'No pudimos consultar tu horario.');
+        if (requestId !== this.loadRequestId) return;
+        if (error?.error?.errorCode === 'WEEK_NOT_PUBLISHED') {
+          this.notPublished.set(true);
+        } else {
+          this.error.set(error?.error?.message || 'No pudimos consultar tu horario.');
+        }
         this.loading.set(false);
       },
     });
   }
 
   statusLabel(): string {
-    if (this.currentStatus() === 'en_turno') return 'En turno ahora';
-    if (this.currentStatus() === 'fuera_turno') return 'Fuera de turno';
-    return 'Pendiente de configurar';
+    if (this.currentStatus() === 'en_turno') return 'En horario ahora';
+    if (this.currentStatus() === 'fuera_turno') return 'Fuera de horario';
+    return 'Sin jornada';
   }
 
   durationLabel(day: TurnoDia): string {
@@ -82,11 +88,21 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
     return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${period}`;
   }
 
-  weeklyHoursLabel(): string {
-    const minutes = this.weeklyMinutes();
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
+  weekRangeLabel(): string {
+    const schedule = this.jornada();
+    if (!schedule) return 'Semana actual';
+    const start = this.parseDate(schedule.semana.fechaInicio);
+    const end = this.parseDate(schedule.semana.fechaFin);
+    const startMonth = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'UTC' }).format(start).replace('.', '');
+    const endMonth = new Intl.DateTimeFormat('es-CO', { month: 'short', timeZone: 'UTC' }).format(end).replace('.', '');
+    if (startMonth === endMonth) return `${start.getUTCDate()} al ${end.getUTCDate()} de ${endMonth}`;
+    return `${start.getUTCDate()} de ${startMonth} al ${end.getUTCDate()} de ${endMonth}`;
+  }
+
+  shortDate(value: string): string {
+    return new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+      .format(this.parseDate(value))
+      .replace('.', '');
   }
 
   isToday(day: TurnoDia): boolean {
@@ -105,5 +121,9 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
   private toMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return (hours * 60) + minutes;
+  }
+
+  private parseDate(value: string): Date {
+    return new Date(`${value.slice(0, 10)}T00:00:00Z`);
   }
 }

@@ -248,7 +248,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // lo necesita para saber si estamos en /reset-password.
         this.routerSub = this.router.events.subscribe(event => {
             if (event instanceof NavigationStart) {
-                this.startNavigationMotion();
+                // Navegaciones que solo actualizan query params (ej. el filtro
+                // de fecha en Aforos) mantienen la misma ruta y el mismo
+                // título — no deben disparar la animación de salida del
+                // título del topbar, solo las que cambian de página sí.
+                const targetPath = event.url.split('?')[0];
+                const currentPath = (this.currentUrl() || '').split('?')[0];
+                this.startNavigationMotion(targetPath !== currentPath);
                 return;
             }
 
@@ -259,8 +265,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 let route = this.activatedRoute;
                 while (route.firstChild) route = route.firstChild;
                 const title = route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
-                this.pageTitle.set(this.extractTitle(title));
-                this.finishNavigationMotion(true);
+                const nextTitle = this.extractTitle(title);
+                const titleChanged = nextTitle !== this.pageTitle();
+                this.pageTitle.set(nextTitle);
+                this.finishNavigationMotion(titleChanged);
                 return;
             }
 
@@ -668,14 +676,17 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return parts.length > 1 ? parts[parts.length - 1].trim() : docTitle.trim();
     }
 
-    private startNavigationMotion(): void {
+    private startNavigationMotion(pathChanged: boolean): void {
         if (!this.showAppChrome()) return;
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
 
         this.finishRouteActivity?.();
         this.finishRouteActivity = this.activity.begin();
-        this.titleEntering.set(false);
-        this.titleLeaving.set(true);
+
+        if (pathChanged) {
+            this.titleEntering.set(false);
+            this.titleLeaving.set(true);
+        }
     }
 
     private finishNavigationMotion(titleChanged: boolean): void {

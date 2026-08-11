@@ -1,36 +1,73 @@
 @if (loading() && asesores().length === 0) {
-  <app-loading-state label="Preparando jornadas de asesores…"></app-loading-state>
+  <app-loading-state label="Preparando el turno de la semana…"></app-loading-state>
 } @else if (error() && asesores().length === 0) {
   <app-loading-state
     mode="error"
-    label="No pudimos cargar las jornadas"
+    label="No pudimos cargar los turnos"
     [detail]="error() || ''"
     actionLabel="Reintentar"
     (action)="load()">
   </app-loading-state>
 } @else {
-  <main class="turnos-page">
-    <header class="turnos-hero">
-      <div>
-        <span class="eyebrow">Equipo comercial</span>
-        <h1>Turnos de asesores</h1>
-        <p>Define la jornada fija que la aplicación usará para interpretar disponibilidad y tiempos.</p>
+  <main class="turnos-page" [class.is-refreshing]="loading() && asesores().length > 0" [attr.aria-busy]="loading()">
+    <header class="week-command">
+      <div class="week-navigation">
+        <button type="button" class="week-arrow" (click)="prevWeek()" aria-label="Semana anterior">
+          <i class="bx bx-chevron-left" aria-hidden="true"></i>
+        </button>
+        <div class="week-context">
+          <span class="context-label">Planificación semanal</span>
+          <div class="week-title-line">
+            <strong>{{ weekLabel() }}</strong>
+            <span
+              class="badge turnos-badge"
+              [class.badge--success]="semana()?.estado === 'publicado'"
+              [class.badge--pending]="semana()?.estado !== 'publicado'"
+            >{{ weekStatusLabel() }}</span>
+          </div>
+        </div>
+        <button type="button" class="week-arrow" (click)="nextWeek()" aria-label="Semana siguiente">
+          <i class="bx bx-chevron-right" aria-hidden="true"></i>
+        </button>
       </div>
-      <div class="summary-strip">
-        <div><strong>{{ asesores().length }}</strong><span>Asesores</span></div>
-        <div><strong>{{ configuredCount() }}</strong><span>Configurados</span></div>
-        <div><strong>{{ workingNowCount() }}</strong><span>En turno ahora</span></div>
+
+      <div class="coverage" aria-label="Cobertura de jornadas configuradas">
+        <div class="coverage-copy">
+          <span>Cobertura</span>
+          <strong><span [countUp]="configuredCount()"></span> de {{ asesores().length }} asesores</strong>
+        </div>
+        <span class="coverage-track" aria-hidden="true"><i [style.width.%]="configuredPercent()"></i></span>
+        @if (weekWarnings().length) {
+          <small class="coverage-warning">{{ weekWarnings().length }} {{ weekWarnings().length === 1 ? 'advertencia' : 'advertencias' }}</small>
+        }
       </div>
+
+      @if (canUpdate()) {
+        <div class="week-actions">
+          @if (canCopyPreviousWeek()) {
+            <button type="button" class="button-quiet" (click)="copyFromPreviousWeek()">Copiar semana anterior</button>
+          }
+          <button
+            type="button"
+            class="publish-button"
+            (click)="publish()"
+            [disabled]="!canPublish() || publishing()"
+          >{{ publishing() ? 'Publicando…' : publishButtonLabel() }}</button>
+        </div>
+      }
     </header>
+
+    @if (dirty()) {
+      <div class="pending-notice" role="status">
+        {{ dirtyAdvisorIds().length }} {{ dirtyAdvisorIds().length === 1 ? 'jornada modificada' : 'jornadas modificadas' }}. Todos los cambios se guardarán juntos al publicar la semana.
+      </div>
+    }
 
     <section class="turnos-workspace">
       <aside class="advisor-panel">
         <div class="panel-heading">
-          <div>
-            <span>Personal</span>
-            <strong>Selecciona un asesor</strong>
-          </div>
-          @if (loading()) { <span class="mini-loader" aria-label="Actualizando"></span> }
+          <div><span class="context-label">Equipo</span><strong>Asesores</strong></div>
+          <small>{{ filteredAdvisors().length }} de {{ asesores().length }}</small>
         </div>
 
         <label class="advisor-search">
@@ -41,23 +78,28 @@
             [value]="search()"
             (input)="updateSearch($any($event.target).value)"
           />
+          @if (loading()) { <span class="mini-loader" aria-label="Actualizando"></span> }
         </label>
 
         <div class="advisor-list">
-          @for (advisor of filteredAdvisors(); track advisor.idUsuario) {
-            <button
-              type="button"
-              class="advisor-row"
-              [class.is-selected]="selectedId() === advisor.idUsuario"
-              [class.is-inactive]="!advisor.activo"
-              (click)="selectAdvisor(advisor)">
-              <span class="advisor-avatar">{{ initials(advisor) }}</span>
-              <span class="advisor-copy">
-                <strong>{{ advisor.nombre }}</strong>
-                <small>{{ advisor.activo ? '@' + advisor.usuario : 'Cuenta inactiva' }}</small>
-              </span>
-              <span class="status-dot" [attr.data-status]="currentStatus(advisor)" [title]="statusLabel(advisor)"></span>
-            </button>
+          @for (group of groupedAdvisors(); track group.nombreCanal) {
+            <div class="channel-heading"><span>{{ group.nombreCanal }}</span><small>{{ group.asesores.length }}</small></div>
+            @for (advisor of group.asesores; track advisor.idUsuario) {
+              <button
+                type="button"
+                class="advisor-row"
+                [class.is-selected]="selectedId() === advisor.idUsuario"
+                [class.is-inactive]="!advisor.activo"
+                (click)="selectAdvisor(advisor)"
+              >
+                <span class="advisor-avatar">{{ initials(advisor) }}</span>
+                <span class="advisor-main">
+                  <strong>{{ advisor.nombre }}</strong>
+                  <small>{{ advisorScheduleSummary(advisor) }}@if (advisor.esSupernumerario) { · Supernumerario }</small>
+                </span>
+                <span class="selection-mark" aria-hidden="true"></span>
+              </button>
+            }
           } @empty {
             <div class="advisor-empty">No hay asesores que coincidan con la búsqueda.</div>
           }
@@ -67,89 +109,115 @@
       <section class="schedule-panel">
         @if (selectedAdvisor(); as advisor) {
           <div class="schedule-header">
-            <div>
-              <span class="eyebrow">Jornada semanal</span>
-              <h2>{{ advisor.nombre }}</h2>
-              <p>
-                <span class="status-pill" [attr.data-status]="currentStatus(advisor)">{{ statusLabel(advisor) }}</span>
-                <span>{{ activeCount() }} días · {{ formatWeeklyHours() }} semanales</span>
-              </p>
-            </div>
-            <button type="button" class="copy-button" (click)="copyFirstWorkingDay()" [disabled]="!canUpdate() || activeCount() === 0">
-              <i class="bx bx-copy" aria-hidden="true"></i>
-              Igualar horas
-            </button>
-          </div>
-
-          <div class="schedule-note">
-            <i class="bx bx-time-five" aria-hidden="true"></i>
-            <span>Zona horaria de Bogotá. Cada turno termina el mismo día y la salida máxima es a las <strong>11:00 p. m.</strong></span>
-          </div>
-
-          <div class="days-table">
-            <div class="days-head" aria-hidden="true">
-              <span>Día</span><span>Estado</span><span>Entrada</span><span>Salida</span><span>Duración</span>
-            </div>
-            @for (day of editorDays(); track day.diaSemana; let index = $index) {
-              <div class="day-row" [class.is-off]="!day.esLaborable">
-                <strong>{{ day.nombreDia }}</strong>
-                <label class="day-toggle">
-                  <input
-                    type="checkbox"
-                    [checked]="day.esLaborable"
-                    [disabled]="!canUpdate()"
-                    (change)="toggleDay(index, $any($event.target).checked)"
-                  />
-                  <span aria-hidden="true"></span>
-                  <small>{{ day.esLaborable ? 'Laborable' : 'Descanso' }}</small>
-                </label>
-                <label class="time-field">
-                  <span>Entrada</span>
-                  <input
-                    type="time"
-                    [value]="day.horaInicio || ''"
-                    [disabled]="!day.esLaborable || !canUpdate()"
-                    max="22:59"
-                    (input)="updateTime(index, 'horaInicio', $any($event.target).value)"
-                  />
-                </label>
-                <label class="time-field">
-                  <span>Salida</span>
-                  <input
-                    type="time"
-                    [value]="day.horaFin || ''"
-                    [disabled]="!day.esLaborable || !canUpdate()"
-                    max="23:00"
-                    (input)="updateTime(index, 'horaFin', $any($event.target).value)"
-                  />
-                </label>
-                <span class="duration">{{ durationLabel(day) }}</span>
-              </div>
-            }
-          </div>
-
-          @if (validationMessage()) {
-            <div class="validation-message" role="alert"><i class="bx bx-error-circle"></i>{{ validationMessage() }}</div>
-          }
-
-          <footer class="schedule-actions">
-            @if (!canUpdate()) {
-              <span>Tu cuenta tiene acceso de consulta.</span>
-            } @else {
-              <span>{{ dirty() ? 'Hay cambios sin guardar.' : 'La jornada está al día.' }}</span>
+            <div class="schedule-identity">
+              <span class="advisor-avatar advisor-avatar--lg">{{ initials(advisor) }}</span>
               <div>
-                <button type="button" class="secondary-button" (click)="resetEditor()" [disabled]="!dirty() || saving()">Descartar</button>
-                <button type="button" class="primary-button" (click)="save()" [disabled]="!dirty() || !!validationMessage() || saving()">
-                  {{ saving() ? 'Guardando…' : 'Guardar jornada' }}
-                </button>
+                <span class="context-label">Jornada del asesor</span>
+                <h2>{{ advisor.nombre }}</h2>
+                <p>
+                  {{ advisor.canal?.nombreCanal || 'Sin canal asignado' }}
+                  <span>·</span> {{ activeCount() }} {{ activeCount() === 1 ? 'día programado' : 'días programados' }}
+                </p>
+              </div>
+            </div>
+
+            @if (canUpdate()) {
+              <div class="advisor-actions">
+                <button type="button" class="button-quiet equalize-button" (click)="copyFirstWorkingDay()" [disabled]="activeCount() === 0">Igualar horas</button>
+                @if (dirtyAdvisorIds().includes(advisor.idUsuario)) {
+                  <button type="button" class="discard-button" (click)="resetEditor()">Revertir asesor</button>
+                }
               </div>
             }
-          </footer>
+          </div>
+
+          <div class="schedule-scroll">
+            <label class="supernumerario-setting" [class.is-active]="editorSupernumerario()">
+              <input
+                type="checkbox"
+                [checked]="editorSupernumerario()"
+                [disabled]="!canUpdate()"
+                (change)="toggleSupernumerario($any($event.target).checked)"
+              />
+              <span class="setting-copy">
+                <strong>Supernumerario esta semana</strong>
+                <small>Cubre huecos y cambios únicamente dentro de su canal.</small>
+              </span>
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+
+            <div class="days-section-title">
+              <div><span class="context-label">Distribución</span><h3>Horario por día</h3></div>
+              <small>Bloques de 30 minutos · salida máxima 11:00 p. m. · al menos un día de descanso</small>
+            </div>
+
+            @if (selectedWarnings().length) {
+              <div class="schedule-warnings" role="status">
+                <strong>Revisa esta jornada</strong>
+                @for (warning of selectedWarnings(); track warning.code + (warning.message || '')) {
+                  <span>{{ warning.message }}</span>
+                }
+              </div>
+            }
+
+            <div class="days-table">
+              <div class="days-head" aria-hidden="true">
+                <span>Día</span><span>Jornada</span><span>Entrada</span><span>Salida</span><span>Rango</span>
+              </div>
+              @for (day of editorDays(); track day.diaSemana; let index = $index) {
+                <div class="day-row" [class.is-off]="!day.esLaborable" [class.is-invalid]="isDayInvalid(day)">
+                  <div class="day-identity"><strong>{{ day.nombreDia }}</strong><small>{{ shortDayDate(day.fecha) }}</small></div>
+                  <label class="day-toggle">
+                    <input
+                      type="checkbox"
+                      [checked]="day.esLaborable"
+                      [disabled]="!canUpdate()"
+                      (change)="toggleDay(index, $any($event.target).checked)"
+                    />
+                    <span aria-hidden="true"></span>
+                    <small>{{ day.esLaborable ? 'Trabaja' : 'Descanso' }}</small>
+                  </label>
+                  @if (day.esLaborable) {
+                    <div class="time-field time-field--start">
+                      <span>Entrada</span>
+                      <app-timepicker
+                        [value]="day.horaInicio"
+                        [disabled]="!canUpdate()"
+                        [invalid]="isDayInvalid(day)"
+                        [step]="30"
+                        maxTime="22:30"
+                        placeholder="Entrada"
+                        (valueChange)="updateTime(index, 'horaInicio', $event)"
+                      ></app-timepicker>
+                    </div>
+                    <div class="time-field time-field--end">
+                      <span>Salida</span>
+                      <app-timepicker
+                        [value]="day.horaFin"
+                        [disabled]="!canUpdate()"
+                        [invalid]="isDayInvalid(day)"
+                        [step]="30"
+                        maxTime="23:00"
+                        placeholder="Salida"
+                        (valueChange)="updateTime(index, 'horaFin', $event)"
+                      ></app-timepicker>
+                    </div>
+                    <span class="duration">{{ durationLabel(day) }}</span>
+                  } @else {
+                    <span class="empty-time empty-time--start">—</span><span class="empty-time empty-time--end">—</span><span class="duration">—</span>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (validationMessage()) {
+              <div class="validation-message" role="alert">{{ validationMessage() }}</div>
+            }
+          </div>
         } @else {
           <div class="no-selection">
-            <i class="bx bx-user-x" aria-hidden="true"></i>
             <h2>No hay asesores disponibles</h2>
-            <p>Los usuarios aparecerán aquí únicamente cuando tengan asignado el rol Asesor.</p>
+            <p>Los usuarios aparecerán aquí cuando tengan asignado el rol Asesor.</p>
           </div>
         }
       </section>

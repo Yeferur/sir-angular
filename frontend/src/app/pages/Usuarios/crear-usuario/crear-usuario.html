@@ -271,6 +271,18 @@
                   <div class="errorMessage">Selecciona un rol.</div>
                 }
               </div>
+
+              @if (isAdvisorRole) {
+                <div class="form-group role-select-group">
+                  <label class="form-label">Canal de ventas</label>
+                  <select class="form-select" formControlName="Id_Canal">
+                    <option [value]="null">Sin asignar</option>
+                    @for (canal of canales; track canal.idCanal) {
+                      <option [value]="canal.idCanal">{{ canal.nombreCanal }}</option>
+                    }
+                  </select>
+                </div>
+              }
             </div>
 
             <div

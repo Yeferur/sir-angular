@@ -1,0 +1,40 @@
+<!-- ── TRIGGER (queda en el DOM normal del componente) ── -->
+<button
+  type="button"
+  class="sir-tp-field"
+  [class.is-open]="isOpen"
+  [class.is-invalid]="invalid"
+  [class.is-disabled]="disabled"
+  [attr.aria-expanded]="isOpen"
+  [attr.aria-label]="value ? displayText : placeholder"
+  [disabled]="disabled || null"
+  (click)="toggle()"
+>
+  <svg class="sir-tp-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9"/>
+    <polyline points="12 7 12 12 15.5 14"/>
+  </svg>
+
+  <span class="sir-tp-text" [class.placeholder]="!value">
+    {{ value ? displayText : placeholder }}
+  </span>
+</button>
+
+<!-- ── PANEL (montado por CDK Overlay fuera del flujo del padre) ── -->
+<ng-template #panelTpl>
+  <div class="sir-tp-panel" role="dialog" aria-modal="true" aria-label="Seleccionar hora">
+    <div class="sir-tp-list" #slotList>
+      @for (slot of slots; track trackBySlot($index, slot)) {
+        <button
+          type="button"
+          class="sir-tp-item"
+          [class.is-selected]="value === slot"
+          [disabled]="isSlotDisabled(slot) || null"
+          [attr.aria-pressed]="value === slot"
+          (click)="selectSlot(slot)"
+        >{{ slotLabel(slot) }}</button>
+      }
+    </div>
+  </div>
+</ng-template>

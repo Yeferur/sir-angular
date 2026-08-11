@@ -1,0 +1,136 @@
+/* ============================================================
+   SIR-TIMEPICKER — Usa CDK Overlay, mismos tokens que el datepicker.
+   El trigger vive en el host (:host). El panel lo monta CDK en el
+   body, por eso usa ViewEncapsulation.None (ver timepicker.ts).
+   ============================================================ */
+
+:host {
+  display: block;
+  width: 100%;
+  font-family: var(--font-family);
+}
+
+.sir-tp-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  transition: border-color .18s var(--ease-soft, ease), box-shadow .18s var(--ease-soft, ease);
+  outline: none;
+}
+
+.sir-tp-field:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--separator-color) 40%, var(--accent-blue));
+}
+
+.sir-tp-field.is-open {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 12%, transparent);
+}
+
+.sir-tp-field.is-invalid {
+  border-color: var(--accent-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-red) 12%, transparent);
+}
+
+.sir-tp-field.is-disabled,
+.sir-tp-field:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.sir-tp-icon {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: color .18s var(--ease-soft, ease);
+}
+.sir-tp-field.is-open .sir-tp-icon { color: var(--accent-blue); }
+
+.sir-tp-text {
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: .76rem;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sir-tp-text.placeholder {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* ── BACKDROP ── */
+.sir-tp-backdrop {
+  background: transparent;
+}
+
+/* ── PANEL (montado por CDK Overlay en el body) — una sola lista ── */
+.sir-tp-panel {
+  width: 168px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color));
+  animation: sirTpPanelIn .18s var(--ease-panel, ease) both;
+}
+
+@keyframes sirTpPanelIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.sir-tp-list {
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--separator-color) transparent;
+}
+
+.sir-tp-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 1px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: .78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .12s var(--ease-soft, ease), color .12s var(--ease-soft, ease), border-color .12s var(--ease-soft, ease);
+}
+.sir-tp-item:hover:not(:disabled):not(.is-selected) {
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  color: var(--accent-blue);
+}
+.sir-tp-item:disabled {
+  color: var(--text-tertiary);
+  opacity: .35;
+  cursor: not-allowed;
+}
+.sir-tp-item.is-selected {
+  background: var(--accent-blue) !important;
+  color: var(--text-on-accent) !important;
+  border-color: var(--accent-blue) !important;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sir-tp-panel { animation: none; }
+}

@@ -7,6 +7,7 @@ import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisoCompleto, PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { CanalTurno, TurnosService } from '../../../services/Turnos/turnos.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import {
@@ -88,6 +89,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   panelAnimating = false;
 
   roles: Rol[] = [];
+  canales: CanalTurno[] = [];
   permisos: PermisoCompleto[] = [];
   selectedPermisos: number[] = [];
   roleDefaultPermisos: number[] = [];
@@ -127,7 +129,8 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
     private usuariosService: UsuariosService,
     private router: Router,
     private cdr: ChangeDetectorRef,
-    private alerts: SirAlertService
+    private alerts: SirAlertService,
+    private turnosService: TurnosService
   ) {
     this.form = this.fb.group({
       Id_Usuario: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(30)]],
@@ -137,7 +140,8 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       Correo: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
       Contrasena: ['', [Validators.required]],
       Confirmar: ['', [Validators.required]],
-      Id_Rol: ['', [Validators.required]]
+      Id_Rol: ['', [Validators.required]],
+      Id_Canal: [null]
     }, { validators: passwordMatchValidator });
   }
 
@@ -186,19 +190,22 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
     forkJoin({
       roles: this.permisosService.obtenerRoles(),
-      permisos: this.permisosService.obtenerPermisos()
+      permisos: this.permisosService.obtenerPermisos(),
+      canales: this.turnosService.obtenerCanales()
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: ({ roles, permisos }) => {
+        next: ({ roles, permisos, canales }) => {
           this.roles = roles.roles || [];
           this.permisos = permisos.permisos || [];
+          this.canales = canales.canales || [];
           this.isLoading.set(false);
           this.cdr.markForCheck();
         },
         error: () => {
           this.roles = [];
           this.permisos = [];
+          this.canales = [];
           this.isLoading.set(false);
           this.loadError.set('No fue posible cargar los roles y permisos. Revisa tu conexión e inténtalo de nuevo.');
           this.cdr.markForCheck();
@@ -209,6 +216,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
   onRolChange(): void {
     const idRol = Number(this.form.value.Id_Rol || 0);
     this.rolePermissionsRequest?.unsubscribe();
+
+    if (!this.isAdvisorRole) {
+      this.form.get('Id_Canal')?.setValue(null, { emitEvent: false });
+    }
 
     if (!idRol) {
       this.loadedRoleId = 0;
@@ -275,6 +286,10 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
 
   get isClientRole(): boolean {
     return String(this.selectedRole?.Nombre_Rol || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
+  }
+
+  get isAdvisorRole(): boolean {
+    return String(this.selectedRole?.Nombre_Rol || '').trim().toLocaleLowerCase('es-CO') === 'asesor';
   }
 
   userInitials(): string {
@@ -523,6 +538,7 @@ export class CrearUsuarioComponent implements OnInit, OnDestroy {
       Correo: String(this.form.value.Correo),
       Contrasena: String(this.form.value.Contrasena),
       Id_Rol: Number(this.form.value.Id_Rol),
+      Id_Canal: this.isAdvisorRole && this.form.value.Id_Canal ? Number(this.form.value.Id_Canal) : null,
       Activo: 1,
       // El backend calcula ALLOW y DENY comparando esta selección completa
       // con la plantilla del rol. `permisos` mantiene compatibilidad con

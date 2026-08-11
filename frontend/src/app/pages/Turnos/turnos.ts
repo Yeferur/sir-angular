@@ -1,38 +1,67 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import {
-  AsesorTurnos,
-  EstadoTurno,
+  AsesorSemana,
+  SemanaTurno,
   TurnoDia,
   TurnosService,
 } from '../../services/Turnos/turnos.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { TimepickerComponent } from '../../shared/timepicker/timepicker';
+import { CountUpDirective } from '../Inicio/count-up.directive';
 
 const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+function parseYMD(value: string): { y: number; m: number; d: number } {
+  const [y, m, d] = value.split('-').map(Number);
+  return { y, m, d };
+}
+
+function addDaysToYMD(value: string, amount: number): string {
+  const { y, m, d } = parseYMD(value);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + amount);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+interface AdvisorGroup {
+  nombreCanal: string;
+  asesores: AsesorSemana[];
+}
+
+interface ScheduleWarning {
+  idUsuario: string;
+  asesor: string;
+  code: 'NO_WORK_DAYS' | 'NO_REST_DAY';
+  message: string;
+}
 
 @Component({
   selector: 'app-turnos',
   standalone: true,
-  imports: [CommonModule, FormsModule, LoadingStateComponent],
+  imports: [CommonModule, FormsModule, LoadingStateComponent, TimepickerComponent, CountUpDirective],
   templateUrl: './turnos.html',
   styleUrl: './turnos.css',
 })
-export class TurnosComponent implements OnInit, OnDestroy {
-  readonly asesores = signal<AsesorTurnos[]>([]);
+export class TurnosComponent implements OnInit {
+  readonly fechaReferencia = signal(new Date().toISOString().slice(0, 10));
+  readonly semana = signal<SemanaTurno | null>(null);
+  readonly asesores = signal<AsesorSemana[]>([]);
   readonly selectedId = signal<string | null>(null);
-  readonly editorDays = signal<TurnoDia[]>(this.emptyWeek());
+  readonly editorDays = signal<TurnoDia[]>([]);
+  readonly editorSupernumerario = signal(false);
   readonly loading = signal(true);
-  readonly saving = signal(false);
+  readonly publishing = signal(false);
   readonly error = signal<string | null>(null);
   readonly search = signal('');
-  readonly now = signal(new Date());
-  readonly dirty = signal(false);
-  readonly zone = signal('America/Bogota');
-
-  private clockTimer?: number;
+  readonly dirtyAdvisorIds = signal<string[]>([]);
+  readonly dirty = computed(() => this.dirtyAdvisorIds().length > 0);
+  private baselineAdvisors = new Map<string, AsesorSemana>();
+  private loadRequestId = 0;
 
   readonly filteredAdvisors = computed(() => {
     const query = this.search().trim().toLocaleLowerCase('es-CO');
@@ -44,18 +73,58 @@ export class TurnosComponent implements OnInit, OnDestroy {
     );
   });
 
+  readonly groupedAdvisors = computed<AdvisorGroup[]>(() => {
+    const groups: AdvisorGroup[] = [];
+    let current: AdvisorGroup | null = null;
+    for (const advisor of this.filteredAdvisors()) {
+      const nombreCanal = advisor.canal?.nombreCanal || 'Sin canal asignado';
+      if (!current || current.nombreCanal !== nombreCanal) {
+        current = { nombreCanal, asesores: [] };
+        groups.push(current);
+      }
+      current.asesores.push(advisor);
+    }
+    return groups;
+  });
+
   readonly selectedAdvisor = computed(() =>
     this.asesores().find((advisor) => advisor.idUsuario === this.selectedId()) || null
   );
 
   readonly configuredCount = computed(() => this.asesores().filter((advisor) => advisor.configurado).length);
-  readonly workingNowCount = computed(() => this.asesores().filter((advisor) => this.currentStatus(advisor) === 'en_turno').length);
+  readonly configuredPercent = computed(() => this.asesores().length
+    ? Math.round((this.configuredCount() / this.asesores().length) * 100)
+    : 0);
   readonly activeCount = computed(() => this.editorDays().filter((day) => day.esLaborable).length);
-  readonly weeklyMinutes = computed(() => this.editorDays().reduce((total, day) => {
-    if (!day.esLaborable || !day.horaInicio || !day.horaFin) return total;
-    return total + Math.max(0, this.toMinutes(day.horaFin) - this.toMinutes(day.horaInicio));
-  }, 0));
   readonly validationMessage = computed(() => this.validateEditor());
+  readonly weekWarnings = computed<ScheduleWarning[]>(() => this.asesores()
+    .filter((advisor) => advisor.activo)
+    .flatMap((advisor) => this.scheduleWarnings(advisor)));
+  readonly selectedWarnings = computed(() => this.weekWarnings().filter((warning) => warning.idUsuario === this.selectedId()));
+
+  readonly weekLabel = computed(() => {
+    const s = this.semana();
+    if (!s) return '';
+    const a = parseYMD(s.fechaInicio);
+    const b = parseYMD(s.fechaFin);
+    return a.m === b.m
+      ? `Semana del ${a.d} al ${b.d} de ${MESES[a.m - 1]}`
+      : `Semana del ${a.d} de ${MESES[a.m - 1]} al ${b.d} de ${MESES[b.m - 1]}`;
+  });
+
+  readonly weekStatusLabel = computed(() => {
+    switch (this.semana()?.estado) {
+      case 'publicado': return 'Publicado';
+      case 'pendiente_republicacion': return 'Cambios sin publicar';
+      default: return 'Borrador';
+    }
+  });
+
+  readonly publishButtonLabel = computed(() => this.semana()?.estado === 'publicado' || this.semana()?.estado === 'pendiente_republicacion'
+    ? 'Republicar semana'
+    : 'Publicar semana');
+  readonly canPublish = computed(() => this.semana()?.estado !== 'publicado' || this.dirty());
+  readonly canCopyPreviousWeek = computed(() => this.semana()?.estado === 'borrador');
 
   constructor(
     private readonly turnosService: TurnosService,
@@ -65,11 +134,6 @@ export class TurnosComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.load();
-    this.clockTimer = window.setInterval(() => this.now.set(new Date()), 60_000);
-  }
-
-  ngOnDestroy(): void {
-    if (this.clockTimer) window.clearInterval(this.clockTimer);
   }
 
   canUpdate(): boolean {
@@ -77,38 +141,58 @@ export class TurnosComponent implements OnInit, OnDestroy {
   }
 
   load(): void {
+    const requestId = ++this.loadRequestId;
     this.loading.set(true);
     this.error.set(null);
-    this.turnosService.listarAsesores().subscribe({
+    this.turnosService.obtenerSemana(this.fechaReferencia()).subscribe({
       next: (response) => {
-        const advisors = response?.asesores || [];
+        if (requestId !== this.loadRequestId) return;
+        this.semana.set(response.semana);
+        const advisors = response.asesores.map((advisor) => this.cloneAdvisor(advisor));
         this.asesores.set(advisors);
-        this.zone.set(response?.zonaHoraria || 'America/Bogota');
+        this.baselineAdvisors = new Map(advisors.map((advisor) => [advisor.idUsuario, this.cloneAdvisor(advisor)]));
+        this.dirtyAdvisorIds.set([]);
         const selected = advisors.find((advisor) => advisor.idUsuario === this.selectedId()) || advisors[0] || null;
-        this.selectedId.set(selected?.idUsuario || null);
-        this.editorDays.set(this.scheduleFor(selected));
-        this.dirty.set(false);
+        this.applySelection(selected);
         this.loading.set(false);
       },
       error: (error) => {
-        this.error.set(error?.error?.message || 'No se pudieron cargar las jornadas.');
+        if (requestId !== this.loadRequestId) return;
+        this.error.set(error?.error?.message || 'No se pudieron cargar los turnos de la semana.');
         this.loading.set(false);
       },
     });
   }
 
-  selectAdvisor(advisor: AsesorTurnos): void {
-    if (this.saving() || advisor.idUsuario === this.selectedId()) return;
+  prevWeek(): void {
+    this.changeWeek(-7);
+  }
+
+  nextWeek(): void {
+    this.changeWeek(7);
+  }
+
+  private changeWeek(deltaDays: number): void {
     if (this.dirty()) {
       this.alerts.confirm(
-        '¿Cambiar de asesor?',
+        '¿Cambiar de semana?',
         'Hay cambios de jornada sin guardar.',
-        () => this.applySelection(advisor),
+        () => {
+          this.fechaReferencia.set(addDaysToYMD(this.fechaReferencia(), deltaDays));
+          this.selectedId.set(null);
+          this.load();
+        },
         undefined,
         { confirmText: 'Descartar cambios', cancelText: 'Seguir editando', type: 'warning' }
       );
       return;
     }
+    this.fechaReferencia.set(addDaysToYMD(this.fechaReferencia(), deltaDays));
+    this.load();
+  }
+
+  selectAdvisor(advisor: AsesorSemana): void {
+    if (advisor.idUsuario === this.selectedId()) return;
     this.applySelection(advisor);
   }
 
@@ -126,7 +210,7 @@ export class TurnosComponent implements OnInit, OnDestroy {
           horaFin: checked ? (day.horaFin || '17:00') : null,
         }
       : day));
-    this.dirty.set(true);
+    this.syncEditorDraft();
   }
 
   updateTime(index: number, field: 'horaInicio' | 'horaFin', value: string): void {
@@ -134,7 +218,13 @@ export class TurnosComponent implements OnInit, OnDestroy {
     this.editorDays.update((days) => days.map((day, currentIndex) => currentIndex === index
       ? { ...day, [field]: value }
       : day));
-    this.dirty.set(true);
+    this.syncEditorDraft();
+  }
+
+  toggleSupernumerario(checked: boolean): void {
+    if (!this.canUpdate()) return;
+    this.editorSupernumerario.set(checked);
+    this.syncEditorDraft();
   }
 
   copyFirstWorkingDay(): void {
@@ -144,66 +234,136 @@ export class TurnosComponent implements OnInit, OnDestroy {
     this.editorDays.update((days) => days.map((day) => day.esLaborable
       ? { ...day, horaInicio: source.horaInicio, horaFin: source.horaFin }
       : day));
-    this.dirty.set(true);
+    this.syncEditorDraft();
   }
 
   resetEditor(): void {
-    this.editorDays.set(this.scheduleFor(this.selectedAdvisor()));
-    this.dirty.set(false);
+    const id = this.selectedId();
+    const baseline = id ? this.baselineAdvisors.get(id) : null;
+    if (!id || !baseline) return;
+    const restored = this.cloneAdvisor(baseline);
+    this.asesores.update((items) => items.map((item) => item.idUsuario === id ? restored : item));
+    this.dirtyAdvisorIds.update((ids) => ids.filter((value) => value !== id));
+    this.applySelection(restored);
   }
 
-  save(): void {
-    const advisor = this.selectedAdvisor();
-    if (!advisor || !this.canUpdate() || this.saving()) return;
-    const validation = this.validationMessage();
-    if (validation) {
-      this.alerts.errorToast('Revisa la jornada', validation);
+  publish(): void {
+    const semana = this.semana();
+    if (!semana || !this.canUpdate() || !this.canPublish() || this.publishing()) return;
+    const invalid = this.asesores().filter((advisor) => advisor.activo).map((advisor) => ({ advisor, message: this.validateDays(advisor.turnos) })).find((item) => item.message);
+    if (invalid) {
+      this.alerts.errorToast('Revisa la semana', `${invalid.advisor.nombre}: ${invalid.message}`);
       return;
     }
+    const warnings = this.weekWarnings();
+    if (warnings.length) {
+      const preview = warnings.slice(0, 3).map((warning) => `${warning.asesor}: ${warning.message}`).join(' ');
+      this.alerts.confirm(
+        'La semana tiene advertencias',
+        `${preview}${warnings.length > 3 ? ` Hay ${warnings.length - 3} advertencias adicionales.` : ''}`,
+        () => this.performPublish(true),
+        undefined,
+        { confirmText: 'Publicar de todas formas', cancelText: 'Seguir revisando', type: 'warning' }
+      );
+      return;
+    }
+    this.performPublish(false);
+  }
 
-    this.saving.set(true);
-    this.turnosService.actualizarJornada(advisor.idUsuario, this.editorDays()).subscribe({
-      next: (result) => {
-        this.asesores.update((items) => items.map((item) => item.idUsuario === advisor.idUsuario
-          ? { ...item, configurado: true, estadoActual: result.estadoActual, turnos: result.turnos }
-          : item));
-        this.editorDays.set(result.turnos.map((day) => ({ ...day })));
-        this.dirty.set(false);
-        this.saving.set(false);
-        this.alerts.successToast('Jornada guardada', `El horario de ${advisor.nombre} quedó actualizado.`);
+  private performPublish(aceptarAdvertencias: boolean): void {
+    const semana = this.semana();
+    if (!semana) return;
+    const jornadas = this.asesores().filter((advisor) => advisor.activo).map((advisor) => ({
+      idUsuario: advisor.idUsuario,
+      esSupernumerario: advisor.esSupernumerario,
+      turnos: advisor.turnos.map((day) => ({
+        diaSemana: day.diaSemana,
+        esLaborable: day.esLaborable,
+        horaInicio: day.horaInicio,
+        horaFin: day.horaFin,
+      })),
+    }));
+    this.publishing.set(true);
+    this.turnosService.publicarSemana(semana.idSemana, { jornadas, aceptarAdvertencias }).subscribe({
+      next: () => {
+        this.publishing.set(false);
+        this.alerts.successToast('Semana publicada', 'Los asesores ya pueden ver su horario.');
+        this.load();
       },
       error: (error) => {
-        this.saving.set(false);
-        this.alerts.errorToast('No se pudo guardar', error?.error?.message || 'Intenta nuevamente.');
+        this.publishing.set(false);
+        this.alerts.errorToast('No se pudo publicar', error?.error?.message || 'Intenta nuevamente.');
       },
     });
   }
 
-  currentStatus(advisor: AsesorTurnos): EstadoTurno {
-    if (!advisor.configurado || advisor.turnos.length !== 7) return 'sin_configurar';
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: this.zone(), weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).formatToParts(this.now());
-    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    const dayNumber: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-    const today = advisor.turnos.find((day) => day.diaSemana === dayNumber[values['weekday']]);
-    const time = `${values['hour']}:${values['minute']}`;
-    return today?.esLaborable && !!today.horaInicio && !!today.horaFin
-      && time >= today.horaInicio && time < today.horaFin ? 'en_turno' : 'fuera_turno';
+  copyFromPreviousWeek(): void {
+    const semana = this.semana();
+    if (!semana || !this.canUpdate()) return;
+    this.alerts.confirm(
+      '¿Copiar la semana anterior?',
+      'Se copiarán como borrador los días, horarios y descansos de la semana pasada. Nada se guardará hasta publicar.',
+      () => {
+        const previousDate = addDaysToYMD(semana.fechaInicio, -7);
+        this.turnosService.obtenerSemana(previousDate).subscribe({
+          next: (previous) => {
+            if (!previous.asesores.some((advisor) => advisor.configurado)) {
+              this.alerts.errorToast('No se pudo copiar', 'La semana anterior no tiene jornadas configuradas.');
+              return;
+            }
+            const previousById = new Map(previous.asesores.map((advisor) => [advisor.idUsuario, advisor]));
+            this.asesores.update((items) => items.map((advisor) => {
+              const source = previousById.get(advisor.idUsuario);
+              if (!source) return advisor;
+              const sourceByDay = new Map(source.turnos.map((day) => [day.diaSemana, day]));
+              return {
+                ...advisor,
+                esSupernumerario: false,
+                configurado: source.configurado,
+                turnos: advisor.turnos.map((day) => {
+                  const sourceDay = sourceByDay.get(day.diaSemana);
+                  return sourceDay ? {
+                    ...day,
+                    esLaborable: sourceDay.esLaborable,
+                    horaInicio: sourceDay.horaInicio,
+                    horaFin: sourceDay.horaFin,
+                    esSupernumerario: false,
+                  } : day;
+                }),
+              };
+            }));
+            this.dirtyAdvisorIds.set(this.asesores().filter((advisor) => advisor.activo).map((advisor) => advisor.idUsuario));
+            this.applySelection(this.selectedAdvisor());
+            this.alerts.successToast('Semana copiada al borrador', 'Revisa los horarios y publícalos cuando estén listos.');
+          },
+          error: (error) => {
+            this.alerts.errorToast('No se pudo copiar', error?.error?.message || 'No existe una semana anterior disponible.');
+          },
+        });
+      },
+      undefined,
+      { confirmText: 'Copiar', cancelText: 'Cancelar', type: 'warning' }
+    );
   }
 
-  statusLabel(advisor: AsesorTurnos): string {
-    const status = this.currentStatus(advisor);
-    if (status === 'en_turno') return 'En turno';
-    if (status === 'fuera_turno') return 'Fuera de turno';
-    return 'Sin configurar';
+  advisorWorkingDays(advisor: AsesorSemana): number {
+    return advisor.turnos.filter((day) => day.esLaborable).length;
   }
 
-  formatWeeklyHours(): string {
-    const minutes = this.weeklyMinutes();
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
+  advisorScheduleSummary(advisor: AsesorSemana): string {
+    const days = this.advisorWorkingDays(advisor);
+    if (!days) return 'Sin jornada definida';
+    return `${days} ${days === 1 ? 'día programado' : 'días programados'}`;
+  }
+
+  shortDayDate(value: string): string {
+    const { m, d } = parseYMD(value);
+    return `${d} ${MESES[m - 1].slice(0, 3)}`;
+  }
+
+  isDayInvalid(day: TurnoDia): boolean {
+    if (!day.esLaborable) return false;
+    return !day.horaInicio || !day.horaFin || day.horaInicio >= day.horaFin || day.horaFin > '23:00';
   }
 
   durationLabel(day: TurnoDia): string {
@@ -214,40 +374,60 @@ export class TurnosComponent implements OnInit, OnDestroy {
     return remainder ? `${hours} h ${remainder} min` : `${hours} h`;
   }
 
-  initials(advisor: AsesorTurnos): string {
+  initials(advisor: AsesorSemana): string {
     const names = advisor.nombre.trim().split(/\s+/).filter(Boolean);
     return `${names[0]?.[0] || ''}${names[1]?.[0] || ''}`.toUpperCase() || '?';
   }
 
-  private applySelection(advisor: AsesorTurnos): void {
-    this.selectedId.set(advisor.idUsuario);
-    this.editorDays.set(this.scheduleFor(advisor));
-    this.dirty.set(false);
-  }
-
-  private scheduleFor(advisor: AsesorTurnos | null): TurnoDia[] {
-    if (advisor?.turnos?.length === 7) return advisor.turnos.map((day) => ({ ...day }));
-    return this.emptyWeek();
-  }
-
-  private emptyWeek(): TurnoDia[] {
-    return DAY_NAMES.map((nombreDia, index): TurnoDia => ({
-      diaSemana: index + 1,
-      nombreDia,
-      esLaborable: false,
-      horaInicio: null,
-      horaFin: null,
-    }));
+  private applySelection(advisor: AsesorSemana | null | undefined): void {
+    this.selectedId.set(advisor?.idUsuario || null);
+    this.editorDays.set(advisor ? advisor.turnos.map((day) => ({ ...day })) : []);
+    this.editorSupernumerario.set(advisor?.esSupernumerario || false);
   }
 
   private validateEditor(): string | null {
-    for (const day of this.editorDays()) {
+    return this.validateDays(this.editorDays());
+  }
+
+  private validateDays(days: TurnoDia[]): string | null {
+    for (const day of days) {
       if (!day.esLaborable) continue;
-      if (!day.horaInicio || !day.horaFin) return `${day.nombreDia} necesita hora de entrada y salida.`;
-      if (day.horaInicio >= day.horaFin) return `La salida del ${day.nombreDia.toLowerCase()} debe ser posterior a la entrada.`;
+      if (!day.horaInicio || !day.horaFin) return `${DAY_NAMES[day.diaSemana - 1]} necesita hora de entrada y salida.`;
+      if (day.horaInicio >= day.horaFin) return `La salida del ${DAY_NAMES[day.diaSemana - 1].toLowerCase()} debe ser posterior a la entrada.`;
       if (day.horaFin > '23:00') return 'La salida máxima permitida es a las 11:00 p. m.';
     }
     return null;
+  }
+
+  private syncEditorDraft(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    const days = this.editorDays().map((day) => ({ ...day, esSupernumerario: this.editorSupernumerario() }));
+    this.asesores.update((items) => items.map((advisor) => advisor.idUsuario === id
+      ? {
+          ...advisor,
+          turnos: days,
+          esSupernumerario: this.editorSupernumerario(),
+          configurado: days.some((day) => day.esLaborable),
+        }
+      : advisor));
+    this.dirtyAdvisorIds.update((ids) => ids.includes(id) ? ids : [...ids, id]);
+  }
+
+  private scheduleWarnings(advisor: AsesorSemana): ScheduleWarning[] {
+    const workDays = advisor.turnos.filter((day) => day.esLaborable && day.horaInicio && day.horaFin);
+    const warnings: ScheduleWarning[] = [];
+    const add = (code: ScheduleWarning['code'], message: string) => warnings.push({ idUsuario: advisor.idUsuario, asesor: advisor.nombre, code, message });
+    if (!workDays.length) {
+      add('NO_WORK_DAYS', 'No tiene ninguna jornada asignada.');
+      return warnings;
+    }
+    if (workDays.length === 7) add('NO_REST_DAY', 'No tiene un día de descanso durante la semana.');
+    return warnings;
+  }
+
+  private cloneAdvisor(advisor: AsesorSemana): AsesorSemana {
+    return { ...advisor, canal: advisor.canal ? { ...advisor.canal } : null, turnos: advisor.turnos.map((day) => ({ ...day })) };
   }
 
   private toMinutes(time: string): number {

@@ -7,6 +7,7 @@ import { startWith, takeUntil } from 'rxjs/operators';
 import { PermisoCompleto, PermisosService, Rol } from '../../../services/Permisos/permisos.service';
 import { UsuariosService } from '../../../services/Usuarios/usuarios';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
+import { CanalTurno, TurnosService } from '../../../services/Turnos/turnos.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import {
@@ -90,6 +91,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
   panelAnimating = false;
 
   roles: Rol[] = [];
+  canales: CanalTurno[] = [];
   permisos: PermisoCompleto[] = [];
   selectedPermisos: number[] = [];
   roleDefaultPermisos: number[] = [];
@@ -116,7 +118,8 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private cdr: ChangeDetectorRef,
-    private alerts: SirAlertService
+    private alerts: SirAlertService,
+    private turnosService: TurnosService
   ) {
     this.form = this.fb.group({
       Id_Usuario: [{ value: '', disabled: true }, [Validators.required]],
@@ -127,6 +130,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
       Contrasena: [''],
       Confirmar: [''],
       Id_Rol: ['', [Validators.required]],
+      Id_Canal: [null],
       Activo: [1]
     }, { validators: passwordMatchValidator });
   }
@@ -159,13 +163,15 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     forkJoin({
       roles: this.permisosService.obtenerRoles(),
       permisos: this.permisosService.obtenerPermisos(),
+      canales: this.turnosService.obtenerCanales(),
       usuario: this.usuariosService.obtenerUsuario(this.userId)
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: ({ roles, permisos, usuario }) => {
+        next: ({ roles, permisos, canales, usuario }) => {
           this.roles = roles.roles || [];
           this.permisos = permisos.permisos || [];
+          this.canales = canales.canales || [];
           this.form.patchValue({
             Id_Usuario: usuario.Id_Usuario,
             Nombres_Apellidos: usuario.Nombres_Apellidos,
@@ -173,6 +179,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
             Usuario: usuario.Usuario,
             Correo: usuario.Correo,
             Id_Rol: usuario.Id_Rol,
+            Id_Canal: usuario.Id_Canal ?? null,
             Activo: Number(usuario.Activo ?? 1)
           });
 
@@ -265,6 +272,9 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
   onRolChange(): void {
     const idRol = Number(this.form.value.Id_Rol || 0);
+    if (!this.isAdvisorRole) {
+      this.form.get('Id_Canal')?.setValue(null, { emitEvent: false });
+    }
     if (!idRol) {
       this.roleDefaultPermisos = [];
       this.selectedPermisos = [];
@@ -298,6 +308,10 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
 
   get isClientRole(): boolean {
     return String(this.selectedRole?.Nombre_Rol || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
+  }
+
+  get isAdvisorRole(): boolean {
+    return String(this.selectedRole?.Nombre_Rol || '').trim().toLocaleLowerCase('es-CO') === 'asesor';
   }
 
   get permissionsByModule(): Array<{ key: string; label: string; permisos: PermisoCompleto[] }> {
@@ -534,6 +548,7 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
       Correo: String(this.form.value.Correo),
       Contrasena: String(this.form.value.Contrasena || ''),
       Id_Rol: Number(this.form.value.Id_Rol),
+      Id_Canal: this.isAdvisorRole && this.form.value.Id_Canal ? Number(this.form.value.Id_Canal) : null,
       Activo: Number(this.form.value.Activo ?? 1),
       permisosEfectivos: [...this.selectedPermisos],
       permisos: this.selectedPermisos.filter((id) => !this.roleDefaultPermisos.includes(id))

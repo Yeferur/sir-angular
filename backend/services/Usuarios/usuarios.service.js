@@ -51,6 +51,7 @@ async function getUserById(id) {
        u.Correo,
        u.Telefono_Usuario,
        u.Id_Rol,
+       u.Id_Canal,
        u.Activo,
        r.Nombre_Rol
      FROM usuarios u
@@ -79,6 +80,7 @@ async function getUserById(id) {
       Correo: u.Correo,
       Telefono_Usuario: u.Telefono_Usuario,
       Id_Rol: u.Id_Rol,
+      Id_Canal: u.Id_Canal,
       Nombre_Rol: u.Nombre_Rol,
       Activo: u.Activo,
       permisos: [],
@@ -130,6 +132,7 @@ async function getUserById(id) {
     Correo: u.Correo,
     Telefono_Usuario: u.Telefono_Usuario,
     Id_Rol: u.Id_Rol,
+    Id_Canal: u.Id_Canal,
     Nombre_Rol: u.Nombre_Rol || 'Sin rol',
     Activo: u.Activo,
     permisos,
