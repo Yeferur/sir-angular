@@ -1,8 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { EstadoTurno, MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
+import { AsesorIntercambio, EstadoTurno, MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { CountUpDirective } from '../Inicio/count-up.directive';
+import { SirDrawerService } from '../../services/Drawer/drawer.service';
+import { WebSocketService } from '../../services/WebSocket/web-socket';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-mi-turno',
@@ -18,7 +21,10 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
   readonly notPublished = signal(false);
   readonly now = signal(new Date());
   readonly zone = signal('America/Bogota');
+  readonly exchangeAvailability = signal<Record<string, boolean>>({});
+  readonly checkingExchangeDate = signal<string | null>(null);
   private timer?: number;
+  private exchangeSub?: Subscription;
   private loadRequestId = 0;
 
   readonly currentStatus = computed<EstadoTurno>(() => {
@@ -32,15 +38,47 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
 
   readonly workingDays = computed(() => (this.jornada()?.turnos || []).filter((day) => day.esLaborable).length);
 
-  constructor(private readonly turnosService: TurnosService) {}
+  constructor(private readonly turnosService: TurnosService, private readonly drawer: SirDrawerService, private readonly webSocket: WebSocketService) {}
+
+  requestExchange(day: TurnoDia): void {
+    if (!this.canExchange(day) || this.checkingExchangeDate()) return;
+    this.checkingExchangeDate.set(day.fecha);
+    this.turnosService.obtenerOpcionesIntercambio(day.fecha).subscribe({
+      next: response => {
+        this.checkingExchangeDate.set(null);
+        const candidates = response.asesores || [];
+        this.exchangeAvailability.update(current => ({ ...current, [day.fecha]: candidates.length > 0 }));
+        if (candidates.length) this.drawer.openTurnosIntercambio({ day, candidates });
+      },
+      error: () => {
+        this.checkingExchangeDate.set(null);
+        this.exchangeAvailability.update(current => ({ ...current, [day.fecha]: false }));
+      },
+    });
+  }
+
+  canExchange(day: TurnoDia): boolean {
+    return this.exchangeAvailability()[day.fecha] === true && this.isFutureExchangeableDay(day);
+  }
+
+  private isFutureExchangeableDay(day: TurnoDia): boolean {
+    if (!day.esLaborable || this.isVacationDay(day)) return false;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: this.zone() }).format(this.now());
+    if (day.fecha > today) return true;
+    return day.fecha === today && !!day.horaInicio && this.clockParts(this.now()).time < day.horaInicio;
+  }
 
   ngOnInit(): void {
     this.load();
+    this.exchangeSub = this.webSocket.events$.subscribe(event => {
+      if (event.type === 'turnoIntercambioActualizado') this.load();
+    });
     this.timer = window.setInterval(() => this.now.set(new Date()), 60_000);
   }
 
   ngOnDestroy(): void {
     if (this.timer) window.clearInterval(this.timer);
+    this.exchangeSub?.unsubscribe();
   }
 
   load(): void {
@@ -53,6 +91,7 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
         if (requestId !== this.loadRequestId) return;
         this.jornada.set(response.jornada);
         this.zone.set(response.zonaHoraria || 'America/Bogota');
+        this.prepareExchangeAvailability(response.jornada, requestId);
         this.loading.set(false);
       },
       error: (error) => {
@@ -65,6 +104,26 @@ export class MiTurnoComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       },
     });
+  }
+
+  private prepareExchangeAvailability(schedule: MiJornadaSemana, requestId: number): void {
+    this.exchangeAvailability.set({});
+    const days = schedule.turnos.filter(day => this.isFutureExchangeableDay(day));
+    if (!schedule.canal || !days.length) return;
+    for (const day of days) {
+      this.turnosService.obtenerOpcionesIntercambio(day.fecha).subscribe({
+        next: response => {
+          if (requestId === this.loadRequestId) {
+            this.exchangeAvailability.update(current => ({ ...current, [day.fecha]: (response.asesores || []).length > 0 }));
+          }
+        },
+        error: () => {
+          if (requestId === this.loadRequestId) {
+            this.exchangeAvailability.update(current => ({ ...current, [day.fecha]: false }));
+          }
+        },
+      });
+    }
   }
 
   statusLabel(): string {

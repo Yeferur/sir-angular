@@ -38,6 +38,8 @@ import { GlobalSearchComponent } from '../components/global-search/global-search
 import { TopbarTransitionService } from '../components/login/topbar-transition.service';
 import { LoginContentComponent } from '../components/login/login';
 import { AppActivityService } from '../services/app-activity.service';
+import { NotificacionesService } from '../services/Notificaciones/notificaciones.service';
+import { WebSocketService } from '../services/WebSocket/web-socket';
 
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -86,6 +88,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private router = inject(Router);
     private activatedRoute = inject(ActivatedRoute);
     private activity = inject(AppActivityService);
+    readonly notifications = inject(NotificacionesService);
+    private webSocket = inject(WebSocketService);
 
     // ── Señales del servicio global ──────────────────────────────
     globalSearchOpen = this.search.open;
@@ -147,6 +151,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private transitionFallbackTimer?: number;
     private finishRouteActivity?: () => void;
     private titleMotionTimer?: number;
+    private notificationEventSub?: Subscription;
 
     private readonly topbarStateEffect = effect(() => {
         this.topbarState();
@@ -303,6 +308,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 .subscribe(() => this.syncActiveSubmenu());
 
             await this.permisosService.loadSessionData();
+            if (!this.isClientUser()) {
+                this.notifications.load();
+                this.notificationEventSub = this.webSocket.events$.subscribe(event => {
+                    if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado') {
+                        this.notifications.load();
+                    }
+                });
+            }
             this.syncActiveSubmenu();
             this.ready.set(true);
         } catch (e: any) {
@@ -328,6 +341,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     ngOnDestroy(): void {
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
+        this.notificationEventSub?.unsubscribe();
         if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
         this.finishRouteActivity?.();
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
@@ -607,6 +621,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // ── Novedades ────────────────────────────────────────────────
     openAppUpdates(): void { this.drawer.openAppUpdates(); }
+    openNotifications(): void { this.drawer.openNotifications(); }
 
     isClientUser(): boolean {
         return this.permisosService.esCliente();

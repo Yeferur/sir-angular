@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones';
+export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'notificaciones' | 'turnos-intercambio';
 
 export interface DrawerMapDestination {
   lat: number;
@@ -65,6 +65,10 @@ export class SirDrawerService {
   openAppUpdates(): void {
     this.open({ type: 'app-updates' });
   }
+
+  openNotifications(): void { this.open({ type: 'notificaciones' }); }
+
+  openTurnosIntercambio(props: Record<string, any>): void { this.open({ type: 'turnos-intercambio', props }); }
 
   openProgramacionListado(props: Record<string, any>): void {
     this.open({ type: 'programacion-listado', props });

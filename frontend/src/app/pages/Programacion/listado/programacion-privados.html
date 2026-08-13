@@ -35,7 +35,7 @@
         {{ exportingAll ? 'Preparando…' : 'Exportar todos' }}
       </button>
       @if (canUpdate && !phoneReadOnly) {
-        <button type="button" class="button button--primary" [disabled]="saving || !dirty" (click)="save()">
+        <button type="button" class="button button--primary" [disabled]="saving || !canSave" (click)="save()">
           @if (saving) {
             <span class="button-spinner" aria-hidden="true"></span>
             Guardando…

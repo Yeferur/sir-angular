@@ -89,7 +89,13 @@
             @if (day.esLaborable) {
               <span class="time-value"><small>Entrada</small>{{ timeLabel(day.horaInicio) }}</span>
               <span class="time-value"><small>Salida</small>{{ timeLabel(day.horaFin) }}</span>
-              <span class="duration-value">{{ durationLabel(day) }}</span>
+              <span class="duration-actions"><span class="duration-value">{{ durationLabel(day) }}</span>
+                @if (canExchange(day)) {
+                  <button class="exchange-action" type="button" [class.is-loading]="checkingExchangeDate() === day.fecha" [disabled]="!!checkingExchangeDate()" (click)="requestExchange(day)">
+                    {{ checkingExchangeDate() === day.fecha ? 'Comprobando…' : 'Cambiar' }}
+                  </button>
+                }
+              </span>
             } @else if (isVacationDay(day)) {
               <span class="rest-value"><i class="bx bx-sun" aria-hidden="true"></i> Vacaciones</span>
             } @else {

@@ -104,6 +104,18 @@ export interface PublicarSemanaPayload {
   aceptarAdvertencias: boolean;
 }
 
+export interface AsesorIntercambio {
+  idUsuario: string; nombre: string; horaInicio: string; horaFin: string;
+}
+
+export interface IntercambioTurno {
+  idIntercambio: string; fecha: string; estado: 'pendiente'|'aceptado'|'rechazado'|'cancelado'|'expirado';
+  esSolicitante: boolean; solicitante: string; receptor: string; motivo: string | null;
+  horarioSolicitante: { inicio: string; fin: string };
+  horarioReceptor: { inicio: string; fin: string };
+  fechaCreacion: string; fechaRespuesta: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TurnosService {
   private readonly baseUrl = `${environment.apiUrl}/turnos`;
@@ -130,6 +142,26 @@ export class TurnosService {
 
   publicarSemana(idSemana: string, payload: PublicarSemanaPayload): Observable<{ idSemana: string; estado: EstadoSemana }> {
     return this.http.post<{ idSemana: string; estado: EstadoSemana }>(`${this.baseUrl}/semanas/${idSemana}/publicar`, payload);
+  }
+
+  obtenerOpcionesIntercambio(fecha: string): Observable<{ asesores: AsesorIntercambio[] }> {
+    return this.http.get<{ asesores: AsesorIntercambio[] }>(`${this.baseUrl}/intercambios/opciones`, { params: { fecha } });
+  }
+
+  obtenerMisIntercambios(): Observable<{ intercambios: IntercambioTurno[] }> {
+    return this.http.get<{ intercambios: IntercambioTurno[] }>(`${this.baseUrl}/intercambios`);
+  }
+
+  solicitarIntercambio(fecha: string, idReceptor: string, motivo: string): Observable<{ idIntercambio: string; estado: string }> {
+    return this.http.post<{ idIntercambio: string; estado: string }>(`${this.baseUrl}/intercambios`, { fecha, idReceptor, motivo });
+  }
+
+  responderIntercambio(id: string, aceptar: boolean): Observable<{ idIntercambio: string; estado: string }> {
+    return this.http.patch<{ idIntercambio: string; estado: string }>(`${this.baseUrl}/intercambios/${id}/responder`, { aceptar });
+  }
+
+  cancelarIntercambio(id: string): Observable<{ idIntercambio: string; estado: string }> {
+    return this.http.patch<{ idIntercambio: string; estado: string }>(`${this.baseUrl}/intercambios/${id}/cancelar`, {});
   }
 
 }

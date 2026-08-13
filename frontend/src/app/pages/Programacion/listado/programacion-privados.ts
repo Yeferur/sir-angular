@@ -141,6 +141,11 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
     return this.editableBuses.filter((bus) => !String(bus.guia || '').trim()).length;
   }
 
+  get canSave(): boolean {
+    if (!this.groups.length) return false;
+    return this.dirty || this.editableBuses.some((bus) => !bus.persistido);
+  }
+
   get naturalOperationDate(): string {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(this.operationDate || '').trim());
     if (!match) return this.operationDate;
@@ -230,7 +235,7 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
   }
 
   async save(): Promise<void> {
-    if (this.phoneReadOnly || !this.canUpdate || this.saving || !this.dirty) return;
+    if (this.phoneReadOnly || !this.canUpdate || this.saving || !this.canSave) return;
     if (!this.validateGuides(this.groups)) return;
 
     const replacing = this.editableBuses.some((bus) => Boolean(bus.persistido));
@@ -243,7 +248,7 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
         cancelText: 'Seguir revisando',
       }
     );
-    if (!confirmed || this.phoneReadOnly || !this.canUpdate || this.saving || !this.dirty) return;
+    if (!confirmed || this.phoneReadOnly || !this.canUpdate || this.saving || !this.canSave) return;
 
     this.saving = true;
     this.programacionService.guardarProgramacionPrivada({

@@ -19,6 +19,8 @@
                           drawer()!.type === 'mapa' ? 'Mapa de ruta' :
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
                           drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
+                          drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
+                          drawer()!.type === 'notificaciones' ? 'Notificaciones' :
                           drawer()!.type === 'programacion-listado' ? 'Listado de programación' : 'Novedades de la app'">
 
     @if (drawer()!.type === 'reserva') {
@@ -72,6 +74,9 @@
     @if (drawer()!.type === 'turnos-vacaciones') {
       <app-turnos-vacaciones-panel />
     }
+
+    @if (drawer()!.type === 'notificaciones') { <app-notifications-panel /> }
+    @if (drawer()!.type === 'turnos-intercambio') { <app-turnos-intercambio-panel /> }
 
   </div>
 }

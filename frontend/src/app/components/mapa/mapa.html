@@ -16,6 +16,38 @@
       </span>
     </div>
     <div class="mapa-topbar-actions">
+      <div class="mapa-topbar-summary" aria-label="Resumen de la ruta">
+        <span class="topbar-metric">
+          <small>Distancia</small>
+          <strong>{{ distanciaKm }} <em>km</em></strong>
+        </span>
+        <span class="topbar-metric">
+          <small>Pasajeros</small>
+          <strong>{{ totalPax }} <em>pax</em></strong>
+        </span>
+        <span class="topbar-metric topbar-metric--pickup">
+          <small>Recogida</small>
+          <strong>{{ tiempoRecogida }}</strong>
+        </span>
+        <span class="topbar-metric topbar-metric--tour" *ngIf="hasTourDestination">
+          <small>Al tour</small>
+          <strong>{{ tiempoAlTour }}</strong>
+        </span>
+        <span class="topbar-schedule" *ngIf="ventanaRecogidaBase">
+          <span>
+            <small>Salida</small>
+            <strong>{{ horaSalidaBase }}</strong>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14"/><path d="m15 8 4 4-4 4"/>
+          </svg>
+          <span class="topbar-schedule-arrival">
+            <small>Llegada</small>
+            <strong>{{ llegadaEstimada }}</strong>
+          </span>
+        </span>
+      </div>
       <button type="button" class="mapa-close-btn" (click)="cerrar()" aria-label="Cerrar mapa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
              stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
@@ -35,7 +67,7 @@
     <div class="mapa-panel">
 
       <!-- Stats -->
-      <div class="panel-stats">
+      <div class="panel-stats" aria-label="Resumen de la ruta">
         <div class="stat-card">
           <div class="stat-label">Distancia total</div>
           <div class="stat-value">

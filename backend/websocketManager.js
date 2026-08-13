@@ -184,6 +184,17 @@ function getAllActiveUsers() {
   return Array.from(clientsByUser.keys());
 }
 
+function sendToUser(userId, event) {
+  const sockets = getClients(userId);
+  const payload = JSON.stringify(event || {});
+  let sent = 0;
+  for (const ws of sockets) {
+    if (!isOpen(ws)) continue;
+    try { ws.send(payload); sent++; } catch {}
+  }
+  return sent;
+}
+
 async function broadcastActiveUsers() {
   try {
     const usuarios = getAllActiveUsers();
@@ -355,6 +366,7 @@ module.exports = {
   removeClient,
   getClients,
   getAllActiveUsers,
+  sendToUser,
   broadcastActiveUsers,
   broadcastAforoActualizado,
   broadcastReservaEvento,

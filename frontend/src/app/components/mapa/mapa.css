@@ -75,8 +75,93 @@
 
 .mapa-topbar-actions {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 7px;
+  gap: 14px;
+}
+
+.mapa-topbar-summary {
+  display: none;
+  min-width: 0;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.topbar-metric,
+.topbar-schedule {
+  display: flex;
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-tertiary) 62%, transparent);
+}
+
+.topbar-metric {
+  min-width: 82px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 9px;
+}
+
+.topbar-metric small,
+.topbar-schedule small {
+  color: var(--text-tertiary);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.topbar-metric strong,
+.topbar-schedule strong {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.topbar-metric em {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.topbar-metric--pickup strong {
+  color: var(--accent-blue);
+}
+
+.topbar-metric--tour strong {
+  color: var(--accent-red);
+}
+
+.topbar-schedule {
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.topbar-schedule > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.topbar-schedule svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--accent-blue);
+}
+
+.topbar-schedule-arrival {
+  text-align: right;
+}
+
+.topbar-schedule-arrival strong {
+  color: var(--accent-green);
 }
 
 .mapa-close-btn {
@@ -204,6 +289,20 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   flex-shrink: 0;
+}
+
+@media (min-width: 1050px) {
+  .mapa-topbar-summary {
+    display: flex;
+  }
+
+  .panel-stats {
+    display: none;
+  }
+
+  .panel-paradas-header {
+    padding-top: 14px;
+  }
 }
 
 .route-stage {

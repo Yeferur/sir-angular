@@ -7,6 +7,25 @@
   padding: 24px 0 52px;
   transition: opacity .24s var(--ease-soft, ease), transform .28s var(--ease-panel, ease), filter .24s var(--ease-soft, ease);
 }
+
+.exchange-action {
+  justify-self: end;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 45%, var(--border-color));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+  color: var(--accent-blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color .16s var(--ease-soft, ease), background-color .16s var(--ease-soft, ease), border-color .16s var(--ease-soft, ease), transform .16s var(--ease-soft, ease), box-shadow .16s var(--ease-soft, ease);
+}
+.exchange-action:hover:not(:disabled) { border-color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 16%, transparent); transform: translateY(-1px); box-shadow: 0 5px 14px color-mix(in srgb, var(--accent-blue) 16%, transparent); }
+.exchange-action:active:not(:disabled) { transform: translateY(0) scale(.98); }
+.exchange-action:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 60%, transparent); outline-offset: 2px; }
+.exchange-action:disabled { cursor: wait; opacity: .65; }
 .page-enter { animation: schedulePageIn .32s var(--ease-panel, ease) both; }
 .my-schedule-page.is-refreshing { opacity: .72; filter: saturate(.82); pointer-events: none; }
 @keyframes schedulePageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -73,6 +92,7 @@
 .time-value { font-size: .74rem; font-weight: 770; font-variant-numeric: tabular-nums; }
 .time-value small { display: none; }
 .duration-value { color: var(--text-secondary); font-size: .67rem; font-weight: 720; text-align: right; }
+.duration-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .rest-value { grid-column: 2 / -1; display: inline-flex; align-items: center; gap: 7px; color: var(--text-tertiary); font-size: .68rem; }
 .rest-value i { font-size: .95rem; }
 
@@ -98,6 +118,7 @@
   .day-name { grid-column: 1 / -1; }
   .time-value small { display: block; margin-bottom: 3px; color: var(--text-tertiary); font-size: .55rem; font-weight: 720; }
   .duration-value { grid-column: 1 / -1; text-align: left; }
+  .duration-actions { grid-column: 1 / -1; justify-content: space-between; }
   .rest-value { grid-column: 1 / -1; }
   .empty-schedule-card { align-items: flex-start; min-height: 160px; padding: 20px; }
 }

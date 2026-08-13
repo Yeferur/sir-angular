@@ -420,6 +420,9 @@
 
 .topbar-icon-btn:active { transform: scale(.92); }
 
+.notification-trigger { position: relative; }
+.notification-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; display: grid; place-items: center; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 800; line-height: 1; }
+
 .topbar-dot { color: var(--accent-red, #ff453a); }
 
 /* ─── Avatar / perfil ─── */

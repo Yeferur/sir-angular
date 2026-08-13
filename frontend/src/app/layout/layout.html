@@ -94,6 +94,10 @@
         </button>
 
         @if (!isClientUser()) {
+        <button class="topbar-icon-btn topbar-icon-btn--secondary notification-trigger" type="button" (click)="openNotifications()" aria-label="Notificaciones">
+          <i class="bx bx-bell" aria-hidden="true"></i>
+          @if (notifications.noLeidas()) { <span class="notification-count">{{ notifications.noLeidas() > 9 ? '9+' : notifications.noLeidas() }}</span> }
+        </button>
         <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openAppUpdates()" aria-label="Novedades de la app">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" stroke-width="2"
@@ -164,8 +168,12 @@
                 Buscar
               </button>
               @if (!isClientUser()) {
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openNotifications(); closeProfileMenu()">
                 <i class="bx bx-bell" aria-hidden="true"></i>
+                Notificaciones @if (notifications.noLeidas()) { ({{ notifications.noLeidas() }}) }
+              </button>
+              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
+                <i class="bx bx-history" aria-hidden="true"></i>
                 Novedades
               </button>
               }

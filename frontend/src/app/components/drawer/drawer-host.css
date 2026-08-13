@@ -89,6 +89,14 @@
   flex-direction: column;
 }
 
+.sir-drawer-panel app-notifications-panel,
+.sir-drawer-panel app-turnos-intercambio-panel {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+}
+
+.sir-drawer-panel:has(app-notifications-panel),
+.sir-drawer-panel:has(app-turnos-intercambio-panel) { width: clamp(390px, 38vw, 580px); }
+
 .sir-drawer-panel:has(app-turnos-vacaciones-panel) {
   width: clamp(390px, 38vw, 580px);
 }

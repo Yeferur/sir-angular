@@ -1,4 +1,4 @@
-<div class="programacion-page" [class.is-editor]="modoVista === 'editor'">
+<div class="programacion-page" [class.is-editor]="modoVista === 'editor' || modoVista === 'privados'">
   @if (modoVista === 'dashboard') {
     <header class="operation-header">
       <div>

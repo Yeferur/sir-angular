@@ -1370,7 +1370,7 @@ export class Listado implements OnInit, OnDestroy {
         this.routingFallback = plan?.fuenteDistancias === 'haversine-local';
         const esFormatoNuevo = Array.isArray(plan) || Array.isArray(plan?.buses);
         this.listadoPersistido = false;
-        this.listadoDirty = true;
+        this.listadoDirty = false;
         this.listadoOrigen = 'nuevo';
 
         if (esFormatoNuevo) {
