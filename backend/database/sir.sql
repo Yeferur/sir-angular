@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1:3306
--- Tiempo de generación: 13-08-2026 a las 04:41:42
+-- Tiempo de generación: 13-08-2026 a las 08:45:40
 -- Versión del servidor: 9.1.0
 -- Versión de PHP: 8.3.14
 
@@ -2056,8 +2056,6 @@ INSERT INTO `disponibilidad` (`Id_Disponibilidad`, `Id_Tour`, `Fecha_Tour`, `Cup
 -- Estructura de tabla para la tabla `email_outbox`
 --
 
-DROP TABLE IF EXISTS `email_outbox_dispatches`;
-DROP TABLE IF EXISTS `email_outbox_control`;
 DROP TABLE IF EXISTS `email_outbox`;
 CREATE TABLE IF NOT EXISTS `email_outbox` (
   `Id_Email` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -2088,9 +2086,25 @@ CREATE TABLE IF NOT EXISTS `email_outbox` (
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `email_outbox_control`
+--
+
+DROP TABLE IF EXISTS `email_outbox_control`;
+CREATE TABLE IF NOT EXISTS `email_outbox_control` (
+  `Id_Control` tinyint UNSIGNED NOT NULL,
+  `Pausado_Hasta` datetime(3) DEFAULT NULL,
+  `Motivo` varchar(64) CHARACTER SET ascii COLLATE ascii_general_ci DEFAULT NULL,
+  `Fecha_Actualizacion` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`Id_Control`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `email_outbox_dispatches`
 --
 
+DROP TABLE IF EXISTS `email_outbox_dispatches`;
 CREATE TABLE IF NOT EXISTS `email_outbox_dispatches` (
   `Id_Despacho` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Email` bigint UNSIGNED NOT NULL,
@@ -2098,22 +2112,7 @@ CREATE TABLE IF NOT EXISTS `email_outbox_dispatches` (
   `Reservado_En` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`Id_Despacho`),
   KEY `idx_email_dispatches_quota` (`Reservado_En`,`Tipo`),
-  KEY `idx_email_dispatches_email` (`Id_Email`),
-  CONSTRAINT `fk_email_dispatches_outbox` FOREIGN KEY (`Id_Email`) REFERENCES `email_outbox` (`Id_Email`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
--- Estructura de tabla para la tabla `email_outbox_control`
---
-
-CREATE TABLE IF NOT EXISTS `email_outbox_control` (
-  `Id_Control` tinyint UNSIGNED NOT NULL,
-  `Pausado_Hasta` datetime(3) DEFAULT NULL,
-  `Motivo` varchar(64) CHARACTER SET ascii COLLATE ascii_general_ci DEFAULT NULL,
-  `Fecha_Actualizacion` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (`Id_Control`)
+  KEY `idx_email_dispatches_email` (`Id_Email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -14209,6 +14208,12 @@ ALTER TABLE `beneficiarios_comision`
 --
 ALTER TABLE `detalle_historial`
   ADD CONSTRAINT `fk_detalle_historial` FOREIGN KEY (`Id_Historial`) REFERENCES `historial` (`Id_Historial`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `email_outbox_dispatches`
+--
+ALTER TABLE `email_outbox_dispatches`
+  ADD CONSTRAINT `fk_email_dispatches_outbox` FOREIGN KEY (`Id_Email`) REFERENCES `email_outbox` (`Id_Email`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `historial`
