@@ -25,7 +25,7 @@
     "mysql2": "^3.14.1",
     "node-cron": "^4.2.1",
     "node-sql-parser": "^5.4.0",
-    "nodemailer": "^8.0.7",
+    "nodemailer": "^9.0.5",
     "ws": "^8.18.3"
   },
   "devDependencies": {
