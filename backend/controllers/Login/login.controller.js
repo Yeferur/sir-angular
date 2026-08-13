@@ -1,14 +1,19 @@
 const loginService = require('../../services/Login/login.service');
-const emailService = require('../../services/email.service');
+const emailOutbox = require('../../services/email-outbox.service');
 const { recordHistorial } = require('../../services/Historial/logger');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const { buildFrontendUrl } = require('../../utils/frontend-url');
+const { isStrongPassword } = require('../../utils/password-policy');
 
 function buildPasswordResetUrl(token) {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
-  const url = new URL('/reset-password', frontendUrl);
-  url.searchParams.set('token', token);
+  const url = new URL(buildFrontendUrl('/reset-password'));
+  // El fragmento nunca viaja en la petición HTTP, por lo que Nginx no deja el
+  // token crudo en access.log ni el navegador lo envía como Referer.
+  url.hash = new URLSearchParams({ token: String(token || '') }).toString();
   return url.toString();
 }
+
+exports._private = { buildPasswordResetUrl };
 
 exports.login = async (req, res) => {
   try {
@@ -79,21 +84,17 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    const result = await loginService.createPasswordResetTokenForEmail(email);
-    const resetUrl = result?.rawToken ? buildPasswordResetUrl(result.rawToken) : null;
-
+    const result = await loginService.createPasswordResetTokenForEmail(email, {
+      onCreated: async (created, conn) => {
+        await emailOutbox.enqueuePasswordResetEmail({
+          to: created.user.Correo,
+          name: created.user.Nombres_Apellidos,
+          resetUrl: buildPasswordResetUrl(created.rawToken),
+          expiresInMinutes: created.expiresInMinutes,
+        }, { executor: conn });
+      },
+    });
     if (result?.user && result?.rawToken) {
-      try {
-        await emailService.sendPasswordResetEmail({
-          to: result.user.Correo,
-          name: result.user.Nombres_Apellidos,
-          resetUrl,
-          expiresInMinutes: result.expiresInMinutes
-        });
-      } catch (mailError) {
-        console.error('forgot-password email error:', mailError?.message || mailError);
-      }
-
       try {
         await recordHistorial({
           tabla: 'usuarios',
@@ -109,18 +110,23 @@ exports.forgotPassword = async (req, res) => {
       }
     }
 
-    // En desarrollo se devuelve el enlace para poder probar el flujo local
-    // aunque SMTP todavía no esté configurado. Nunca se expone en producción.
     return sendSuccess(res, {
       data: {
-        message: genericMessage,
-        resetUrl: process.env.NODE_ENV === 'production' ? null : resetUrl
+        message: genericMessage
       },
       message: genericMessage
     });
   } catch (e) {
-    console.error('forgot-password error:', e);
-    return sendSuccess(res, { message: genericMessage });
+    // mysql2 puede adjuntar `sql` con el payload interpolado. Nunca registrar el
+    // objeto completo porque el enlace incluye un token de recuperación vivo.
+    const safeErrorCode = String(e?.code || e?.name || 'UNKNOWN_ERROR')
+      .replace(/[^A-Z0-9_-]/gi, '')
+      .slice(0, 120) || 'UNKNOWN_ERROR';
+    console.error('forgot-password error:', safeErrorCode);
+    return sendSuccess(res, {
+      data: { message: genericMessage },
+      message: genericMessage
+    });
   }
 };
 
@@ -137,11 +143,11 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    if (passwordText.length < 8) {
+    if (!isStrongPassword(passwordText)) {
       return sendError(res, {
         status: 400,
-        message: 'La contraseña debe tener al menos 8 caracteres.',
-        errorCode: 'INVALID_PASSWORD'
+        message: 'La contraseña debe incluir mayúscula, minúscula, número, símbolo y mínimo 8 caracteres.',
+        errorCode: 'WEAK_PASSWORD'
       });
     }
 

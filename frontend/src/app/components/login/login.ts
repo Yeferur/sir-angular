@@ -21,7 +21,6 @@ export class LoginContentComponent implements OnInit, OnDestroy {
   recoveryOpen = false;
   recoveryEmail = '';
   recoveryMessage = '';
-  recoveryResetUrl = '';
   recoveryError = '';
   recoverySubmitting = false;
   resetMode = false;
@@ -72,7 +71,6 @@ export class LoginContentComponent implements OnInit, OnDestroy {
     const email = this.recoveryEmail.trim();
     this.recoveryMessage = '';
     this.recoveryError = '';
-    this.recoveryResetUrl = '';
 
     if (!email) {
       this.recoveryError = 'Ingresa un correo electrónico.';
@@ -83,7 +81,6 @@ export class LoginContentComponent implements OnInit, OnDestroy {
     this.auth.forgotPassword(email).subscribe({
       next: (response) => {
         this.recoveryMessage = response?.message || 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.';
-        this.recoveryResetUrl = response?.resetUrl || '';
         this.recoverySubmitting = false;
         this.cdr.markForCheck();
       },
@@ -173,7 +170,17 @@ export class LoginContentComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.resetMode = this.route.snapshot.routeConfig?.path === 'reset-password';
-    this.resetToken = String(this.route.snapshot.queryParamMap.get('token') || '').trim();
+    const fragmentParams = new URLSearchParams(String(this.route.snapshot.fragment || ''));
+    this.resetToken = String(fragmentParams.get('token') || '').trim();
+    if (this.resetToken && typeof window !== 'undefined') {
+      // Conservamos el token sólo en memoria y limpiamos la barra/historial en
+      // cuanto Angular lo captura.
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${window.location.search}`
+      );
+    }
     if (this.resetMode && !this.resetToken) {
       this.resetError = 'El enlace de recuperación no es válido o ya expiró.';
     }

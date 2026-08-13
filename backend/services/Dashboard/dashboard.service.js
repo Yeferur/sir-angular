@@ -556,7 +556,7 @@ async function getReservationBreakdownSvc(filters = {}) {
   }));
 }
 
-// ─── 8. Top destinos por pasajeros ────────────────────────────────────────────
+// ─── 8. Pasajeros por tour o por plan ─────────────────────────────────────────
 async function getTourOccupancySvc(filters = {}) {
   if (filters.tourId) {
     const [planRows] = await db.query(
@@ -584,57 +584,86 @@ async function getTourOccupancySvc(filters = {}) {
 
     const andRangeConds = rangeConds.length ? `AND ${rangeConds.join(' AND ')}` : '';
 
+    const metricsByPlanSql = `
+      SELECT
+        p.Id_Plan,
+        COUNT(DISTINCT r.Id_Reserva) AS reservas,
+        COUNT(p.Id_Pasajero) AS pasajeros,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'ADULTO' THEN 1 ELSE 0 END) AS adultos,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'NINO' THEN 1 ELSE 0 END) AS ninos,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'INFANTE' THEN 1 ELSE 0 END) AS infantes
+      FROM pasajeros p
+      JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+      JOIN horarios h ON r.Id_Horario = h.Id_Horario
+      JOIN planes_tours assigned_plan
+        ON assigned_plan.Id_Plan = p.Id_Plan
+       AND assigned_plan.Id_Tour = h.Id_Tour
+      WHERE h.Id_Tour = ?
+        AND ${ACTIVE_RESERVATION_SQL}
+        ${andRangeConds}
+      GROUP BY p.Id_Plan
+    `;
+
+    const unassignedMetricsSql = `
+      SELECT
+        NULL AS Id_Plan,
+        'Sin plan' AS nombre,
+        COUNT(DISTINCT r.Id_Reserva) AS reservas,
+        COUNT(p.Id_Pasajero) AS pasajeros,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'ADULTO' THEN 1 ELSE 0 END) AS adultos,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'NINO' THEN 1 ELSE 0 END) AS ninos,
+        SUM(CASE WHEN p.Tipo_Pasajero = 'INFANTE' THEN 1 ELSE 0 END) AS infantes,
+        1 AS sin_plan
+      FROM pasajeros p
+      JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+      JOIN horarios h ON r.Id_Horario = h.Id_Horario
+      LEFT JOIN planes_tours assigned_plan
+        ON assigned_plan.Id_Plan = p.Id_Plan
+       AND assigned_plan.Id_Tour = h.Id_Tour
+      WHERE h.Id_Tour = ?
+        AND assigned_plan.Id_Plan IS NULL
+        AND ${ACTIVE_RESERVATION_SQL}
+        ${andRangeConds}
+      HAVING COUNT(p.Id_Pasajero) > 0
+    `;
+
     const sqlByPlan = `
       SELECT
         pt.Id_Plan,
-        pt.Nombre_Plan AS nombre,
-        COALESCE(px.pasajeros, 0) AS pasajeros
+        COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), CONCAT('Plan ', pt.Id_Plan)) AS nombre,
+        COALESCE(px.reservas, 0) AS reservas,
+        COALESCE(px.pasajeros, 0) AS pasajeros,
+        COALESCE(px.adultos, 0) AS adultos,
+        COALESCE(px.ninos, 0) AS ninos,
+        COALESCE(px.infantes, 0) AS infantes,
+        0 AS sin_plan
       FROM planes_tours pt
-      LEFT JOIN (
-        SELECT
-          base.plan_resuelto AS Id_Plan,
-          COUNT(base.Id_Pasajero) AS pasajeros
-        FROM (
-          SELECT
-            p.Id_Pasajero,
-            COALESCE(
-              pt_direct.Id_Plan,
-              (
-                SELECT pt2.Id_Plan
-                FROM planes_tours pt2
-                WHERE pt2.Id_Tour = h.Id_Tour
-                  AND (
-                    pt2.Fecha_Inicio IS NULL
-                    OR (pt2.Fecha_Inicio <= DATE(r.Fecha_Tour) AND pt2.Fecha_Fin >= DATE(r.Fecha_Tour))
-                  )
-                ORDER BY
-                  CASE WHEN pt2.Fecha_Inicio IS NULL THEN 1 ELSE 0 END,
-                  pt2.Fecha_Inicio DESC,
-                  pt2.Id_Plan ASC
-                LIMIT 1
-              )
-            ) AS plan_resuelto
-          FROM pasajeros p
-          JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
-          JOIN horarios h ON r.Id_Horario = h.Id_Horario
-          LEFT JOIN planes_tours pt_direct
-            ON pt_direct.Id_Plan = p.Id_Plan
-           AND pt_direct.Id_Tour = h.Id_Tour
-          WHERE h.Id_Tour = ?
-            AND ${ACTIVE_RESERVATION_SQL}
-            ${andRangeConds}
-        ) base
-        WHERE base.plan_resuelto IS NOT NULL
-        GROUP BY base.plan_resuelto
-      ) px ON px.Id_Plan = pt.Id_Plan
+      LEFT JOIN (${metricsByPlanSql}) px ON px.Id_Plan = pt.Id_Plan
       WHERE pt.Id_Tour = ?
-      ORDER BY pt.Id_Plan ASC
+
+      UNION ALL
+
+      ${unassignedMetricsSql}
+
+      ORDER BY sin_plan ASC, Id_Plan ASC
     `;
 
-    const [rows] = await db.query(sqlByPlan, [filters.tourId, ...rangeParams, filters.tourId]);
+    const [rows] = await db.query(sqlByPlan, [
+      filters.tourId,
+      ...rangeParams,
+      filters.tourId,
+      filters.tourId,
+      ...rangeParams,
+    ]);
     return rows.map((row) => ({
+      idPlan: row.Id_Plan == null ? null : Number(row.Id_Plan),
       nombre: row.nombre,
-      pasajeros: Number(row.pasajeros || 0)
+      reservas: Number(row.reservas || 0),
+      pasajeros: Number(row.pasajeros || 0),
+      adultos: Number(row.adultos || 0),
+      ninos: Number(row.ninos || 0),
+      infantes: Number(row.infantes || 0),
+      sinPlan: Boolean(row.sin_plan),
     }));
   }
 

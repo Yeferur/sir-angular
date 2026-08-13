@@ -51,7 +51,7 @@
       mode="error"
       label="No pudimos cargar la programación"
       [detail]="loadError"
-      (action)="cargarToursDelDia()">
+      (action)="retryPageLoad()">
     </app-loading-state>
   } @else {
     @if (modoVista === 'dashboard') {

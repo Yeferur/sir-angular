@@ -38,7 +38,15 @@ export class ResetPasswordPageComponent implements OnInit {
   }, { validators: passwordMatchValidator });
 
   ngOnInit(): void {
-    this.token = String(this.route.snapshot.queryParamMap.get('token') || '').trim();
+    const fragmentParams = new URLSearchParams(String(this.route.snapshot.fragment || ''));
+    this.token = String(fragmentParams.get('token') || '').trim();
+    if (this.token && typeof window !== 'undefined') {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${window.location.search}`
+      );
+    }
 
     if (!this.token) {
       this.error = 'El enlace de recuperación no es válido o ya expiró.';

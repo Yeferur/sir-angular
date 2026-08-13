@@ -5,7 +5,7 @@ import { forkJoin, finalize, catchError, of } from 'rxjs';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
-import { DashboardService, DashboardFilters } from '../../services/Dashboard/Dashboard.service';
+import { DashboardService, DashboardFilters, TourOccupancy } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
 import { Tours } from '../../services/Tours/tours';
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
@@ -146,6 +146,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedTourId: number | null = null;
   selectedReservationType: '' | 'Grupal' | 'Privada' = '';
   selectedTourPlanCount = 0;
+  tourPlanRows: TourOccupancy[] = [];
 
   get tourLabel(): string {
     if (!this.selectedTourId) return 'Todos los tours';
@@ -239,6 +240,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   onTourChange(tourId: number | null) {
     const parsed = Number(tourId);
     this.selectedTourId = Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    this.selectedTourPlanCount = 0;
+    this.tourPlanRows = [];
     this.syncFiltersToUrl();
     this.loadSelectedTourMeta();
   }
@@ -249,19 +252,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get shouldShowTourPaxCard(): boolean {
-    return !this.selectedTourId || this.selectedTourPlanCount > 1;
+    return !this.selectedTourId || this.selectedTourPlanCount > 1 || this.isPlanBreakdown;
+  }
+
+  get isPlanBreakdown(): boolean {
+    return !!this.selectedTourId && this.tourPlanRows.length > 0;
   }
 
   get tourPaxTitle(): string {
-    return this.selectedTourId && this.selectedTourPlanCount > 1
+    return this.isPlanBreakdown || (this.selectedTourId && this.selectedTourPlanCount > 1)
       ? 'Pasajeros por plan'
       : 'Pasajeros por tour';
   }
 
   get tourPaxSubtitle(): string {
-    return this.selectedTourId && this.selectedTourPlanCount > 1
-      ? 'Cantidad de pasajeros por plan del tour seleccionado.'
-      : 'Qué tours están moviendo más pasajeros en el rango seleccionado.';
+    return this.isPlanBreakdown || (this.selectedTourId && this.selectedTourPlanCount > 1)
+      ? 'Distribución del tour seleccionado en el rango.'
+      : 'Tours con más pasajeros en el rango.';
   }
 
   private loadSelectedTourMeta(refreshAfterLoad = true): void {
@@ -719,6 +726,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // 7. Pasajeros por tour
     const occ = Array.isArray(res.occupancy) ? res.occupancy : [];
+    this.tourPlanRows = this.selectedTourId && occ.some((item: TourOccupancy) => Object.hasOwn(item, 'idPlan'))
+      ? occ
+      : [];
     const occCats = occ.map((d: any) => d.nombre);
     const occData = occ.map((d: any) => Number(d.pasajeros || 0));
     this.hasTourPaxData = occData.some((v: number) => v > 0);
@@ -889,23 +899,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     end.setDate(end.getDate() + 6);
     return this.startDate === this.toDateStr(start) && this.endDate === this.toDateStr(end);
   }
-  hasAnyActivity(): boolean  { return this.totalReservas > 0 || this.totalPasajeros > 0 || this.totalIngresos > 0; }
-
-  // Antes calculados y nunca mostrados — ahora alimentan el Resumen.
-  getOperationVolumeLabel(): string {
-    if (this.totalPasajeros >= 100) return 'Alto';
-    if (this.totalPasajeros >= 30)  return 'Medio';
-    if (this.totalPasajeros > 0)    return 'Bajo';
-    return 'Sin operación';
-  }
-
-  getOperationVolumeClass(): string {
-    if (this.totalPasajeros >= 100) return 'high';
-    if (this.totalPasajeros >= 30)  return 'medium';
-    if (this.totalPasajeros > 0)    return 'low';
-    return 'none';
-  }
-
   get avgPaxPerBooking(): number | null {
     return this.totalReservas ? this.totalPasajeros / this.totalReservas : null;
   }
@@ -969,6 +962,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get privatePassengers(): number {
     return Number(this.reservationTypeRows.find((item) => item.tipo === 'Privadas')?.pasajeros || 0);
+  }
+
+  get planPassengerTotal(): number {
+    return this.tourPlanRows.reduce((total, plan) => total + Number(plan.pasajeros || 0), 0);
+  }
+
+  planPassengerShare(plan: TourOccupancy): number {
+    return this.planPassengerTotal > 0
+      ? (Number(plan.pasajeros || 0) / this.planPassengerTotal) * 100
+      : 0;
   }
 
   comparisonClass(value: number | null): string {

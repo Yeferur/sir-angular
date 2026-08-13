@@ -215,9 +215,6 @@ Diseño coherente con el sistema de cards de la app.
             @if (recoveryMessage) {
               <div class="success-message" role="status">{{ recoveryMessage }}</div>
             }
-            @if (recoveryResetUrl) {
-              <a class="local-reset-link" [href]="recoveryResetUrl">Abrir enlace de prueba local</a>
-            }
             @if (recoveryError) {
               <div class="error-message" role="alert">{{ recoveryError }}</div>
             }

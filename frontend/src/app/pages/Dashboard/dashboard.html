@@ -17,7 +17,7 @@
         </div>
         <div class="form-group form-group--tour">
           <label class="form-label" for="dashboard-tour">Tour</label>
-          <select id="dashboard-tour" class="form-input" [ngModel]="selectedTourId" (ngModelChange)="onTourChange($event)">
+          <select id="dashboard-tour" class="form-select" [ngModel]="selectedTourId" (ngModelChange)="onTourChange($event)">
             <option [ngValue]="null">Todos los tours</option>
             @for (tour of tours; track tour.Id_Tour) {
               <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
@@ -26,7 +26,7 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="dashboard-reservation-type">Tipo de reserva</label>
-          <select id="dashboard-reservation-type" class="form-input" [ngModel]="selectedReservationType" (ngModelChange)="onReservationTypeChange($event)">
+          <select id="dashboard-reservation-type" class="form-select" [ngModel]="selectedReservationType" (ngModelChange)="onReservationTypeChange($event)">
             <option value="">Grupales y privadas</option>
             <option value="Grupal">Solo grupales</option>
             <option value="Privada">Solo privadas</option>
@@ -51,7 +51,6 @@
           }
           <span>·</span> {{ tourLabel }}
           @if (selectedReservationType) { <span>·</span> {{ selectedReservationType }} }
-          @if (hasAnyActivity()) { <span>·</span> <span class="volume-tag" [attr.data-tone]="getOperationVolumeClass()">Operación {{ getOperationVolumeLabel() | lowercase }}</span> }
         </span>
 
         <div class="filter-meta-actions">
@@ -102,7 +101,9 @@
             <div class="metric-label"><span>Ingreso de empresa</span><small>{{ primaryCurrency }}</small></div>
             <strong>{{ companyRevenue | currency:primaryCurrency:'symbol-narrow':'1.0-0' }}</strong>
             <span class="metric-context">Tours + transfers</span>
-            <span class="metric-change" [attr.data-tone]="comparisonClass(companyRevenueComparison)">{{ comparisonText(companyRevenueComparison) }} vs. periodo anterior</span>
+            @if (companyRevenueComparison !== null) {
+              <span class="metric-change" [attr.data-tone]="comparisonClass(companyRevenueComparison)">{{ comparisonText(companyRevenueComparison) }} vs. periodo anterior</span>
+            }
           </article>
 
           <article class="metric-card">
@@ -115,7 +116,9 @@
             <div class="metric-label"><span>Pasajeros</span></div>
             <strong>{{ totalPasajeros }}</strong>
             <span class="metric-context">{{ avgPaxPerBooking === null ? 'Sin reservas en el rango' : (avgPaxPerBooking | number:'1.1-1') + ' pax por reserva en promedio' }}</span>
-            <span class="metric-change" [attr.data-tone]="comparisonClass(passengerComparison)">{{ comparisonText(passengerComparison) }} vs. periodo anterior</span>
+            @if (passengerComparison !== null) {
+              <span class="metric-change" [attr.data-tone]="comparisonClass(passengerComparison)">{{ comparisonText(passengerComparison) }} vs. periodo anterior</span>
+            }
           </article>
 
           <article class="metric-card metric-card--confirmation">
@@ -135,7 +138,9 @@
           <article class="ticket-card">
             <span class="ticket-label">Reservas</span>
             <strong>{{ totalReservas }}</strong>
-            <span class="metric-change" [attr.data-tone]="comparisonClass(bookingComparison)">{{ comparisonText(bookingComparison) }} vs. periodo anterior</span>
+            @if (bookingComparison !== null) {
+              <span class="metric-change" [attr.data-tone]="comparisonClass(bookingComparison)">{{ comparisonText(bookingComparison) }} vs. periodo anterior</span>
+            }
           </article>
           <article class="ticket-card">
             <span class="ticket-label">Ticket promedio</span>
@@ -156,7 +161,7 @@
 
         <article class="chart-card chart-card--composition">
           <header class="chart-header">
-            <div><h3>Composición del ingreso</h3><p>De qué se compone lo que factura la empresa y qué parte de tours se queda vs. se paga en comisión</p></div>
+            <div><h3>Composición del ingreso</h3><p>Tours, transfers, neto y comisiones.</p></div>
           </header>
           @if (hasCompositionData) {
             <div class="composition-grid">
@@ -187,7 +192,7 @@
 
       <!-- ═══════════════════════ COBROS ═══════════════════════ -->
       <section id="cobros" class="report-section section-anchor">
-        <header class="section-heading"><h2>Cobros y cierre operativo</h2><span class="section-definition">Qué falta por cerrar y por recaudar, para actuar hoy</span></header>
+        <header class="section-heading"><h2>Cobros y cierre operativo</h2></header>
 
         <div class="collection-metrics">
           <article class="metric-card">
@@ -276,7 +281,7 @@
 
       <!-- ═══════════════════════ COMERCIAL ═══════════════════════ -->
       <section id="comercial" class="report-section section-anchor">
-        <header class="section-heading"><h2>Comportamiento comercial</h2><span class="section-definition">Por dónde entra la venta y qué se está vendiendo</span></header>
+        <header class="section-heading"><h2>Comportamiento comercial</h2></header>
         <div class="commercial-grid">
           <article class="chart-card chart-card--channels">
             <header class="chart-header"><div><h3>Canales de venta</h3><p>Pasajeros aportados por cada canal</p></div></header>
@@ -295,6 +300,32 @@
                   <apx-chart #chartTourPax [series]="tourPaxChartOptions.series" [chart]="tourPaxChartOptions.chart" [plotOptions]="tourPaxChartOptions.plotOptions" [xaxis]="tourPaxChartOptions.xaxis" [yaxis]="tourPaxChartOptions.yaxis" [colors]="tourPaxChartOptions.colors" [dataLabels]="tourPaxChartOptions.dataLabels" [grid]="tourPaxChartOptions.grid" [legend]="tourPaxChartOptions.legend" [tooltip]="tourPaxChartOptions.tooltip" />
                 } @else { <div class="chart-empty"><strong>{{ selectedTourId ? 'Sin pasajeros por plan' : 'Sin tours con pasajeros' }}</strong><span>No hay datos para el alcance actual.</span></div> }
               </div>
+              @if (isPlanBreakdown && hasTourPaxData) {
+                <div class="plan-summary" aria-label="Detalle de pasajeros por plan">
+                  @for (plan of tourPlanRows; track plan.idPlan ?? plan.nombre) {
+                    <article class="plan-summary-row" [class.plan-summary-row--unassigned]="plan.sinPlan">
+                      <div class="plan-summary-name">
+                        <span class="plan-marker" aria-hidden="true"></span>
+                        <strong>{{ plan.nombre }}</strong>
+                        @if (plan.sinPlan) { <small>Revisar asignación</small> }
+                      </div>
+                      <div class="plan-summary-metric">
+                        <span>Pasajeros</span>
+                        <strong>{{ plan.pasajeros || 0 }}</strong>
+                        <small>{{ planPassengerShare(plan) | number:'1.0-1' }}%</small>
+                      </div>
+                      <div class="plan-summary-metric">
+                        <span>Reservas</span>
+                        <strong>{{ plan.reservas || 0 }}</strong>
+                      </div>
+                      <div class="plan-summary-metric plan-summary-metric--mix">
+                        <span>Composición</span>
+                        <strong>{{ plan.adultos || 0 }} adultos · {{ plan.ninos || 0 }} niños · {{ plan.infantes || 0 }} infantes</strong>
+                      </div>
+                    </article>
+                  }
+                </div>
+              }
             </article>
           }
 

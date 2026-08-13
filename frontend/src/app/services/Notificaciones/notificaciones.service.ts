@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { Subscription } from 'rxjs';
 
 export interface SirNotification {
   idNotificacion: string; tipo: string; titulo: string; mensaje: string; entidadTipo: string | null;
@@ -14,10 +15,26 @@ export class NotificacionesService {
   private readonly baseUrl = `${environment.apiUrl}/notificaciones`;
   readonly noLeidas = signal(0);
   readonly items = signal<SirNotification[]>([]);
+  private loadSub?: Subscription;
+  private loadGeneration = 0;
+
+  clear(): void {
+    this.loadGeneration += 1;
+    this.loadSub?.unsubscribe();
+    this.loadSub = undefined;
+    this.noLeidas.set(0);
+    this.items.set([]);
+  }
 
   load(): void {
-    this.http.get<{ noLeidas: number; notificaciones: SirNotification[] }>(this.baseUrl).subscribe({
-      next: response => { this.noLeidas.set(response.noLeidas || 0); this.items.set(response.notificaciones || []); },
+    this.loadSub?.unsubscribe();
+    const generation = ++this.loadGeneration;
+    this.loadSub = this.http.get<{ noLeidas: number; notificaciones: SirNotification[] }>(this.baseUrl).subscribe({
+      next: response => {
+        if (generation !== this.loadGeneration) return;
+        this.noLeidas.set(response.noLeidas || 0);
+        this.items.set(response.notificaciones || []);
+      },
     });
   }
   markRead(id: string): void {

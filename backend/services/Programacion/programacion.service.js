@@ -2462,19 +2462,9 @@ async function construirResumenPrivados(fecha, idsTours = null, connection = db)
 }
 
 async function resumenPrivadosDia(fecha, idsTours) {
-    try {
-        return await construirResumenPrivados(fecha, idsTours);
-    } catch (error) {
-        console.error('Error en resumenPrivadosDia:', error);
-        return {
-            totalReservas: 0,
-            totalBuses: 0,
-            totalPax: 0,
-            idProgramacion: null,
-            confirmadoEn: null,
-            privados: []
-        };
-    }
+    // Los errores reales deben llegar al controller (500) para que la UI pueda
+    // mostrar “Reintentar”; devolver ceros ocultaría reservas operativas.
+    return construirResumenPrivados(fecha, idsTours);
 }
 
 async function guardarProgramacionPrivada({ fecha, buses, userId = null }) {

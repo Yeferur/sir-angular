@@ -5,6 +5,9 @@
   "scripts": {
     "test": "node --test",
     "test:programacion-shadow": "node --test test/programacion-shadow.optimizer.test.js",
+    "db:migrate:email-outbox": "node scripts/run-migration.js 20260813_email_outbox.sql",
+    "email:outbox:status": "node scripts/email-outbox-status.js",
+    "smtp:verify": "node scripts/verify-smtp.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],

@@ -9,6 +9,11 @@ const wsManager = require('../../websocketManager');
 const PASSWORD_HASH_ROUNDS = 10;
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 10;
 
+function getPasswordResetCooldownSeconds(env = process.env) {
+  const parsed = Number(env.PASSWORD_RESET_COOLDOWN_SECONDS);
+  return Number.isInteger(parsed) && parsed >= 60 && parsed <= 3600 ? parsed : 600;
+}
+
 /**
  * Buscar usuario por username/email/id
  */
@@ -61,18 +66,35 @@ async function findUserByEmail(email, executor = db) {
     `SELECT Id_Usuario, Nombres_Apellidos, Usuario, Correo, Activo
      FROM usuarios
      WHERE Activo = 1 AND LOWER(Correo) = LOWER(?)
-     LIMIT 1`,
+     LIMIT 1
+     FOR UPDATE`,
     [normalizedEmail]
   );
   return rows[0] || null;
 }
 
-async function createPasswordResetTokenForEmail(email) {
+async function createPasswordResetTokenForEmail(email, options = {}) {
   return withTransaction(async (conn) => {
     const user = await findUserByEmail(email, conn);
 
     if (!user) {
       return { user: null, rawToken: null, expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES };
+    }
+
+    const cooldownSeconds = getPasswordResetCooldownSeconds(options.env || process.env);
+    const [recentTokens] = await conn.query(
+      `SELECT id FROM password_reset_tokens
+       WHERE user_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [user.Id_Usuario, cooldownSeconds]
+    );
+    if (recentTokens.length) {
+      return {
+        user,
+        rawToken: null,
+        expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES,
+        rateLimited: true,
+      };
     }
 
     await conn.query(
@@ -89,7 +111,13 @@ async function createPasswordResetTokenForEmail(email) {
       [user.Id_Usuario, tokenHash, PASSWORD_RESET_TOKEN_TTL_MINUTES]
     );
 
-    return { user, rawToken, expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES };
+    const result = { user, rawToken, expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES };
+    if (typeof options.onCreated === 'function') {
+      // Permite persistir el correo en la misma transacción que el token. Si
+      // falla la cola, no queda en producción un token que nunca podrá llegar.
+      await options.onCreated(result, conn);
+    }
+    return result;
   });
 }
 
@@ -98,12 +126,13 @@ async function resetPasswordWithToken(rawToken, password) {
 
   return withTransaction(async (conn) => {
     const [rows] = await conn.query(
-      `SELECT id, user_id
-       FROM password_reset_tokens
-       WHERE token_hash = ?
-         AND used_at IS NULL
-         AND expires_at > NOW()
-       ORDER BY created_at DESC
+      `SELECT prt.id, prt.user_id
+       FROM password_reset_tokens prt
+       INNER JOIN usuarios u ON u.Id_Usuario = prt.user_id AND u.Activo = 1
+       WHERE prt.token_hash = ?
+         AND prt.used_at IS NULL
+         AND prt.expires_at > NOW()
+       ORDER BY prt.created_at DESC
        LIMIT 1
        FOR UPDATE`,
       [tokenHash]
@@ -277,5 +306,6 @@ module.exports = {
   createPasswordResetTokenForEmail,
   resetPasswordWithToken,
   hashPasswordResetToken,
-  generatePasswordResetToken
+  generatePasswordResetToken,
+  getPasswordResetCooldownSeconds,
 };

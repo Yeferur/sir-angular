@@ -36,40 +36,6 @@ h2, h3, p { margin: 0; }
   gap: 10px;
 }
 
-.form-group {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.form-label {
-  padding-left: 3px;
-  color: var(--text-secondary);
-  font-size: .75rem;
-  font-weight: 760;
-  letter-spacing: .035em;
-  text-transform: uppercase;
-}
-
-.form-input {
-  width: 100%;
-  height: 40px;
-  padding: 0 13px;
-  border: 1px solid var(--separator-color);
-  border-radius: var(--radius-sm, 8px);
-  outline: 0;
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-  font-size: .8rem;
-  transition: border-color .16s ease, box-shadow .16s ease;
-}
-
-.form-input:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 13%, transparent);
-}
-
 .quick-actions {
   height: 40px;
   padding: 3px;
@@ -124,17 +90,6 @@ h2, h3, p { margin: 0; }
 }
 
 .scope-summary span { margin: 0 4px; color: var(--text-tertiary); }
-
-.volume-tag {
-  padding: 2px 7px;
-  border-radius: 999px;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  font-weight: 700;
-}
-.volume-tag[data-tone='high'] { color: var(--accent-green); }
-.volume-tag[data-tone='medium'] { color: var(--accent-yellow); }
-.volume-tag[data-tone='low'] { color: var(--accent-orange); }
 
 .filter-meta-actions {
   flex: 0 0 auto;
@@ -251,8 +206,7 @@ h2, h3, p { margin: 0; }
   letter-spacing: -.02em;
 }
 
-.period-status,
-.section-definition {
+.period-status {
   padding: 5px 9px;
   border: 1px solid var(--separator-color);
   border-radius: 999px;
@@ -495,6 +449,86 @@ h2, h3, p { margin: 0; }
 
 .chart-card--reservation-type { grid-column: 1 / -1; }
 
+.plan-summary {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--separator-color);
+  display: grid;
+  gap: 7px;
+}
+
+.plan-summary-row {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(72px, .45fr) minmax(65px, .4fr) minmax(180px, 1.2fr);
+  align-items: center;
+  gap: 12px;
+  background: color-mix(in srgb, var(--bg-tertiary) 58%, transparent);
+}
+
+.plan-summary-row--unassigned {
+  border-color: color-mix(in srgb, var(--accent-orange) 34%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-orange) 6%, var(--bg-secondary));
+}
+
+.plan-summary-name,
+.plan-summary-metric { min-width: 0; }
+
+.plan-summary-name {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+
+.plan-summary-name strong {
+  overflow: hidden;
+  font-size: .78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-summary-name small {
+  grid-column: 2;
+  margin-top: 2px;
+  color: var(--accent-orange);
+  font-size: .66rem;
+  font-weight: 700;
+}
+
+.plan-marker {
+  width: 8px;
+  height: 8px;
+  grid-row: 1 / span 2;
+  border-radius: 50%;
+  background: #2dd4bf;
+}
+
+.plan-summary-row--unassigned .plan-marker { background: var(--accent-orange); }
+
+.plan-summary-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 6px;
+}
+
+.plan-summary-metric > span {
+  width: 100%;
+  color: var(--text-tertiary);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.plan-summary-metric strong { font-size: .82rem; }
+.plan-summary-metric small { color: var(--text-secondary); font-size: .68rem; }
+.plan-summary-metric--mix strong { color: var(--text-secondary); font-size: .72rem; line-height: 1.35; }
+
 /* ── Navegación que sigue el scroll ───────────────────────────────────── */
 .report-dock {
   position: fixed;
@@ -614,7 +648,9 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .metric-card { min-height: 132px; }
   .composition-item { flex-direction: column; align-items: flex-start; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
-  .period-status, .section-definition { white-space: normal; line-height: 1.35; }
+  .period-status { white-space: normal; line-height: 1.35; }
+  .plan-summary-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-summary-name, .plan-summary-metric--mix { grid-column: 1 / -1; }
   .attendance-breakdown { grid-template-columns: minmax(0, 1fr); }
   .type-summary { align-items: flex-start; flex-direction: column; gap: 5px; }
   .currency-notice { align-items: flex-start; flex-direction: column; }

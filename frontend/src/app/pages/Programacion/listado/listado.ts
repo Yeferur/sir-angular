@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -165,13 +165,18 @@ export class Listado implements OnInit, OnDestroy {
   private initialEditorSnapshot: ProgramacionMoveSnapshot | null = null;
   editorChangedFromBaseline = false;
   private isEditorRoute = false;
+  private isPrivateRoute = false;
   private editorRouteKey: string | null = null;
   private forceRegenerateFromRoute = false;
   private editorRouteOpenTimer?: ReturnType<typeof setTimeout>;
   private editorNavigationTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
-    this.initializeRouteContext();
+    if (!this.initializeRouteContext()) return;
+    if (this.isPrivateRoute) {
+      this.cargarPrivadosDelDia();
+      return;
+    }
     this.cargarToursDelDia();
   }
 
@@ -184,6 +189,11 @@ export class Listado implements OnInit, OnDestroy {
 
   hasUnsavedChanges(): boolean {
     return (this.listadoDirty || this.privateDirty) && !this.isSaving;
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) event.preventDefault();
   }
 
   get editorStatusText(): string {
@@ -230,8 +240,21 @@ export class Listado implements OnInit, OnDestroy {
       && this.editorChangedFromBaseline;
   }
 
-  private initializeRouteContext(): void {
-    this.isEditorRoute = this.route.snapshot.data['programacionView'] === 'editor';
+  private initializeRouteContext(): boolean {
+    const routeView = this.route.snapshot.data['programacionView'];
+    this.isEditorRoute = routeView === 'editor';
+    this.isPrivateRoute = routeView === 'privados';
+
+    if (this.isPrivateRoute) {
+      const routeDate = String(this.route.snapshot.paramMap.get('fecha') || '');
+      if (!this.isValidIsoDate(routeDate)) {
+        void this.navigateToDashboard(true);
+        return false;
+      }
+      this.fechaSeleccionada = routeDate;
+      this.modoVista = 'privados';
+      return true;
+    }
 
     if (this.isEditorRoute) {
       const routeDate = String(this.route.snapshot.paramMap.get('fecha') || '');
@@ -242,13 +265,65 @@ export class Listado implements OnInit, OnDestroy {
       this.forceRegenerateFromRoute = this.route.snapshot.queryParamMap.get('regenerar') === '1';
       this.modoVista = 'editor';
       this.editorLoadingMode = this.forceRegenerateFromRoute ? 'generating' : 'saved';
-      return;
+      return true;
     }
 
     const queryDate = String(this.route.snapshot.queryParamMap.get('fecha') || '');
     if (/^\d{4}-\d{2}-\d{2}$/.test(queryDate)) {
       this.fechaSeleccionada = queryDate;
     }
+    return true;
+  }
+
+  private isValidIsoDate(value: string): boolean {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year
+      && date.getUTCMonth() === month - 1
+      && date.getUTCDate() === day;
+  }
+
+  private cargarPrivadosDelDia(): void {
+    const requestSequence = ++this.loadSequence;
+    this.loadSubscription?.unsubscribe();
+    this.loadError = '';
+    this.isPageLoading = true;
+
+    this.loadSubscription = this.programacionService.resumenPrivadosDia(this.fechaSeleccionada).pipe(
+      finalize(() => {
+        if (requestSequence !== this.loadSequence) return;
+        this.isPageLoading = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (response) => {
+        if (requestSequence !== this.loadSequence) return;
+        this.busesPrivados = Array.isArray(response?.privados)
+          ? JSON.parse(JSON.stringify(response.privados))
+          : [];
+        this.privateDirty = false;
+        this.listadoOrigen = this.busesPrivados.length > 0 ? 'db' : 'nuevo';
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (requestSequence !== this.loadSequence) return;
+        console.error('Error al cargar la programación privada', error);
+        this.loadError = 'No fue posible consultar las reservas privadas de esta fecha. Revisa la conexión e inténtalo nuevamente.';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  retryPageLoad(): void {
+    if (this.isPrivateRoute) {
+      this.cargarPrivadosDelDia();
+      return;
+    }
+    this.cargarToursDelDia();
   }
 
   cargarToursDelDia(): void {
@@ -710,10 +785,19 @@ export class Listado implements OnInit, OnDestroy {
       return;
     }
 
-    this.isPageLoading = true;
-    this.editorLoadingMode = options?.forceRegenerate || tour.estado !== 'Generado'
-      ? 'generating'
-      : 'saved';
+    const opensSavedListingDrawer = isGenerated
+      && !options?.openInEditor
+      && !options?.forceRegenerate
+      && !this.isEditorRoute;
+
+    // Consultar un listado ya generado no debe reemplazar el dashboard por el
+    // loader: las cards permanecen visibles mientras se prepara su drawer.
+    if (!opensSavedListingDrawer) {
+      this.isPageLoading = true;
+      this.editorLoadingMode = options?.forceRegenerate || tour.estado !== 'Generado'
+        ? 'generating'
+        : 'saved';
+    }
 
     this.tourSeleccionado = tour;
 
@@ -740,6 +824,10 @@ export class Listado implements OnInit, OnDestroy {
           const sugerencia = this.construirSugerenciaDesdeListado(data);
           this.isPageLoading = false;
           this.editorLoadingMode = null;
+          // En modo zoneless, abrir el drawer marca su host, pero no necesariamente
+          // esta vista. Marcamos Programacion antes de abrirlo para que el loader
+          // no permanezca renderizado como fondo del listado guardado.
+          this.cdr.markForCheck();
           if (options?.openInEditor || this.isEditorRoute) {
             this.aplicarPlan(
               tour,
@@ -783,15 +871,8 @@ export class Listado implements OnInit, OnDestroy {
   abrirVistaPrivados(): void {
     if (this.totalReservasPrivadas === 0) return;
     this.confirmarPerdidaCambios(() => {
-      const privadosActuales = Array.isArray(this.busesPrivados)
-        ? JSON.parse(JSON.stringify(this.busesPrivados))
-        : [];
-      this.resetEditorState();
-      this.busesPrivados = privadosActuales;
-      this.modoVista = 'privados';
-      this.privateDirty = false;
-      this.listadoOrigen = privadosActuales.length > 0 ? 'db' : 'nuevo';
-      this.cdr.markForCheck();
+      this.drawerService.close(true);
+      void this.router.navigate(['/Programacion/Privados', this.fechaSeleccionada]);
     });
   }
 
@@ -806,7 +887,7 @@ export class Listado implements OnInit, OnDestroy {
 
   volverAlDashboard(): void {
     this.confirmarPerdidaCambios(() => {
-      if (this.isEditorRoute) {
+      if (this.isEditorRoute || this.isPrivateRoute) {
         this.resetEditorState();
         void this.navigateToDashboard();
         return;

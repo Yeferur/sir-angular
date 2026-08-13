@@ -1,5 +1,10 @@
+const crypto = require('node:crypto');
+
 const db = require('../../database/db');
 const { recordHistorial } = require('../Historial/logger');
+const emailOutbox = require('../email-outbox.service');
+const notifications = require('../Notificaciones/notificaciones.service');
+const websocketManager = require('../../websocketManager');
 
 const BOGOTA_TIME_ZONE = 'America/Bogota';
 const MAX_END_TIME = '23:00';
@@ -211,6 +216,152 @@ function mapDiaRow(row) {
     horaInicio: row.Hora_Inicio ? String(row.Hora_Inicio).slice(0, 5) : null,
     horaFin: row.Hora_Fin ? String(row.Hora_Fin).slice(0, 5) : null,
     esSupernumerario: Number(row.Es_Supernumerario) === 1,
+  };
+}
+
+function normalizePublicationVacation(value) {
+  if (!value) return null;
+  const normalizeDateValue = (dateValue) => {
+    const parsed = parseDateOnly(dateValue);
+    return parsed ? formatDateOnly(parsed) : String(dateValue || '').slice(0, 10);
+  };
+  return {
+    fechaInicio: normalizeDateValue(value.fechaInicio || value.Fecha_Inicio),
+    fechaFin: normalizeDateValue(value.fechaFin || value.Fecha_Fin),
+    fechaRegreso: normalizeDateValue(value.fechaRegreso || value.Fecha_Regreso),
+    diasHabiles: Number(value.diasHabiles ?? value.Dias_Habiles ?? 0),
+    observaciones: String(value.observaciones ?? value.Observaciones ?? '').trim() || null,
+  };
+}
+
+function normalizePublicationState(value = {}) {
+  return {
+    idCanalSemanal: value.idCanalSemanal == null || value.idCanalSemanal === ''
+      ? null : String(value.idCanalSemanal),
+    esSupernumerario: value.esSupernumerario === true || value.esSupernumerario === 1,
+    vacation: normalizePublicationVacation(value.vacation),
+    turnos: [...(value.turnos || [])]
+      .map((day) => ({
+        diaSemana: Number(day.diaSemana),
+        esLaborable: day.esLaborable === true || day.esLaborable === 1,
+        horaInicio: day.esLaborable ? normalizeTime(day.horaInicio) : null,
+        horaFin: day.esLaborable ? normalizeTime(day.horaFin) : null,
+      }))
+      .sort((a, b) => a.diaSemana - b.diaSemana),
+  };
+}
+
+function publicationStatesEqual(left, right) {
+  return JSON.stringify(normalizePublicationState(left)) === JSON.stringify(normalizePublicationState(right));
+}
+
+function notificationWeekLabel(startValue, endValue) {
+  const start = parseDateOnly(startValue);
+  const end = parseDateOnly(endValue);
+  if (!start || !end) return `${startValue} al ${endValue}`;
+  const month = (date) => new Intl.DateTimeFormat('es-CO', {
+    month: 'long', timeZone: 'UTC',
+  }).format(date);
+  if (start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth()) {
+    return `${start.getUTCDate()} al ${end.getUTCDate()} de ${month(end)}`;
+  }
+  return `${start.getUTCDate()} de ${month(start)} al ${end.getUTCDate()} de ${month(end)}`;
+}
+
+/**
+ * La primera publicación afecta a toda la semana. En una republicación que
+ * parte de `publicado`, el estado almacenado todavía es el último estado
+ * visible y permite identificar exactamente qué asesores cambiaron.
+ *
+ * `pendiente_republicacion` es un estado heredado de la edición persistente
+ * individual: la tabla no conserva el roster granular de cambios. En ese caso
+ * el alcance no es determinable con seguridad y se avisa a toda la semana.
+ */
+function resolvePublicationRecipients(previousStatus, prepared, previousStates) {
+  if (previousStatus === 'borrador' || previousStatus === 'pendiente_republicacion') {
+    return prepared.map((item) => item.idUsuario);
+  }
+  if (previousStatus !== 'publicado') return prepared.map((item) => item.idUsuario);
+  return prepared
+    .filter((item) => !publicationStatesEqual(previousStates.get(item.idUsuario), item))
+    .map((item) => item.idUsuario);
+}
+
+async function loadPublicationSnapshot(conn, semana, prepared) {
+  const userIds = prepared.map((item) => item.idUsuario);
+  const weekStart = formatDateOnly(parseDateOnly(semana.Fecha_Inicio));
+  const weekEnd = formatDateOnly(addDays(parseDateOnly(semana.Fecha_Inicio), 6));
+
+  const [userRows] = await conn.query(
+    `SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Correo
+       FROM usuarios u
+       INNER JOIN roles r ON r.Id_Rol = u.Id_Rol
+      WHERE u.Id_Usuario IN (?) AND u.Activo = 1
+        AND LOWER(TRIM(r.Nombre_Rol)) = 'asesor'`,
+    [userIds]
+  );
+  const [assignmentRows] = await conn.query(
+    `SELECT Id_Usuario, Id_Canal, Es_Supernumerario
+       FROM turnos_asesores_semana WHERE Id_Semana = ? AND Id_Usuario IN (?)`,
+    [semana.Id_Semana, userIds]
+  );
+  const [dayRows] = await conn.query(
+    `SELECT Id_Usuario, Dia_Semana, Es_Laborable, Hora_Inicio, Hora_Fin
+       FROM turnos_dias WHERE Id_Semana = ? AND Id_Usuario IN (?)
+      ORDER BY Id_Usuario, Dia_Semana`,
+    [semana.Id_Semana, userIds]
+  );
+  const [vacationRows] = await conn.query(
+    `SELECT Id_Usuario, Fecha_Inicio, Fecha_Fin, Fecha_Regreso, Dias_Habiles, Observaciones
+       FROM turnos_vacaciones
+      WHERE Id_Usuario IN (?) AND Estado = 'programada'
+        AND Fecha_Inicio <= ? AND Fecha_Fin >= ?
+      ORDER BY Fecha_Inicio`,
+    [userIds, weekEnd, weekStart]
+  );
+  const channelIds = [...new Set(prepared.map((item) => item.idCanalSemanal).filter(Boolean))];
+  const channelRows = channelIds.length
+    ? (await conn.query(
+      `SELECT Id_Canal, Nombre_Canal FROM canales_turno WHERE Id_Canal IN (?) AND Activo = 1`,
+      [channelIds]
+    ))[0]
+    : [];
+
+  const users = new Map(userRows.map((row) => [String(row.Id_Usuario), {
+    idUsuario: String(row.Id_Usuario),
+    nombre: row.Nombres_Apellidos || '',
+    correo: String(row.Correo || '').trim(),
+  }]));
+  const states = new Map(userIds.map((id) => [id, {
+    idCanalSemanal: null, esSupernumerario: false, vacation: null, turnos: [],
+  }]));
+  for (const row of assignmentRows) {
+    const state = states.get(String(row.Id_Usuario));
+    if (!state) continue;
+    state.idCanalSemanal = row.Id_Canal == null ? null : String(row.Id_Canal);
+    state.esSupernumerario = Number(row.Es_Supernumerario) === 1;
+  }
+  for (const row of dayRows) {
+    const state = states.get(String(row.Id_Usuario));
+    if (!state) continue;
+    state.turnos.push({
+      diaSemana: Number(row.Dia_Semana),
+      esLaborable: Number(row.Es_Laborable) === 1,
+      horaInicio: row.Hora_Inicio ? String(row.Hora_Inicio).slice(0, 5) : null,
+      horaFin: row.Hora_Fin ? String(row.Hora_Fin).slice(0, 5) : null,
+    });
+  }
+  for (const row of vacationRows) {
+    const state = states.get(String(row.Id_Usuario));
+    if (state && !state.vacation) state.vacation = normalizePublicationVacation(row);
+  }
+
+  return {
+    users,
+    states,
+    channelNames: new Map(channelRows.map((row) => [String(row.Id_Canal), row.Nombre_Canal])),
+    weekStart,
+    weekEnd,
   };
 }
 
@@ -580,6 +731,11 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
   }
 
   const conn = await db.getConnection();
+  let notificationDispatches = [];
+  let emailsQueued = 0;
+  let emailsSkipped = 0;
+  let publicationKind = 'publicada';
+  const publicationId = crypto.randomUUID();
   try {
     await conn.beginTransaction();
     const [rows] = await conn.query(`SELECT Id_Semana, Fecha_Inicio, Estado FROM turnos_semanas WHERE Id_Semana = ? LIMIT 1 FOR UPDATE`, [idSemana]);
@@ -647,6 +803,15 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
     }
 
     await ensureAdvisorRows(semana.Id_Semana, semana.Fecha_Inicio, conn);
+    const snapshot = await loadPublicationSnapshot(conn, semana, prepared);
+    if (snapshot.users.size !== prepared.length) {
+      const error = new Error('La publicación contiene usuarios inactivos o que ya no son asesores.');
+      error.code = 'INVALID_WEEK_PAYLOAD';
+      throw error;
+    }
+    const affectedIds = resolvePublicationRecipients(estadoAnterior, prepared, snapshot.states);
+    publicationKind = estadoAnterior === 'borrador' ? 'publicada' : 'actualizada';
+
     for (const item of prepared) {
       if (item.idCanalSemanal != null) {
         const [channels] = await conn.query(
@@ -761,8 +926,71 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
       ],
     });
 
+    const preparedByUser = new Map(prepared.map((item) => [item.idUsuario, item]));
+    for (const idUsuario of affectedIds) {
+      const recipient = snapshot.users.get(idUsuario);
+      const published = preparedByUser.get(idUsuario);
+      if (!recipient || !published) continue;
+
+      const title = publicationKind === 'publicada'
+        ? 'Tu horario semanal fue publicado'
+        : 'Tu horario semanal fue actualizado';
+      const message = `Tu jornada del ${notificationWeekLabel(snapshot.weekStart, snapshot.weekEnd)} ya está disponible.`;
+      const notificationId = await notifications.createNotification(conn, {
+        userId: idUsuario,
+        type: publicationKind === 'publicada' ? 'turnos_semana_publicada' : 'turnos_semana_actualizada',
+        title,
+        message,
+        entityType: 'turnos_semanas',
+        entityId: semana.Id_Semana,
+        data: {
+          idSemana: String(semana.Id_Semana),
+          fechaInicio: snapshot.weekStart,
+          fechaFin: snapshot.weekEnd,
+          route: '/MiHorario',
+        },
+      });
+      notificationDispatches.push({ idUsuario, notificationId });
+      if (recipient.correo && emailOutbox.isSingleMailbox(recipient.correo)) {
+        await emailOutbox.enqueueScheduleEmail({
+          to: recipient.correo,
+          name: recipient.nombre,
+          weekStart: snapshot.weekStart,
+          weekEnd: snapshot.weekEnd,
+          turnos: published.turnos,
+          channelName: published.idCanalSemanal
+            ? snapshot.channelNames.get(published.idCanalSemanal) || null
+            : null,
+          vacation: published.vacation,
+          isUpdate: publicationKind === 'actualizada',
+        }, publicationId, { executor: conn });
+        emailsQueued += 1;
+      } else if (recipient.correo) {
+        // Un dato de contacto inválido no debe impedir que la semana y la
+        // notificación interna queden publicadas.
+        emailsSkipped += 1;
+      }
+    }
+
     await conn.commit();
-    return { idSemana: String(idSemana), estado: 'publicado' };
+    for (const dispatch of notificationDispatches) {
+      try {
+        websocketManager.sendToUser(dispatch.idUsuario, {
+          type: 'notificacionNueva',
+          idNotificacion: dispatch.notificationId,
+          categoria: 'turnos',
+        });
+      } catch (error) {
+        console.error('[turnos] No se pudo emitir una notificación en tiempo real:', error?.message || error);
+      }
+    }
+    return {
+      idSemana: String(idSemana),
+      estado: 'publicado',
+      notificados: notificationDispatches.length,
+      correosEncolados: emailsQueued,
+      correosOmitidos: emailsSkipped,
+    };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -814,4 +1042,9 @@ module.exports = {
   publishWeek,
   listCanales,
   listWeekHistory,
+  _publication: {
+    normalizePublicationState,
+    publicationStatesEqual,
+    resolvePublicationRecipients,
+  },
 };

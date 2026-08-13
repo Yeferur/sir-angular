@@ -22,8 +22,8 @@ import {
     NavigationError,
     ActivatedRoute,
 } from '@angular/router';
-import { filter } from 'rxjs/operators';
-import { Subscription } from 'rxjs';
+import { distinctUntilChanged, filter } from 'rxjs/operators';
+import { combineLatest, Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 
 import { AuthService } from '../services/Login/login-service';
@@ -152,6 +152,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private finishRouteActivity?: () => void;
     private titleMotionTimer?: number;
     private notificationEventSub?: Subscription;
+    private authNotificationSub?: Subscription;
 
     private readonly topbarStateEffect = effect(() => {
         this.topbarState();
@@ -247,6 +248,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // Usuario y avatar
         this.user.set(this.authService.getUser());
         if (this.authService.getToken?.()) this.refreshAvatar();
+        this.authNotificationSub = combineLatest([
+            this.authService.isLoggedIn(),
+            this.permisosService.role$,
+        ]).pipe(
+            distinctUntilChanged(([prevLogged, prevRole], [nextLogged, nextRole]) => (
+                prevLogged === nextLogged && prevRole === nextRole
+            )),
+        ).subscribe(([loggedIn, role]) => this.syncNotificationSession(loggedIn, role));
 
         // Título de la página desde datos de ruta. También mantiene
         // currentUrl al día siempre (con o sin sesión) — showAuthSlot
@@ -308,14 +317,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 .subscribe(() => this.syncActiveSubmenu());
 
             await this.permisosService.loadSessionData();
-            if (!this.isClientUser()) {
-                this.notifications.load();
-                this.notificationEventSub = this.webSocket.events$.subscribe(event => {
-                    if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado') {
-                        this.notifications.load();
-                    }
-                });
-            }
             this.syncActiveSubmenu();
             this.ready.set(true);
         } catch (e: any) {
@@ -341,10 +342,35 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     ngOnDestroy(): void {
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
+        this.authNotificationSub?.unsubscribe();
         this.notificationEventSub?.unsubscribe();
         if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
         this.finishRouteActivity?.();
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
+    }
+
+    private syncNotificationSession(loggedIn: boolean, role: string | null): void {
+        this.notificationEventSub?.unsubscribe();
+        this.notificationEventSub = undefined;
+
+        if (!loggedIn) {
+            this.notifications.clear();
+            return;
+        }
+
+        const normalizedRole = String(role || '').trim().toLocaleLowerCase('es-CO');
+        // En restauración, espera a que el rol esté hidratado antes de consultar.
+        if (!normalizedRole || normalizedRole === 'cliente') {
+            this.notifications.clear();
+            return;
+        }
+
+        this.notifications.load();
+        this.notificationEventSub = this.webSocket.events$.subscribe(event => {
+            if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado') {
+                this.notifications.load();
+            }
+        });
     }
 
     // El ancho se obtiene del contenido interno, que conserva su medida
@@ -552,6 +578,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     /** Finaliza el logout cuando la isla ya cubre el viewport. */
     private finishLogout(): void {
         this.userService.clearUser();
+        this.notifications.clear();
         this.authService.logout();
         this.user.set(null);
         this.avatarUrl.set(null);

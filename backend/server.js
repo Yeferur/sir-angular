@@ -1,12 +1,21 @@
 // backend/server.js
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// PM2 puede iniciar sir-api con el cwd en la raíz del repositorio. Cargamos
+// siempre la configuración propia del backend antes de calcular CORS, IA y
+// cualquier otro flag; el archivo legado sólo completa variables ausentes.
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, 'env', '.env') });
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const http = require('http');
 
 const app = express();
+// Nginx se conecta desde loopback; así req.ip conserva el cliente real sin
+// confiar cabeceras X-Forwarded-For enviadas directamente desde Internet.
+app.set('trust proxy', 'loopback');
 const aiEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.IA_ENABLED ?? process.env.AI_ENABLED ?? '').trim().toLowerCase());
 
 function parseOrigins(value) {
@@ -65,7 +74,8 @@ const searchRoutes = require('./routes/Search/search.routes');
 const homeRoutes = require('./routes/Home/home.routes');
 const turnosRoutes = require('./routes/Turnos/turnos.routes');
 const notificacionesRoutes = require('./routes/Notificaciones/notificaciones.routes');
-const { iniciarVencimientosJob } = require('./jobs/vencimientos.job');
+const { iniciarVencimientosJob, detenerVencimientosJob } = require('./jobs/vencimientos.job');
+const { iniciarEmailOutboxJob, detenerEmailOutboxJob } = require('./jobs/email-outbox.job');
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
@@ -150,4 +160,29 @@ server.on('error', (err) => {
 
 // ✅ Levantar server
 iniciarVencimientosJob();
+iniciarEmailOutboxJob();
 startServer(DEFAULT_PORT);
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] ${signal}: cerrando sir-api de forma ordenada.`);
+  detenerVencimientosJob();
+
+  const closeServer = new Promise((resolve) => {
+    if (!server.listening) return resolve();
+    server.close(() => resolve());
+  });
+  const forceExit = setTimeout(() => {
+    console.error('[shutdown] Tiempo de cierre agotado; finalizando sir-api.');
+    process.exit(1);
+  }, 15000);
+
+  await Promise.allSettled([closeServer, detenerEmailOutboxJob({ timeoutMs: 12000 })]);
+  clearTimeout(forceExit);
+  process.exit(0);
+}
+
+process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+process.once('SIGINT', () => { void shutdown('SIGINT'); });

@@ -637,11 +637,3 @@
   padding: 10px 14px;
   border-radius: 10px;
 }
-
-.local-reset-link {
-  display: block;
-  color: var(--accent-blue);
-  font-size: .78rem;
-  text-align: center;
-  overflow-wrap: anywhere;
-}

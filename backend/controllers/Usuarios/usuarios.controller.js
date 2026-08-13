@@ -8,20 +8,13 @@ const fs = require('fs');
 const path = require('path');
 const { isClientRoleName } = require('../../utils/clientAccess');
 const { invalidarCacheUsuario } = require('../../middlewares/permissionsMiddleware');
+const { isStrongPassword } = require('../../utils/password-policy');
+const { invalidatePendingPasswordResets } = require('../../services/Login/password-reset-invalidation.service');
 
 const backendRoot = path.join(__dirname, '..', '..');
 
 function isAdvisorRoleName(value) {
   return String(value || '').trim().toLowerCase() === 'asesor';
-}
-
-function isStrongPassword(value) {
-  const password = String(value || '');
-  return password.length >= 8
-    && /[a-z]/.test(password)
-    && /[A-Z]/.test(password)
-    && /\d/.test(password)
-    && /[^A-Za-z0-9]/.test(password);
 }
 
 function parsePermissionIds(value) {
@@ -297,6 +290,17 @@ exports.actualizarMiPerfil = async (req, res) => {
     params.push(userId);
 
     await conn.query(updateQuery, params);
+
+    const emailChanged = String(current.Correo || '').trim().toLowerCase()
+      !== String(Correo || '').trim().toLowerCase();
+    if (hash || emailChanged) {
+      await invalidatePendingPasswordResets(
+        conn,
+        userId,
+        current.Correo,
+        'Invalidado porque el usuario actualizó sus credenciales.'
+      );
+    }
 
     const detalles = [
       { columna: 'Nombres_Apellidos', anterior: current.Nombres_Apellidos, nuevo: String(Nombres_Apellidos).trim() },
@@ -588,6 +592,18 @@ exports.actualizarUsuario = async (req, res) => {
 
     await conn.query(updateQuery, params);
 
+    const emailChanged = String(current.Correo || '').trim().toLowerCase()
+      !== String(Correo || '').trim().toLowerCase();
+    const isDeactivated = typeof Activo !== 'undefined' && Number(Activo) === 0;
+    if (hash || emailChanged || isDeactivated) {
+      await invalidatePendingPasswordResets(
+        conn,
+        id,
+        current.Correo,
+        'Invalidado porque un administrador actualizó las credenciales.'
+      );
+    }
+
     if (targetIsClient) {
       // Cliente siempre usa únicamente la plantilla fija resuelta por el
       // servicio de permisos; no se persisten ALLOW/DENY individuales.
@@ -714,7 +730,7 @@ exports.eliminarUsuario = async (req, res) => {
     await conn.beginTransaction();
 
     const [currentRows] = await conn.query(
-      `SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Activo, u.Id_Rol, r.Nombre_Rol
+      `SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Correo, u.Activo, u.Id_Rol, r.Nombre_Rol
        FROM usuarios u
        LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
        WHERE u.Id_Usuario = ?
@@ -772,6 +788,12 @@ exports.eliminarUsuario = async (req, res) => {
     const totalSesionesCerradas = Number(sessionRows[0]?.total || 0);
 
     await conn.query('UPDATE usuarios SET Activo = 0 WHERE Id_Usuario = ?', [id]);
+    await invalidatePendingPasswordResets(
+      conn,
+      id,
+      current.Correo,
+      'Invalidado porque el usuario fue desactivado.'
+    );
     await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
 
     await recordHistorial({

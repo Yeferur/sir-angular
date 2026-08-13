@@ -1,0 +1,88 @@
+<section class="notifications-panel" aria-labelledby="notifications-title">
+  <header class="panel-header">
+    <div>
+      <span class="eyebrow">Centro personal</span>
+      <h2 id="notifications-title">Notificaciones</h2>
+      <p>Avisos y solicitudes importantes.</p>
+    </div>
+    <button class="close-button" type="button" (click)="close()" aria-label="Cerrar notificaciones">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="panel-toolbar">
+    <span><strong>{{ notifications.noLeidas() }}</strong> sin leer</span>
+    @if (notifications.noLeidas()) {
+      <button type="button" (click)="notifications.markAllRead()">Marcar todas como leídas</button>
+    }
+  </div>
+
+  <div class="panel-scroll">
+    @if (pending().length) {
+      <section class="notification-section">
+        <span class="section-label">Requieren tu respuesta</span>
+        @for (item of pending(); track item.idIntercambio) {
+          <article class="request-card">
+            <div class="request-icon"><i class="bx bx-transfer-alt" aria-hidden="true"></i></div>
+            <div class="request-copy">
+              <strong>{{ item.solicitante }} solicita cambiar el turno</strong>
+              <p>{{ dateLabel(item.fecha) }} · recibirías {{ time(item.horarioSolicitante.inicio) }}–{{ time(item.horarioSolicitante.fin) }}</p>
+              @if (item.motivo) { <small>“{{ item.motivo }}”</small> }
+              <div class="actions">
+                <button type="button" class="secondary-button" [disabled]="busy()" (click)="respond(item, false)">Rechazar</button>
+                <button type="button" class="primary-button" [disabled]="busy()" (click)="respond(item, true)">Aceptar cambio</button>
+              </div>
+            </div>
+          </article>
+        }
+      </section>
+    }
+
+    @if (outgoing().length) {
+      <section class="notification-section">
+        <span class="section-label">Esperando respuesta</span>
+        @for (item of outgoing(); track item.idIntercambio) {
+          <article class="request-card request-card--quiet">
+            <div class="request-icon"><i class="bx bx-time-five" aria-hidden="true"></i></div>
+            <div class="request-copy">
+              <strong>Solicitud enviada a {{ item.receptor }}</strong>
+              <p>{{ dateLabel(item.fecha) }} · propusiste {{ time(item.horarioSolicitante.inicio) }}–{{ time(item.horarioSolicitante.fin) }}</p>
+              <div class="actions actions--single">
+                <button type="button" class="secondary-button" [disabled]="busy()" (click)="cancel(item)">Cancelar solicitud</button>
+              </div>
+            </div>
+          </article>
+        }
+      </section>
+    }
+
+    <section class="notification-section">
+      <span class="section-label">Actividad reciente</span>
+      <div class="notification-list">
+        @for (item of notifications.items(); track item.idNotificacion) {
+          <button type="button" class="notification-item" [class.is-unread]="!item.leida"
+            (click)="openNotification(item)">
+            <span class="notification-icon"><i [class]="'bx ' + notificationIcon(item)" aria-hidden="true"></i></span>
+            <span class="notification-copy">
+              <strong>{{ item.titulo }}</strong>
+              <small>{{ item.mensaje }}</small>
+              <time>{{ relative(item.fechaCreacion) }}</time>
+            </span>
+            @if (!item.leida) { <span class="unread-dot" aria-label="Sin leer"></span> }
+            @if (item.datos?.['route']) { <i class="bx bx-chevron-right item-chevron" aria-hidden="true"></i> }
+          </button>
+        } @empty {
+          <div class="empty-state">
+            <span><i class="bx bx-bell" aria-hidden="true"></i></span>
+            <strong>Todo está al día</strong>
+            <p>Los avisos importantes aparecerán aquí.</p>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</section>

@@ -7,9 +7,14 @@ const {
   getCurrentScheduleStatus,
   getWeekBounds,
   getAdvisorWeekSchedule,
+  publishWeek,
   validateVacation,
+  _publication,
 } = require('../services/Turnos/turnos.service');
 const db = require('../database/db');
+const emailOutbox = require('../services/email-outbox.service');
+const notifications = require('../services/Notificaciones/notificaciones.service');
+const websocketManager = require('../websocketManager');
 
 function week(overrides = {}) {
   return Array.from({ length: 7 }, (_, index) => ({
@@ -19,6 +24,152 @@ function week(overrides = {}) {
     horaFin: index < 5 ? '17:30' : null,
     ...(overrides[index + 1] || {}),
   }));
+}
+
+function createPublicationHarness({ previousStatus = 'borrador', enqueueError = null } = {}) {
+  const events = [];
+  const publishedSchedule = validateWeeklySchedule(week());
+  let transactionOpen = false;
+
+  const snapshotDays = publishedSchedule.map((day) => ({
+    Id_Usuario: 41,
+    Dia_Semana: day.diaSemana,
+    Es_Laborable: day.esLaborable ? 1 : 0,
+    Hora_Inicio: day.horaInicio,
+    Hora_Fin: day.horaFin,
+  }));
+  const persistedDays = publishedSchedule.map((day) => ({
+    Id_Turno_Dia: 700 + day.diaSemana,
+    Dia_Semana: day.diaSemana,
+  }));
+
+  const connection = {
+    async beginTransaction() {
+      assert.equal(transactionOpen, false);
+      transactionOpen = true;
+      events.push('begin');
+    },
+    async commit() {
+      assert.equal(transactionOpen, true);
+      events.push('commit');
+      transactionOpen = false;
+    },
+    async rollback() {
+      assert.equal(transactionOpen, true);
+      events.push('rollback');
+      transactionOpen = false;
+    },
+    release() {
+      events.push('release');
+    },
+    async query(sql) {
+      const statement = String(sql).replace(/\s+/g, ' ').trim();
+
+      if (statement.startsWith('SELECT Id_Semana, Fecha_Inicio, Estado FROM turnos_semanas')) {
+        return [[{
+          Id_Semana: 7,
+          Fecha_Inicio: '2026-08-03',
+          Estado: previousStatus,
+        }]];
+      }
+      if (statement.startsWith('SELECT u.Id_Usuario, u.Nombres_Apellidos, u.Correo')) {
+        return [[{
+          Id_Usuario: 41,
+          Nombres_Apellidos: 'Ana Asesora',
+          Correo: 'ana@example.com',
+        }]];
+      }
+      if (statement.startsWith('SELECT Id_Usuario, Id_Canal, Es_Supernumerario')) {
+        return [[{ Id_Usuario: 41, Id_Canal: null, Es_Supernumerario: 0 }]];
+      }
+      if (statement.startsWith('SELECT Id_Usuario, Dia_Semana, Es_Laborable')) {
+        return [snapshotDays];
+      }
+      if (statement.startsWith('SELECT Id_Usuario, Fecha_Inicio, Fecha_Fin')) {
+        return [[]];
+      }
+      if (statement.startsWith('SELECT Id_Vacacion FROM turnos_vacaciones')) {
+        return [[]];
+      }
+      if (statement.startsWith('SELECT Id_Turno_Dia, Dia_Semana FROM turnos_dias')) {
+        return [persistedDays];
+      }
+      if (statement.startsWith('INSERT INTO historial ')) {
+        return [{ insertId: 91 }];
+      }
+      if (statement.startsWith('INSERT INTO detalle_historial ')) {
+        return [{ affectedRows: 3 }];
+      }
+      if (
+        statement.startsWith('INSERT INTO turnos_dias ')
+        || statement.startsWith('INSERT INTO turnos_asesores_semana ')
+        || statement.startsWith('UPDATE turnos_dias ')
+        || statement.startsWith('UPDATE turnos_semanas ')
+      ) {
+        return [{ affectedRows: 1 }];
+      }
+
+      throw new Error(`Consulta no contemplada en el mock de publicación: ${statement}`);
+    },
+  };
+
+  const originals = {
+    getConnection: db.getConnection,
+    query: db.query,
+    createNotification: notifications.createNotification,
+    isSingleMailbox: emailOutbox.isSingleMailbox,
+    enqueueScheduleEmail: emailOutbox.enqueueScheduleEmail,
+    sendToUser: websocketManager.sendToUser,
+  };
+
+  db.getConnection = async () => connection;
+  db.query = async (sql) => {
+    assert.match(String(sql), /INFORMATION_SCHEMA\.COLUMNS/i);
+    return [[{ DATA_TYPE: 'varchar' }]];
+  };
+  notifications.createNotification = async (executor, payload) => {
+    assert.equal(transactionOpen, true, 'la notificación interna debe crearse antes del commit');
+    assert.equal(executor, connection, 'la notificación debe usar la conexión transaccional');
+    events.push('notification');
+    assert.equal(payload.userId, '41');
+    return '501';
+  };
+  emailOutbox.isSingleMailbox = () => true;
+  emailOutbox.enqueueScheduleEmail = async (payload, publicationId, options) => {
+    assert.equal(transactionOpen, true, 'el correo debe encolarse antes del commit');
+    assert.equal(options.executor, connection, 'el outbox debe usar la conexión transaccional');
+    assert.match(publicationId, /^[0-9a-f-]{36}$/i);
+    assert.equal(payload.to, 'ana@example.com');
+    events.push('enqueue');
+    if (enqueueError) throw enqueueError;
+    return { queued: true };
+  };
+  websocketManager.sendToUser = (userId, payload) => {
+    assert.equal(transactionOpen, false, 'WebSocket solo puede emitirse después del commit');
+    assert.ok(events.includes('commit'), 'WebSocket requiere un commit previo');
+    assert.equal(userId, '41');
+    assert.equal(payload.idNotificacion, '501');
+    events.push('websocket');
+  };
+
+  return {
+    events,
+    jornadas: [{
+      idUsuario: '41',
+      idCanalSemanal: null,
+      esSupernumerario: false,
+      vacacion: null,
+      turnos: publishedSchedule,
+    }],
+    restore() {
+      db.getConnection = originals.getConnection;
+      db.query = originals.query;
+      notifications.createNotification = originals.createNotification;
+      emailOutbox.isSingleMailbox = originals.isSingleMailbox;
+      emailOutbox.enqueueScheduleEmail = originals.enqueueScheduleEmail;
+      websocketManager.sendToUser = originals.sendToUser;
+    },
+  };
 }
 
 test('acepta una jornada semanal completa en bloques de 30 minutos', () => {
@@ -130,4 +281,110 @@ test('la jornada personal exige que el usuario tenga actualmente el rol Asesor',
   const result = await getAdvisorWeekSchedule('123', '2026-08-03');
   assert.equal(result, null);
   assert.match(capturedSql, /LOWER\(TRIM\(r\.Nombre_Rol\)\) = 'asesor'/);
+});
+
+test('la publicación inicial notifica a todos y una republicación sólo a cambios reales', () => {
+  const base = {
+    idUsuario: '1',
+    turnos: validateWeeklySchedule(week()),
+    esSupernumerario: false,
+    idCanalSemanal: '3',
+    vacation: null,
+  };
+  const second = { ...base, idUsuario: '2' };
+  const previous = new Map([
+    ['1', _publication.normalizePublicationState(base)],
+    ['2', _publication.normalizePublicationState(second)],
+  ]);
+
+  assert.deepEqual(
+    _publication.resolvePublicationRecipients('borrador', [base, second], previous),
+    ['1', '2']
+  );
+  assert.deepEqual(
+    _publication.resolvePublicationRecipients('publicado', [base, second], previous),
+    []
+  );
+
+  const changed = {
+    ...second,
+    turnos: validateWeeklySchedule(week({ 1: { horaInicio: '08:30' } })),
+  };
+  assert.deepEqual(
+    _publication.resolvePublicationRecipients('publicado', [base, changed], previous),
+    ['2']
+  );
+});
+
+test('pendiente_republicacion usa alcance completo porque no conserva el roster granular', () => {
+  const advisor = {
+    idUsuario: '9', turnos: validateWeeklySchedule(week()), esSupernumerario: false,
+    idCanalSemanal: null, vacation: null,
+  };
+  const previous = new Map([['9', _publication.normalizePublicationState(advisor)]]);
+  assert.deepEqual(
+    _publication.resolvePublicationRecipients('pendiente_republicacion', [advisor], previous),
+    ['9']
+  );
+});
+
+test('publicar crea notificación y outbox en la transacción, y emite WebSocket después del commit', async () => {
+  const harness = createPublicationHarness();
+  try {
+    const result = await publishWeek('7', harness.jornadas, true, '12');
+
+    assert.deepEqual(result, {
+      idSemana: '7',
+      estado: 'publicado',
+      notificados: 1,
+      correosEncolados: 1,
+      correosOmitidos: 0,
+    });
+    assert.deepEqual(harness.events, [
+      'begin',
+      'notification',
+      'enqueue',
+      'commit',
+      'websocket',
+      'release',
+    ]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('si falla el enqueue de correo, publicar revierte toda la transacción y no emite WebSocket', async () => {
+  const enqueueError = new Error('No se pudo persistir el correo');
+  const harness = createPublicationHarness({ enqueueError });
+  try {
+    await assert.rejects(
+      publishWeek('7', harness.jornadas, true, '12'),
+      enqueueError
+    );
+    assert.deepEqual(harness.events, [
+      'begin',
+      'notification',
+      'enqueue',
+      'rollback',
+      'release',
+    ]);
+    assert.equal(harness.events.includes('commit'), false);
+    assert.equal(harness.events.includes('websocket'), false);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('republicar una semana idéntica confirma los datos sin crear avisos ni correos', async () => {
+  const harness = createPublicationHarness({ previousStatus: 'publicado' });
+  try {
+    const result = await publishWeek('7', harness.jornadas, true, '12');
+
+    assert.equal(result.notificados, 0);
+    assert.equal(result.correosEncolados, 0);
+    assert.equal(result.correosOmitidos, 0);
+    assert.deepEqual(harness.events, ['begin', 'commit', 'release']);
+  } finally {
+    harness.restore();
+  }
 });

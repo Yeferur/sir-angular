@@ -102,6 +102,12 @@ export interface ReservationBreakdown {
 export interface TourOccupancy {
   nombre: string;
   pasajeros: number;
+  idPlan?: number | null;
+  reservas?: number;
+  adultos?: number;
+  ninos?: number;
+  infantes?: number;
+  sinPlan?: boolean;
 }
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -168,7 +174,7 @@ export class DashboardService {
     return this.http.get<ReservationBreakdown[]>(`${this.base}/reservation-breakdown`, { params: toParams(filters) });
   }
 
-  /** Top 10 destinos por pasajeros */
+  /** Top 10 tours o, al seleccionar un tour con varios planes, desglose por plan. */
   getTourOccupancy(filters: DashboardFilters = {}): Observable<TourOccupancy[]> {
     return this.http.get<TourOccupancy[]>(`${this.base}/tour-occupancy`, { params: toParams(filters) });
   }

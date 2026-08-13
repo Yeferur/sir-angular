@@ -153,6 +153,14 @@ export const routes: Routes = [
     data: { programacionView: 'editor', permiso: 'PROGRAMACION.ACTUALIZAR', redirectTo: '/Programacion/Listado' },
     title: 'Editar programación',
   },
+  {
+    path: 'Programacion/Privados/:fecha',
+    loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    canActivate: [authGuard, permisoGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: { programacionView: 'privados', permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
+    title: 'Programación privada',
+  },
 
   {
     path: 'Reservas/Confirmacion',

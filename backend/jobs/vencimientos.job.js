@@ -53,8 +53,16 @@ function iniciarVencimientosJob() {
   return tareaVencimientos;
 }
 
+function detenerVencimientosJob() {
+  if (!tareaVencimientos) return;
+  tareaVencimientos.stop();
+  tareaVencimientos.destroy?.();
+  tareaVencimientos = null;
+}
+
 module.exports = {
   iniciarVencimientosJob,
+  detenerVencimientosJob,
   ejecutarVencimientosAutomaticos,
   CRON_VENCIMIENTOS,
   TIMEZONE_VENCIMIENTOS,
