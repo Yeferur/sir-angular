@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildBusStatus } = require('../services/Seguros/seguros.service');
+const {
+    buildBusStatus,
+    findBusAssignmentConflicts,
+    buildConsolidatedRows,
+} = require('../services/Seguros/seguros.service');
 
 function bus(overrides = {}) {
     return {
@@ -57,4 +61,42 @@ test('el nombre del guía puede completarse desde Seguros', () => {
         label: 'Nombre del guía',
         source: 'seguros',
     });
+});
+
+test('detecta placa, guía y conductor repetidos entre buses de la misma fecha', () => {
+    const conflicts = findBusAssignmentConflicts(bus({
+        Id_Bus_Prog: 2,
+        Placa_Display: 'abc-123',
+        Guia: 'Laura Gomez',
+        DNI_Guia: '101.010',
+        Conductor: 'Carlos Perez',
+        DNI_Conductor: '202-020',
+    }), [bus()], 2);
+
+    assert.deepEqual(conflicts.map(conflict => conflict.field), [
+        'Placa_Display',
+        'DNI_Guia',
+        'DNI_Conductor',
+    ]);
+});
+
+test('ignora identificadores genéricos de bus al buscar placas repetidas', () => {
+    const conflicts = findBusAssignmentConflicts(
+        bus({ Id_Bus_Prog: 2, Placa_Display: 'Bus 1', Guia: 'Otra guía', DNI_Guia: '999', Conductor: 'Otro conductor', DNI_Conductor: '888' }),
+        [bus({ Placa_Display: 'Bus 1' })],
+        2
+    );
+    assert.equal(conflicts.length, 0);
+});
+
+test('construye el consolidado incluyendo pasajeros, guía y conductor de cada bus', () => {
+    const rows = buildConsolidatedRows([
+        bus(),
+        bus({ Id_Bus_Prog: 2, Orden_Bus: 2, Placa_Display: 'DEF456', pasajeros: [] }),
+    ]);
+
+    assert.equal(rows.length, 5);
+    assert.deepEqual(rows.map(row => row.tipo), ['PASAJERO', 'GUÍA', 'CONDUCTOR', 'GUÍA', 'CONDUCTOR']);
+    assert.equal(rows[0].bus, 'Bus 1');
+    assert.equal(rows[3].placa, 'DEF456');
 });

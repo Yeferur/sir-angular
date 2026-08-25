@@ -118,6 +118,8 @@ CREATE TABLE IF NOT EXISTS `beneficiarios_comision` (
   `Telefono` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Forma_Pago` enum('TRANSFERENCIA_BANCOLOMBIA','NEQUI','EFECTIVO') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Numero_Cuenta` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Receptor` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `DNI_Receptor` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Activo` tinyint(1) NOT NULL DEFAULT '1',
   `Creado_Por` bigint UNSIGNED DEFAULT NULL,
   `Actualizado_Por` bigint UNSIGNED DEFAULT NULL,
@@ -127,6 +129,21 @@ CREATE TABLE IF NOT EXISTS `beneficiarios_comision` (
   KEY `idx_beneficiarios_canal_activo_nombre` (`Id_Canal`,`Activo`,`Nombre`),
   KEY `idx_beneficiarios_creado_por` (`Creado_Por`),
   KEY `idx_beneficiarios_actualizado_por` (`Actualizado_Por`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `beneficiarios_comision_documentos` (
+  `Id_Documento` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Beneficiario` bigint UNSIGNED NOT NULL,
+  `Nombre_Original` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre_Almacenado` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Ruta_Privada` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Mime_Type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tamano_Bytes` bigint UNSIGNED NOT NULL,
+  `Creado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Documento`),
+  KEY `idx_beneficiario_documentos_beneficiario` (`Id_Beneficiario`),
+  KEY `idx_beneficiario_documentos_usuario` (`Creado_Por`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -8933,6 +8950,8 @@ CREATE TABLE IF NOT EXISTS `liquidaciones` (
   `Nombre_Beneficiario_Snap` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Forma_Pago` enum('TRANSFERENCIA_BANCOLOMBIA','NEQUI','EFECTIVO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Cuenta_Bancaria` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Nombre_Receptor_Snap` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `DNI_Receptor_Snap` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Estado` enum('PENDIENTE','PAGADO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDIENTE',
   `Fecha_Pago` date DEFAULT NULL,
   `Fecha_Registro` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -14202,6 +14221,10 @@ ALTER TABLE `beneficiarios_comision`
   ADD CONSTRAINT `fk_beneficiarios_actualizado_por` FOREIGN KEY (`Actualizado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_beneficiarios_canal` FOREIGN KEY (`Id_Canal`) REFERENCES `canales_reservas` (`Id_Canal`) ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_beneficiarios_creado_por` FOREIGN KEY (`Creado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `beneficiarios_comision_documentos`
+  ADD CONSTRAINT `fk_beneficiario_documentos_beneficiario` FOREIGN KEY (`Id_Beneficiario`) REFERENCES `beneficiarios_comision` (`Id_Beneficiario`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_beneficiario_documentos_usuario` FOREIGN KEY (`Creado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `detalle_historial`

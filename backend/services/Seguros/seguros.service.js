@@ -19,6 +19,81 @@ function cleanText(value, maxLength = 100) {
     return normalized;
 }
 
+function normalizeAssignmentValue(value) {
+    return String(value || '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+}
+
+function normalizeDocument(value) {
+    return normalizeAssignmentValue(value).replace(/[^A-Z0-9]/g, '');
+}
+
+function isGenericVehicleIdentifier(value) {
+    return /^(BUS|PRIVADO|VEHICULO|VEHÍCULO)\s*\d+$/i.test(String(value || '').trim());
+}
+
+function findBusAssignmentConflicts(candidate, buses, currentBusId = null) {
+    const conflicts = [];
+    const plate = isGenericVehicleIdentifier(candidate.Placa_Display) ? '' : normalizeDocument(candidate.Placa_Display);
+    const guide = normalizeAssignmentValue(candidate.Guia);
+    const guideDocument = normalizeDocument(candidate.DNI_Guia);
+    const driver = normalizeAssignmentValue(candidate.Conductor);
+    const driverDocument = normalizeDocument(candidate.DNI_Conductor);
+
+    for (const bus of buses || []) {
+        if (Number(bus.Id_Bus_Prog) === Number(currentBusId)) continue;
+        const label = String(bus.Placa_Display || '').trim() || `Bus ${bus.Orden_Bus || ''}`.trim();
+
+        if (plate && !isGenericVehicleIdentifier(bus.Placa_Display) && plate === normalizeDocument(bus.Placa_Display)) {
+            conflicts.push({ field: 'Placa_Display', label: 'Placa', value: candidate.Placa_Display, bus: label });
+        }
+        if (guideDocument && guideDocument === normalizeDocument(bus.DNI_Guia)) {
+            conflicts.push({ field: 'DNI_Guia', label: 'Documento del guía', value: candidate.DNI_Guia, bus: label });
+        } else if (guide && guide === normalizeAssignmentValue(bus.Guia)) {
+            conflicts.push({ field: 'Guia', label: 'Guía', value: candidate.Guia, bus: label });
+        }
+        if (driverDocument && driverDocument === normalizeDocument(bus.DNI_Conductor)) {
+            conflicts.push({ field: 'DNI_Conductor', label: 'Documento del conductor', value: candidate.DNI_Conductor, bus: label });
+        } else if (driver && driver === normalizeAssignmentValue(bus.Conductor)) {
+            conflicts.push({ field: 'Conductor', label: 'Conductor', value: candidate.Conductor, bus: label });
+        }
+    }
+
+    return conflicts;
+}
+
+function buildInsuranceRows(bus) {
+    return [
+        ...(bus.pasajeros || []).map(p => ({
+            tipo: p.Tipo_Pasajero || 'PASAJERO',
+            nombre: p.Nombre_Pasajero,
+            dni: p.DNI,
+            reserva: p.Id_Reserva
+        })),
+        { tipo: 'GUÍA', nombre: bus.Guia, dni: bus.DNI_Guia, reserva: '' },
+        { tipo: 'CONDUCTOR', nombre: bus.Conductor, dni: bus.DNI_Conductor, reserva: '' }
+    ];
+}
+
+function buildConsolidatedRows(buses) {
+    const rows = [];
+    for (const bus of buses || []) {
+        const busLabel = bus.Tipo_Bus === 'privado' ? `Privado ${bus.Orden_Bus}` : `Bus ${bus.Orden_Bus}`;
+        for (const registro of buildInsuranceRows(bus)) {
+            rows.push({
+                bus: busLabel,
+                placa: String(bus.Placa_Display || '').trim(),
+                ...registro
+            });
+        }
+    }
+    return rows;
+}
+
 function buildBusStatus(bus) {
     const missing = [];
     if (!bus.Guia) missing.push({ code: 'GUIA', label: 'Nombre del guía', source: 'seguros' });
@@ -196,10 +271,12 @@ async function actualizarPersonalBus(idBusProg, campos) {
     };
     const sets = [];
     const params = [];
+    const normalizedFields = {};
 
     for (const [key, maxLength] of Object.entries(permitidos)) {
         if (Object.prototype.hasOwnProperty.call(campos, key)) {
             const value = cleanText(campos[key], maxLength);
+            normalizedFields[key] = value;
             sets.push(key === 'Placa_Display'
                 ? '`Placa_Display` = COALESCE(?, CONCAT(\'Bus \', Orden_Bus))'
                 : `\`${key}\` = ?`);
@@ -208,12 +285,63 @@ async function actualizarPersonalBus(idBusProg, campos) {
     }
     if (!sets.length) return { affected: 0 };
 
-    params.push(idBusProg);
-    const [result] = await db.query(
-        `UPDATE programacion_buses SET ${sets.join(', ')} WHERE Id_Bus_Prog = ?`,
-        params
-    );
-    return { affected: result.affectedRows };
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+        const [[currentBus]] = await conn.query(
+            `
+            SELECT pb.*, p.Fecha_Tour
+            FROM programacion_buses pb
+            INNER JOIN programaciones p ON p.Id_Programacion = pb.Id_Programacion
+            WHERE pb.Id_Bus_Prog = ?
+            LIMIT 1
+            `,
+            [idBusProg]
+        );
+        if (!currentBus) {
+            await conn.rollback();
+            return { affected: 0 };
+        }
+
+        const [sameDateBuses] = await conn.query(
+            `
+            SELECT pb.Id_Bus_Prog, pb.Placa_Display, pb.Orden_Bus,
+                   pb.Guia, pb.DNI_Guia, pb.Conductor, pb.DNI_Conductor
+            FROM programacion_buses pb
+            INNER JOIN programaciones p ON p.Id_Programacion = pb.Id_Programacion
+            WHERE p.Fecha_Tour = ?
+              AND p.Estado = 'activa'
+            ORDER BY pb.Id_Bus_Prog ASC
+            FOR UPDATE
+            `,
+            [currentBus.Fecha_Tour]
+        );
+
+        const lockedCurrent = sameDateBuses.find(bus => Number(bus.Id_Bus_Prog) === Number(idBusProg)) || currentBus;
+        const candidate = { ...lockedCurrent, ...normalizedFields };
+        const conflicts = findBusAssignmentConflicts(candidate, sameDateBuses, idBusProg);
+        if (conflicts.length) {
+            throw createServiceError(
+                'No se puede guardar: la placa, el guía o el conductor ya están asignados a otro bus en esta fecha.',
+                409,
+                'DUPLICATE_BUS_ASSIGNMENT',
+                conflicts
+            );
+        }
+
+        params.push(idBusProg);
+        const [result] = await conn.query(
+            `UPDATE programacion_buses SET ${sets.join(', ')} WHERE Id_Bus_Prog = ?`,
+            params
+        );
+        await conn.commit();
+        return { affected: result.affectedRows };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
 }
 
 async function generarExcelSeguros(filtros, res) {
@@ -264,6 +392,57 @@ async function generarExcelSeguros(filtros, res) {
         { header: 'ID RESERVA', key: 'reserva', width: 16 }
     ];
 
+    const consolidatedColumns = [
+        { header: 'N°', key: 'num', width: 6 },
+        { header: 'BUS', key: 'bus', width: 16 },
+        { header: 'PLACA', key: 'placa', width: 18 },
+        { header: 'TIPO', key: 'tipo', width: 14 },
+        { header: 'NOMBRE', key: 'nombre', width: 36 },
+        { header: 'DNI / PASAPORTE', key: 'dni', width: 22 },
+        { header: 'ID RESERVA', key: 'reserva', width: 16 }
+    ];
+    const consolidated = workbook.addWorksheet('Consolidado');
+    consolidated.columns = consolidatedColumns;
+    consolidated.views = [{ state: 'frozen', ySplit: 2 }];
+    consolidated.autoFilter = { from: 'A2', to: 'G2' };
+    consolidated.mergeCells('A1:G1');
+    const consolidatedTitle = consolidated.getCell('A1');
+    consolidatedTitle.value = `${nombreTour} · ${Fecha} · Consolidado de todos los buses`;
+    consolidatedTitle.font = { bold: true, size: 13, color: { argb: 'FF111827' } };
+    consolidatedTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+    consolidatedTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+    consolidatedTitle.border = border;
+    consolidated.getRow(1).height = 25;
+    const consolidatedHeader = consolidated.getRow(2);
+    consolidatedHeader.values = consolidatedColumns.map(column => column.header);
+    consolidatedHeader.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FF111827' }, size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = border;
+    });
+    const consolidatedRows = buildConsolidatedRows(buses);
+    consolidatedRows.forEach((registro, index) => {
+        const row = consolidated.getRow(index + 3);
+        row.values = [index + 1, registro.bus, registro.placa, registro.tipo, registro.nombre, registro.dni, registro.reserva];
+        row.eachCell({ includeEmpty: true }, cell => {
+            cell.border = border;
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            if (index % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        });
+        row.getCell(5).alignment = { vertical: 'middle', horizontal: 'left' };
+        row.height = 19;
+    });
+    const consolidatedTotalRow = consolidatedRows.length + 3;
+    consolidated.mergeCells(`A${consolidatedTotalRow}:B${consolidatedTotalRow}`);
+    consolidated.getCell(`A${consolidatedTotalRow}`).value = 'Total asegurados';
+    consolidated.getCell(`A${consolidatedTotalRow}`).font = { bold: true };
+    consolidated.getCell(`A${consolidatedTotalRow}`).border = border;
+    consolidated.getCell(`C${consolidatedTotalRow}`).value = consolidatedRows.length;
+    consolidated.getCell(`C${consolidatedTotalRow}`).font = { bold: true };
+    consolidated.getCell(`C${consolidatedTotalRow}`).border = border;
+    consolidated.getCell(`C${consolidatedTotalRow}`).alignment = { horizontal: 'center' };
+
     for (const bus of buses) {
         const plate = String(bus.Placa_Display || '').trim();
         const suffix = plate && !/^bus\s+\d+$/i.test(plate) ? ` - ${plate}` : '';
@@ -291,16 +470,7 @@ async function generarExcelSeguros(filtros, res) {
             cell.border = border;
         });
 
-        const registros = [
-            ...bus.pasajeros.map(p => ({
-                tipo: p.Tipo_Pasajero || 'PASAJERO',
-                nombre: p.Nombre_Pasajero,
-                dni: p.DNI,
-                reserva: p.Id_Reserva
-            })),
-            { tipo: 'GUÍA', nombre: bus.Guia, dni: bus.DNI_Guia, reserva: '' },
-            { tipo: 'CONDUCTOR', nombre: bus.Conductor, dni: bus.DNI_Conductor, reserva: '' }
-        ];
+        const registros = buildInsuranceRows(bus);
 
         registros.forEach((registro, index) => {
             const row = ws.getRow(index + 3);
@@ -331,4 +501,11 @@ async function generarExcelSeguros(filtros, res) {
     res.end();
 }
 
-module.exports = { listarSeguros, actualizarPersonalBus, generarExcelSeguros, buildBusStatus };
+module.exports = {
+    listarSeguros,
+    actualizarPersonalBus,
+    generarExcelSeguros,
+    buildBusStatus,
+    findBusAssignmentConflicts,
+    buildConsolidatedRows
+};

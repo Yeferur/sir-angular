@@ -66,6 +66,45 @@ function buildFilters(filters = {}) {
   return { conds, params };
 }
 
+function buildCancelledReservationsSql(andConds = '') {
+  return `
+    SELECT COUNT(DISTINCT r.Id_Reserva) AS Reservas_Canceladas
+    FROM reservas r
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    WHERE UPPER(TRIM(COALESCE(r.Estado, ''))) IN ('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO')
+    ${andConds}
+  `;
+}
+
+function buildReservationStatusesSql(andConds = '') {
+  return `
+    SELECT
+      COALESCE(NULLIF(UPPER(TRIM(r.Estado)), ''), 'SIN_ESTADO') AS Estado_Reserva,
+      COUNT(DISTINCT r.Id_Reserva) AS Cantidad
+    FROM reservas r
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    WHERE 1 = 1
+    ${andConds}
+    GROUP BY Estado_Reserva
+    ORDER BY FIELD(Estado_Reserva, 'COMPLETADA', 'CONFIRMADA', 'ACTIVA', 'PENDIENTE', 'PENDIENTEDATOS', 'CANCELADA', 'CANCELADO', 'SIN_ESTADO'), Estado_Reserva
+  `;
+}
+
+function buildPassengerAgeSql(andConds = '') {
+  return `
+    SELECT
+      COALESCE(NULLIF(UPPER(TRIM(p.Tipo_Pasajero)), ''), 'SIN_TIPO') AS Tipo_Pasajero,
+      COUNT(p.Id_Pasajero) AS Cantidad
+    FROM pasajeros p
+    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    WHERE ${ACTIVE_RESERVATION_SQL}
+    ${andConds}
+    GROUP BY Tipo_Pasajero
+    ORDER BY FIELD(Tipo_Pasajero, 'ADULTO', 'NINO', 'INFANTE', 'SIN_TIPO'), Tipo_Pasajero
+  `;
+}
+
 // ─── 1. Stats generales (KPIs) ───────────────────────────────────────────────
 async function getDashboardStatsSnapshot(filters = {}) {
   const { conds, params } = buildFilters(filters);
@@ -114,6 +153,10 @@ async function getDashboardStatsSnapshot(filters = {}) {
     GROUP BY COALESCE(m.Codigo, 'COP')
   `;
 
+  const cancelledReservationsSql = buildCancelledReservationsSql(andConds);
+  const reservationStatusesSql = buildReservationStatusesSql(andConds);
+  const passengerAgeSql = buildPassengerAgeSql(andConds);
+
   const includeTransfers = !filters.tourId && !normalizeReservationType(filters.reservationType);
   const transferParams = [filters.startDate, filters.endDate].filter(Boolean);
   const transferDateConds = [];
@@ -157,8 +200,11 @@ async function getDashboardStatsSnapshot(filters = {}) {
     GROUP BY COALESCE(m.Codigo, 'COP')
   `;
 
-  const [reservationResult, transferResult, reservationPaymentResult, transferPaymentResult] = await Promise.all([
+  const [reservationResult, cancelledReservationResult, reservationStatusesResult, passengerAgeResult, transferResult, reservationPaymentResult, transferPaymentResult] = await Promise.all([
     db.query(reservationsSql, params),
+    db.query(cancelledReservationsSql, params),
+    db.query(reservationStatusesSql, params),
+    db.query(passengerAgeSql, params),
     includeTransfers ? db.query(transfersSql, transferParams) : Promise.resolve([[]]),
     db.query(reservationPaymentsSql, params),
     includeTransfers ? db.query(transferPaymentsSql, transferParams) : Promise.resolve([[]]),
@@ -187,6 +233,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
   };
 
   let totalReservas = 0;
+  const totalReservasCanceladas = Number(cancelledReservationResult[0]?.[0]?.Reservas_Canceladas || 0);
   let totalPasajeros = 0;
   let totalViajaron = 0;
   let totalNoViajaron = 0;
@@ -239,6 +286,15 @@ async function getDashboardStatsSnapshot(filters = {}) {
   const primary = financialByCurrency.find((item) => item.currency === 'COP') || financialByCurrency[0] || ensureCurrency('COP');
   return {
     totalReservas,
+    totalReservasCanceladas,
+    reservationStatuses: (reservationStatusesResult[0] || []).map((row) => ({
+      estado: String(row.Estado_Reserva || 'SIN_ESTADO'),
+      cantidad: Number(row.Cantidad || 0),
+    })),
+    passengerAge: (passengerAgeResult[0] || []).map((row) => ({
+      tipo: String(row.Tipo_Pasajero || 'SIN_TIPO'),
+      cantidad: Number(row.Cantidad || 0),
+    })),
     totalPasajeros,
     totalTransfers,
     totalTransferPassengers,
@@ -425,29 +481,30 @@ async function getDailyIncomeSvc(filters = {}) {
     .map((row) => ({ ...row, empresa: row.bruto + row.transfer }));
 }
 
-// ─── 4. Pasajeros totales por día ─────────────────────────────────────────────
+// ─── 4. Pasajeros por día y tour ──────────────────────────────────────────────
 async function getDailyPassengersSvc(filters = {}) {
   const { conds, params } = buildFilters(filters);
-  const needsTourJoin = !!filters.tourId;
-  const tourJoin = needsTourJoin ? 'JOIN horarios h ON r.Id_Horario = h.Id_Horario' : '';
   const andConds = conds.length ? `AND ${conds.join(' AND ')}` : '';
 
   const sql = `
     SELECT
       DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS fecha,
+      t.Nombre_Tour            AS tour,
       COUNT(p.Id_Pasajero)     AS pasajeros
     FROM pasajeros p
     JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
-    ${tourJoin}
+    JOIN horarios h ON r.Id_Horario = h.Id_Horario
+    JOIN tours t ON h.Id_Tour = t.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL}
     ${andConds}
-    GROUP BY DATE(r.Fecha_Tour)
-    ORDER BY fecha
+    GROUP BY DATE(r.Fecha_Tour), t.Id_Tour, t.Nombre_Tour
+    ORDER BY fecha, tour
   `;
 
   const [rows] = await db.query(sql, params);
   return rows.map(r => ({
     fecha:     r.fecha,
+    tour:      r.tour,
     pasajeros: Number(r.pasajeros)
   }));
 }
@@ -692,6 +749,105 @@ async function getTourOccupancySvc(filters = {}) {
   }));
 }
 
+// ─── 9. Métricas ampliadas del informe ──────────────────────────────────────
+// Expone únicamente métricas agregadas y acotadas para que el informe pueda
+// crecer en fechas y registros sin convertirse en una vista operativa de buses.
+async function getDashboardOperationalSvc(filters = {}) {
+  const { conds, params } = buildFilters(filters);
+  const andConds = conds.length ? `AND ${conds.join(' AND ')}` : '';
+  const languageSql = `
+    SELECT COALESCE(NULLIF(TRIM(r.Idioma_Reserva), ''), 'Sin idioma') AS idioma,
+           COUNT(p.Id_Pasajero) AS registrados,
+           SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+    GROUP BY idioma ORDER BY registrados DESC
+  `;
+  const pointsSql = `
+    SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Punto), ''), 'Sin punto') AS punto,
+           COUNT(p.Id_Pasajero) AS registrados,
+           SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+    GROUP BY punto ORDER BY registrados DESC LIMIT 20
+  `;
+  const absenceBase = `
+    SELECT %GROUP% AS agrupador,
+      COUNT(p.Id_Pasajero) AS programados,
+      SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron,
+      SUM(CASE WHEN cj.Id_Confirmacion IS NOT NULL AND cj.Total_Pasajeros = jornada.Total_Pasajeros AND COALESCE(p.Confirmacion, 0) = 0 THEN 1 ELSE 0 END) AS noViajaron,
+      SUM(CASE WHEN cj.Id_Confirmacion IS NULL OR cj.Total_Pasajeros <> jornada.Total_Pasajeros THEN 1 ELSE 0 END) AS pendientes
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN (
+      SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
+      FROM reservas r2 JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
+      LEFT JOIN pasajeros p2 ON p2.Id_Reserva = r2.Id_Reserva
+      WHERE ${ACTIVE_RESERVATION_SQL.replaceAll('r.', 'r2.')}
+      GROUP BY h2.Id_Tour, r2.Fecha_Tour
+    ) jornada ON jornada.Id_Tour = h.Id_Tour AND jornada.Fecha_Tour = r.Fecha_Tour
+    LEFT JOIN confirmaciones_jornada cj ON cj.Id_Tour = h.Id_Tour AND cj.Fecha_Tour = r.Fecha_Tour
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+    GROUP BY agrupador ORDER BY programados DESC
+  `;
+  const channelAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(c.Nombre_Canal, 'Sin canal')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal');
+  const tourAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(t.Nombre_Tour, 'Sin tour')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour');
+  const tariffSql = `
+    SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), CONCAT('Sin plan · ', COALESCE(p.Tipo_Pasajero, 'Sin tipo'))) AS tarifa,
+           COUNT(p.Id_Pasajero) AS pasajeros,
+           COALESCE(SUM(p.Precio_Pasajero), 0) AS ingresos
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+    GROUP BY tarifa ORDER BY pasajeros DESC LIMIT 20
+  `;
+  const passportSql = `
+    SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), 'Sin plan') AS plan,
+           COUNT(p.Id_Pasajero) AS pasajeros
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+      AND UPPER(COALESCE(t.Nombre_Tour, '')) LIKE '%NAPOLES%'
+    GROUP BY plan ORDER BY pasajeros DESC
+  `.replace('LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour', 'LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour\n    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour');
+  const channelFinancialSql = `
+    SELECT COALESCE(c.Nombre_Canal, 'Sin canal') AS canal,
+           SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron,
+           COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Precio_Pasajero ELSE 0 END), 0) AS ingresos,
+           COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Comision ELSE 0 END), 0) AS comisiones
+    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
+    GROUP BY canal ORDER BY ingresos DESC
+  `;
+
+  const [languageResult, pointResult, channelAbsenceResult, tourAbsenceResult, tariffResult, passportResult, channelFinancialResult] = await Promise.all([
+    db.query(languageSql, params),
+    db.query(pointsSql, params),
+    db.query(channelAbsenceSql, params),
+    db.query(tourAbsenceSql, params),
+    db.query(tariffSql, params),
+    db.query(passportSql, params),
+    db.query(channelFinancialSql, params),
+  ]);
+  const normalizeRows = (rows, key) => rows.map((row) => ({ [key]: row.agrupador, programados: Number(row.programados || 0), viajaron: Number(row.viajaron || 0), noViajaron: Number(row.noViajaron || 0), pendientes: Number(row.pendientes || 0) }));
+  return {
+    idiomas: languageResult[0].map((row) => ({ idioma: row.idioma, registrados: Number(row.registrados || 0), viajaron: Number(row.viajaron || 0) })),
+    puntos: pointResult[0].map((row) => ({ punto: row.punto, registrados: Number(row.registrados || 0), viajaron: Number(row.viajaron || 0) })),
+    inasistenciaCanal: normalizeRows(channelAbsenceResult[0], 'canal'),
+    inasistenciaTour: normalizeRows(tourAbsenceResult[0], 'tour'),
+    tarifas: tariffResult[0].map((row) => ({ tarifa: row.tarifa, pasajeros: Number(row.pasajeros || 0), ingresos: Number(row.ingresos || 0) })),
+    pasaportes: passportResult[0].map((row) => ({ plan: row.plan, pasajeros: Number(row.pasajeros || 0) })),
+    canalFinanciero: channelFinancialResult[0].map((row) => ({ canal: row.canal, viajaron: Number(row.viajaron || 0), ingresos: Number(row.ingresos || 0), comisiones: Number(row.comisiones || 0) })),
+  };
+}
+
 module.exports = {
   getDashboardStatsSvc,
   getIncomeHistorySvc,
@@ -701,6 +857,10 @@ module.exports = {
   getPassengerDistributionSvc,
   getReservationBreakdownSvc,
   getTourOccupancySvc,
+  getDashboardOperationalSvc,
+  buildCancelledReservationsSql,
+  buildReservationStatusesSql,
+  buildPassengerAgeSql,
   previousPeriod,
   percentageChange,
 };

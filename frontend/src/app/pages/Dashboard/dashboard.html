@@ -5,6 +5,17 @@
   />
 } @else {
   <main class="dashboard-page">
+    <section class="print-report-header" aria-hidden="true">
+      <div>
+        <p class="print-report-kicker">Maxitours · Informe de gestión</p>
+        <h1>Dashboard de operación, ingresos y comportamiento comercial</h1>
+      </div>
+      <dl>
+        <div><dt>Periodo</dt><dd>{{ startDate | date:'d MMM yyyy':'':'es-CO' }} — {{ endDate | date:'d MMM yyyy':'':'es-CO' }}</dd></div>
+        <div><dt>Tour</dt><dd>{{ tourLabel }}</dd></div>
+        <div><dt>Tipo de reserva</dt><dd>{{ selectedReservationType || 'Grupales y privadas' }}</dd></div>
+      </dl>
+    </section>
     <section class="filter-panel" aria-label="Alcance del informe">
       <div class="filter-grid">
         <div class="form-group">
@@ -68,6 +79,7 @@
               Sin conexión
             }
           </span>
+          <button type="button" class="excel-button" (click)="exportExcel()">Exportar Excel</button>
           <button type="button" class="print-button" (click)="printReport()">Imprimir</button>
         </div>
       </div>
@@ -113,7 +125,7 @@
           </article>
 
           <article class="metric-card">
-            <div class="metric-label"><span>Pasajeros</span></div>
+            <div class="metric-label"><span>Pasajeros registrados</span></div>
             <strong>{{ totalPasajeros }}</strong>
             <span class="metric-context">{{ avgPaxPerBooking === null ? 'Sin reservas en el rango' : (avgPaxPerBooking | number:'1.1-1') + ' pax por reserva en promedio' }}</span>
             @if (passengerComparison !== null) {
@@ -136,11 +148,16 @@
 
         <div class="ticket-metrics">
           <article class="ticket-card">
-            <span class="ticket-label">Reservas</span>
+            <span class="ticket-label">Reservas activas</span>
             <strong>{{ totalReservas }}</strong>
             @if (bookingComparison !== null) {
               <span class="metric-change" [attr.data-tone]="comparisonClass(bookingComparison)">{{ comparisonText(bookingComparison) }} vs. periodo anterior</span>
             }
+          </article>
+          <article class="ticket-card ticket-card--warning">
+            <span class="ticket-label">Reservas canceladas</span>
+            <strong>{{ totalReservasCanceladas }}</strong>
+            <span class="ticket-detail">Según la fecha del tour</span>
           </article>
           <article class="ticket-card">
             <span class="ticket-label">Ticket promedio</span>
@@ -158,6 +175,27 @@
             <span class="ticket-detail">{{ totalTransferPassengers }} pasajeros movilizados</span>
           </article>
         </div>
+
+        <article class="chart-card reservation-status-card">
+          <header class="chart-header">
+            <div>
+              <h3>Estado de reservas</h3>
+              <p>Distribución de las reservas según su estado actual en el periodo y filtros seleccionados.</p>
+            </div>
+          </header>
+          @if (reservationStatusRows.length) {
+            <div class="reservation-status-grid">
+              @for (status of reservationStatusRows; track status.estado) {
+                <div class="reservation-status-item" [attr.data-tone]="status.tone">
+                  <span class="reservation-status-label">{{ status.label }}</span>
+                  <strong>{{ status.cantidad }}</strong>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="chart-empty"><strong>Sin reservas en el alcance</strong><span>No hay estados de reserva para los filtros actuales.</span></div>
+          }
+        </article>
 
         <article class="chart-card chart-card--composition">
           <header class="chart-header">
@@ -245,13 +283,40 @@
           </article>
 
           <article class="chart-card">
-            <header class="chart-header"><div><h3>Pasajeros por día</h3><p>Ritmo de la operación dentro del rango seleccionado</p></div></header>
+            <header class="chart-header"><div><h3>Pasajeros por día y tour</h3><p>Ritmo de la operación desglosado por tour en el rango seleccionado</p></div></header>
             <div class="chart-body chart-body--compact">
               @if (hasPaxData) {
-                <apx-chart #chartPax [series]="paxChartOptions.series" [chart]="paxChartOptions.chart" [plotOptions]="paxChartOptions.plotOptions" [xaxis]="paxChartOptions.xaxis" [yaxis]="paxChartOptions.yaxis" [colors]="paxChartOptions.colors" [dataLabels]="paxChartOptions.dataLabels" [fill]="paxChartOptions.fill" [grid]="paxChartOptions.grid" [tooltip]="paxChartOptions.tooltip" />
+                <apx-chart #chartPax [series]="paxChartOptions.series" [chart]="paxChartOptions.chart" [plotOptions]="paxChartOptions.plotOptions" [xaxis]="paxChartOptions.xaxis" [yaxis]="paxChartOptions.yaxis" [colors]="paxChartOptions.colors" [dataLabels]="paxChartOptions.dataLabels" [fill]="paxChartOptions.fill" [grid]="paxChartOptions.grid" [legend]="paxChartOptions.legend" [tooltip]="paxChartOptions.tooltip" />
               } @else { <div class="chart-empty"><strong>Sin pasajeros diarios</strong><span>No hay pasajeros registrados.</span></div> }
             </div>
           </article>
+          <article class="chart-card">
+            <header class="chart-header"><div><h3>Composición por edad</h3><p>Pasajeros registrados por tipo en el alcance seleccionado</p></div></header>
+            <div class="chart-body chart-body--compact">
+              @if (hasAgeData) {
+                <apx-chart #chartAge [series]="ageChartOptions.series" [chart]="ageChartOptions.chart" [labels]="ageChartOptions.labels" [colors]="ageChartOptions.colors" [legend]="ageChartOptions.legend" [dataLabels]="ageChartOptions.dataLabels" [plotOptions]="ageChartOptions.plotOptions" [stroke]="ageChartOptions.stroke" [tooltip]="ageChartOptions.tooltip" />
+              } @else { <div class="chart-empty"><strong>Sin composición por edad</strong><span>No hay pasajeros registrados en el alcance actual.</span></div> }
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════ OPERACIÓN ═══════════════════════ -->
+      <section id="operacion" class="report-section section-anchor">
+        <header class="section-heading"><h2>Operación y asistencia</h2><span class="period-status">Asignación histórica por fecha del tour</span></header>
+
+        <div class="operational-grid">
+          @if (showLanguageChart) {
+            <article class="chart-card"><header class="chart-header"><div><h3>Idioma del tour</h3><p>Distribución de pasajeros registrados</p></div></header><div class="chart-body chart-body--compact"><apx-chart [series]="languageChartOptions.series" [chart]="languageChartOptions.chart" [labels]="languageChartOptions.labels" [colors]="languageChartOptions.colors" [legend]="languageChartOptions.legend" [dataLabels]="languageChartOptions.dataLabels" [plotOptions]="languageChartOptions.plotOptions" [stroke]="languageChartOptions.stroke" [tooltip]="languageChartOptions.tooltip" /></div></article>
+          }
+          <article class="chart-card"><header class="chart-header"><div><h3>Top puntos de encuentro</h3><p>Pasajeros registrados por punto</p></div></header><div class="chart-body"><apx-chart #chartPoints [series]="pointsChartOptions.series" [chart]="pointsChartOptions.chart" [plotOptions]="pointsChartOptions.plotOptions" [xaxis]="pointsChartOptions.xaxis" [yaxis]="pointsChartOptions.yaxis" [colors]="pointsChartOptions.colors" [dataLabels]="pointsChartOptions.dataLabels" [grid]="pointsChartOptions.grid" [legend]="pointsChartOptions.legend" [tooltip]="pointsChartOptions.tooltip" /></div></article>
+          @if (isNapolesScope && passportRows.length) {
+            <article class="chart-card"><header class="chart-header"><div><h3>Pasaportes Hacienda Nápoles</h3><p>Distribución por plan vendido en este tour</p></div></header><div class="chart-body chart-body--compact"><apx-chart #chartPassport [series]="passportChartOptions.series" [chart]="passportChartOptions.chart" [labels]="passportChartOptions.labels" [colors]="passportChartOptions.colors" [legend]="passportChartOptions.legend" [dataLabels]="passportChartOptions.dataLabels" [plotOptions]="passportChartOptions.plotOptions" [stroke]="passportChartOptions.stroke" [tooltip]="passportChartOptions.tooltip" /></div></article>
+          }
+          <article class="chart-card"><header class="chart-header"><div><h3>Inasistencia por canal</h3><p>No viajaron sobre pasajeros programados</p></div></header><div class="chart-body"><apx-chart #chartChannelAbsence [series]="channelAbsenceChartOptions.series" [chart]="channelAbsenceChartOptions.chart" [plotOptions]="channelAbsenceChartOptions.plotOptions" [xaxis]="channelAbsenceChartOptions.xaxis" [yaxis]="channelAbsenceChartOptions.yaxis" [colors]="channelAbsenceChartOptions.colors" [dataLabels]="channelAbsenceChartOptions.dataLabels" [grid]="channelAbsenceChartOptions.grid" [legend]="channelAbsenceChartOptions.legend" [tooltip]="channelAbsenceChartOptions.tooltip" /></div></article>
+          <article class="chart-card"><header class="chart-header"><div><h3>Inasistencia por tour</h3><p>No viajaron sobre pasajeros programados</p></div></header><div class="chart-body"><apx-chart #chartTourAbsence [series]="tourAbsenceChartOptions.series" [chart]="tourAbsenceChartOptions.chart" [plotOptions]="tourAbsenceChartOptions.plotOptions" [xaxis]="tourAbsenceChartOptions.xaxis" [yaxis]="tourAbsenceChartOptions.yaxis" [colors]="tourAbsenceChartOptions.colors" [dataLabels]="tourAbsenceChartOptions.dataLabels" [grid]="tourAbsenceChartOptions.grid" [legend]="tourAbsenceChartOptions.legend" [tooltip]="tourAbsenceChartOptions.tooltip" /></div></article>
+          <article class="chart-card"><header class="chart-header"><div><h3>Composición por tarifa</h3><p>Pasajeros registrados por plan</p></div></header><div class="chart-body"><apx-chart #chartTariff [series]="tariffChartOptions.series" [chart]="tariffChartOptions.chart" [plotOptions]="tariffChartOptions.plotOptions" [xaxis]="tariffChartOptions.xaxis" [yaxis]="tariffChartOptions.yaxis" [colors]="tariffChartOptions.colors" [dataLabels]="tariffChartOptions.dataLabels" [grid]="tariffChartOptions.grid" [legend]="tariffChartOptions.legend" [tooltip]="tariffChartOptions.tooltip" /></div></article>
+          <article class="chart-card"><header class="chart-header"><div><h3>Pasajeros e ingresos por canal</h3><p>Ingresos y comisiones de pasajeros que viajaron</p></div></header><div class="chart-body"><apx-chart #chartChannelFinancial [series]="channelFinancialChartOptions.series" [chart]="channelFinancialChartOptions.chart" [plotOptions]="channelFinancialChartOptions.plotOptions" [xaxis]="channelFinancialChartOptions.xaxis" [yaxis]="channelFinancialChartOptions.yaxis" [colors]="channelFinancialChartOptions.colors" [dataLabels]="channelFinancialChartOptions.dataLabels" [grid]="channelFinancialChartOptions.grid" [legend]="channelFinancialChartOptions.legend" [tooltip]="channelFinancialChartOptions.tooltip" /></div></article>
         </div>
       </section>
 
@@ -354,6 +419,7 @@
       <div class="dock-sections">
         <button type="button" [class.active]="activeSection === 'resumen'" [attr.aria-current]="activeSection === 'resumen' ? 'true' : null" (click)="scrollToSection('resumen')">Resumen</button>
         <button type="button" [class.active]="activeSection === 'cobros'" [attr.aria-current]="activeSection === 'cobros' ? 'true' : null" (click)="scrollToSection('cobros')">Cobros</button>
+        <button type="button" [class.active]="activeSection === 'operacion'" [attr.aria-current]="activeSection === 'operacion' ? 'true' : null" (click)="scrollToSection('operacion')">Operación</button>
         <button type="button" [class.active]="activeSection === 'ingresos'" [attr.aria-current]="activeSection === 'ingresos' ? 'true' : null" (click)="scrollToSection('ingresos')">Ingresos</button>
         <button type="button" [class.active]="activeSection === 'comercial'" [attr.aria-current]="activeSection === 'comercial' ? 'true' : null" (click)="scrollToSection('comercial')">Comercial</button>
       </div>

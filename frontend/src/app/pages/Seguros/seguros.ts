@@ -336,7 +336,7 @@ export class SegurosComponent implements OnInit {
         anchor.click();
         anchor.remove();
         window.URL.revokeObjectURL(url);
-        this.alerts.successToast('Archivo generado', 'El listado quedó separado en una hoja por bus.');
+        this.alerts.successToast('Archivo generado', 'El archivo incluye una hoja consolidada y una hoja por cada bus.');
       },
       error: error => this.alerts.errorToast('No se pudo descargar', this.errorMessage(error, 'Revisa los datos pendientes e intenta nuevamente.')),
     });
@@ -424,7 +424,13 @@ export class SegurosComponent implements OnInit {
   }
 
   private errorMessage(error: any, fallback: string): string {
-    return error?.error?.message || error?.message || fallback;
+    const message = error?.error?.message || error?.message || fallback;
+    const conflicts = error?.error?.errorCode === 'DUPLICATE_BUS_ASSIGNMENT' && Array.isArray(error?.error?.details)
+      ? error.error.details
+          .map((item: any) => `${item?.label || 'Dato'} ${item?.value || ''} ya está en ${item?.bus || 'otro bus'}.`)
+          .slice(0, 4)
+      : [];
+    return conflicts.length ? `${message} ${conflicts.join(' ')}` : message;
   }
 
   private addDays(date: Date, days: number): Date {

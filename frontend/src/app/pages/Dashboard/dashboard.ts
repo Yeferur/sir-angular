@@ -5,12 +5,14 @@ import { forkJoin, finalize, catchError, of } from 'rxjs';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
-import { DashboardService, DashboardFilters, TourOccupancy } from '../../services/Dashboard/Dashboard.service';
+import { DashboardService, DashboardFilters, TourOccupancy, DashboardOperational } from '../../services/Dashboard/Dashboard.service';
 import { SirAlertService }      from '../../services/Alertas/alert.service';
 import { Tours } from '../../services/Tours/tours';
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 
 import {
   NgApexchartsModule, ChartComponent,
@@ -117,6 +119,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   totalReservas       = 0;
+  totalReservasCanceladas = 0;
+  reservationStatusRows: Array<{ estado: string; cantidad: number; label: string; tone: string }> = [];
   totalPasajeros      = 0;
   totalIngresos       = 0;    // bruto tours
   totalIngresosNetos  = 0;    // neto tours (tras comisión)
@@ -136,8 +140,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   financialByCurrency: any[] = [];
   comparison: any = null;
   connectionState: WebSocketConnectionState = 'connecting';
-  activeSection: 'resumen' | 'cobros' | 'ingresos' | 'comercial' = 'resumen';
+  activeSection: 'resumen' | 'cobros' | 'operacion' | 'ingresos' | 'comercial' = 'resumen';
   reservationTypeRows: any[] = [];
+  passengerAgeRows: Array<{ tipo: string; cantidad: number; label: string }> = [];
+  operational: DashboardOperational | null = null;
+  languageRows: any[] = [];
+  pointRows: any[] = [];
+  channelAbsenceRows: any[] = [];
+  tourAbsenceRows: any[] = [];
+  tariffRows: any[] = [];
+  passportRows: any[] = [];
+  channelFinancialRows: any[] = [];
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   startDate  = '';
@@ -153,11 +166,29 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.tours.find(t => t.Id_Tour === this.selectedTourId)?.Nombre_Tour ?? 'Tour seleccionado';
   }
 
+  get isNapolesScope(): boolean {
+    return Boolean(this.selectedTourId && this.tourLabel.toUpperCase().includes('NAPOLES'));
+  }
+
+  get showLanguageChart(): boolean {
+    if (!this.selectedTourId) return this.languageRows.length > 0;
+    const tour = this.tourLabel.toUpperCase();
+    return (tour.includes('GUATAPE') || tour.includes('GUATAPÉ') || tour.includes('CITY TOUR') || tour.includes('COFFEE TOUR')) && this.languageRows.length > 0;
+  }
+
   // ── ViewChild refs ────────────────────────────────────────────────────────
   @ViewChild('chartIncome')      chartIncome?:      ChartComponent;
   @ViewChild('chartPax')         chartPax?:         ChartComponent;
   @ViewChild('chartChannel')     chartChannel?:     ChartComponent;
   @ViewChild('chartAttendance')  chartAttendance?:  ChartComponent;
+  @ViewChild('chartAge')         chartAge?:         ChartComponent;
+  @ViewChild('chartLanguage')    chartLanguage?:    ChartComponent;
+  @ViewChild('chartPoints')      chartPoints?:      ChartComponent;
+  @ViewChild('chartPassport')    chartPassport?:    ChartComponent;
+  @ViewChild('chartChannelAbsence') chartChannelAbsence?: ChartComponent;
+  @ViewChild('chartTourAbsence') chartTourAbsence?: ChartComponent;
+  @ViewChild('chartTariff')      chartTariff?:      ChartComponent;
+  @ViewChild('chartChannelFinancial') chartChannelFinancial?: ChartComponent;
   @ViewChild('chartReservationType') chartReservationType?: ChartComponent;
   @ViewChild('chartTourPax')     chartTourPax?:     ChartComponent;
   @ViewChild('chartCompanySplit') chartCompanySplit?: ChartComponent;
@@ -168,6 +199,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   paxChartOptions:       Partial<ChartOptions> | any = {};
   channelChartOptions:   Partial<ChartOptions> | any = {};
   attendanceChartOptions: Partial<ChartOptions> | any = {};
+  ageChartOptions:       Partial<ChartOptions> | any = {};
+  languageChartOptions:  Partial<ChartOptions> | any = {};
+  pointsChartOptions:    Partial<ChartOptions> | any = {};
+  passportChartOptions:  Partial<ChartOptions> | any = {};
+  channelAbsenceChartOptions: Partial<ChartOptions> | any = {};
+  tourAbsenceChartOptions: Partial<ChartOptions> | any = {};
+  tariffChartOptions:    Partial<ChartOptions> | any = {};
+  channelFinancialChartOptions: Partial<ChartOptions> | any = {};
   reservationTypeChartOptions: Partial<ChartOptions> | any = {};
   tourPaxChartOptions:   Partial<ChartOptions> | any = {};
   companySplitChartOptions: Partial<ChartOptions> | any = {};
@@ -185,6 +224,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   hasPaxData       = false;
   hasChannelData   = false;
   hasAttendanceData = false;
+  hasAgeData       = false;
   hasReservationTypeData = false;
   hasTourPaxData   = false;
   hasCompositionData = false;
@@ -199,7 +239,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private reqId              = 0;
   private tourMetaReqId      = 0;
   private sectionScrollRaf: number | null = null;
-  private readonly reportSectionIds = ['resumen', 'cobros', 'ingresos', 'comercial'] as const;
+  private readonly reportSectionIds = ['resumen', 'cobros', 'operacion', 'ingresos', 'comercial'] as const;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
@@ -336,9 +376,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // ── 2. Pasajeros por día — ritmo operativo, vive en "Cobros" ─────────
     this.paxChartOptions = {
-      series: [{ name: 'Pasajeros', data: [] }],
+      series: [],
       chart: {
         id: 'daily-pax', type: 'bar', height: 280, toolbar: { show: false },
+        stacked: true,
         fontFamily: FONT, background: BG,
         animations: { enabled: true, easing: APEX_EASING, speed: 480, dynamicAnimation: { enabled: true, speed: 380 } },
         redrawOnParentResize: true, redrawOnWindowResize: true
@@ -346,11 +387,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       plotOptions: {
         bar: { horizontal: false, borderRadius: 5, borderRadiusApplication: 'end', columnWidth: '44%' }
       },
-      colors: [C_BLUE],
+      colors: [C_BLUE, C_TEAL, C_GREEN, C_ORANGE, C_PURPLE, C_RED],
       dataLabels: {
-        enabled: true,
+        enabled: false,
         style: { fontSize: '11px', fontFamily: FONT, colors: ['#fff'] },
         formatter: (v: number) => v > 0 ? String(v) : ''
+      },
+      legend: {
+        show: true, position: 'top', horizontalAlign: 'right',
+        labels: { colors: AXIS }, fontSize: '11px', fontFamily: FONT,
+        markers: { size: 6 }
       },
       xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
       yaxis: { labels: { ...axisStyle(), formatter: (v: number) => Math.round(v).toString() } },
@@ -434,7 +480,49 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pasajeros` } }
     };
 
-    // ── 5. Reservas grupales vs. privadas — barras agrupadas ────────────
+    // ── 5. Composición por edad — resumen general del alcance ───────────
+    this.ageChartOptions = {
+      series: [],
+      chart: {
+        id: 'passenger-age', type: 'donut', height: 280, toolbar: { show: false },
+        fontFamily: FONT, background: BG,
+        animations: { enabled: true, easing: APEX_EASING, speed: 520 },
+        redrawOnParentResize: true, redrawOnWindowResize: true
+      },
+      labels: ['Adultos', 'Niños', 'Infantes', 'Sin tipo'],
+      colors: [C_BLUE, C_ORANGE, C_PURPLE, C_YELLOW],
+      legend: { position: 'bottom', labels: { colors: '#9ca3af' }, fontSize: '12px', fontFamily: FONT, itemMargin: { horizontal: 8 } },
+      dataLabels: { enabled: true, style: { fontSize: '12px', fontFamily: FONT, fontWeight: 700, colors: ['#fff'] } },
+      plotOptions: { pie: { donut: { size: '68%' } } },
+      stroke: { show: false },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pasajeros` } }
+    };
+
+    const operationalBar = (id: string, series: any[] = [], height = 300): any => ({
+      series,
+      chart: { id, type: 'bar', height, toolbar: { show: false }, fontFamily: FONT, background: BG, animations: { enabled: true, easing: APEX_EASING, speed: 500 }, redrawOnParentResize: true, redrawOnWindowResize: true },
+      plotOptions: { bar: { horizontal: true, borderRadius: 5, borderRadiusApplication: 'end', barHeight: '62%' } },
+      colors: [C_BLUE, C_GREEN, C_ORANGE], dataLabels: { enabled: false },
+      xaxis: { categories: [], labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { style: { colors: AXIS, fontSize: '11px', fontFamily: FONT }, maxWidth: 190 } },
+      grid: grid(true, false), legend: { position: 'top', horizontalAlign: 'right', labels: { colors: AXIS }, fontSize: '11px', fontFamily: FONT },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false }
+    });
+    const operationalDonut = (id: string, labels: string[] = []): any => ({
+      series: [], labels, chart: { id, type: 'donut', height: 280, toolbar: { show: false }, fontFamily: FONT, background: BG, animations: { enabled: true, easing: APEX_EASING, speed: 500 }, redrawOnParentResize: true, redrawOnWindowResize: true },
+      colors: DIST_PALETTE, dataLabels: { enabled: true, style: { fontSize: '11px', fontFamily: FONT, fontWeight: 700, colors: ['#fff'] } },
+      legend: { position: 'bottom', labels: { colors: AXIS }, fontSize: '11px', fontFamily: FONT }, plotOptions: { pie: { donut: { size: '68%' } } }, stroke: { show: false },
+      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: (v: number) => `${v} pasajeros` } }
+    });
+    this.languageChartOptions = operationalDonut('dashboard-language');
+    this.pointsChartOptions = operationalBar('dashboard-points', [{ name: 'Pasajeros', data: [] }]);
+    this.passportChartOptions = operationalDonut('dashboard-passports', []);
+    this.channelAbsenceChartOptions = operationalBar('dashboard-channel-absence', [{ name: 'Inasistencia %', data: [] }]);
+    this.tourAbsenceChartOptions = operationalBar('dashboard-tour-absence', [{ name: 'Inasistencia %', data: [] }]);
+    this.tariffChartOptions = operationalBar('dashboard-tariffs', [{ name: 'Pasajeros', data: [] }]);
+    this.channelFinancialChartOptions = operationalBar('dashboard-channel-financial', [{ name: 'Ingresos', data: [] }, { name: 'Comisiones', data: [] }]);
+
+    // ── 6. Reservas grupales vs. privadas — barras agrupadas ────────────
     this.reservationTypeChartOptions = {
       series: [
         { name: 'Reservas', data: [] },
@@ -552,7 +640,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       channels: this.svc.getPassengersByChannel(f).pipe(catchError(() => { partial = true; return of([]); })),
       attendance: this.svc.getPassengerDistribution(f).pipe(catchError(() => { partial = true; return of([]); })),
       reservationTypes: this.svc.getReservationBreakdown(f).pipe(catchError(() => { partial = true; return of([]); })),
-      occupancy:this.svc.getTourOccupancy(f).pipe(catchError(() => { partial = true; return of([]); }))
+      occupancy:this.svc.getTourOccupancy(f).pipe(catchError(() => { partial = true; return of([]); })),
+      operational: this.svc.getOperational(f).pipe(catchError(() => { partial = true; return of(null); }))
     })
     .pipe(finalize(() => {
       if (id !== this.reqId) return;
@@ -566,6 +655,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.lastResponse = res;
 
         this.totalReservas      = Number(res.stats?.totalReservas      || 0);
+        this.totalReservasCanceladas = Number(res.stats?.totalReservasCanceladas || 0);
+        this.reservationStatusRows = this.buildReservationStatusRows(res.stats?.reservationStatuses);
+        this.passengerAgeRows = this.buildPassengerAgeRows(res.stats?.passengerAge);
+        this.operational = res.operational;
         this.totalPasajeros     = Number(res.stats?.totalPasajeros     || 0);
         this.totalIngresos      = Number(res.stats?.totalIngresos      || 0);
         this.totalIngresosNetos = Number(res.stats?.totalIngresosNetos || 0);
@@ -599,9 +692,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         console.error(err);
         this.totalReservas = this.totalPasajeros = this.totalIngresos =
           this.totalIngresosNetos = this.totalTransfers = 0;
+        this.totalReservasCanceladas = 0;
+        this.reservationStatusRows = [];
+        this.passengerAgeRows = [];
+        this.operational = null;
+        this.languageRows = this.pointRows = [];
+        this.channelAbsenceRows = this.tourAbsenceRows = this.tariffRows = this.passportRows = this.channelFinancialRows = [];
         this.hasIncomeData = this.hasPaxData = this.hasChannelData =
           this.hasAttendanceData = this.hasReservationTypeData =
-          this.hasTourPaxData = this.hasCompositionData = false;
+          this.hasAgeData = this.hasTourPaxData = this.hasCompositionData = false;
         this.alert.showModal({ type: 'error', title: 'Error al cargar el dashboard',
           message: 'No se pudo obtener la información.' });
         this.cdr.detectChanges();
@@ -609,8 +708,113 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  private buildReservationStatusRows(raw: any): Array<{ estado: string; cantidad: number; label: string; tone: string }> {
+    const labels: Record<string, { label: string; tone: string }> = {
+      COMPLETADA: { label: 'Completadas', tone: 'completed' },
+      COMPLETADO: { label: 'Completadas', tone: 'completed' },
+      CONFIRMADA: { label: 'Confirmadas', tone: 'confirmed' },
+      CONFIRMADO: { label: 'Confirmadas', tone: 'confirmed' },
+      ACTIVA: { label: 'Activas', tone: 'active' },
+      ACTIVO: { label: 'Activas', tone: 'active' },
+      PENDIENTE: { label: 'Pendientes', tone: 'pending' },
+      PENDIENTE_DE_DATOS: { label: 'Pendientes de datos', tone: 'pending-data' },
+      PENDIENTEDATOS: { label: 'Pendientes de datos', tone: 'pending-data' },
+      'PENDIENTE DE DATOS': { label: 'Pendientes de datos', tone: 'pending-data' },
+      PENDIENTE_DE_PAGO: { label: 'Pendientes de pago', tone: 'pending-data' },
+      'PENDIENTE DE PAGO': { label: 'Pendientes de pago', tone: 'pending-data' },
+      CANCELADA: { label: 'Canceladas', tone: 'cancelled' },
+      CANCELADO: { label: 'Canceladas', tone: 'cancelled' },
+      ELIMINADA: { label: 'Eliminadas', tone: 'cancelled' },
+      ELIMINADO: { label: 'Eliminadas', tone: 'cancelled' },
+      SIN_ESTADO: { label: 'Sin estado', tone: 'unknown' },
+    };
+
+    return (Array.isArray(raw) ? raw : [])
+      .map((item: any) => {
+        const estado = String(item?.estado || 'SIN_ESTADO').trim().toUpperCase();
+        const presentation = labels[estado] || { label: estado || 'Sin estado', tone: 'unknown' };
+        return {
+          estado,
+          cantidad: Number(item?.cantidad || 0),
+          ...presentation,
+        };
+      })
+      .filter((item) => item.cantidad > 0);
+  }
+
+  private buildPassengerAgeRows(raw: any): Array<{ tipo: string; cantidad: number; label: string }> {
+    const labels: Record<string, string> = {
+      ADULTO: 'Adultos', NINO: 'Niños', INFANTE: 'Infantes', SIN_TIPO: 'Sin tipo'
+    };
+    return (Array.isArray(raw) ? raw : [])
+      .map((item: any) => {
+        const tipo = String(item?.tipo || 'SIN_TIPO').trim().toUpperCase();
+        return { tipo, cantidad: Number(item?.cantidad || 0), label: labels[tipo] || tipo };
+      })
+      .filter((item) => item.cantidad > 0);
+  }
+
+  private applyOperational(raw: any) {
+    const data = raw || {};
+    this.languageRows = Array.isArray(data.idiomas) ? data.idiomas : [];
+    this.pointRows = Array.isArray(data.puntos) ? data.puntos : [];
+    this.channelAbsenceRows = Array.isArray(data.inasistenciaCanal) ? data.inasistenciaCanal : [];
+    this.tourAbsenceRows = Array.isArray(data.inasistenciaTour) ? data.inasistenciaTour : [];
+    this.tariffRows = Array.isArray(data.tarifas) ? data.tarifas : [];
+    this.passportRows = Array.isArray(data.pasaportes) ? data.pasaportes : [];
+    this.channelFinancialRows = Array.isArray(data.canalFinanciero) ? data.canalFinanciero : [];
+
+    const languageLabels = this.languageRows.map((row) => String(row.idioma || 'Sin idioma'));
+    const languageData = this.languageRows.map((row) => Number(row.registrados || 0));
+    this.languageChartOptions = { ...this.languageChartOptions, labels: languageLabels, series: languageData };
+    this.chartLanguage?.updateOptions({ labels: languageLabels }, false, false);
+    this.chartLanguage?.updateSeries(languageData, true);
+
+    const pointLabels = this.pointRows.map((row) => String(row.punto || 'Sin punto'));
+    const pointData = this.pointRows.map((row) => Number(row.registrados || 0));
+    this.pointsChartOptions = { ...this.pointsChartOptions, xaxis: { ...this.pointsChartOptions.xaxis, categories: pointLabels }, series: [{ name: 'Pasajeros', data: pointData }] };
+    this.chartPoints?.updateOptions({ xaxis: { ...this.pointsChartOptions.xaxis, categories: pointLabels } }, false, false);
+    this.chartPoints?.updateSeries(this.pointsChartOptions.series, true);
+
+    const absenceSeries = (rows: any[], key: string) => ({
+      labels: rows.map((row) => String(row[key] || 'Sin dato')),
+      data: rows.map((row) => {
+        const programados = Number(row.programados || 0);
+        return programados ? Number(((Number(row.noViajaron || 0) / programados) * 100).toFixed(1)) : 0;
+      })
+    });
+    const channelAbsence = absenceSeries(this.channelAbsenceRows, 'canal');
+    this.channelAbsenceChartOptions = { ...this.channelAbsenceChartOptions, xaxis: { ...this.channelAbsenceChartOptions.xaxis, categories: channelAbsence.labels }, series: [{ name: 'Inasistencia %', data: channelAbsence.data }] };
+    this.chartChannelAbsence?.updateOptions({ xaxis: { ...this.channelAbsenceChartOptions.xaxis, categories: channelAbsence.labels } }, false, false);
+    this.chartChannelAbsence?.updateSeries(this.channelAbsenceChartOptions.series, true);
+    const tourAbsence = absenceSeries(this.tourAbsenceRows, 'tour');
+    this.tourAbsenceChartOptions = { ...this.tourAbsenceChartOptions, xaxis: { ...this.tourAbsenceChartOptions.xaxis, categories: tourAbsence.labels }, series: [{ name: 'Inasistencia %', data: tourAbsence.data }] };
+    this.chartTourAbsence?.updateOptions({ xaxis: { ...this.tourAbsenceChartOptions.xaxis, categories: tourAbsence.labels } }, false, false);
+    this.chartTourAbsence?.updateSeries(this.tourAbsenceChartOptions.series, true);
+
+    const passportLabels = this.passportRows.map((row) => String(row.plan || 'Sin plan'));
+    const passportData = this.passportRows.map((row) => Number(row.pasajeros || 0));
+    this.passportChartOptions = { ...this.passportChartOptions, labels: passportLabels, series: passportData };
+    this.chartPassport?.updateOptions({ labels: passportLabels }, false, false);
+    this.chartPassport?.updateSeries(passportData, true);
+    const tariffLabels = this.tariffRows.map((row) => String(row.tarifa || 'Sin tarifa'));
+    const tariffData = this.tariffRows.map((row) => Number(row.pasajeros || 0));
+    this.tariffChartOptions = { ...this.tariffChartOptions, xaxis: { ...this.tariffChartOptions.xaxis, categories: tariffLabels }, series: [{ name: 'Pasajeros', data: tariffData }] };
+    this.chartTariff?.updateOptions({ xaxis: { ...this.tariffChartOptions.xaxis, categories: tariffLabels } }, false, false);
+    this.chartTariff?.updateSeries(this.tariffChartOptions.series, true);
+    const channelLabels = this.channelFinancialRows.map((row) => String(row.canal || 'Sin canal'));
+    this.channelFinancialChartOptions = { ...this.channelFinancialChartOptions, xaxis: { ...this.channelFinancialChartOptions.xaxis, categories: channelLabels }, series: [
+      { name: 'Ingresos', data: this.channelFinancialRows.map((row) => Number(row.ingresos || 0)) },
+      { name: 'Comisiones', data: this.channelFinancialRows.map((row) => Number(row.comisiones || 0)) }
+    ], tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false, y: { formatter: (v: number) => COP(v) } } };
+    this.chartChannelFinancial?.updateOptions({ xaxis: { ...this.channelFinancialChartOptions.xaxis, categories: channelLabels } }, false, false);
+    this.chartChannelFinancial?.updateSeries(this.channelFinancialChartOptions.series, true);
+  }
+
   // ── Apply chart data ──────────────────────────────────────────────────────
   private applyAll(res: any) {
+
+    this.applyOperational(res.operational);
 
     // 1. Ingresos — arma los dos sets (mensual/diario) y pinta el activo
     const brutoArr = Array.isArray(res.income?.bruto) ? res.income.bruto : Array(12).fill(0);
@@ -654,18 +858,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // 3. Pasajeros por día
     const dp = Array.isArray(res.dailyPax) ? res.dailyPax : [];
-    const dpLabels = dp.map((d: any) => this.fmtDate(d.fecha));
-    const dpData   = dp.map((d: any) => Number(d.pasajeros || 0));
+    const dpDates = [...new Set(dp.map((d: any) => String(d.fecha)))].sort();
+    const dpLabels = dpDates.map((fecha) => this.fmtDate(fecha));
+    const tourNames = [...new Set(dp.map((d: any) => String(d.tour || 'Sin tour')))].sort();
+    const pSeries = tourNames.map((tour) => ({
+      name: tour,
+      data: dpDates.map((fecha) => dp
+        .filter((row: any) => String(row.fecha) === fecha && String(row.tour || 'Sin tour') === tour)
+        .reduce((total: number, row: any) => total + Number(row.pasajeros || 0), 0)),
+    }));
+    const dpData = pSeries.flatMap((series) => series.data as number[]);
     this.hasPaxData = dpData.some((v: number) => v > 0);
 
-    const pSeries = [{ name: 'Pasajeros', data: dpData }];
     this.paxChartOptions = {
       ...this.paxChartOptions,
       xaxis: { ...this.paxChartOptions.xaxis, categories: dpLabels },
-      series: pSeries
+      series: this.hasPaxData ? pSeries : []
     };
     this.chartPax?.updateOptions({ xaxis: { ...this.paxChartOptions.xaxis, categories: dpLabels } }, false, false);
-    this.chartPax?.updateSeries(pSeries, true);
+    this.chartPax?.updateSeries((this.hasPaxData ? pSeries : []) as any, true);
 
     // 4. Pasajeros por canal
     const ch = Array.isArray(res.channels) ? res.channels : [];
@@ -700,7 +911,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     };
     this.chartAttendance?.updateSeries(this.hasAttendanceData ? attendanceData : [], true);
 
-    // 6. Reservas grupales vs. privadas
+    // 6. Composición por edad
+    const ageLabels = ['Adultos', 'Niños', 'Infantes', 'Sin tipo'];
+    const ageMap = new Map(this.passengerAgeRows.map((row) => [row.label, row.cantidad]));
+    const ageData = ageLabels.map((label) => Number(ageMap.get(label) || 0));
+    this.hasAgeData = ageData.some((value) => value > 0);
+    this.ageChartOptions = {
+      ...this.ageChartOptions,
+      labels: ageLabels,
+      series: this.hasAgeData ? ageData : []
+    };
+    this.chartAge?.updateOptions({ labels: ageLabels }, false, false);
+    this.chartAge?.updateSeries(this.hasAgeData ? ageData : [], true);
+
+    // 7. Reservas grupales vs. privadas
     const typeRows = Array.isArray(res.reservationTypes) ? res.reservationTypes : [];
     this.reservationTypeRows = typeRows;
     const typeMap = new Map<string, any>(
@@ -986,7 +1210,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   scrollToSection(id: string): void {
-    if (id === 'resumen' || id === 'cobros' || id === 'ingresos' || id === 'comercial') {
+    if (id === 'resumen' || id === 'cobros' || id === 'operacion' || id === 'ingresos' || id === 'comercial') {
       this.activeSection = id;
       this.cdr.markForCheck();
     }
@@ -1000,7 +1224,230 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   printReport(): void {
+    const previousTitle = document.title;
+    const scope = this.selectedTourId ? this.tourLabel : 'Todos los tours';
+    document.title = `Informe Dashboard · ${scope} · ${this.startDate || 'sin inicio'} a ${this.endDate || 'sin fin'}`;
     window.print();
+    window.setTimeout(() => { document.title = previousTitle; }, 1000);
+  }
+
+  async exportExcelWithCharts(): Promise<void> {
+    if (!this.lastResponse) {
+      this.alert.showModal({ type: 'warning', title: 'Informe no disponible', message: 'Espera a que termine la carga para exportar la información.' });
+      return;
+    }
+
+    const response = this.lastResponse;
+    const stats = response.stats || {};
+    const operation = response.operational || {};
+    const n = (value: unknown): number => Number(value || 0);
+    const workbook = new ExcelJS.Workbook();
+    const scope = this.selectedTourId ? this.tourLabel : 'Todos los tours';
+    const reservationType = this.selectedReservationType || 'Grupales y privadas';
+    const blue = '0A84FF';
+    const green = '30D158';
+    const orange = 'FF9F0A';
+    const red = 'FF453A';
+
+    const addSheet = (name: string, rows: any[][], widths: number[], freezeRows = 0): void => {
+      const sheet = workbook.addWorksheet(name);
+      rows.forEach((row) => sheet.addRow(row));
+      widths.forEach((width, index) => { sheet.getColumn(index + 1).width = width; });
+      if (freezeRows) sheet.views = [{ state: 'frozen', ySplit: freezeRows }];
+      sheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+          if (rowNumber === 1) {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blue } };
+          } else if (typeof cell.value === 'string' && /^[A-ZÁÉÍÓÚÑ ·]+$/.test(cell.value) && cell.value.length > 4) {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1F2937' } };
+          }
+        });
+      });
+    };
+
+    addSheet('Resumen', [
+      ['INFORME DE GESTIÓN · MAXITOURS'],
+      ['Periodo', `${this.startDate || 'Sin inicio'} a ${this.endDate || 'Sin fin'}`, 'Tour', scope],
+      ['Tipo de reserva', reservationType, 'Generado', new Date().toLocaleString('es-CO')], [], ['RESUMEN'],
+      ['Indicador', 'Valor', 'Unidad', 'Observación'],
+      ['Reservas operativas', n(stats.totalReservas), 'reservas', 'No incluye canceladas'],
+      ['Reservas canceladas', n(stats.totalReservasCanceladas), 'reservas', 'Según fecha del tour'],
+      ['Pasajeros registrados', n(stats.totalPasajeros), 'pasajeros', 'Reservas no canceladas'],
+      ['Pasajeros que viajaron', n(stats.totalViajaron), 'pasajeros', 'Confirmación individual'],
+      ['Pasajeros que no viajaron', n(stats.totalNoViajaron), 'pasajeros', 'Confirmación individual'],
+      ['Pasajeros pendientes', n(stats.totalPendientes), 'pasajeros', 'Sin confirmación final'],
+      ['Ingresos de empresa', n(stats.companyRevenue), this.primaryCurrency, 'Tours y transfers'],
+      ['Neto de tours', n(stats.totalIngresosNetos), this.primaryCurrency, 'Después de comisiones'],
+      ['Ingresos de transfers', n(stats.transferRevenue), this.primaryCurrency, 'Transfers del periodo'],
+      ['Comisiones de tours', n(stats.tourCommission), this.primaryCurrency, 'Comisiones registradas'],
+      ['Recaudo registrado', n(stats.collectedRevenue), this.primaryCurrency, 'Pagos registrados'],
+      ['Pendiente por recaudar', n(stats.pendingCollection), this.primaryCurrency, 'Saldo pendiente'], [], ['ESTADO DE RESERVAS'],
+      ['Estado', 'Cantidad'], ...(Array.isArray(stats.reservationStatuses) ? stats.reservationStatuses.map((row: any) => [row.estado, n(row.cantidad)]) : []), [], ['RESERVAS POR TIPO'],
+      ['Tipo', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'], ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
+    ], [34, 20, 18, 42], 6);
+
+    addSheet('Pasajeros', [
+      ['PASAJEROS Y ASISTENCIA'], ['Fecha', 'Tour', 'Pasajeros registrados'], ...(Array.isArray(response.dailyPax) ? response.dailyPax.map((row: any) => [row.fecha, row.tour, n(row.pasajeros)]) : []), [], ['CONFIRMACIÓN DE VIAJE'], ['Estado', 'Cantidad'], ...(Array.isArray(response.attendance) ? response.attendance.map((row: any) => [row.estado, n(row.cantidad)]) : []), [], ['COMPOSICIÓN POR EDAD'], ['Tipo', 'Cantidad'], ...(Array.isArray(stats.passengerAge) ? stats.passengerAge.map((row: any) => [row.tipo, n(row.cantidad)]) : []), [], ['IDIOMAS'], ['Idioma', 'Registrados', 'Viajaron'], ...(Array.isArray(operation.idiomas) ? operation.idiomas.map((row: any) => [row.idioma, n(row.registrados), n(row.viajaron)]) : []), [], ['PUNTOS DE ENCUENTRO'], ['Punto', 'Registrados', 'Viajaron'], ...(Array.isArray(operation.puntos) ? operation.puntos.map((row: any) => [row.punto, n(row.registrados), n(row.viajaron)]) : []),
+    ], [28, 32, 22], 2);
+
+    addSheet('Ingresos', [
+      ['INGRESOS Y RECAUDO'], ['Fecha', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'], ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []), [], ['INGRESOS POR CANAL'], ['Canal', 'Viajaron', 'Ingresos', 'Comisiones'], ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []), [], ['TARIFAS'], ['Tarifa', 'Pasajeros', 'Ingresos'], ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, n(row.pasajeros), n(row.ingresos)]) : []),
+    ], [24, 20, 20, 18, 18], 2);
+
+    const operationRows: any[][] = [['OPERACIÓN Y SEGUIMIENTO'], ['INASISTENCIA POR CANAL'], ['Canal', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'], ...(Array.isArray(operation.inasistenciaCanal) ? operation.inasistenciaCanal.map((row: any) => [row.canal, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : []), [], ['INASISTENCIA POR TOUR'], ['Tour', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'], ...(Array.isArray(operation.inasistenciaTour) ? operation.inasistenciaTour.map((row: any) => [row.tour, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : [])];
+    if (this.isNapolesScope && Array.isArray(operation.pasaportes) && operation.pasaportes.length) operationRows.push([], ['PASAPORTES HACIENDA NÁPOLES'], ['Plan', 'Pasajeros'], ...operation.pasaportes.map((row: any) => [row.plan, n(row.pasajeros)]));
+    addSheet('Operación', operationRows, [32, 18, 18, 18, 18], 3);
+
+    const chartImage = (title: string, labels: string[], series: Array<{ name: string; values: number[]; color: string }>): string | null => {
+      if (!labels.length || !series.some((item) => item.values.some((value) => value > 0))) return null;
+      const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 430;
+      const ctx = canvas.getContext('2d'); if (!ctx) return null;
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#111827'; ctx.font = '700 24px Arial'; ctx.fillText(title, 34, 38);
+      const left = 250, top = 78, width = 870, rowHeight = Math.max(24, Math.min(46, 300 / labels.length));
+      const max = Math.max(1, ...series.flatMap((item) => item.values));
+      labels.forEach((label, index) => {
+        const y = top + index * rowHeight;
+        ctx.fillStyle = '#4B5563'; ctx.font = '14px Arial'; ctx.fillText(String(label).slice(0, 34), 34, y + 18);
+        series.forEach((item, seriesIndex) => {
+          const value = item.values[index] || 0; const barY = y + seriesIndex * 17;
+          ctx.fillStyle = item.color; ctx.fillRect(left, barY, Math.max(1, (value / max) * width), 11);
+          ctx.fillStyle = '#374151'; ctx.font = '12px Arial'; ctx.fillText(String(value), left + (value / max) * width + 8, barY + 10);
+        });
+      });
+      series.forEach((item, index) => { ctx.fillStyle = item.color; ctx.fillRect(34 + index * 170, 398, 12, 12); ctx.fillStyle = '#4B5563'; ctx.font = '13px Arial'; ctx.fillText(item.name, 52 + index * 170, 409); });
+      return canvas.toDataURL('image/png');
+    };
+
+    const charts = workbook.addWorksheet('Gráficos');
+    charts.getColumn(1).width = 18; charts.getColumn(2).width = 18;
+    charts.addRow(['GRÁFICOS DEL INFORME']); charts.getRow(1).font = { bold: true, size: 16, color: { argb: `FF${blue}` } };
+    charts.addRow([`Periodo: ${this.startDate || 'Sin inicio'} a ${this.endDate || 'Sin fin'} · ${scope}`]);
+    const addChart = (title: string, labels: string[], series: Array<{ name: string; values: number[]; color: string }>, row: number): void => {
+      const image = chartImage(title, labels, series); if (!image) return;
+      const id = workbook.addImage({ base64: image, extension: 'png' }); charts.addImage(id, { tl: { col: 0, row }, ext: { width: 900, height: 322 } });
+    };
+    const attendanceLabels = Array.isArray(response.attendance) ? response.attendance.map((row: any) => row.estado) : [];
+    addChart('Confirmación de viaje', attendanceLabels, [{ name: 'Pasajeros', values: Array.isArray(response.attendance) ? response.attendance.map((row: any) => n(row.cantidad)) : [], color: green }], 3);
+    const paxRows = Array.isArray(response.dailyPax) ? response.dailyPax.slice(0, 12) : [];
+    addChart('Pasajeros registrados por fecha y tour', paxRows.map((row: any) => `${row.fecha} · ${row.tour}`), [{ name: 'Registrados', values: paxRows.map((row: any) => n(row.pasajeros)), color: blue }], 25);
+    const typeRows = Array.isArray(response.reservationTypes) ? response.reservationTypes : [];
+    addChart('Reservas por tipo', typeRows.map((row: any) => row.tipo), [{ name: 'Reservas', values: typeRows.map((row: any) => n(row.reservas)), color: orange }, { name: 'Pasajeros', values: typeRows.map((row: any) => n(row.pasajeros)), color: blue }], 47);
+    const absenceRows = Array.isArray(operation.inasistenciaCanal) ? operation.inasistenciaCanal : [];
+    addChart('Inasistencia por canal', absenceRows.map((row: any) => row.canal), [{ name: 'No viajaron', values: absenceRows.map((row: any) => n(row.noViajaron)), color: red }, { name: 'Pendientes', values: absenceRows.map((row: any) => n(row.pendientes)), color: orange }], 69);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `Informe_Maxitours_${scope.replace(/[^a-z0-9áéíóúñ]+/gi, '_')}_${this.startDate || 'sin_fecha'}.xlsx`; link.click(); URL.revokeObjectURL(link.href);
+    this.alert.showModal({ type: 'success', title: 'Excel generado', message: 'El informe se descargó con resumen, datos y gráficos.' });
+  }
+
+  exportExcel(): void {
+    if (!this.lastResponse) {
+      this.alert.showModal({ type: 'warning', title: 'Informe no disponible', message: 'Espera a que termine la carga para exportar la información.' });
+      return;
+    }
+
+    const response = this.lastResponse;
+    const stats = response.stats || {};
+    const operation = response.operational || {};
+    const n = (value: unknown): number => Number(value || 0);
+    const workbook = XLSX.utils.book_new();
+    const scope = this.selectedTourId ? this.tourLabel : 'Todos los tours';
+    const reservationType = this.selectedReservationType || 'Grupales y privadas';
+
+    const addSheet = (name: string, rows: any[][], widths: number[], freezeRows = 0): void => {
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      sheet['!cols'] = widths.map((wch) => ({ wch }));
+      if (freezeRows) sheet['!freeze'] = { xSplit: 0, ySplit: freezeRows };
+      XLSX.utils.book_append_sheet(workbook, sheet, name);
+    };
+
+    addSheet('Resumen', [
+      ['INFORME DE GESTIÓN · MAXITOURS'],
+      ['Periodo', `${this.startDate || 'Sin inicio'} a ${this.endDate || 'Sin fin'}`, 'Tour', scope],
+      ['Tipo de reserva', reservationType, 'Generado', new Date().toLocaleString('es-CO')],
+      [],
+      ['RESUMEN'],
+      ['Indicador', 'Valor', 'Unidad', 'Observación'],
+      ['Reservas operativas', n(stats.totalReservas), 'reservas', 'No incluye canceladas'],
+      ['Reservas canceladas', n(stats.totalReservasCanceladas), 'reservas', 'Según fecha del tour'],
+      ['Pasajeros registrados', n(stats.totalPasajeros), 'pasajeros', 'Reservas no canceladas'],
+      ['Pasajeros que viajaron', n(stats.totalViajaron), 'pasajeros', 'Confirmación individual'],
+      ['Pasajeros que no viajaron', n(stats.totalNoViajaron), 'pasajeros', 'Confirmación individual'],
+      ['Pasajeros pendientes', n(stats.totalPendientes), 'pasajeros', 'Sin confirmación final'],
+      ['Ingresos de empresa', n(stats.companyRevenue), this.primaryCurrency, 'Tours y transfers'],
+      ['Neto de tours', n(stats.totalIngresosNetos), this.primaryCurrency, 'Después de comisiones'],
+      ['Ingresos de transfers', n(stats.transferRevenue), this.primaryCurrency, 'Transfers del periodo'],
+      ['Comisiones de tours', n(stats.tourCommission), this.primaryCurrency, 'Comisiones registradas'],
+      ['Recaudo registrado', n(stats.collectedRevenue), this.primaryCurrency, 'Pagos registrados'],
+      ['Pendiente por recaudar', n(stats.pendingCollection), this.primaryCurrency, 'Saldo pendiente'],
+      [],
+      ['ESTADO DE RESERVAS'],
+      ['Estado', 'Cantidad'],
+      ...(Array.isArray(stats.reservationStatuses) ? stats.reservationStatuses.map((row: any) => [row.estado, n(row.cantidad)]) : []),
+      [],
+      ['RESERVAS POR TIPO'],
+      ['Tipo', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'],
+      ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
+    ], [34, 20, 18, 42], 6);
+
+    addSheet('Pasajeros', [
+      ['PASAJEROS Y ASISTENCIA'],
+      ['Fecha', 'Tour', 'Pasajeros registrados'],
+      ...(Array.isArray(response.dailyPax) ? response.dailyPax.map((row: any) => [row.fecha, row.tour, n(row.pasajeros)]) : []),
+      [], ['CONFIRMACIÓN DE VIAJE'], ['Estado', 'Cantidad'],
+      ...(Array.isArray(response.attendance) ? response.attendance.map((row: any) => [row.estado, n(row.cantidad)]) : []),
+      [], ['COMPOSICIÓN POR EDAD'], ['Tipo', 'Cantidad'],
+      ...(Array.isArray(stats.passengerAge) ? stats.passengerAge.map((row: any) => [row.tipo, n(row.cantidad)]) : []),
+      [], ['IDIOMAS'], ['Idioma', 'Registrados', 'Viajaron'],
+      ...(Array.isArray(operation.idiomas) ? operation.idiomas.map((row: any) => [row.idioma, n(row.registrados), n(row.viajaron)]) : []),
+      [], ['PUNTOS DE ENCUENTRO'], ['Punto', 'Registrados', 'Viajaron'],
+      ...(Array.isArray(operation.puntos) ? operation.puntos.map((row: any) => [row.punto, n(row.registrados), n(row.viajaron)]) : []),
+    ], [28, 32, 22], 2);
+
+    addSheet('Ingresos', [
+      ['INGRESOS Y RECAUDO'], ['Fecha', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'],
+      ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []),
+      [], ['INGRESOS POR CANAL'], ['Canal', 'Viajaron', 'Ingresos', 'Comisiones'],
+      ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []),
+      [], ['TARIFAS'], ['Tarifa', 'Pasajeros', 'Ingresos'],
+      ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, n(row.pasajeros), n(row.ingresos)]) : []),
+      [], ['INGRESOS POR MONEDA'], ['Moneda', 'Ingresos tours', 'Comisiones', 'Neto tours', 'Transfers', 'Empresa'],
+      ...(Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency.map((row: any) => [row.currency, n(row.tourRevenue), n(row.tourCommission), n(row.tourNetRevenue), n(row.transferRevenue), n(row.companyRevenue)]) : []),
+    ], [24, 20, 20, 18, 18, 18], 2);
+
+    const operationRows: any[][] = [
+      ['OPERACIÓN Y SEGUIMIENTO'], ['INASISTENCIA POR CANAL'], ['Canal', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'],
+      ...(Array.isArray(operation.inasistenciaCanal) ? operation.inasistenciaCanal.map((row: any) => [row.canal, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : []),
+      [], ['INASISTENCIA POR TOUR'], ['Tour', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'],
+      ...(Array.isArray(operation.inasistenciaTour) ? operation.inasistenciaTour.map((row: any) => [row.tour, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : []),
+    ];
+    if (this.isNapolesScope && Array.isArray(operation.pasaportes) && operation.pasaportes.length) {
+      operationRows.push([], ['PASAPORTES HACIENDA NÁPOLES'], ['Plan', 'Pasajeros'], ...operation.pasaportes.map((row: any) => [row.plan, n(row.pasajeros)]));
+    }
+    addSheet('Operación', operationRows, [32, 18, 18, 18, 18], 3);
+
+    const title = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 }, fill: { fgColor: { rgb: '0A84FF' } } };
+    const section = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1F2937' } } };
+    Object.values(workbook.Sheets).forEach((sheet: any) => {
+      const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
+      for (let row = range.s.r; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+          if (!cell) continue;
+          if (row === 0) cell.s = title;
+          if (typeof cell.v === 'string' && /^[A-ZÁÉÍÓÚÑ ·]+$/.test(cell.v) && cell.v.length > 4) cell.s = section;
+        }
+      }
+    });
+
+    const safeTour = scope.replace(/[^a-z0-9áéíóúñ]+/gi, '_').replace(/^_|_$/g, '') || 'todos_los_tours';
+    XLSX.writeFile(workbook, `Informe_Maxitours_${safeTour}_${this.startDate || 'sin_fecha'}.xlsx`, { bookType: 'xlsx', cellStyles: true });
+    this.alert.showModal({ type: 'success', title: 'Excel generado', message: 'El informe se descargó con resumen, pasajeros, ingresos y operación.' });
   }
 
   private listenForRealtimeChanges(): void {

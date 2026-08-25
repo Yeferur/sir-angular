@@ -100,9 +100,15 @@
 
               <div class="card-stats">
                 <div class="card-stat">
-                  <span class="card-stat-label">Pasajeros:</span>
+                  <span class="card-stat-label">Pasajeros grupales:</span>
                   <span class="card-stat-value" [countUp]="getLinkedTotalPax()"></span>
                 </div>
+                @if (getLinkedPrivatePax() > 0) {
+                  <div class="card-stat card-stat-private">
+                    <span class="card-stat-label">Pasajeros privados:</span>
+                    <span class="card-stat-value" [countUp]="getLinkedPrivatePax()"></span>
+                  </div>
+                }
                 <div class="card-stat">
                   <span class="card-stat-label">Capacidad:</span>
                   <span class="card-stat-value" [countUp]="getCupoCompartido()"></span>
@@ -174,13 +180,19 @@
               <div class="card-avail">
                 <span class="avail-big" [ngClass]="getAvailabilityTone(tour)" [countUp]="getAvailableSeats(tour)"></span>
                 <span class="avail-sub">disponibles</span>
-              </div>
+                </div>
 
               <div class="card-stats">
                 <div class="card-stat">
-                  <span class="card-stat-label">Pasajeros:</span>
+                  <span class="card-stat-label">Pasajeros grupales:</span>
                   <span class="card-stat-value" [countUp]="tour.NumeroPasajeros"></span>
                 </div>
+                @if (tour.NumeroPasajerosPrivados > 0) {
+                  <div class="card-stat card-stat-private">
+                    <span class="card-stat-label">Pasajeros privados:</span>
+                    <span class="card-stat-value" [countUp]="tour.NumeroPasajerosPrivados"></span>
+                  </div>
+                }
                 <div class="card-stat">
                   <span class="card-stat-label">Capacidad:</span>
                   <span class="card-stat-value" [countUp]="getCuposParaMeta(tour)"></span>

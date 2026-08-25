@@ -1360,10 +1360,16 @@ export class Listado implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error al guardar', err);
+        const backendMessage = String(err?.error?.message || '').trim();
+        const backendDetails = Array.isArray(err?.error?.details)
+          ? err.error.details.map((detail: unknown) => String(detail || '').trim()).filter(Boolean).slice(0, 4)
+          : [];
         this.navbar.showAlert({
           type: 'error',
           title: 'No pudimos guardar el listado',
-          message: 'Tus cambios siguen en pantalla. Revisa la conexión e inténtalo nuevamente.',
+          message: backendMessage
+            ? `${backendMessage}${backendDetails.length ? ` ${backendDetails.join(' ')}` : ''}`
+            : 'Tus cambios siguen en pantalla. Revisa la conexión e inténtalo nuevamente.',
         });
       }
     });

@@ -3,8 +3,34 @@ const router  = express.Router();
 const comisionesController = require('../../controllers/Comisiones/comisiones.controller');
 const { authMiddleware }   = require('../../middlewares/authMiddleware');
 const { checkPermission }  = require('../../middlewares/permissionsMiddleware');
+const multer = require('multer');
 
 const PERM = 'COMISIONES.LEER';
+const uploadDocuments = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024, files: 5 },
+    fileFilter: (_req, file, cb) => {
+        if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.mimetype)) {
+            const error = new Error('Solo se permiten imágenes JPG, PNG o documentos PDF.');
+            error.status = 400;
+            return cb(error);
+        }
+        cb(null, true);
+    }
+});
+
+function receiveDocuments(req, res, next) {
+    uploadDocuments.array('documentos', 5)(req, res, (error) => {
+        if (!error) return next();
+        const tooLarge = error.code === 'LIMIT_FILE_SIZE';
+        return res.status(400).json({
+            success: false,
+            data: null,
+            message: tooLarge ? 'Cada documento debe pesar máximo 5 MB.' : (error.message || 'No fue posible recibir los documentos.'),
+            errorCode: tooLarge ? 'DOCUMENT_TOO_LARGE' : 'DOCUMENT_UPLOAD_FAILED'
+        });
+    });
+}
 
 // Listar comisiones con filtros
 router.get(
@@ -43,7 +69,22 @@ router.post(
     '/beneficiarios',
     authMiddleware,
     checkPermission(PERM),
+    receiveDocuments,
     comisionesController.guardarBeneficiario
+);
+
+router.get(
+    '/beneficiarios/documentos/:idDocumento',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.descargarDocumento
+);
+
+router.delete(
+    '/beneficiarios/:idBeneficiario/documentos/:idDocumento',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.eliminarDocumento
 );
 
 // Exportar Excel

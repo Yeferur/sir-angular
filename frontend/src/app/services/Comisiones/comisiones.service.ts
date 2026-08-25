@@ -7,6 +7,15 @@ export type FormaPagoComision = 'TRANSFERENCIA_BANCOLOMBIA' | 'NEQUI' | 'EFECTIV
 export type EstadoLiquidacion = 'PENDIENTE' | 'PAGADO';
 export type TipoBeneficiario = 'HOTEL' | 'AGENCIA' | 'FREELANCE';
 
+export interface DocumentoBeneficiarioComision {
+  Id_Documento: number;
+  Id_Beneficiario: number;
+  Nombre_Original: string;
+  Mime_Type: string;
+  Tamano_Bytes: number;
+  Fecha_Creacion: string;
+}
+
 export interface ComisionPasajero {
   Id_Pasajero: number;
   Nombre_Pasajero: string;
@@ -28,6 +37,8 @@ export interface ComisionReserva {
   Estado_Liquidacion: EstadoLiquidacion;
   Forma_Pago: FormaPagoComision | null;
   Cuenta_Bancaria: string | null;
+  Nombre_Receptor: string | null;
+  DNI_Receptor: string | null;
   Fecha_Pago: string | null;
   pasajeros: ComisionPasajero[];
 }
@@ -42,6 +53,9 @@ export interface ComisionBeneficiario {
   Centralizado: boolean;
   Forma_Pago: FormaPagoComision | null;
   Cuenta_Bancaria: string | null;
+  Nombre_Receptor: string | null;
+  DNI_Receptor: string | null;
+  documentos: DocumentoBeneficiarioComision[];
   Origen_Datos_Pago: 'CENTRALIZADO' | 'HISTORICO' | 'SIN_DATOS';
   Total_Reportante: number;
   Pendiente_Reportante: number;
@@ -70,6 +84,8 @@ export interface GrupoPagoComision {
   reservas: string[];
   Forma_Pago: FormaPagoComision | null;
   Cuenta_Bancaria: string | null;
+  Nombre_Receptor: string | null;
+  DNI_Receptor: string | null;
 }
 
 export interface BeneficiarioComisionPayload {
@@ -80,7 +96,10 @@ export interface BeneficiarioComisionPayload {
   Telefono?: string | null;
   Forma_Pago: FormaPagoComision;
   Numero_Cuenta: string | null;
+  Nombre_Receptor: string;
+  DNI_Receptor: string;
   reservas: string[];
+  documentos?: File[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -113,9 +132,29 @@ export class ComisionesService {
   }
 
   guardarBeneficiario(payload: BeneficiarioComisionPayload): Observable<any> {
-    return this.http.post<unknown>(`${this.apiUrl}/beneficiarios`, payload).pipe(
+    const form = new FormData();
+    form.append('Id_Beneficiario', String(payload.Id_Beneficiario || ''));
+    form.append('Id_Canal', String(payload.Id_Canal));
+    form.append('Tipo_Beneficiario', payload.Tipo_Beneficiario);
+    form.append('Nombre', payload.Nombre);
+    form.append('Telefono', payload.Telefono || '');
+    form.append('Forma_Pago', payload.Forma_Pago);
+    form.append('Numero_Cuenta', payload.Numero_Cuenta || '');
+    form.append('Nombre_Receptor', payload.Nombre_Receptor);
+    form.append('DNI_Receptor', payload.DNI_Receptor);
+    form.append('reservas', JSON.stringify(payload.reservas));
+    for (const document of payload.documentos || []) form.append('documentos', document, document.name);
+    return this.http.post<unknown>(`${this.apiUrl}/beneficiarios`, form).pipe(
       map((response: any) => response?.data ?? response),
     );
+  }
+
+  descargarDocumento(idDocumento: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/beneficiarios/documentos/${idDocumento}`, { responseType: 'blob' });
+  }
+
+  eliminarDocumento(idBeneficiario: number, idDocumento: number): Observable<unknown> {
+    return this.http.delete(`${this.apiUrl}/beneficiarios/${idBeneficiario}/documentos/${idDocumento}`);
   }
 
   exportarExcel(filtros: FiltrosComisiones): Observable<Blob> {

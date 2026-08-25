@@ -23,6 +23,7 @@ export interface Tour {
   cupos: number;
   NumeroPasajeros: number;
   totalPrivados: number;
+  NumeroPasajerosPrivados: number;
   privados: Privado[];
   /** Presente solo cuando el tour tiene multiples planes y el backend los incluye */
   planes?: PlanSummary[];

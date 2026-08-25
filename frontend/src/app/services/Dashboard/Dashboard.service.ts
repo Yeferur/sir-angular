@@ -14,6 +14,9 @@ export interface DashboardFilters {
 
 export interface DashboardStats {
   totalReservas:      number;
+  totalReservasCanceladas: number;
+  reservationStatuses: ReservationStatusSummary[];
+  passengerAge: PassengerAgeSummary[];
   totalPasajeros:     number;
   totalIngresos:      number;   // bruto
   totalIngresosNetos: number;   // neto
@@ -35,6 +38,16 @@ export interface DashboardStats {
   noShowAdjustment: number;
   financialByCurrency: FinancialCurrencySummary[];
   comparison: DashboardComparison | null;
+}
+
+export interface ReservationStatusSummary {
+  estado: string;
+  cantidad: number;
+}
+
+export interface PassengerAgeSummary {
+  tipo: string;
+  cantidad: number;
 }
 
 export interface FinancialCurrencySummary {
@@ -78,6 +91,7 @@ export interface DailyIncome {
 
 export interface DailyPassengers {
   fecha:     string;
+  tour:      string;
   pasajeros: number;
 }
 
@@ -109,6 +123,23 @@ export interface TourOccupancy {
   infantes?: number;
   sinPlan?: boolean;
 }
+
+export interface DashboardOperational {
+  idiomas: DashboardLanguageRow[];
+  puntos: DashboardPointRow[];
+  inasistenciaCanal: DashboardAbsenceRow[];
+  inasistenciaTour: DashboardAbsenceRow[];
+  tarifas: DashboardTariffRow[];
+  pasaportes: DashboardPassportRow[];
+  canalFinanciero: DashboardChannelFinancialRow[];
+}
+
+export interface DashboardLanguageRow { idioma: string; registrados: number; viajaron: number; }
+export interface DashboardPointRow { punto: string; registrados: number; viajaron: number; }
+export interface DashboardAbsenceRow { canal?: string; tour?: string; programados: number; viajaron: number; noViajaron: number; pendientes: number; }
+export interface DashboardTariffRow { tarifa: string; pasajeros: number; ingresos: number; }
+export interface DashboardPassportRow { plan: string; pasajeros: number; }
+export interface DashboardChannelFinancialRow { canal: string; viajaron: number; ingresos: number; comisiones: number; }
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -177,5 +208,9 @@ export class DashboardService {
   /** Top 10 tours o, al seleccionar un tour con varios planes, desglose por plan. */
   getTourOccupancy(filters: DashboardFilters = {}): Observable<TourOccupancy[]> {
     return this.http.get<TourOccupancy[]>(`${this.base}/tour-occupancy`, { params: toParams(filters) });
+  }
+
+  getOperational(filters: DashboardFilters = {}): Observable<DashboardOperational> {
+    return this.http.get<DashboardOperational>(`${this.base}/operational`, { params: toParams(filters) });
   }
 }

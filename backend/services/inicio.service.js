@@ -3,6 +3,17 @@ const db = require('../database/db');
 // Estados admitidos (normalizamos con UPPER/TRIM para tolerar mayúsculas, minúsculas y espacios)
 const ESTADOS_VALIDOS = ['ACTIVA', 'ACTIVO', 'PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
 
+function normalizarTourInicio(tour) {
+  return {
+    ...tour,
+    cupos: Number(tour.cupos) || 0,
+    NumeroPasajeros: Number(tour.NumeroPasajeros) || 0,
+    totalReservas: Number(tour.totalReservas) || 0,
+    totalPrivados: Number(tour.totalPrivados) || 0,
+    NumeroPasajerosPrivados: Number(tour.NumeroPasajerosPrivados) || 0,
+  };
+}
+
 async function obtenerDatosInicio(fecha) {
   // TOURS: cupo del día (aforos) con fallback a Cupo_Base,
   //        pasajeros grupales y # de reservas privadas del día
@@ -50,6 +61,16 @@ async function obtenerDatosInicio(fecha) {
           AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
           AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
       ), 0) AS totalPrivados
+      ,COALESCE((
+        SELECT COUNT(p.Id_Pasajero)
+        FROM reservas r
+        JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+        WHERE h.Id_Tour = t.Id_Tour
+          AND r.Fecha_Tour = ?
+          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+      ), 0) AS NumeroPasajerosPrivados
     FROM tours t
     WHERE t.Activo = 1
   `;
@@ -130,16 +151,14 @@ async function obtenerDatosInicio(fecha) {
         fecha,                 // aforos.Fecha_Aforo
         fecha, ...estadosParams, // pasajeros GRUPAL
         fecha, ...estadosParams, // reservas GRUPAL (nuevo)
-        fecha, ...estadosParams  // count PRV
+        fecha, ...estadosParams, // count PRV
+        fecha, ...estadosParams  // pasajeros PRV
       ]
     );
 
     // Normalize numeric fields to avoid string concatenation in frontend
-    for (const t of tours) {
-      t.cupos = Number(t.cupos) || 0;
-      t.NumeroPasajeros = Number(t.NumeroPasajeros) || 0;
-      t.totalReservas = Number(t.totalReservas) || 0;
-      t.totalPrivados = Number(t.totalPrivados) || 0;
+    for (let index = 0; index < tours.length; index += 1) {
+      tours[index] = normalizarTourInicio(tours[index]);
     }
 
     const [transfers] = await db.query(transferQuery, [fecha]);
@@ -248,4 +267,4 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
   }
 }
 
-module.exports = { obtenerDatosInicio, guardarAforo };
+module.exports = { obtenerDatosInicio, guardarAforo, normalizarTourInicio };

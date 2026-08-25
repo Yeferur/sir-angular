@@ -405,6 +405,13 @@ export class Inicio implements OnInit, OnDestroy {
     );
   }
 
+  getLinkedPrivatePax(): number {
+    return this.getLinkedTours().reduce(
+      (total, tour) => total + Number(tour.NumeroPasajerosPrivados || 0),
+      0,
+    );
+  }
+
   getLinkedAvailableSeats(): number {
     return Math.max(this.getCupoCompartido() - this.getLinkedTotalPax(), 0);
   }

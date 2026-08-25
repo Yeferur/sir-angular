@@ -29,6 +29,7 @@
     "node-cron": "^4.2.1",
     "node-sql-parser": "^5.4.0",
     "nodemailer": "^9.0.5",
+    "sharp": "^0.35.3",
     "ws": "^8.18.3"
   },
   "devDependencies": {

@@ -14,6 +14,8 @@ h2, h3, p { margin: 0; }
   animation: page-enter .38s var(--ease-soft, ease) both;
 }
 
+.print-report-header { display: none; }
+
 .filter-panel,
 .metric-card,
 .ticket-card,
@@ -140,6 +142,21 @@ h2, h3, p { margin: 0; }
 }
 
 .print-button:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--accent-blue) 38%, var(--separator-color)); transform: translateY(-1px); }
+
+.excel-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-green) 48%, var(--separator-color));
+  border-radius: var(--radius-sm, 8px);
+  color: var(--accent-green);
+  background: color-mix(in srgb, var(--accent-green) 8%, var(--bg-secondary));
+  font-size: .75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: color .16s ease, border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+.excel-button:hover { color: var(--text-primary); border-color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 14%, var(--bg-secondary)); transform: translateY(-1px); }
 
 .report-content {
   position: relative;
@@ -318,6 +335,35 @@ h2, h3, p { margin: 0; }
 .ticket-label { color: var(--text-secondary); font-size: .72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
 .ticket-card > strong { font-size: 1.15rem; letter-spacing: -.02em; }
 .ticket-detail { color: var(--text-tertiary); font-size: .72rem; }
+.ticket-card--warning .ticket-label,
+.ticket-card--warning > strong { color: var(--accent-orange); }
+
+.reservation-status-card { margin-top: 10px; }
+
+.reservation-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.reservation-status-item {
+  min-height: 72px;
+  padding: 11px 13px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--bg-secondary) 86%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reservation-status-label { color: var(--text-secondary); font-size: .72rem; font-weight: 700; }
+.reservation-status-item strong { color: var(--text-primary); font-size: 1.18rem; }
+.reservation-status-item[data-tone='completed'] { border-color: color-mix(in srgb, var(--accent-blue) 38%, var(--separator-color)); }
+.reservation-status-item[data-tone='confirmed'] { border-color: color-mix(in srgb, var(--accent-green) 38%, var(--separator-color)); }
+.reservation-status-item[data-tone='pending'],
+.reservation-status-item[data-tone='pending-data'] { border-color: color-mix(in srgb, var(--accent-orange) 42%, var(--separator-color)); }
+.reservation-status-item[data-tone='cancelled'] { border-color: color-mix(in srgb, var(--accent-red) 42%, var(--separator-color)); }
 
 /* ── Resumen: composición del ingreso (reemplaza la lista de texto) ──────── */
 .chart-card--composition { margin-top: 10px; }
@@ -445,6 +491,13 @@ h2, h3, p { margin: 0; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.operational-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .chart-card--reservation-type { grid-column: 1 / -1; }
@@ -629,7 +682,8 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-group--tour, .quick-group { grid-column: 1 / -1; }
   .cobros-grid,
-  .commercial-grid { grid-template-columns: minmax(0, 1fr); }
+  .commercial-grid,
+  .operational-grid { grid-template-columns: minmax(0, 1fr); }
   .chart-card--reservation-type { grid-column: auto; }
   .dock-context { display: none; }
   .report-dock-row { width: fit-content; max-width: calc(100% - 22px); grid-template-columns: auto auto; }
@@ -663,14 +717,66 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
 }
 
 @media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  :host,
+  .dashboard-page {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+    margin: 0 0 18px;
+    padding: 0 0 12px;
+    border-bottom: 2px solid var(--accent-blue);
+  }
+  .print-report-kicker {
+    margin: 0 0 5px;
+    color: var(--accent-blue);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .print-report-header h1 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 20px;
+    line-height: 1.2;
+  }
+  .print-report-header dl {
+    min-width: 260px;
+    margin: 0;
+    display: grid;
+    gap: 4px;
+    color: var(--text-secondary);
+    font-size: 10px;
+  }
+  .print-report-header dl div { display: grid; grid-template-columns: 82px 1fr; gap: 8px; }
+  .print-report-header dt { color: var(--text-tertiary); font-weight: 700; text-transform: uppercase; }
+  .print-report-header dd { margin: 0; color: var(--text-primary); font-weight: 600; }
   .report-dock,
+  .excel-button,
   .print-button,
+  .filter-panel,
   .quick-group,
   .refresh-line,
   .granularity-toggle { display: none !important; }
-  .dashboard-page { width: 100%; padding: 0; }
+  .dashboard-page { width: 100%; max-width: none; margin: 0; padding: 0; animation: none; }
   .report-content { opacity: 1 !important; }
-  .report-section { break-inside: avoid; margin-top: 20px; }
+  .report-section { break-inside: auto; page-break-after: always; margin-top: 18px; }
+  .report-section:last-of-type { page-break-after: auto; }
+  .chart-card,
+  .metric-card,
+  .ticket-card,
+  .currency-notice,
+  .composition-item { break-inside: avoid; page-break-inside: avoid; }
+  .section-heading { break-after: avoid; page-break-after: avoid; }
+  .chart-card { margin-bottom: 10px; }
+  .chart-body { min-height: 0 !important; }
+  .chart-empty { min-height: 90px; }
   .filter-panel,
   .metric-card,
   .ticket-card,

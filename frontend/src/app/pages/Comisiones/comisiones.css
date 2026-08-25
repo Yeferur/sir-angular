@@ -545,6 +545,18 @@ select { font: inherit; }
 .payment-summary span { color: var(--text-secondary); font-size: .7rem; }
 .payment-summary strong { color: var(--accent-blue); font-size: 1.15rem; }
 .payment-summary p { margin-top: 10px; color: var(--text-tertiary); font-size: .68rem; line-height: 1.5; }
+.payment-summary .payment-reservations {
+  max-height: 96px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--separator-color);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  overflow-y: auto;
+}
+.payment-summary .payment-reservations span { line-height: 1.35; }
 
 .optional-toggle {
   width: 100%;
@@ -621,6 +633,44 @@ select { font: inherit; }
 
 .input-error { border-color: #ff4d4f !important; }
 .field-error { color: #ff6668; font-size: .65rem; line-height: 1.4; }
+
+.beneficiary-documents {
+  padding: 12px;
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+}
+.beneficiary-documents__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.beneficiary-documents__heading > span { display: flex; flex-direction: column; gap: 3px; }
+.beneficiary-documents__heading strong { font-size: .7rem; }
+.beneficiary-documents__heading small { color: var(--text-tertiary); font-size: .62rem; line-height: 1.35; }
+.beneficiary-document-list { display: grid; gap: 6px; }
+.beneficiary-document-row {
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-tertiary);
+}
+.beneficiary-document-row > button:first-child,
+.beneficiary-document-row > span {
+  min-width: 0;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: .64rem;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.beneficiary-document-row > button:first-child { cursor: pointer; }
+.document-remove { border: 0; color: var(--accent-red); background: transparent; font-size: .62rem; font-weight: 700; cursor: pointer; }
+.beneficiary-document-row--new { box-shadow: inset 2px 0 0 var(--accent-green); }
 
 .sheet-footer {
   flex: 0 0 auto;

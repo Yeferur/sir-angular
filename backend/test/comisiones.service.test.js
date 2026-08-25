@@ -5,6 +5,8 @@ const {
   agruparComisiones,
   buildPassengerQuery,
   validarDatosPago,
+  validarReceptor,
+  detectarTipoDocumento,
   normalizarFormaPago,
 } = require('../services/Comisiones/comisiones.service');
 
@@ -90,6 +92,22 @@ test('rechaza números de Bancolombia y Nequi que no cumplen la regla acordada',
   assert.throws(() => validarDatosPago('NEQUI', '2001234567'), /iniciar en 3/);
 });
 
+test('exige nombre y documento de quien recibe cuando hay medio de pago', () => {
+  assert.deepEqual(validarReceptor('Agencia Central SAS', '900.123.456-7', 'TRANSFERENCIA_BANCOLOMBIA'), {
+    Nombre_Receptor: 'Agencia Central SAS',
+    DNI_Receptor: '900.123.456-7',
+  });
+  assert.throws(() => validarReceptor('', '', 'NEQUI'), /persona o empresa/);
+  assert.deepEqual(validarReceptor('', '', null), { Nombre_Receptor: null, DNI_Receptor: null });
+});
+
+test('valida el contenido real de JPG, PNG y PDF sin confiar solo en la extensión', () => {
+  assert.equal(detectarTipoDocumento(Buffer.from([0xff, 0xd8, 0xff, 0x00])).mime, 'image/jpeg');
+  assert.equal(detectarTipoDocumento(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])).mime, 'image/png');
+  assert.equal(detectarTipoDocumento(Buffer.from('%PDF-1.7')).mime, 'application/pdf');
+  assert.equal(detectarTipoDocumento(Buffer.from('archivo falso')), null);
+});
+
 test('calcula la comisión desde el valor histórico de cada pasajero', () => {
   const result = agruparComisiones([
     passenger(),
@@ -120,6 +138,8 @@ test('usa el identificador centralizado para agrupar y conserva la fuente de pag
       Nombre_Beneficiario: 'Hotel Central Medellín',
       Forma_Pago_Beneficiario: 'NEQUI',
       Cuenta_Beneficiario: '3001234567',
+      Nombre_Receptor_Beneficiario: 'Hotel Central Medellín SAS',
+      DNI_Receptor_Beneficiario: '900123456',
     }),
   ]);
 
@@ -128,4 +148,6 @@ test('usa el identificador centralizado para agrupar y conserva la fuente de pag
   assert.equal(reportante.Centralizado, true);
   assert.equal(reportante.Origen_Datos_Pago, 'CENTRALIZADO');
   assert.equal(reportante.Nombre_Reportante, 'Hotel Central Medellín');
+  assert.equal(reportante.Nombre_Receptor, 'Hotel Central Medellín SAS');
+  assert.equal(reportante.DNI_Receptor, '900123456');
 });

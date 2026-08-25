@@ -268,6 +268,11 @@
         <section class="payment-summary">
           <div><span>Total a registrar</span><strong>{{ formatCOP(panelTotal) }}</strong></div>
           <p>El pago quedará registrado para informes. La transferencia se realiza por fuera de la aplicación.</p>
+          <div class="payment-reservations" aria-label="Reservas incluidas en el pago">
+            @for (reserva of panel.reservas; track reserva.Id_Reserva) {
+              <span>#{{ reserva.Id_Reserva }} · {{ reserva.Nombre_Tour }} · {{ formatCOP(reserva.Total_Comision) }}</span>
+            }
+          </div>
         </section>
 
         <button type="button" class="optional-toggle" (click)="toggleDatosPago()" [attr.aria-expanded]="panel.mostrarDatosPago">
@@ -301,6 +306,22 @@
               </div>
             }
 
+            @if (panel.formaPago) {
+              <div class="field-group">
+                <label class="form-label" for="payment-recipient">Persona o empresa que recibe</label>
+                <input id="payment-recipient" class="form-control" autocomplete="off" maxlength="255"
+                  [(ngModel)]="panel.nombreReceptor" (ngModelChange)="panel.touched = true"
+                  placeholder="Nombre completo o razón social" />
+              </div>
+
+              <div class="field-group">
+                <label class="form-label" for="payment-recipient-id">DNI, NIT o documento</label>
+                <input id="payment-recipient-id" class="form-control" autocomplete="off" maxlength="50"
+                  [(ngModel)]="panel.dniReceptor" (ngModelChange)="panel.touched = true"
+                  placeholder="Documento de quien recibe" />
+              </div>
+            }
+
             <label class="central-switch" [class.central-switch--disabled]="!panel.formaPago">
               <input type="checkbox" [(ngModel)]="panel.guardarCentral" [disabled]="!panel.formaPago" />
               <span class="switch-control" aria-hidden="true"></span>
@@ -309,6 +330,39 @@
                 <small>Se aplicará automáticamente cuando vuelva a aparecer este reportante.</small>
               </span>
             </label>
+
+            <section class="beneficiary-documents">
+              <div class="beneficiary-documents__heading">
+                <span>
+                  <strong>Documentos bancarios</strong>
+                  <small>Opcional · hasta 5 archivos JPG, PNG o PDF de máximo 5 MB cada uno</small>
+                </span>
+                <label class="button button--secondary button--small">
+                  Adjuntar
+                  <input type="file" accept="image/jpeg,image/png,application/pdf" multiple
+                    (change)="seleccionarDocumentos($event)" hidden />
+                </label>
+              </div>
+
+              @if (panel.reportante.documentos?.length || panel.documentosNuevos.length) {
+                <div class="beneficiary-document-list">
+                  @for (documento of panel.reportante.documentos || []; track documento.Id_Documento) {
+                    <div class="beneficiary-document-row">
+                      <button type="button" (click)="descargarDocumento(documento.Id_Documento, documento.Nombre_Original)">
+                        {{ documento.Nombre_Original }}
+                      </button>
+                      <button type="button" class="document-remove" (click)="eliminarDocumento(documento.Id_Documento)" aria-label="Eliminar documento">Eliminar</button>
+                    </div>
+                  }
+                  @for (documento of panel.documentosNuevos; track documento.name; let index = $index) {
+                    <div class="beneficiary-document-row beneficiary-document-row--new">
+                      <span>{{ documento.name }}</span>
+                      <button type="button" class="document-remove" (click)="quitarDocumentoNuevo(index)">Quitar</button>
+                    </div>
+                  }
+                </div>
+              }
+            </section>
 
             @if (panel.touched && (panelError || centralizacionError)) {
               <p class="field-error">{{ panelError || centralizacionError }}</p>

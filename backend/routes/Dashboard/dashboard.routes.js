@@ -15,5 +15,6 @@ router.get('/passenger-distribution', authMiddleware, dashboardReadPermission, d
 router.get('/passengers-distribution', authMiddleware, dashboardReadPermission, dashboardController.getPassengerDistribution);
 router.get('/reservation-breakdown', authMiddleware, dashboardReadPermission, dashboardController.getReservationBreakdown);
 router.get('/tour-occupancy', authMiddleware, dashboardReadPermission, dashboardController.getTourOccupancy);
+router.get('/operational', authMiddleware, dashboardReadPermission, dashboardController.getDashboardOperational);
 
 module.exports = router;

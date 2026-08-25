@@ -45,6 +45,9 @@ interface PanelPagoState {
   mostrarDatosPago: boolean;
   formaPago: FormaPagoPanel;
   cuenta: string;
+  nombreReceptor: string;
+  dniReceptor: string;
+  documentosNuevos: File[];
   guardarCentral: boolean;
   saving: boolean;
   touched: boolean;
@@ -100,6 +103,9 @@ export class ComisionesComponent implements OnInit {
     mostrarDatosPago: false,
     formaPago: '',
     cuenta: '',
+    nombreReceptor: '',
+    dniReceptor: '',
+    documentosNuevos: [],
     guardarCentral: false,
     saving: false,
     touched: false,
@@ -286,7 +292,10 @@ export class ComisionesComponent implements OnInit {
     this.panel.reservas = reservas;
     this.panel.formaPago = forma;
     this.panel.cuenta = cuenta;
-    this.panel.mostrarDatosPago = Boolean(forma || cuenta || reportante.Centralizado);
+    this.panel.nombreReceptor = reportante.Nombre_Receptor || reservas[0]?.Nombre_Receptor || '';
+    this.panel.dniReceptor = reportante.DNI_Receptor || reservas[0]?.DNI_Receptor || '';
+    this.panel.documentosNuevos = [];
+    this.panel.mostrarDatosPago = Boolean(forma || cuenta || reportante.Nombre_Receptor || reportante.documentos?.length || reportante.Centralizado);
     this.panel.guardarCentral = reportante.Centralizado;
     this.panel.saving = false;
     this.panel.touched = false;
@@ -304,6 +313,9 @@ export class ComisionesComponent implements OnInit {
     this.panel.mostrarDatosPago = false;
     this.panel.formaPago = '';
     this.panel.cuenta = '';
+    this.panel.nombreReceptor = '';
+    this.panel.dniReceptor = '';
+    this.panel.documentosNuevos = [];
     this.panel.guardarCentral = false;
     this.panel.touched = false;
     this.cdr.markForCheck();
@@ -317,6 +329,33 @@ export class ComisionesComponent implements OnInit {
   onFormaPagoChange(): void {
     this.panel.touched = true;
     if (!this.panelRequiereCuenta) this.panel.cuenta = '';
+  }
+
+  seleccionarDocumentos(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    const allowed = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+    const invalid = files.find(file => !allowed.has(file.type) || file.size > 5 * 1024 * 1024);
+    if (invalid) {
+      this.alerts.warningToast('Documento no permitido', 'Solo se admiten JPG, PNG o PDF de máximo 5 MB por archivo.');
+      return;
+    }
+    const combined = [...this.panel.documentosNuevos, ...files];
+    const existingCount = this.panel.reportante?.documentos?.length || 0;
+    if (existingCount + combined.length > 5) {
+      this.alerts.warningToast('Demasiados documentos', 'Puedes adjuntar máximo 5 documentos por beneficiario.');
+      return;
+    }
+    this.panel.documentosNuevos = combined;
+    if (files.length) this.panel.guardarCentral = true;
+    this.panel.touched = true;
+    this.cdr.markForCheck();
+  }
+
+  quitarDocumentoNuevo(index: number): void {
+    this.panel.documentosNuevos = this.panel.documentosNuevos.filter((_, current) => current !== index);
+    this.cdr.markForCheck();
   }
 
   omitirPagoActual(): void {
@@ -354,27 +393,39 @@ export class ComisionesComponent implements OnInit {
           Telefono: reportante.Telefono,
           Forma_Pago: forma,
           Numero_Cuenta: cuenta,
+          Nombre_Receptor: this.panel.nombreReceptor.trim(),
+          DNI_Receptor: this.panel.dniReceptor.trim(),
           reservas: ids,
+          documentos: this.panel.documentosNuevos,
         }));
         reportante.Id_Beneficiario = Number(beneficiario.Id_Beneficiario);
         reportante.Centralizado = true;
         reportante.Tipo_Beneficiario = beneficiario.Tipo_Beneficiario;
         reportante.Origen_Datos_Pago = 'CENTRALIZADO';
+        reportante.Nombre_Receptor = beneficiario.Nombre_Receptor;
+        reportante.DNI_Receptor = beneficiario.DNI_Receptor;
+        reportante.documentos = beneficiario.documentos || reportante.documentos || [];
       }
 
       const payload: GrupoPagoComision = {
         reservas: ids,
         Forma_Pago: forma,
         Cuenta_Bancaria: cuenta,
+        Nombre_Receptor: forma ? this.panel.nombreReceptor.trim() : null,
+        DNI_Receptor: forma ? this.panel.dniReceptor.trim() : null,
       };
       await firstValueFrom(this.comisionesService.actualizarLiquidacion({ ...payload, Estado: 'PAGADO' }));
 
       reportante.Forma_Pago = forma;
       reportante.Cuenta_Bancaria = cuenta;
+      reportante.Nombre_Receptor = payload.Nombre_Receptor;
+      reportante.DNI_Receptor = payload.DNI_Receptor;
       if (!reportante.Centralizado) reportante.Origen_Datos_Pago = forma ? 'HISTORICO' : 'SIN_DATOS';
       for (const reserva of this.panel.reservas) {
         reserva.Forma_Pago = forma;
         reserva.Cuenta_Bancaria = cuenta;
+        reserva.Nombre_Receptor = payload.Nombre_Receptor;
+        reserva.DNI_Receptor = payload.DNI_Receptor;
         reserva.Estado_Liquidacion = 'PAGADO';
         reserva.Fecha_Pago = this.fechaMaxima;
       }
@@ -423,6 +474,8 @@ export class ComisionesComponent implements OnInit {
         Estado: 'PENDIENTE',
         Forma_Pago: reportante.Forma_Pago,
         Cuenta_Bancaria: reportante.Cuenta_Bancaria,
+        Nombre_Receptor: reportante.Nombre_Receptor,
+        DNI_Receptor: reportante.DNI_Receptor,
       }));
       for (const reserva of pagadas) {
         reserva.Estado_Liquidacion = 'PENDIENTE';
@@ -504,6 +557,9 @@ export class ComisionesComponent implements OnInit {
     const forma = this.panel.formaPago || null;
     const cuenta = this.panel.cuenta.trim();
     if (!forma && cuenta) return 'Selecciona el medio de pago asociado a este número.';
+    if (forma && !this.panel.nombreReceptor.trim()) return 'Ingresa el nombre de la persona o empresa que recibe el pago.';
+    if (forma && !this.panel.dniReceptor.trim()) return 'Ingresa el DNI, NIT o documento de quien recibe el pago.';
+    if (forma && !/^[a-zA-Z0-9.\-\s]{4,50}$/.test(this.panel.dniReceptor.trim())) return 'El DNI, NIT o documento del receptor no es válido.';
     if (!forma || !cuenta) return '';
     if (forma === 'TRANSFERENCIA_BANCOLOMBIA' && !/^\d{11}$/.test(cuenta)) {
       return 'La cuenta Bancolombia debe tener exactamente 11 dígitos.';
@@ -575,6 +631,39 @@ export class ComisionesComponent implements OnInit {
       return false;
     }
     return Boolean(this.panel.reportante && this.panel.reservas.length);
+  }
+
+  descargarDocumento(idDocumento: number, nombre: string): void {
+    this.comisionesService.descargarDocumento(idDocumento).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nombre || 'documento';
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => this.alerts.errorToast('No se pudo descargar', this.errorMessage(error, 'Intenta nuevamente.')),
+    });
+  }
+
+  async eliminarDocumento(idDocumento: number): Promise<void> {
+    const beneficiary = this.panel.reportante;
+    if (!beneficiary?.Id_Beneficiario || this.panel.saving) return;
+    const accepted = await this.alerts.confirmDecision(
+      'Eliminar documento',
+      'El archivo se eliminará definitivamente del beneficiario.',
+      { confirmText: 'Eliminar', cancelText: 'Cancelar' },
+    );
+    if (!accepted) return;
+    try {
+      await firstValueFrom(this.comisionesService.eliminarDocumento(beneficiary.Id_Beneficiario, idDocumento));
+      beneficiary.documentos = (beneficiary.documentos || []).filter(document => document.Id_Documento !== idDocumento);
+      this.alerts.successToast('Documento eliminado', 'El archivo se eliminó correctamente.');
+      this.cdr.markForCheck();
+    } catch (error) {
+      this.alerts.errorToast('No se pudo eliminar', this.errorMessage(error, 'Intenta nuevamente.'));
+    }
   }
 
   private reservasPendientesDe(reportante: ComisionBeneficiario): ComisionReserva[] {

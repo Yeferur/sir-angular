@@ -323,6 +323,11 @@
   font-weight: 700;
 }
 
+.card-stat-private .card-stat-label,
+.card-stat-private .card-stat-value {
+  color: #ffb340;
+}
+
 .card-progress {
   padding: 10px 16px 14px;
 }

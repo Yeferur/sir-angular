@@ -98,6 +98,16 @@ async function getTourOccupancy(req, res) {
     }
 }
 
+async function getDashboardOperational(req, res) {
+    try {
+        const data = await dashboardService.getDashboardOperationalSvc(readFilters(req));
+        return sendSuccess(res, { data, message: 'Métricas operativas del dashboard obtenidas correctamente' });
+    } catch (error) {
+        console.error('Error fetching dashboard operational metrics:', error);
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+    }
+}
+
 module.exports = {
     getDashboardStats,
     getIncomeHistory,
@@ -106,5 +116,6 @@ module.exports = {
     getPassengersByChannel,
     getPassengerDistribution,
     getReservationBreakdown,
-    getTourOccupancy
+    getTourOccupancy,
+    getDashboardOperational
 };

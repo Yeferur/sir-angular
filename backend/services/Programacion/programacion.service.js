@@ -1728,10 +1728,101 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
         throw createValidationError('Uno o más buses superan la capacidad o tienen datos inválidos.', errores);
     }
 
+    await validarAsignacionesOperativasFecha(conn, {
+        fecha,
+        tipoProgramacion: 'grupal',
+        buses: busesValidados
+    });
+
     return {
         buses: busesValidados,
         totalReservas: reservasPlan.length
     };
+}
+
+function normalizarAsignacionOperativa(value) {
+    return String(value || '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+}
+
+function esIdentificadorGenericoBus(value) {
+    return /^(BUS|PRIVADO|VEHICULO|VEHÍCULO)\s*\d+$/i.test(String(value || '').trim());
+}
+
+function normalizarPlaca(value) {
+    return normalizarAsignacionOperativa(value).replace(/[^A-Z0-9]/g, '');
+}
+
+function detectarDuplicadosAsignacion(buses) {
+    const errores = [];
+    const placas = new Map();
+    const guias = new Map();
+
+    for (let index = 0; index < (buses || []).length; index += 1) {
+        const bus = buses[index] || {};
+        const label = String(bus.placa || '').trim() || `Bus ${index + 1}`;
+        const placa = esIdentificadorGenericoBus(bus.placa) ? '' : normalizarPlaca(bus.placa);
+        const guia = normalizarAsignacionOperativa(bus.guia);
+
+        if (placa) {
+            if (placas.has(placa)) errores.push(`La placa ${label} también está asignada a ${placas.get(placa)}.`);
+            else placas.set(placa, label);
+        }
+        if (guia) {
+            if (guias.has(guia)) errores.push(`El guía ${bus.guia} también está asignado a ${guias.get(guia)}.`);
+            else guias.set(guia, label);
+        }
+    }
+
+    return errores;
+}
+
+async function validarAsignacionesOperativasFecha(conn, { fecha, tipoProgramacion, buses }) {
+    const errores = detectarDuplicadosAsignacion(buses);
+    const [activeBuses] = await conn.query(
+        `
+        SELECT pb.Placa_Display, pb.Guia, pb.Orden_Bus, COALESCE(pb.Tipo_Bus, 'grupal') AS Tipo_Bus,
+               COALESCE(p.Tipo_Programacion, 'grupal') AS Tipo_Programacion
+        FROM programacion_buses pb
+        INNER JOIN programaciones p ON p.Id_Programacion = pb.Id_Programacion
+        WHERE p.Fecha_Tour = ?
+          AND p.Estado = 'activa'
+        ORDER BY pb.Id_Bus_Prog ASC
+        FOR UPDATE
+        `,
+        [fecha]
+    );
+    const existingBuses = (activeBuses || []).filter(bus => bus.Tipo_Programacion !== tipoProgramacion);
+
+    for (let index = 0; index < (buses || []).length; index += 1) {
+        const bus = buses[index] || {};
+        const label = String(bus.placa || '').trim() || `Bus ${index + 1}`;
+        const placa = esIdentificadorGenericoBus(bus.placa) ? '' : normalizarPlaca(bus.placa);
+        const guia = normalizarAsignacionOperativa(bus.guia);
+
+        for (const existing of existingBuses || []) {
+            const existingLabel = String(existing.Placa_Display || '').trim()
+                || `${existing.Tipo_Bus === 'privado' ? 'Privado' : 'Bus'} ${existing.Orden_Bus}`;
+            if (placa && !esIdentificadorGenericoBus(existing.Placa_Display)
+                && placa === normalizarPlaca(existing.Placa_Display)) {
+                errores.push(`La placa ${label} ya está asignada a ${existingLabel} en esta fecha.`);
+            }
+            if (guia && guia === normalizarAsignacionOperativa(existing.Guia)) {
+                errores.push(`El guía ${bus.guia} ya está asignado a ${existingLabel} en esta fecha.`);
+            }
+        }
+    }
+
+    if (errores.length) {
+        throw createValidationError(
+            'No se puede guardar la programación porque hay placas o guías repetidos en la misma fecha.',
+            [...new Set(errores)]
+        );
+    }
 }
 
 function toNullableNumber(value) {
@@ -2486,6 +2577,11 @@ async function guardarProgramacionPrivada({ fecha, buses, userId = null }) {
         }
 
         const normalizedBuses = validatePrivateAssignments(buses, expectedBuses);
+        await validarAsignacionesOperativasFecha(conn, {
+            fecha,
+            tipoProgramacion: 'privada',
+            buses: normalizedBuses
+        });
         const tourIds = [...new Set(reservas.map((reserva) => Number(reserva.Id_Tour)).filter(Number.isFinite))];
         const primaryTourId = tourIds[0];
         if (!primaryTourId) {
@@ -2772,7 +2868,8 @@ module.exports = {
     obtenerListadoFinal,
     calcularRutaVisualOSRM,
     generarZipListados,
-    generarZipPrivados
+    generarZipPrivados,
+    detectarDuplicadosAsignacion
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {
