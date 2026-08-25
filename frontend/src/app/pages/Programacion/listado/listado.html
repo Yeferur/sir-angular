@@ -30,10 +30,10 @@
             </svg>
           </button>
 
-          <button type="button" class="date-shortcut-btn" [class.active]="isTomorrowSelected()" (click)="irManana()">
+          <button type="button" class="date-shortcut-btn date-shortcut-btn--tomorrow" [class.active]="isTomorrowSelected()" (click)="irManana()">
             {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
           </button>
-          <button type="button" class="date-shortcut-btn" [class.active]="isTodaySelected()" (click)="irHoy()">
+          <button type="button" class="date-shortcut-btn date-shortcut-btn--today" [class.active]="isTodaySelected()" (click)="irHoy()">
             Hoy
           </button>
         </div>
@@ -62,8 +62,11 @@
         [totalReservasPrivadas]="totalReservasPrivadas"
         [totalBusesPrivados]="totalBusesPrivados"
         [totalPaxPrivados]="totalPaxPrivados"
+        [transfers]="transfersDia"
+        [transfersUnavailable]="transfersLoadError"
         (tourSelected)="openTourFromDashboard($event)"
-        (privadosSelected)="abrirVistaPrivados()">
+        (privadosSelected)="abrirVistaPrivados()"
+        (transfersSelected)="abrirVistaTransfers()">
       </app-programacion-day-dashboard>
     }
 
@@ -117,6 +120,16 @@
         (dirtyChange)="onPrivateDirtyChange($event)"
         (closeRequested)="volverAlDashboard()">
       </app-programacion-privados>
+    }
+
+    @if (modoVista === 'transfers') {
+      <app-programacion-transfers
+        [operationDate]="fechaSeleccionada"
+        [data]="transfersDia"
+        [exporting]="isExportingTransfers"
+        (closeRequested)="volverAlDashboard()"
+        (exportRequested)="exportarTransfersDia()">
+      </app-programacion-transfers>
     }
   }
 </div>

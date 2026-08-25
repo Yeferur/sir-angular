@@ -201,7 +201,23 @@ export class ProgramacionEditorComponent implements OnDestroy {
 
   projectedCapacity(bus: Bus): number | null {
     const load = this.projectedLoad(bus);
+    if (bus.capacidadManual) return load <= Number(bus.capacidad || 0) ? Number(bus.capacidad) : null;
     return this.availableCapacities().find((capacity) => capacity >= load) ?? null;
+  }
+
+  setManualCapacity(bus: Bus, value: number | string | null): void {
+    bus.capacidad = Number(value || 0);
+    bus.capacidadManual = true;
+    this.busChanged.emit();
+  }
+
+  restoreAutomaticCapacity(bus: Bus): void {
+    const occupied = Number(bus.ocupados || 0);
+    const automatic = this.availableCapacities().find((capacity) => capacity >= occupied);
+    if (!automatic) return;
+    bus.capacidad = automatic;
+    bus.capacidadManual = false;
+    this.busChanged.emit();
   }
 
   canMoveToBus(index: number): boolean {

@@ -40,7 +40,7 @@
 
       <button
         type="button"
-        class="date-hoy-btn"
+        class="date-hoy-btn date-hoy-btn--tomorrow"
         [class.active]="isTomorrowSelected()"
         (click)="irManana()">
         {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
@@ -48,7 +48,7 @@
 
       <button
         type="button"
-        class="date-hoy-btn"
+        class="date-hoy-btn date-hoy-btn--today"
         [class.active]="isTodaySelected()"
         (click)="irHoy()">
         Hoy

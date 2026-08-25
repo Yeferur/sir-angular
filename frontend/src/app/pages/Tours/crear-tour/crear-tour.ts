@@ -48,8 +48,9 @@ type CrearTourFullPayload = {
   Abreviacion: string;
   Comisiones: ComisionPayload[];
   Cupo_Base: number;
-  Latitud: number | null;
-  Longitud: number | null;
+  Nombre_Primera_Parada: string | null;
+  Latitud_Primera_Parada: number | null;
+  Longitud_Primera_Parada: number | null;
   Id_Tour_Origen: number | null;
   Planes: PlanPayload[];
   Disponibilidad?: any;
@@ -155,6 +156,7 @@ export class CrearTourComponent implements OnInit {
       Nombre_Tour: ['', [Validators.required, Validators.maxLength(255)]],
       Abreviacion: ['', [Validators.required, Validators.maxLength(50)]],
       Cupo_Base: [null, [Validators.required, Validators.min(0)]],
+      Nombre_Primera_Parada: ['', [Validators.maxLength(255)]],
       Coordenadas: ['', [this.coordenadasValidator()]],
       Id_Tour_Origen: [null],
       planes: this.fb.array([]),
@@ -1028,8 +1030,9 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
       Abreviacion: String(raw.Abreviacion || '').trim(),
       Comisiones: comisiones,
       Cupo_Base: Number(raw.Cupo_Base || 0),
-      Latitud: coords?.lat ?? null,
-      Longitud: coords?.lng ?? null,
+      Nombre_Primera_Parada: String(raw.Nombre_Primera_Parada || '').trim() || null,
+      Latitud_Primera_Parada: coords?.lat ?? null,
+      Longitud_Primera_Parada: coords?.lng ?? null,
       Id_Tour_Origen: raw.Id_Tour_Origen ?? null,
       Planes: planes,
       Disponibilidad: disponibilidad,

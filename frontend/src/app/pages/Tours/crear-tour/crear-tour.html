@@ -484,24 +484,27 @@
         <section class="card settings-card">
           <div class="card-header">
             <div>
-              <h2>Geolocalización del tour</h2>
+              <h2>Primera parada operativa</h2>
               <p class="card-header-hint">
-                Añade coordenadas solo si existe un destino o punto fijo para orientar las rutas de recogida.
-                Puedes omitirlas en recorridos por zonas amplias o con puntos que cambian según la temporada.
+                Lugar al que se dirige el bus después de completar la recogida. No se registra como punto de encuentro.
               </p>
             </div>
             <span class="optional-pill">Opcional</span>
           </div>
           <div class="form-group">
-            <label class="form-label">Coordenadas del punto fijo</label>
+            <label class="form-label">Nombre de la primera parada</label>
+            <input formControlName="Nombre_Primera_Parada" type="text" class="form-input"
+              placeholder="Ej: Restaurante Porto Madero, Marinilla" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Coordenadas de la primera parada</label>
             <input formControlName="Coordenadas" type="text" class="form-input" placeholder="Ej: 6.244747, -75.574756"
               [class.errorInput]="form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid" />
             @if (form.get('Coordenadas')?.touched && form.get('Coordenadas')?.invalid) {
               <div class="errorMessage">Usa una latitud y longitud válidas separadas por coma.</div>
             }
             <p class="form-hint">
-              Puede ser el destino del tour o el lugar fijo donde inicia el recorrido después de recoger a todos los pasajeros.
-              El sistema funciona normalmente si este campo queda vacío.
+              La programación usa estas coordenadas para orientar el recorrido y calcular la llegada a la primera parada.
             </p>
           </div>
         </section>
@@ -577,7 +580,8 @@
             <div class="review-detail-list">
               <div><span>Comisiones activas</span><strong>{{ getActiveCommissionsCount() }}</strong></div>
               <div><span>Puntos de encuentro</span><strong>{{ getOriginTourName() }}</strong></div>
-              <div><span>Geolocalización</span><strong>{{ form.get('Coordenadas')?.value || 'Sin configurar' }}</strong></div>
+              <div><span>Primera parada</span><strong>{{ form.get('Nombre_Primera_Parada')?.value || 'Sin configurar' }}</strong></div>
+              <div><span>Coordenadas</span><strong>{{ form.get('Coordenadas')?.value || 'Sin configurar' }}</strong></div>
             </div>
           </section>
         </section>

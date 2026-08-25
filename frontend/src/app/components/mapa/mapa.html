@@ -30,7 +30,7 @@
           <strong>{{ tiempoRecogida }}</strong>
         </span>
         <span class="topbar-metric topbar-metric--tour" *ngIf="hasTourDestination">
-          <small>Al tour</small>
+          <small>A primera parada</small>
           <strong>{{ tiempoAlTour }}</strong>
         </span>
         <span class="topbar-schedule" *ngIf="ventanaRecogidaBase">
@@ -94,26 +94,30 @@
               <path d="M5 12h14"/><path d="m15 8 4 4-4 4"/>
             </svg>
             <div class="eta-time eta-time--arrival">
-              <span>Llegada al tour</span>
+              <span>Llegada a primera parada</span>
               <strong>{{ llegadaEstimada }}</strong>
             </div>
           </div>
-          <p>Recogida en Estación Poblado: {{ ventanaRecogidaBase }}</p>
+          <p>
+            Recogida en Estación Poblado: {{ ventanaRecogidaBase }}.<br>
+            Modelo: {{ velocidadCiudadKmh }} km/h en ciudad<span *ngIf="hasTourDestination"> y {{ velocidadViajeKmh }} km/h hacia la primera parada</span>.
+            No incluye tráfico, esperas ni tiempo de abordaje.
+          </p>
         </div>
 
         <div class="route-stage">
           <div class="route-stage-copy">
             <span class="route-stage-kicker">Ruta de recogida</span>
-            <span class="route-stage-detail">Inicio y puntos de encuentro</span>
+            <span class="route-stage-detail">Promedio operativo: {{ velocidadCiudadKmh }} km/h</span>
           </div>
           <strong class="route-stage-time">{{ tiempoRecogida }}</strong>
         </div>
 
         <div class="route-stage route-stage--tour" *ngIf="hasTourDestination">
           <div class="route-stage-copy">
-            <span class="route-stage-kicker">Viaje al tour</span>
+            <span class="route-stage-kicker">Viaje a primera parada</span>
             <span class="route-stage-detail" [title]="'Desde ' + ultimoPuntoRecogidaNombre">
-              Desde {{ ultimoPuntoRecogidaNombre }}
+              Desde {{ ultimoPuntoRecogidaNombre }} · {{ velocidadViajeKmh }} km/h
             </span>
           </div>
           <strong class="route-stage-time">{{ tiempoAlTour }}</strong>
@@ -149,7 +153,7 @@
               [class.dot-active]="paradaActivaIndex === i">
               <span *ngIf="i === 0">S</span>
               <span *ngIf="i === agrupadosConBase.length - 1 && i !== 0">
-                {{ punto.esDestinoTour ? 'T' : 'F' }}
+                {{ punto.esDestinoTour ? 'P' : 'F' }}
               </span>
               <span *ngIf="i !== 0 && i !== agrupadosConBase.length - 1">{{ i }}</span>
             </div>

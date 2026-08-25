@@ -112,7 +112,12 @@
 
 /* ── Móvil: pantalla casi completa ─────────────────────────── */
 @media (max-width: 766px) {
-  .sir-drawer-panel {
+  .sir-drawer-panel,
+  .sir-drawer-panel:has(app-notifications-panel),
+  .sir-drawer-panel:has(app-turnos-intercambio-panel),
+  .sir-drawer-panel:has(app-turnos-vacaciones-panel),
+  .sir-drawer-panel:has(app-usuario-detail),
+  .sir-drawer-panel:has(app-mapa) {
     top: 0;
     right: 0;
     bottom: 0;

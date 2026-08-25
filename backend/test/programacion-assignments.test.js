@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { detectarDuplicadosAsignacion } = require('../services/Programacion/programacion.service');
+const {
+    detectarDuplicadosAsignacion,
+    normalizarCapacidadProgramacion,
+} = require('../services/Programacion/programacion.service');
 
 test('rechaza placas y guías repetidos dentro del listado de la misma fecha', () => {
     const errores = detectarDuplicadosAsignacion([
@@ -23,3 +26,23 @@ test('permite identificadores genéricos repetidos porque todavía no son placas
     assert.deepEqual(errores, []);
 });
 
+test('conserva una capacidad manual válida y reconoce su modo', () => {
+    assert.deepEqual(normalizarCapacidadProgramacion({ capacidad: 42, capacidadManual: true }), {
+        capacidad: 42,
+        capacidadManual: true,
+        valida: true,
+    });
+});
+
+test('una capacidad manual inválida no se acepta y la automática conserva el valor por defecto', () => {
+    assert.deepEqual(normalizarCapacidadProgramacion({ capacidad: 0, capacidadManual: true }), {
+        capacidad: 38,
+        capacidadManual: true,
+        valida: false,
+    });
+    assert.deepEqual(normalizarCapacidadProgramacion({ capacidad: 0 }), {
+        capacidad: 38,
+        capacidadManual: false,
+        valida: true,
+    });
+});

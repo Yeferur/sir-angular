@@ -1,8 +1,5 @@
 // src/controllers/Reservas/reservas.controller.js
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
-const { randomUUID } = require('crypto');
 
 const {
   filtrarReservas,
@@ -31,14 +28,6 @@ const { clientOwnerIdFromRequest } = require('../../utils/clientAccess');
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-function extensionForMime(file) {
-  if (file.mimetype === 'image/jpeg') return '.jpg';
-  if (file.mimetype === 'image/png') return '.png';
-  if (file.mimetype === 'application/pdf') return '.pdf';
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  return ext || '.bin';
-}
-
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE },
@@ -63,10 +52,7 @@ function sendError(res, { status = 500, message = 'Error interno del servidor', 
 function buildFilesMap(files = []) {
   const filesMap = {};
   for (const f of files) {
-    filesMap[f.fieldname] = {
-      ...f,
-      safeName: `${randomUUID()}${extensionForMime(f)}`,
-    };
+    filesMap[f.fieldname] = f;
   }
   return filesMap;
 }

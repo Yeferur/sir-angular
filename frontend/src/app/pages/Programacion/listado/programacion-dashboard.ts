@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { CountUpDirective } from '../../Inicio/count-up.directive';
+import { TransfersProgramacionResponse } from '../../../services/Programacion/programacion';
 
 @Component({
   selector: 'app-programacion-day-dashboard',
@@ -18,9 +19,12 @@ export class ProgramacionDashboardComponent {
   totalReservasPrivadas = input(0);
   totalBusesPrivados = input(0);
   totalPaxPrivados = input(0);
+  transfers = input.required<TransfersProgramacionResponse>();
+  transfersUnavailable = input(false);
 
   tourSelected = output<TourProgramacion>();
   privadosSelected = output<void>();
+  transfersSelected = output<void>();
 
   get totalPasajeros(): number {
     return this.tours().reduce((total, tour) => total + Number(tour.totalPasajeros || 0), 0)
@@ -47,8 +51,4 @@ export class ProgramacionDashboardComponent {
     this.tourSelected.emit(tour);
   }
 
-  occupancy(tour: TourProgramacion): number {
-    const value = Number(tour.ocupacionPromedio || 0);
-    return value > 1 ? Math.min(100, value) : Math.min(100, value * 100);
-  }
 }

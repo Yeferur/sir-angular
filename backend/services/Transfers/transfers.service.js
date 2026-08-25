@@ -1,9 +1,9 @@
 const db = require('../../database/db');
 const path = require('path');
 const fs = require('fs');
-const { randomUUID } = require('crypto');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
+const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
 
 const COMPROBANTE_TRANSFER_FILE_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -80,15 +80,9 @@ async function guardarComprobanteTransferInicial(idTransfer, file) {
   }
 
   const baseDir = path.join(__dirname, '../../uploads', 'transfers', String(idTransfer));
-  fs.mkdirSync(baseDir, { recursive: true });
-
-  const ext = getExtensionForMime(file);
-  const fileName = `${randomUUID()}${ext}`;
-  const filePath = path.join(baseDir, fileName);
-
-  fs.writeFileSync(filePath, file.buffer);
-
-  return `transfers/${idTransfer}/${fileName}`;
+  const prepared = await prepararComprobante(file);
+  const saved = await guardarComprobanteAtomico(baseDir, prepared);
+  return `transfers/${idTransfer}/${saved.fileName}`;
 }
 
 function obtenerArchivoPorCampo(files = [], ...fieldNames) {
@@ -997,20 +991,7 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
     }
     rutaAnterior = normalizarRutaComprobanteTransferSalida(pagos[0].Pago_Comprobante, Id_Transfer);
 
-    // Crear carpeta de uploads si no existe
-    const baseDir = path.join(__dirname, '../../uploads', 'transfers', String(Id_Transfer));
-    fs.mkdirSync(baseDir, { recursive: true });
-
-    // Generar nombre seguro para el archivo
-    const ext = getExtensionForMime(file);
-    const fileName = `${randomUUID()}${ext}`;
-    const filePath = path.join(baseDir, fileName);
-
-    // Guardar archivo
-    fs.writeFileSync(filePath, file.buffer);
-
-    // Generar ruta relativa segura
-    const rutaComprobante = `transfers/${Id_Transfer}/${fileName}`;
+    const rutaComprobante = await guardarComprobanteTransferInicial(Id_Transfer, file);
     rutaNueva = rutaComprobante;
 
     // Actualizar la base de datos con la ruta
@@ -1059,14 +1040,6 @@ async function subirComprobanteTransferSvc(Id_Transfer, Id_Pago, file, userId = 
     }
     throw error;
   }
-}
-
-function getExtensionForMime(file) {
-  if (file.mimetype === 'image/jpeg') return '.jpg';
-  if (file.mimetype === 'image/png') return '.png';
-  if (file.mimetype === 'application/pdf') return '.pdf';
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  return ext || '.bin';
 }
 
 async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
@@ -1347,6 +1320,7 @@ async function cancelarTransferSvc(Id_Transfer, userId = null) {
 
 async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) {
   const conn = await db.getConnection();
+  let committed = false;
   try {
     await conn.beginTransaction();
 
@@ -1384,6 +1358,9 @@ async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) 
       const ruta = String(p?.Pago_Comprobante || '').trim();
       return ruta && ruta !== 'N/A';
     }).length;
+    const rutasComprobantes = (pagos || [])
+      .map((pago) => normalizarRutaComprobanteTransferSalida(pago.Pago_Comprobante, Id_Transfer))
+      .filter(Boolean);
 
     await recordHistorial({
       conexion: conn,
@@ -1403,6 +1380,14 @@ async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) 
     await conn.query('DELETE FROM transfers WHERE Id_Transfer = ?', [Id_Transfer]);
 
     await conn.commit();
+    committed = true;
+
+    const resultadosEliminacion = await Promise.all(
+      rutasComprobantes.map((ruta) => eliminarArchivoComprobanteTransferFisico(ruta).catch((error) => {
+        console.warn('No se pudo eliminar un comprobante del transfer eliminado:', error?.message || error);
+        return false;
+      }))
+    );
 
     return {
       Id_Transfer: Number(Id_Transfer),
@@ -1411,10 +1396,10 @@ async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) 
         pagos: pagosCount,
         comprobantesReferenciados: comprobantesCount,
       },
-      comprobantesFisicosEliminados: false,
+      comprobantesFisicosEliminados: resultadosEliminacion.filter(Boolean).length,
     };
   } catch (error) {
-    await conn.rollback();
+    if (!committed) await conn.rollback();
     try { await logSistema({ mensaje: `eliminarTransfer error: ${error.message || error}`, meta: { Id_Transfer, userId, clientIp } }); } catch (_) {}
     throw error;
   } finally {
@@ -1423,41 +1408,30 @@ async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) 
 }
 
 async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
-  // Validar que nombreArchivo no intente path traversal
-  if (nombreArchivo.includes('..') || nombreArchivo.includes('/') || nombreArchivo.includes('\\')) {
-    return null;
-  }
+  const fileName = String(nombreArchivo || '').trim();
+  if (!COMPROBANTE_TRANSFER_FILE_RE.test(fileName)) return null;
+  const suffix = `/${fileName}`;
 
-  // Buscar el archivo en la carpeta uploads/transfers o en sus subcarpetas por transfer
-  const uploadsDir = path.join(__dirname, '../../uploads', 'transfers');
-  const directPath = path.resolve(uploadsDir, nombreArchivo);
-  let resolvedPath = directPath;
+  const [rows] = await db.query(
+    `SELECT Id_Transfer, Pago_Comprobante
+       FROM pagos_transfers
+      WHERE RIGHT(Pago_Comprobante, ?) = ?
+      ORDER BY Id_Pago DESC
+      LIMIT 1`,
+    [suffix.length, suffix]
+  );
+  if (!rows?.length) return null;
 
-  if (!fs.existsSync(resolvedPath)) {
-    const transferDirs = fs.existsSync(uploadsDir)
-      ? fs.readdirSync(uploadsDir, { withFileTypes: true }).filter(entry => entry.isDirectory())
-      : [];
-
-    const match = transferDirs
-      .map(entry => path.resolve(uploadsDir, entry.name, nombreArchivo))
-      .find(candidate => candidate.startsWith(uploadsDir) && fs.existsSync(candidate));
-
-    if (match) resolvedPath = match;
-  }
-
-  // Verificar que está dentro de uploadsDir
-  if (!resolvedPath.startsWith(uploadsDir)) {
-    return null;
-  }
-
-  // Verificar que el archivo existe
-  if (!fs.existsSync(resolvedPath)) {
-    return null;
-  }
+  const relativePath = normalizarRutaComprobanteTransferSalida(
+    rows[0].Pago_Comprobante,
+    rows[0].Id_Transfer
+  );
+  const resolvedPath = rutaComprobanteTransferAbsolutaSegura(relativePath);
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) return null;
 
   return {
     absolutePath: resolvedPath,
-    relativePath: nombreArchivo
+    relativePath
   };
 }
 

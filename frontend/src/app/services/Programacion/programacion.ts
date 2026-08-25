@@ -32,6 +32,44 @@ export interface ListadoProgramacionResponse {
   destinoTour?: DestinoTourProgramacion | null;
 }
 
+export interface TransferServicioProgramacion {
+  servicio: string;
+  totalTransfers: number;
+  totalPasajeros: number;
+  pendientes: number;
+  primeraRecogida: string | null;
+  ultimaRecogida: string | null;
+}
+
+export interface TransferProgramacion {
+  Id_Transfer: number;
+  Codigo_Transfer: string;
+  Fecha_Transfer: string;
+  Hora_Recogida: string | null;
+  Estado: string | null;
+  Punto_Salida: string | null;
+  Punto_Destino: string | null;
+  Nombre_Titular: string | null;
+  Telefono_Titular: string | null;
+  DNI: string | null;
+  Cantidad_Personas: number;
+  Vuelo: string | null;
+  TipoVuelo: string | null;
+  Observaciones: string | null;
+  Nombre_Servicio: string;
+  Rango_Descripcion: string;
+}
+
+export interface TransfersProgramacionResponse {
+  fecha: string;
+  totalTransfers: number;
+  totalPasajeros: number;
+  totalServicios: number;
+  totalPendientes: number;
+  servicios: TransferServicioProgramacion[];
+  transfers: TransferProgramacion[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -151,5 +189,18 @@ export class ProgramacionDashboardService {
     nombreTour?: string;
   }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-listados-zip`, payload, { responseType: 'blob' });
+  }
+
+  obtenerTransfersDia(fecha: string): Observable<TransfersProgramacionResponse> {
+    return this.http.get<TransfersProgramacionResponse>(`${this.apiUrl}/transfers-del-dia`, {
+      params: { fecha },
+    });
+  }
+
+  exportarTransfersDia(fecha: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/exportar-transfers-dia`, {
+      params: { fecha },
+      responseType: 'blob',
+    });
   }
 }

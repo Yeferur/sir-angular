@@ -31,6 +31,19 @@ const CONFIG = {
     GRAFO_PATH: 'grafo_antioquia.json',
 };
 
+function normalizarCapacidadProgramacion(bus) {
+    const capacidadFrontend = Number(bus?.capacidad || 0);
+    const capacidadManual = bus?.capacidadManual === true || bus?.capacidadManual === 1 || bus?.capacidadManual === '1';
+    const capacidadValida = Number.isInteger(capacidadFrontend)
+        && capacidadFrontend >= 1
+        && capacidadFrontend <= 200;
+    return {
+        capacidad: capacidadValida ? capacidadFrontend : CAPACIDAD_BUS_GENERACION,
+        capacidadManual,
+        valida: !capacidadManual || capacidadValida
+    };
+}
+
 const RUTA_ADJACENCY = {
     "0": new Set(["5", "2"]),
     "1": new Set(["2", "3", "4", "5"]),
@@ -1439,8 +1452,8 @@ async function getDistanceKmBetweenStops(a, b) {
 }
 
 async function obtenerCoordenadasTours(tours) {
-    // Consulta las coordenadas de destino por tour.
-    // Devuelve { "Id_Tour": { Latitud, Longitud } } solo para tours con coordenadas válidas.
+    // Consulta la primera parada operativa de cada tour. Estos datos viven en
+    // tours y nunca forman parte del catálogo de puntos de encuentro.
     // Tours sin coordenadas (ej: Tour de Compras, Tour de Luces) no aparecen en el mapa
     // y el algoritmo de ordenamiento se comporta igual que antes para ellos.
     try {
@@ -1450,8 +1463,9 @@ async function obtenerCoordenadasTours(tours) {
             SELECT
                 t.Id_Tour,
                 t.Nombre_Tour,
-                t.Latitud,
-                t.Longitud,
+                t.Nombre_Primera_Parada,
+                t.Latitud_Primera_Parada AS Latitud,
+                t.Longitud_Primera_Parada AS Longitud,
                 (
                     SELECT h.Hora_Salida
                     FROM horarios h
@@ -1462,8 +1476,8 @@ async function obtenerCoordenadasTours(tours) {
                 ) AS Hora_Salida_Base
             FROM tours t
             WHERE t.Id_Tour IN (?)
-              AND t.Latitud IS NOT NULL
-              AND t.Longitud IS NOT NULL
+              AND t.Latitud_Primera_Parada IS NOT NULL
+              AND t.Longitud_Primera_Parada IS NOT NULL
             `,
             [estacionPobladoId, tours]
         );
@@ -1475,6 +1489,7 @@ async function obtenerCoordenadasTours(tours) {
                 mapa[String(row.Id_Tour)] = {
                     Id_Tour: Number(row.Id_Tour),
                     Nombre_Tour: row.Nombre_Tour || null,
+                    Nombre_Primera_Parada: row.Nombre_Primera_Parada || null,
                     Latitud: lat,
                     Longitud: lon,
                     Hora_Salida_Base: row.Hora_Salida_Base || null
@@ -1505,7 +1520,7 @@ function resolverDestinoTour(tours, tourDestinos = {}) {
         idTour: Number(destino.Id_Tour || primaryTourId),
         lat,
         lng,
-        nombre: destino.Nombre_Tour || `Tour ${primaryTourId}`,
+        nombre: destino.Nombre_Primera_Parada || destino.Nombre_Tour || `Tour ${primaryTourId}`,
         horaSalidaBase: destino.Hora_Salida_Base || null
     };
 }
@@ -1692,10 +1707,11 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
 
     const busesValidados = buses.map((bus, index) => {
         const placa = String(bus?.id || '').trim() || `Bus ${index + 1}`;
-        const capacidadFrontend = Number(bus?.capacidad || 0);
-        const capacidad = Number.isFinite(capacidadFrontend) && capacidadFrontend > 0
-            ? capacidadFrontend
-            : CAPACIDAD_BUS_GENERACION;
+        const capacidadNormalizada = normalizarCapacidadProgramacion(bus);
+        if (!capacidadNormalizada.valida) {
+            errores.push(`${placa} debe tener una capacidad manual entera entre 1 y 200 pasajeros.`);
+        }
+        const { capacidad, capacidadManual } = capacidadNormalizada;
 
         const reservasBus = Array.isArray(bus?.reservas) ? bus.reservas : [];
         const reservasValidadas = reservasBus.map((reserva, reservaIndex) => {
@@ -1718,6 +1734,7 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
         return {
             placa,
             capacidad,
+            capacidadManual,
             ocupados,
             guia: bus?.guia ? String(bus.guia).trim() : null,
             reservas: reservasValidadas
@@ -1964,10 +1981,10 @@ async function guardarSnapshotProgramacion(conn, { fecha, tours, primaryTourId, 
         const [busResult] = await conn.query(
             `
             INSERT INTO programacion_buses
-            (Id_Programacion, Placa_Display, Capacidad, Pasajeros_Total, Guia, Recorrido_Km, Orden_Bus)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (Id_Programacion, Placa_Display, Capacidad, Capacidad_Manual, Pasajeros_Total, Guia, Recorrido_Km, Orden_Bus)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `,
-            [idProgramacion, bus.placa, bus.capacidad, bus.ocupados, bus.guia || null, recorridoKm, busIndex + 1]
+            [idProgramacion, bus.placa, bus.capacidad, bus.capacidadManual ? 1 : 0, bus.ocupados, bus.guia || null, recorridoKm, busIndex + 1]
         );
 
         const idBusProg = busResult.insertId;
@@ -2089,7 +2106,7 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
 
     const [busesRows] = await db.query(
         `
-        SELECT Id_Bus_Prog, Placa_Display, Capacidad, Pasajeros_Total, Guia, Recorrido_Km, Orden_Bus
+        SELECT Id_Bus_Prog, Placa_Display, Capacidad, Capacidad_Manual, Pasajeros_Total, Guia, Recorrido_Km, Orden_Bus
         FROM programacion_buses
         WHERE Id_Programacion = ?
         ORDER BY Orden_Bus ASC, Id_Bus_Prog ASC
@@ -2200,6 +2217,7 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
         return {
             id: placa,
             capacidad: Number(bus.Capacidad || 0),
+            capacidadManual: Boolean(bus.Capacidad_Manual),
             ocupados: Number(bus.Pasajeros_Total || 0),
             reservas,
             recorridoKm: bus.Recorrido_Km !== null && bus.Recorrido_Km !== undefined ? Number(bus.Recorrido_Km) : estimateRouteKm(groupReservationsByPoint(reservas)),
@@ -2804,6 +2822,192 @@ function safeExportName(value, fallback) {
     return normalized || fallback;
 }
 
+function validarFechaProgramacionTransfer(fecha) {
+    const value = String(fecha || '').trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) throw createValidationError('La fecha de transfers debe tener formato YYYY-MM-DD.');
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) {
+        throw createValidationError('La fecha de transfers no es válida.');
+    }
+    return value;
+}
+
+function normalizarHoraProgramacionTransfer(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return { display: null, minutes: Number.MAX_SAFE_INTEGER };
+    const match = /^(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*([AaPp])\.?\s*[Mm]\.?)?$/.exec(raw);
+    if (!match) return { display: raw, minutes: Number.MAX_SAFE_INTEGER - 1 };
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const period = String(match[3] || '').toUpperCase();
+    if (minute > 59 || (period && (hour < 1 || hour > 12)) || (!period && hour > 23)) {
+        return { display: raw, minutes: Number.MAX_SAFE_INTEGER - 1 };
+    }
+    if (period === 'A' && hour === 12) hour = 0;
+    if (period === 'P' && hour !== 12) hour += 12;
+    return {
+        display: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        minutes: hour * 60 + minute,
+    };
+}
+
+function resumirTransfersPorServicio(transfers = []) {
+    const groups = new Map();
+    for (const transfer of transfers) {
+        const service = String(transfer.Nombre_Servicio || 'Sin servicio').trim() || 'Sin servicio';
+        if (!groups.has(service)) {
+            groups.set(service, {
+                servicio: service,
+                totalTransfers: 0,
+                totalPasajeros: 0,
+                pendientes: 0,
+                primeraRecogida: null,
+                ultimaRecogida: null,
+            });
+        }
+        const group = groups.get(service);
+        const time = normalizarHoraProgramacionTransfer(transfer.Hora_Recogida).display;
+        group.totalTransfers += 1;
+        group.totalPasajeros += Math.max(0, Number(transfer.Cantidad_Personas || 0));
+        if (/pendiente/i.test(String(transfer.Estado || ''))) group.pendientes += 1;
+        if (time && (!group.primeraRecogida || time < group.primeraRecogida)) group.primeraRecogida = time;
+        if (time && (!group.ultimaRecogida || time > group.ultimaRecogida)) group.ultimaRecogida = time;
+    }
+    return [...groups.values()].sort((a, b) => a.servicio.localeCompare(b.servicio, 'es'));
+}
+
+async function obtenerTransfersProgramacion(fecha) {
+    const fechaValida = validarFechaProgramacionTransfer(fecha);
+    const [rows] = await db.query(
+        `SELECT
+            tr.Id_Transfer,
+            CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
+            tr.Fecha_Transfer,
+            tr.Hora_Recogida,
+            tr.Estado,
+            tr.Punto_Salida,
+            tr.Punto_Destino,
+            tr.Nombre_Titular,
+            tr.Telefono_Titular,
+            tr.DNI,
+            tr.Cantidad_Personas,
+            tr.Vuelo,
+            tr.TipoVuelo,
+            tr.Observaciones,
+            COALESCE(NULLIF(s.Nombre_Servicio, ''), 'Sin servicio') AS Nombre_Servicio,
+            COALESCE(NULLIF(rg.Descripcion, ''), 'Sin rango') AS Rango_Descripcion
+         FROM transfers tr
+         LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
+         LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
+         WHERE tr.Fecha_Transfer = ?
+           AND LOWER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('cancelado', 'cancelada')
+         ORDER BY Nombre_Servicio ASC, tr.Id_Transfer ASC`,
+        [fechaValida]
+    );
+    const transfers = (rows || []).map((row) => {
+        const normalizedTime = normalizarHoraProgramacionTransfer(row.Hora_Recogida);
+        return {
+            ...row,
+            Cantidad_Personas: Math.max(0, Number(row.Cantidad_Personas || 0)),
+            Hora_Recogida: normalizedTime.display,
+            _HoraOrden: normalizedTime.minutes,
+        };
+    }).sort((a, b) => (
+        String(a.Nombre_Servicio).localeCompare(String(b.Nombre_Servicio), 'es')
+        || a._HoraOrden - b._HoraOrden
+        || Number(a.Id_Transfer) - Number(b.Id_Transfer)
+    )).map(({ _HoraOrden, ...transfer }) => transfer);
+    const servicios = resumirTransfersPorServicio(transfers);
+    return {
+        fecha: fechaValida,
+        totalTransfers: transfers.length,
+        totalPasajeros: transfers.reduce((sum, item) => sum + item.Cantidad_Personas, 0),
+        totalServicios: servicios.length,
+        totalPendientes: servicios.reduce((sum, item) => sum + item.pendientes, 0),
+        servicios,
+        transfers,
+    };
+}
+
+async function exportarTransfersProgramacion(fecha) {
+    const data = await obtenerTransfersProgramacion(fecha);
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Maxitours SIR';
+    workbook.created = new Date();
+
+    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A84FF' } };
+    const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true };
+    const border = { bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } } };
+
+    const summary = workbook.addWorksheet('Resumen', { views: [{ state: 'frozen', ySplit: 5 }] });
+    summary.mergeCells('A1:F1');
+    summary.getCell('A1').value = 'PROGRAMACIÓN DIARIA DE TRANSFERS';
+    summary.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF111827' } };
+    summary.mergeCells('A2:F2');
+    summary.getCell('A2').value = `Fecha de operación: ${data.fecha}`;
+    summary.getCell('A2').font = { size: 11, color: { argb: 'FF4B5563' } };
+    summary.addRow([]);
+    summary.addRow(['Transfers', data.totalTransfers, 'Pasajeros', data.totalPasajeros, 'Servicios', data.totalServicios]);
+    summary.getRow(4).font = { bold: true, color: { argb: 'FF111827' } };
+    const summaryHeader = summary.addRow(['Servicio', 'Transfers', 'Pasajeros', 'Pendientes', 'Primera recogida', 'Última recogida']);
+    summaryHeader.fill = headerFill;
+    summaryHeader.font = headerFont;
+    data.servicios.forEach((service) => summary.addRow([
+        service.servicio,
+        service.totalTransfers,
+        service.totalPasajeros,
+        service.pendientes,
+        service.primeraRecogida || '—',
+        service.ultimaRecogida || '—',
+    ]));
+    summary.columns = [34, 14, 14, 14, 20, 20].map((width) => ({ width }));
+    summary.autoFilter = { from: 'A5', to: 'F5' };
+
+    const detail = workbook.addWorksheet('Transfers', { views: [{ state: 'frozen', ySplit: 4 }] });
+    detail.mergeCells('A1:O1');
+    detail.getCell('A1').value = 'DETALLE OPERATIVO DE TRANSFERS';
+    detail.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF111827' } };
+    detail.mergeCells('A2:O2');
+    detail.getCell('A2').value = `${data.fecha} · ${data.totalTransfers} transfers · ${data.totalPasajeros} pasajeros`;
+    detail.getCell('A2').font = { size: 11, color: { argb: 'FF4B5563' } };
+    detail.addRow([]);
+    const columns = [
+        ['Código', 15], ['Servicio', 25], ['Hora', 12], ['Pasajeros', 12], ['Origen', 34],
+        ['Destino', 34], ['Titular', 28], ['DNI', 18], ['Teléfono', 18], ['Vuelo', 16],
+        ['Tipo de vuelo', 18], ['Rango', 22], ['Estado', 18], ['Observaciones', 42], ['ID', 10],
+    ];
+    const detailHeader = detail.addRow(columns.map(([name]) => name));
+    detailHeader.fill = headerFill;
+    detailHeader.font = headerFont;
+    data.transfers.forEach((item) => detail.addRow([
+        item.Codigo_Transfer,
+        item.Nombre_Servicio,
+        item.Hora_Recogida || '—',
+        item.Cantidad_Personas,
+        item.Punto_Salida || '—',
+        item.Punto_Destino || '—',
+        item.Nombre_Titular || '—',
+        item.DNI || '—',
+        item.Telefono_Titular || '—',
+        item.Vuelo || '—',
+        item.TipoVuelo || '—',
+        item.Rango_Descripcion || '—',
+        item.Estado || '—',
+        item.Observaciones || '',
+        item.Id_Transfer,
+    ]));
+    detail.columns = columns.map(([, width]) => ({ width }));
+    detail.autoFilter = { from: 'A4', to: 'O4' };
+    for (const sheet of [summary, detail]) {
+        sheet.eachRow((row, rowNumber) => {
+            row.alignment = { vertical: 'middle', wrapText: true };
+            if (rowNumber > (sheet === summary ? 5 : 4)) row.eachCell((cell) => { cell.border = border; });
+        });
+    }
+    return { buffer: await workbook.xlsx.writeBuffer(), fileName: `${data.fecha}_transfers.xlsx` };
+}
+
 async function generarZipPrivados({ fecha, buses }) {
     if (!fecha || !Array.isArray(buses) || buses.length === 0) {
         const error = new Error('Se requiere fecha y al menos un vehículo privado para exportar.');
@@ -2869,7 +3073,12 @@ module.exports = {
     calcularRutaVisualOSRM,
     generarZipListados,
     generarZipPrivados,
-    detectarDuplicadosAsignacion
+    obtenerTransfersProgramacion,
+    exportarTransfersProgramacion,
+    resumirTransfersPorServicio,
+    normalizarHoraProgramacionTransfer,
+    detectarDuplicadosAsignacion,
+    normalizarCapacidadProgramacion
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {

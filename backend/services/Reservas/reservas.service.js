@@ -6,6 +6,7 @@ const websocketManager = require('../../websocketManager');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { assertReservationOwner } = require('../../utils/clientAccess');
+const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
 const fsp = fs.promises;
 
 /* ===========================
@@ -114,14 +115,15 @@ async function resolverComprobanteSeguroPorNombre(nombreArchivo, ownerUserId = n
   if (!COMPROBANTE_FILE_RE.test(fileName)) return null;
 
   const ownerCondition = ownerUserId == null ? '' : 'AND r.Creado_Por = ?';
-  const params = [`%/${fileName}`];
+  const suffix = `/${fileName}`;
+  const params = [suffix.length, suffix];
   if (ownerUserId != null) params.push(ownerUserId);
 
   const [rows] = await db.query(
     `SELECT pr.Ruta_Comprobante
        FROM pagos_reservas pr
        INNER JOIN reservas r ON r.Id_Reserva = pr.Id_Reserva
-      WHERE pr.Ruta_Comprobante LIKE ?
+      WHERE RIGHT(REPLACE(pr.Ruta_Comprobante, '\\\\', '/'), ?) = ?
         ${ownerCondition}
       ORDER BY Id_Pago DESC
       LIMIT 1`,
@@ -151,6 +153,21 @@ const TOUR_PASSENGER_RULES = {
 
 function normalizarTipoPasajero(tipo) {
   return String(tipo || '').trim().toUpperCase();
+}
+
+async function guardarComprobanteReserva(idReserva, file) {
+  const prepared = await prepararComprobante(file);
+  const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(idReserva));
+  const saved = await guardarComprobanteAtomico(baseDir, prepared);
+  const relativePath = rutaComprobanteRelativaSegura(idReserva, saved.fileName);
+  if (!relativePath) {
+    await fsp.unlink(saved.absolutePath).catch(() => false);
+    const error = new Error('No fue posible generar una ruta segura para el comprobante.');
+    error.status = 500;
+    error.errorCode = 'RECEIPT_STORAGE_ERROR';
+    throw error;
+  }
+  return relativePath;
 }
 
 async function resolverMonedaReserva(connection, idMonedaValue, { required = false } = {}) {
@@ -1412,6 +1429,8 @@ async function crearReservaConPasajerosYPagos(
   privacyOwnerUserId = null
 ) {
   let conn;
+  let committed = false;
+  const rutasComprobantesCreadas = [];
   try {
     if (!payload || !payload.cabeceraReserva) {
       const err = new Error('Payload inválido: falta cabeceraReserva');
@@ -1514,9 +1533,6 @@ async function crearReservaConPasajerosYPagos(
       }
     }
 
-    const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(idReserva));
-    fs.mkdirSync(baseDir, { recursive: true });
-
     if (pagosArray.length > 0) {
       let abonoIdx = 0;
       for (const pago of pagosArray) {
@@ -1530,10 +1546,8 @@ async function crearReservaConPasajerosYPagos(
           const field = pago.fileField;
           const f = field ? filesMap[field] : undefined;
           if (f && f.buffer) {
-            const fileName = f.safeName || `${Date.now()}_${Math.random().toString(36).slice(2)}.bin`;
-            const dest = path.join(baseDir, fileName);
-            fs.writeFileSync(dest, f.buffer);
-            rutaComprobante = rutaComprobanteRelativaSegura(idReserva, fileName) || '';
+            rutaComprobante = await guardarComprobanteReserva(idReserva, f);
+            rutasComprobantesCreadas.push(rutaComprobante);
             if (tipo === 'Abono') abonoIdx++;
           } else if (pago.Ruta_Comprobante) {
             rutaComprobante = normalizarRutaComprobanteExistente(pago.Ruta_Comprobante, idReserva);
@@ -1584,6 +1598,7 @@ async function crearReservaConPasajerosYPagos(
     });
 
     await conn.commit();
+    committed = true;
 
     if (payload?.cabeceraReserva?.Fecha_Tour) {
       websocketManager.broadcastReservaEvento({
@@ -1597,7 +1612,12 @@ async function crearReservaConPasajerosYPagos(
     
     return { Id_Reserva: idReserva };
   } catch (error) {
-    if (conn) await conn.rollback();
+    if (conn && !committed) await conn.rollback();
+    if (!committed && rutasComprobantesCreadas.length > 0) {
+      await Promise.all(
+        rutasComprobantesCreadas.map((ruta) => eliminarArchivoComprobanteFisico(ruta).catch(() => false))
+      );
+    }
     try { await logSistema({ mensaje: `crearReserva error: ${error.message || error}`, meta: { payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
     throw error;
   } finally {
@@ -1768,7 +1788,9 @@ async function actualizarReservaConPasajerosYPagos(
   ownerUserId = null
 ) {
   let conn;
+  let committed = false;
   let rutasPendientesEliminar = [];
+  const rutasComprobantesCreadas = [];
   try {
     validarReglasPasajerosPorTour(payload);
 
@@ -1896,9 +1918,6 @@ async function actualizarReservaConPasajerosYPagos(
     }
 
     // 3) Pagos
-    const baseDir = path.join(__dirname, '../../uploads', 'reservas', String(Id_Reserva));
-    fs.mkdirSync(baseDir, { recursive: true });
-
     if (payload.pagos !== undefined) {
       const [pagosActualesRows] = await conn.query(
         `SELECT Id_Pago, Ruta_Comprobante
@@ -1933,10 +1952,8 @@ async function actualizarReservaConPasajerosYPagos(
           const field = pago.fileField;
           const f = field ? filesMap[field] : undefined;
           if (f && f.buffer) {
-            const fileName = f.safeName || `${Date.now()}_${Math.random().toString(36).slice(2)}.bin`;
-            const dest = path.join(baseDir, fileName);
-            fs.writeFileSync(dest, f.buffer);
-            rutaComprobante = rutaComprobanteRelativaSegura(Id_Reserva, fileName) || '';
+            rutaComprobante = await guardarComprobanteReserva(Id_Reserva, f);
+            rutasComprobantesCreadas.push(rutaComprobante);
             if (tipo === 'Abono') abonoIdx++;
           } else if (pago.Ruta_Comprobante || pago.SoporteUrl) {
             rutaComprobante = normalizarRutaComprobanteExistente(pago.Ruta_Comprobante || pago.SoporteUrl, Id_Reserva);
@@ -1986,9 +2003,15 @@ async function actualizarReservaConPasajerosYPagos(
     });
 
     await conn.commit();
+    committed = true;
 
     if (rutasPendientesEliminar.length > 0) {
-      await Promise.all(rutasPendientesEliminar.map((ruta) => eliminarArchivoComprobanteFisico(ruta)));
+      await Promise.all(
+        rutasPendientesEliminar.map((ruta) => eliminarArchivoComprobanteFisico(ruta).catch((error) => {
+          console.warn('No se pudo eliminar un comprobante anterior de la reserva:', error?.message || error);
+          return false;
+        }))
+      );
     }
 
     if (payload?.cabeceraReserva?.Fecha_Tour) {
@@ -2003,7 +2026,12 @@ async function actualizarReservaConPasajerosYPagos(
 
     return { Id_Reserva };
   } catch (error) {
-    if (conn) await conn.rollback();
+    if (conn && !committed) await conn.rollback();
+    if (!committed && rutasComprobantesCreadas.length > 0) {
+      await Promise.all(
+        rutasComprobantesCreadas.map((ruta) => eliminarArchivoComprobanteFisico(ruta).catch(() => false))
+      );
+    }
     try { await logSistema({ mensaje: `actualizarReserva error: ${error.message || error}`, meta: { Id_Reserva, payloadSummary: { Id_Tour: payload?.cabeceraReserva?.Id_Tour } } }); } catch (_) {}
     throw error;
   } finally {
@@ -2068,6 +2096,8 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
 
 async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ownerUserId = null) {
   let conn;
+  let committed = false;
+  let rutasComprobantes = [];
   try {
     conn = await db.getConnection();
     await conn.beginTransaction();
@@ -2098,6 +2128,17 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       [Id_Reserva, Id_Reserva, Id_Reserva]
     );
 
+    const [comprobantesRows] = await conn.query(
+      `SELECT Ruta_Comprobante
+         FROM pagos_reservas
+        WHERE Id_Reserva = ?
+        FOR UPDATE`,
+      [Id_Reserva]
+    );
+    rutasComprobantes = (comprobantesRows || [])
+      .map((row) => normalizarRutaComprobanteSalida(row.Ruta_Comprobante))
+      .filter(Boolean);
+
     const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
 
     await recordHistorial({
@@ -2123,6 +2164,14 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
     await conn.query('DELETE FROM reservas WHERE Id_Reserva = ?', [Id_Reserva]);
 
     await conn.commit();
+    committed = true;
+
+    const resultadosEliminacion = await Promise.all(
+      rutasComprobantes.map((ruta) => eliminarArchivoComprobanteFisico(ruta).catch((error) => {
+        console.warn('No se pudo eliminar un comprobante de la reserva eliminada:', error?.message || error);
+        return false;
+      }))
+    );
 
     websocketManager.broadcastReservaEvento({
       type: 'reservaEliminada',
@@ -2140,10 +2189,10 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
         comprobantesReferenciados: Number(resumenDeps.comprobantes || 0),
       },
       cuposLiberados,
-      comprobantesFisicosEliminados: false,
+      comprobantesFisicosEliminados: resultadosEliminacion.filter(Boolean).length,
     };
   } catch (error) {
-    if (conn) await conn.rollback();
+    if (conn && !committed) await conn.rollback();
     try { await logSistema({ mensaje: `eliminarReserva error: ${error.message || error}`, meta: { Id_Reserva, userId, clientIp } }); } catch (_) {}
     throw error;
   } finally {
@@ -2159,6 +2208,7 @@ async function eliminarComprobantePagoReserva(
   ownerUserId = null
 ) {
   let conn;
+  let committed = false;
   let rutaEliminar = null;
 
   try {
@@ -2221,18 +2271,24 @@ async function eliminarComprobantePagoReserva(
     });
 
     await conn.commit();
+    committed = true;
 
+    let comprobanteFisicoEliminado = false;
     if (rutaEliminar) {
-      await eliminarArchivoComprobanteFisico(rutaEliminar);
+      comprobanteFisicoEliminado = await eliminarArchivoComprobanteFisico(rutaEliminar).catch((error) => {
+        console.warn('No se pudo eliminar físicamente el comprobante de la reserva:', error?.message || error);
+        return false;
+      });
     }
 
     return {
       Id_Reserva: String(Id_Reserva),
       Id_Pago: Number(Id_Pago),
       comprobanteEliminado: true,
+      comprobanteFisicoEliminado,
     };
   } catch (error) {
-    if (conn) await conn.rollback();
+    if (conn && !committed) await conn.rollback();
     throw error;
   } finally {
     if (conn) conn.release();

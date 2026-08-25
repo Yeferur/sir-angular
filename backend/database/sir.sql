@@ -10740,6 +10740,7 @@ CREATE TABLE IF NOT EXISTS `programacion_buses` (
   `Id_Programacion` bigint UNSIGNED NOT NULL,
   `Placa_Display` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Capacidad` int NOT NULL DEFAULT '0',
+  `Capacidad_Manual` tinyint(1) NOT NULL DEFAULT '0',
   `Pasajeros_Total` int NOT NULL DEFAULT '0',
   `Guia` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Conductor` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -12443,6 +12444,9 @@ CREATE TABLE IF NOT EXISTS `tours` (
   `Nombre_Tour` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Abreviacion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Cupo_Base` int DEFAULT '0',
+  `Nombre_Primera_Parada` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Latitud_Primera_Parada` decimal(10,7) DEFAULT NULL,
+  `Longitud_Primera_Parada` decimal(10,7) DEFAULT NULL,
   `Latitud` decimal(10,7) DEFAULT NULL,
   `Longitud` decimal(10,7) DEFAULT NULL,
   `Activo` tinyint(1) NOT NULL DEFAULT '1',
@@ -12453,17 +12457,17 @@ CREATE TABLE IF NOT EXISTS `tours` (
 -- Volcado de datos para la tabla `tours`
 --
 
-INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Cupo_Base`, `Latitud`, `Longitud`, `Activo`) VALUES
-(1, 'RÍO CLARO', 'TRC', 0, 5.9094770, -74.8541590, 1),
-(2, 'GUATAPÉ', 'TG', 380, 6.2343110, -75.1617250, 1),
-(3, 'CITY TOUR + GRAFFITOUR', 'CTG', 76, 6.2539330, -75.5687160, 1),
-(4, 'SANTA FE DE ANTIOQUIA', 'TSA', 38, 6.5567630, -75.8277640, 1),
-(5, 'HACIENDA NÁPOLES', 'THN', 76, 5.9115980, -74.7251700, 1),
-(6, 'SILLETERO', 'TS', 38, 6.2091780, -75.4977640, 1),
-(7, 'TOUR DE LUCES', 'TDL', 38, 6.2502002, -75.5675845, 1),
-(8, 'PABLO ESCOBAR', 'TPE', 15, 6.2107740, -75.5580550, 1),
-(9, 'TOUR DE COMPRAS', 'TDC', 15, NULL, NULL, 1),
-(10, 'COFFEE TOUR', 'COF', 38, 6.3447100, -75.7027800, 1);
+INSERT INTO `tours` (`Id_Tour`, `Nombre_Tour`, `Abreviacion`, `Cupo_Base`, `Nombre_Primera_Parada`, `Latitud_Primera_Parada`, `Longitud_Primera_Parada`, `Latitud`, `Longitud`, `Activo`) VALUES
+(1, 'RÍO CLARO', 'TRC', 0, NULL, NULL, NULL, 5.9094770, -74.8541590, 1),
+(2, 'GUATAPÉ', 'TG', 380, 'Restaurante Porto Madero, Marinilla', 6.2076963, -75.2824310, 6.2343110, -75.1617250, 1),
+(3, 'CITY TOUR + GRAFFITOUR', 'CTG', 76, 'Plaza Botero, Medellín', 6.2522570, -75.5686141, 6.2539330, -75.5687160, 1),
+(4, 'SANTA FE DE ANTIOQUIA', 'TSA', 38, 'Restaurante Porto Madero, Laureles', 6.2491212, -75.5943729, 6.5567630, -75.8277640, 1),
+(5, 'HACIENDA NÁPOLES', 'THN', 76, 'Restaurante El Bohío, entrada Parque Temático Hacienda Nápoles', 5.9014587, -74.7239828, 5.9115980, -74.7251700, 1),
+(6, 'SILLETERO', 'TS', 38, NULL, NULL, NULL, 6.2091780, -75.4977640, 1),
+(7, 'TOUR DE LUCES', 'TDL', 38, NULL, NULL, NULL, 6.2502002, -75.5675845, 1),
+(8, 'PABLO ESCOBAR', 'TPE', 15, 'Parque de la Inflexión, Medellín', 6.1915064, -75.5775938, 6.2107740, -75.5580550, 1),
+(9, 'TOUR DE COMPRAS', 'TDC', 15, NULL, NULL, NULL, NULL, NULL, 1),
+(10, 'COFFEE TOUR', 'COF', 38, 'D''Arrieros Coffee Farm, Palmitas', 6.3446600, -75.7026407, 6.3447100, -75.7027800, 1);
 
 -- --------------------------------------------------------
 

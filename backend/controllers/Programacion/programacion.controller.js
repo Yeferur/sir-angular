@@ -404,3 +404,38 @@ exports.exportarPrivadosZipController = async (req, res) => {
         });
     }
 };
+
+exports.obtenerTransfersProgramacionController = async (req, res) => {
+    try {
+        const resultado = await cerebro.obtenerTransfersProgramacion(req.query?.fecha);
+        return sendSuccess(res, {
+            data: resultado,
+            message: 'Transfers del día obtenidos correctamente'
+        });
+    } catch (error) {
+        console.error('Error al consultar los transfers del día:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible consultar los transfers del día.',
+            errorCode: error.errorCode || 'DAILY_TRANSFERS_FAILED',
+            details: error.details || undefined
+        });
+    }
+};
+
+exports.exportarTransfersProgramacionController = async (req, res) => {
+    try {
+        const resultado = await cerebro.exportarTransfersProgramacion(req.query?.fecha);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${resultado.fileName}"`);
+        res.send(resultado.buffer);
+    } catch (error) {
+        console.error('Error al exportar los transfers del día:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'No fue posible exportar los transfers del día.',
+            errorCode: error.errorCode || 'DAILY_TRANSFERS_EXPORT_FAILED',
+            details: error.details || undefined
+        });
+    }
+};

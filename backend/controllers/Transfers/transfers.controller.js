@@ -1,7 +1,4 @@
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
-const { randomUUID } = require('crypto');
 
 const {
   getServiciosTransferSvc,
@@ -21,14 +18,6 @@ const { filtrarTransfersSvc } = require('../../services/Transfers/transfers.serv
 // Configuración multer para comprobantes
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-function extensionForMime(file) {
-  if (file.mimetype === 'image/jpeg') return '.jpg';
-  if (file.mimetype === 'image/png') return '.png';
-  if (file.mimetype === 'application/pdf') return '.pdf';
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  return ext || '.bin';
-}
 
 const uploadComprobante = multer({
   storage: multer.memoryStorage(),

@@ -268,8 +268,9 @@ async function crearTour(data, userId = null) {
     Comisiones,
     comisiones,
     Cupo_Base = 0,
-    Latitud = null,
-    Longitud = null,
+    Nombre_Primera_Parada = null,
+    Latitud_Primera_Parada = null,
+    Longitud_Primera_Parada = null,
     Id_Tour_Origen = null
   } = data || {};
 
@@ -284,14 +285,15 @@ async function crearTour(data, userId = null) {
     // 1) Crear el tour
     const [result] = await conn.query(
       `INSERT INTO tours
-        (Nombre_Tour, Abreviacion, Cupo_Base, Latitud, Longitud, Activo)
-       VALUES (?, ?, ?, ?, ?, 1)`,
+        (Nombre_Tour, Abreviacion, Cupo_Base, Nombre_Primera_Parada, Latitud_Primera_Parada, Longitud_Primera_Parada, Activo)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
       [
         Nombre_Tour,
         Abreviacion || null,
         Number(Cupo_Base) || 0,
-        Latitud,
-        Longitud
+        String(Nombre_Primera_Parada || '').trim() || null,
+        Latitud_Primera_Parada,
+        Longitud_Primera_Parada
       ]
     );
 
@@ -468,6 +470,9 @@ async function obtenerTours() {
        t.Nombre_Tour,
        t.Abreviacion,
        t.Cupo_Base,
+       t.Nombre_Primera_Parada,
+       t.Latitud_Primera_Parada,
+       t.Longitud_Primera_Parada,
        t.Latitud,
        t.Longitud,
        (SELECT COUNT(*) FROM planes_tours pt WHERE pt.Id_Tour = t.Id_Tour) AS Cantidad_Planes,
@@ -645,8 +650,9 @@ async function actualizarTour(Id_Tour, data, userId = null) {
     Comisiones,
     comisiones,
     Cupo_Base = 0,
-    Latitud = null,
-    Longitud = null
+    Nombre_Primera_Parada = null,
+    Latitud_Primera_Parada = null,
+    Longitud_Primera_Parada = null
   } = data || {};
 
   if (!Nombre_Tour) throw new Error('El nombre del tour es obligatorio');
@@ -666,16 +672,18 @@ async function actualizarTour(Id_Tour, data, userId = null) {
       `UPDATE tours
        SET Nombre_Tour = ?,
            Abreviacion = ?,
-           Cupo_Base = ?,
-           Latitud = ?,
-           Longitud = ?
+            Cupo_Base = ?,
+            Nombre_Primera_Parada = ?,
+            Latitud_Primera_Parada = ?,
+            Longitud_Primera_Parada = ?
        WHERE Id_Tour = ?`,
       [
         Nombre_Tour,
         Abreviacion || null,
         Number(Cupo_Base) || 0,
-        Latitud,
-        Longitud,
+        String(Nombre_Primera_Parada || '').trim() || null,
+        Latitud_Primera_Parada,
+        Longitud_Primera_Parada,
         Id_Tour
       ]
     );

@@ -521,7 +521,7 @@
 
   .detail-footer {
     align-items: stretch;
-    padding: 12px 18px 16px;
+    padding: 10px 18px max(14px, env(safe-area-inset-bottom));
   }
 
   .detail-footer button {
@@ -530,6 +530,26 @@
 
   .detail-footer .btn-primary {
     flex-basis: 100%;
+  }
+
+  .detail-header {
+    gap: 12px;
+  }
+
+  .identity-copy,
+  .identity-title-row {
+    min-width: 0;
+  }
+
+  .identity-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .identity-title-row h1,
+  .identity-copy p {
+    overflow-wrap: anywhere;
   }
 }
 

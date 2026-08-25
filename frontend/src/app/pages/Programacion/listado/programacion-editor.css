@@ -682,6 +682,51 @@ h2 {
   border-bottom: 1px solid var(--separator-color);
 }
 
+.bus-toolbar.is-transfer-mode {
+  display: block;
+  padding: 10px 12px;
+}
+
+.transfer-toolbar-note {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-blue) 8%, var(--bg-secondary));
+}
+
+.transfer-toolbar-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-blue) 18%, transparent);
+  color: var(--accent-blue);
+  font-weight: 900;
+}
+
+.transfer-toolbar-note > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.transfer-toolbar-note strong {
+  color: var(--text-primary);
+  font-size: .78rem;
+}
+
+.transfer-toolbar-note small {
+  color: var(--text-secondary);
+  font-size: .68rem;
+}
+
 .bus-selector,
 .bus-fields label {
   display: flex;
@@ -715,6 +760,10 @@ h2 {
   color: var(--text-tertiary);
 }
 
+.field-requirement--automatic {
+  color: var(--accent-green);
+}
+
 .bus-navigation {
   display: grid;
   grid-template-columns: 34px minmax(72px, auto) 34px;
@@ -739,7 +788,7 @@ h2 {
 
 .bus-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto;
   gap: 10px;
 }
 
@@ -747,6 +796,34 @@ h2 {
   height: 36px;
   padding-inline: 10px;
   font-size: .82rem;
+}
+
+.capacity-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.capacity-control .form-input {
+  width: 82px;
+  min-width: 82px;
+  max-width: 82px;
+  flex: 0 0 82px;
+}
+
+.capacity-auto-button {
+  padding-inline: 9px;
+  color: var(--accent-blue);
+  font-size: .62rem;
+  white-space: nowrap;
+}
+
+.manual-capacity-chip {
+  color: var(--accent-yellow);
+  font-size: .55rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .editing-grid {

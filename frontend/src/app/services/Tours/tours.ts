@@ -8,6 +8,9 @@ export interface Tour {
   Nombre_Tour: string;
   Abreviacion?: string;
   Cupo_Base?: number;
+  Nombre_Primera_Parada?: string | null;
+  Latitud_Primera_Parada?: number | null;
+  Longitud_Primera_Parada?: number | null;
   Latitud?: number;
   Longitud?: number;
   Id_Tour_Origen?: number;

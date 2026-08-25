@@ -206,8 +206,19 @@
   transition: width .4s cubic-bezier(.22, 1, .36, 1);
 }
 
-.operation-progress .private-progress {
+.operation-progress .status-line--ready,
+.operation-progress .status-line--pending,
+.operation-progress .status-line--private,
+.operation-progress .status-line--transfer {
   width: 100%;
+}
+
+.operation-progress .status-line--ready {
+  background: var(--accent-green);
+}
+
+.operation-progress .status-line--pending,
+.operation-progress .status-line--private {
   background: var(--accent-yellow);
 }
 
@@ -230,6 +241,10 @@
 }
 
 .transfer-card {
+  cursor: pointer;
+}
+
+.transfer-card:disabled {
   cursor: default;
 }
 
@@ -239,49 +254,8 @@
   color: var(--accent-blue);
 }
 
-.transfer-copy {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0 20px;
-}
-
-.transfer-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
-  border: 1px solid color-mix(in srgb, var(--accent-blue) 24%, var(--separator-color));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent-blue) 8%, var(--bg-tertiary));
-  color: var(--accent-blue);
-  font-size: 1rem;
-  font-weight: 850;
-}
-
-.transfer-copy > span:last-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.transfer-copy strong {
-  color: var(--text-primary);
-  font-size: .8rem;
-}
-
-.transfer-copy small {
-  color: var(--text-secondary);
-  font-size: .7rem;
-  line-height: 1.4;
-}
-
-.operation-progress.transfer-track > span {
-  width: 0;
+.operation-progress .status-line--transfer {
   background: var(--accent-blue);
-  opacity: .55;
 }
 
 .transfer-card .operation-action {

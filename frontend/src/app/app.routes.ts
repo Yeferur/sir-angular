@@ -151,7 +151,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { programacionView: 'editor', permiso: 'PROGRAMACION.ACTUALIZAR', redirectTo: '/Programacion/Listado' },
-    title: 'Editar programación',
+    title: 'Programación',
   },
   {
     path: 'Programacion/Privados/:fecha',

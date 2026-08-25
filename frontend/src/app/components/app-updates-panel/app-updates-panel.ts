@@ -78,7 +78,7 @@ export class AppUpdatesPanelComponent {
         'Programación separa claramente el dashboard de consulta y el editor operativo de cada jornada.',
         'Los listados guardados pueden consultarse antes de editar, y las reservas se asignan o trasladan entre buses con acciones explícitas.',
         'Se incorporaron deshacer, restaurar, reservas sin asignar, guías obligatorias y validaciones antes de guardar.',
-        'Las rutas se calculan sobre carretera y muestran recogida, recorrido hacia el tour, distancias y tiempos estimados sin tráfico.',
+        'Las rutas terminan en la primera parada operativa de cada tour y muestran tiempos transparentes: 22 km/h en ciudad y 50 km/h en carretera, sin tráfico, esperas ni abordaje.',
         'Las reservas privadas cuentan con una programación independiente de vehículos y guías.',
         'Cada bus puede exportarse individualmente y la jornada completa puede descargarse en un archivo ZIP con un Excel por vehículo.',
       ],

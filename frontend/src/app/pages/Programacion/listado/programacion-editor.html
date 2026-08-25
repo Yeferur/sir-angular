@@ -164,6 +164,9 @@
               <span class="capacity-line">
                 <span class="capacity-track"><span [style.width.%]="pct"></span></span>
                 <span>{{ bus.ocupados }} / {{ bus.capacidad }}</span>
+                @if (bus.capacidadManual) {
+                  <small class="manual-capacity-chip">Manual</small>
+                }
               </span>
               @if (quality.total > 0) {
                 <span class="fleet-quality-alert" [attr.title]="busQualityLabel(quality)">
@@ -200,7 +203,16 @@
 
     <main class="operation-panel">
       @if (activeBus(); as bus) {
-        <div class="bus-toolbar">
+        <div class="bus-toolbar" [class.is-transfer-mode]="transferMode">
+          @if (transferReservation(); as movingReservation) {
+            <div class="transfer-toolbar-note" role="status">
+              <span class="transfer-toolbar-icon" aria-hidden="true">→</span>
+              <span>
+                <strong>Moviendo reserva #{{ movingReservation.Id_Reserva }}</strong>
+                <small>{{ transferPax }} pax · selecciona el bus de destino en la flota</small>
+              </span>
+            </div>
+          } @else {
           <div class="bus-selector">
             <span>Bus seleccionado</span>
             <div class="bus-navigation">
@@ -242,6 +254,36 @@
                   (ngModelChange)="bus.guia = $event; busChanged.emit()"
                   placeholder="Asignar guía">
               </label>
+              <label class="capacity-field">
+                <span class="field-label">
+                  Capacidad
+                  <em class="field-requirement" [class.field-requirement--automatic]="!bus.capacidadManual">
+                    {{ bus.capacidadManual ? 'Manual' : 'Automática' }}
+                  </em>
+                </span>
+                <span class="capacity-control">
+                  <input
+                    class="form-input"
+                    type="number"
+                    min="1"
+                    max="200"
+                    step="1"
+                    inputmode="numeric"
+                    [disabled]="transferMode"
+                    [ngModel]="bus.capacidad"
+                    (ngModelChange)="setManualCapacity(bus, $event)"
+                    aria-label="Capacidad del bus">
+                  @if (bus.capacidadManual) {
+                    <button
+                      type="button"
+                      class="button button--quiet capacity-auto-button"
+                      [disabled]="transferMode"
+                      (click)="restoreAutomaticCapacity(bus)">
+                      Usar automática
+                    </button>
+                  }
+                </span>
+              </label>
               </div>
             }
 
@@ -258,6 +300,7 @@
                 Exportar bus
               </button>
             </div>
+          }
           }
         </div>
 

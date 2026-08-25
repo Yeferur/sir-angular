@@ -86,8 +86,9 @@ type EditarTourFullPayload = {
   Abreviacion: string;
   Comisiones: ComisionPayload[];
   Cupo_Base: number;
-  Latitud: number | null;
-  Longitud: number | null;
+  Nombre_Primera_Parada: string | null;
+  Latitud_Primera_Parada: number | null;
+  Longitud_Primera_Parada: number | null;
   Planes: PlanPayload[];
   Disponibilidad: DisponibilidadPayload;
 };
@@ -168,6 +169,7 @@ export class EditarTourComponent implements OnInit {
       Nombre_Tour: ['', [Validators.required, Validators.maxLength(255)]],
       Abreviacion: ['', [Validators.required, Validators.maxLength(50)]],
       Cupo_Base: [null, [Validators.required, Validators.min(0)]],
+      Nombre_Primera_Parada: ['', [Validators.maxLength(255)]],
       Coordenadas: ['', [this.coordenadasValidator()]],
 
       // compat simple pricing (no lo usamos si hay planes)
@@ -1052,7 +1054,8 @@ export class EditarTourComponent implements OnInit {
               Nombre_Tour: tour.Nombre_Tour,
               Abreviacion: tour.Abreviacion,
               Cupo_Base: tour.Cupo_Base,
-              Coordenadas: this.formatCoordenadas(tour.Latitud, tour.Longitud),
+              Nombre_Primera_Parada: tour.Nombre_Primera_Parada || '',
+              Coordenadas: this.formatCoordenadas(tour.Latitud_Primera_Parada, tour.Longitud_Primera_Parada),
             },
             { emitEvent: false }
           );
@@ -1249,8 +1252,9 @@ export class EditarTourComponent implements OnInit {
       Abreviacion: String(raw.Abreviacion || '').trim(),
       Comisiones: comisiones,
       Cupo_Base: Number(raw.Cupo_Base || 0),
-      Latitud: coords?.lat ?? null,
-      Longitud: coords?.lng ?? null,
+      Nombre_Primera_Parada: String(raw.Nombre_Primera_Parada || '').trim() || null,
+      Latitud_Primera_Parada: coords?.lat ?? null,
+      Longitud_Primera_Parada: coords?.lng ?? null,
       Planes: planes,
       Disponibilidad: disponibilidad,
     };
@@ -1298,6 +1302,7 @@ export class EditarTourComponent implements OnInit {
         Nombre_Tour: 'Nombre del Tour',
         Abreviacion: 'Abreviacion',
         Cupo_Base: 'Cupo Base',
+        Nombre_Primera_Parada: 'Primera parada',
         Coordenadas: 'Geolocalización',
         Modo_Disponibilidad: 'Modo de disponibilidad',
         planes: 'Planes y precios',

@@ -58,6 +58,8 @@ interface PuntoSinCoordenadas {
   styleUrls: ['./mapa.css']
 })
 export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
+  readonly velocidadCiudadKmh = 22;
+  readonly velocidadCarreteraKmh = 50;
   @Input() puntos: any[] = [];
   @Input() destino: DestinoTourMapa | null = null;
   @Output() onClose = new EventEmitter<void>();
@@ -72,6 +74,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   ventanaRecogidaBase: string = '';
   horaSalidaBase: string = '—';
   llegadaEstimada: string = '—';
+  velocidadViajeKmh: number = this.velocidadCiudadKmh;
   totalPax: number = 0;
   puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
   mapTheme: 'dark' | 'light' =
@@ -178,7 +181,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   }
 
   emptyStopLabel(punto: PuntoAgrupado, index: number): string {
-    if (punto.esDestinoTour) return 'Destino del tour';
+    if (punto.esDestinoTour) return 'Primera parada operativa';
     if (index === 0) return 'Punto de inicio';
     return 'Sin reservas';
   }
@@ -196,6 +199,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     this.tiempoRecogida = '—';
     this.tiempoAlTour = '—';
     this.llegadaEstimada = '—';
+    this.velocidadViajeKmh = this.velocidadCiudadKmh;
     this.configurarHorarioBase();
 
     if (!Array.isArray(this.puntos) || this.puntos.length === 0) return;
@@ -302,13 +306,13 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
       if (destinoExistenteIndex >= 0) {
         const [destinoExistente] = this.agrupadosConBase.splice(destinoExistenteIndex, 1);
         destinoExistente.esDestinoTour = true;
-        destinoExistente.NombrePunto = destinoTour.nombre || 'Destino del tour';
+        destinoExistente.NombrePunto = destinoTour.nombre || 'Primera parada operativa';
         this.agrupadosConBase.push(destinoExistente);
       } else {
         this.agrupadosConBase.push({
           lat: destinoTour.lat,
           lng: destinoTour.lng,
-          NombrePunto: destinoTour.nombre || 'Destino del tour',
+          NombrePunto: destinoTour.nombre || 'Primera parada operativa',
           reservas: [],
           totalPaxEnEstePunto: 0,
           esDestinoTour: true
@@ -376,7 +380,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
 
         // Popup estilizado dark
         const emptyLabel = esDestinoTour
-          ? 'Destino del tour'
+          ? 'Primera parada operativa'
           : isStart
             ? 'Punto de inicio'
             : 'Sin reservas';
@@ -399,7 +403,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
           : `<div class="mapa-popup-empty">${emptyLabel}</div>`;
 
         const badgeClass = isStart ? 'badge-start' : isEnd ? 'badge-end' : 'badge-mid';
-        const badgeText  = isStart ? 'INICIO' : isEnd ? (esDestinoTour ? 'TOUR' : 'FINAL') : `Parada ${i + 1}`;
+        const badgeText  = isStart ? 'INICIO' : isEnd ? (esDestinoTour ? 'PRIMERA PARADA' : 'FINAL') : `Parada ${i + 1}`;
         const numPaxTotal = this.totalPaxPunto(punto ?? { reservas: [] } as any);
 
         marker.bindPopup(`
@@ -444,15 +448,25 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
       this.map.fitBounds(L.latLngBounds(r.coordinates), { padding: [32, 32] });
 
       const distM = Number(r.summary?.totalDistance ?? 0);
-      const timeS = Number(r.summary?.totalTime ?? 0);
       const routeLegs = Array.isArray(r.routeLegs) ? r.routeLegs : [];
       const ultimoTramo = this.hasTourDestination && routeLegs.length
         ? routeLegs[routeLegs.length - 1]
         : null;
-      const tiempoAlTourS = Number(ultimoTramo?.duration ?? 0);
-      const tiempoRecogidaS = this.hasTourDestination && ultimoTramo
-        ? Math.max(0, timeS - tiempoAlTourS)
-        : timeS;
+      const distanciaAlTourM = Number(ultimoTramo?.distance ?? 0);
+      const distanciaRecogidaM = ultimoTramo
+        ? Math.max(0, distM - distanciaAlTourM)
+        : distM;
+
+      // OSRM aporta el trazado y las distancias. El horario usa un modelo
+      // operativo explícito y estable, no la duración opaca del proveedor.
+      this.velocidadViajeKmh = distanciaAlTourM >= 15_000
+        ? this.velocidadCarreteraKmh
+        : this.velocidadCiudadKmh;
+      const tiempoRecogidaS = this.estimateTravelSeconds(distanciaRecogidaM, this.velocidadCiudadKmh);
+      const tiempoAlTourS = this.hasTourDestination
+        ? this.estimateTravelSeconds(distanciaAlTourM, this.velocidadViajeKmh)
+        : 0;
+      const tiempoTotalS = tiempoRecogidaS + tiempoAlTourS;
 
       this.distanciaKm = (distM / 1000).toFixed(1);
       this.tiempoRecogida = this.formatDuration(tiempoRecogidaS);
@@ -460,7 +474,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
         ? this.formatDuration(tiempoAlTourS)
         : '—';
       this.llegadaEstimada = this.salidaBaseMinutos !== null
-        ? this.formatClockMinutes(this.salidaBaseMinutos + Math.round(timeS / 60))
+        ? this.formatClockMinutes(this.salidaBaseMinutos + Math.round(tiempoTotalS / 60))
         : '—';
       this.cdr.detectChanges();
     });
@@ -503,7 +517,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
 
     const color  = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
     const shadow = isStart ? 'rgba(34,197,94,0.4)' : isEnd ? 'rgba(239,68,68,0.4)' : 'rgba(59,130,246,0.4)';
-    const label  = isStart ? 'S' : isEnd ? (esDestinoTour ? 'T' : 'F') : String(i);
+    const label  = isStart ? 'S' : isEnd ? (esDestinoTour ? 'P' : 'F') : String(i);
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
@@ -555,7 +569,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     return {
       lat,
       lng,
-      nombre: String(this.destino?.nombre || '').trim() || 'Destino del tour',
+      nombre: String(this.destino?.nombre || '').trim() || 'Primera parada operativa',
       horaSalidaBase: this.destino?.horaSalidaBase || null
     };
   }
@@ -621,6 +635,12 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     if (!hours) return `${minutes} min`;
     if (!minutes) return `${hours} h`;
     return `${hours} h ${minutes} min`;
+  }
+
+  private estimateTravelSeconds(distanceMeters: number, speedKmh: number): number {
+    const distanceKm = Number(distanceMeters || 0) / 1000;
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0 || speedKmh <= 0) return 0;
+    return (distanceKm / speedKmh) * 3600;
   }
 
   private observeAppTheme(): void {
@@ -690,7 +710,8 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     if (wps.length <= max) return wps;
 
     // Cuando existe destino, el último punto es el tour y el penúltimo es la
-    // última recogida. Conservar ambos mantiene exacto ese tramo.
+        // última recogida. Conservar ambos mantiene exacto el tramo hacia la
+        // primera parada operativa.
     const indices = new Set<number>([0, wps.length - 2, wps.length - 1]);
     const disponibles = Math.max(0, max - indices.size);
 

@@ -1134,6 +1134,16 @@
   gap: 8px;
 }
 
+.mobile-drawer-title {
+  color: var(--text-primary);
+  font-size: .92rem;
+  font-weight: 750;
+}
+
+@media (max-width: 520px) {
+  .mobile-drawer { width: 100%; }
+}
+
 .mobile-drawer-logo {
   height: 26px;
   width: auto;

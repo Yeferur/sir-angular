@@ -2,12 +2,15 @@ import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef, HostListener }
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
+import {
+  ProgramacionDashboardService,
+  TransfersProgramacionResponse,
+} from '../../../services/Programacion/programacion';
 import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
+import { catchError, forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
@@ -15,6 +18,7 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 import { ProgramacionDashboardComponent } from './programacion-dashboard';
 import { ProgramacionEditorComponent } from './programacion-editor';
 import { ProgramacionPrivadosComponent } from './programacion-privados';
+import { ProgramacionTransfersComponent } from './programacion-transfers';
 import { ProgramacionViewStop as ViewStop } from './programacion-view.types';
 import {
   bestBusCapacity,
@@ -58,6 +62,7 @@ interface ProgramacionMoveSnapshot {
     ProgramacionDashboardComponent,
     ProgramacionEditorComponent,
     ProgramacionPrivadosComponent,
+    ProgramacionTransfersComponent,
   ],
   templateUrl: './listado.html',
   styleUrls: ['./listado.css']
@@ -100,7 +105,7 @@ export class Listado implements OnInit, OnDestroy {
   isSaving = false;
   editorLoadingMode: 'saved' | 'generating' | null = null;
   loadError = '';
-  modoVista: 'dashboard' | 'editor' | 'privados' = 'dashboard';
+  modoVista: 'dashboard' | 'editor' | 'privados' | 'transfers' = 'dashboard';
 
   tourSeleccionado: TourProgramacion | null = null;
   planSeleccionado: Sugerencia | null = null;
@@ -115,6 +120,9 @@ export class Listado implements OnInit, OnDestroy {
   reservasSinAsignar: Reserva[] = [];
   busesPrivados: any[] = [];  // buses para reservas privadas del día
   privateDirty = false;
+  transfersDia: TransfersProgramacionResponse = this.emptyTransfersResponse(this.fechaSeleccionada);
+  transfersLoadError = false;
+  isExportingTransfers = false;
   destinoTourActual: DestinoTourProgramacion | null = null;
 
   // Buses privados agrupados por reserva para la vista de privados
@@ -291,6 +299,7 @@ export class Listado implements OnInit, OnDestroy {
     const requestSequence = ++this.loadSequence;
     this.loadSubscription?.unsubscribe();
     this.loadError = '';
+    this.transfersLoadError = false;
     this.isPageLoading = true;
 
     this.loadSubscription = this.programacionService.resumenPrivadosDia(this.fechaSeleccionada).pipe(
@@ -330,6 +339,7 @@ export class Listado implements OnInit, OnDestroy {
     const requestSequence = ++this.loadSequence;
     this.loadSubscription?.unsubscribe();
     this.loadError = '';
+    this.transfersLoadError = false;
     const isInitialLoad = this.toursDelDia.length === 0;
 
     if (isInitialLoad) {
@@ -375,6 +385,13 @@ export class Listado implements OnInit, OnDestroy {
           datosDelDia: this.inicioService.getDatosInicio(this.fechaSeleccionada),
           listados: tours.length > 0 ? forkJoin(listadoObservables) : of({}),
           privadosDelDia: this.programacionService.resumenPrivadosDia(this.fechaSeleccionada, todosIds)
+            .pipe(catchError(() => of({ totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] }))),
+          transfersDelDia: this.programacionService.obtenerTransfersDia(this.fechaSeleccionada)
+            .pipe(catchError((error) => {
+              console.error('No fue posible cargar los transfers del día', error);
+              this.transfersLoadError = true;
+              return of(this.emptyTransfersResponse(this.fechaSeleccionada));
+            }))
         });
       }),
       finalize(() => {
@@ -397,6 +414,7 @@ export class Listado implements OnInit, OnDestroy {
         if (resumenPrivados?.privados?.length) {
           this.busesPrivados = resumenPrivados.privados;
         }
+        this.transfersDia = result.transfersDelDia || this.emptyTransfersResponse(this.fechaSeleccionada);
 
         // Crear mapa de pasajeros y reservas por tour desde datosDelDia
         const pasajerosPorTour = new Map<number, number>();
@@ -876,6 +894,33 @@ export class Listado implements OnInit, OnDestroy {
     });
   }
 
+  abrirVistaTransfers(): void {
+    if (this.transfersLoadError || this.transfersDia.totalTransfers === 0) return;
+    this.modoVista = 'transfers';
+    this.cdr.markForCheck();
+  }
+
+  exportarTransfersDia(): void {
+    if (this.isExportingTransfers || this.transfersDia.totalTransfers === 0) return;
+    this.isExportingTransfers = true;
+    this.programacionService.exportarTransfersDia(this.fechaSeleccionada).pipe(
+      finalize(() => {
+        this.isExportingTransfers = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (blob) => this.downloadBlob(blob, `${this.fechaSeleccionada}_transfers.xlsx`),
+      error: (error) => {
+        console.error('Error al exportar los transfers del día', error);
+        this.alerts.showAlert({
+          type: 'error',
+          title: 'No pudimos exportar los transfers',
+          message: 'La información sigue disponible en pantalla. Inténtalo nuevamente.',
+        });
+      },
+    });
+  }
+
   updatePrivateBuses(buses: any[]): void {
     this.busesPrivados = Array.isArray(buses) ? JSON.parse(JSON.stringify(buses)) : [];
     this.cdr.markForCheck();
@@ -1026,7 +1071,9 @@ export class Listado implements OnInit, OnDestroy {
       if (!targetBus) return;
 
       const projectedLoad = Number(targetBus.ocupados || 0) + Number(reservation.NumeroPasajeros || 0);
-      const projectedCapacity = bestBusCapacity(projectedLoad, this.CAPACIDADES_BUSES);
+      const projectedCapacity = targetBus.capacidadManual
+        ? (projectedLoad <= Number(targetBus.capacidad || 0) ? Number(targetBus.capacidad) : null)
+        : bestBusCapacity(projectedLoad, this.CAPACIDADES_BUSES);
       if (!projectedCapacity) {
         this.alerts.errorToast(
           'La reserva no cabe en este bus',
@@ -1036,7 +1083,7 @@ export class Listado implements OnInit, OnDestroy {
       }
 
       sourceReservations.splice(sourcePosition, 1);
-      targetBus.capacidad = projectedCapacity;
+      if (!targetBus.capacidadManual) targetBus.capacidad = projectedCapacity;
       targetBus.reservas.push(reservation);
       destinationBus = targetBus;
     }
@@ -1214,7 +1261,8 @@ export class Listado implements OnInit, OnDestroy {
       return {
         ...bus,
         id: identifier || `Bus ${index + 1}`,
-        guia: String(bus.guia || '').trim()
+        guia: String(bus.guia || '').trim(),
+        capacidadManual: Boolean(bus.capacidadManual)
       };
     });
   }
@@ -1270,6 +1318,25 @@ export class Listado implements OnInit, OnDestroy {
     return false;
   }
 
+  private validateBusCapacities(): boolean {
+    if (!this.planSeleccionado) return false;
+    const invalidIndex = this.planSeleccionado.buses.findIndex((bus) => {
+      const capacity = Number(bus.capacidad || 0);
+      const occupied = Number(bus.ocupados || 0);
+      return !Number.isInteger(capacity) || capacity < 1 || capacity > 200 || capacity < occupied;
+    });
+    if (invalidIndex < 0) return true;
+
+    const bus = this.planSeleccionado.buses[invalidIndex];
+    this.selectBus(invalidIndex);
+    this.navbar.showAlert({
+      type: 'warning',
+      title: 'Capacidad del bus no válida',
+      message: `${bus.id || `Bus ${invalidIndex + 1}`} tiene ${bus.ocupados || 0} pasajeros. La capacidad debe ser un número entero entre ${Math.max(1, Number(bus.ocupados || 0))} y 200.`
+    });
+    return false;
+  }
+
   async guardarListadoFinal(options: { skipConfirmation?: boolean } = {}): Promise<void> {
     if (!this.canUpdateProgramacion) {
       this.navbar.warningToast('Acción no permitida', 'No tienes permiso para guardar el listado.');
@@ -1293,6 +1360,7 @@ export class Listado implements OnInit, OnDestroy {
     this.normalizeBusMetadata();
     if (!this.validateRequiredGuides()) return;
     if (!this.validateUniqueBusIdentifiers()) return;
+    if (!this.validateBusCapacities()) return;
 
     const busesOrdenados = this.planSeleccionado.buses.map((bus) => ({
       ...bus,
@@ -1442,6 +1510,18 @@ export class Listado implements OnInit, OnDestroy {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  private emptyTransfersResponse(fecha: string): TransfersProgramacionResponse {
+    return {
+      fecha,
+      totalTransfers: 0,
+      totalPasajeros: 0,
+      totalServicios: 0,
+      totalPendientes: 0,
+      servicios: [],
+      transfers: [],
+    };
   }
 
   private generarPlanDesdeCero(tour: TourProgramacion): void {
@@ -1695,6 +1775,7 @@ export class Listado implements OnInit, OnDestroy {
     const nuevoBus: Bus = {
       id: '',
       capacidad,
+      capacidadManual: false,
       ocupados: reserva.NumeroPasajeros,
       reservas: [reserva],
       recorridoKm: 0
@@ -1729,6 +1810,7 @@ export class Listado implements OnInit, OnDestroy {
     this.planSeleccionado?.buses.forEach(bus => {
       bus.ocupados = bus.reservas.reduce((sum, r) => sum + r.NumeroPasajeros, 0);
       const needed = bus.ocupados || 0;
+      if (bus.capacidadManual) return;
       const best = bestBusCapacity(needed, this.CAPACIDADES_BUSES);
       if (best && best !== bus.capacidad) bus.capacidad = best;
     });

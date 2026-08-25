@@ -47,6 +47,7 @@ export interface DestinoTourProgramacion {
 export interface Bus {
   id: string;
   capacidad: number;
+  capacidadManual?: boolean;
   ocupados: number;
   reservas: Reserva[];
   recorridoKm: number;
