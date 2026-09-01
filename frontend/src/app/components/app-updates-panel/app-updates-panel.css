@@ -127,25 +127,36 @@
 
 .updates-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  grid-template-areas:
+    "warning summary"
+    "report summary"
+    "changes changes";
   gap: 12px;
+  align-items: stretch;
   margin-top: 12px;
 }
 
 .update-card {
-  min-height: 148px;
+  min-height: 0;
   padding: 16px;
   border-radius: 18px;
 }
 
 .warning-card {
+  grid-area: warning;
   border-color: color-mix(in srgb, var(--accent-red) 34%, var(--separator-color));
   background:
     linear-gradient(145deg, rgba(255, 69, 58, 0.13), transparent 58%),
     color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
 }
 
+.summary-card {
+  grid-area: summary;
+}
+
 .report-card {
+  grid-area: report;
   border-color: color-mix(in srgb, var(--accent-green) 36%, var(--separator-color));
   background:
     linear-gradient(145deg, rgba(48, 209, 88, 0.12), transparent 58%),
@@ -153,7 +164,7 @@
 }
 
 .changes-card {
-  grid-column: 1 / -1;
+  grid-area: changes;
 }
 
 .changes-card ul {
@@ -202,6 +213,11 @@
 
   .updates-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "warning"
+      "report"
+      "summary"
+      "changes";
   }
 
   .update-card {

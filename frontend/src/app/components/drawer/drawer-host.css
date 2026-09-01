@@ -107,7 +107,7 @@
 
 /* ── Mapa: ancho más generoso ───────────────────────────────── */
 .sir-drawer-panel:has(app-mapa) {
-  width: clamp(520px, 60vw, 1100px);
+  width: min(92vw, 1440px);
 }
 
 /* ── Móvil: pantalla casi completa ─────────────────────────── */
