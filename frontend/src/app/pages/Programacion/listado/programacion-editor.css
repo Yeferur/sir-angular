@@ -650,6 +650,26 @@ h2 {
   font-size: .72rem;
   font-weight: 800;
   text-align: center;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.new-bus-target:hover:not(.cannot-receive) {
+  border-color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 14%, var(--bg-secondary));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.new-bus-target:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-blue) 25%, transparent);
+  outline-offset: 2px;
+}
+
+.new-bus-target-icon {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
 }
 
 .new-bus-target.is-visible {
@@ -708,6 +728,11 @@ h2 {
   background: color-mix(in srgb, var(--accent-blue) 18%, transparent);
   color: var(--accent-blue);
   font-weight: 900;
+}
+
+.transfer-toolbar-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .transfer-toolbar-note > span:last-child {

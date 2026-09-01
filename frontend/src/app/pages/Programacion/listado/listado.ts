@@ -12,7 +12,7 @@ import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
-import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { SirDrawerService, type DrawerMapDestination } from '../../../services/Drawer/drawer.service';
 import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { ProgramacionDashboardComponent } from './programacion-dashboard';
@@ -1527,6 +1527,9 @@ export class Listado implements OnInit, OnDestroy {
   private generarPlanDesdeCero(tour: TourProgramacion): void {
     this.isPageLoading = true;
     this.editorLoadingMode = 'generating';
+    // La aplicación usa detección zoneless. Esta función también puede entrar
+    // desde timers y suscripciones, que no garantizan un nuevo render por sí solos.
+    this.cdr.detectChanges();
 
     this.editorSubscription?.unsubscribe();
     this.editorSubscription = this.programacionService.generarPlanLogistico(
@@ -1597,6 +1600,7 @@ export class Listado implements OnInit, OnDestroy {
         console.error(`Error al generar plan para ${tour.NombreTour}`, err);
         this.isPageLoading = false;
         this.editorLoadingMode = null;
+        this.cdr.markForCheck();
         this.navbar.showAlert({
           type: 'error',
           title: 'No pudimos preparar el listado',
@@ -1886,17 +1890,34 @@ export class Listado implements OnInit, OnDestroy {
     this.drawerService.openMapa(reservas, this.getTourMapDestination());
   }
 
-  private getTourMapDestination(): { lat: number; lng: number; nombre?: string; horaSalidaBase?: string | null } | null {
-    const lat = this.parseCoordinate(this.destinoTourActual?.lat);
-    const lng = this.parseCoordinate(this.destinoTourActual?.lng);
+  private getTourMapDestination(): DrawerMapDestination | null {
+    const destino = this.destinoTourActual;
+    if (!destino) return null;
 
-    if (lat === null || lng === null) return null;
+    const normalizarPunto = (punto: any, nombreFallback: string) => {
+      const lat = this.parseCoordinate(punto?.lat);
+      const lng = this.parseCoordinate(punto?.lng);
+      return lat === null || lng === null ? null : {
+        lat,
+        lng,
+        nombre: String(punto?.nombre || '').trim() || nombreFallback,
+      };
+    };
+
+    const paradaExplicita = normalizarPunto(destino.primeraParadaOperativa, 'Primera parada operativa');
+    const tour = normalizarPunto(destino.tour, this.tourSeleccionado?.NombreTour || 'Tour');
+    // Respuestas antiguas: los campos planos representaban la parada operativa.
+    const paradaLegacy = paradaExplicita
+      ? null
+      : normalizarPunto(destino, destino.nombre || 'Primera parada operativa');
+    const primeraParadaOperativa = paradaExplicita || paradaLegacy;
+
+    if (!primeraParadaOperativa && !tour) return null;
 
     return {
-      lat,
-      lng,
-      nombre: this.destinoTourActual?.nombre || this.tourSeleccionado?.NombreTour || 'Destino del tour',
-      horaSalidaBase: this.destinoTourActual?.horaSalidaBase || null
+      horaSalidaBase: destino.horaSalidaBase || null,
+      primeraParadaOperativa,
+      tour,
     };
   }
 

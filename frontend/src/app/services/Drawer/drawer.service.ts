@@ -2,11 +2,20 @@ import { Injectable, signal } from '@angular/core';
 
 export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'notificaciones' | 'turnos-intercambio';
 
-export interface DrawerMapDestination {
+export interface DrawerMapPoint {
   lat: number;
   lng: number;
   nombre?: string;
+}
+
+export interface DrawerMapDestination {
+  // Campos planos para mantener compatibilidad con aperturas anteriores.
+  lat?: number;
+  lng?: number;
+  nombre?: string;
   horaSalidaBase?: string | null;
+  primeraParadaOperativa?: DrawerMapPoint | null;
+  tour?: DrawerMapPoint | null;
 }
 
 export interface DrawerState {

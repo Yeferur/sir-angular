@@ -10,10 +10,28 @@
         <circle cx="12" cy="9" r="2.5"/>
       </svg>
       <span class="mapa-topbar-title">Ruta del día</span>
-      <span class="mapa-topbar-badge">{{ agrupadosConBase.length }} paradas</span>
+      <span class="mapa-topbar-badge">{{ totalPuntosRecogida }} puntos de recogida</span>
       <span class="mapa-topbar-warning" *ngIf="puntosSinCoordenadas.length">
         {{ puntosSinCoordenadas.length }} sin coordenadas
       </span>
+      <div class="destination-switcher" *ngIf="hasBothAvailableDestinations" aria-label="Destinos visibles en la ruta">
+        <button
+          type="button"
+          [class.is-active]="mostrarParadaOperativa"
+          [attr.aria-pressed]="mostrarParadaOperativa"
+          (click)="toggleDestino('operativa')">
+          <span class="switcher-dot switcher-dot--operativa"></span>
+          Parada operativa
+        </button>
+        <button
+          type="button"
+          [class.is-active]="mostrarTour"
+          [attr.aria-pressed]="mostrarTour"
+          (click)="toggleDestino('tour')">
+          <span class="switcher-dot switcher-dot--tour"></span>
+          Tour
+        </button>
+      </div>
     </div>
     <div class="mapa-topbar-actions">
       <div class="mapa-topbar-summary" aria-label="Resumen de la ruta">
@@ -29,9 +47,13 @@
           <small>Recogida</small>
           <strong>{{ tiempoRecogida }}</strong>
         </span>
+        <span class="topbar-metric topbar-metric--operational" *ngIf="hasOperationalStop">
+          <small>A primera parada operativa</small>
+          <strong>{{ tiempoAParadaOperativa }}</strong>
+        </span>
         <span class="topbar-metric topbar-metric--tour" *ngIf="hasTourDestination">
-          <small>A primera parada</small>
-          <strong>{{ tiempoAlTour }}</strong>
+          <small>Al tour</small>
+          <strong>{{ tiempoATour }}</strong>
         </span>
         <span class="topbar-schedule" *ngIf="ventanaRecogidaBase">
           <span>
@@ -94,13 +116,13 @@
               <path d="M5 12h14"/><path d="m15 8 4 4-4 4"/>
             </svg>
             <div class="eta-time eta-time--arrival">
-              <span>Llegada a primera parada</span>
+              <span>Llegada a {{ etiquetaDestinoFinal }}</span>
               <strong>{{ llegadaEstimada }}</strong>
             </div>
           </div>
           <p>
             Recogida en Estación Poblado: {{ ventanaRecogidaBase }}.<br>
-            Modelo: {{ velocidadCiudadKmh }} km/h en ciudad<span *ngIf="hasTourDestination"> y {{ velocidadViajeKmh }} km/h hacia la primera parada</span>.
+            Modelo: {{ velocidadCiudadKmh }} km/h en ciudad<span *ngIf="hasOperationalStop || hasTourDestination"> y {{ velocidadViajeKmh }} km/h después de la recogida</span>.
             No incluye tráfico, esperas ni tiempo de abordaje.
           </p>
         </div>
@@ -113,14 +135,24 @@
           <strong class="route-stage-time">{{ tiempoRecogida }}</strong>
         </div>
 
-        <div class="route-stage route-stage--tour" *ngIf="hasTourDestination">
+        <div class="route-stage route-stage--operational" *ngIf="hasOperationalStop">
           <div class="route-stage-copy">
-            <span class="route-stage-kicker">Viaje a primera parada</span>
+            <span class="route-stage-kicker">Viaje a primera parada operativa</span>
             <span class="route-stage-detail" [title]="'Desde ' + ultimoPuntoRecogidaNombre">
               Desde {{ ultimoPuntoRecogidaNombre }} · {{ velocidadViajeKmh }} km/h
             </span>
           </div>
-          <strong class="route-stage-time">{{ tiempoAlTour }}</strong>
+          <strong class="route-stage-time">{{ tiempoAParadaOperativa }}</strong>
+        </div>
+
+        <div class="route-stage route-stage--tour" *ngIf="hasTourDestination">
+          <div class="route-stage-copy">
+            <span class="route-stage-kicker">Viaje al tour</span>
+            <span class="route-stage-detail" [title]="'Desde ' + origenTramoTourNombre">
+              Desde {{ origenTramoTourNombre }} · {{ velocidadViajeKmh }} km/h
+            </span>
+          </div>
+          <strong class="route-stage-time">{{ tiempoATour }}</strong>
         </div>
       </div>
 
@@ -136,26 +168,30 @@
       </div>
 
       <!-- Lista de paradas -->
-      <div class="panel-paradas-header">Paradas</div>
+      <div class="panel-paradas-header">Recorrido <small *ngIf="hasOperationalStop || hasTourDestination">· destinos diferenciados por color</small></div>
       <div class="panel-paradas">
         <div
           *ngFor="let punto of agrupadosConBase; let i = index; let last = last"
           class="parada-item"
           [class.parada-activa]="paradaActivaIndex === i"
+          [class.parada-operativa]="punto.tipoDestino === 'operativa' || punto.tipoDestino === 'ambos'"
+          [class.parada-tour]="punto.tipoDestino === 'tour'"
           (click)="seleccionarParada(i)">
 
           <!-- Indicador visual (dot + línea conectora) -->
           <div class="parada-indicator">
             <div class="parada-dot"
               [class.dot-start]="i === 0"
-              [class.dot-end]="i === agrupadosConBase.length - 1"
-              [class.dot-mid]="i !== 0 && i !== agrupadosConBase.length - 1"
+              [class.dot-operativa]="punto.tipoDestino === 'operativa'"
+              [class.dot-tour]="punto.tipoDestino === 'tour'"
+              [class.dot-ambos]="punto.tipoDestino === 'ambos'"
+              [class.dot-mid]="i !== 0 && !punto.tipoDestino"
               [class.dot-active]="paradaActivaIndex === i">
               <span *ngIf="i === 0">S</span>
-              <span *ngIf="i === agrupadosConBase.length - 1 && i !== 0">
-                {{ punto.esDestinoTour ? 'P' : 'F' }}
-              </span>
-              <span *ngIf="i !== 0 && i !== agrupadosConBase.length - 1">{{ i }}</span>
+              <span *ngIf="i !== 0 && punto.tipoDestino === 'operativa'">O</span>
+              <span *ngIf="i !== 0 && punto.tipoDestino === 'tour'">T</span>
+              <span *ngIf="i !== 0 && punto.tipoDestino === 'ambos'">O+T</span>
+              <span *ngIf="i !== 0 && !punto.tipoDestino">{{ i }}</span>
             </div>
             <div class="parada-connector" *ngIf="!last"></div>
           </div>
@@ -193,10 +229,13 @@
         <span class="legend-dot dot-green"></span>Inicio
       </span>
       <span class="legend-item">
-        <span class="legend-dot dot-blue"></span>Parada
+        <span class="legend-dot dot-blue"></span>Recogida
       </span>
       <span class="legend-item">
-        <span class="legend-dot dot-red"></span>{{ hasTourDestination ? 'Tour' : 'Final' }}
+        <span class="legend-dot dot-amber"></span>Parada operativa
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot dot-red"></span>Tour
       </span>
     </div>
   </div>

@@ -1452,10 +1452,8 @@ async function getDistanceKmBetweenStops(a, b) {
 }
 
 async function obtenerCoordenadasTours(tours) {
-    // Consulta la primera parada operativa de cada tour. Estos datos viven en
-    // tours y nunca forman parte del catálogo de puntos de encuentro.
-    // Tours sin coordenadas (ej: Tour de Compras, Tour de Luces) no aparecen en el mapa
-    // y el algoritmo de ordenamiento se comporta igual que antes para ellos.
+    // Consulta por separado la primera parada operativa y la ubicación del tour.
+    // Ninguna de las dos forma parte del catálogo de puntos de encuentro.
     try {
         const estacionPobladoId = Number(process.env.PUNTOS_ESTACION_POBLADO_ID || 6);
         const [rows] = await db.query(
@@ -1464,8 +1462,10 @@ async function obtenerCoordenadasTours(tours) {
                 t.Id_Tour,
                 t.Nombre_Tour,
                 t.Nombre_Primera_Parada,
-                t.Latitud_Primera_Parada AS Latitud,
-                t.Longitud_Primera_Parada AS Longitud,
+                t.Latitud_Primera_Parada,
+                t.Longitud_Primera_Parada,
+                t.Latitud AS Latitud_Tour,
+                t.Longitud AS Longitud_Tour,
                 (
                     SELECT h.Hora_Salida
                     FROM horarios h
@@ -1476,22 +1476,35 @@ async function obtenerCoordenadasTours(tours) {
                 ) AS Hora_Salida_Base
             FROM tours t
             WHERE t.Id_Tour IN (?)
-              AND t.Latitud_Primera_Parada IS NOT NULL
-              AND t.Longitud_Primera_Parada IS NOT NULL
             `,
             [estacionPobladoId, tours]
         );
         const mapa = {};
         for (const row of rows || []) {
-            const lat = Number(row.Latitud);
-            const lon = Number(row.Longitud);
-            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            const latParada = Number(row.Latitud_Primera_Parada);
+            const lngParada = Number(row.Longitud_Primera_Parada);
+            const latTour = Number(row.Latitud_Tour);
+            const lngTour = Number(row.Longitud_Tour);
+            const paradaValida = row.Latitud_Primera_Parada !== null
+                && row.Longitud_Primera_Parada !== null
+                && Number.isFinite(latParada) && Number.isFinite(lngParada);
+            const tourValido = row.Latitud_Tour !== null
+                && row.Longitud_Tour !== null
+                && Number.isFinite(latTour) && Number.isFinite(lngTour);
+
+            if (paradaValida || tourValido) {
                 mapa[String(row.Id_Tour)] = {
                     Id_Tour: Number(row.Id_Tour),
                     Nombre_Tour: row.Nombre_Tour || null,
                     Nombre_Primera_Parada: row.Nombre_Primera_Parada || null,
-                    Latitud: lat,
-                    Longitud: lon,
+                    // Compatibilidad con el optimizador: orientar primero hacia
+                    // la parada operativa y, si no existe, hacia el tour.
+                    Latitud: paradaValida ? latParada : latTour,
+                    Longitud: paradaValida ? lngParada : lngTour,
+                    Latitud_Primera_Parada: paradaValida ? latParada : null,
+                    Longitud_Primera_Parada: paradaValida ? lngParada : null,
+                    Latitud_Tour: tourValido ? latTour : null,
+                    Longitud_Tour: tourValido ? lngTour : null,
                     Hora_Salida_Base: row.Hora_Salida_Base || null
                 };
             }
@@ -1512,16 +1525,44 @@ function resolverDestinoTour(tours, tourDestinos = {}) {
     const destino = tourDestinos[String(primaryTourId)] || tourDestinos[String(ids[0])];
     if (!destino) return null;
 
-    const lat = Number(destino.Latitud);
-    const lng = Number(destino.Longitud);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const latParada = Number(destino.Latitud_Primera_Parada);
+    const lngParada = Number(destino.Longitud_Primera_Parada);
+    const latTour = Number(destino.Latitud_Tour);
+    const lngTour = Number(destino.Longitud_Tour);
+    const paradaValida = destino.Latitud_Primera_Parada !== null
+        && destino.Latitud_Primera_Parada !== undefined
+        && destino.Longitud_Primera_Parada !== null
+        && destino.Longitud_Primera_Parada !== undefined
+        && Number.isFinite(latParada) && Number.isFinite(lngParada);
+    const tourValido = destino.Latitud_Tour !== null
+        && destino.Latitud_Tour !== undefined
+        && destino.Longitud_Tour !== null
+        && destino.Longitud_Tour !== undefined
+        && Number.isFinite(latTour) && Number.isFinite(lngTour);
+    if (!paradaValida && !tourValido) return null;
+
+    const destinoPrincipal = paradaValida
+        ? { lat: latParada, lng: lngParada }
+        : { lat: latTour, lng: lngTour };
 
     return {
         idTour: Number(destino.Id_Tour || primaryTourId),
-        lat,
-        lng,
-        nombre: destino.Nombre_Primera_Parada || destino.Nombre_Tour || `Tour ${primaryTourId}`,
-        horaSalidaBase: destino.Hora_Salida_Base || null
+        // Campos planos conservados para clientes anteriores.
+        ...destinoPrincipal,
+        nombre: paradaValida
+            ? (destino.Nombre_Primera_Parada || 'Primera parada operativa')
+            : (destino.Nombre_Tour || `Tour ${primaryTourId}`),
+        horaSalidaBase: destino.Hora_Salida_Base || null,
+        primeraParadaOperativa: paradaValida ? {
+            lat: latParada,
+            lng: lngParada,
+            nombre: destino.Nombre_Primera_Parada || 'Primera parada operativa'
+        } : null,
+        tour: tourValido ? {
+            lat: latTour,
+            lng: lngTour,
+            nombre: destino.Nombre_Tour || `Tour ${primaryTourId}`
+        } : null
     };
 }
 
@@ -3078,7 +3119,8 @@ module.exports = {
     resumirTransfersPorServicio,
     normalizarHoraProgramacionTransfer,
     detectarDuplicadosAsignacion,
-    normalizarCapacidadProgramacion
+    normalizarCapacidadProgramacion,
+    resolverDestinoTour
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {

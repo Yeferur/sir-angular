@@ -30,18 +30,23 @@ interface PuntoAgrupado {
   lng: number;
   reservas: any[];
   NombrePunto?: string;
-  esDestinoTour?: boolean;
+  tipoDestino?: 'operativa' | 'tour' | 'ambos';
   // Suma de __paxEnEstePunto de las reservas en este punto.
   // Puede diferir del total de NumeroPasajeros cuando una reserva
   // tiene pasajeros repartidos en múltiples puntos de la misma ruta.
   totalPaxEnEstePunto: number;
 }
 
-interface DestinoTourMapa {
-  lat: number;
-  lng: number;
+interface PuntoDestinoMapa {
+  lat?: number;
+  lng?: number;
   nombre?: string | null;
+}
+
+interface DestinosRutaMapa extends PuntoDestinoMapa {
   horaSalidaBase?: string | null;
+  primeraParadaOperativa?: PuntoDestinoMapa | null;
+  tour?: PuntoDestinoMapa | null;
 }
 
 interface PuntoSinCoordenadas {
@@ -61,7 +66,7 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   readonly velocidadCiudadKmh = 22;
   readonly velocidadCarreteraKmh = 50;
   @Input() puntos: any[] = [];
-  @Input() destino: DestinoTourMapa | null = null;
+  @Input() destino: DestinosRutaMapa | null = null;
   @Output() onClose = new EventEmitter<void>();
   @ViewChild('mapaDiv') mapContainer!: ElementRef<HTMLDivElement>;
 
@@ -70,13 +75,16 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   paradaActivaIndex: number | null = null;
   distanciaKm: string = '—';
   tiempoRecogida: string = '—';
-  tiempoAlTour: string = '—';
+  tiempoAParadaOperativa: string = '—';
+  tiempoATour: string = '—';
   ventanaRecogidaBase: string = '';
   horaSalidaBase: string = '—';
   llegadaEstimada: string = '—';
   velocidadViajeKmh: number = this.velocidadCiudadKmh;
   totalPax: number = 0;
   puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
+  mostrarParadaOperativa = true;
+  mostrarTour = true;
   mapTheme: 'dark' | 'light' =
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
       ? 'light'
@@ -162,17 +170,30 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     return punto.reservas.reduce((sum, r) => sum + (Number(r.NumeroPasajeros) || 0), 0);
   }
 
+  get hasOperationalStop(): boolean {
+    return this.agrupadosConBase.some((punto) => punto.tipoDestino === 'operativa' || punto.tipoDestino === 'ambos');
+  }
+
   get hasTourDestination(): boolean {
-    return this.agrupadosConBase.some((punto) => punto.esDestinoTour);
+    return this.agrupadosConBase.some((punto) => punto.tipoDestino === 'tour' || punto.tipoDestino === 'ambos');
+  }
+
+  get hasBothAvailableDestinations(): boolean {
+    return !!this.normalizarPuntoDestino(this.destino?.primeraParadaOperativa, 'Primera parada operativa')
+      && !!this.normalizarPuntoDestino(this.destino?.tour, 'Tour');
+  }
+
+  get totalPuntosRecogida(): number {
+    return this.agrupadosConBase.filter((punto, index) => index > 0 && !punto.tipoDestino).length;
   }
 
   get ultimoPuntoRecogidaNombre(): string {
-    const destinoIndex = this.agrupadosConBase.findIndex((punto) => punto.esDestinoTour);
+    const destinoIndex = this.agrupadosConBase.findIndex((punto) => !!punto.tipoDestino);
     const limite = destinoIndex >= 0 ? destinoIndex : this.agrupadosConBase.length;
 
     for (let index = limite - 1; index > 0; index--) {
       const punto = this.agrupadosConBase[index];
-      if (!punto.esDestinoTour && punto.NombrePunto?.trim()) {
+      if (!punto.tipoDestino && punto.NombrePunto?.trim()) {
         return punto.NombrePunto.trim();
       }
     }
@@ -181,9 +202,34 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   }
 
   emptyStopLabel(punto: PuntoAgrupado, index: number): string {
-    if (punto.esDestinoTour) return 'Primera parada operativa';
+    if (punto.tipoDestino === 'operativa') return 'Primera parada operativa';
+    if (punto.tipoDestino === 'tour') return 'Destino del tour';
+    if (punto.tipoDestino === 'ambos') return 'Parada operativa y tour';
     if (index === 0) return 'Punto de inicio';
     return 'Sin reservas';
+  }
+
+  get etiquetaDestinoFinal(): string {
+    if (this.hasTourDestination) return 'tour';
+    if (this.hasOperationalStop) return 'primera parada operativa';
+    return 'fin del recorrido';
+  }
+
+  get origenTramoTourNombre(): string {
+    const parada = this.agrupadosConBase.find((punto) => punto.tipoDestino === 'operativa' || punto.tipoDestino === 'ambos');
+    return parada?.NombrePunto?.trim() || this.ultimoPuntoRecogidaNombre;
+  }
+
+  toggleDestino(tipo: 'operativa' | 'tour'): void {
+    if (!this.hasBothAvailableDestinations) return;
+    if (tipo === 'operativa') {
+      if (this.mostrarParadaOperativa && !this.mostrarTour) return;
+      this.mostrarParadaOperativa = !this.mostrarParadaOperativa;
+    } else {
+      if (this.mostrarTour && !this.mostrarParadaOperativa) return;
+      this.mostrarTour = !this.mostrarTour;
+    }
+    this.scheduleMapInit({ reset: true });
   }
 
   // ── Init del mapa ────────────────────────────────────────────
@@ -197,7 +243,8 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     this.puntosSinCoordenadas = [];
     this.distanciaKm = '—';
     this.tiempoRecogida = '—';
-    this.tiempoAlTour = '—';
+    this.tiempoAParadaOperativa = '—';
+    this.tiempoATour = '—';
     this.llegadaEstimada = '—';
     this.velocidadViajeKmh = this.velocidadCiudadKmh;
     this.configurarHorarioBase();
@@ -296,26 +343,45 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
       ...agrupadosSinBase
     ];
 
-    const destinoTour = this.normalizarDestinoTour();
-    if (destinoTour) {
-      const destinoKey = `${destinoTour.lat.toFixed(5)},${destinoTour.lng.toFixed(5)}`;
+    const destinos = [
+      this.mostrarParadaOperativa
+        ? this.normalizarPuntoDestino(this.destino?.primeraParadaOperativa, 'Primera parada operativa', 'operativa')
+        : null,
+      this.mostrarTour
+        ? this.normalizarPuntoDestino(this.destino?.tour, 'Tour', 'tour')
+        : null,
+    ].filter((destino): destino is PuntoDestinoMapa & { lat: number; lng: number; nombre: string; tipo: 'operativa' | 'tour' } => !!destino);
+
+    // Compatibilidad: en respuestas antiguas los campos planos representaban
+    // únicamente la primera parada operativa.
+    if (!destinos.length && this.mostrarParadaOperativa) {
+      const legacy = this.normalizarPuntoDestino(this.destino, 'Primera parada operativa', 'operativa');
+      if (legacy) destinos.push(legacy);
+    }
+
+    for (const destinoRuta of destinos) {
+      const destinoKey = `${destinoRuta.lat.toFixed(5)},${destinoRuta.lng.toFixed(5)}`;
       const destinoExistenteIndex = this.agrupadosConBase.findIndex(
         p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}` === destinoKey
       );
 
       if (destinoExistenteIndex >= 0) {
         const [destinoExistente] = this.agrupadosConBase.splice(destinoExistenteIndex, 1);
-        destinoExistente.esDestinoTour = true;
-        destinoExistente.NombrePunto = destinoTour.nombre || 'Primera parada operativa';
+        destinoExistente.tipoDestino = destinoExistente.tipoDestino && destinoExistente.tipoDestino !== destinoRuta.tipo
+          ? 'ambos'
+          : destinoRuta.tipo;
+        destinoExistente.NombrePunto = destinoExistente.tipoDestino === 'ambos'
+          ? `${destinoExistente.NombrePunto || 'Parada operativa'} · ${destinoRuta.nombre}`
+          : destinoRuta.nombre;
         this.agrupadosConBase.push(destinoExistente);
       } else {
         this.agrupadosConBase.push({
-          lat: destinoTour.lat,
-          lng: destinoTour.lng,
-          NombrePunto: destinoTour.nombre || 'Primera parada operativa',
+          lat: destinoRuta.lat,
+          lng: destinoRuta.lng,
+          NombrePunto: destinoRuta.nombre,
           reservas: [],
           totalPaxEnEstePunto: 0,
-          esDestinoTour: true
+          tipoDestino: destinoRuta.tipo
         });
       }
     }
@@ -372,15 +438,15 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
         const punto = this.agrupadosConBase[i];
         const isStart = i === 0;
         const isEnd   = i === n - 1;
-        const esDestinoTour = !!punto?.esDestinoTour;
+        const tipoDestino = punto?.tipoDestino;
 
         const marker = L.marker(wp.latLng, {
-          icon: this.crearIconoSvg(i, n, esDestinoTour)
+          icon: this.crearIconoSvg(i, tipoDestino)
         });
 
         // Popup estilizado dark
-        const emptyLabel = esDestinoTour
-          ? 'Primera parada operativa'
+        const emptyLabel = tipoDestino
+          ? this.emptyStopLabel(punto, i)
           : isStart
             ? 'Punto de inicio'
             : 'Sin reservas';
@@ -402,8 +468,16 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
             }).join('')
           : `<div class="mapa-popup-empty">${emptyLabel}</div>`;
 
-        const badgeClass = isStart ? 'badge-start' : isEnd ? 'badge-end' : 'badge-mid';
-        const badgeText  = isStart ? 'INICIO' : isEnd ? (esDestinoTour ? 'PRIMERA PARADA' : 'FINAL') : `Parada ${i + 1}`;
+        const badgeClass = isStart ? 'badge-start' : tipoDestino ? `badge-destination badge-${tipoDestino}` : 'badge-mid';
+        const badgeText = isStart
+          ? 'INICIO'
+          : tipoDestino === 'operativa'
+            ? 'PARADA OPERATIVA'
+            : tipoDestino === 'tour'
+              ? 'TOUR'
+              : tipoDestino === 'ambos'
+                ? 'PARADA + TOUR'
+                : `Recogida ${i}`;
         const numPaxTotal = this.totalPaxPunto(punto ?? { reservas: [] } as any);
 
         marker.bindPopup(`
@@ -449,29 +523,38 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
 
       const distM = Number(r.summary?.totalDistance ?? 0);
       const routeLegs = Array.isArray(r.routeLegs) ? r.routeLegs : [];
-      const ultimoTramo = this.hasTourDestination && routeLegs.length
-        ? routeLegs[routeLegs.length - 1]
-        : null;
-      const distanciaAlTourM = Number(ultimoTramo?.distance ?? 0);
-      const distanciaRecogidaM = ultimoTramo
-        ? Math.max(0, distM - distanciaAlTourM)
-        : distM;
+      const destinosActivos = this.agrupadosConBase.filter((punto) => !!punto.tipoDestino);
+      let distanciaOperativaM = 0;
+      let distanciaTourM = 0;
+      const primerTramoDestino = Math.max(0, routeLegs.length - destinosActivos.length);
+      destinosActivos.forEach((destinoRuta, index) => {
+        const distanciaTramo = Number(routeLegs[primerTramoDestino + index]?.distance ?? 0);
+        if (destinoRuta.tipoDestino === 'operativa' || destinoRuta.tipoDestino === 'ambos') {
+          distanciaOperativaM += distanciaTramo;
+        } else if (destinoRuta.tipoDestino === 'tour') {
+          distanciaTourM += distanciaTramo;
+        }
+      });
+      const distanciaDestinosM = distanciaOperativaM + distanciaTourM;
+      const distanciaRecogidaM = Math.max(0, distM - distanciaDestinosM);
 
       // OSRM aporta el trazado y las distancias. El horario usa un modelo
       // operativo explícito y estable, no la duración opaca del proveedor.
-      this.velocidadViajeKmh = distanciaAlTourM >= 15_000
+      this.velocidadViajeKmh = Math.max(distanciaOperativaM, distanciaTourM) >= 15_000
         ? this.velocidadCarreteraKmh
         : this.velocidadCiudadKmh;
       const tiempoRecogidaS = this.estimateTravelSeconds(distanciaRecogidaM, this.velocidadCiudadKmh);
-      const tiempoAlTourS = this.hasTourDestination
-        ? this.estimateTravelSeconds(distanciaAlTourM, this.velocidadViajeKmh)
-        : 0;
-      const tiempoTotalS = tiempoRecogidaS + tiempoAlTourS;
+      const tiempoOperativaS = this.estimateTravelSeconds(distanciaOperativaM, this.velocidadViajeKmh);
+      const tiempoTourS = this.estimateTravelSeconds(distanciaTourM, this.velocidadViajeKmh);
+      const tiempoTotalS = tiempoRecogidaS + tiempoOperativaS + tiempoTourS;
 
       this.distanciaKm = (distM / 1000).toFixed(1);
       this.tiempoRecogida = this.formatDuration(tiempoRecogidaS);
-      this.tiempoAlTour = this.hasTourDestination
-        ? this.formatDuration(tiempoAlTourS)
+      this.tiempoAParadaOperativa = this.hasOperationalStop
+        ? this.formatDuration(tiempoOperativaS)
+        : '—';
+      this.tiempoATour = this.hasTourDestination
+        ? this.formatDuration(tiempoTourS)
         : '—';
       this.llegadaEstimada = this.salidaBaseMinutos !== null
         ? this.formatClockMinutes(this.salidaBaseMinutos + Math.round(tiempoTotalS / 60))
@@ -511,13 +594,19 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   }
 
   // ── Icono SVG custom por tipo de parada ─────────────────────
-  private crearIconoSvg(i: number, n: number, esDestinoTour: boolean): L.DivIcon {
+  private crearIconoSvg(i: number, tipoDestino?: 'operativa' | 'tour' | 'ambos'): L.DivIcon {
     const isStart = i === 0;
-    const isEnd   = i === n - 1;
-
-    const color  = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6';
-    const shadow = isStart ? 'rgba(34,197,94,0.4)' : isEnd ? 'rgba(239,68,68,0.4)' : 'rgba(59,130,246,0.4)';
-    const label  = isStart ? 'S' : isEnd ? (esDestinoTour ? 'P' : 'F') : String(i);
+    const color = isStart
+      ? '#22c55e'
+      : tipoDestino === 'operativa'
+        ? '#f59e0b'
+        : tipoDestino === 'tour'
+          ? '#ef4444'
+          : tipoDestino === 'ambos'
+            ? '#a855f7'
+            : '#3b82f6';
+    const shadow = isStart ? 'rgba(34,197,94,0.4)' : `${color}66`;
+    const label = isStart ? 'S' : tipoDestino === 'operativa' ? 'O' : tipoDestino === 'tour' ? 'T' : tipoDestino === 'ambos' ? 'O+T' : String(i);
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
@@ -554,9 +643,13 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     return isNaN(n) ? null : n;
   }
 
-  private normalizarDestinoTour(): DestinoTourMapa | null {
-    const lat = this.toNumber(this.destino?.lat);
-    const lng = this.toNumber(this.destino?.lng);
+  private normalizarPuntoDestino(
+    punto: PuntoDestinoMapa | null | undefined,
+    nombreFallback: string,
+    tipo?: 'operativa' | 'tour'
+  ): (PuntoDestinoMapa & { lat: number; lng: number; nombre: string; tipo: 'operativa' | 'tour' }) | null {
+    const lat = this.toNumber(punto?.lat);
+    const lng = this.toNumber(punto?.lng);
 
     if (
       lat === null || lng === null ||
@@ -569,8 +662,8 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     return {
       lat,
       lng,
-      nombre: String(this.destino?.nombre || '').trim() || 'Primera parada operativa',
-      horaSalidaBase: this.destino?.horaSalidaBase || null
+      nombre: String(punto?.nombre || '').trim() || nombreFallback,
+      tipo: tipo || 'operativa'
     };
   }
 

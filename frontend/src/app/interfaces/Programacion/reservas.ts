@@ -33,12 +33,21 @@ export interface Reserva {
   ruta?: string | null;
 }
 
-export interface DestinoTourProgramacion {
-  idTour?: number | null;
+export interface PuntoDestinoProgramacion {
   lat: number;
   lng: number;
   nombre?: string | null;
+}
+
+export interface DestinoTourProgramacion {
+  idTour?: number | null;
+  // Compatibilidad con respuestas anteriores, donde solo existía un destino.
+  lat?: number;
+  lng?: number;
+  nombre?: string | null;
   horaSalidaBase?: string | null;
+  primeraParadaOperativa?: PuntoDestinoProgramacion | null;
+  tour?: PuntoDestinoProgramacion | null;
 }
 
 /**

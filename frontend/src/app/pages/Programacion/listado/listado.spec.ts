@@ -23,7 +23,7 @@ describe('Listado', () => {
   beforeEach(async () => {
     programacionService = jasmine.createSpyObj<ProgramacionDashboardService>(
       'ProgramacionDashboardService',
-      ['obtenerListadoFinal', 'resumenPrivadosDia']
+      ['obtenerListadoFinal', 'resumenPrivadosDia', 'generarPlanLogistico']
     );
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
@@ -84,6 +84,68 @@ describe('Listado', () => {
     expect(component.editorLoadingMode).toBeNull();
     expect(markForCheck).toHaveBeenCalledBefore(openDrawer);
     expect(drawer.drawer()?.type).toBe('programacion-listado');
+  });
+
+  it('renderiza inmediatamente el mensaje al comenzar a generar en modo zoneless', () => {
+    const response$ = new Subject<any>();
+    programacionService.generarPlanLogistico.and.returnValue(response$);
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    component.modoVista = 'editor';
+    const tour: TourProgramacion = {
+      Id_Tour: 2,
+      NombreTour: 'Guatapé',
+      estado: 'Pendiente',
+      planGenerado: null,
+      totalPasajeros: 8,
+    };
+
+    (component as any).generarPlanDesdeCero(tour);
+
+    expect(component.isPageLoading).toBeTrue();
+    expect(component.editorLoadingMode).toBe('generating');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Generando los listados y optimizando los recorridos'
+    );
+  });
+
+  it('conserva parada operativa y tour de forma independiente según sus coordenadas', () => {
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    component.tourSeleccionado = {
+      Id_Tour: 2,
+      NombreTour: 'Guatapé',
+      estado: 'Generado',
+      planGenerado: null,
+    };
+
+    component.destinoTourActual = {
+      horaSalidaBase: '6:00 AM',
+      primeraParadaOperativa: { lat: 6.2076963, lng: -75.282431, nombre: 'Restaurante Porto Madero' },
+      tour: { lat: 6.234311, lng: -75.161725, nombre: 'Guatapé' },
+    };
+    expect((component as any).getTourMapDestination()).toEqual({
+      horaSalidaBase: '6:00 AM',
+      primeraParadaOperativa: { lat: 6.2076963, lng: -75.282431, nombre: 'Restaurante Porto Madero' },
+      tour: { lat: 6.234311, lng: -75.161725, nombre: 'Guatapé' },
+    });
+
+    component.destinoTourActual = {
+      primeraParadaOperativa: { lat: 6.2076963, lng: -75.282431, nombre: 'Restaurante Porto Madero' },
+      tour: null,
+    };
+    expect((component as any).getTourMapDestination().tour).toBeNull();
+
+    component.destinoTourActual = {
+      primeraParadaOperativa: null,
+      tour: { lat: 6.234311, lng: -75.161725, nombre: 'Guatapé' },
+    };
+    const soloTour = (component as any).getTourMapDestination();
+    expect(soloTour.primeraParadaOperativa).toBeNull();
+    expect(soloTour.tour?.nombre).toBe('Guatapé');
+
+    component.destinoTourActual = { primeraParadaOperativa: null, tour: null };
+    expect((component as any).getTourMapDestination()).toBeNull();
   });
 
   for (const estado of ['Generado', 'Confirmado'] as const) {
