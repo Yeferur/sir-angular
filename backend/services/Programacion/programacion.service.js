@@ -2725,6 +2725,83 @@ async function guardarProgramacionPrivada({ fecha, buses, userId = null }) {
     return construirResumenPrivados(fecha);
 }
 
+const POLITICA_ALTERNATIVAS_RUTA = Object.freeze({
+    distanciaMinimaMetros: 20000,
+    reduccionMinimaDistancia: 0.15,
+    aumentoMaximoDuracion: 0.10,
+    cantidadAlternativas: 3
+});
+
+function construirUrlRutaOSRM(baseUrl, perfil, puntos, { alternatives = 'false', steps = 'false' } = {}) {
+    const textoCoordenadas = puntos.map((punto) => `${punto.lng},${punto.lat}`).join(';');
+    const url = new URL(`/route/v1/${encodeURIComponent(perfil)}/${textoCoordenadas}`, `${baseUrl}/`);
+    url.searchParams.set('overview', 'full');
+    url.searchParams.set('geometries', 'geojson');
+    url.searchParams.set('steps', steps);
+    url.searchParams.set('alternatives', alternatives);
+    return url;
+}
+
+function coordenadasLegOSRM(leg) {
+    const resultado = [];
+    for (const step of Array.isArray(leg?.steps) ? leg.steps : []) {
+        for (const coordenada of step?.geometry?.coordinates || []) {
+            const anterior = resultado[resultado.length - 1];
+            if (!anterior || anterior[0] !== coordenada[0] || anterior[1] !== coordenada[1]) {
+                resultado.push(coordenada);
+            }
+        }
+    }
+    return resultado;
+}
+
+function unirGeometriasRuta(segmentos) {
+    const resultado = [];
+    for (const segmento of segmentos) {
+        for (const coordenada of segmento) {
+            const anterior = resultado[resultado.length - 1];
+            if (!anterior || anterior[0] !== coordenada[0] || anterior[1] !== coordenada[1]) {
+                resultado.push(coordenada);
+            }
+        }
+    }
+    return resultado;
+}
+
+async function buscarAlternativaEquilibradaOSRM({ baseUrl, perfil, inicio, fin, leg, timeoutMs }) {
+    if (Number(leg?.distance || 0) < POLITICA_ALTERNATIVAS_RUTA.distanciaMinimaMetros) return null;
+    if (!inicio || !fin) return null;
+
+    try {
+        const url = construirUrlRutaOSRM(baseUrl, perfil, [inicio, fin], {
+            alternatives: String(POLITICA_ALTERNATIVAS_RUTA.cantidadAlternativas),
+            steps: 'false'
+        });
+        const response = await fetch(url, {
+            signal: AbortSignal.timeout(timeoutMs),
+            headers: { accept: 'application/json' }
+        });
+        if (!response.ok) return null;
+
+        const body = await response.json();
+        if (body?.code !== 'Ok' || !Array.isArray(body.routes)) return null;
+
+        const distanciaMaxima = Number(leg.distance) * (1 - POLITICA_ALTERNATIVAS_RUTA.reduccionMinimaDistancia);
+        const duracionMaxima = Number(leg.duration) * (1 + POLITICA_ALTERNATIVAS_RUTA.aumentoMaximoDuracion);
+
+        return body.routes
+            .filter((route) =>
+                Array.isArray(route?.geometry?.coordinates) &&
+                Number(route.distance) <= distanciaMaxima &&
+                Number(route.duration) <= duracionMaxima
+            )
+            .sort((a, b) => Number(a.distance) - Number(b.distance) || Number(a.duration) - Number(b.duration))[0] || null;
+    } catch {
+        // La comparación es una mejora opcional: la ruta principal debe seguir disponible.
+        return null;
+    }
+}
+
 async function calcularRutaVisualOSRM(coordenadas) {
     if (!Array.isArray(coordenadas) || coordenadas.length < 2) {
         const error = new Error('Se requieren al menos dos coordenadas válidas.');
@@ -2758,17 +2835,13 @@ async function calcularRutaVisualOSRM(coordenadas) {
     }
 
     const perfil = process.env.PROGRAMACION_OSRM_PROFILE || 'driving';
-    const textoCoordenadas = puntos.map((punto) => `${punto.lng},${punto.lat}`).join(';');
-    const url = new URL(`/route/v1/${encodeURIComponent(perfil)}/${textoCoordenadas}`, `${baseUrl}/`);
-    url.searchParams.set('overview', 'full');
-    url.searchParams.set('geometries', 'geojson');
-    url.searchParams.set('steps', 'false');
-    url.searchParams.set('alternatives', 'false');
+    const timeoutMs = Number(process.env.PROGRAMACION_OSRM_TIMEOUT_MS || 8000);
+    const url = construirUrlRutaOSRM(baseUrl, perfil, puntos, { steps: 'true' });
 
     let response;
     try {
         response = await fetch(url, {
-            signal: AbortSignal.timeout(Number(process.env.PROGRAMACION_OSRM_TIMEOUT_MS || 8000)),
+            signal: AbortSignal.timeout(timeoutMs),
             headers: { accept: 'application/json' }
         });
     } catch (cause) {
@@ -2795,17 +2868,55 @@ async function calcularRutaVisualOSRM(coordenadas) {
         throw error;
     }
 
+    const legsBase = Array.isArray(route.legs) ? route.legs : [];
+    const alternativas = await Promise.all(legsBase.map((leg, index) =>
+        buscarAlternativaEquilibradaOSRM({
+            baseUrl,
+            perfil,
+            inicio: puntos[index],
+            fin: puntos[index + 1],
+            leg,
+            timeoutMs
+        })
+    ));
+    const alternativasSeleccionadas = alternativas.filter(Boolean).length;
+
+    let coordinates = route.geometry.coordinates;
+    let legs = legsBase.map((leg) => ({
+        distance: Number(leg?.distance || 0),
+        duration: Number(leg?.duration || 0)
+    }));
+    let distance = Number(route.distance || 0);
+    let duration = Number(route.duration || 0);
+    let rutaRecompuesta = false;
+
+    if (alternativasSeleccionadas > 0) {
+        const segmentos = legsBase.map((leg, index) =>
+            alternativas[index]?.geometry?.coordinates || coordenadasLegOSRM(leg)
+        );
+
+        if (segmentos.every((segmento) => Array.isArray(segmento) && segmento.length >= 2)) {
+            coordinates = unirGeometriasRuta(segmentos);
+            legs = legsBase.map((leg, index) => ({
+                distance: Number(alternativas[index]?.distance ?? leg?.distance ?? 0),
+                duration: Number(alternativas[index]?.duration ?? leg?.duration ?? 0)
+            }));
+            distance = legs.reduce((total, leg) => total + leg.distance, 0);
+            duration = legs.reduce((total, leg) => total + leg.duration, 0);
+            rutaRecompuesta = true;
+        }
+    }
+
     return {
         source: 'osrm-local',
-        coordinates: route.geometry.coordinates,
-        distance: Number(route.distance || 0),
-        duration: Number(route.duration || 0),
-        legs: Array.isArray(route.legs)
-            ? route.legs.map((leg) => ({
-                distance: Number(leg?.distance || 0),
-                duration: Number(leg?.duration || 0)
-            }))
-            : []
+        coordinates,
+        distance,
+        duration,
+        legs,
+        routingPolicy: {
+            longLegsEvaluated: legsBase.filter((leg) => Number(leg?.distance || 0) >= POLITICA_ALTERNATIVAS_RUTA.distanciaMinimaMetros).length,
+            alternativesSelected: rutaRecompuesta ? alternativasSeleccionadas : 0
+        }
     };
 }
 
