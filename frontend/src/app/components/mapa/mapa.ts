@@ -83,8 +83,6 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   velocidadViajeKmh: number = this.velocidadCiudadKmh;
   totalPax: number = 0;
   puntosSinCoordenadas: PuntoSinCoordenadas[] = [];
-  mostrarParadaOperativa = true;
-  mostrarTour = true;
   mapTheme: 'dark' | 'light' =
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
       ? 'light'
@@ -178,11 +176,6 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     return this.agrupadosConBase.some((punto) => punto.tipoDestino === 'tour' || punto.tipoDestino === 'ambos');
   }
 
-  get hasBothAvailableDestinations(): boolean {
-    return !!this.normalizarPuntoDestino(this.destino?.primeraParadaOperativa, 'Primera parada operativa')
-      && !!this.normalizarPuntoDestino(this.destino?.tour, 'Tour');
-  }
-
   get totalPuntosRecogida(): number {
     return this.agrupadosConBase.filter((punto, index) => index > 0 && !punto.tipoDestino).length;
   }
@@ -218,18 +211,6 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   get origenTramoTourNombre(): string {
     const parada = this.agrupadosConBase.find((punto) => punto.tipoDestino === 'operativa' || punto.tipoDestino === 'ambos');
     return parada?.NombrePunto?.trim() || this.ultimoPuntoRecogidaNombre;
-  }
-
-  toggleDestino(tipo: 'operativa' | 'tour'): void {
-    if (!this.hasBothAvailableDestinations) return;
-    if (tipo === 'operativa') {
-      if (this.mostrarParadaOperativa && !this.mostrarTour) return;
-      this.mostrarParadaOperativa = !this.mostrarParadaOperativa;
-    } else {
-      if (this.mostrarTour && !this.mostrarParadaOperativa) return;
-      this.mostrarTour = !this.mostrarTour;
-    }
-    this.scheduleMapInit({ reset: true });
   }
 
   // ── Init del mapa ────────────────────────────────────────────
@@ -344,17 +325,13 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     ];
 
     const destinos = [
-      this.mostrarParadaOperativa
-        ? this.normalizarPuntoDestino(this.destino?.primeraParadaOperativa, 'Primera parada operativa', 'operativa')
-        : null,
-      this.mostrarTour
-        ? this.normalizarPuntoDestino(this.destino?.tour, 'Tour', 'tour')
-        : null,
+      this.normalizarPuntoDestino(this.destino?.primeraParadaOperativa, 'Primera parada operativa', 'operativa'),
+      this.normalizarPuntoDestino(this.destino?.tour, 'Tour', 'tour'),
     ].filter((destino): destino is PuntoDestinoMapa & { lat: number; lng: number; nombre: string; tipo: 'operativa' | 'tour' } => !!destino);
 
     // Compatibilidad: en respuestas antiguas los campos planos representaban
     // únicamente la primera parada operativa.
-    if (!destinos.length && this.mostrarParadaOperativa) {
+    if (!destinos.length) {
       const legacy = this.normalizarPuntoDestino(this.destino, 'Primera parada operativa', 'operativa');
       if (legacy) destinos.push(legacy);
     }
@@ -762,11 +739,10 @@ export class Mapa implements OnInit, AfterViewInit, OnChanges, OnDestroy {
     if (!this.map) return;
     if (this.tileLayer) this.map.removeLayer(this.tileLayer);
 
-    const style = this.mapTheme === 'dark' ? 'dark_all' : 'light_all';
-    this.tileLayer = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-      attribution: '© CARTO · OpenStreetMap',
-      subdomains: 'abcd',
-      maxZoom: 20
+    this.tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      className: this.mapTheme === 'dark' ? 'osm-tiles--dark' : 'osm-tiles--light',
+      maxZoom: 19
     }).addTo(this.map);
   }
 

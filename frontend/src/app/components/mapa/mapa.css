@@ -40,56 +40,6 @@
   gap: 8px;
 }
 
-.destination-switcher {
-  display: inline-flex;
-  gap: 3px;
-  margin-left: 4px;
-  padding: 3px;
-  border: 1px solid var(--separator-color);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-tertiary) 62%, transparent);
-}
-
-.destination-switcher button {
-  display: inline-flex;
-  min-height: 26px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-tertiary);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 650;
-  cursor: pointer;
-  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
-}
-
-.destination-switcher button:hover,
-.destination-switcher button.is-active {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .14);
-}
-
-.destination-switcher button:focus-visible {
-  outline: 2px solid var(--accent-blue);
-  outline-offset: 1px;
-}
-
-.switcher-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
-
-.destination-switcher button:not(.is-active) .switcher-dot { opacity: .35; }
-.switcher-dot--operativa { background: #f59e0b; }
-.switcher-dot--tour { background: #ef4444; }
-
 .mapa-topbar-icon {
   width: 16px;
   height: 16px;
@@ -252,6 +202,11 @@
   flex: 1;
   min-height: 300px;
   z-index: 1;
+}
+
+/* OpenStreetMap no necesita una segunda capa para el tema oscuro. */
+:host ::ng-deep .osm-tiles--dark {
+  filter: brightness(.62) invert(1) contrast(1.18) hue-rotate(180deg) saturate(.55);
 }
 
 /* Ocultar panel nativo de Leaflet Routing Machine */

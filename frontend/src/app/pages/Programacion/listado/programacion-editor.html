@@ -194,11 +194,6 @@
             [class.cannot-receive]="!canCreateBusForTransfer"
             [attr.aria-disabled]="!canCreateBusForTransfer"
             (click)="moveSelectedToNewBus()">
-            <svg class="new-bus-target-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="6" width="18" height="11" rx="2"></rect>
-              <path d="M7 17v2M17 17v2M7 10h10M8 13h.01M16 13h.01"></path>
-              <path d="M12 3v3M9.5 3h5"></path>
-            </svg>
             {{ canCreateBusForTransfer ? 'Crear otro bus' : 'No hay un bus disponible' }}
           </button>
         }

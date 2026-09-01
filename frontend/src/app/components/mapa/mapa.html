@@ -14,24 +14,6 @@
       <span class="mapa-topbar-warning" *ngIf="puntosSinCoordenadas.length">
         {{ puntosSinCoordenadas.length }} sin coordenadas
       </span>
-      <div class="destination-switcher" *ngIf="hasBothAvailableDestinations" aria-label="Destinos visibles en la ruta">
-        <button
-          type="button"
-          [class.is-active]="mostrarParadaOperativa"
-          [attr.aria-pressed]="mostrarParadaOperativa"
-          (click)="toggleDestino('operativa')">
-          <span class="switcher-dot switcher-dot--operativa"></span>
-          Parada operativa
-        </button>
-        <button
-          type="button"
-          [class.is-active]="mostrarTour"
-          [attr.aria-pressed]="mostrarTour"
-          (click)="toggleDestino('tour')">
-          <span class="switcher-dot switcher-dot--tour"></span>
-          Tour
-        </button>
-      </div>
     </div>
     <div class="mapa-topbar-actions">
       <div class="mapa-topbar-summary" aria-label="Resumen de la ruta">
@@ -222,7 +204,7 @@
   <!-- ── Footer ──────────────────────────────────────────────── -->
   <div class="mapa-footer">
     <span class="footer-attribution">
-      © CARTO · OpenStreetMap · OSRM
+      © OpenStreetMap contributors · OSRM
     </span>
     <div class="footer-legend">
       <span class="legend-item">
