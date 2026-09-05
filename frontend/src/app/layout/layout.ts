@@ -22,7 +22,7 @@ import {
     NavigationError,
     ActivatedRoute,
 } from '@angular/router';
-import { distinctUntilChanged, filter } from 'rxjs/operators';
+import { distinctUntilChanged } from 'rxjs/operators';
 import { combineLatest, Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 
@@ -48,6 +48,8 @@ interface SidebarItem {
     key: string;
     label: string;
     icon: string;
+    group?: 'principal' | 'operacion' | 'gestion' | 'sistema';
+    kind?: 'action' | 'destination';
     route?: string;
     permission?: string | string[];
     exact?: boolean;
@@ -102,7 +104,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     isDarkMode = true;
     profileMenuOpen = signal(false);
     mobileDrawerOpen = signal(false);
-    sidebarHovered = signal(false);
+    hoveredMenuItem = signal<SidebarItem | null>(null);
+    railTooltipTop = signal(0);
     pageTitle = signal<string>('');
     titleLeaving = signal(false);
     titleEntering = signal(false);
@@ -312,12 +315,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             this.transitionStage.set('island');
             this.transitionService.markAppReady();
 
-            this.router.events
-                .pipe(filter(e => e instanceof NavigationEnd))
-                .subscribe(() => this.syncActiveSubmenu());
-
             await this.permisosService.loadSessionData();
-            this.syncActiveSubmenu();
             this.ready.set(true);
         } catch (e: any) {
             console.error('Layout init error:', e);
@@ -439,6 +437,11 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     navigateToProfile(): void {
         this.closeProfileMenu();
         this.router.navigate(['/Perfil/Editar']);
+    }
+
+    navigateToHelp(): void {
+        this.closeProfileMenu();
+        this.router.navigate(['/Ayuda']);
     }
 
     toggleTheme(event?: MouseEvent): void {
@@ -685,6 +688,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.closeGlobalSearch();
             }
             if (this.profileMenuOpen()) this.closeProfileMenu();
+            if (this.activeMenu()) this.closeAllSubmenus();
         }
     }
 
@@ -701,6 +705,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             && !target?.closest('[data-global-search-trigger]')
         ) {
             this.closeGlobalSearch();
+        }
+        if (this.activeMenu() && !target?.closest('.sidebar-navigation')) {
+            this.closeAllSubmenus();
         }
     }
 
@@ -754,15 +761,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         });
     }
 
-    private syncActiveSubmenu(): void {
-        for (const item of this.getVisibleMenuItems()) {
-            if (this.shouldRenderAsDropdown(item) && this.isSubmenuActive(item)) {
-                this.activeMenu.set(item.key);
-                return;
-            }
-        }
-    }
-
     private normalizeUrl(url: string): string {
         const sanitized = String(url || '').split(/[?#]/)[0].replace(/\/+$/, '');
         return sanitized || '/';
@@ -776,6 +774,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'inicio',
             label: 'Inicio',
             icon: 'bx bxs-home',
+            group: 'principal',
             route: '/',
             exact: true,
             clientVisible: true,
@@ -784,6 +783,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'mi-horario',
             label: 'Mi horario',
             icon: 'bx bx-time-five',
+            group: 'principal',
             route: '/MiHorario',
             exact: true,
             advisorVisible: true,
@@ -792,6 +792,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'aforos',
             label: 'Aforos',
             icon: 'bx bxs-dashboard',
+            group: 'principal',
             route: '/Aforos',
             permission: ['AFOROS.LEER', 'INICIO.LEER'],
             exact: true,
@@ -800,6 +801,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'informes',
             label: 'Informes',
             icon: 'bx bx-line-chart',
+            group: 'principal',
             route: '/Informes',
             permission: 'INFORMES.LEER',
             exact: true,
@@ -808,6 +810,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'historial',
             label: 'Historial',
             icon: 'bx bx-history',
+            group: 'principal',
             route: '/Historial',
             permission: 'HISTORIAL.LEER',
             exact: true,
@@ -815,13 +818,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         {
             key: 'reservas',
             label: 'Reservas',
-            icon: 'bx bx-calendar-plus',
+            icon: 'bx bx-calendar',
+            group: 'operacion',
             clientVisible: true,
             children: [
                 {
                     key: 'reservas-nueva',
                     label: 'Nueva Reserva',
-                    icon: 'bx bx-plus',
+                    icon: 'bx bx-calendar-event',
+                    kind: 'action',
                     route: '/Reservas/NuevaReserva',
                     permission: 'RESERVAS.CREAR',
                     exact: true,
@@ -850,11 +855,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'transfers',
             label: 'Transfer',
             icon: 'bx bx-car',
+            group: 'operacion',
             children: [
                 {
                     key: 'transfers-nuevo',
                     label: 'Nuevo Transfer',
-                    icon: 'bx bx-plus',
+                    icon: 'bx bx-car',
+                    kind: 'action',
                     route: '/Transfers/NuevoTransfer',
                     permission: 'TRANSFERS.CREAR',
                     exact: true,
@@ -873,11 +880,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'tours',
             label: 'Tours',
             icon: 'bx bx-flag',
+            group: 'operacion',
             children: [
                 {
                     key: 'tours-nuevo',
                     label: 'Nuevo Tour',
-                    icon: 'bx bx-plus',
+                    icon: 'bx bx-flag',
+                    kind: 'action',
                     route: '/Tours/NuevoTour',
                     permission: 'TOURS.CREAR',
                     exact: true,
@@ -896,11 +905,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'puntos',
             label: 'Puntos de encuentro',
             icon: 'bx bx-map',
+            group: 'operacion',
             children: [
                 {
                     key: 'puntos-nuevo',
                     label: 'Nuevo Punto',
-                    icon: 'bx bx-plus',
+                    icon: 'bx bx-map-pin',
+                    kind: 'action',
                     route: '/Puntos/NuevoPunto',
                     permission: 'PUNTOS.CREAR',
                     exact: true,
@@ -919,6 +930,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'programacion',
             label: 'Listados de buses',
             icon: 'bx bx-list-check',
+            group: 'gestion',
             route: '/Programacion',
             permission: 'PROGRAMACION.LEER',
             exact: false,
@@ -927,6 +939,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'seguros',
             label: 'Seguros',
             icon: 'bx bx-shield',
+            group: 'gestion',
             route: '/Seguros',
             permission: 'SEGUROS.LEER',
             exact: true,
@@ -935,6 +948,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'comisiones',
             label: 'Comisiones',
             icon: 'bx bx-dollar',
+            group: 'gestion',
             route: '/Comisiones',
             permission: 'COMISIONES.LEER',
             exact: true,
@@ -943,6 +957,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'configuracion',
             label: 'Configuración',
             icon: 'bx bx-cog',
+            group: 'sistema',
             children: [
                 {
                     key: 'usuarios',
@@ -955,7 +970,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 {
                     key: 'usuarios-nuevo',
                     label: 'Crear Usuarios',
-                    icon: 'bx bx-user-plus',
+                    icon: 'bx bx-user',
+                    kind: 'action',
                     route: '/Usuarios/NuevoUsuario',
                     permission: 'USUARIOS.CREAR',
                     exact: true,
@@ -968,13 +984,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     permission: 'TURNOS.LEER',
                     exact: true,
                     adminVisible: true,
-                },
-                {
-                    key: 'ayuda',
-                    label: 'Ayuda',
-                    icon: 'bx bx-help-circle',
-                    route: '/Ayuda',
-                    exact: true,
                 },
             ],
         },
@@ -989,6 +998,26 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     getVisibleChildren(item: SidebarItem): SidebarItem[] {
         return (item.children ?? []).filter(child => this.isVisibleItem(child));
+    }
+
+    getActionChildren(item: SidebarItem): SidebarItem[] {
+        return this.getVisibleChildren(item).filter(child => child.kind === 'action');
+    }
+
+    getNavigationChildren(item: SidebarItem): SidebarItem[] {
+        return this.getVisibleChildren(item).filter(child => child.kind !== 'action');
+    }
+
+    getContextMenuItem(): SidebarItem | null {
+        const key = this.activeMenu();
+        if (!key) return null;
+        return this.getVisibleMenuItems().find(item => item.key === key && this.shouldRenderAsDropdown(item)) ?? null;
+    }
+
+    startsMenuGroup(item: SidebarItem): boolean {
+        const items = this.getVisibleMenuItems();
+        const index = items.findIndex(candidate => candidate.key === item.key);
+        return index > 0 && items[index - 1].group !== item.group;
     }
 
     getSingleVisibleChild(item: SidebarItem): SidebarItem | null {
@@ -1055,18 +1084,28 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     toggleMenu(key: string, event?: Event): void {
         event?.preventDefault();
         event?.stopPropagation();
+        this.hideRailTooltip();
         this.activeMenu.update(current => current === key ? null : key);
     }
 
+    showRailTooltip(item: SidebarItem, event: Event): void {
+        const target = event.currentTarget as HTMLElement | null;
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        this.railTooltipTop.set(rect.top + rect.height / 2);
+        this.hoveredMenuItem.set(item);
+    }
+
+    hideRailTooltip(): void {
+        this.hoveredMenuItem.set(null);
+    }
+
     closeAllSubmenus(): void {
-        const key = this.activeMenu();
-        if (!key) return;
-        const item = this.menuItems.find(i => i.key === key);
-        if (item && this.isSubmenuActive(item)) return;
         this.activeMenu.set(null);
     }
 
     clickPage(): void {
+        this.hideRailTooltip();
         this.closeAllSubmenus();
     }
 }

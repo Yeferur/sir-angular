@@ -192,6 +192,10 @@
                 </svg>
                 Editar perfil
               </button>
+              <button class="profile-dropdown-item" role="menuitem" (click)="navigateToHelp()">
+                <i class="bx bx-help-circle" aria-hidden="true"></i>
+                Ayuda y soporte
+              </button>
               <div class="profile-dropdown-sep"></div>
               <button class="profile-dropdown-item danger" role="menuitem" (click)="handleLogout()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -261,57 +265,66 @@
      SIDEBAR — desktop flotante (≥767px)
 ═══════════════════════════════════════════ -->
 @if (showAppChrome()) {
-<div class="sidebar"
-     [class.is-expanded]="sidebarHovered()"
-     (mouseenter)="sidebarHovered.set(true)"
-     (mouseleave)="sidebarHovered.set(false); closeAllSubmenus()">
-  <div class="menu">
+<nav class="sidebar-navigation" aria-label="Navegación principal">
+<div class="sidebar">
+  <div class="menu rail-menu">
 
     @for (item of getVisibleMenuItems(); track item.key) {
 
       @if (shouldRenderAsDropdown(item)) {
         <div class="menu-item"
-             [class.active]="isMenuOpen(item)"
+             [class.starts-group]="startsMenuGroup(item)"
+             [class.active]="activeMenu() === item.key"
              [class.has-active-child]="isSubmenuActive(item)">
-          <button type="button" class="link menu-trigger" (click)="toggleMenu(item.key, $event)">
+          <button type="button" class="link menu-trigger"
+                  (click)="toggleMenu(item.key, $event)"
+                  (mouseenter)="showRailTooltip(item, $event)"
+                  (mouseleave)="hideRailTooltip()"
+                  (focus)="showRailTooltip(item, $event)"
+                  (blur)="hideRailTooltip()"
+                  [attr.aria-label]="item.label"
+                  [attr.aria-describedby]="'rail-tooltip-' + item.key"
+                  [attr.aria-expanded]="activeMenu() === item.key"
+                  [attr.aria-controls]="'context-panel-' + item.key">
             <i [class]="item.icon"></i>
-            <span>{{ item.label }}</span>
-            <i class="bx bx-chevron-down chevron"></i>
+            <span class="rail-label">{{ item.label }}</span>
           </button>
-          <div class="submenu">
-            <div class="submenu-inner">
-              @for (child of getVisibleChildren(item); track child.key) {
-                @if (child.route) {
-                  <a [routerLink]="child.route"
-                     routerLinkActive="active-link"
-                     [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
-                     (click)="clickPage()">{{ child.label }}</a>
-                }
-              }
-            </div>
-          </div>
         </div>
 
       } @else if (shouldRenderAsDirectLink(item)) {
         @if (getDirectRouteForSingleChild(item)) {
           <a class="link"
+             [class.starts-group]="startsMenuGroup(item)"
              [routerLink]="getDirectRouteForSingleChild(item)!"
              routerLinkActive="active-link"
              [routerLinkActiveOptions]="{ exact: getSingleVisibleChild(item)?.exact ?? false }"
-             (click)="clickPage()">
+             (click)="clickPage()"
+             (mouseenter)="showRailTooltip(item, $event)"
+             (mouseleave)="hideRailTooltip()"
+             (focus)="showRailTooltip(item, $event)"
+             (blur)="hideRailTooltip()"
+             [attr.aria-label]="item.label"
+             [attr.aria-describedby]="'rail-tooltip-' + item.key">
             <i [class]="item.icon"></i>
-            <span>{{ item.label }}</span>
+            <span class="rail-label">{{ item.label }}</span>
           </a>
         }
 
       } @else {
         @if (item.route) {
-          <a [routerLink]="item.route"
+          <a [class.starts-group]="startsMenuGroup(item)"
+             [routerLink]="item.route"
              routerLinkActive="active-link"
              [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-             (click)="clickPage()">
+             (click)="clickPage()"
+             (mouseenter)="showRailTooltip(item, $event)"
+             (mouseleave)="hideRailTooltip()"
+             (focus)="showRailTooltip(item, $event)"
+             (blur)="hideRailTooltip()"
+             [attr.aria-label]="item.label"
+             [attr.aria-describedby]="'rail-tooltip-' + item.key">
             <i [class]="item.icon"></i>
-            <span>{{ item.label }}</span>
+            <span class="rail-label">{{ item.label }}</span>
           </a>
         }
       }
@@ -319,6 +332,84 @@
     }
   </div>
 </div>
+
+@if (hoveredMenuItem(); as hoveredItem) {
+  @if (!getContextMenuItem()) {
+    <div class="rail-tooltip" [id]="'rail-tooltip-' + hoveredItem.key" [style.top.px]="railTooltipTop()" role="tooltip">
+      {{ hoveredItem.label }}
+    </div>
+  }
+}
+
+@if (getContextMenuItem(); as contextItem) {
+  <section class="context-panel"
+           [id]="'context-panel-' + contextItem.key"
+           [attr.aria-label]="'Opciones de ' + contextItem.label">
+    <header class="context-panel-header">
+      <div class="context-panel-heading">
+        <span class="context-panel-icon" aria-hidden="true"><i [class]="contextItem.icon"></i></span>
+        <div>
+          <span class="context-panel-kicker">Módulo</span>
+          <h2>{{ contextItem.label }}</h2>
+        </div>
+      </div>
+      <button type="button" class="context-panel-close" (click)="closeAllSubmenus()" aria-label="Cerrar panel">
+        <i class="bx bx-x" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    @if (getActionChildren(contextItem).length) {
+      <div class="context-panel-section context-panel-actions">
+        <span class="context-panel-section-label">Crear</span>
+        @for (child of getActionChildren(contextItem); track child.key) {
+          @if (child.route) {
+            <a class="context-action" [routerLink]="child.route" (click)="clickPage()">
+              <i [class]="child.icon" aria-hidden="true"></i>
+              <span>{{ child.label }}</span>
+              <i class="bx bx-right-arrow-alt context-link-arrow" aria-hidden="true"></i>
+            </a>
+          }
+        }
+      </div>
+    }
+
+    @if (getNavigationChildren(contextItem).length) {
+      <div class="context-panel-section">
+        <span class="context-panel-section-label">Navegación</span>
+        <div class="context-navigation-list">
+          @for (child of getNavigationChildren(contextItem); track child.key) {
+            @if (child.route) {
+              <a [routerLink]="child.route"
+                 routerLinkActive="active-link"
+                 [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
+                 (click)="clickPage()">
+                <i [class]="child.icon" aria-hidden="true"></i>
+                <span>{{ child.label }}</span>
+                <i class="bx bx-chevron-right context-link-arrow" aria-hidden="true"></i>
+              </a>
+            }
+          }
+        </div>
+      </div>
+    }
+
+    @if (!isClientUser()) {
+      <button type="button" class="context-activity" (click)="openNotifications(); closeAllSubmenus()">
+        <span class="context-activity-icon" aria-hidden="true"><i class="bx bx-bell"></i></span>
+        <span class="context-activity-copy">
+          <strong>Notificaciones y recordatorios</strong>
+          <small>{{ notifications.noLeidas() ? notifications.noLeidas() + (notifications.noLeidas() === 1 ? ' aviso pendiente' : ' avisos pendientes') : 'No tienes avisos pendientes' }}</small>
+        </span>
+        @if (notifications.noLeidas()) {
+          <span class="context-activity-count">{{ notifications.noLeidas() > 99 ? '99+' : notifications.noLeidas() }}</span>
+        } @else {
+          <i class="bx bx-chevron-right context-link-arrow" aria-hidden="true"></i>
+        }
+      </button>
+    }
+  </section>
+}
+</nav>
 }
 
 
