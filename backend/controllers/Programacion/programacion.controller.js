@@ -50,21 +50,22 @@ exports.generarPlanLogisticoController = async (req, res) => {
 
 /**
  * Exporta el listado de un bus en formato Excel (XLSX).
- * Body: { fecha: 'YYYY-MM-DD', idTour: number, bus: {...}, nombreTour?: string }
+ * Body: { fecha: 'YYYY-MM-DD', idTour: number, bus: {...}, nombreTour?: string, formato?: 'compacto'|'operativo' }
  */
 exports.exportarListadoBusController = async (req, res) => {
-    const { fecha, idTour, bus, nombreTour } = req.body || {};
+    const { fecha, idTour, bus, nombreTour, formato = 'operativo' } = req.body || {};
 
     if (!fecha || !idTour || !bus) {
         return sendError(res, { status: 400, message: 'Se requiere fecha, idTour y bus en el cuerpo.', errorCode: 'MISSING_PARAMS' });
     }
 
     try {
-        const buffer = await cerebro.generarExcelListadoBus({ fecha, idTour, bus, nombreTour });
+        const buffer = await cerebro.generarExcelListadoBus({ fecha, idTour, bus, nombreTour, formato });
 
         const placa = bus.id ? String(bus.id).replace(/\s+/g, '_') : 'Bus';
         const tourName = nombreTour ? String(nombreTour).replace(/\s+/g, '_') : 'Tour';
-        const fileName = `${fecha}_${tourName}_${placa}.xlsx`;
+        const formatoNombre = formato === 'compacto' ? 'compacto' : 'operativo';
+        const fileName = `${fecha}_${tourName}_${placa}_${formatoNombre}.xlsx`;
 
         try {
             await recordHistorial({
@@ -371,9 +372,9 @@ exports.calcularRutaVisualController = async (req, res) => {
 };
 
 exports.exportarListadosZipController = async (req, res) => {
-    const { fecha, idTour, buses, nombreTour } = req.body || {};
+    const { fecha, idTour, buses, nombreTour, formato = 'operativo' } = req.body || {};
     try {
-        const resultado = await cerebro.generarZipListados({ fecha, idTour, buses, nombreTour });
+        const resultado = await cerebro.generarZipListados({ fecha, idTour, buses, nombreTour, formato });
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${resultado.fileName}"`);
         res.send(resultado.buffer);

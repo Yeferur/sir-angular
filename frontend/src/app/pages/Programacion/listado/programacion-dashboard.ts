@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TourProgramacion } from '../../../interfaces/Programacion/reservas';
-import { CountUpDirective } from '../../Inicio/count-up.directive';
+import { CountUpDirective } from '../../Aforos/count-up.directive';
 import { TransfersProgramacionResponse } from '../../../services/Programacion/programacion';
 
 @Component({

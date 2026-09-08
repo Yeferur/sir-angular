@@ -765,7 +765,6 @@
   .context-panel,
   .context-panel-header,
   .context-panel-section,
-  .context-activity,
   .rail-tooltip,
   .rail-menu a,
   .rail-menu .link,
@@ -1036,7 +1035,7 @@
   overflow: hidden auto;
   pointer-events: auto;
   z-index: var(--z-sidebar, 800);
-  animation: sidebarShellEnter 520ms var(--ease-panel) both;
+  animation: sidebarShellEnter 220ms cubic-bezier(.2, .8, .2, 1) both;
 
   transition:
     background-color 0.25s ease,
@@ -1045,32 +1044,36 @@
 }
 
 @keyframes sidebarShellEnter {
-  from { opacity: 0; transform: translateY(-50%) translateX(-16px) scale(.96); }
-  to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+  from { opacity: 0; transform: translateY(-50%) translateX(-8px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .sidebar::-webkit-scrollbar { display: none; }
 .sidebar { scrollbar-width: none; }
 
 .rail-menu {
+  --rail-item-size: 42px;
+  --rail-item-gap: 7px;
   padding-block: 7px;
+  gap: var(--rail-item-gap);
 }
 
 .rail-menu .menu-item,
 .rail-menu > a {
   position: relative;
+  min-height: var(--rail-item-size);
 }
 
 .rail-menu .menu-item.starts-group,
 .rail-menu > a.starts-group {
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .rail-menu .menu-item.starts-group::before,
 .rail-menu > a.starts-group::before {
   content: '';
   position: absolute;
-  top: -6px;
+  top: calc(var(--rail-item-gap) / -2 - .5px);
   left: 15px;
   right: 15px;
   height: 1px;
@@ -1082,18 +1085,18 @@
 .rail-menu button.link,
 .rail-menu .menu-trigger {
   width: 44px;
-  height: 42px;
-  min-height: 42px;
+  height: var(--rail-item-size);
+  min-height: var(--rail-item-size);
   margin-inline: 6px;
   padding: 0;
   justify-content: center;
   overflow: hidden;
-  transition: background-color .18s ease, color .18s ease, transform 220ms var(--ease-panel), box-shadow 220ms ease;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 
 .rail-menu a:hover,
 .rail-menu .link:hover {
-  transform: translateX(2px) scale(1.055);
+  transform: translateX(1px);
 }
 
 .rail-menu .rail-label {
@@ -1110,8 +1113,13 @@
 }
 
 .rail-menu i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   min-width: 0;
   font-size: 20px;
+  line-height: 1;
 }
 
 .rail-menu .has-active-child > .link,
@@ -1150,7 +1158,7 @@
   line-height: 1.2;
   white-space: nowrap;
   pointer-events: none;
-  animation: railTooltipEnter 180ms var(--ease-panel) both;
+  animation: railTooltipEnter 130ms ease-out both;
 }
 
 .rail-tooltip::before {
@@ -1185,41 +1193,24 @@
   overflow: hidden auto;
   color: var(--text-primary);
   background: var(--sidebar-bg);
-  backdrop-filter: blur(25px) saturate(180%);
-  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
   border: 1px solid var(--sidebar-border);
   border-radius: 20px;
   box-shadow: var(--sidebar-shadow);
   pointer-events: auto;
-  transform-origin: left center;
-  animation: contextPanelEnter 360ms cubic-bezier(.16, 1, .3, 1) both;
+  animation: contextPanelEnter 180ms cubic-bezier(.2, .8, .2, 1) both;
 }
 
 @keyframes contextPanelEnter {
-  from { opacity: 0; transform: translateY(-50%) translateX(-14px) scale(.965); }
-  to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
-}
-
-.context-panel-header,
-.context-panel-section,
-.context-activity {
-  animation: contextContentEnter 360ms var(--ease-panel) both;
-}
-
-.context-panel-section { animation-delay: 45ms; }
-.context-panel-section + .context-panel-section { animation-delay: 85ms; }
-.context-activity { animation-delay: 125ms; }
-
-@keyframes contextContentEnter {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-50%) translateX(-8px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .context-panel-header,
 .context-panel-heading,
 .context-action,
-.context-navigation-list a,
-.context-activity {
+.context-navigation-list a {
   display: flex;
   align-items: center;
 }
@@ -1233,8 +1224,7 @@
 
 .context-panel-heading { gap: 10px; min-width: 0; }
 
-.context-panel-icon,
-.context-activity-icon {
+.context-panel-icon {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -1245,10 +1235,8 @@
   background: var(--sidebar-active-bg);
 }
 
-.context-panel-icon i,
-.context-activity-icon i { font-size: 19px; }
+.context-panel-icon i { font-size: 19px; }
 
-.context-panel-kicker,
 .context-panel-section-label {
   display: block;
   color: var(--text-secondary);
@@ -1259,7 +1247,7 @@
 }
 
 .context-panel-heading h2 {
-  margin: 2px 0 0;
+  margin: 0;
   overflow: hidden;
   color: var(--text-primary);
   font-size: 1rem;
@@ -1300,8 +1288,7 @@
 .context-panel-section-label { margin: 0 4px 7px; }
 
 .context-action,
-.context-navigation-list a,
-.context-activity {
+.context-navigation-list a {
   width: 100%;
   box-sizing: border-box;
   gap: 10px;
@@ -1346,31 +1333,6 @@
 
 .context-navigation-list a > i:first-child { font-size: 18px; }
 .context-link-arrow { flex: 0 0 auto; font-size: 18px; opacity: .72; }
-
-.context-activity {
-  margin-top: 10px;
-  text-align: left;
-  background: var(--sidebar-hover-bg);
-}
-
-.context-activity:hover { background: var(--sidebar-active-bg); }
-.context-activity-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-.context-activity-copy strong { color: var(--text-primary); font-size: .82rem; }
-.context-activity-copy small { margin-top: 2px; color: var(--text-secondary); font-size: .72rem; }
-
-.context-activity-count {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  border-radius: 999px;
-  color: #fff;
-  background: var(--accent-red);
-  font-size: .68rem;
-  font-weight: 800;
-}
 
 @media (max-width: 766px) {
   .sidebar-navigation { display: none; }

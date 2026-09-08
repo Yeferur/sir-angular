@@ -12,6 +12,8 @@ interface BusQualitySummary {
   total: number;
 }
 
+type FormatoListadoBus = 'compacto' | 'operativo';
+
 @Component({
   selector: 'app-programacion-editor',
   standalone: true,
@@ -61,13 +63,13 @@ export class ProgramacionEditorComponent implements OnDestroy {
   closeRequested = output<void>();
   restoreRequested = output<void>();
   saveRequested = output<void>();
-  exportAllRequested = output<void>();
+  exportAllRequested = output<FormatoListadoBus>();
   busSelected = output<number>();
   previousBusRequested = output<void>();
   nextBusRequested = output<void>();
   busChanged = output<void>();
   mapRequested = output<{ bus: Bus; index: number }>();
-  exportBusRequested = output<number>();
+  exportBusRequested = output<{ index: number; formato: FormatoListadoBus }>();
   reservationViewRequested = output<string>();
   reservationMoveRequested = output<{
     reservationId: string | number;
@@ -88,6 +90,16 @@ export class ProgramacionEditorComponent implements OnDestroy {
   get totalReservations(): number {
     return this.buses.reduce((total, bus) => total + (bus.reservas?.length || 0), 0)
       + this.unassigned().length;
+  }
+
+  requestExportAll(formato: FormatoListadoBus, menu: HTMLDetailsElement): void {
+    menu.open = false;
+    this.exportAllRequested.emit(formato);
+  }
+
+  requestExportBus(formato: FormatoListadoBus, menu: HTMLDetailsElement): void {
+    menu.open = false;
+    this.exportBusRequested.emit({ index: this.activeBusIndex(), formato });
   }
 
   get naturalOperationDate(): string {

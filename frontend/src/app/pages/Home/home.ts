@@ -23,7 +23,7 @@ import {
 } from '../../services/Home/home.service';
 import { WebSocketConnectionState, WebSocketService } from '../../services/WebSocket/web-socket';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
-import { CountUpDirective } from '../Inicio/count-up.directive';
+import { CountUpDirective } from '../Aforos/count-up.directive';
 import { MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 
 const UPDATE_FEEDBACK_MS = 1100;
@@ -247,7 +247,7 @@ export class HomeComponent implements OnInit {
   overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail: string; detailValue?: number; icon: string }> {
     const metrics = [
       { label: 'Reservas', value: day.reservations, detail: 'privadas', detailValue: day.privateReservations, icon: 'bx bx-calendar-check' },
-      { label: 'Pasajeros', value: day.passengers, detail: 'en tours', icon: 'bx bx-group' },
+      { label: 'Pasajeros', value: day.passengers, detail: 'privados', detailValue: day.privatePassengers, icon: 'bx bx-group' },
       { label: 'Transfers', value: day.transfers, detail: 'servicios', icon: 'bx bx-car' },
       { label: 'Pasajeros', value: day.transferPassengers, detail: 'en transfers', icon: 'bx bx-user-voice' },
     ];

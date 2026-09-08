@@ -27,6 +27,7 @@ import {
   reservationPointKey,
 } from './programacion-editor.utils';
 
+type FormatoListadoBus = 'compacto' | 'operativo';
 type LegacyButton = { text: string; style: string; onClick: () => void };
 
 interface LegacyNavbarFacade {
@@ -1256,40 +1257,15 @@ export class Listado implements OnInit, OnDestroy {
   private normalizeBusMetadata(): void {
     if (!this.planSeleccionado) return;
 
-    this.planSeleccionado.buses = this.planSeleccionado.buses.map((bus, index) => {
+    this.planSeleccionado.buses = this.planSeleccionado.buses.map((bus) => {
       const identifier = String(bus.id || '').trim();
       return {
         ...bus,
-        id: identifier || `Bus ${index + 1}`,
+        id: identifier,
         guia: String(bus.guia || '').trim(),
         capacidadManual: Boolean(bus.capacidadManual)
       };
     });
-  }
-
-  private validateRequiredGuides(busIndexes?: number[]): boolean {
-    if (!this.planSeleccionado) return false;
-
-    const indexes = busIndexes
-      ?? this.planSeleccionado.buses.map((_, index) => index);
-    const missing = indexes.filter((index) => {
-      const bus = this.planSeleccionado?.buses[index];
-      return Boolean(bus) && !String(bus.guia || '').trim();
-    });
-
-    if (!missing.length) return true;
-
-    const busNames = missing.map((index) => {
-      const bus = this.planSeleccionado?.buses[index];
-      return bus?.id || `Bus ${index + 1}`;
-    });
-    this.selectBus(missing[0]);
-    this.navbar.showAlert({
-      type: 'warning',
-      title: missing.length === 1 ? 'Falta asignar un guía' : `Faltan guías en ${missing.length} buses`,
-      message: `Asigna un guía antes de continuar: ${busNames.join(', ')}.`
-    });
-    return false;
   }
 
   private validateUniqueBusIdentifiers(): boolean {
@@ -1298,14 +1274,16 @@ export class Listado implements OnInit, OnDestroy {
     const identifiers = this.planSeleccionado.buses.map((bus) => String(bus.id || '').trim());
     const normalized = identifiers.map((identifier) => identifier.toLocaleLowerCase('es'));
     const duplicateKeys = Array.from(new Set(
-      normalized.filter((identifier) => normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier))
+      normalized.filter((identifier) => identifier
+        && normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier))
     ));
     const duplicates = duplicateKeys.map((identifier) => identifiers[normalized.indexOf(identifier)]);
 
     if (!duplicates.length) return true;
 
     const firstDuplicateIndex = normalized.findIndex(
-      (identifier, index) => normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier)
+      (identifier, index) => Boolean(identifier)
+        && normalized.indexOf(identifier) !== normalized.lastIndexOf(identifier)
         && index === normalized.lastIndexOf(identifier)
     );
     if (firstDuplicateIndex >= 0) this.selectBus(firstDuplicateIndex);
@@ -1358,7 +1336,6 @@ export class Listado implements OnInit, OnDestroy {
     }
 
     this.normalizeBusMetadata();
-    if (!this.validateRequiredGuides()) return;
     if (!this.validateUniqueBusIdentifiers()) return;
     if (!this.validateBusCapacities()) return;
 
@@ -1443,10 +1420,9 @@ export class Listado implements OnInit, OnDestroy {
     });
   }
 
-  descargarListadoBus(index: number): void {
+  descargarListadoBus(index: number, formato: FormatoListadoBus = 'operativo'): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
     this.normalizeBusMetadata();
-    if (!this.validateRequiredGuides([index])) return;
 
     const bus = this.planSeleccionado.buses[index];
     if (!bus) return;
@@ -1456,13 +1432,14 @@ export class Listado implements OnInit, OnDestroy {
       idTour: this.tourSeleccionado.Id_Tour,
       bus,
       nombreTour: this.tourSeleccionado.NombreTour,
+      formato,
     };
 
     this.programacionService.exportarListadoBus(payload).subscribe({
       next: (blob) => {
         const placa = bus.id && String(bus.id).trim() ? bus.id : `Bus_${index + 1}`;
         const nombre = this.tourSeleccionado?.NombreTour?.replace(/\s+/g, '_') || 'Tour';
-        const filename = `${this.fechaSeleccionada}_${nombre}_${placa}.xlsx`;
+        const filename = `${this.fechaSeleccionada}_${nombre}_${placa}_${formato}.xlsx`;
         this.downloadBlob(blob, filename);
       },
       error: (err) => {
@@ -1472,10 +1449,9 @@ export class Listado implements OnInit, OnDestroy {
     });
   }
 
-  descargarTodosLosListados(): void {
+  descargarTodosLosListados(formato: FormatoListadoBus = 'operativo'): void {
     if (!this.planSeleccionado || !this.tourSeleccionado) return;
     this.normalizeBusMetadata();
-    if (!this.validateRequiredGuides()) return;
     if (!this.validateUniqueBusIdentifiers()) return;
 
     const payload = {
@@ -1483,12 +1459,13 @@ export class Listado implements OnInit, OnDestroy {
       idTour: this.tourSeleccionado.Id_Tour,
       buses: this.planSeleccionado.buses,
       nombreTour: this.tourSeleccionado.NombreTour,
+      formato,
     };
 
     this.programacionService.exportarListadosZip(payload).subscribe({
       next: (blob) => {
         const tour = this.tourSeleccionado?.NombreTour?.replace(/\s+/g, '_') || 'Tour';
-        this.downloadBlob(blob, `${this.fechaSeleccionada}_${tour}_listados.zip`);
+        this.downloadBlob(blob, `${this.fechaSeleccionada}_${tour}_formato_${formato}.zip`);
       },
       error: (err) => {
         console.error('Error al exportar todos los listados', err);
@@ -1744,6 +1721,16 @@ export class Listado implements OnInit, OnDestroy {
       },
       onRegenerate: () => {
         this.navigateToEditor(tour, { regenerate: true });
+      },
+      onExportBus: (index: number, formato: FormatoListadoBus) => {
+        this.planSeleccionado = snapshot;
+        this.tourSeleccionado = tour;
+        this.descargarListadoBus(index, formato);
+      },
+      onExportAll: (formato: FormatoListadoBus) => {
+        this.planSeleccionado = snapshot;
+        this.tourSeleccionado = tour;
+        this.descargarTodosLosListados(formato);
       }
     });
   }

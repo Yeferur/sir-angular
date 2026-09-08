@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { AsesorIntercambio, EstadoTurno, MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
-import { CountUpDirective } from '../Inicio/count-up.directive';
+import { CountUpDirective } from '../Aforos/count-up.directive';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
 import { Subscription } from 'rxjs';

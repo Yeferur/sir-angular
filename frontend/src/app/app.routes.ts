@@ -23,7 +23,7 @@ export const routes: Routes = [
   },
   {
     path: 'Aforos',
-    loadComponent: () => import('./pages/Inicio/inicio').then((m) => m.Inicio),
+    loadComponent: () => import('./pages/Aforos/aforos').then((m) => m.Inicio),
     canActivate: [authGuard, permisoGuard],
     data: {
       preload: true,

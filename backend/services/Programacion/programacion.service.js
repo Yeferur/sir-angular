@@ -1747,10 +1747,11 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
     }
 
     const busesValidados = buses.map((bus, index) => {
-        const placa = String(bus?.id || '').trim() || `Bus ${index + 1}`;
+        const placa = String(bus?.id || '').trim();
+        const etiquetaBus = placa || `Bus ${index + 1}`;
         const capacidadNormalizada = normalizarCapacidadProgramacion(bus);
         if (!capacidadNormalizada.valida) {
-            errores.push(`${placa} debe tener una capacidad manual entera entre 1 y 200 pasajeros.`);
+            errores.push(`${etiquetaBus} debe tener una capacidad manual entera entre 1 y 200 pasajeros.`);
         }
         const { capacidad, capacidadManual } = capacidadNormalizada;
 
@@ -1760,7 +1761,7 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
             const reservaDb = reservasDb.get(idReserva);
             return {
                 idReserva,
-                placa,
+                placa: etiquetaBus,
                 orden: reservaIndex + 1,
                 pasajeros: reservaDb.NumeroPasajeros
             };
@@ -1769,7 +1770,7 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
         const ocupados = reservasValidadas.reduce((sum, reserva) => sum + reserva.pasajeros, 0);
 
         if (ocupados > capacidad) {
-            errores.push(`${placa} supera la capacidad permitida: ${ocupados}/${capacidad}.`);
+            errores.push(`${etiquetaBus} supera la capacidad permitida: ${ocupados}/${capacidad}.`);
         }
 
         return {
@@ -2232,7 +2233,7 @@ async function obtenerListadoSnapshot({ fecha, idsTours }) {
     }
 
     const buses = (busesRows || []).map((bus, index) => {
-        const placa = bus.Placa_Display ? String(bus.Placa_Display).trim() : `Bus ${index + 1}`;
+        const placa = bus.Placa_Display ? String(bus.Placa_Display).trim() : '';
         const paradasBus = paradasPorBus.get(bus.Id_Bus_Prog) || [];
         const reservas = (reservasPorBus.get(bus.Id_Bus_Prog) || []).map(reserva => ({
             ...reserva,
@@ -2920,7 +2921,7 @@ async function calcularRutaVisualOSRM(coordenadas) {
     };
 }
 
-async function generarZipListados({ fecha, idTour, buses, nombreTour }) {
+async function generarZipListados({ fecha, idTour, buses, nombreTour, formato = 'operativo' }) {
     if (!fecha || !idTour || !Array.isArray(buses) || buses.length === 0) {
         const error = new Error('Se requiere fecha, idTour y al menos un bus para exportar.');
         error.statusCode = 400;
@@ -2945,7 +2946,7 @@ async function generarZipListados({ fecha, idTour, buses, nombreTour }) {
 
     for (let index = 0; index < buses.length; index += 1) {
         const bus = buses[index];
-        const buffer = await generarExcelListadoBus({ fecha, idTour, bus, nombreTour });
+        const buffer = await generarExcelListadoBus({ fecha, idTour, bus, nombreTour, formato });
         const baseName = `${String(index + 1).padStart(2, '0')}_${safeName(bus?.id, `Bus_${index + 1}`)}`;
         let fileName = `${baseName}.xlsx`;
         let suffix = 2;
@@ -2959,7 +2960,7 @@ async function generarZipListados({ fecha, idTour, buses, nombreTour }) {
 
     return {
         buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }),
-        fileName: `${fecha}_${tourName}_listados.zip`
+        fileName: `${fecha}_${tourName}_${formato === 'compacto' ? 'formato_compacto' : 'formato_operativo'}.zip`
     };
 }
 
@@ -3440,51 +3441,84 @@ async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour,
  * @param {number} params.idTour
  * @param {Object} params.bus - Bus con reservas del plan
  * @param {string} [params.nombreTour]
+ * @param {'compacto'|'operativo'} [params.formato]
  * @returns {Promise<Buffer>} Buffer XLSX
  */
-async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
+async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour, formato = 'operativo' }) {
     if (!bus || !Array.isArray(bus.reservas) || bus.reservas.length === 0) {
         throw new Error('El bus no contiene reservas para exportar.');
     }
 
-    const reservaIds = bus.reservas.map(r => r.Id_Reserva).filter(Boolean);
+    const reservaIds = [...new Set(
+        bus.reservas
+            .map(reserva => String(reserva?.Id_Reserva || '').trim())
+            .filter(Boolean)
+    )];
     if (reservaIds.length === 0) throw new Error('No se encontraron Id_Reserva válidos en el bus.');
 
-    // Consulta principal de reservas con datos básicos y conteo de pasajeros
+    const estadosPlaceholders = ESTADOS_RESERVA_ACTIVOS.map(() => '?').join(',');
+
+    // Los importes de pagos están normalizados en pagos_reservas. El total de
+    // abonos se recupera por reserva y solo se expone como Pago Agencia cuando
+    // el canal es AGENCIA NACIONAL.
     const reservasSql = `
-        SELECT 
+        SELECT
             r.Id_Reserva,
+            h.Id_Tour,
+            t.Nombre_Tour,
             r.Estado,
             r.Tipo_Reserva,
             r.Fecha_Tour,
             r.Idioma_Reserva AS IdiomaReserva,
             r.Nombre_Reportante AS NombreReporta,
             r.Observaciones,
-            COUNT(p.Id_Pasajero) AS NumeroPasajeros,
-            pt.Nombre_Punto AS PuntoEncuentro
+            r.Id_Canal,
+            c.Nombre_Canal AS NombreCanal,
+            COALESCE(m.Codigo, 'COP') AS MonedaCodigo,
+            (
+                SELECT COUNT(*)
+                FROM pasajeros conteo
+                WHERE conteo.Id_Reserva = r.Id_Reserva
+            ) AS NumeroPasajeros,
+            COALESCE((
+                SELECT SUM(pr.Monto)
+                FROM pagos_reservas pr
+                WHERE pr.Id_Reserva = r.Id_Reserva
+                  AND UPPER(TRIM(COALESCE(pr.Tipo, ''))) = 'ABONO'
+            ), 0) AS TotalAbonos
         FROM reservas r
-        LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-        LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+        INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+        LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
+        LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+        LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
         WHERE r.Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
-        GROUP BY r.Id_Reserva
+          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
     `;
 
-    // Consulta de pasajeros agregados por reserva
+    // Una fila por pasajero evita perder o desalinear datos cuando un nombre,
+    // documento o teléfono contiene comas.
     const pasajerosSql = `
-        SELECT 
-            Id_Reserva,
-            GROUP_CONCAT(Nombre_Pasajero SEPARATOR ', ') AS Nombre_Pasajero,
-            GROUP_CONCAT(DNI SEPARATOR ', ') AS DNI,
-            GROUP_CONCAT(Telefono_Pasajero SEPARATOR ', ') AS Telefono_Pasajero
-        FROM pasajeros
-        WHERE Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
-        GROUP BY Id_Reserva
+        SELECT
+            p.Id_Reserva,
+            p.Id_Pasajero,
+            p.Nombre_Pasajero,
+            p.DNI,
+            p.Telefono_Pasajero,
+            p.Precio_Pasajero AS PrecioTour,
+            p.Id_Punto,
+            pt.Nombre_Punto AS PuntoEncuentro,
+            COALESCE(NULLIF(pt.ruta, ''), 'Pendiente') AS Ruta,
+            pt.posicion AS Posicion
+        FROM pasajeros p
+        LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
+        WHERE p.Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
+        ORDER BY p.Id_Reserva ASC, p.Id_Pasajero ASC
     `;
 
     let reservasRows = [];
     let pasajerosRows = [];
     try {
-        const [rRows] = await db.query(reservasSql, reservaIds);
+        const [rRows] = await db.query(reservasSql, [...reservaIds, ...ESTADOS_RESERVA_ACTIVOS]);
         reservasRows = rRows || [];
         const [pRows] = await db.query(pasajerosSql, reservaIds);
         pasajerosRows = pRows || [];
@@ -3493,25 +3527,102 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
         throw new Error('Fallo al obtener datos para el listado.');
     }
 
-    const pasajerosIndex = new Map(pasajerosRows.map(x => [x.Id_Reserva, x]));
-    const reservasIndex = new Map((reservasRows || []).map(x => [x.Id_Reserva, x]));
+    const pasajerosIndex = new Map();
+    for (const pasajero of pasajerosRows) {
+        const key = String(pasajero.Id_Reserva);
+        if (!pasajerosIndex.has(key)) pasajerosIndex.set(key, []);
+        pasajerosIndex.get(key).push(pasajero);
+    }
 
+    const reservasPlanIndex = new Map(
+        bus.reservas.map((reserva, index) => [String(reserva.Id_Reserva), { ...reserva, __ordenBus: index }])
+    );
+
+    const normalizarRutaListado = value => {
+        const ruta = String(value ?? '').trim();
+        if (!ruta || normalizarAsignacionOperativa(ruta) === 'PENDIENTE') return 'Pendiente';
+        return ruta;
+    };
+    const valorNumericoOBlanco = value => {
+        if (value === null || value === undefined || value === '') return null;
+        const numero = Number(value);
+        return Number.isFinite(numero) ? numero : null;
+    };
+    const obtenerPuntoPrincipal = (reservaPlan, pasajeros) => {
+        const idPuntoPlan = reservaPlan?.Id_Punto ?? reservaPlan?.idPunto ?? null;
+        const pasajeroPrincipal = idPuntoPlan
+            ? pasajeros.find(pasajero => String(pasajero.Id_Punto) === String(idPuntoPlan))
+            : null;
+        return pasajeroPrincipal || pasajeros[0] || {};
+    };
+
+    const reservasListado = reservasRows.map(reserva => {
+        const key = String(reserva.Id_Reserva);
+        const reservaPlan = reservasPlanIndex.get(key) || {};
+        const pasajeros = pasajerosIndex.get(key) || [];
+        const puntoPrincipal = obtenerPuntoPrincipal(reservaPlan, pasajeros);
+        const ruta = normalizarRutaListado(
+            reservaPlan.ruta ?? reservaPlan.Ruta ?? puntoPrincipal.Ruta
+        );
+        const posicion = Number(
+            reservaPlan.ordenRuta
+            ?? reservaPlan.Posicion
+            ?? puntoPrincipal.Posicion
+            ?? Number.MAX_SAFE_INTEGER
+        );
+
+        return {
+            ...reserva,
+            pasajeros,
+            PuntoEncuentro: reservaPlan.NombrePunto
+                || reservaPlan.PuntoEncuentro
+                || puntoPrincipal.PuntoEncuentro
+                || '',
+            Ruta: ruta,
+            Posicion: Number.isFinite(posicion) ? posicion : Number.MAX_SAFE_INTEGER,
+            __ordenBus: reservaPlan.__ordenBus ?? Number.MAX_SAFE_INTEGER,
+        };
+    }).filter(reserva => reserva.pasajeros.length > 0);
+
+    reservasListado.sort((a, b) => {
+        const rutaA = /^\d+$/.test(a.Ruta) ? Number(a.Ruta) : Number.MAX_SAFE_INTEGER;
+        const rutaB = /^\d+$/.test(b.Ruta) ? Number(b.Ruta) : Number.MAX_SAFE_INTEGER;
+        if (rutaA !== rutaB) return rutaA - rutaB;
+        if (a.Ruta !== b.Ruta) return a.Ruta.localeCompare(b.Ruta, 'es');
+        if (a.Posicion !== b.Posicion) return a.Posicion - b.Posicion;
+        if (a.__ordenBus !== b.__ordenBus) return a.__ordenBus - b.__ordenBus;
+        return String(a.Id_Reserva).localeCompare(String(b.Id_Reserva), 'es', { numeric: true });
+    });
+
+    if (reservasListado.length === 0) {
+        throw new Error('El bus no contiene reservas operativas con pasajeros para exportar.');
+    }
+
+    const formatoListado = formato === 'compacto' ? 'compacto' : 'operativo';
+    const esCompacto = formatoListado === 'compacto';
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('LISTADO');
 
     const borderThin = { style: 'thin' };
 
-    // Definir columnas similares (solo las que garantizamos)
     const columns = [
-        { header: 'NOMBRE DEL PASAJERO', key: 'NombrePasajero', width: 40 },
-        { header: 'DNI/PASAPORTE', key: 'IdPas', width: 16 },
-        { header: 'TELEFONO', key: 'TelefonoPasajero', width: 18 },
-        { header: '# PAX', key: 'NumeroPasajeros', width: 10 },
-        { header: 'PUNTO DE ENCUENTRO', key: 'PuntoEncuentro', width: 24 },
-        { header: 'OBSERVACIONES', key: 'Observaciones', width: 30 },
+        { header: 'NOMBRE DEL PASAJERO', key: 'NombrePasajero', width: esCompacto ? 30 : 42 },
+        { header: 'DNI/PASAPORTE', key: 'IdPas', width: 18 },
+        { header: 'TELEFONO', key: 'TelefonoPasajero', width: esCompacto ? 16 : 22 },
+        { header: '# PAX', key: 'NumeroPasajeros', width: esCompacto ? 8 : 10 },
+        { header: 'PUNTO DE ENCUENTRO', key: 'PuntoEncuentro', width: esCompacto ? 28 : 30 },
+        { header: 'OBSERVACIONES', key: 'Observaciones', width: esCompacto ? 38 : 40 },
+        { header: 'PRECIO', key: 'PrecioTour', width: 15 },
+        { header: esCompacto ? 'AGENCIA' : 'PAGO AGENCIA', key: 'PagoAgencia', width: 18 },
+        { header: 'DOLARES', key: 'Dolares', width: 14 },
+        { header: 'TRANSFER', key: 'Transfer', width: 18 },
+        { header: 'REPORTA', key: 'NombreReporta', width: esCompacto ? 24 : 36 },
         { header: 'IDIOMA', key: 'IdiomaReserva', width: 12 },
-        { header: 'TIPO DE RESERVA', key: 'Tipo_Reserva', width: 18 },
-        { header: 'ESTADO DE RESERVA', key: 'Estado', width: 18 },
+        ...(!esCompacto ? [
+            { header: 'TIPO DE RESERVA', key: 'Tipo_Reserva', width: 20 },
+            { header: 'RUTA', key: 'Ruta', width: 12 },
+            { header: 'ESTADO DE RESERVA', key: 'Estado', width: 18 },
+        ] : []),
     ];
 
     worksheet.columns = columns;
@@ -3526,21 +3637,47 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
     headerRowDate.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
     headerRowDate.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
 
-    const richText = [];
     const texto = nombre;
-    if (texto.includes('RIO CLARO')) {
-        const parts = texto.split('RIO CLARO');
-        if (parts[0]) richText.push({ text: parts[0], font: { bold: true } });
-        richText.push({ text: 'RIO CLARO', font: { bold: true, color: { argb: 'FF00FF00' } } });
-        if (parts[1]) richText.push({ text: parts[1], font: { bold: true } });
+    const richText = [];
+    const rioClaroMatch = /R[IÍ]O CLARO/i.exec(texto);
+    if (rioClaroMatch) {
+        const inicio = rioClaroMatch.index;
+        const fin = inicio + rioClaroMatch[0].length;
+        if (inicio > 0) richText.push({ text: texto.slice(0, inicio), font: { bold: true } });
+        richText.push({ text: texto.slice(inicio, fin), font: { bold: true, color: { argb: 'FF00FF00' } } });
+        if (fin < texto.length) richText.push({ text: texto.slice(fin), font: { bold: true } });
     } else {
         richText.push({ text: texto, font: { bold: true } });
     }
     const headerRowTour = worksheet.getCell(1, 2);
     headerRowTour.value = { richText };
-    worksheet.mergeCells(1, 2, 1, columns.length);
+    const tourEndColumn = esCompacto ? 6 : 8;
+    worksheet.mergeCells(1, 2, 1, tourEndColumn);
     headerRowTour.alignment = { vertical: 'middle', horizontal: 'center' };
     headerRowTour.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+
+    const identificador = String(bus?.id || '').trim();
+    const guia = String(bus?.guia || '').trim();
+    const busStartColumn = esCompacto ? 7 : 9;
+    const busEndColumn = esCompacto ? 9 : 11;
+    const guideStartColumn = esCompacto ? 10 : 12;
+    const guideEndColumn = columns.length;
+
+    const busHeader = worksheet.getCell(1, busStartColumn);
+    busHeader.value = identificador ? `BUS: ${identificador}` : 'BUS:';
+    worksheet.mergeCells(1, busStartColumn, 1, busEndColumn);
+    busHeader.font = { bold: true };
+    busHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+    busHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } };
+    busHeader.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+
+    const guideHeader = worksheet.getCell(1, guideStartColumn);
+    guideHeader.value = `GUÍA: ${guia || 'PENDIENTE'}`;
+    worksheet.mergeCells(1, guideStartColumn, 1, guideEndColumn);
+    guideHeader.font = { bold: true, color: guia ? { argb: 'FF000000' } : { argb: 'FFFF0000' } };
+    guideHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+    guideHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    guideHeader.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
 
     // Fila 2: encabezados
     const headerRow2 = worksheet.getRow(2);
@@ -3552,48 +3689,98 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
         cell.border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
     });
 
+    const agregarTotalRuta = (ruta, pasajerosRuta) => {
+        const totalRow = worksheet.getRow(worksheet.rowCount + 1);
+        totalRow.getCell(1).value = `Total Ruta ${ruta}`;
+        totalRow.getCell(1).font = { bold: true };
+        totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDDDDD' } };
+        totalRow.getCell(4).value = pasajerosRuta;
+        totalRow.getCell(4).font = { bold: true, color: { argb: 'FFFF0000' } };
+        totalRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDDDDD' } };
+        for (let col = 1; col <= columns.length; col++) {
+            const cell = totalRow.getCell(col);
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = { top: borderThin, bottom: borderThin };
+        }
+    };
+
     let totalPasajeros = 0;
+    let rutaActual = null;
+    let totalPasajerosRuta = 0;
 
-    // Agregar filas por reserva respetando el orden de bus.reservas (reservaIds)
-    for (const id of reservaIds) {
-        const r = reservasIndex.get(id);
-        if (!r) continue; // Saltar si por alguna razón la reserva no vino en la consulta
+    for (const r of reservasListado) {
+        if (!esCompacto && rutaActual !== null && rutaActual !== r.Ruta) {
+            agregarTotalRuta(rutaActual, totalPasajerosRuta);
+            totalPasajerosRuta = 0;
+        }
+        rutaActual = r.Ruta;
 
-        const paxAgg = pasajerosIndex.get(r.Id_Reserva) || {};
-        const nombres = paxAgg.Nombre_Pasajero ? String(paxAgg.Nombre_Pasajero).split(', ') : [''];
-        const ids = paxAgg.DNI ? String(paxAgg.DNI).split(', ') : [''];
-        const tels = paxAgg.Telefono_Pasajero ? String(paxAgg.Telefono_Pasajero).split(', ') : [''];
+        const esRioClaro = Number(r.Id_Tour) === 1
+            || normalizarAsignacionOperativa(r.Nombre_Tour).includes('RIO CLARO');
+        const esIngles = normalizarAsignacionOperativa(r.IdiomaReserva) === 'INGLES';
+        const esAgenciaNacional = normalizarAsignacionOperativa(r.NombreCanal) === 'AGENCIA NACIONAL';
+        const monedaCodigo = normalizarAsignacionOperativa(r.MonedaCodigo) || 'COP';
+        const pagoAgencia = esAgenciaNacional && Number(r.TotalAbonos) > 0
+            ? Number(r.TotalAbonos)
+            : null;
 
         const startRow = worksheet.rowCount + 1;
-        nombres.forEach((nombre, idx) => {
+        r.pasajeros.forEach((pasajero, idx) => {
+            const precio = valorNumericoOBlanco(pasajero.PrecioTour);
             const data = {
-                NombrePasajero: nombre,
-                IdPas: ids[idx] || '',
-                TelefonoPasajero: tels[idx] || '',
+                NombrePasajero: pasajero.Nombre_Pasajero || '',
+                IdPas: pasajero.DNI || '',
+                TelefonoPasajero: pasajero.Telefono_Pasajero || '',
+                PrecioTour: precio,
+                Dolares: monedaCodigo === 'USD' ? precio : null,
             };
             if (idx === 0) {
                 Object.assign(data, {
-                    NumeroPasajeros: r.NumeroPasajeros || 0,
+                    NumeroPasajeros: r.pasajeros.length,
                     PuntoEncuentro: r.PuntoEncuentro || '',
                     Observaciones: r.Observaciones || '',
+                    PagoAgencia: pagoAgencia,
+                    Transfer: null,
+                    NombreReporta: r.NombreReporta || '',
                     IdiomaReserva: r.IdiomaReserva || '',
                     Tipo_Reserva: r.Tipo_Reserva || '',
+                    Ruta: r.Ruta,
                     Estado: r.Estado || '',
                 });
             }
-            worksheet.addRow(data);
+            const newRow = worksheet.addRow(data);
+            if (esRioClaro) {
+                newRow.getCell(1).font = { bold: true, color: { argb: 'FF00FF00' } };
+            }
         });
         const endRow = worksheet.rowCount;
-        // Merge columnas para datos comunes
-        worksheet.mergeCells(`D${startRow}:D${endRow}`);
-        worksheet.mergeCells(`E${startRow}:E${endRow}`);
-        worksheet.mergeCells(`F${startRow}:F${endRow}`);
-        worksheet.mergeCells(`G${startRow}:G${endRow}`);
-        worksheet.mergeCells(`H${startRow}:H${endRow}`);
-        worksheet.mergeCells(`I${startRow}:I${endRow}`);
+        if (startRow !== endRow) {
+            const mergedColumns = esCompacto
+                ? ['D', 'E', 'F', 'H', 'I', 'J', 'K', 'L']
+                : ['D', 'E', 'F', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+            for (const column of mergedColumns) {
+                worksheet.mergeCells(`${column}${startRow}:${column}${endRow}`);
+            }
+        }
         aplicarBordesBloque(worksheet, startRow, endRow, 1, columns.length);
 
-        totalPasajeros += parseInt(r.NumeroPasajeros || 0, 10);
+        if (esIngles) {
+            for (const column of [5, 12]) {
+                worksheet.getCell(startRow, column).font = { bold: true, color: { argb: 'FFFF0000' } };
+            }
+        }
+
+        totalPasajeros += r.pasajeros.length;
+        totalPasajerosRuta += r.pasajeros.length;
+    }
+
+    worksheet.getColumn(7).numFmt = '#,##0';
+    worksheet.getColumn(8).numFmt = '#,##0';
+    worksheet.getColumn(9).numFmt = '#,##0.00';
+
+    if (!esCompacto && rutaActual !== null) {
+        agregarTotalRuta(rutaActual, totalPasajerosRuta);
+        worksheet.addRow({});
     }
 
     // Fila total de pasajeros
@@ -3604,14 +3791,18 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour }) {
     totalRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
     totalRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
     totalRow.getCell(4).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
-    totalRow.getCell(1).value = 'Total de Pasajeros';
-    totalRow.getCell(1).font = { bold: true };
-    totalRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
-    totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-    totalRow.getCell(1).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    if (!esCompacto) {
+        totalRow.getCell(1).value = 'Total de Pasajeros';
+        totalRow.getCell(1).font = { bold: true };
+        totalRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+        totalRow.getCell(1).border = { top: borderThin, left: borderThin, bottom: borderThin, right: borderThin };
+    }
     totalRow.height = 20;
 
-    worksheet.eachRow(row => { row.alignment = { vertical: 'middle', horizontal: 'center' }; });
+    worksheet.eachRow({ includeEmpty: true }, row => {
+        row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     return buffer;

@@ -349,7 +349,6 @@
       <div class="context-panel-heading">
         <span class="context-panel-icon" aria-hidden="true"><i [class]="contextItem.icon"></i></span>
         <div>
-          <span class="context-panel-kicker">Módulo</span>
           <h2>{{ contextItem.label }}</h2>
         </div>
       </div>
@@ -391,21 +390,6 @@
           }
         </div>
       </div>
-    }
-
-    @if (!isClientUser()) {
-      <button type="button" class="context-activity" (click)="openNotifications(); closeAllSubmenus()">
-        <span class="context-activity-icon" aria-hidden="true"><i class="bx bx-bell"></i></span>
-        <span class="context-activity-copy">
-          <strong>Notificaciones y recordatorios</strong>
-          <small>{{ notifications.noLeidas() ? notifications.noLeidas() + (notifications.noLeidas() === 1 ? ' aviso pendiente' : ' avisos pendientes') : 'No tienes avisos pendientes' }}</small>
-        </span>
-        @if (notifications.noLeidas()) {
-          <span class="context-activity-count">{{ notifications.noLeidas() > 99 ? '99+' : notifications.noLeidas() }}</span>
-        } @else {
-          <i class="bx bx-chevron-right context-link-arrow" aria-hidden="true"></i>
-        }
-      </button>
     }
   </section>
 }

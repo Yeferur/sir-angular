@@ -221,21 +221,20 @@ async function broadcastActiveUsers() {
   }
 }
 
-// ✅ Aforo a todos menos quien actualiza (si userId viene)
-function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId = null }) {
+// ✅ Aforo a todos los sockets internos, incluidas las demás pestañas del autor.
+function broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, Fecha }) {
   try {
     const payload = JSON.stringify({
       type: 'aforoActualizado',
       Id_Tour,
       Nombre_Tour,
-      NuevoCupo
+      NuevoCupo,
+      Fecha
     });
 
     let enviados = 0;
 
-    for (const [uid, userMap] of clientsByUser.entries()) {
-      if (userId != null && uid === Number(userId)) continue;
-
+    for (const userMap of clientsByUser.values()) {
       for (const set of userMap.values()) {
         for (const ws of set) {
           if (isOpen(ws)) {

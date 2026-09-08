@@ -1,0 +1,447 @@
+<div class="page-container">
+
+  <header class="page-header">
+    <div class="header-left">
+      <span class="page-date-label">Operación del día</span>
+      <p class="page-subtitle">
+        Disponibilidad de cupos ·
+        <span class="date-slide-track">
+          @for (frame of [dateAnimKey]; track frame) {
+            <span
+              class="date-slide-item"
+              [class.slide-prev]="dateAnimDirection === 'prev'">
+              {{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+            </span>
+          }
+        </span>
+      </p>
+    </div>
+
+    <div class="date-nav-control">
+      <button type="button" class="date-nav-btn" (click)="irDiaAnterior()" aria-label="Día anterior">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+
+      <div class="date-picker-wrap">
+        <app-datepicker
+          [ngModel]="fecha"
+          (dateChange)="onFechaChange($event)"
+          placeholder="Seleccionar fecha">
+        </app-datepicker>
+      </div>
+
+      <button type="button" class="date-nav-btn" (click)="irDiaSiguiente()" aria-label="Día siguiente">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="date-hoy-btn date-hoy-btn--tomorrow"
+        [class.active]="isTomorrowSelected()"
+        (click)="irManana()">
+        {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+      </button>
+
+      <button
+        type="button"
+        class="date-hoy-btn date-hoy-btn--today"
+        [class.active]="isTodaySelected()"
+        (click)="irHoy()">
+        Hoy
+      </button>
+    </div>
+  </header>
+
+  @if (isLoading) {
+    <app-loading-state label="Cargando aforos y servicios del día…"></app-loading-state>
+  } @else if (loadError && !hasLoaded) {
+    <app-loading-state
+      mode="error"
+      label="No pudimos cargar Inicio"
+      [detail]="loadError"
+      (action)="retryLoad()">
+    </app-loading-state>
+  } @else {
+    <div class="content-wrap" [class.is-updating]="isUpdatingDate" [attr.aria-busy]="isUpdatingDate">
+
+      @if (loadError) {
+        <div class="inicio-stale-notice" role="alert">
+          <span>{{ loadError }}</span>
+          @if (loadedFecha && loadedFecha !== fecha) {
+            <small>Se conservan los datos de {{ loadedFecha | date:"d 'de' MMMM" : '' : 'es-CO' }}.</small>
+          }
+          <button type="button" (click)="retryLoad()">Reintentar</button>
+        </div>
+      }
+
+      @if (tours.length) {
+      <div class="tours-grid">
+
+        <div
+          class="tour-card card-linked"
+          [class.has-privados]="hasAnyLinkedPrivados()"
+          [class.card-flash]="flashLinked">
+          <div class="card-head">
+            <div class="card-name-col">
+              <span class="card-tour-name">{{ getLinkedTourNames() }}</span>
+            </div>
+          </div>
+
+          <div class="linked-content linked-content-split">
+            <div class="linked-summary">
+              <div class="card-avail">
+                <span class="avail-big" [ngClass]="getLinkedAvailabilityTone()" [countUp]="getLinkedAvailableSeats()"></span>
+                <span class="avail-sub">disponibles</span>
+              </div>
+
+              <div class="card-stats">
+                <div class="card-stat">
+                  <span class="card-stat-label">Pasajeros:</span>
+                  <span class="card-stat-value" [countUp]="getLinkedTotalPax()"></span>
+                </div>
+                <div class="card-stat">
+                  <span class="card-stat-label">Capacidad:</span>
+                  <span class="card-stat-value" [countUp]="getCupoCompartido()"></span>
+                </div>
+              </div>
+
+              <div class="card-progress">
+                <div class="card-progress-track">
+                  <span
+                    class="card-progress-fill"
+                    [ngClass]="getLinkedCardColor()"
+                    [style.width]="getProgressWidth(getLinkedOccupancyPct())"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="linked-side-tours">
+              @for (tour of getLinkedTours(); track tour.Id_Tour) {
+                <div class="linked-side-tour">
+                  <span class="linked-side-tour-name">{{ tour.Nombre_Tour }}</span>
+                  <span class="linked-side-tour-pax" [countUp]="tour.NumeroPasajeros"></span>
+                  @if (hasPrivados(tour)) {
+                    <button
+                      type="button"
+                      class="privados-badge linked-side-tour-privados"
+                      (click)="abrirDrawerPrivados(tour)"
+                      [attr.aria-label]="'Ver reservas privadas de ' + tour.Nombre_Tour">
+                      <span class="privados-badge-dot"></span>
+                      {{ tour.privados.length }} privada{{ tour.privados.length !== 1 ? 's' : '' }}
+                      · {{ getTotalPrivadosPax(tour) }} pasajeros
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button
+              type="button"
+              class="btn-open-results"
+              (click)="irAReservas(getLinkedTours())">
+              Ver reservas
+            </button>
+
+            <button
+              *appPermiso="['AFOROS.ACTUALIZAR', 'INICIO.ACTUALIZAR_AFORO']; requireAll: false"
+              type="button"
+              class="btn-edit-aforo"
+              (click)="abrirDrawerEdicionCompartido()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Editar cupo compartido
+            </button>
+          </div>
+        </div>
+
+        @for (tour of tours; track tour.Id_Tour) {
+          @if (!isLinked(tour)) {
+            <div class="tour-card" [class.has-privados]="hasPrivados(tour)" [class.card-flash]="isFlashing(tour)">
+              <div class="card-head">
+                <div class="card-name-col">
+                  <span class="card-tour-name">{{ tour.Nombre_Tour }}</span>
+                </div>
+              </div>
+
+              <div class="card-avail">
+                <span class="avail-big" [ngClass]="getAvailabilityTone(tour)" [countUp]="getAvailableSeats(tour)"></span>
+                <span class="avail-sub">disponibles</span>
+                </div>
+
+              <div class="card-stats">
+                <div class="card-stat">
+                  <span class="card-stat-label">Pasajeros:</span>
+                  <span class="card-stat-value" [countUp]="tour.NumeroPasajeros"></span>
+                </div>
+                <div class="card-stat">
+                  <span class="card-stat-label">Capacidad:</span>
+                  <span class="card-stat-value" [countUp]="getCuposParaMeta(tour)"></span>
+                </div>
+              </div>
+
+              <div class="card-progress">
+                <div class="card-progress-track">
+                  <span
+                    class="card-progress-fill"
+                    [ngClass]="getCardColor(tour)"
+                    [style.width]="getProgressWidth(getOccupancyPct(tour))"></span>
+                </div>
+              </div>
+
+              @if (hasPrivados(tour)) {
+                <div class="card-privados-row">
+                  <button
+                    type="button"
+                    class="privados-badge"
+                    (click)="abrirDrawerPrivados(tour)"
+                    [attr.aria-label]="'Ver reservas privadas de ' + tour.Nombre_Tour">
+                    <span class="privados-badge-dot"></span>
+                    {{ tour.privados.length }} privada{{ tour.privados.length !== 1 ? 's' : '' }}
+                    · {{ getTotalPrivadosPax(tour) }} pasajeros
+                  </button>
+                </div>
+              }
+
+              <div class="card-footer">
+                <button
+                  type="button"
+                  class="btn-open-results"
+                  (click)="irAReservas(tour)">
+                  Ver reservas
+                </button>
+
+                <button
+                  *appPermiso="['AFOROS.ACTUALIZAR', 'INICIO.ACTUALIZAR_AFORO']; requireAll: false"
+                  type="button"
+                  class="btn-edit-aforo"
+                  (click)="abrirDrawerEdicion(tour)">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Editar cupos
+                </button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+      } @else {
+        <app-loading-state
+          mode="empty"
+          label="No hay tours activos para mostrar"
+          detail="Puedes consultar otra fecha o revisar la configuración de tours.">
+        </app-loading-state>
+      }
+
+      <div class="transfers-card">
+        <div class="transfers-head">
+          <div>
+            <span class="transfers-title">Transfers</span>
+            <span class="transfers-sub">Servicios del día</span>
+          </div>
+          <span class="transfer-total-badge" [countUp]="transfersSummary.total"></span>
+        </div>
+
+        <div class="transfers-body">
+          <div class="transfer-col">
+            <span class="transfer-label">Hotel/Aeropuerto</span>
+            <strong class="transfer-value" [countUp]="transfersSummary.hotelAeropuerto"></strong>
+          </div>
+          <div class="transfer-col">
+            <span class="transfer-label">Aeropuerto/Hotel</span>
+            <strong class="transfer-value" [countUp]="transfersSummary.aeropuertoHotel"></strong>
+          </div>
+          <div class="transfer-col">
+            <span class="transfer-label">Otro</span>
+            <strong class="transfer-value" [countUp]="transfersSummary.otros"></strong>
+          </div>
+        </div>
+
+        <div class="transfers-footer">
+          <button type="button" class="btn-open-results" (click)="irATransfers()">
+            Ver transfers
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<div class="drawer-overlay" [class.open]="drawerOpen" (click)="cerrarDrawer()" aria-hidden="true"></div>
+
+<aside
+  class="drawer"
+  [class.open]="drawerOpen && drawerMode === 'edit'"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-hidden]="drawerOpen && drawerMode === 'edit' ? null : true"
+  [attr.inert]="drawerOpen && drawerMode === 'edit' ? null : ''"
+  tabindex="-1"
+  (keydown)="onDrawerKeydown($event)"
+  aria-labelledby="drawer-edit-title">
+  @if (drawerTour) {
+    <div class="drawer-header">
+      <div>
+        <h2 class="drawer-title" id="drawer-edit-title">{{ getDrawerTitle() }}</h2>
+        <p class="drawer-sub">{{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}</p>
+      </div>
+
+      <button type="button" class="drawer-close-btn" (click)="cerrarDrawer()" aria-label="Cerrar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="drawer-current">
+        <div>
+          <div class="dc-num" [ngClass]="getDrawerAvailabilityTone()">{{ getDrawerAvailableSeats() }}</div>
+          <div class="dc-label">disponibles</div>
+        </div>
+
+        <div class="dc-sep"></div>
+
+        <div style="text-align:right">
+          <div class="dc-cap-num">{{ getDrawerCapacity() }}</div>
+          <div class="dc-label">capacidad actual</div>
+        </div>
+      </div>
+
+      <div class="drawer-prog-wrap">
+        <div
+          class="drawer-prog-fill"
+          [ngClass]="getDrawerCardColor()"
+          [style.width.%]="getDrawerOccupancyPct()">
+        </div>
+      </div>
+
+      <div class="drawer-prog-labels">
+        <span>0</span>
+        <span>{{ getDrawerAssignedPax() }} pasajeros</span>
+        <span>{{ getDrawerCapacity() }}</span>
+      </div>
+
+      @if (isLinked(drawerTour)) {
+        <div class="drawer-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>Cupo compartido. Al guardar, <strong>{{ getLinkedTourNames() }}</strong> tendrán la misma capacidad.</span>
+        </div>
+      }
+
+      <div class="field-group">
+        <label class="field-label" for="cupo-edit-input">Nuevo cupo</label>
+        <input
+          id="cupo-edit-input"
+          type="number"
+          inputmode="numeric"
+          class="field-input-big"
+          [value]="nuevoCupoDrawer"
+          (input)="nuevoCupoDrawer = +$any($event.target).value"
+          min="0"
+          max="9999"
+          placeholder="0">
+
+        <span class="field-hint">
+          {{ isLinked(drawerTour)
+            ? 'El cambio se aplicará al cupo compartido de ambos tours'
+            : 'Ingresa la nueva capacidad total para este tour' }}
+        </span>
+      </div>
+
+      <div class="drawer-actions">
+        <button type="button" class="btn-drawer-cancel" (click)="cerrarDrawer()">Cancelar</button>
+        <button type="button" class="btn-drawer-save" (click)="guardarAforo()">Guardar cupo</button>
+      </div>
+    </div>
+  }
+</aside>
+
+<aside
+  class="drawer"
+  [class.open]="drawerOpen && drawerMode === 'privados'"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-hidden]="drawerOpen && drawerMode === 'privados' ? null : true"
+  [attr.inert]="drawerOpen && drawerMode === 'privados' ? null : ''"
+  tabindex="-1"
+  (keydown)="onDrawerKeydown($event)"
+  aria-labelledby="drawer-priv-title">
+  @if (drawerTour) {
+    <div class="drawer-header">
+      <div>
+        <h2 class="drawer-title" id="drawer-priv-title">{{ drawerTour.Nombre_Tour }} — privadas</h2>
+        <p class="drawer-sub">
+          {{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+          · {{ drawerTour.privados.length }} reserva{{ drawerTour.privados.length !== 1 ? 's' : '' }}
+        </p>
+      </div>
+
+      <button type="button" class="drawer-close-btn" (click)="cerrarDrawer()" aria-label="Cerrar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="privados-summary">
+        <div class="pvs-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+
+        <div>
+          <div class="pvs-total">{{ getTotalPrivadosPax(drawerTour) }}</div>
+          <div class="pvs-label">pasajeros privados</div>
+        </div>
+
+        <div class="pvs-sep"></div>
+
+        <div style="text-align:right">
+          <div class="pvs-count-num">{{ drawerTour.privados.length }}</div>
+          <div class="pvs-label">reserva{{ drawerTour.privados.length !== 1 ? 's' : '' }}</div>
+        </div>
+      </div>
+
+      <div class="privados-list-label">Detalle</div>
+
+      <div class="privados-list">
+        @for (p of drawerTour.privados; track p.Id_Reserva) {
+          <div class="privado-item">
+            <span class="pi-id">Reserva #{{ p.Id_Reserva }}</span>
+            <span class="pi-pax">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+              </svg>
+              {{ p.NumeroPasajeros }} pasajeros
+            </span>
+          </div>
+        }
+      </div>
+
+      <button type="button" class="btn-view-private-reservations" (click)="irAReservas(drawerTour, 'Privada')">
+        Ver reservas privadas
+      </button>
+    </div>
+  }
+</aside>

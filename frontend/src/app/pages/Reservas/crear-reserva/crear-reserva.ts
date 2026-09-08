@@ -963,11 +963,20 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
           const fecha = this.form.get('Fecha_Tour')?.value;
           const tour = this.form.get('SelectTour')?.value;
 
-          if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
+          if ((msg?.type === 'reservaCreada' || msg?.type === 'reservaActualizada' || msg?.type === 'reservaEliminada') && msg?.Fecha_Tour === fecha && msg?.Id_Tour == tour) {
             void this.refrescarCuposPorEvento();
           }
-          if (msg?.type === 'aforoActualizado' && msg?.Id_Tour == tour) {
-            if (!msg?.Fecha || msg.Fecha === fecha) void this.refrescarCuposPorEvento();
+        });
+      });
+
+    this.wsService.aforoEvents$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((msg: any) => {
+        this.zone.run(() => {
+          const fecha = this.form.get('Fecha_Tour')?.value;
+          const tour = this.form.get('SelectTour')?.value;
+          if (msg?.Id_Tour == tour && (!msg?.Fecha || msg.Fecha === fecha)) {
+            void this.refrescarCuposPorEvento();
           }
         });
       });

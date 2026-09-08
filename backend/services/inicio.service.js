@@ -10,7 +10,6 @@ function normalizarTourInicio(tour) {
     NumeroPasajeros: Number(tour.NumeroPasajeros) || 0,
     totalReservas: Number(tour.totalReservas) || 0,
     totalPrivados: Number(tour.totalPrivados) || 0,
-    NumeroPasajerosPrivados: Number(tour.NumeroPasajerosPrivados) || 0,
   };
 }
 
@@ -61,16 +60,6 @@ async function obtenerDatosInicio(fecha) {
           AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
           AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
       ), 0) AS totalPrivados
-      ,COALESCE((
-        SELECT COUNT(p.Id_Pasajero)
-        FROM reservas r
-        JOIN horarios h ON h.Id_Horario = r.Id_Horario
-        JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-        WHERE h.Id_Tour = t.Id_Tour
-          AND r.Fecha_Tour = ?
-          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
-          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
-      ), 0) AS NumeroPasajerosPrivados
     FROM tours t
     WHERE t.Activo = 1
   `;
@@ -151,8 +140,7 @@ async function obtenerDatosInicio(fecha) {
         fecha,                 // aforos.Fecha_Aforo
         fecha, ...estadosParams, // pasajeros GRUPAL
         fecha, ...estadosParams, // reservas GRUPAL (nuevo)
-        fecha, ...estadosParams, // count PRV
-        fecha, ...estadosParams  // pasajeros PRV
+        fecha, ...estadosParams  // count PRV
       ]
     );
 
@@ -251,7 +239,12 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
     try {
       const wsManager = require('../websocketManager');
       if (typeof userId !== 'undefined') {
-        wsManager.broadcastAforoActualizado({ Id_Tour, Nombre_Tour, NuevoCupo, userId });
+        wsManager.broadcastAforoActualizado({
+          Id_Tour,
+          Nombre_Tour,
+          NuevoCupo,
+          Fecha,
+        });
       }
     } catch (err) {
       console.error('Error enviando notificación de aforo actualizado:', err);

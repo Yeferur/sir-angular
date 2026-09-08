@@ -482,6 +482,93 @@ li small {
   background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
 }
 
+.export-menu {
+  position: relative;
+}
+
+.export-menu > summary {
+  list-style: none;
+  user-select: none;
+}
+
+.export-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu > summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: 3px;
+  border-right: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.export-menu--bus {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px 10px;
+}
+
+.export-menu--bus > summary {
+  min-height: 34px;
+}
+
+.export-menu__options {
+  position: absolute;
+  z-index: 20;
+  right: 8px;
+  bottom: calc(100% + 2px);
+  min-width: 250px;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .28);
+}
+
+.export-menu__options--footer {
+  right: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+}
+
+.export-menu__options button {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-menu__options button:hover,
+.export-menu__options button:focus-visible {
+  outline: none;
+  background: var(--bg-tertiary);
+}
+
+.export-menu__options strong,
+.export-menu__options small {
+  display: block;
+}
+
+.export-menu__options strong {
+  font-size: .77rem;
+}
+
+.export-menu__options small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: .67rem;
+}
+
 .btn-close:focus-visible,
 .btn-secondary:focus-visible,
 .btn-primary:focus-visible,
@@ -532,11 +619,20 @@ li small {
   }
 
   .detail-footer {
+    flex-wrap: wrap;
+    gap: 8px;
     padding: 12px 16px 16px;
   }
 
-  .detail-footer .btn-primary {
+  .detail-footer .btn-primary,
+  .detail-footer .export-menu--all,
+  .detail-footer .export-menu--all > summary {
     width: 100%;
+  }
+
+  .export-menu__options--footer {
+    right: 0;
+    left: auto;
   }
 }
 

@@ -33,6 +33,7 @@ export interface HomeDayOverview {
   reservations: number;
   passengers: number;
   privateReservations: number;
+  privatePassengers: number;
   transfers: number;
   transferPassengers: number;
 }

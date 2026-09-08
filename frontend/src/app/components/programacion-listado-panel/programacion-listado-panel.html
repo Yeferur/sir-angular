@@ -66,7 +66,7 @@
 
             <span class="bus-copy">
               <strong>{{ bus.id || 'Bus ' + (busIndex + 1) }}</strong>
-              <small [class.is-pending]="!bus.guia">{{ bus.guia || 'Guía pendiente' }}</small>
+              <small [class.is-pending]="!bus.guia">{{ bus.guia || 'PENDIENTE' }}</small>
             </span>
 
             <span class="bus-overview">
@@ -102,6 +102,20 @@
                   </li>
                 }
               </ol>
+
+              <details class="export-menu export-menu--bus" #busExportMenu>
+                <summary class="btn-secondary">Descargar bus</summary>
+                <div class="export-menu__options">
+                  <button type="button" (click)="exportBus(busIndex, 'compacto', busExportMenu)">
+                    <strong>Formato compacto</strong>
+                    <small>Versión breve para guía y conductor</small>
+                  </button>
+                  <button type="button" (click)="exportBus(busIndex, 'operativo', busExportMenu)">
+                    <strong>Formato operativo</strong>
+                    <small>Incluye rutas, tipo y estado</small>
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
         </article>
@@ -110,8 +124,25 @@
   </section>
 </main>
 
-@if (props().canEdit) {
+@if ((props().buses?.length || 0) > 0 || props().canEdit) {
   <footer class="detail-footer">
-    <button type="button" class="btn-primary" (click)="edit()">Editar listado</button>
+    @if ((props().buses?.length || 0) > 0) {
+      <details class="export-menu export-menu--all" #allExportMenu>
+        <summary class="btn-secondary">Descargar todos</summary>
+        <div class="export-menu__options export-menu__options--footer">
+          <button type="button" (click)="exportAll('compacto', allExportMenu)">
+            <strong>Formato compacto</strong>
+            <small>Un Excel compacto por bus</small>
+          </button>
+          <button type="button" (click)="exportAll('operativo', allExportMenu)">
+            <strong>Formato operativo</strong>
+            <small>Un Excel operativo por bus</small>
+          </button>
+        </div>
+      </details>
+    }
+    @if (props().canEdit) {
+      <button type="button" class="btn-primary" (click)="edit()">Editar listado</button>
+    }
   </footer>
 }

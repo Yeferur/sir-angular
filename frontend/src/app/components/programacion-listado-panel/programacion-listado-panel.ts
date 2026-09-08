@@ -11,6 +11,8 @@ interface ProgramacionListadoPanelProps {
   canEdit?: boolean;
   onEdit?: () => void;
   onRegenerate?: () => void;
+  onExportBus?: (index: number, formato: 'compacto' | 'operativo') => void;
+  onExportAll?: (formato: 'compacto' | 'operativo') => void;
 }
 
 @Component({
@@ -61,6 +63,16 @@ export class ProgramacionListadoPanelComponent {
     const action = this.props().onRegenerate;
     this.drawer.close(true);
     action?.();
+  }
+
+  exportBus(index: number, formato: 'compacto' | 'operativo', menu: HTMLDetailsElement): void {
+    menu.open = false;
+    this.props().onExportBus?.(index, formato);
+  }
+
+  exportAll(formato: 'compacto' | 'operativo', menu: HTMLDetailsElement): void {
+    menu.open = false;
+    this.props().onExportAll?.(formato);
   }
 
   close(): void {

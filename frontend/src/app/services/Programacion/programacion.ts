@@ -165,7 +165,13 @@ export class ProgramacionDashboardService {
     return this.http.post(`${this.apiUrl}/exportar-privados-zip`, payload, { responseType: 'blob' });
   }
 
-  exportarListadoBus(payload: { fecha: string; idTour: number; bus: any; nombreTour?: string }): Observable<Blob> {
+  exportarListadoBus(payload: {
+    fecha: string;
+    idTour: number;
+    bus: any;
+    nombreTour?: string;
+    formato: 'compacto' | 'operativo';
+  }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-listado-bus`, payload, { responseType: 'blob' });
   }
 
@@ -187,6 +193,7 @@ export class ProgramacionDashboardService {
     idTour: number;
     buses: any[];
     nombreTour?: string;
+    formato: 'compacto' | 'operativo';
   }): Observable<Blob> {
     return this.http.post(`${this.apiUrl}/exportar-listados-zip`, payload, { responseType: 'blob' });
   }

@@ -36,6 +36,7 @@ function normalizeOverview(rows, dates) {
       reservations: Number(row.Reservas || 0),
       passengers: Number(row.Pasajeros || 0),
       privateReservations: Number(row.Privadas || 0),
+      privatePassengers: Number(row.Pasajeros_Privados || 0),
       transfers: Number(row.Transfers || 0),
       transferPassengers: Number(row.Pasajeros_Transfer || 0),
     };
@@ -73,9 +74,12 @@ async function getOverview(userId, dates, personalScope, includeTransfers = true
        DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha,
        COUNT(DISTINCT r.Id_Reserva) AS Reservas,
        COUNT(p.Id_Pasajero) AS Pasajeros,
-       COUNT(DISTINCT CASE
-         WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'GRUPAL'))) = 'PRIVADA' THEN r.Id_Reserva
-       END) AS Privadas
+        COUNT(DISTINCT CASE
+          WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'GRUPAL'))) = 'PRIVADA' THEN r.Id_Reserva
+        END) AS Privadas,
+        COUNT(CASE
+          WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'GRUPAL'))) = 'PRIVADA' THEN p.Id_Pasajero
+        END) AS Pasajeros_Privados
      FROM reservas r
      LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
      WHERE r.Fecha_Tour IN (?, ?)
