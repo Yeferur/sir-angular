@@ -119,6 +119,7 @@ function createPublicationHarness({ previousStatus = 'borrador', enqueueError = 
     createNotification: notifications.createNotification,
     isSingleMailbox: emailOutbox.isSingleMailbox,
     enqueueScheduleEmail: emailOutbox.enqueueScheduleEmail,
+    cancelPendingScheduleEmail: emailOutbox.cancelPendingScheduleEmail,
     sendToUser: websocketManager.sendToUser,
   };
 
@@ -144,6 +145,13 @@ function createPublicationHarness({ previousStatus = 'borrador', enqueueError = 
     if (enqueueError) throw enqueueError;
     return { queued: true };
   };
+  emailOutbox.cancelPendingScheduleEmail = async (payload, options) => {
+    assert.equal(transactionOpen, true, 'la cancelación del correo anterior debe ocurrir antes del commit');
+    assert.equal(options.executor, connection, 'la cancelación debe usar la conexión transaccional');
+    assert.equal(payload.to, 'ana@example.com');
+    events.push('cancel-email');
+    return { cancelled: 0 };
+  };
   websocketManager.sendToUser = (userId, payload) => {
     assert.equal(transactionOpen, false, 'WebSocket solo puede emitirse después del commit');
     assert.ok(events.includes('commit'), 'WebSocket requiere un commit previo');
@@ -167,6 +175,7 @@ function createPublicationHarness({ previousStatus = 'borrador', enqueueError = 
       notifications.createNotification = originals.createNotification;
       emailOutbox.isSingleMailbox = originals.isSingleMailbox;
       emailOutbox.enqueueScheduleEmail = originals.enqueueScheduleEmail;
+      emailOutbox.cancelPendingScheduleEmail = originals.cancelPendingScheduleEmail;
       websocketManager.sendToUser = originals.sendToUser;
     },
   };
@@ -331,12 +340,13 @@ test('pendiente_republicacion usa alcance completo porque no conserva el roster 
 test('publicar crea notificación y outbox en la transacción, y emite WebSocket después del commit', async () => {
   const harness = createPublicationHarness();
   try {
-    const result = await publishWeek('7', harness.jornadas, true, '12');
+    const result = await publishWeek('7', harness.jornadas, true, '12', true);
 
     assert.deepEqual(result, {
       idSemana: '7',
       estado: 'publicado',
       notificados: 1,
+      envioCorreos: true,
       correosEncolados: 1,
       correosOmitidos: 0,
     });
@@ -353,12 +363,38 @@ test('publicar crea notificación y outbox en la transacción, y emite WebSocket
   }
 });
 
+test('publicar sin correos conserva la notificación interna y no encola entregas', async () => {
+  const harness = createPublicationHarness();
+  try {
+    const result = await publishWeek('7', harness.jornadas, true, '12', false);
+
+    assert.deepEqual(result, {
+      idSemana: '7',
+      estado: 'publicado',
+      notificados: 1,
+      envioCorreos: false,
+      correosEncolados: 0,
+      correosOmitidos: 0,
+    });
+    assert.deepEqual(harness.events, [
+      'begin',
+      'notification',
+      'cancel-email',
+      'commit',
+      'websocket',
+      'release',
+    ]);
+  } finally {
+    harness.restore();
+  }
+});
+
 test('si falla el enqueue de correo, publicar revierte toda la transacción y no emite WebSocket', async () => {
   const enqueueError = new Error('No se pudo persistir el correo');
   const harness = createPublicationHarness({ enqueueError });
   try {
     await assert.rejects(
-      publishWeek('7', harness.jornadas, true, '12'),
+      publishWeek('7', harness.jornadas, true, '12', true),
       enqueueError
     );
     assert.deepEqual(harness.events, [

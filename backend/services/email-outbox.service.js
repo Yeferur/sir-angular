@@ -336,6 +336,24 @@ async function enqueueScheduleEmail(message, publicationId, dependencies = {}) {
   }, { ...dependencies, executor });
 }
 
+async function cancelPendingScheduleEmail(message, dependencies = {}) {
+  const recipient = normalizeRecipient(message.to);
+  if (!isSingleMailbox(recipient)) return { cancelled: 0 };
+
+  const executor = dependencies.executor || db;
+  const [result] = await executor.query(
+    `UPDATE email_outbox
+     SET Estado = 'fallido', Fallido_En = NOW(),
+         Ultimo_Error = 'Cancelado al publicar la semana sin envío por correo.',
+         Payload = JSON_OBJECT(), Fecha_Actualizacion = NOW()
+     WHERE Tipo = 'schedule' AND Destinatario = ? AND Estado = 'pendiente'
+       AND JSON_UNQUOTE(JSON_EXTRACT(Payload, '$.weekStart')) = ?
+       AND JSON_UNQUOTE(JSON_EXTRACT(Payload, '$.weekEnd')) = ?`,
+    [recipient, message.weekStart, message.weekEnd]
+  );
+  return { cancelled: Number(result?.affectedRows || 0) };
+}
+
 function sanitizeError(error) {
   return String(error?.message || error || 'Error de entrega desconocido').slice(0, 2000);
 }
@@ -758,6 +776,7 @@ module.exports = {
   enqueueEmail,
   enqueuePasswordResetEmail,
   enqueueScheduleEmail,
+  cancelPendingScheduleEmail,
   isSingleMailbox,
   processOutboxBatch,
   _private: {

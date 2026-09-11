@@ -723,7 +723,7 @@ async function copyWeekFrom(idSemanaDestino, actorId) {
   }
 }
 
-async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
+async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId, enviarCorreos = false) {
   if (!/^\d+$/.test(String(idSemana || ''))) {
     const error = new Error('La semana indicada no es válida.');
     error.code = 'WEEK_NOT_FOUND';
@@ -923,6 +923,7 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
         { columna: 'Estado', anterior: estadoAnterior, nuevo: 'publicado' },
         { columna: 'Jornadas_Publicadas', anterior: '', nuevo: String(prepared.length) },
         { columna: 'Advertencias_Aceptadas', anterior: '', nuevo: String(advertencias.length) },
+        { columna: 'Correos_Solicitados', anterior: '', nuevo: enviarCorreos ? 'SI' : 'NO' },
       ],
     });
 
@@ -951,7 +952,7 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
         },
       });
       notificationDispatches.push({ idUsuario, notificationId });
-      if (recipient.correo && emailOutbox.isSingleMailbox(recipient.correo)) {
+      if (enviarCorreos && recipient.correo && emailOutbox.isSingleMailbox(recipient.correo)) {
         await emailOutbox.enqueueScheduleEmail({
           to: recipient.correo,
           name: recipient.nombre,
@@ -965,10 +966,16 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
           isUpdate: publicationKind === 'actualizada',
         }, publicationId, { executor: conn });
         emailsQueued += 1;
-      } else if (recipient.correo) {
+      } else if (enviarCorreos && recipient.correo) {
         // Un dato de contacto inválido no debe impedir que la semana y la
         // notificación interna queden publicadas.
         emailsSkipped += 1;
+      } else if (!enviarCorreos && recipient.correo) {
+        await emailOutbox.cancelPendingScheduleEmail({
+          to: recipient.correo,
+          weekStart: snapshot.weekStart,
+          weekEnd: snapshot.weekEnd,
+        }, { executor: conn });
       }
     }
 
@@ -988,6 +995,7 @@ async function publishWeek(idSemana, jornadas, aceptarAdvertencias, actorId) {
       idSemana: String(idSemana),
       estado: 'publicado',
       notificados: notificationDispatches.length,
+      envioCorreos: enviarCorreos,
       correosEncolados: emailsQueued,
       correosOmitidos: emailsSkipped,
     };

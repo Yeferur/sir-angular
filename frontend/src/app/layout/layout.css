@@ -422,6 +422,8 @@
 
 .notification-trigger { position: relative; }
 .notification-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; display: grid; place-items: center; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 800; line-height: 1; }
+.menu-count { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 850; line-height: 1; box-shadow: 0 0 0 2px var(--bg-secondary); }
+.mobile-menu-count { margin-left: auto; min-width: 23px; height: 22px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--accent-red) 16%, transparent); color: var(--accent-red); font-size: 11px; font-weight: 850; }
 
 .topbar-dot { color: var(--accent-red, #ff453a); }
 

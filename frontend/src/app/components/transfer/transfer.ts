@@ -182,7 +182,9 @@ export class TransferDynamicComponent implements OnChanges, OnDestroy {
 
   get puedeCancelar(): boolean {
     const estado = String(this.transfer.Estado ?? (this.transfer as any).Estado_Transfer ?? '').toLowerCase();
-    return !!this.transfer.Id_Transfer && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosService.tienePermiso('TRANSFERS.CANCELAR')
+      && !!this.transfer.Id_Transfer
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
   editarTransfer(): void {

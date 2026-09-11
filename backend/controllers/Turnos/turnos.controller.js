@@ -102,7 +102,8 @@ exports.publicarSemana = async (req, res) => {
       req.params.idSemana,
       req.body?.jornadas,
       req.body?.aceptarAdvertencias,
-      req.user?.id
+      req.user?.id,
+      req.body?.enviarCorreos === true
     );
     return sendSuccess(res, { data: result, message: 'Semana publicada correctamente' });
   } catch (error) {

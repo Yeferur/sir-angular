@@ -6,6 +6,7 @@ frontend/.angular/
 dist/
 .angular/
 coverage/
+backend/database/backups/
 backend/infrastructure/osrm/data/
 .env
 .env.*

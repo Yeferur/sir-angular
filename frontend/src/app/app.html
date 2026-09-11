@@ -5,7 +5,7 @@
 @if (viewLoggedIn()) {
   <div class="app-shell app-shell--private"
        [class.is-entering]="shellEntering()"
-       [class.is-navigating]="routeTransitioning">
+       [class.is-navigating]="routeTransitioning()">
     <app-sir-drawer></app-sir-drawer>
     <div class="main-shell">
       <main class="content">
@@ -15,7 +15,7 @@
   </div>
 } @else if (publicAuthRoute) {
   <main class="auth-public-shell">
-    @if (!routeTransitioning) {
+    @if (!routeTransitioning()) {
       <router-outlet></router-outlet>
     }
   </main>

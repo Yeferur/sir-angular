@@ -74,8 +74,11 @@ const searchRoutes = require('./routes/Search/search.routes');
 const homeRoutes = require('./routes/Home/home.routes');
 const turnosRoutes = require('./routes/Turnos/turnos.routes');
 const notificacionesRoutes = require('./routes/Notificaciones/notificaciones.routes');
+const pendientesRoutes = require('./routes/Pendientes/pendientes.routes');
+const recordatoriosRoutes = require('./routes/Recordatorios/recordatorios.routes');
 const { iniciarVencimientosJob, detenerVencimientosJob } = require('./jobs/vencimientos.job');
 const { iniciarEmailOutboxJob, detenerEmailOutboxJob } = require('./jobs/email-outbox.job');
+const { iniciarPendientesJob, detenerPendientesJob } = require('./jobs/pendientes.job');
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
@@ -95,6 +98,8 @@ app.use('/api/search', searchRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
+app.use('/api/pendientes', pendientesRoutes);
+app.use('/api/recordatorios', recordatoriosRoutes);
 const dashboardRoutes = require('./routes/Dashboard/dashboard.routes');
 app.use('/api/dashboard', dashboardRoutes);
 
@@ -161,6 +166,7 @@ server.on('error', (err) => {
 // ✅ Levantar server
 iniciarVencimientosJob();
 iniciarEmailOutboxJob();
+iniciarPendientesJob();
 startServer(DEFAULT_PORT);
 
 let shuttingDown = false;
@@ -169,6 +175,7 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`[shutdown] ${signal}: cerrando sir-api de forma ordenada.`);
   detenerVencimientosJob();
+  await detenerPendientesJob();
 
   const closeServer = new Promise((resolve) => {
     if (!server.listening) return resolve();

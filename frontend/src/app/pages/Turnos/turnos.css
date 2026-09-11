@@ -12,6 +12,11 @@ button, input, select, textarea { font: inherit; }
 .week-summary { display: flex; justify-content: center; gap: 16px; color: var(--text-tertiary); font-size: .62rem; }.week-summary strong { color: var(--text-primary); }.week-summary .unsaved strong { color: var(--accent-orange); }
 .warning-summary { padding: 0; border: 0; color: var(--accent-orange); background: transparent; font: inherit; cursor: pointer; }.warning-summary strong { color: inherit; }.warning-summary:hover { text-decoration: underline; text-underline-offset: 3px; }
 .week-actions, .advisor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.email-publish-setting { min-height: 38px; padding: 5px 9px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 9px; color: var(--text-secondary); background: var(--bg-tertiary); cursor: pointer; }
+.email-publish-setting > span:first-child { min-width: 0; }
+.email-publish-setting strong, .email-publish-setting small { display: block; white-space: nowrap; }
+.email-publish-setting strong { color: var(--text-primary); font-size: .63rem; }
+.email-publish-setting small { margin-top: 2px; color: var(--text-tertiary); font-size: .52rem; }
 .icon-button { width: 34px; height: 34px; padding: 0; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--text-secondary); background: transparent; cursor: pointer; transition: .16s var(--ease-soft, ease); }
 .icon-button:hover { color: var(--accent-blue); border-color: color-mix(in srgb, var(--accent-blue) 38%, var(--separator-color)); background: color-mix(in srgb, var(--accent-blue) 6%, transparent); }
 .button-primary, .button-secondary, .button-danger, .button-quiet { min-height: 36px; padding: 0 13px; border-radius: var(--radius-sm); font-size: .66rem; font-weight: 750; cursor: pointer; transition: .16s var(--ease-soft, ease); }

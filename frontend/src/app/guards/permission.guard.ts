@@ -1,10 +1,12 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { PermisosService } from '../services/Permisos/permisos.service';
+import { SirAlertService } from '../services/Alertas/alert.service';
 
 export const permisoGuard: CanActivateFn = async (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot) => {
   const permisosService = inject(PermisosService);
   const router = inject(Router);
+  const alerts = inject(SirAlertService);
 
   const singlePermission = String(route.data?.['permiso'] || '').trim();
   const multiplePermissions = Array.isArray(route.data?.['permisos'])
@@ -28,6 +30,10 @@ export const permisoGuard: CanActivateFn = async (route: ActivatedRouteSnapshot,
     return true;
   }
 
+  alerts.errorToast(
+    'Acceso denegado',
+    'No tienes permiso para acceder a esta sección.',
+  );
   const redirectTo = String(route.data?.['redirectTo'] || '/').trim() || '/';
   return router.parseUrl(redirectTo);
 };

@@ -21,6 +21,10 @@
       @if (canUpdate()) {
         <div class="week-actions">
           @if (semana()?.estado === 'borrador') { <button type="button" class="button-secondary" (click)="copyPrevious()">Copiar semana anterior</button> }
+          <label class="email-publish-setting" title="Solo se enviarán correos si activas esta opción para esta publicación">
+            <span><strong>Enviar correos</strong><small>A asesores afectados</small></span>
+            <span class="switch-control"><input type="checkbox" [checked]="sendScheduleEmails()" [disabled]="publishing()" (change)="sendScheduleEmails.set($any($event.target).checked)" /><i aria-hidden="true"></i></span>
+          </label>
           <button type="button" class="button-primary" [disabled]="!canPublish() || publishing()" (click)="publish()">{{ publishing() ? 'Publicando…' : publishLabel() }}</button>
         </div>
       }

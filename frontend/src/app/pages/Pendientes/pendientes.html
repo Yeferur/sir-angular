@@ -1,0 +1,182 @@
+<main class="work-center">
+  <header class="center-header">
+    <div>
+      <span class="eyebrow">Centro operativo personal</span>
+      <h1>Lo que necesita tu atención</h1>
+      <p>Pendientes detectados por SIR y recordatorios que creaste para ti.</p>
+    </div>
+    @if (canCreateReminders) {
+      <button type="button" class="button button--primary" (click)="openReminderForm()">
+        <i class="bx bx-plus" aria-hidden="true"></i>
+        Nuevo recordatorio
+      </button>
+    }
+  </header>
+
+  <section class="center-summary" aria-label="Resumen">
+    <article>
+      <span>Pendientes activos</span>
+      <strong>{{ pending().length }}</strong>
+    </article>
+    <article>
+      <span>Prioridad alta o crítica</span>
+      <strong>{{ highPriorityCount }}</strong>
+    </article>
+    <article>
+      <span>Recordatorios personales</span>
+      <strong>{{ reminders().length }}</strong>
+    </article>
+  </section>
+
+  <nav class="center-tabs" aria-label="Secciones">
+    @if (canReadPending) {
+      <button type="button" [class.active]="activeTab() === 'pendientes'" (click)="setTab('pendientes')">
+        Pendientes <span>{{ pending().length }}</span>
+      </button>
+    }
+    @if (canReadReminders) {
+      <button type="button" [class.active]="activeTab() === 'recordatorios'" (click)="setTab('recordatorios')">
+        Mis recordatorios <span>{{ reminders().length }}</span>
+      </button>
+    }
+  </nav>
+
+  @if (loading()) {
+    <section class="state-card" aria-live="polite">
+      <span class="spinner"></span>
+      <div><strong>Organizando tu información</strong><p>Estamos consultando lo que necesita atención.</p></div>
+    </section>
+  } @else if (error()) {
+    <section class="state-card state-card--error">
+      <i class="bx bx-error-circle" aria-hidden="true"></i>
+      <div><strong>No pudimos cargar el centro</strong><p>{{ error() }}</p></div>
+      <button type="button" class="button button--secondary" (click)="load()">Reintentar</button>
+    </section>
+  } @else if (activeTab() === 'pendientes') {
+    <div class="section-toolbar">
+      <div>
+        <h2>Pendientes automáticos</h2>
+        <p>Se cierran solos cuando completas el proceso que los originó.</p>
+      </div>
+      <label class="switch-label">
+        <input type="checkbox" [checked]="includeSuppressed()" (change)="toggleSuppressed()" />
+        Mostrar pospuestos
+      </label>
+    </div>
+
+    @if (!pending().length) {
+      <section class="empty-state">
+        <span class="empty-icon"><i class="bx bx-check" aria-hidden="true"></i></span>
+        <h2>Todo al día</h2>
+        <p>SIR no detecta situaciones operativas pendientes para ti.</p>
+      </section>
+    } @else {
+      <section class="item-list" aria-label="Pendientes automáticos">
+        @for (item of pending(); track trackPending($index, item)) {
+          <article class="attention-card" [attr.data-priority]="item.prioridad" [class.is-suppressed]="item.estaSuprimido">
+            <div class="priority-rail"></div>
+            <div class="attention-content">
+              <div class="attention-topline">
+                <span class="priority-chip">{{ priorityLabel(item.prioridad) }}</span>
+                @if (item.estaSuprimido) {
+                  <span class="muted-chip"><i class="bx bx-time-five"></i> Pospuesto hasta {{ item.suprimidoHasta | date:'d MMM, h:mm a' }}</span>
+                }
+                <span class="entity-chip">{{ item.entidadTipo }} · {{ item.entidadId }}</span>
+              </div>
+              <h3>{{ item.titulo }}</h3>
+              @if (item.descripcion) { <p>{{ item.descripcion }}</p> }
+              <div class="attention-meta">
+                @if (item.fechaLimite) { <span><i class="bx bx-alarm"></i> Límite: {{ item.fechaLimite | date:'d MMM, h:mm a' }}</span> }
+                @else if (item.fechaOperacion) { <span><i class="bx bx-calendar"></i> Operación: {{ item.fechaOperacion | date:'d MMM, h:mm a' }}</span> }
+                <span><i class="bx bx-refresh"></i> Verificado {{ item.ultimaDeteccion | date:'d MMM, h:mm a' }}</span>
+              </div>
+
+              @if (pendingActionId() === item.idPendiente && pendingAction() === 'posponer') {
+                <div class="inline-action">
+                  <label>Volver a mostrar
+                    <input type="datetime-local" [(ngModel)]="postponeUntil" />
+                  </label>
+                  @if (item.posposicionMaxMinutos) { <small>Máximo {{ item.posposicionMaxMinutos }} minutos según esta regla.</small> }
+                  <div class="inline-buttons">
+                    <button type="button" class="button button--ghost" (click)="cancelPendingAction()">Cancelar</button>
+                    <button type="button" class="button button--primary" [disabled]="saving()" (click)="confirmPostpone(item)">Posponer</button>
+                  </div>
+                </div>
+              }
+
+              @if (pendingActionId() === item.idPendiente && pendingAction() === 'descartar') {
+                <div class="inline-action">
+                  <label>Motivo {{ item.requiereJustificacion ? '(obligatorio)' : '(opcional)' }}
+                    <textarea rows="2" maxlength="500" [(ngModel)]="dismissReason" placeholder="Explica por qué esta situación no requiere acción"></textarea>
+                  </label>
+                  <small>El descarte quedará registrado en auditoría.</small>
+                  <div class="inline-buttons">
+                    <button type="button" class="button button--ghost" (click)="cancelPendingAction()">Cancelar</button>
+                    <button type="button" class="button button--danger" [disabled]="saving()" (click)="confirmDismiss(item)">Descartar</button>
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="card-actions">
+              <button type="button" class="button button--secondary" (click)="openEntity(item)">Abrir origen</button>
+              @if (canManagePending) {
+                <button type="button" class="icon-button" (click)="beginPendingAction(item, 'posponer')" aria-label="Posponer" title="Posponer">
+                  <i class="bx bx-time-five"></i>
+                </button>
+                @if (item.permiteDescarte) {
+                  <button type="button" class="icon-button" (click)="beginPendingAction(item, 'descartar')" aria-label="Descartar" title="Descartar">
+                    <i class="bx bx-hide"></i>
+                  </button>
+                }
+              }
+            </div>
+          </article>
+        }
+      </section>
+    }
+  } @else {
+    <div class="section-toolbar">
+      <div><h2>Mis recordatorios</h2><p>Son privados: nadie más puede verlos ni administrarlos.</p></div>
+    </div>
+
+    @if (showReminderForm()) {
+      <form class="reminder-form" (ngSubmit)="saveReminder()">
+        <div class="form-heading"><div><span class="eyebrow">Nuevo</span><h2>¿Qué quieres recordar?</h2></div><button type="button" class="icon-button" (click)="closeReminderForm()" aria-label="Cerrar"><i class="bx bx-x"></i></button></div>
+        <label class="field field--wide">Título<input name="title" maxlength="255" required [(ngModel)]="reminderForm.titulo" placeholder="Ej. Revisar la reserva CTG11014" /></label>
+        <label class="field">Fecha y hora<input name="date" type="datetime-local" required [(ngModel)]="reminderForm.fecha" /></label>
+        <label class="field field--wide">Nota<textarea name="description" rows="3" maxlength="4000" [(ngModel)]="reminderForm.descripcion" placeholder="Contexto útil para cuando vuelva a verlo"></textarea></label>
+        <div class="form-actions"><button type="button" class="button button--ghost" (click)="closeReminderForm()">Cancelar</button><button class="button button--primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Crear recordatorio' }}</button></div>
+      </form>
+    }
+
+    @if (!reminders().length && !showReminderForm()) {
+      <section class="empty-state">
+        <span class="empty-icon empty-icon--reminder"><i class="bx bx-bell-plus" aria-hidden="true"></i></span>
+        <h2>No tienes recordatorios</h2>
+        <p>Crea uno para volver a una tarea en el momento adecuado.</p>
+        @if (canCreateReminders) { <button type="button" class="button button--primary" (click)="openReminderForm()">Crear recordatorio</button> }
+      </section>
+    } @else {
+      <section class="reminder-grid" aria-label="Recordatorios personales">
+        @for (item of reminders(); track trackReminder($index, item)) {
+          <article class="reminder-card" [class.is-suppressed]="item.estaSuprimido">
+            <div class="reminder-date"><span>{{ (item.siguienteTrigger || item.fecha) | date:'d' }}</span><small>{{ (item.siguienteTrigger || item.fecha) | date:'MMM' }}</small></div>
+            <div class="reminder-content"><span class="reminder-time">{{ (item.siguienteTrigger || item.fecha) | date:'h:mm a' }}</span><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }@if (item.entidadId) { <span class="entity-chip">{{ item.entidadTipo }} · {{ item.entidadId }}</span> }
+              @if (reminderActionId() === item.idRecordatorio) {
+                <div class="inline-action reminder-inline-action">
+                  <label>Recordarme de nuevo<input type="datetime-local" [(ngModel)]="postponeUntil" /></label>
+                  <div class="inline-buttons"><button type="button" class="button button--ghost" (click)="cancelReminderPostpone()">Cancelar</button><button type="button" class="button button--primary" [disabled]="saving()" (click)="postponeReminder(item)">Posponer</button></div>
+                </div>
+              }
+            </div>
+            <div class="card-actions">
+              @if (canUpdateReminders) { <button type="button" class="icon-button" (click)="beginReminderPostpone(item)" aria-label="Posponer"><i class="bx bx-time-five"></i></button> }
+              @if (canUpdateReminders) { <button type="button" class="button button--secondary" (click)="completeReminder(item)"><i class="bx bx-check"></i> Completar</button> }
+              @if (canDeleteReminders) { <button type="button" class="icon-button icon-button--danger" (click)="deleteReminder(item)" aria-label="Eliminar"><i class="bx bx-trash"></i></button> }
+            </div>
+          </article>
+        }
+      </section>
+    }
+  }
+</main>

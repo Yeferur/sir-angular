@@ -102,6 +102,7 @@ export interface ActualizarAsesorSemanaPayload {
 export interface PublicarSemanaPayload {
   jornadas: Array<ActualizarAsesorSemanaPayload & { idUsuario: string }>;
   aceptarAdvertencias: boolean;
+  enviarCorreos: boolean;
 }
 
 export interface AsesorIntercambio {

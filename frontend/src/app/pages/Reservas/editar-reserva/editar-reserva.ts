@@ -2455,7 +2455,9 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   get puedeCancelarReserva(): boolean {
     const estado = String(this.originalReserva?.Cabecera?.Estado ?? this.originalReserva?.Estado ?? '').trim().toLowerCase();
-    return !!this.reservaId() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosService.tienePermiso('RESERVAS.CANCELAR')
+      && !!this.reservaId()
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
   get canDeleteReserva(): boolean {

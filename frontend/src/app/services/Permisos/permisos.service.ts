@@ -78,8 +78,11 @@ export class PermisosService {
   // CARGA RÁPIDA: localStorage + backend
   // =====================================================
 
-  async loadSessionData(options?: { token?: string | null }): Promise<boolean> {
-    return this.asegurarPermisosCargados({ token: options?.token ?? null });
+  async loadSessionData(options?: { token?: string | null; forceBackend?: boolean }): Promise<boolean> {
+    return this.asegurarPermisosCargados({
+      token: options?.token ?? null,
+      forceBackend: options?.forceBackend ?? false,
+    });
   }
 
   private getTokenFromStorage(): string | null {

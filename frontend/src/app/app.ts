@@ -21,7 +21,7 @@ import { TopbarTransitionService } from './components/login/topbar-transition.se
 export class App implements OnInit, OnDestroy {
   loggedIn = false;
   publicAuthRoute = false;
-  routeTransitioning = false;
+  routeTransitioning = signal(false);
 
   /**
    * Controla qué rama del template se muestra. Deliberadamente
@@ -142,7 +142,7 @@ export class App implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((event: RouterEvent) => {
         if (event instanceof NavigationStart) {
-          this.routeTransitioning = true;
+          queueMicrotask(() => this.routeTransitioning.set(true));
           this.syncShellForUrl(event.url);
         } else if (
           event instanceof NavigationEnd ||
@@ -150,7 +150,7 @@ export class App implements OnInit, OnDestroy {
           event instanceof NavigationError
         ) {
           const url = event instanceof NavigationEnd ? event.urlAfterRedirects : this.router.url;
-          this.routeTransitioning = false;
+          queueMicrotask(() => this.routeTransitioning.set(false));
           this.syncShellForUrl(url);
 
           this.cdr.markForCheck();

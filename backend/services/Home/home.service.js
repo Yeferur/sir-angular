@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const { isClientRoleName } = require('../../utils/clientAccess');
+const { syncHomeProcesses } = require('../Pendientes/home-process-detector.service');
 
 const ACTIVE_RESERVATION_SQL = "UPPER(TRIM(COALESCE(r.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO')";
 const ACTIVE_TRANSFER_SQL = "UPPER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ANULADA','ANULADO','ELIMINADA','ELIMINADO')";
@@ -248,7 +249,7 @@ async function getCapacityAlerts(dates) {
 async function getOperationalProcesses(dates, permissions) {
   const processes = [];
 
-  if (hasAnyPermission(permissions, 'CONTROL_VIAJE.LEER', 'COMISIONES.LEER', 'SEGUROS.LEER')) {
+  if (hasAnyPermission(permissions, 'CONTROL_VIAJE.LEER')) {
     const [rows] = await db.query(
       `SELECT COUNT(*) AS Total
        FROM (
@@ -405,6 +406,17 @@ async function getHomeSummary(userId, permissions = []) {
       : Promise.resolve([]),
     management ? getManagementActivity(permissions) : Promise.resolve([]),
   ]);
+
+  // Inicio ya es la fuente de estas detecciones. Pendientes proyecta su
+  // resultado, sin volver a decidir qué significa cada condición operativa.
+  if (!clientMode && hasAnyPermission(permissions, 'PENDIENTES.LEER')) {
+    try {
+      await syncHomeProcesses(processes);
+    } catch (error) {
+      // Un fallo de proyección no debe impedir que el asesor abra Inicio.
+      console.error('[Pendientes] No se pudieron sincronizar los procesos de Inicio:', error);
+    }
+  }
 
   return {
     generatedAt: new Date().toISOString(),

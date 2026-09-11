@@ -39,6 +39,7 @@ import { TopbarTransitionService } from '../components/login/topbar-transition.s
 import { LoginContentComponent } from '../components/login/login';
 import { AppActivityService } from '../services/app-activity.service';
 import { NotificacionesService } from '../services/Notificaciones/notificaciones.service';
+import { PendientesService } from '../services/Pendientes/pendientes.service';
 import { WebSocketService } from '../services/WebSocket/web-socket';
 
 
@@ -55,7 +56,6 @@ interface SidebarItem {
     exact?: boolean;
     clientVisible?: boolean;
     advisorVisible?: boolean;
-    adminVisible?: boolean;
     children?: SidebarItem[];
 }
 
@@ -91,6 +91,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private activatedRoute = inject(ActivatedRoute);
     private activity = inject(AppActivityService);
     readonly notifications = inject(NotificacionesService);
+    readonly pendingCenter = inject(PendientesService);
     private webSocket = inject(WebSocketService);
 
     // ── Señales del servicio global ──────────────────────────────
@@ -253,12 +254,12 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         if (this.authService.getToken?.()) this.refreshAvatar();
         this.authNotificationSub = combineLatest([
             this.authService.isLoggedIn(),
-            this.permisosService.role$,
+            this.permisosService.permisos$,
         ]).pipe(
-            distinctUntilChanged(([prevLogged, prevRole], [nextLogged, nextRole]) => (
-                prevLogged === nextLogged && prevRole === nextRole
+            distinctUntilChanged(([prevLogged, prevPermissions], [nextLogged, nextPermissions]) => (
+                prevLogged === nextLogged && prevPermissions.join('|') === nextPermissions.join('|')
             )),
-        ).subscribe(([loggedIn, role]) => this.syncNotificationSession(loggedIn, role));
+        ).subscribe(([loggedIn]) => this.syncNotificationSession(loggedIn));
 
         // Título de la página desde datos de ruta. También mantiene
         // currentUrl al día siempre (con o sin sesión) — showAuthSlot
@@ -315,7 +316,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             this.transitionStage.set('island');
             this.transitionService.markAppReady();
 
-            await this.permisosService.loadSessionData();
+            await this.permisosService.loadSessionData({ forceBackend: true });
             this.ready.set(true);
         } catch (e: any) {
             console.error('Layout init error:', e);
@@ -347,18 +348,23 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
     }
 
-    private syncNotificationSession(loggedIn: boolean, role: string | null): void {
+    private syncNotificationSession(loggedIn: boolean): void {
         this.notificationEventSub?.unsubscribe();
         this.notificationEventSub = undefined;
 
         if (!loggedIn) {
             this.notifications.clear();
+            this.pendingCenter.clear();
             return;
         }
 
-        const normalizedRole = String(role || '').trim().toLocaleLowerCase('es-CO');
-        // En restauración, espera a que el rol esté hidratado antes de consultar.
-        if (!normalizedRole || normalizedRole === 'cliente') {
+        if (this.permisosService.tienePermiso('PENDIENTES.LEER')) {
+            this.pendingCenter.loadCount();
+        } else {
+            this.pendingCenter.clear();
+        }
+
+        if (!this.permisosService.tienePermiso('NOTIFICACIONES.LEER')) {
             this.notifications.clear();
             return;
         }
@@ -789,6 +795,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             advisorVisible: true,
         },
         {
+            key: 'pendientes',
+            label: 'Pendientes',
+            icon: 'bx bx-list-check',
+            group: 'principal',
+            route: '/Pendientes',
+            permission: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
+            exact: true,
+        },
+        {
             key: 'aforos',
             label: 'Aforos',
             icon: 'bx bxs-dashboard',
@@ -983,7 +998,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     route: '/Turnos',
                     permission: 'TURNOS.LEER',
                     exact: true,
-                    adminVisible: true,
                 },
             ],
         },
@@ -1035,7 +1049,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     isVisibleItem(item: SidebarItem): boolean {
         if (this.isClientUser() && !item.clientVisible) return false;
         if (item.advisorVisible && !this.isAdvisorUser()) return false;
-        if (item.adminVisible && !this.isAdministratorUser()) return false;
         if (item.children?.length) {
             return this.tienePermiso(item.permission) &&
                 this.getVisibleChildren(item).length > 0;

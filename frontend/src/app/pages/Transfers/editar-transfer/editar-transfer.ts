@@ -1017,7 +1017,9 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
   get puedeCancelarTransfer(): boolean {
     const estado = this.getTransferEstadoActual();
-    return !!this.getTransferIdFromRoute() && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosSvc.tienePermiso('TRANSFERS.CANCELAR')
+      && !!this.getTransferIdFromRoute()
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
   get canDeleteTransfer(): boolean {

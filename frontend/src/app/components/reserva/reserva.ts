@@ -137,7 +137,9 @@ export class ReservasDynamicComponent implements OnChanges, OnDestroy {
 
   get puedeCancelar(): boolean {
     const estado = (this.reserva?.Estado || '').toLowerCase();
-    return !!this.reserva?.Id_Reserva && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosService.tienePermiso('RESERVAS.CANCELAR')
+      && !!this.reserva?.Id_Reserva
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
   get canDeleteReserva(): boolean {

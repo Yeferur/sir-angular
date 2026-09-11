@@ -1290,8 +1290,19 @@ input[type=number] {
   background: transparent;
 }
 
+/* El contenido privado deja espacio para el rail lateral y un gutter derecho
+   de 24px. La barra debe compartir esa misma retícula, en lugar de centrarse
+   contra todo el viewport. */
+@media (min-width: 767px) {
+  .wizard-nav {
+    left: calc(15px + 52px + 14px);
+    right: 24px;
+  }
+}
+
 .wizard-nav-row {
-  width: min(1400px, calc(100% - 28px));
+  /* Mantiene la misma caja de lectura que los formularios (.wizard-shell). */
+  width: min(1350px, 100%);
   margin: 0 auto;
   padding: 10px 18px;
   min-height: 60px;
@@ -1487,6 +1498,12 @@ input[type=number] {
   }
 }
 
+@media (max-width: 766px) {
+  .wizard-nav-row {
+    width: calc(100% - 48px);
+  }
+}
+
 @media (max-width: 640px) {
   .step-label { display: none; }
 
@@ -1522,9 +1539,8 @@ input[type=number] {
   }
 
   .wizard-nav-row {
-    width: calc(100% - 16px);
-    padding: 12px 14px;
-    gap: 12px;
+    padding: 10px 12px;
+    gap: 8px;
     border-radius: 16px;
     min-height: auto;
     align-items: center;
@@ -1532,6 +1548,7 @@ input[type=number] {
 
   .wizard-nav-left,
   .wizard-nav-right {
+    min-width: 0;
     align-self: stretch;
   }
 
@@ -1554,7 +1571,7 @@ input[type=number] {
 
   .btn-wizard-next,
   .btn-wizard-submit {
-    padding: 10px 16px;
+    padding: 10px 14px;
     font-size: .82rem;
   }
 

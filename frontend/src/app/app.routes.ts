@@ -4,7 +4,6 @@ import { authGuard } from './guards/auth.guard';
 import { permisoGuard } from './guards/permission.guard';
 import { nonClientGuard } from './guards/non-client.guard';
 import { advisorGuard } from './guards/advisor.guard';
-import { administratorGuard } from './guards/administrator.guard';
 import { LoginContentComponent } from './components/login/login';
 import { EditarTourComponent } from './pages/Tours/editar-tour/editar-tour';
 
@@ -31,6 +30,17 @@ export const routes: Routes = [
       redirectTo: '/Ayuda',
     },
     title: 'Aforos',
+  },
+  {
+    path: 'Pendientes',
+    loadComponent: () => import('./pages/Pendientes/pendientes').then((m) => m.PendientesComponent),
+    canActivate: [authGuard, permisoGuard],
+    data: {
+      preload: true,
+      permisos: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
+      redirectTo: '/',
+    },
+    title: 'Pendientes y recordatorios',
   },
   {
     path: 'Informes',
@@ -211,7 +221,7 @@ export const routes: Routes = [
   {
     path: 'Turnos',
     loadComponent: () => import('./pages/Turnos/turnos').then((m) => m.TurnosComponent),
-    canActivate: [authGuard, administratorGuard, permisoGuard],
+    canActivate: [authGuard, permisoGuard],
     data: { permiso: 'TURNOS.LEER', redirectTo: '/Usuarios' },
     title: 'Turnos de asesores',
   },

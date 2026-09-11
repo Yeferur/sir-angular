@@ -202,7 +202,9 @@ seleccionarPuntoAutocomplete(p: any) {
 
   canCancelReserva(reserva: any): boolean {
     const estado = String(reserva?.Estado || '').toLowerCase();
-    return !!reserva?.Id_Reserva && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosService.tienePermiso('RESERVAS.CANCELAR')
+      && !!reserva?.Id_Reserva
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
 

@@ -146,6 +146,7 @@ export class TurnosComponent implements OnInit {
     : this.semana()?.estado === 'pendiente_republicacion' ? 'Cambios sin publicar' : 'Borrador');
   readonly publishLabel = computed(() => this.semana()?.estado === 'borrador' ? 'Publicar semana' : 'Republicar semana');
   readonly canPublish = computed(() => this.semana()?.estado !== 'publicado' || this.dirty());
+  readonly sendScheduleEmails = signal(false);
 
   constructor(private readonly service: TurnosService, private readonly permissions: PermisosService, private readonly alerts: SirAlertService) {}
 
@@ -303,18 +304,18 @@ export class TurnosComponent implements OnInit {
     if (invalid) { this.alerts.errorToast('Revisa la semana', `${invalid} tiene un rango horario incompleto.`); return; }
     const perform = (accept: boolean) => {
       this.publishing.set(true);
-      this.service.publicarSemana(week.idSemana, { aceptarAdvertencias: accept, jornadas: this.asesores().filter((a) => a.activo).map((advisor) => ({
+      this.service.publicarSemana(week.idSemana, { aceptarAdvertencias: accept, enviarCorreos: this.sendScheduleEmails(), jornadas: this.asesores().filter((a) => a.activo).map((advisor) => ({
         idUsuario: advisor.idUsuario, esSupernumerario: advisor.esSupernumerario,
         idCanalSemanal: advisor.canal?.idCanal || null,
         vacacion: advisor.vacacion ? { ...advisor.vacacion } : null,
         turnos: advisor.turnos.map(({ diaSemana, esLaborable, horaInicio, horaFin }) => ({ diaSemana, esLaborable, horaInicio, horaFin })),
-      })) }).subscribe({ next: () => { this.publishing.set(false); this.alerts.successToast('Semana publicada', 'Horarios, canales y vacaciones ya están disponibles.'); this.load(); },
+      })) }).subscribe({ next: () => { this.publishing.set(false); this.sendScheduleEmails.set(false); this.alerts.successToast('Semana publicada', 'Horarios, canales y vacaciones ya están disponibles.'); this.load(); },
         error: (error) => { this.publishing.set(false); this.alerts.errorToast('No se pudo publicar', error?.error?.message || 'Intenta nuevamente.'); } });
     };
     if (this.weekWarnings().length) {
       this.alerts.confirm(
         `${this.weekWarnings().length} asesores por revisar`,
-        `${this.warningSummary()}. Puedes revisar sus jornadas o publicar la semana conservando estas advertencias.`,
+        `${this.warningSummary()}. Puedes revisar sus jornadas o publicar la semana conservando estas advertencias. ${this.sendScheduleEmails() ? 'Se enviarán correos a los asesores afectados.' : 'No se enviarán correos.'}`,
         () => perform(true),
         () => this.reviewFirstWarning(),
         { confirmText: 'Publicar de todas formas', cancelText: 'Revisar primero', type: 'warning' },
@@ -324,7 +325,7 @@ export class TurnosComponent implements OnInit {
 
     this.alerts.confirm(
       this.semana()?.estado === 'borrador' ? '¿Publicar esta semana?' : '¿Republicar esta semana?',
-      `Los horarios, canales y vacaciones de ${this.asesores().filter((advisor) => advisor.activo).length} asesores quedarán visibles en la aplicación.`,
+      `Los horarios, canales y vacaciones de ${this.asesores().filter((advisor) => advisor.activo).length} asesores quedarán visibles en la aplicación. ${this.sendScheduleEmails() ? 'También se enviarán correos a los asesores afectados.' : 'No se enviarán correos; recibirán únicamente la notificación interna.'}`,
       () => perform(false),
       undefined,
       { confirmText: this.publishLabel(), cancelText: 'Seguir revisando', type: 'info' },

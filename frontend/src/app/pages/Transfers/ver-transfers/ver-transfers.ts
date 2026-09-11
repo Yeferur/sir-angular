@@ -97,7 +97,9 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
   canCancelTransfer(transfer: any): boolean {
     const estado = String(transfer?.Estado ?? transfer?.Estado_Transfer ?? '').toLowerCase();
-    return !!transfer?.Id_Transfer && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
+    return this.permisosService.tienePermiso('TRANSFERS.CANCELAR')
+      && !!transfer?.Id_Transfer
+      && !['cancelada', 'cancelado', 'completada', 'completado'].includes(estado);
   }
 
   loadInitialData() {

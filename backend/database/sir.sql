@@ -9074,7 +9074,7 @@ CREATE TABLE IF NOT EXISTS `notificaciones` (
   `Titulo` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
   `Mensaje` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
   `Entidad_Tipo` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `Entidad_Id` bigint UNSIGNED DEFAULT NULL,
+  `Entidad_Id` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Datos` json DEFAULT NULL,
   `Leida` tinyint(1) NOT NULL DEFAULT '0',
   `Fecha_Lectura` datetime DEFAULT NULL,
@@ -10590,7 +10590,7 @@ CREATE TABLE IF NOT EXISTS `permisos` (
   `Modulo_Permiso` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`Id_Permiso`),
   UNIQUE KEY `ux_permisos_codigo` (`Codigo_Permiso`)
-) ENGINE=InnoDB AUTO_INCREMENT=112 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=122 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `permisos`
@@ -10641,7 +10641,17 @@ INSERT INTO `permisos` (`Id_Permiso`, `Accion`, `Codigo_Permiso`, `Descripcion`,
 (108, 'LEER', 'AFOROS.LEER', 'Ver aforos y capacidad operativa', 'Aforos'),
 (109, 'ACTUALIZAR', 'AFOROS.ACTUALIZAR', 'Actualizar aforos', 'Aforos'),
 (110, 'LEER', 'TURNOS.LEER', 'Ver las jornadas de los asesores', 'Turnos'),
-(111, 'ACTUALIZAR', 'TURNOS.ACTUALIZAR', 'Configurar las jornadas de los asesores', 'Turnos');
+(111, 'ACTUALIZAR', 'TURNOS.ACTUALIZAR', 'Configurar las jornadas de los asesores', 'Turnos'),
+(112, 'CANCELAR', 'RESERVAS.CANCELAR', 'Cancelar reservas sin eliminarlas', 'Reservas'),
+(113, 'CANCELAR', 'TRANSFERS.CANCELAR', 'Cancelar transfers sin eliminarlos', 'Transfers'),
+(114, 'LEER', 'NOTIFICACIONES.LEER', 'Acceder al centro interno de notificaciones', 'Notificaciones'),
+(115, 'LEER', 'PENDIENTES.LEER', 'Consultar pendientes operativos propios o visibles por regla', 'Pendientes'),
+(116, 'GESTIONAR', 'PENDIENTES.GESTIONAR', 'Posponer o descartar pendientes según su regla', 'Pendientes'),
+(117, 'AUDITAR', 'PENDIENTES.AUDITAR', 'Consultar trazabilidad administrativa de pendientes', 'Pendientes'),
+(118, 'LEER', 'RECORDATORIOS.LEER', 'Consultar recordatorios personales', 'Recordatorios'),
+(119, 'CREAR', 'RECORDATORIOS.CREAR', 'Crear recordatorios personales', 'Recordatorios'),
+(120, 'ACTUALIZAR', 'RECORDATORIOS.ACTUALIZAR', 'Actualizar recordatorios personales', 'Recordatorios'),
+(121, 'ELIMINAR', 'RECORDATORIOS.ELIMINAR', 'Eliminar recordatorios personales', 'Recordatorios');
 
 -- --------------------------------------------------------
 
@@ -11810,6 +11820,104 @@ INSERT INTO `puntos` (`Id_Punto`, `Nombre_Punto`, `Sector`, `Direccion`, `ruta`,
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `reglas_pendientes`
+--
+
+DROP TABLE IF EXISTS `reglas_pendientes`;
+CREATE TABLE IF NOT EXISTS `reglas_pendientes` (
+  `Id_Regla` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Codigo` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Nombre` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Descripcion` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Activa` tinyint(1) NOT NULL DEFAULT '1',
+  `Prioridad_Default` enum('BAJA','MEDIA','ALTA','CRITICA') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MEDIA',
+  `Recurrencia_Minutos` int UNSIGNED DEFAULT NULL,
+  `Permite_Descarte` tinyint(1) NOT NULL DEFAULT '1',
+  `Requiere_Justificacion` tinyint(1) NOT NULL DEFAULT '0',
+  `Posposicion_Max_Minutos` int UNSIGNED DEFAULT NULL,
+  `Ventanas_Urgencia` json DEFAULT NULL,
+  `Configuracion` json DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Regla`),
+  UNIQUE KEY `uq_reglas_pendientes_codigo` (`Codigo`),
+  CONSTRAINT `chk_reglas_pendientes_recurrencia` CHECK ((`Recurrencia_Minutos` is null) or (`Recurrencia_Minutos` > 0)),
+  CONSTRAINT `chk_reglas_pendientes_posposicion` CHECK ((`Posposicion_Max_Minutos` is null) or (`Posposicion_Max_Minutos` > 0))
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `reglas_pendientes` (`Id_Regla`, `Codigo`, `Nombre`, `Descripcion`, `Activa`, `Prioridad_Default`, `Recurrencia_Minutos`, `Permite_Descarte`, `Requiere_Justificacion`, `Posposicion_Max_Minutos`, `Ventanas_Urgencia`, `Configuracion`) VALUES
+(1, 'CONTROL_VIAJE_CIERRE_PENDIENTE', 'Cierre de control de viaje pendiente', 'La operación conserva un cierre de control de viaje pendiente.', 1, 'ALTA', 120, 0, 1, 60, '[{"prioridad": "ALTA", "minutosRestantes": 240}, {"prioridad": "CRITICA", "minutosRestantes": 60}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"]}'),
+(2, 'PROGRAMACION_NO_ACTIVA', 'Programación no activa', 'Existe una programación operativa que todavía no está activa.', 1, 'ALTA', 180, 1, 1, 120, '[{"prioridad": "ALTA", "minutosRestantes": 360}, {"prioridad": "CRITICA", "minutosRestantes": 120}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"]}'),
+(3, 'SEGUROS_INCOMPLETOS', 'Seguros incompletos', 'La operación tiene información de seguros sin completar.', 1, 'ALTA', 120, 0, 1, 60, '[{"prioridad": "ALTA", "minutosRestantes": 360}, {"prioridad": "CRITICA", "minutosRestantes": 120}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"]}'),
+(4, 'COMISIONES_PENDIENTES', 'Comisiones pendientes', 'La operación conserva comisiones pendientes de revisión.', 1, 'MEDIA', 360, 1, 1, 240, '[{"prioridad": "MEDIA", "minutosRestantes": 1440}, {"prioridad": "ALTA", "minutosRestantes": 240}]', '{"canales": ["CENTRO", "INICIO", "NOTIFICACION"]}'),
+(5, 'RESERVA_ESTADO_PENDIENTE', 'Reserva que requiere atención', 'El estado calculado por Reservas indica que el proceso sigue incompleto.', 1, 'ALTA', 180, 0, 1, 120, '[{"prioridad": "ALTA", "minutosRestantes": 2880}, {"prioridad": "CRITICA", "minutosRestantes": 720}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"], "diasAnticipacion": 30}'),
+(6, 'TRANSFER_ESTADO_PENDIENTE', 'Transfer que requiere atención', 'El estado calculado por Transfers indica que el proceso sigue incompleto.', 1, 'ALTA', 120, 0, 1, 90, '[{"prioridad": "ALTA", "minutosRestantes": 1440}, {"prioridad": "CRITICA", "minutosRestantes": 360}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"], "diasAnticipacion": 30}');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `pendientes_operativos`
+--
+
+DROP TABLE IF EXISTS `pendientes_operativos`;
+CREATE TABLE IF NOT EXISTS `pendientes_operativos` (
+  `Id_Pendiente` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Regla` bigint UNSIGNED NOT NULL,
+  `Clave_Deduplicacion` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Entidad_Tipo` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Entidad_Id` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Id_Usuario_Destino` bigint UNSIGNED DEFAULT NULL,
+  `Permiso_Audiencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Titulo` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Descripcion` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Prioridad` enum('BAJA','MEDIA','ALTA','CRITICA') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'MEDIA',
+  `Estado` enum('ACTIVO','RESUELTO_AUTOMATICAMENTE','DESCARTADO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVO',
+  `Fecha_Operacion` datetime DEFAULT NULL,
+  `Fecha_Limite` datetime DEFAULT NULL,
+  `Suprimido_Hasta` datetime DEFAULT NULL,
+  `Siguiente_Recordatorio` datetime DEFAULT NULL,
+  `Motivo_Descarte` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Descartado_Por` bigint UNSIGNED DEFAULT NULL,
+  `Fecha_Descarte` datetime DEFAULT NULL,
+  `Primera_Deteccion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Ultima_Deteccion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Resolucion` datetime DEFAULT NULL,
+  `Datos` json DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Pendiente`),
+  UNIQUE KEY `uq_pendientes_clave` (`Clave_Deduplicacion`),
+  KEY `idx_pendientes_usuario_estado` (`Id_Usuario_Destino`,`Estado`,`Suprimido_Hasta`),
+  KEY `idx_pendientes_audiencia_estado` (`Permiso_Audiencia`,`Estado`,`Suprimido_Hasta`),
+  KEY `idx_pendientes_entidad` (`Entidad_Tipo`,`Entidad_Id`),
+  KEY `idx_pendientes_recordatorio` (`Estado`,`Siguiente_Recordatorio`),
+  KEY `fk_pendientes_regla` (`Id_Regla`),
+  KEY `fk_pendientes_descartado_por` (`Descartado_Por`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `pendientes_eventos`
+--
+
+DROP TABLE IF EXISTS `pendientes_eventos`;
+CREATE TABLE IF NOT EXISTS `pendientes_eventos` (
+  `Id_Evento` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Id_Pendiente` bigint UNSIGNED NOT NULL,
+  `Tipo` enum('DETECTADO','REACTIVADO','POSPUESTO','DESCARTADO','RESUELTO_AUTOMATICAMENTE') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Id_Usuario` bigint UNSIGNED DEFAULT NULL,
+  `Motivo` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Datos` json DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id_Evento`),
+  KEY `idx_pendientes_eventos_pendiente` (`Id_Pendiente`,`Fecha_Creacion`),
+  KEY `fk_pendientes_eventos_usuario` (`Id_Usuario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `recordatorios`
 --
 
@@ -11817,17 +11925,25 @@ DROP TABLE IF EXISTS `recordatorios`;
 CREATE TABLE IF NOT EXISTS `recordatorios` (
   `Id_Recordatorio` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Usuario` bigint UNSIGNED DEFAULT NULL,
-  `Titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `Fecha` datetime DEFAULT NULL,
+  `Fecha` datetime NOT NULL,
   `Recurrencia` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Intervalo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Recordar_Todo_El_Dia` tinyint(1) DEFAULT '0',
   `Intervalo_Todo_El_Dia` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Siguiente_Trigger` datetime DEFAULT NULL,
+  `Estado` enum('ACTIVO','COMPLETADO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVO',
+  `Suprimido_Hasta` datetime DEFAULT NULL,
+  `Entidad_Tipo` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Entidad_Id` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Activo` tinyint(1) DEFAULT '1',
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Recordatorio`),
-  KEY `Id_Usuario` (`Id_Usuario`)
+  KEY `Id_Usuario` (`Id_Usuario`),
+  KEY `idx_recordatorios_usuario_estado` (`Id_Usuario`,`Estado`,`Fecha`),
+  KEY `idx_recordatorios_trigger` (`Estado`,`Siguiente_Trigger`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -12311,7 +12427,7 @@ CREATE TABLE IF NOT EXISTS `rol_permisos` (
   PRIMARY KEY (`Id_Rol_Permiso`),
   UNIQUE KEY `ux_rol_permisos` (`Id_Rol`,`Id_Permiso`),
   KEY `idx_rol_permisos_permiso` (`Id_Permiso`)
-) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=136 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `rol_permisos`
@@ -12372,7 +12488,26 @@ INSERT INTO `rol_permisos` (`Id_Rol_Permiso`, `Id_Rol`, `Id_Permiso`, `Fecha_Asi
 (112, 2, 108, '2026-08-05 21:47:32'),
 (114, 1, 109, '2026-08-05 21:47:32'),
 (115, 1, 110, '2026-08-07 14:45:01'),
-(116, 1, 111, '2026-08-07 14:45:01');
+(116, 1, 111, '2026-08-07 14:45:01'),
+(117, 1, 112, '2026-09-11 00:00:00'),
+(118, 2, 112, '2026-09-11 00:00:00'),
+(119, 1, 113, '2026-09-11 00:00:00'),
+(120, 2, 113, '2026-09-11 00:00:00'),
+(121, 1, 114, '2026-09-11 00:00:00'),
+(122, 2, 114, '2026-09-11 00:00:00'),
+(123, 1, 115, '2026-09-11 00:00:00'),
+(124, 2, 115, '2026-09-11 00:00:00'),
+(125, 1, 116, '2026-09-11 00:00:00'),
+(126, 2, 116, '2026-09-11 00:00:00'),
+(127, 1, 117, '2026-09-11 00:00:00'),
+(128, 1, 118, '2026-09-11 00:00:00'),
+(129, 2, 118, '2026-09-11 00:00:00'),
+(130, 1, 119, '2026-09-11 00:00:00'),
+(131, 2, 119, '2026-09-11 00:00:00'),
+(132, 1, 120, '2026-09-11 00:00:00'),
+(133, 2, 120, '2026-09-11 00:00:00'),
+(134, 1, 121, '2026-09-11 00:00:00'),
+(135, 2, 121, '2026-09-11 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -13091,7 +13226,7 @@ CREATE TABLE IF NOT EXISTS `turnos_dias` (
   KEY `idx_turnos_dias_semana` (`Id_Semana`),
   KEY `fk_turnos_dias_creado_por` (`Creado_Por`),
   KEY `fk_turnos_dias_actualizado_por` (`Actualizado_Por`)
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Volcado de datos para la tabla `turnos_dias`
@@ -14356,6 +14491,21 @@ ALTER TABLE `programacion_reservas`
 ALTER TABLE `programacion_tours`
   ADD CONSTRAINT `fk_programacion_tours_programacion` FOREIGN KEY (`Id_Programacion`) REFERENCES `programaciones` (`Id_Programacion`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_programacion_tours_tour` FOREIGN KEY (`Id_Tour`) REFERENCES `tours` (`Id_Tour`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `pendientes_operativos`
+--
+ALTER TABLE `pendientes_operativos`
+  ADD CONSTRAINT `fk_pendientes_regla` FOREIGN KEY (`Id_Regla`) REFERENCES `reglas_pendientes` (`Id_Regla`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_pendientes_usuario_destino` FOREIGN KEY (`Id_Usuario_Destino`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_pendientes_descartado_por` FOREIGN KEY (`Descartado_Por`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `pendientes_eventos`
+--
+ALTER TABLE `pendientes_eventos`
+  ADD CONSTRAINT `fk_pendientes_eventos_pendiente` FOREIGN KEY (`Id_Pendiente`) REFERENCES `pendientes_operativos` (`Id_Pendiente`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_pendientes_eventos_usuario` FOREIGN KEY (`Id_Usuario`) REFERENCES `usuarios` (`Id_Usuario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `recordatorios`
