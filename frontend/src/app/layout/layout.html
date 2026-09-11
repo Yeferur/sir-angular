@@ -1,17 +1,6 @@
 @if (!isPublicAuthRoute()) {
 <div class="topnav-host" [attr.data-state]="topbarState()">
   <div class="topbar-row">
-    @if (showAppChrome()) {
-    <div class="topbar-quick-actions">
-      @if (tienePermiso('RESERVAS.LEER')) {
-      <a routerLink="/Reservas/VerReservas" class="topbar-pill">Ver Reservas</a>
-      }
-      @if (tienePermiso('RESERVAS.CREAR')) {
-      <a routerLink="/Reservas/NuevaReserva" class="topbar-pill">Crear Reserva</a>
-      }
-    </div>
-    }
-
     <div class="topbar-bar" #topbarBar
       [style.width.px]="transitionPhase() === 'app' ? (topbarWidth() || null) : null"
       [style.--logout-start-top.px]="logoutStartRect()?.top"
@@ -23,20 +12,24 @@
       [class.is-fullscreen]="transitionStage() === 'fullscreen'"
       [class.is-collapsing]="transitionPhase() === 'collapsing'"
       [class.is-searching]="globalSearchOpen() && showAppChrome()">
-      @if (showAppChrome()) {
+      @if (showAppChrome() || transitionPhase() === 'collapsing') {
       <div class="topbar-island-content" #topbarContent>
 
-      <!-- Hamburger (solo móvil) -->
+      <!-- Launcher único de navegación: escritorio, tablet y móvil -->
       <button
-        class="topbar-hamburger"
-        (click)="toggleMobileDrawer()"
-        [class.is-open]="mobileDrawerOpen()"
-        aria-label="Abrir menú"
-        [attr.aria-expanded]="mobileDrawerOpen()"
+        #navigationTrigger
+        class="topbar-control topbar-navigation-trigger"
+        type="button"
+        data-navigation-trigger
+        (click)="toggleNavigationLauncher($event)"
+        [class.active]="navigationLauncherOpen()"
+        aria-label="Abrir navegación"
+        title="Navegación"
+        [attr.aria-expanded]="navigationLauncherOpen()"
+        aria-controls="navigation-launcher"
       >
-        <span></span>
-        <span></span>
-        <span></span>
+        <i class="bx bx-grid-alt" aria-hidden="true"></i>
+        <span>Menú</span>
       </button>
 
       <!-- Marca -->
@@ -84,14 +77,31 @@
       </div>
       } @else {
       <!-- Título de la página activa — SIEMPRE visible, sin condición -->
-      <div class="topbar-title-zone">
+      <div class="topbar-title-zone" animate.enter="search-rest-enter">
         <span class="topbar-page-title"
               [class.is-leaving]="titleLeaving()"
               [class.is-entering]="titleEntering()">{{ pageTitle() }}</span>
       </div>
 
       <!-- Zona derecha — búsqueda, novedades, tema, avatar -->
-      <div class="topbar-right">
+      <div class="topbar-right" animate.enter="search-rest-enter">
+
+        @if (getCreateActions().length) {
+        <button
+          #createTrigger
+          class="topbar-control topbar-create-trigger"
+          type="button"
+          data-create-trigger
+          (click)="toggleCreateMenu($event)"
+          [class.active]="createMenuOpen()"
+          aria-label="Abrir acciones de creación"
+          title="Crear"
+          [attr.aria-expanded]="createMenuOpen()"
+          aria-controls="topbar-create-menu">
+          <i class="bx bx-plus" aria-hidden="true"></i>
+          <span>Crear</span>
+        </button>
+        }
 
         <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" data-global-search-trigger (click)="openGlobalSearch()" aria-label="Buscar" title="Buscar (Ctrl/Cmd+K)">
           <i class="bx bx-search" aria-hidden="true"></i>
@@ -161,7 +171,7 @@
           </button>
 
           @if (profileMenuOpen()) {
-            <div class="profile-dropdown" role="menu">
+            <div class="profile-dropdown" animate.enter="panel-enter" animate.leave="panel-leave" role="menu">
               <div class="profile-dropdown-header">
                 <div class="pdd-name">{{ user()?.name }} {{ user()?.apellidos }}</div>
                 <div class="pdd-email">{{ user()?.email }}</div>
@@ -222,22 +232,36 @@
       </div><!-- /topbar-right -->
       }
       </div><!-- /topbar-island-content -->
-      } @else {
+      }
+      @if (!showAppChrome()) {
       <!-- La isla, ya expandida a pantalla completa por is-transitioning /
            is-fullscreen, aloja aquí el login — es la MISMA caja
            que crece, no un componente aparte apareciendo en otro sitio. -->
-      <div class="topbar-auth-slot" [class.is-ready]="transitionPhase() === 'login'">
+      <div class="topbar-auth-slot" [class.is-ready]="transitionPhase() === 'login'" [inert]="transitionPhase() !== 'login'">
         <app-login></app-login>
       </div>
       }
       @if (sessionTransitionMessage(); as transitionMessage) {
         <div
           class="topbar-session-message"
+          [class.show-copy]="sessionCopyVisible()"
           [attr.data-kind]="transitionMessage.kind"
           role="status"
           aria-live="polite">
-          <span class="topbar-session-signal" aria-hidden="true"></span>
-          <strong>{{ transitionMessage.title }}</strong>
+          <span class="topbar-session-glow" aria-hidden="true"></span>
+          <img
+            [src]="isDarkMode
+              ? 'assets/img/LogoMaxitoursPNG.webp'
+              : 'assets/img/LogoMaxitours-Light.webp'"
+            alt=""
+            class="topbar-session-brand"
+            aria-hidden="true" />
+          <span class="topbar-session-line" aria-hidden="true"></span>
+          <span class="topbar-session-copy">
+            <strong>{{ transitionMessage.title }}</strong>
+            <small>{{ transitionMessage.subtitle }}</small>
+            <em>{{ transitionMessage.microcopy }}</em>
+          </span>
         </div>
       }
       @if (navigationActive() && showAppChrome()) {
@@ -253,7 +277,7 @@
 
     <!-- Panel expandido — búsqueda global -->
     @if (topbarState() === 'global-search') {
-      <div class="topbar-expanded topbar-expanded--search" role="dialog"
+      <div class="topbar-expanded topbar-expanded--search" animate.enter="panel-enter" animate.leave="panel-leave" role="dialog"
            aria-modal="true" aria-label="Buscador global">
         <app-global-search [integrated]="true"></app-global-search>
       </div>
@@ -265,263 +289,159 @@
       </div>
     }
 
-</div><!-- /topnav-host -->
-}
+    @if (showAppChrome()) {
+      <div
+        class="topbar-overlay"
+        [class.is-open]="navigationLauncherOpen() || createMenuOpen()"
+        (click)="closeTopbarMenus()"
+        aria-hidden="true"></div>
 
-
-<!-- ═══════════════════════════════════════════
-     SIDEBAR — desktop flotante (≥767px)
-═══════════════════════════════════════════ -->
-@if (showAppChrome()) {
-<nav class="sidebar-navigation" aria-label="Navegación principal">
-<div class="sidebar">
-  <div class="menu rail-menu">
-
-    @for (item of getVisibleMenuItems(); track item.key) {
-
-      @if (shouldRenderAsDropdown(item)) {
-        <div class="menu-item"
-             [class.starts-group]="startsMenuGroup(item)"
-             [class.active]="activeMenu() === item.key"
-             [class.has-active-child]="isSubmenuActive(item)">
-          <button type="button" class="link menu-trigger"
-                  (click)="toggleMenu(item.key, $event)"
-                  (mouseenter)="showRailTooltip(item, $event)"
-                  (mouseleave)="hideRailTooltip()"
-                  (focus)="showRailTooltip(item, $event)"
-                  (blur)="hideRailTooltip()"
-                  [attr.aria-label]="item.label"
-                  [attr.aria-describedby]="'rail-tooltip-' + item.key"
-                  [attr.aria-expanded]="activeMenu() === item.key"
-                  [attr.aria-controls]="'context-panel-' + item.key">
-            <i [class]="item.icon"></i>
-            <span class="rail-label">{{ item.label }}</span>
-            @if (item.key === 'pendientes' && pendingCenter.activeCount()) {
-              <span class="menu-count">{{ pendingCenter.activeCount() > 9 ? '9+' : pendingCenter.activeCount() }}</span>
-            }
+      <section
+        #navigationLauncher
+        id="navigation-launcher"
+        class="navigation-launcher"
+        [class.is-open]="navigationLauncherOpen()"
+        [attr.aria-hidden]="!navigationLauncherOpen()"
+        [inert]="!navigationLauncherOpen()"
+        (click)="$event.stopPropagation()"
+        (keydown)="trapPanelFocus($event, navigationLauncher)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="navigation-launcher-title">
+        <header class="navigation-launcher-header">
+          <div>
+            <h2 id="navigation-launcher-title">Navegación</h2>
+            <p>Todo el sistema, sin ocupar espacio permanente</p>
+          </div>
+          <button type="button" class="launcher-close" (click)="closeNavigationLauncher(true)" aria-label="Cerrar navegación">
+            <i class="bx bx-x" aria-hidden="true"></i>
           </button>
-        </div>
+        </header>
 
-      } @else if (shouldRenderAsDirectLink(item)) {
-        @if (getDirectRouteForSingleChild(item)) {
-          <a class="link"
-             [class.starts-group]="startsMenuGroup(item)"
-             [routerLink]="getDirectRouteForSingleChild(item)!"
-             routerLinkActive="active-link"
-             [routerLinkActiveOptions]="{ exact: getSingleVisibleChild(item)?.exact ?? false }"
-             (click)="clickPage()"
-             (mouseenter)="showRailTooltip(item, $event)"
-             (mouseleave)="hideRailTooltip()"
-             (focus)="showRailTooltip(item, $event)"
-             (blur)="hideRailTooltip()"
-             [attr.aria-label]="item.label"
-             [attr.aria-describedby]="'rail-tooltip-' + item.key">
-            <i [class]="item.icon"></i>
-            <span class="rail-label">{{ item.label }}</span>
-            @if (item.key === 'pendientes' && pendingCenter.activeCount()) {
-              <span class="menu-count">{{ pendingCenter.activeCount() > 9 ? '9+' : pendingCenter.activeCount() }}</span>
-            }
-          </a>
-        }
-
-      } @else {
-        @if (item.route) {
-          <a [class.starts-group]="startsMenuGroup(item)"
-             [routerLink]="item.route"
-             routerLinkActive="active-link"
-             [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-             (click)="clickPage()"
-             (mouseenter)="showRailTooltip(item, $event)"
-             (mouseleave)="hideRailTooltip()"
-             (focus)="showRailTooltip(item, $event)"
-             (blur)="hideRailTooltip()"
-             [attr.aria-label]="item.label"
-             [attr.aria-describedby]="'rail-tooltip-' + item.key">
-            <i [class]="item.icon"></i>
-            <span class="rail-label">{{ item.label }}</span>
-            @if (item.key === 'pendientes' && pendingCenter.activeCount()) {
-              <span class="menu-count">{{ pendingCenter.activeCount() > 9 ? '9+' : pendingCenter.activeCount() }}</span>
-            }
-          </a>
-        }
-      }
-
-    }
-  </div>
-</div>
-
-@if (hoveredMenuItem(); as hoveredItem) {
-  @if (!getContextMenuItem()) {
-    <div class="rail-tooltip" [id]="'rail-tooltip-' + hoveredItem.key" [style.top.px]="railTooltipTop()" role="tooltip">
-      {{ hoveredItem.label }}
-    </div>
-  }
-}
-
-@if (getContextMenuItem(); as contextItem) {
-  <section class="context-panel"
-           [id]="'context-panel-' + contextItem.key"
-           [attr.aria-label]="'Opciones de ' + contextItem.label">
-    <header class="context-panel-header">
-      <div class="context-panel-heading">
-        <span class="context-panel-icon" aria-hidden="true"><i [class]="contextItem.icon"></i></span>
-        <div>
-          <h2>{{ contextItem.label }}</h2>
-        </div>
-      </div>
-      <button type="button" class="context-panel-close" (click)="closeAllSubmenus()" aria-label="Cerrar panel">
-        <i class="bx bx-x" aria-hidden="true"></i>
-      </button>
-    </header>
-
-    @if (getActionChildren(contextItem).length) {
-      <div class="context-panel-section context-panel-actions">
-        <span class="context-panel-section-label">Crear</span>
-        @for (child of getActionChildren(contextItem); track child.key) {
-          @if (child.route) {
-            <a class="context-action" [routerLink]="child.route" (click)="clickPage()">
-              <i [class]="child.icon" aria-hidden="true"></i>
-              <span>{{ child.label }}</span>
-              <i class="bx bx-right-arrow-alt context-link-arrow" aria-hidden="true"></i>
-            </a>
-          }
-        }
-      </div>
-    }
-
-    @if (getNavigationChildren(contextItem).length) {
-      <div class="context-panel-section">
-        <span class="context-panel-section-label">Navegación</span>
-        <div class="context-navigation-list">
-          @for (child of getNavigationChildren(contextItem); track child.key) {
-            @if (child.route) {
-              <a [routerLink]="child.route"
-                 routerLinkActive="active-link"
-                 [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
-                 (click)="clickPage()">
-                <i [class]="child.icon" aria-hidden="true"></i>
-                <span>{{ child.label }}</span>
-                <i class="bx bx-chevron-right context-link-arrow" aria-hidden="true"></i>
+        <div class="navigation-launcher-grid">
+          @if (getVisibleMenuItemsByGroup('principal').length) {
+          <section class="launcher-column">
+            <h3>Principal</h3>
+            @for (item of getVisibleMenuItemsByGroup('principal'); track item.key) {
+              @if (item.route) {
+              <a class="launcher-card"
+                 [class.active]="isRouteActive(item.route, item.exact ?? false)"
+                 [routerLink]="item.route"
+                 (click)="navigateFromTopbar()">
+                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
+                <span class="launcher-card-copy">
+                  <strong>{{ item.label }}</strong>
+                  <small>{{ getMenuDescription(item) }}</small>
+                </span>
+                @if (item.key === 'pendientes' && pendingCenter.activeCount()) {
+                  <span class="launcher-count">{{ pendingCenter.activeCount() > 99 ? '99+' : pendingCenter.activeCount() }}</span>
+                }
               </a>
-            }
-          }
-        </div>
-      </div>
-    }
-  </section>
-}
-</nav>
-}
-
-
-<!-- ═══════════════════════════════════════════
-     MOBILE DRAWER (≤766px)
-
-     Cierre:
-       · X                 → closeMobileDrawer()
-       · Backdrop          → closeMobileDrawer()
-       · Navegar a ruta    → closeMobileDrawer() en (click) del link
-     El drawer en sí detiene la propagación con
-     (click)="$event.stopPropagation()" para que
-     tocar dentro no active el cierre del backdrop.
-═══════════════════════════════════════════ -->
-
-@if (showAppChrome()) {
-<!-- Backdrop: cubre toda la pantalla; click → cierra -->
-<div class="mobile-backdrop"
-     [class.is-open]="mobileDrawerOpen()"
-     (click)="closeMobileDrawer()"
-     aria-hidden="true">
-</div>
-
-<!-- Panel: stopPropagation evita que clicks internos lleguen al backdrop -->
-<nav class="mobile-drawer is-expanded"
-     [class.is-open]="mobileDrawerOpen()"
-     (click)="$event.stopPropagation()"
-     role="navigation"
-     aria-label="Menú principal">
-
-  <!-- Cabecera -->
-  <div class="mobile-drawer-header">
-    <strong class="mobile-drawer-title">Menú principal</strong>
-    <div class="mobile-drawer-header-actions">
-      <!-- X — cierra el drawer explícitamente -->
-      <button class="mobile-drawer-close" type="button" (click)="closeMobileDrawer()" aria-label="Cerrar menú">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2.5"
-             stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-
-  <!-- Menú completo con scroll -->
-  <div class="mobile-menu-wrap">
-    <div class="menu">
-
-      @for (item of getVisibleMenuItems(); track item.key) {
-
-        <!-- Dropdown con 2+ hijos: click en padre → solo abre/cierra submenú -->
-        @if (shouldRenderAsDropdown(item)) {
-          <div class="menu-item"
-               [class.active]="isMenuOpen(item)"
-               [class.has-active-child]="isSubmenuActive(item)">
-            <button type="button" class="link menu-trigger" (click)="toggleMenu(item.key, $event)">
-              <i [class]="item.icon"></i>
-              <span>{{ item.label }}</span>
-              @if (item.key === 'pendientes' && pendingCenter.activeCount()) {
-                <span class="mobile-menu-count">{{ pendingCenter.activeCount() > 99 ? '99+' : pendingCenter.activeCount() }}</span>
               }
-              <i class="bx bx-chevron-down chevron"></i>
-            </button>
-            <div class="submenu">
-              <div class="submenu-inner">
+            }
+          </section>
+          }
+
+          @if (getVisibleMenuItemsByGroup('operacion').length) {
+          <section class="launcher-column launcher-column--operation">
+            <h3>Operación</h3>
+            @for (item of getVisibleMenuItemsByGroup('operacion'); track item.key) {
+              <div class="launcher-subgroup" [class.has-active-child]="isSubmenuActive(item)">
+                <h4>{{ item.label }}</h4>
                 @for (child of getVisibleChildren(item); track child.key) {
                   @if (child.route) {
-                    <!-- Click en hijo: navega + cierra drawer -->
-                    <a [routerLink]="child.route"
-                       routerLinkActive="active-link"
-                       [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
-                       (click)="clickPage(); closeMobileDrawer()">{{ child.label }}</a>
+                  <a class="launcher-subitem"
+                     [class.action]="child.kind === 'action'"
+                     [class.active]="isRouteActive(child.route, child.exact ?? false)"
+                     [routerLink]="child.route"
+                     (click)="navigateFromTopbar()">
+                    <i [class]="child.icon" aria-hidden="true"></i>
+                    <span>{{ child.label }}</span>
+                    @if (child.kind === 'action') { <i class="bx bx-right-arrow-alt launcher-arrow" aria-hidden="true"></i> }
+                  </a>
                   }
                 }
               </div>
-            </div>
-          </div>
-
-        <!-- Link directo con 1 hijo -->
-        } @else if (shouldRenderAsDirectLink(item)) {
-          @if (getDirectRouteForSingleChild(item)) {
-            <a class="link"
-               [routerLink]="getDirectRouteForSingleChild(item)!"
-               routerLinkActive="active-link"
-               [routerLinkActiveOptions]="{ exact: getSingleVisibleChild(item)?.exact ?? false }"
-               (click)="clickPage(); closeMobileDrawer()">
-              <i [class]="item.icon"></i>
-              <span>{{ item.label }}</span>
-            </a>
+            }
+          </section>
           }
 
-        <!-- Link sin hijos -->
-        } @else {
-          @if (item.route) {
-            <a [routerLink]="item.route"
-               routerLinkActive="active-link"
-               [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-               (click)="clickPage(); closeMobileDrawer()">
-              <i [class]="item.icon"></i>
-              <span>{{ item.label }}</span>
-            </a>
+          @if (getVisibleMenuItemsByGroup('gestion').length) {
+          <section class="launcher-column">
+            <h3>Gestión</h3>
+            @for (item of getVisibleMenuItemsByGroup('gestion'); track item.key) {
+              @if (item.route) {
+              <a class="launcher-card"
+                 [class.active]="isRouteActive(item.route, item.exact ?? false)"
+                 [routerLink]="item.route"
+                 (click)="navigateFromTopbar()">
+                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
+                <span class="launcher-card-copy">
+                  <strong>{{ item.label }}</strong>
+                  <small>{{ getMenuDescription(item) }}</small>
+                </span>
+              </a>
+              }
+            }
+          </section>
           }
-        }
 
-      }
-    </div>
-  </div><!-- /mobile-menu-wrap -->
+          @if (getVisibleMenuItemsByGroup('sistema').length) {
+          <section class="launcher-column">
+            <h3>Sistema</h3>
+            @for (item of getVisibleMenuItemsByGroup('sistema'); track item.key) {
+              <div class="launcher-subgroup" [class.has-active-child]="isSubmenuActive(item)">
+                <h4>{{ item.label }}</h4>
+                @for (child of getVisibleChildren(item); track child.key) {
+                  @if (child.route) {
+                  <a class="launcher-subitem"
+                     [class.action]="child.kind === 'action'"
+                     [class.active]="isRouteActive(child.route, child.exact ?? false)"
+                     [routerLink]="child.route"
+                     (click)="navigateFromTopbar()">
+                    <i [class]="child.icon" aria-hidden="true"></i>
+                    <span>{{ child.label }}</span>
+                  </a>
+                  }
+                }
+              </div>
+            }
+          </section>
+          }
+        </div>
+      </section>
 
-</nav>
+      <section
+        #createMenu
+        id="topbar-create-menu"
+        class="topbar-create-menu"
+        [class.is-open]="createMenuOpen()"
+        [attr.aria-hidden]="!createMenuOpen()"
+        [inert]="!createMenuOpen()"
+        (click)="$event.stopPropagation()"
+        (keydown)="trapPanelFocus($event, createMenu)"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-menu-title">
+        <header class="create-menu-header">
+          <h2 id="create-menu-title">Crear</h2>
+          <button type="button" class="launcher-close" (click)="closeCreateMenu(true)" aria-label="Cerrar acciones de creación">
+            <i class="bx bx-x" aria-hidden="true"></i>
+          </button>
+        </header>
+        <div class="create-menu-list">
+          @for (action of getCreateActions(); track action.key) {
+            @if (action.route) {
+            <a [routerLink]="action.route" (click)="navigateFromTopbar()">
+              <span class="create-menu-icon"><i [class]="action.icon" aria-hidden="true"></i></span>
+              <span>{{ action.label }}</span>
+              <i class="bx bx-chevron-right create-menu-arrow" aria-hidden="true"></i>
+            </a>
+            }
+          }
+        </div>
+      </section>
+    }
 
+</div><!-- /topnav-host -->
 }

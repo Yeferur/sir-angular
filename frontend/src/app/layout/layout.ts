@@ -15,7 +15,6 @@ import {
 import {
     Router,
     RouterLink,
-    RouterLinkActive,
     NavigationStart,
     NavigationEnd,
     NavigationCancel,
@@ -67,7 +66,6 @@ interface SidebarItem {
     standalone: true,
     imports: [
         RouterLink,
-        RouterLinkActive,
         FormsModule,
         GlobalSearchComponent,
         LoginContentComponent,
@@ -104,16 +102,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     avatarUrl = signal<string | null>(null);
     isDarkMode = true;
     profileMenuOpen = signal(false);
-    mobileDrawerOpen = signal(false);
-    hoveredMenuItem = signal<SidebarItem | null>(null);
-    railTooltipTop = signal(0);
+    navigationLauncherOpen = signal(false);
+    createMenuOpen = signal(false);
     pageTitle = signal<string>('');
     titleLeaving = signal(false);
     titleEntering = signal(false);
     readonly navigationActive = this.activity.visible;
 
-    // Sidebar
-    activeMenu = signal<string | null>(null);
     currentUrl = signal<string>(this.router.url);
     ready = signal(false);
     loadingError = signal<string | null>(null);
@@ -121,6 +116,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     topbarWidth = signal<number | null>(null);
     logoutStartRect = signal<{ top: number; left: number; width: number; height: number } | null>(null);
     transitionStage = signal<'island' | 'wide' | 'fullscreen'>('fullscreen');
+    sessionCopyVisible = signal(false);
     readonly transitionPhase = this.transitionService.phase;
     readonly sessionTransitionMessage = computed(() => {
         const phase = this.transitionPhase();
@@ -133,12 +129,16 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             return {
                 kind: 'welcome' as const,
                 title: firstName ? `Qué bueno verte, ${firstName}` : 'Qué bueno verte',
+                subtitle: 'Tu sesión está lista.',
+                microcopy: 'Preparando tu espacio de trabajo',
             };
         }
 
         return {
             kind: 'farewell' as const,
             title: firstName ? `Hasta pronto, ${firstName}` : 'Hasta pronto',
+            subtitle: 'Cerrando tu sesión…',
+            microcopy: 'Nos vemos pronto en Maxitours',
         };
     });
     readonly topbarFeedbackType = computed(() => {
@@ -149,10 +149,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
     @ViewChild('topbarContent') private topbarContent?: ElementRef<HTMLElement>;
     @ViewChild('topbarSearchInput') private topbarSearchInput?: ElementRef<HTMLInputElement>;
+    @ViewChild('navigationTrigger') private navigationTrigger?: ElementRef<HTMLButtonElement>;
+    @ViewChild('createTrigger') private createTrigger?: ElementRef<HTMLButtonElement>;
+    @ViewChild('navigationLauncher') private navigationLauncher?: ElementRef<HTMLElement>;
+    @ViewChild('createMenu') private createMenu?: ElementRef<HTMLElement>;
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
     private transitionFallbackTimer?: number;
+    private sessionBeatTimer?: number;
     private finishRouteActivity?: () => void;
     private titleMotionTimer?: number;
     private notificationEventSub?: Subscription;
@@ -163,9 +168,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         queueMicrotask(() => this.syncTopbarWidth());
     });
 
-    private readonly searchFocusEffect = effect(() => {
+    private readonly searchFocusEffect = effect((onCleanup) => {
         if (!this.globalSearchOpen()) return;
-        window.setTimeout(() => this.topbarSearchInput?.nativeElement.focus(), 80);
+        const timer = window.setTimeout(() => this.topbarSearchInput?.nativeElement.focus(), 180);
+        onCleanup(() => window.clearTimeout(timer));
     });
 
     private readonly loginTargetEffect = effect(() => {
@@ -185,16 +191,33 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            // Regreso inverso: primero recupera la altura de la isla y
-            // después reduce el ancho hacia el centro superior.
-            this.transitionStage.set('wide');
-            this.afterTopbarTransition(['height', 'top'], () => {
-                this.transitionStage.set('island');
-                this.afterTopbarTransition(['width', 'left'], () => {
-                    this.router.navigateByUrl('/');
-                    this.logoutStartRect.set(null);
-                    this.transitionService.markAppReady();
-                    queueMicrotask(() => this.syncTopbarWidth());
+            const content = this.topbarContent?.nativeElement;
+            if (content) {
+                const target = this.getFallbackIslandRect();
+                if (window.innerWidth > 766) {
+                    target.width = Math.min(content.scrollWidth + 30, window.innerWidth - 30);
+                    target.left = (window.innerWidth - target.width) / 2;
+                }
+                this.logoutStartRect.set(target);
+                this.topbarWidth.set(target.width);
+            }
+            // Primero se lee la bienvenida; después la marca viaja hacia la isla.
+            this.sessionBeat(280, () => {
+                this.sessionCopyVisible.set(true);
+                this.sessionBeat(1150, () => {
+                    this.sessionCopyVisible.set(false);
+                    this.sessionBeat(220, () => {
+                        this.transitionStage.set('wide');
+                        this.afterTopbarTransition(['height'], () => {
+                            this.transitionStage.set('island');
+                            this.afterTopbarTransition(['width'], () => {
+                                this.router.navigateByUrl('/');
+                                this.logoutStartRect.set(null);
+                                this.transitionService.markAppReady();
+                                queueMicrotask(() => this.syncTopbarWidth());
+                            });
+                        });
+                    });
                 });
             });
         }));
@@ -266,6 +289,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // lo necesita para saber si estamos en /reset-password.
         this.routerSub = this.router.events.subscribe(event => {
             if (event instanceof NavigationStart) {
+                this.closeTopbarMenus();
                 // Navegaciones que solo actualizan query params (ej. el filtro
                 // de fecha en Aforos) mantienen la misma ruta y el mismo
                 // título — no deben disparar la animación de salida del
@@ -344,6 +368,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.authNotificationSub?.unsubscribe();
         this.notificationEventSub?.unsubscribe();
         if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
+        if (this.sessionBeatTimer) window.clearTimeout(this.sessionBeatTimer);
         this.finishRouteActivity?.();
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
     }
@@ -384,7 +409,11 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         requestAnimationFrame(() => requestAnimationFrame(() => {
             const bar = this.topbarBar?.nativeElement;
             const content = this.topbarContent?.nativeElement;
-            if (!bar || !content) return;
+            if (!bar || !content || !this.showAppChrome()) return;
+            if (this.globalSearchOpen()) {
+                this.topbarWidth.set(Math.min(1040, window.innerWidth - 30));
+                return;
+            }
 
             const styles = getComputedStyle(bar);
             const horizontalChrome =
@@ -418,6 +447,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     toggleProfileMenu(): void {
+        this.closeNavigationLauncher();
+        this.closeCreateMenu();
+        this.closeGlobalSearch();
         this.profileMenuOpen.update(v => !v);
     }
 
@@ -425,17 +457,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.profileMenuOpen.set(false);
     }
 
-    // ── Mobile drawer ─────────────────────────────────────────────
-
-    toggleMobileDrawer(): void { this.mobileDrawerOpen.update(v => !v); }
-    closeMobileDrawer(): void {
-        this.mobileDrawerOpen.set(false);
-        this.closeAllSubmenus();
-    }
-
     onBrandClick(): void {
         this.closeProfileMenu();
-        this.closeMobileDrawer();
+        this.closeTopbarMenus();
         this.closeGlobalSearch();
     }
 
@@ -554,7 +578,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     async handleLogout(): Promise<void> {
+        if (!this.showAppChrome()) return;
         this.closeProfileMenu();
+        this.closeTopbarMenus();
+        this.closeGlobalSearch();
 
         const bar = this.topbarBar?.nativeElement;
         if (!bar) {
@@ -573,13 +600,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.transitionStage.set('island');
         this.transitionService.requestExpandToFullscreen();
 
-        // Secuencia explícita: isla centrada → 100% del ancho → 100% de
-        // la altura. Cada etapa espera su propia propiedad CSS.
+        this.sessionCopyVisible.set(false);
         requestAnimationFrame(() => requestAnimationFrame(() => {
             this.transitionStage.set('wide');
-            this.afterTopbarTransition(['width', 'left'], () => {
+            this.afterTopbarTransition(['width'], () => {
                 this.transitionStage.set('fullscreen');
-                this.afterTopbarTransition(['height', 'top'], () => this.finishLogout());
+                this.afterTopbarTransition(['height'], () => {
+                    this.sessionCopyVisible.set(true);
+                    this.sessionBeat(1150, () => {
+                        this.sessionCopyVisible.set(false);
+                        this.sessionBeat(240, () => this.finishLogout());
+                    });
+                });
             });
         }));
     }
@@ -642,6 +674,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     // ── Búsqueda global ──
     openGlobalSearch(): void {
         this.closeProfileMenu();
+        this.closeTopbarMenus();
         this.search.openSearch();
     }
     closeGlobalSearch(): void { this.search.closeSearch(); }
@@ -688,13 +721,22 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         if (event.key === 'Escape') {
+            if (this.navigationLauncherOpen()) {
+                event.preventDefault();
+                this.closeNavigationLauncher(true);
+                return;
+            }
+            if (this.createMenuOpen()) {
+                event.preventDefault();
+                this.closeCreateMenu(true);
+                return;
+            }
             if (this.globalSearchOpen()) {
                 if (editable && !target?.closest('app-global-search')) return;
                 event.preventDefault();
                 this.closeGlobalSearch();
             }
             if (this.profileMenuOpen()) this.closeProfileMenu();
-            if (this.activeMenu()) this.closeAllSubmenus();
         }
     }
 
@@ -712,8 +754,19 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         ) {
             this.closeGlobalSearch();
         }
-        if (this.activeMenu() && !target?.closest('.sidebar-navigation')) {
-            this.closeAllSubmenus();
+        if (
+            this.navigationLauncherOpen()
+            && !target?.closest('.navigation-launcher')
+            && !target?.closest('[data-navigation-trigger]')
+        ) {
+            this.closeNavigationLauncher();
+        }
+        if (
+            this.createMenuOpen()
+            && !target?.closest('.topbar-create-menu')
+            && !target?.closest('[data-create-trigger]')
+        ) {
+            this.closeCreateMenu();
         }
     }
 
@@ -1010,33 +1063,43 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return this.menuItems.filter(item => this.isVisibleItem(item));
     }
 
+    /** Pausas de lectura, nunca esperas de red ni bloqueos del hilo de UI. */
+    private sessionBeat(duration: number, callback: () => void): void {
+        if (this.sessionBeatTimer) window.clearTimeout(this.sessionBeatTimer);
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        this.sessionBeatTimer = window.setTimeout(() => {
+            this.sessionBeatTimer = undefined;
+            if (this.transitionPhase() === 'collapsing' || this.transitionPhase() === 'expanding') callback();
+        }, reduced ? 0 : duration);
+    }
+
+    getVisibleMenuItemsByGroup(group: NonNullable<SidebarItem['group']>): SidebarItem[] {
+        return this.getVisibleMenuItems().filter(item => item.group === group);
+    }
+
+    getCreateActions(): SidebarItem[] {
+        return this.getVisibleMenuItems().flatMap(item =>
+            this.getVisibleChildren(item).filter(child => child.kind === 'action' && !!child.route)
+        );
+    }
+
+    getMenuDescription(item: SidebarItem): string {
+        const descriptions: Record<string, string> = {
+            inicio: 'Resumen general',
+            'mi-horario': 'Turnos y jornada',
+            pendientes: 'Recordatorios y tareas',
+            aforos: 'Disponibilidad y cupos',
+            informes: 'Análisis y reportes',
+            historial: 'Actividad del sistema',
+            programacion: 'Programación operativa',
+            seguros: 'Vehículos, guías y conductores',
+            comisiones: 'Pendientes por liquidar',
+        };
+        return descriptions[item.key] || '';
+    }
+
     getVisibleChildren(item: SidebarItem): SidebarItem[] {
         return (item.children ?? []).filter(child => this.isVisibleItem(child));
-    }
-
-    getActionChildren(item: SidebarItem): SidebarItem[] {
-        return this.getVisibleChildren(item).filter(child => child.kind === 'action');
-    }
-
-    getNavigationChildren(item: SidebarItem): SidebarItem[] {
-        return this.getVisibleChildren(item).filter(child => child.kind !== 'action');
-    }
-
-    getContextMenuItem(): SidebarItem | null {
-        const key = this.activeMenu();
-        if (!key) return null;
-        return this.getVisibleMenuItems().find(item => item.key === key && this.shouldRenderAsDropdown(item)) ?? null;
-    }
-
-    startsMenuGroup(item: SidebarItem): boolean {
-        const items = this.getVisibleMenuItems();
-        const index = items.findIndex(candidate => candidate.key === item.key);
-        return index > 0 && items[index - 1].group !== item.group;
-    }
-
-    getSingleVisibleChild(item: SidebarItem): SidebarItem | null {
-        const [child] = this.getVisibleChildren(item);
-        return child ?? null;
     }
 
     tienePermiso(permission?: string | string[]): boolean {
@@ -1054,18 +1117,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.getVisibleChildren(item).length > 0;
         }
         return this.tienePermiso(item.permission);
-    }
-
-    shouldRenderAsDropdown(item: SidebarItem): boolean {
-        return this.getVisibleChildren(item).length >= 2;
-    }
-
-    shouldRenderAsDirectLink(item: SidebarItem): boolean {
-        return this.getVisibleChildren(item).length === 1;
-    }
-
-    getDirectRouteForSingleChild(item: SidebarItem): string | null {
-        return this.getSingleVisibleChild(item)?.route ?? null;
     }
 
     isRouteActive(route: string, exact = false): boolean {
@@ -1087,38 +1138,76 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return children.some(c => !!c.route && this.isRouteActive(c.route, c.exact ?? false));
     }
 
-    isMenuOpen(item: SidebarItem): boolean {
-        return this.activeMenu() === item.key || this.isSubmenuActive(item);
-    }
+    // ── Navegación compacta del topbar ───────────────────────────
 
-
-    // ── Acciones UI del sidebar ──────────────────────────────────
-
-    toggleMenu(key: string, event?: Event): void {
+    toggleNavigationLauncher(event?: Event): void {
         event?.preventDefault();
         event?.stopPropagation();
-        this.hideRailTooltip();
-        this.activeMenu.update(current => current === key ? null : key);
+        const shouldOpen = !this.navigationLauncherOpen();
+        this.closeCreateMenu();
+        this.closeProfileMenu();
+        this.closeGlobalSearch();
+        this.navigationLauncherOpen.set(shouldOpen);
+        if (shouldOpen) this.focusFirstInteractive(this.navigationLauncher);
     }
 
-    showRailTooltip(item: SidebarItem, event: Event): void {
-        const target = event.currentTarget as HTMLElement | null;
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
-        this.railTooltipTop.set(rect.top + rect.height / 2);
-        this.hoveredMenuItem.set(item);
+    closeNavigationLauncher(restoreFocus = false): void {
+        if (!this.navigationLauncherOpen()) return;
+        this.navigationLauncherOpen.set(false);
+        if (restoreFocus) queueMicrotask(() => this.navigationTrigger?.nativeElement.focus());
     }
 
-    hideRailTooltip(): void {
-        this.hoveredMenuItem.set(null);
+    toggleCreateMenu(event?: Event): void {
+        event?.preventDefault();
+        event?.stopPropagation();
+        const shouldOpen = !this.createMenuOpen();
+        this.closeNavigationLauncher();
+        this.closeProfileMenu();
+        this.closeGlobalSearch();
+        this.createMenuOpen.set(shouldOpen);
+        if (shouldOpen) this.focusFirstInteractive(this.createMenu);
     }
 
-    closeAllSubmenus(): void {
-        this.activeMenu.set(null);
+    closeCreateMenu(restoreFocus = false): void {
+        if (!this.createMenuOpen()) return;
+        this.createMenuOpen.set(false);
+        if (restoreFocus) queueMicrotask(() => this.createTrigger?.nativeElement.focus());
     }
 
-    clickPage(): void {
-        this.hideRailTooltip();
-        this.closeAllSubmenus();
+    closeTopbarMenus(): void {
+        this.closeNavigationLauncher();
+        this.closeCreateMenu();
     }
+
+    navigateFromTopbar(): void {
+        this.closeTopbarMenus();
+        this.closeProfileMenu();
+    }
+
+    trapPanelFocus(event: KeyboardEvent, container: HTMLElement): void {
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(container.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(element => element.offsetParent !== null);
+        if (!focusable.length) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    private focusFirstInteractive(container?: ElementRef<HTMLElement>): void {
+        window.setTimeout(() => {
+            container?.nativeElement
+                .querySelector<HTMLElement>('a:not([tabindex="-1"]), button:not([disabled])')
+                ?.focus();
+        }, 40);
+    }
+
 }

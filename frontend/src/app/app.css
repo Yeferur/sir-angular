@@ -3,7 +3,12 @@
 }
 
 .app-shell--private .main-shell {
-  transition: opacity 180ms ease, transform 220ms var(--ease-panel);
+  transition: opacity 380ms ease, transform 480ms var(--ease-panel), filter 520ms var(--ease-panel);
+}
+
+.app-shell--private.is-session-transitioning .main-shell {
+  opacity: .35;
+  pointer-events: none;
 }
 
 .app-shell--private.is-navigating .main-shell {
@@ -32,18 +37,17 @@
   min-width: 0;
   /* Espacio para el topbar: 10px padding-top + 48px barra + 14px gap */
   padding-top: calc(10px + 48px + 14px);
-  /* Espacio para el sidebar colapsado: 15px left + 52px width + 14px gap */
-  padding-left: calc(15px + 52px + 14px);
+  /* La navegación vive dentro del topbar y no reserva espacio lateral. */
+  padding-left: 0;
   min-height: 100vh;
   box-sizing: border-box;
 }
  
 .main-shell .content {
   padding: 20px 24px;
-  padding-left: 0;
 }
  
-/* Móvil: sin offset de sidebar */
+/* Móvil: el launcher tampoco reserva espacio lateral. */
 @media (max-width: 766px) {
   .main-shell {
     padding-left: 0;

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject, signal, effect } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, computed, inject, signal, effect } from '@angular/core';
 import { RouterOutlet, Router, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { SirAlertsHostComponent } from './components/alerts/alerts-host';
 import {SirDrawerHostComponent} from "./components/drawer/drawer-host";
@@ -36,6 +36,10 @@ export class App implements OnInit, OnDestroy {
   shellEntering = signal(false);
 
   private transition = inject(TopbarTransitionService);
+  readonly sessionTransitioning = computed(() => {
+    const phase = this.transition.phase();
+    return phase === 'expanding' || phase === 'collapsing';
+  });
   private viewGateBooted = false;
   private pendingViewSyncTimer: any;
   private shellEntryTimer: any;
