@@ -1,4 +1,4 @@
-<section class="gs-shell" [class.is-closing]="isClosing()" (click)="$event.stopPropagation()">
+<section class="gs-shell" [class.is-integrated]="integrated" [class.is-closing]="isClosing() && !integrated" (click)="$event.stopPropagation()">
   <div class="gs-header">
     <div class="gs-brand">
       <div class="gs-brand-orb" aria-hidden="true">

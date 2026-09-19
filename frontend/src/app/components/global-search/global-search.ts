@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import {
-  AfterViewInit, Component, ElementRef, HostListener, NgZone,
-  Input,
-  OnDestroy, ViewChild, computed, effect, inject, signal
+  AfterViewInit, Component, ElementRef, EventEmitter, HostListener,
+  Input, Output,
+  ViewChild, computed, effect, inject, signal
 } from '@angular/core';
 import { GlobalSearchAction, GlobalSearchResult, GlobalSearchService } from '../../services/global-search.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
@@ -21,11 +21,11 @@ interface SearchShortcut {
   templateUrl: './global-search.html',
   styleUrls: ['./global-search.css'],
 })
-export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
+export class GlobalSearchComponent implements AfterViewInit {
   private readonly search = inject(GlobalSearchService);
   private readonly permissions = inject(PermisosService);
-  private readonly zone = inject(NgZone);
   @Input() integrated = false;
+  @Output() closeRequested = new EventEmitter<void>();
 
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
@@ -82,20 +82,6 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     this.isCurrentQuerySubmitted() && !this.loading() && this.flatResults().length === 0
   );
 
-  // ─── Comet animation ───────────────────────────────────────────
-  private cometRaf?: number;
-  private cometOffset = 0;
-  private cometPerimeter = 2400;
-  private readonly COMET_LEN = 260;
-  private readonly COMET_SPEED = 2.4;
-  private cometColorIdx = 0;
-  private readonly COMET_COLORS: [string, string][] = [
-    ['#0a84ff', '#30d158'],
-    ['#30d158', '#ffd60a'],
-    ['#ffd60a', '#bf5af2'],
-    ['#bf5af2', '#0a84ff'],
-  ];
-
   constructor() {
     effect(() => {
       const total = this.flatResults().length;
@@ -103,22 +89,12 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
       if (this.selectedIndex() >= total) this.selectedIndex.set(total - 1);
     });
 
-    effect(() => {
-      if (!this.search.open()) return;
-      setTimeout(() => this.searchInput?.nativeElement?.focus(), 50);
-    });
-
   }
 
   ngAfterViewInit(): void {
-    if (this.search.open()) {
+    if (!this.integrated && this.search.open()) {
       setTimeout(() => this.searchInput?.nativeElement?.focus(), 50);
     }
-    this.zone.runOutsideAngular(() => this.initComet());
-  }
-
-  ngOnDestroy(): void {
-    if (this.cometRaf) cancelAnimationFrame(this.cometRaf);
   }
 
   // ─── Input ─────────────────────────────────────────────────────
@@ -145,6 +121,10 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
   closeFromButton(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
+    if (this.integrated) {
+      this.close();
+      return;
+    }
     this.isClosing.set(true);
     setTimeout(() => {
       this.close();
@@ -152,78 +132,15 @@ export class GlobalSearchComponent implements AfterViewInit, OnDestroy {
     }, 140);
   }
 
-  // ─── Comet border (RAF, fuera de Angular) ──────────────────────
-  private initComet(): void {
-    const svgEl   = document.querySelector<SVGSVGElement>('.island-comet-svg');
-    const rectEl  = document.querySelector<SVGRectElement>('#sir-comet');
-    const gradEl  = document.querySelector<SVGLinearGradientElement>('#sir-comet-grad');
-    if (!svgEl || !rectEl || !gradEl) return;
-
-    const updateSize = () => {
-      const host = svgEl.closest('.global-search-shell') as HTMLElement | null;
-      if (!host) return;
-      const w = host.offsetWidth;
-      const h = host.offsetHeight;
-      const r = 27;
-      // Perímetro rectángulo redondeado
-      this.cometPerimeter = 2 * (w - 2*r) + 2 * (h - 2*r) + 2 * Math.PI * r;
-      rectEl.setAttribute('width',  String(w - 2));
-      rectEl.setAttribute('height', String(h - 2));
-      rectEl.setAttribute('x', '1');
-      rectEl.setAttribute('y', '1');
-      svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
-      svgEl.style.inset = '0';
-      svgEl.style.width = '100%';
-      svgEl.style.height = '100%';
-      const baseEl = svgEl.querySelector<SVGRectElement>('.comet-base');
-      if (baseEl) {
-        baseEl.setAttribute('width',  String(w - 2));
-        baseEl.setAttribute('height', String(h - 2));
-        baseEl.setAttribute('x', '1');
-        baseEl.setAttribute('y', '1');
-      }
-    };
-
-    const updateGradient = () => {
-      const [head, tail] = this.COMET_COLORS[this.cometColorIdx % this.COMET_COLORS.length];
-      gradEl.innerHTML = `
-        <stop offset="0%"   stop-color="${tail}" stop-opacity="0"/>
-        <stop offset="25%"  stop-color="${tail}" stop-opacity="0.3"/>
-        <stop offset="60%"  stop-color="${head}" stop-opacity="1"/>
-        <stop offset="80%"  stop-color="${head}" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="${head}" stop-opacity="0"/>
-      `;
-    };
-
-    updateSize();
-    updateGradient();
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const host = svgEl.closest('.global-search-shell') as HTMLElement | null;
-      if (host) new ResizeObserver(updateSize).observe(host);
-    }
-
-    this.cometOffset = this.COMET_LEN;
-
-    const loop = () => {
-      this.cometOffset -= this.COMET_SPEED;
-      if (this.cometOffset <= -this.cometPerimeter) {
-        this.cometOffset = this.COMET_LEN;
-        this.cometColorIdx++;
-        updateGradient();
-      }
-      const gap = this.cometPerimeter - this.COMET_LEN;
-      rectEl.style.strokeDasharray  = `${this.COMET_LEN} ${gap}`;
-      rectEl.style.strokeDashoffset = String(this.cometOffset);
-      this.cometRaf = requestAnimationFrame(loop);
-    };
-
-    this.cometRaf = requestAnimationFrame(loop);
-  }
-
   // ─── Navigation helpers ────────────────────────────────────────
   close(): void {
     this.isClosing.set(false);
+    if (this.integrated) {
+      // El layout es dueño de la geometría de la isla. Delegar el cierre evita
+      // que el panel desaparezca antes de que el topbar recupere su ancho idle.
+      this.closeRequested.emit();
+      return;
+    }
     this.search.closeSearch();
   }
 

@@ -46,6 +46,7 @@ export class App implements OnInit, OnDestroy {
 
   private readonly shellPhaseEffect = effect(() => {
     const phase = this.transition.phase();
+    this.syncSessionScrollLock();
     if (phase === 'app') {
       this.viewLoggedIn.set(true);
       this.shellEntering.set(true);
@@ -91,24 +92,39 @@ export class App implements OnInit, OnDestroy {
     return normalizedUrl.startsWith('/reset-password');
   }
 
+  private syncSessionScrollLock(): void {
+    if (typeof document === 'undefined') return;
+    const phase = this.transition.phase();
+    const shouldLock = !this.publicAuthRoute && phase !== 'app';
+    document.documentElement.classList.toggle('sir-session-scroll-lock', shouldLock);
+    document.body.classList.toggle('sir-session-scroll-lock', shouldLock);
+  }
+
   private scheduleViewSync(target: boolean, graceMs: number): void {
     this.viewGateBooted = true;
     clearTimeout(this.pendingViewSyncTimer);
 
-    if (!target) {
-      this.viewLoggedIn.set(false);
-      this.cdr.markForCheck();
-      return;
-    }
-
     this.pendingViewSyncTimer = setTimeout(() => {
-      this.viewLoggedIn.set(target);
+      const phase = this.transition.phase();
+
+      // Tras el arranque, la fase de TopbarTransitionService es la autoridad.
+      // No montamos el shell privado por un simple cambio de auth mientras el
+      // topbar continúa en `collapsing`, porque eso crea scroll detrás del
+      // fullscreen y compite con la animación de bienvenida.
+      if (target) {
+        if (phase !== 'app') return;
+        this.viewLoggedIn.set(true);
+      } else {
+        if (phase !== 'login') return;
+        this.viewLoggedIn.set(false);
+      }
       this.cdr.markForCheck();
     }, graceMs);
   }
 
   private syncShellForUrl(url: string) {
     this.publicAuthRoute = this.isPublicAuthRoute(url);
+    this.syncSessionScrollLock();
 
     if (!this.loggedIn && this.publicAuthRoute) {
       this.alerts.closeModal();
@@ -226,7 +242,14 @@ export class App implements OnInit, OnDestroy {
       .subscribe((logged) => {
         this.loggedIn = logged;
         this.cdr.markForCheck();
-        this.scheduleViewSync(logged, this.viewGateBooted ? 900 : 60);
+
+        if (!this.viewGateBooted) {
+          this.scheduleViewSync(logged, 60);
+        } else {
+          const phase = this.transition.phase();
+          if (logged && phase === 'app') this.viewLoggedIn.set(true);
+          if (!logged && phase === 'login') this.viewLoggedIn.set(false);
+        }
 
         if (logged) {
           const token = this.auth.getToken();
@@ -252,6 +275,10 @@ export class App implements OnInit, OnDestroy {
     this.destroy$.complete();
     clearTimeout(this.pendingViewSyncTimer);
     clearTimeout(this.shellEntryTimer);
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.remove('sir-session-scroll-lock');
+      document.body.classList.remove('sir-session-scroll-lock');
+    }
     this.ws.disconnect();
   }
 }

@@ -44,6 +44,8 @@
 
 }
 
+.gs-shell.is-integrated { animation: none; }
+
 /* Light mode */
 @media (prefers-color-scheme: light) {
   .gs-shell {

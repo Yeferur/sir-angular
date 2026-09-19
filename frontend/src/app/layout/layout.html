@@ -11,8 +11,9 @@
       [class.is-wide]="transitionStage() === 'wide' || transitionStage() === 'fullscreen'"
       [class.is-fullscreen]="transitionStage() === 'fullscreen'"
       [class.is-collapsing]="transitionPhase() === 'collapsing'"
-      [class.is-searching]="globalSearchOpen() && showAppChrome()">
-      @if (showAppChrome() || transitionPhase() === 'collapsing') {
+      [class.show-chrome-handoff]="chromeHandoffVisible()"
+      [class.is-searching]="searchModeActive() && showAppChrome()">
+      @if (showAppChrome() || transitionPhase() === 'collapsing' || transitionPhase() === 'expanding') {
       <div class="topbar-island-content" #topbarContent>
 
       <!-- Launcher único de navegación: escritorio, tablet y móvil -->
@@ -54,7 +55,7 @@
 
       <div class="topbar-sep topbar-sep--after-brand"></div>
 
-      @if (globalSearchOpen()) {
+      @if (searchModeActive()) {
       <div class="topbar-search-mode">
         <i class="bx bx-search" aria-hidden="true"></i>
         <input
@@ -245,6 +246,7 @@
         <div
           class="topbar-session-message"
           [class.show-copy]="sessionCopyVisible()"
+          [class.show-details]="sessionDetailsVisible()"
           [attr.data-kind]="transitionMessage.kind"
           role="status"
           aria-live="polite">
@@ -279,7 +281,7 @@
     @if (topbarState() === 'global-search') {
       <div class="topbar-expanded topbar-expanded--search" animate.enter="panel-enter" animate.leave="panel-leave" role="dialog"
            aria-modal="true" aria-label="Buscador global">
-        <app-global-search [integrated]="true"></app-global-search>
+        <app-global-search [integrated]="true" (closeRequested)="closeGlobalSearch()"></app-global-search>
       </div>
     }
     @if (topbarState() === 'sistema') {
@@ -308,15 +310,6 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="navigation-launcher-title">
-        <header class="navigation-launcher-header">
-          <div>
-            <h2 id="navigation-launcher-title">Navegación</h2>
-            <p>Todo el sistema, sin ocupar espacio permanente</p>
-          </div>
-          <button type="button" class="launcher-close" (click)="closeNavigationLauncher(true)" aria-label="Cerrar navegación">
-            <i class="bx bx-x" aria-hidden="true"></i>
-          </button>
-        </header>
 
         <div class="navigation-launcher-grid">
           @if (getVisibleMenuItemsByGroup('principal').length) {

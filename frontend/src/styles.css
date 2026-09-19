@@ -263,6 +263,16 @@ body {
   color: var(--text-color);
 }
 
+/* Durante login/logout la superficie del topbar es el viewport. Bloqueamos el
+   scroll del documento para que el contenido privado no pueda desplazarse por
+   detrás de la transición. El login conserva su propio scroll interno cuando
+   realmente lo necesita. */
+html.sir-session-scroll-lock,
+body.sir-session-scroll-lock {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
 .content {
   width: 100%;
 }
@@ -1680,19 +1690,17 @@ app-layout .topbar-session-message {
 }
 app-layout .topbar-session-brand {
   position: absolute;
-  left: 14px;
+  left: 50%;
   top: 50%;
   width: 80px;
   height: auto;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   object-fit: contain;
-  transition: left 390ms cubic-bezier(.16,1,.3,1), top 480ms cubic-bezier(.16,1,.3,1),
+  transition: top 480ms cubic-bezier(.16,1,.3,1),
     width 480ms cubic-bezier(.16,1,.3,1), transform 480ms cubic-bezier(.16,1,.3,1), opacity 240ms ease;
 }
 app-layout .is-wide .topbar-session-brand {
-  left: 50%;
   width: 108px;
-  transform: translate(-50%, -50%);
 }
 app-layout .is-fullscreen .topbar-session-brand {
   top: calc(50% - 78px);
@@ -1732,6 +1740,17 @@ app-layout .topbar-session-copy em {
   letter-spacing: .09em;
   text-transform: uppercase;
 }
+app-layout .topbar-session-copy small,
+app-layout .topbar-session-copy em {
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 220ms ease, transform 280ms cubic-bezier(.16,1,.3,1);
+}
+app-layout .show-details .topbar-session-copy small,
+app-layout .show-details .topbar-session-copy em {
+  opacity: 1;
+  transform: translateY(0);
+}
 app-layout .topbar-session-line {
   position: absolute;
   top: calc(50% - 25px);
@@ -1747,6 +1766,17 @@ app-layout .show-copy .topbar-session-line {
   opacity: .8;
   transform: translateX(-50%) scaleX(1);
 }
+
+/* El copy de bienvenida/despedida solo pertenece al lienzo fullscreen.
+   Cuando comienza fullscreen → wide debe apagarse antes de que el texto pueda
+   quedar recortado dentro de la barra de 56px. */
+app-layout .topbar-bar.is-collapsing:not(.is-fullscreen) .topbar-session-copy,
+app-layout .topbar-bar.is-collapsing:not(.is-fullscreen) .topbar-session-line,
+app-layout .topbar-bar.is-collapsing:not(.is-fullscreen) .topbar-session-glow {
+  opacity: 0 !important;
+  transition-duration: 140ms !important;
+}
+
 app-layout .topbar-session-glow {
   position: absolute;
   inset: 18% 10%;
@@ -1759,8 +1789,7 @@ app-layout .show-copy .topbar-session-glow { opacity: 1; }
   app-layout .topbar-session-brand { width: 72px; }
 }
 @media (max-width: 390px) {
-  app-layout .topbar-session-brand { left: 9px; width: 64px; }
-  app-layout .is-wide .topbar-session-brand { left: 50%; }
+  app-layout .topbar-session-brand { width: 64px; }
 }
 @media (prefers-reduced-motion: reduce) {
   app-layout .topbar-session-brand,

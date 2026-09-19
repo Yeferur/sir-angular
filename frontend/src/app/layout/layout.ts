@@ -11,6 +11,7 @@ import {
     ChangeDetectorRef,
     ViewChild,
     effect,
+    untracked,
 } from '@angular/core';
 import {
     Router,
@@ -96,6 +97,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     globalSearchOpen = this.search.open;
     searchQuery = this.search.query;
     searchLoading = this.search.loading;
+    searchClosing = signal(false);
+    readonly searchModeActive = computed(() => this.globalSearchOpen() || this.searchClosing());
 
     // ── Estado local ─────────────────────────────────────────────
     user = signal<any>(null);
@@ -117,6 +120,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     logoutStartRect = signal<{ top: number; left: number; width: number; height: number } | null>(null);
     transitionStage = signal<'island' | 'wide' | 'fullscreen'>('fullscreen');
     sessionCopyVisible = signal(false);
+    sessionDetailsVisible = signal(false);
+    chromeHandoffVisible = signal(false);
     readonly transitionPhase = this.transitionService.phase;
     readonly sessionTransitionMessage = computed(() => {
         const phase = this.transitionPhase();
@@ -156,8 +161,11 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
-    private transitionFallbackTimer?: number;
     private sessionBeatTimer?: number;
+    private transitionRun = 0;
+    private idleTopbarWidth: number | null = null;
+    private searchWasOpen = false;
+    private searchRestoreTimer?: number;
     private finishRouteActivity?: () => void;
     private titleMotionTimer?: number;
     private notificationEventSub?: Subscription;
@@ -181,7 +189,16 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     });
 
     private readonly collapseEffect = effect(() => {
+        // IMPORTANTE: este effect debe depender únicamente de la fase.
+        // Las señales que mutamos durante la coreografía (logoutStartRect,
+        // topbarWidth, etc.) se leen/escriben fuera del tracking para evitar
+        // reiniciar la transición mientras sigue en `collapsing`.
         if (this.transitionService.phase() !== 'collapsing') return;
+        untracked(() => this.beginLoginCollapse());
+    });
+
+    private beginLoginCollapse(): void {
+        const run = ++this.transitionRun;
 
         this.user.set(this.authService.getUser());
         this.refreshAvatar();
@@ -191,6 +208,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (!this.isTransitionRunActive(run, 'collapsing')) return;
+
             const content = this.topbarContent?.nativeElement;
             if (content) {
                 const target = this.getFallbackIslandRect();
@@ -201,27 +220,66 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.logoutStartRect.set(target);
                 this.topbarWidth.set(target.width);
             }
-            // Primero se lee la bienvenida; después la marca viaja hacia la isla.
-            this.sessionBeat(280, () => {
-                this.sessionCopyVisible.set(true);
-                this.sessionBeat(1150, () => {
-                    this.sessionCopyVisible.set(false);
-                    this.sessionBeat(220, () => {
-                        this.transitionStage.set('wide');
-                        this.afterTopbarTransition(['height'], () => {
-                            this.transitionStage.set('island');
-                            this.afterTopbarTransition(['width'], () => {
-                                this.router.navigateByUrl('/');
-                                this.logoutStartRect.set(null);
-                                this.transitionService.markAppReady();
-                                queueMicrotask(() => this.syncTopbarWidth());
-                            });
-                        });
-                    });
-                });
-            });
+
+            void this.runLoginTransition(run);
         }));
-    });
+    }
+
+    private async runLoginTransition(run: number): Promise<void> {
+        try {
+            this.chromeHandoffVisible.set(false);
+            this.sessionCopyVisible.set(true);
+            this.sessionDetailsVisible.set(true);
+
+            await this.waitForBeat(620, run);
+            if (!this.isTransitionRunActive(run, 'collapsing')) return;
+
+            // El mensaje pertenece al estado fullscreen. Al empezar a volver
+            // a una barra de 56px se desvanece inmediatamente, en paralelo a
+            // fullscreen → wide. Así nunca queda texto grande recortado dentro
+            // de la barra compacta.
+            this.sessionDetailsVisible.set(false);
+            this.sessionCopyVisible.set(false);
+            this.transitionStage.set('wide');
+
+            await this.waitForTopbarTransition(['height', 'top'], 520, run);
+            if (!this.isTransitionRunActive(run, 'collapsing')) return;
+
+            // Sin pausa entre etapas. El chrome real empieza el handoff antes
+            // de que termine wide → island para que la barra nunca quede vacía.
+            this.transitionStage.set('island');
+            window.setTimeout(() => {
+                if (this.isTransitionRunActive(run, 'collapsing')) {
+                    this.chromeHandoffVisible.set(true);
+                }
+            }, this.prefersReducedMotion() ? 0 : 230);
+
+            await this.waitForTopbarTransition(['width', 'left'], 430, run);
+            if (!this.isTransitionRunActive(run, 'collapsing')) return;
+
+            this.completeLoginTransition(run);
+        } catch (error) {
+            console.error('Topbar login transition failed:', error);
+            // Si la ejecución sigue siendo la vigente, cerramos la coreografía
+            // de forma segura en vez de dejar la app atrapada en `collapsing`.
+            this.completeLoginTransition(run);
+        }
+    }
+
+    private completeLoginTransition(run: number): void {
+        if (!this.isTransitionRunActive(run, 'collapsing')) return;
+
+        this.transitionStage.set('island');
+        this.chromeHandoffVisible.set(true);
+        this.sessionDetailsVisible.set(false);
+        this.sessionCopyVisible.set(false);
+        this.logoutStartRect.set(null);
+
+        // phase='app' es la única señal que debe montar el shell privado.
+        this.transitionService.markAppReady();
+        void this.router.navigateByUrl('/');
+        queueMicrotask(() => this.syncTopbarWidth());
+    }
 
 
     // ── Estado computado del topbar ──────────────────────────────
@@ -367,8 +425,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.routerSub?.unsubscribe();
         this.authNotificationSub?.unsubscribe();
         this.notificationEventSub?.unsubscribe();
-        if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
         if (this.sessionBeatTimer) window.clearTimeout(this.sessionBeatTimer);
+        if (this.searchRestoreTimer) window.clearTimeout(this.searchRestoreTimer);
+        this.transitionRun++;
         this.finishRouteActivity?.();
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
     }
@@ -411,7 +470,30 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             const content = this.topbarContent?.nativeElement;
             if (!bar || !content || !this.showAppChrome()) return;
             if (this.globalSearchOpen()) {
-                this.topbarWidth.set(Math.min(1040, window.innerWidth - 30));
+                if (!this.searchWasOpen) {
+                    this.idleTopbarWidth = this.topbarWidth() || Math.ceil(bar.getBoundingClientRect().width);
+                    this.searchWasOpen = true;
+                }
+                const available = Math.max(220, window.innerWidth - 30);
+                const compact = window.innerWidth <= 766
+                    ? available
+                    : Math.min(available, Math.max(560, Math.min(680, this.idleTopbarWidth * .76)));
+                this.topbarWidth.set(compact);
+                return;
+            }
+
+            if (this.searchWasOpen) {
+                // Durante el cierre explícito, closeGlobalSearch() es dueño de
+                // la geometría hasta que termine la transición de width.
+                if (this.searchClosing()) return;
+
+                this.searchWasOpen = false;
+                if (this.idleTopbarWidth != null) {
+                    this.topbarWidth.set(Math.min(this.idleTopbarWidth, window.innerWidth - 30));
+                }
+                this.idleTopbarWidth = null;
+                if (this.searchRestoreTimer) window.clearTimeout(this.searchRestoreTimer);
+                this.searchRestoreTimer = window.setTimeout(() => this.syncTopbarWidth(), 400);
                 return;
             }
 
@@ -601,19 +683,35 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.transitionService.requestExpandToFullscreen();
 
         this.sessionCopyVisible.set(false);
+        this.sessionDetailsVisible.set(false);
+        this.chromeHandoffVisible.set(true);
+        const run = ++this.transitionRun;
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            this.transitionStage.set('wide');
-            this.afterTopbarTransition(['width'], () => {
-                this.transitionStage.set('fullscreen');
-                this.afterTopbarTransition(['height'], () => {
-                    this.sessionCopyVisible.set(true);
-                    this.sessionBeat(1150, () => {
-                        this.sessionCopyVisible.set(false);
-                        this.sessionBeat(240, () => this.finishLogout());
-                    });
-                });
-            });
+            void this.runLogoutTransition(run);
         }));
+    }
+
+    private async runLogoutTransition(run: number): Promise<void> {
+        // Crossfade corto: marca real → marca centrada de transición.
+        await this.waitForBeat(150, run);
+        if (!this.isTransitionRunActive(run, 'expanding')) return;
+        this.chromeHandoffVisible.set(false);
+        this.transitionStage.set('wide');
+        await this.waitForTopbarTransition(['width', 'left'], 430, run);
+        if (!this.isTransitionRunActive(run, 'expanding')) return;
+
+        this.transitionStage.set('fullscreen');
+        await this.waitForTopbarTransition(['height', 'top'], 520, run);
+        if (!this.isTransitionRunActive(run, 'expanding')) return;
+
+        this.sessionCopyVisible.set(true);
+        this.sessionDetailsVisible.set(true);
+        await this.waitForBeat(900, run);
+        if (!this.isTransitionRunActive(run, 'expanding')) return;
+        this.sessionCopyVisible.set(false);
+        this.sessionDetailsVisible.set(false);
+        await this.waitForBeat(180, run);
+        if (this.isTransitionRunActive(run, 'expanding')) this.finishLogout();
     }
 
     /** Finaliza el logout cuando la isla ya cubre el viewport. */
@@ -644,30 +742,43 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         };
     }
 
-    private afterTopbarTransition(properties: string[], callback: () => void): void {
-        const bar = this.topbarBar?.nativeElement;
-        if (!bar || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            callback();
-            return;
-        }
+    private prefersReducedMotion(): boolean {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
 
-        let completed = false;
-        const finish = () => {
-            if (completed) return;
-            completed = true;
-            bar.removeEventListener('transitionend', onTransitionEnd);
-            if (this.transitionFallbackTimer) window.clearTimeout(this.transitionFallbackTimer);
-            this.transitionFallbackTimer = undefined;
-            callback();
-        };
-        const onTransitionEnd = (event: TransitionEvent) => {
-            if (event.target === bar && properties.includes(event.propertyName)) {
-                finish();
+    private isTransitionRunActive(run: number, phase: 'collapsing' | 'expanding'): boolean {
+        return run === this.transitionRun && this.transitionPhase() === phase;
+    }
+
+    private waitForBeat(duration: number, run: number): Promise<void> {
+        return new Promise(resolve => {
+            const timer = window.setTimeout(resolve, this.prefersReducedMotion() ? 0 : duration);
+            if (run !== this.transitionRun) {
+                window.clearTimeout(timer);
+                resolve();
             }
-        };
+        });
+    }
 
-        bar.addEventListener('transitionend', onTransitionEnd);
-        this.transitionFallbackTimer = window.setTimeout(finish, 650);
+    private waitForTopbarTransition(properties: string[], timeoutMs: number, run: number): Promise<void> {
+        const bar = this.topbarBar?.nativeElement;
+        if (!bar || this.prefersReducedMotion()) return Promise.resolve();
+
+        return new Promise(resolve => {
+            let completed = false;
+            const finish = () => {
+                if (completed) return;
+                completed = true;
+                bar.removeEventListener('transitionend', onTransitionEnd);
+                window.clearTimeout(timer);
+                resolve();
+            };
+            const onTransitionEnd = (event: TransitionEvent) => {
+                if (run === this.transitionRun && event.target === bar && properties.includes(event.propertyName)) finish();
+            };
+            const timer = window.setTimeout(finish, timeoutMs);
+            bar.addEventListener('transitionend', onTransitionEnd);
+        });
     }
 
 
@@ -675,9 +786,61 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     openGlobalSearch(): void {
         this.closeProfileMenu();
         this.closeTopbarMenus();
+        this.searchClosing.set(false);
+
+        if (!this.globalSearchOpen()) {
+            const bar = this.topbarBar?.nativeElement;
+            this.idleTopbarWidth = this.topbarWidth()
+                || (bar ? Math.ceil(bar.getBoundingClientRect().width) : null);
+            this.searchWasOpen = true;
+        }
+
         this.search.openSearch();
+        queueMicrotask(() => this.syncTopbarWidth());
     }
-    closeGlobalSearch(): void { this.search.closeSearch(); }
+
+    closeGlobalSearch(): void {
+        if (!this.globalSearchOpen() || this.searchClosing()) return;
+
+        const bar = this.topbarBar?.nativeElement;
+        const fromWidth = bar?.getBoundingClientRect().width ?? this.topbarWidth() ?? 0;
+        const targetWidth = this.idleTopbarWidth != null
+            ? Math.min(this.idleTopbarWidth, window.innerWidth - 30)
+            : fromWidth;
+
+        // El panel de resultados se desmonta ya, pero mantenemos visualmente
+        // el modo de búsqueda mientras la isla recupera su ancho. Así los
+        // iconos normales nunca aparecen fuera de una barra todavía compacta.
+        this.searchClosing.set(true);
+        if (targetWidth > 0) this.topbarWidth.set(targetWidth);
+        this.search.closeSearch();
+
+        const finish = () => {
+            this.searchClosing.set(false);
+            this.searchWasOpen = false;
+            this.idleTopbarWidth = null;
+            queueMicrotask(() => this.syncTopbarWidth());
+        };
+
+        if (!bar || this.prefersReducedMotion() || Math.abs(fromWidth - targetWidth) < 1) {
+            finish();
+            return;
+        }
+
+        let completed = false;
+        const done = () => {
+            if (completed) return;
+            completed = true;
+            bar.removeEventListener('transitionend', onEnd);
+            window.clearTimeout(fallback);
+            finish();
+        };
+        const onEnd = (event: TransitionEvent) => {
+            if (event.target === bar && event.propertyName === 'width') done();
+        };
+        const fallback = window.setTimeout(done, 430);
+        bar.addEventListener('transitionend', onEnd);
+    }
     onTopbarSearchInput(event: Event): void {
         this.search.updateQuery((event.target as HTMLInputElement).value);
     }
