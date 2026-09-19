@@ -232,7 +232,7 @@
     <!-- Panel expandido — búsqueda global -->
     @if (topbarState() === 'global-search') {
       <div class="topbar-expanded topbar-expanded--search" animate.enter="panel-enter" animate.leave="panel-leave" role="dialog"
-           aria-modal="true" aria-labelledby="global-search-title">
+           aria-modal="true" aria-label="Búsqueda global">
         <app-global-search [integrated]="true" (closeRequested)="closeGlobalSearch()"></app-global-search>
       </div>
     }
@@ -342,22 +342,20 @@
           <section class="launcher-column">
             <h3>Sistema</h3>
             @for (item of getVisibleMenuItemsByGroup('sistema'); track item.key) {
-              <div class="launcher-subgroup" [class.has-active-child]="isSubmenuActive(item)">
-                <h4>{{ item.label }}</h4>
-                @for (child of getVisibleChildren(item); track child.key) {
-                  @if (child.route) {
-                  <a class="launcher-subitem"
-                     [class.action]="child.kind === 'action'"
-                     [class.active]="isRouteActive(child.route, child.exact ?? false)"
-                     [attr.aria-current]="isRouteActive(child.route, child.exact ?? false) ? 'page' : null"
-                     [routerLink]="child.route"
-                     (click)="navigateFromTopbar()">
-                    <i [class]="child.icon" aria-hidden="true"></i>
-                    <span>{{ child.label }}</span>
-                  </a>
-                  }
+              @for (child of getVisibleChildren(item); track child.key) {
+                @if (child.route) {
+                <a class="launcher-card"
+                   [class.active]="isRouteActive(child.route, child.exact ?? false)"
+                   [attr.aria-current]="isRouteActive(child.route, child.exact ?? false) ? 'page' : null"
+                   [routerLink]="child.route"
+                   (click)="navigateFromTopbar()">
+                  <span class="launcher-card-icon"><i [class]="child.icon" aria-hidden="true"></i></span>
+                  <span class="launcher-card-copy">
+                    <strong>{{ child.label }}</strong>
+                  </span>
+                </a>
                 }
-              </div>
+              }
             }
           </section>
           }

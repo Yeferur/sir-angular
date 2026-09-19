@@ -305,7 +305,7 @@ async function getOperationalProcesses(dates, permissions) {
     processes.push({
       id: 'programming',
       label: 'Programación',
-      description: 'Tours de hoy o mañana aún sin listado activo.',
+      description: 'Tours de hoy o mañana pendientes de programación.',
       count: Number(rows?.[0]?.Total || 0),
       route: '/Programacion/Listado',
       permission: 'PROGRAMACION.LEER',
@@ -393,7 +393,6 @@ async function getHomeSummary(userId, permissions = []) {
     'SEGUROS.LEER',
     'COMISIONES.LEER',
     'AFOROS.LEER',
-    'INICIO.LEER',
   );
   const personalScope = !management;
 
@@ -401,7 +400,7 @@ async function getHomeSummary(userId, permissions = []) {
     getOverview(userId, dates, personalScope, !clientMode && hasAnyPermission(permissions, 'TRANSFERS.LEER')),
     getPersonalWork(userId, dates, permissions, clientMode),
     operations ? getOperationalProcesses(dates, permissions) : Promise.resolve([]),
-    operations && hasAnyPermission(permissions, 'AFOROS.LEER', 'INICIO.LEER')
+    operations && hasAnyPermission(permissions, 'AFOROS.LEER')
       ? getCapacityAlerts(dates)
       : Promise.resolve([]),
     management ? getManagementActivity(permissions) : Promise.resolve([]),
@@ -438,7 +437,7 @@ async function getHomeSummary(userId, permissions = []) {
       canCreateTransfers: hasAnyPermission(permissions, 'TRANSFERS.CREAR'),
       canReadTransfers: hasAnyPermission(permissions, 'TRANSFERS.LEER'),
       canUpdateTransfers: hasAnyPermission(permissions, 'TRANSFERS.ACTUALIZAR'),
-      canReadAforos: hasAnyPermission(permissions, 'AFOROS.LEER', 'INICIO.LEER'),
+      canReadAforos: hasAnyPermission(permissions, 'AFOROS.LEER'),
       canReadReports: hasAnyPermission(permissions, 'INFORMES.LEER'),
       canReadProgramming: hasAnyPermission(permissions, 'PROGRAMACION.LEER'),
     },

@@ -672,12 +672,14 @@
 }
 
 .topbar-expanded--search {
-  /* El panel puede ser más ancho que la isla de búsqueda, pero siempre queda
-     centrado y desacoplado de la animación de ancho del topbar. */
-  width: min(1040px, calc(100% - 48px));
-  margin: 8px auto 0;
+  /* El panel queda conectado visualmente a la isla y crece solo con su contenido. */
+  width: min(900px, calc(100% - 32px));
+  margin: 6px auto 0;
   translate: 0;
   transform-origin: top center;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--accent-blue) 16%, var(--separator-color));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .28);
 
   /* El panel crece con los resultados y solo toma altura de dialogo cuando
      realmente la necesita. Evita el gran bloque vacio con 1 o 2 coincidencias. */
@@ -989,7 +991,7 @@
   }
 
   .topbar-expanded--search {
-    width: calc(100% - 48px);
+    width: calc(100% - 24px);
     translate: 0;
     max-height: calc(100dvh - 86px);
   }

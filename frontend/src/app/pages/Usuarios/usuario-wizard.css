@@ -144,6 +144,36 @@
   gap: 8px;
 }
 
+.client-fixed-permissions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.client-fixed-permission {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 28%, var(--separator-color));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-blue) 7%, var(--bg-tertiary));
+}
+
+.client-fixed-permission__mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 13%, transparent);
+  font-size: .82rem;
+}
+
 .permission-option {
   display: flex;
   position: relative;
@@ -769,6 +799,7 @@
 
   .form-grid,
   .permissions-grid,
+  .client-fixed-permissions,
   .review-grid,
   .review-summary-strip {
     grid-template-columns: 1fr;

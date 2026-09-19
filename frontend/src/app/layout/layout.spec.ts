@@ -77,6 +77,14 @@ describe('Navegación superior', () => {
     ]);
     expect(element('.launcher-operation-grid').children.length).toBe(4);
     expect(element('a[href="/Reservas/Confirmacion"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Gestión');
+    const systemColumns = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[];
+    const systemColumn = systemColumns
+      .find(column => column.querySelector('h3')?.textContent?.trim() === 'Sistema');
+    expect(systemColumn?.querySelector('h4')).toBeNull();
+    expect(Array.from(systemColumn?.querySelectorAll('.launcher-card strong') || [])
+      .map(node => node.textContent?.trim())).toEqual([
+        'Administrar Usuarios', 'Crear Usuarios', 'Turnos de asesores',
+      ]);
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
   });
 

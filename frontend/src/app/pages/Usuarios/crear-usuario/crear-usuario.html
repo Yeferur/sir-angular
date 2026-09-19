@@ -296,7 +296,7 @@
                     <p>
                       @if (selectedRole) {
                         @if (isClientRole) {
-                          Este rol solo puede crear, consultar, editar, duplicar y cancelar sus propias reservas.
+                          Este rol tiene acceso fijo para consultar, crear y actualizar únicamente sus propias reservas. No puede acceder a otros módulos ni cancelar o eliminar reservas.
                         } @else {
                           Los incluidos por el rol ya están seleccionados; puedes activar o retirar cualquiera.
                         }
@@ -311,24 +311,38 @@
                   </span>
                 </div>
 
-                <div class="permissions-grid">
-                  @for (module of permissionsByModule; track module.key) {
-                    @for (permiso of module.permisos; track permiso.Id_Permiso) {
-                      <button
-                        type="button"
-                        class="permission-option"
-                        [class.permission-option--selected]="isSelected(permiso.Id_Permiso)"
-                        [disabled]="!selectedRole || rolePermissionsLoading() || isClientRole"
-                        (click)="togglePermiso(permiso.Id_Permiso)"
-                        [attr.aria-pressed]="isSelected(permiso.Id_Permiso)">
+                @if (isClientRole) {
+                  <div class="client-fixed-permissions" aria-label="Capacidades fijas del Cliente">
+                    @for (permiso of clientPermissions; track permiso.Id_Permiso) {
+                      <div class="client-fixed-permission">
+                        <span class="client-fixed-permission__mark" aria-hidden="true"><i class="bx bx-check"></i></span>
                         <span class="permission-copy">
                           <strong>{{ permiso.Descripcion || permissionAction(permiso) }}</strong>
-                          <small>{{ module.label }}</small>
+                          <small>Capacidad fija del Cliente</small>
                         </span>
-                      </button>
+                      </div>
                     }
-                  }
-                </div>
+                  </div>
+                } @else {
+                  <div class="permissions-grid">
+                    @for (module of permissionsByModule; track module.key) {
+                      @for (permiso of module.permisos; track permiso.Id_Permiso) {
+                        <button
+                          type="button"
+                          class="permission-option"
+                          [class.permission-option--selected]="isSelected(permiso.Id_Permiso)"
+                          [disabled]="!selectedRole || rolePermissionsLoading()"
+                          (click)="togglePermiso(permiso.Id_Permiso)"
+                          [attr.aria-pressed]="isSelected(permiso.Id_Permiso)">
+                          <span class="permission-copy">
+                            <strong>{{ permiso.Descripcion || permissionAction(permiso) }}</strong>
+                            <small>{{ module.label }}</small>
+                          </span>
+                        </button>
+                      }
+                    }
+                  </div>
+                }
             </div>
           </section>
         }

@@ -1,29 +1,9 @@
 <section class="gs-shell" [class.is-integrated]="integrated" [class.is-closing]="isClosing() && !integrated" (click)="$event.stopPropagation()">
-  <div class="gs-header">
-    <div class="gs-brand">
-      <div class="gs-brand-orb" aria-hidden="true">
-        <span class="gs-brand-star">✦</span>
-      </div>
-      <div class="gs-brand-info">
-        <span id="global-search-title" class="gs-brand-name">Buscador global</span>
-        <span class="gs-brand-badge">SIR</span>
-      </div>
-    </div>
-    <button type="button" class="gs-close-btn" (click)="closeFromButton($event)" aria-label="Cerrar">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
-  </div>
-
   <div class="gs-body">
     @if (showWelcome()) {
       <div class="gs-welcome" role="region" aria-label="Ayuda de búsqueda">
-        <div class="gs-welcome-orb" aria-hidden="true">⌕</div>
         <h2 class="gs-welcome-title">Busca en SIR</h2>
-        <p class="gs-welcome-sub">Busca reservas y transfers por ID, pasajero, titular o documento. También puedes escribir un tour, un punto de encuentro, un servicio de transfer o una fecha como “mañana”, “2026-08-07” o “7 de agosto”.</p>
+        <p class="gs-welcome-sub">Busca por ID, pasajero, documento, tour o fecha.</p>
         @if (availableShortcuts.length > 0) {
           <span class="gs-shortcuts-label">O abre directamente un módulo</span>
           <div class="gs-chips" role="list" aria-label="Accesos rápidos">
@@ -38,11 +18,30 @@
       </div>
     }
 
-    @if (showAwaitingSubmit()) {
-      <div class="gs-search-empty gs-search-prompt" role="status">
-        <kbd class="gs-enter-key">Enter</kbd>
-        <strong>Presiona Enter para buscar</strong>
-        <span>La búsqueda se ejecutará únicamente cuando la confirmes.</span>
+    @if (waiting()) {
+      <div class="gs-search-status" role="status" aria-live="polite">
+        <span>Preparando búsqueda…</span>
+      </div>
+    }
+
+    @if (showLoading()) {
+      <div class="gs-search-status" role="status" aria-live="polite">
+        <span class="gs-status-spinner" aria-hidden="true"></span>
+        <span>Buscando…</span>
+      </div>
+    }
+
+    @if (showQueryHint()) {
+      <div class="gs-search-status" role="status" aria-live="polite">
+        <span>Escribe al menos dos caracteres para buscar.</span>
+      </div>
+    }
+
+    @if (showError()) {
+      <div class="gs-search-empty gs-search-error" role="alert">
+        <i class="bx bx-wifi-off" aria-hidden="true"></i>
+        <strong>No pudimos completar la búsqueda</strong>
+        <span>{{ error() }}</span>
       </div>
     }
 

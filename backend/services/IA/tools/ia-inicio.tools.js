@@ -39,7 +39,7 @@ const inicioTools = [
     },
     riskLevel: 'read',
     requiresConfirmation: false,
-    requiredPermission: 'INICIO.LEER',
+    requiredPermission: 'AFOROS.LEER',
     module: 'inicio',
     execute: executeConsultarInicioFecha,
   },

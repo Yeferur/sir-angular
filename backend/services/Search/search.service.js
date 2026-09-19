@@ -134,13 +134,12 @@ function buildDateResult(query, permisos) {
       params: { queryParams: { fechaTransfer: date, buscar: 1 } },
     });
   }
-  if (hasPermission(permisos, 'AFOROS.LEER', 'INICIO.LEER')) {
-    const permission = hasPermission(permisos, 'AFOROS.LEER') ? 'AFOROS.LEER' : 'INICIO.LEER';
+  if (hasPermission(permisos, 'AFOROS.LEER')) {
     actions.push({
       label: 'Ver aforos',
       kind: 'aforo',
       route: '/Aforos',
-      permission,
+      permission: 'AFOROS.LEER',
       params: { queryParams: { fecha: date } },
     });
   }
@@ -805,4 +804,5 @@ module.exports = {
   sanitizeQuery,
   canSearchQuery,
   isSensitiveQuery,
+  buildDateResult,
 };

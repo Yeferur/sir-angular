@@ -26,7 +26,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     data: {
       preload: true,
-      permisos: ['AFOROS.LEER', 'INICIO.LEER'],
+      permiso: 'AFOROS.LEER',
       redirectTo: '/Ayuda',
     },
     title: 'Aforos',

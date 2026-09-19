@@ -82,92 +82,6 @@
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ── HEADER ── */
-.gs-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--gs-sep);
-  flex-shrink: 0;
-}
-
-.gs-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.gs-brand-orb {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.22), rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.08));
-  border: 1px solid rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.3);
-  overflow: hidden;
-}
-
-.gs-brand-star {
-  color: var(--gs-blue);
-  font-size: 0.72rem;
-  animation: starPulse 3.5s ease-in-out infinite;
-}
-
-@keyframes starPulse {
-  0%, 100% { opacity: 0.7; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.15); }
-}
-
-.gs-brand-info {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.gs-brand-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  color: var(--gs-text);
-}
-
-.gs-brand-badge {
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--gs-blue);
-  background: rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.12);
-  border: 1px solid rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.24);
-  border-radius: 999px;
-  padding: 2px 7px;
-}
-
-.gs-close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--separator-color);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
-}
-
-.gs-close-btn:hover {
-  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
-  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
-  color: var(--accent-red);
-  transform: translateY(-1px);
-}
-.gs-close-btn:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2px; }
-
 /* ── BODY (scroll) ── */
 .gs-body {
   flex: 0 1 auto;
@@ -283,6 +197,27 @@
 .gs-search-empty strong { color: var(--gs-text); font-size: .9rem; }
 .gs-search-empty span { font-size: .76rem; }
 
+.gs-search-status {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--gs-text-2);
+  font-size: .78rem;
+}
+
+.gs-status-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--gs-border);
+  border-top-color: var(--gs-blue);
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+}
+
+.gs-search-error > .bx { color: var(--accent-red); }
+
 .gs-enter-key {
   min-width: 48px;
   padding: 5px 10px;
@@ -306,7 +241,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 20px 8px 18px;
+  padding: 16px 8px 14px;
   gap: 0;
   animation: fadeUp 300ms cubic-bezier(0.32,0.72,0,1) both;
 }
@@ -316,21 +251,8 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.gs-welcome-orb {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.2), rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.06));
-  border: 1px solid rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.28);
-  color: var(--gs-blue);
-  font-size: 1.1rem;
-  margin-bottom: 12px;
-}
-
 .gs-welcome-title {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 1.08rem;
   font-weight: 600;
   color: var(--gs-text);
@@ -494,8 +416,7 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 600px) {
-  .gs-header { padding: 11px 14px 9px; }
-  .gs-body   { padding: 10px 14px 12px; }
+  .gs-body   { padding: 10px 12px 12px; }
   .gs-footer { padding: 10px 12px 14px; }
   .gs-result-badge { display: none; }
   .gs-result-item { align-items: flex-start; flex-direction: column; }

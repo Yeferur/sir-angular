@@ -163,6 +163,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
     @ViewChild('topbarContent') private topbarContent?: ElementRef<HTMLElement>;
     @ViewChild('topbarSearchInput') private topbarSearchInput?: ElementRef<HTMLInputElement>;
+    @ViewChild(GlobalSearchComponent) private globalSearchComponent?: GlobalSearchComponent;
     @ViewChild('navigationTrigger') private navigationTrigger?: ElementRef<HTMLButtonElement>;
     @ViewChild('createTrigger') private createTrigger?: ElementRef<HTMLButtonElement>;
     @ViewChild('profileTrigger') private profileTrigger?: ElementRef<HTMLButtonElement>;
@@ -897,7 +898,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     submitTopbarSearch(): void {
         const query = this.searchQuery().trim();
-        if (query) this.search.searchGlobal(query);
+        if (!query) return;
+
+        // El componente conserva el resultado seleccionado y decide si Enter
+        // debe ejecutar la consulta o abrir el elemento activo.
+        if (this.globalSearchComponent) {
+            this.globalSearchComponent.onEnterSearch();
+        } else {
+            this.search.searchGlobal(query);
+        }
     }
     showSystemEvent(payload: any): void { this.systemEvent.set(payload); }
 
@@ -1088,7 +1097,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             icon: 'bx bxs-dashboard',
             group: 'principal',
             route: '/Aforos',
-            permission: ['AFOROS.LEER', 'INICIO.LEER'],
+            permission: 'AFOROS.LEER',
             exact: true,
         },
         {

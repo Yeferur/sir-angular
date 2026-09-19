@@ -6,6 +6,7 @@ import { PermisosService } from './Permisos/permisos.service';
 import { SirAlertService } from './Alertas/alert.service';
 import { SirDrawerService } from './Drawer/drawer.service';
 import { SILENT_APP_ACTIVITY } from '../interceptors/app-activity.interceptor';
+import { Subscription } from 'rxjs';
 
 export interface GlobalSearchAction {
   label: string;
@@ -46,6 +47,7 @@ export class GlobalSearchService {
   private readonly drawer = inject(SirDrawerService);
   private globalSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private globalSearchRequestId = 0;
+  private globalSearchSubscription: Subscription | null = null;
 
   private readonly apiUrl = environment.apiUrl;
 
@@ -53,7 +55,18 @@ export class GlobalSearchService {
   readonly query = signal('');
   readonly submittedQuery = signal('');
   readonly results = signal<GlobalSearchResult[]>([]);
+  readonly waiting = signal(false);
   readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
+
+  private cancelPendingSearch(): void {
+    if (this.globalSearchDebounceTimer) {
+      clearTimeout(this.globalSearchDebounceTimer);
+      this.globalSearchDebounceTimer = null;
+    }
+    this.globalSearchSubscription?.unsubscribe();
+    this.globalSearchSubscription = null;
+  }
 
   private canSearchQuery(query: string): boolean {
     const safe = String(query || '').trim();
@@ -82,77 +95,103 @@ export class GlobalSearchService {
     this.query.set('');
     this.submittedQuery.set('');
     this.results.set([]);
+    this.waiting.set(false);
     this.loading.set(false);
+    this.error.set(null);
     this.globalSearchRequestId++;
-    if (this.globalSearchDebounceTimer) {
-      clearTimeout(this.globalSearchDebounceTimer);
-      this.globalSearchDebounceTimer = null;
-    }
+    this.cancelPendingSearch();
   }
 
   updateQuery(query: string): void {
     const value = query ?? '';
     this.query.set(value);
-    if (value.trim() === this.submittedQuery()) return;
-
+    const safeQuery = value.trim();
+    this.error.set(null);
     this.results.set([]);
-    this.loading.set(false);
     this.globalSearchRequestId++;
-    if (this.globalSearchDebounceTimer) {
-      clearTimeout(this.globalSearchDebounceTimer);
-      this.globalSearchDebounceTimer = null;
+    const requestId = this.globalSearchRequestId;
+    this.cancelPendingSearch();
+
+    if (!safeQuery) {
+      this.submittedQuery.set('');
+      this.waiting.set(false);
+      this.loading.set(false);
+      return;
     }
+    if (!this.canSearchQuery(safeQuery)) {
+      this.submittedQuery.set('');
+      this.waiting.set(false);
+      this.loading.set(false);
+      return;
+    }
+
+    this.waiting.set(true);
+    this.loading.set(false);
+    this.globalSearchDebounceTimer = setTimeout(() => {
+      this.globalSearchDebounceTimer = null;
+      this.submittedQuery.set(safeQuery);
+      this.waiting.set(false);
+      this.loading.set(true);
+      this.runSearch(safeQuery, requestId);
+    }, 300);
   }
 
   searchGlobal(query: string): void {
     const safeQuery = String(query || '').trim();
     this.query.set(query ?? '');
-    this.submittedQuery.set(safeQuery);
-
-    if (this.globalSearchDebounceTimer) {
-      clearTimeout(this.globalSearchDebounceTimer);
-      this.globalSearchDebounceTimer = null;
-    }
+    this.error.set(null);
+    this.results.set([]);
+    this.globalSearchRequestId++;
+    const requestId = this.globalSearchRequestId;
+    this.cancelPendingSearch();
 
     if (!safeQuery) {
       this.submittedQuery.set('');
+      this.waiting.set(false);
       this.loading.set(false);
-      this.results.set([]);
+      return;
+    }
+    if (!this.canSearchQuery(safeQuery)) {
+      this.submittedQuery.set('');
+      this.waiting.set(false);
+      this.loading.set(false);
       return;
     }
 
-    const requestId = ++this.globalSearchRequestId;
-    const shouldQuery = this.canSearchQuery(safeQuery);
-    this.loading.set(shouldQuery);
+    this.submittedQuery.set(safeQuery);
+    this.waiting.set(false);
+    this.loading.set(true);
+    this.runSearch(safeQuery, requestId);
+  }
 
-    if (!shouldQuery) {
-      this.results.set([]);
-      return;
-    }
-
-    this.globalSearchDebounceTimer = setTimeout(() => {
-      const params = new HttpParams().set('q', safeQuery);
-      const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
-      this.http.get<GlobalSearchResponse>(`${this.apiUrl}/search/global`, { params, context }).subscribe({
-        next: (response) => {
-          if (requestId !== this.globalSearchRequestId) return;
-          const rawResults = Array.isArray(response?.results) ? response.results : [];
-          const results = rawResults.filter((item) => this.canShowByFrontendPermission(item.permission))
-            .map((item) => ({
-              ...item,
-              actions: (item.actions || []).filter((action) => this.canShowByFrontendPermission(action.permission)),
-            }));
-          this.results.set(results);
-          this.loading.set(false);
-        },
-        error: () => {
-          if (requestId !== this.globalSearchRequestId) return;
-          this.results.set([]);
-          this.loading.set(false);
-          this.alerts.warningToast('Búsqueda no disponible', 'No fue posible consultar el buscador global.');
-        },
-      });
-    }, 300);
+  private runSearch(safeQuery: string, requestId: number): void {
+    const params = new HttpParams().set('q', safeQuery);
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
+    this.globalSearchSubscription = this.http.get<GlobalSearchResponse>(`${this.apiUrl}/search/global`, { params, context }).subscribe({
+      next: (response) => {
+        if (requestId !== this.globalSearchRequestId) return;
+        const rawResults = Array.isArray(response?.results) ? response.results : [];
+        const results = rawResults.filter((item) => this.canShowByFrontendPermission(item.permission))
+          .map((item) => ({
+            ...item,
+            actions: (item.actions || []).filter((action) => this.canShowByFrontendPermission(action.permission)),
+          }));
+        this.results.set(results);
+        this.error.set(null);
+        this.waiting.set(false);
+        this.loading.set(false);
+        this.globalSearchSubscription = null;
+      },
+      error: () => {
+        if (requestId !== this.globalSearchRequestId) return;
+        this.results.set([]);
+        this.waiting.set(false);
+        this.loading.set(false);
+        this.error.set('Comprueba la conexión e inténtalo de nuevo.');
+        this.globalSearchSubscription = null;
+        this.alerts.warningToast('Búsqueda no disponible', 'No fue posible consultar el buscador global.');
+      },
+    });
   }
 
   private getPrimaryAction(result: GlobalSearchResult): GlobalSearchAction | null {

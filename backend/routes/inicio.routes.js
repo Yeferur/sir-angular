@@ -8,13 +8,13 @@ const { checkAnyPermission } = require('../middlewares/permissionsMiddleware');
 router.get(
   '/tours-data',
   authMiddleware,
-  checkAnyPermission(['AFOROS.LEER', 'INICIO.LEER']),
+  checkAnyPermission(['AFOROS.LEER']),
   inicioCtrl.getInicioData,
 );
 router.post(
   '/guardar-aforo',
   authMiddleware,
-  checkAnyPermission(['AFOROS.ACTUALIZAR', 'INICIO.ACTUALIZAR_AFORO']),
+  checkAnyPermission(['AFOROS.ACTUALIZAR']),
   inicioCtrl.guardarAforo,
 );
 

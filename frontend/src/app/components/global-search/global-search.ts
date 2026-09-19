@@ -32,7 +32,9 @@ export class GlobalSearchComponent implements AfterViewInit {
   query    = this.search.query;
   submittedQuery = this.search.submittedQuery;
   results  = this.search.results;
+  waiting  = this.search.waiting;
   loading  = this.search.loading;
+  error    = this.search.error;
   isClosing = signal(false);
   inputFocused = signal(false);
 
@@ -72,15 +74,17 @@ export class GlobalSearchComponent implements AfterViewInit {
   );
   showInitialState = computed(() => !this.hasQuery() && !this.loading());
   showWelcome   = computed(() => this.showInitialState() && !this.isClosing());
-  showAwaitingSubmit = computed(() =>
-    this.hasQuery() && !this.loading() && !this.isCurrentQuerySubmitted()
+  showLoading = computed(() => this.hasQuery() && this.loading());
+  showQueryHint = computed(() =>
+    this.hasQuery() && !this.waiting() && !this.loading() && !this.error() && !this.isCurrentQuerySubmitted()
   );
   showResults = computed(() =>
     this.isCurrentQuerySubmitted() && this.flatResults().length > 0
   );
-  showNoResults    = computed(() =>
-    this.isCurrentQuerySubmitted() && !this.loading() && this.flatResults().length === 0
+  showNoResults = computed(() =>
+    this.isCurrentQuerySubmitted() && !this.loading() && !this.error() && this.flatResults().length === 0
   );
+  showError = computed(() => this.hasQuery() && !this.loading() && !!this.error());
 
   constructor() {
     effect(() => {
@@ -105,7 +109,11 @@ export class GlobalSearchComponent implements AfterViewInit {
 
   onEnterSearch(): void {
     const q = this.query().trim();
-    if (!q || this.loading()) return;
+    if (!q) return;
+    if (this.isCurrentQuerySubmitted() && !this.loading() && this.flatResults().length > 0) {
+      this.execute(this.flatResults()[this.selectedIndex()] || this.flatResults()[0]);
+      return;
+    }
     this.search.searchGlobal(q);
   }
 

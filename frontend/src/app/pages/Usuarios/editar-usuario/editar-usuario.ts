@@ -50,6 +50,12 @@ const PERMISSION_ACTION_ORDER: Record<string, number> = {
   ELIMINAR: 90
 };
 
+const CLIENT_PERMISSION_CODES = new Set([
+  'RESERVAS.LEER',
+  'RESERVAS.CREAR',
+  'RESERVAS.ACTUALIZAR',
+]);
+
 function permissionOrderToken(value: unknown): string {
   return String(value || '')
     .normalize('NFD')
@@ -322,6 +328,12 @@ export class EditarUsuarioComponent implements OnInit, OnDestroy {
     return this.buildPermissionModules(
       this.permisos.filter((permission) => this.isSelected(permission.Id_Permiso))
     );
+  }
+
+  get clientPermissions(): PermisoCompleto[] {
+    return this.permisos
+      .filter((permission) => CLIENT_PERMISSION_CODES.has(String(permission.Codigo_Permiso || '')))
+      .sort((left, right) => String(left.Codigo_Permiso || '').localeCompare(String(right.Codigo_Permiso || '')));
   }
 
   get selectedAdditionalPermissions(): PermisoCompleto[] {
