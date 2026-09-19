@@ -46,21 +46,7 @@
 
 .gs-shell.is-integrated { animation: none; }
 
-/* Light mode */
-@media (prefers-color-scheme: light) {
-  .gs-shell {
-    --gs-bg: rgba(242, 242, 247, 0.98);
-    --gs-surface: rgba(255,255,255,0.95);
-    --gs-surface-2: rgba(235,235,240,0.8);
-    --gs-glass: rgba(0,0,0,0.02);
-    --gs-text: rgba(0,0,0,0.88);
-    --gs-text-2: rgba(0,0,0,0.55);
-    --gs-text-3: rgba(0,0,0,0.36);
-    --gs-sep: rgba(0,0,0,0.07);
-    --gs-border: rgba(0,0,0,0.10);
-    --gs-blue-glow: rgba(10,132,255,0.15);
-  }
-}
+/* El tema explícito de SIR tiene prioridad sobre la preferencia del sistema. */
 :host-context([data-theme="light"]) .gs-shell,
 :host-context(.light) .gs-shell {
   --gs-bg: rgba(242,242,247,0.98);
@@ -81,14 +67,14 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
   border-radius: inherit;
   background: var(--gs-bg);
   color: var(--gs-text);
-  animation: gsEnter 280ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: gsEnter 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes gsEnter {
@@ -101,7 +87,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 14px;
+  padding: 12px 16px 10px;
   border-bottom: 1px solid var(--gs-sep);
   flex-shrink: 0;
 }
@@ -184,11 +170,11 @@
 
 /* ── BODY (scroll) ── */
 .gs-body {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 20px;
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -285,11 +271,11 @@
 }
 
 .gs-search-empty {
-  margin: auto;
+  margin: 0;
   display: grid;
   justify-items: center;
   gap: 7px;
-  padding: 28px;
+  padding: 20px 12px;
   color: var(--gs-text-2);
   text-align: center;
 }
@@ -314,13 +300,13 @@
 
 /* ── WELCOME STATE ── */
 .gs-welcome {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 32px 8px 24px;
+  padding: 20px 8px 18px;
   gap: 0;
   animation: fadeUp 300ms cubic-bezier(0.32,0.72,0,1) both;
 }
@@ -340,7 +326,7 @@
   border: 1px solid rgba(var(--gs-blue-r),var(--gs-blue-g),var(--gs-blue-b),0.28);
   color: var(--gs-blue);
   font-size: 1.1rem;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .gs-welcome-title {
@@ -352,7 +338,8 @@
 }
 
 .gs-welcome-sub {
-  margin: 0 0 22px;
+  margin: 0 0 16px;
+  max-width: 520px;
   font-size: 0.82rem;
   color: var(--gs-text-2);
   line-height: 1.55;
@@ -507,8 +494,8 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 600px) {
-  .gs-header { padding: 14px 14px 12px; }
-  .gs-body   { padding: 12px 14px; }
+  .gs-header { padding: 11px 14px 9px; }
+  .gs-body   { padding: 10px 14px 12px; }
   .gs-footer { padding: 10px 12px 14px; }
   .gs-result-badge { display: none; }
   .gs-result-item { align-items: flex-start; flex-direction: column; }

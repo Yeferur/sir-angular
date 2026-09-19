@@ -12,7 +12,8 @@
       [class.is-fullscreen]="transitionStage() === 'fullscreen'"
       [class.is-collapsing]="transitionPhase() === 'collapsing'"
       [class.show-chrome-handoff]="chromeHandoffVisible()"
-      [class.is-searching]="searchModeActive() && showAppChrome()">
+      [class.is-searching]="searchModeActive() && showAppChrome()"
+      [class.is-search-restoring]="searchRestoreActive() && showAppChrome()">
       @if (showAppChrome() || transitionPhase() === 'collapsing' || transitionPhase() === 'expanding') {
       <div class="topbar-island-content" #topbarContent>
 
@@ -28,6 +29,7 @@
         title="Navegación"
         [attr.aria-expanded]="navigationLauncherOpen()"
         aria-controls="navigation-launcher"
+        aria-haspopup="dialog"
       >
         <i class="bx bx-grid-alt" aria-hidden="true"></i>
         <span>Menú</span>
@@ -98,7 +100,8 @@
           aria-label="Abrir acciones de creación"
           title="Crear"
           [attr.aria-expanded]="createMenuOpen()"
-          aria-controls="topbar-create-menu">
+          aria-controls="topbar-create-menu"
+          aria-haspopup="menu">
           <i class="bx bx-plus" aria-hidden="true"></i>
           <span>Crear</span>
         </button>
@@ -158,10 +161,15 @@
 
         <div class="topbar-profile">
           <button
+            #profileTrigger
+            type="button"
+            data-profile-trigger
             class="topbar-avatar-btn"
             (click)="toggleProfileMenu()"
             [class.active]="profileMenuOpen()"
             aria-label="Menú de perfil"
+            aria-haspopup="menu"
+            aria-controls="topbar-profile-menu"
             [attr.aria-expanded]="profileMenuOpen()"
           >
             @if (avatarUrl()) {
@@ -171,63 +179,7 @@
             }
           </button>
 
-          @if (profileMenuOpen()) {
-            <div class="profile-dropdown" animate.enter="panel-enter" animate.leave="panel-leave" role="menu">
-              <div class="profile-dropdown-header">
-                <div class="pdd-name">{{ user()?.name }} {{ user()?.apellidos }}</div>
-                <div class="pdd-email">{{ user()?.email }}</div>
-              </div>
-              <div class="profile-dropdown-sep"></div>
 
-              <!-- Solo en mobile: acciones que en desktop viven en el topbar -->
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" data-global-search-trigger (click)="openGlobalSearch(); closeProfileMenu()">
-                <i class="bx bx-search" aria-hidden="true"></i>
-                Buscar
-              </button>
-              @if (tienePermiso('NOTIFICACIONES.LEER')) {
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openNotifications(); closeProfileMenu()">
-                <i class="bx bx-bell" aria-hidden="true"></i>
-                Notificaciones @if (notifications.noLeidas()) { ({{ notifications.noLeidas() }}) }
-              </button>
-              }
-              @if (!isClientUser()) {
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
-                <i class="bx bx-history" aria-hidden="true"></i>
-                Novedades
-              </button>
-              }
-              <button class="profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme($event); closeProfileMenu()">
-                <i class="bx" [class.bx-sun]="!isDarkMode" [class.bx-moon]="isDarkMode" aria-hidden="true"></i>
-                {{ isDarkMode ? 'Tema claro' : 'Tema oscuro' }}
-              </button>
-              <div class="profile-dropdown-sep profile-dropdown-sep--mobile-only"></div>
-
-              <button class="profile-dropdown-item" role="menuitem" (click)="navigateToProfile()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                Editar perfil
-              </button>
-              <button class="profile-dropdown-item" role="menuitem" (click)="navigateToHelp()">
-                <i class="bx bx-help-circle" aria-hidden="true"></i>
-                Ayuda y soporte
-              </button>
-              <div class="profile-dropdown-sep"></div>
-              <button class="profile-dropdown-item danger" role="menuitem" (click)="handleLogout()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                Salir
-              </button>
-            </div>
-          }
         </div>
 
       </div><!-- /topbar-right -->
@@ -280,7 +232,7 @@
     <!-- Panel expandido — búsqueda global -->
     @if (topbarState() === 'global-search') {
       <div class="topbar-expanded topbar-expanded--search" animate.enter="panel-enter" animate.leave="panel-leave" role="dialog"
-           aria-modal="true" aria-label="Buscador global">
+           aria-modal="true" aria-labelledby="global-search-title">
         <app-global-search [integrated]="true" (closeRequested)="closeGlobalSearch()"></app-global-search>
       </div>
     }
@@ -294,14 +246,15 @@
     @if (showAppChrome()) {
       <div
         class="topbar-overlay"
-        [class.is-open]="navigationLauncherOpen() || createMenuOpen()"
-        (click)="closeTopbarMenus()"
+        [class.is-open]="navigationLauncherOpen()"
+        (click)="closeNavigationLauncher(true)"
         aria-hidden="true"></div>
 
       <section
         #navigationLauncher
         id="navigation-launcher"
         class="navigation-launcher"
+        [style.--navigation-panel-width.px]="getNavigationPanelWidth()"
         [class.is-open]="navigationLauncherOpen()"
         [attr.aria-hidden]="!navigationLauncherOpen()"
         [inert]="!navigationLauncherOpen()"
@@ -309,7 +262,7 @@
         (keydown)="trapPanelFocus($event, navigationLauncher)"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="navigation-launcher-title">
+        aria-label="Navegación principal">
 
         <div class="navigation-launcher-grid">
           @if (getVisibleMenuItemsByGroup('principal').length) {
@@ -319,6 +272,7 @@
               @if (item.route) {
               <a class="launcher-card"
                  [class.active]="isRouteActive(item.route, item.exact ?? false)"
+                 [attr.aria-current]="isRouteActive(item.route, item.exact ?? false) ? 'page' : null"
                  [routerLink]="item.route"
                  (click)="navigateFromTopbar()">
                 <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
@@ -336,8 +290,10 @@
           }
 
           @if (getVisibleMenuItemsByGroup('operacion').length) {
-          <section class="launcher-column launcher-column--operation">
+          <section class="launcher-column launcher-column--operation"
+                   [class.launcher-column--wide]="getVisibleMenuItemsByGroup('operacion').length > 1">
             <h3>Operación</h3>
+            <div class="launcher-operation-grid">
             @for (item of getVisibleMenuItemsByGroup('operacion'); track item.key) {
               <div class="launcher-subgroup" [class.has-active-child]="isSubmenuActive(item)">
                 <h4>{{ item.label }}</h4>
@@ -346,6 +302,7 @@
                   <a class="launcher-subitem"
                      [class.action]="child.kind === 'action'"
                      [class.active]="isRouteActive(child.route, child.exact ?? false)"
+                     [attr.aria-current]="isRouteActive(child.route, child.exact ?? false) ? 'page' : null"
                      [routerLink]="child.route"
                      (click)="navigateFromTopbar()">
                     <i [class]="child.icon" aria-hidden="true"></i>
@@ -356,6 +313,7 @@
                 }
               </div>
             }
+            </div>
           </section>
           }
 
@@ -366,6 +324,7 @@
               @if (item.route) {
               <a class="launcher-card"
                  [class.active]="isRouteActive(item.route, item.exact ?? false)"
+                 [attr.aria-current]="isRouteActive(item.route, item.exact ?? false) ? 'page' : null"
                  [routerLink]="item.route"
                  (click)="navigateFromTopbar()">
                 <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
@@ -390,6 +349,7 @@
                   <a class="launcher-subitem"
                      [class.action]="child.kind === 'action'"
                      [class.active]="isRouteActive(child.route, child.exact ?? false)"
+                     [attr.aria-current]="isRouteActive(child.route, child.exact ?? false) ? 'page' : null"
                      [routerLink]="child.route"
                      (click)="navigateFromTopbar()">
                     <i [class]="child.icon" aria-hidden="true"></i>
@@ -404,31 +364,92 @@
         </div>
       </section>
 
+      <div #profileMenu id="topbar-profile-menu" class="profile-dropdown small-dropdown"
+           [class.is-open]="profileMenuOpen()"
+           [style.left.px]="profileMenuPosition().left"
+           [style.top.px]="profileMenuPosition().top"
+           [attr.aria-hidden]="!profileMenuOpen()"
+           [inert]="!profileMenuOpen()"
+           (click)="$event.stopPropagation()"
+           (keydown)="handleSmallMenuKeydown($event, profileMenu, 'profile')"
+           role="menu" aria-label="Menú de perfil">
+        <div class="profile-dropdown-header">
+          <div class="pdd-name">{{ user()?.name }} {{ user()?.apellidos }}</div>
+          <div class="pdd-email">{{ user()?.email }}</div>
+        </div>
+        <div class="profile-dropdown-sep"></div>
+
+        <!-- Solo en mobile: acciones que en desktop viven en el topbar -->
+        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" data-global-search-trigger (click)="openGlobalSearch(); closeProfileMenu()">
+          <i class="bx bx-search" aria-hidden="true"></i>
+          Buscar
+        </button>
+        @if (tienePermiso('NOTIFICACIONES.LEER')) {
+        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openNotifications(); closeProfileMenu()">
+          <i class="bx bx-bell" aria-hidden="true"></i>
+          Notificaciones @if (notifications.noLeidas()) { ({{ notifications.noLeidas() }}) }
+        </button>
+        }
+        @if (!isClientUser()) {
+        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
+          <i class="bx bx-history" aria-hidden="true"></i>
+          Novedades
+        </button>
+        }
+        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme($event); closeProfileMenu(true)">
+          <i class="bx" [class.bx-sun]="isDarkMode" [class.bx-moon]="!isDarkMode" aria-hidden="true"></i>
+          {{ isDarkMode ? 'Tema claro' : 'Tema oscuro' }}
+        </button>
+        <div class="profile-dropdown-sep profile-dropdown-sep--mobile-only"></div>
+
+        <button class="small-dropdown-item profile-dropdown-item" role="menuitem" (click)="navigateToProfile()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          Editar perfil
+        </button>
+        <button class="small-dropdown-item profile-dropdown-item" role="menuitem" (click)="navigateToHelp()">
+          <i class="bx bx-help-circle" aria-hidden="true"></i>
+          Ayuda y soporte
+        </button>
+        <div class="profile-dropdown-sep"></div>
+        <button class="small-dropdown-item profile-dropdown-item danger" role="menuitem" (click)="handleLogout()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Salir
+        </button>
+      </div>
+
       <section
         #createMenu
         id="topbar-create-menu"
-        class="topbar-create-menu"
+        class="topbar-create-menu small-dropdown"
+        [style.left.px]="createMenuPosition().left"
+        [style.top.px]="createMenuPosition().top"
         [class.is-open]="createMenuOpen()"
         [attr.aria-hidden]="!createMenuOpen()"
         [inert]="!createMenuOpen()"
         (click)="$event.stopPropagation()"
-        (keydown)="trapPanelFocus($event, createMenu)"
-        role="dialog"
-        aria-modal="true"
+        (keydown)="handleSmallMenuKeydown($event, createMenu, 'create')"
+        role="menu"
         aria-labelledby="create-menu-title">
         <header class="create-menu-header">
           <h2 id="create-menu-title">Crear</h2>
-          <button type="button" class="launcher-close" (click)="closeCreateMenu(true)" aria-label="Cerrar acciones de creación">
-            <i class="bx bx-x" aria-hidden="true"></i>
-          </button>
         </header>
         <div class="create-menu-list">
           @for (action of getCreateActions(); track action.key) {
             @if (action.route) {
-            <a [routerLink]="action.route" (click)="navigateFromTopbar()">
-              <span class="create-menu-icon"><i [class]="action.icon" aria-hidden="true"></i></span>
+            <a class="small-dropdown-item" role="menuitem" [routerLink]="action.route" (click)="navigateFromTopbar()">
+              <i [class]="action.icon" aria-hidden="true"></i>
               <span>{{ action.label }}</span>
-              <i class="bx bx-chevron-right create-menu-arrow" aria-hidden="true"></i>
             </a>
             }
           }

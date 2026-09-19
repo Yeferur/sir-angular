@@ -12,6 +12,8 @@ import {
     ViewChild,
     effect,
     untracked,
+    afterNextRender,
+    Injector,
 } from '@angular/core';
 import {
     Router,
@@ -92,13 +94,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     readonly notifications = inject(NotificacionesService);
     readonly pendingCenter = inject(PendientesService);
     private webSocket = inject(WebSocketService);
+    private injector = inject(Injector);
 
     // ── Señales del servicio global ──────────────────────────────
     globalSearchOpen = this.search.open;
     searchQuery = this.search.query;
     searchLoading = this.search.loading;
     searchClosing = signal(false);
-    readonly searchModeActive = computed(() => this.globalSearchOpen() || this.searchClosing());
+    searchControlsRestoring = signal(false);
+    readonly searchModeActive = computed(() =>
+        this.globalSearchOpen() || (this.searchClosing() && !this.searchControlsRestoring())
+    );
+    readonly searchRestoreActive = computed(() => this.searchClosing() && this.searchControlsRestoring());
 
     // ── Estado local ─────────────────────────────────────────────
     user = signal<any>(null);
@@ -107,6 +114,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     profileMenuOpen = signal(false);
     navigationLauncherOpen = signal(false);
     createMenuOpen = signal(false);
+    createMenuPosition = signal({ left: 10, top: 76 });
+    profileMenuPosition = signal({ left: 10, top: 76 });
     pageTitle = signal<string>('');
     titleLeaving = signal(false);
     titleEntering = signal(false);
@@ -156,8 +165,12 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     @ViewChild('topbarSearchInput') private topbarSearchInput?: ElementRef<HTMLInputElement>;
     @ViewChild('navigationTrigger') private navigationTrigger?: ElementRef<HTMLButtonElement>;
     @ViewChild('createTrigger') private createTrigger?: ElementRef<HTMLButtonElement>;
+    @ViewChild('profileTrigger') private profileTrigger?: ElementRef<HTMLButtonElement>;
     @ViewChild('navigationLauncher') private navigationLauncher?: ElementRef<HTMLElement>;
     @ViewChild('createMenu') private createMenu?: ElementRef<HTMLElement>;
+    @ViewChild('profileMenu') private profileMenu?: ElementRef<HTMLElement>;
+
+    private topbarResizeObserver?: ResizeObserver;
 
     private themeObserver?: MutationObserver;
     private routerSub?: Subscription;
@@ -166,6 +179,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private idleTopbarWidth: number | null = null;
     private searchWasOpen = false;
     private searchRestoreTimer?: number;
+    private searchTransitionCleanup?: () => void;
+    private searchTransitionRun = 0;
     private finishRouteActivity?: () => void;
     private titleMotionTimer?: number;
     private notificationEventSub?: Subscription;
@@ -348,6 +363,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.routerSub = this.router.events.subscribe(event => {
             if (event instanceof NavigationStart) {
                 this.closeTopbarMenus();
+                this.closeProfileMenu();
                 // Navegaciones que solo actualizan query params (ej. el filtro
                 // de fecha en Aforos) mantienen la misma ruta y el mismo
                 // título — no deben disparar la animación de salida del
@@ -409,6 +425,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     ngAfterViewInit(): void {
         this.syncTopbarWidth();
+        this.topbarResizeObserver = new ResizeObserver(() => this.positionSmallMenu());
+        if (this.topbarBar) this.topbarResizeObserver.observe(this.topbarBar.nativeElement);
 
         // Reintento tras cargar fuentes (Boxicons). La primera medición
         // de scrollWidth puede ocurrir antes de que la fuente de íconos
@@ -421,12 +439,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     ngOnDestroy(): void {
+        this.topbarResizeObserver?.disconnect();
         this.themeObserver?.disconnect();
         this.routerSub?.unsubscribe();
         this.authNotificationSub?.unsubscribe();
         this.notificationEventSub?.unsubscribe();
         if (this.sessionBeatTimer) window.clearTimeout(this.sessionBeatTimer);
         if (this.searchRestoreTimer) window.clearTimeout(this.searchRestoreTimer);
+        this.searchTransitionCleanup?.();
         this.transitionRun++;
         this.finishRouteActivity?.();
         if (this.titleMotionTimer) window.clearTimeout(this.titleMotionTimer);
@@ -529,14 +549,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     toggleProfileMenu(): void {
+        const shouldOpen = !this.profileMenuOpen();
         this.closeNavigationLauncher();
         this.closeCreateMenu();
         this.closeGlobalSearch();
-        this.profileMenuOpen.update(v => !v);
+        this.profileMenuOpen.set(shouldOpen);
+        if (shouldOpen) this.focusFirstInteractive('profile');
     }
 
-    closeProfileMenu(): void {
+    closeProfileMenu(restoreFocus = false): void {
+        if (!this.profileMenuOpen()) return;
         this.profileMenuOpen.set(false);
+        if (restoreFocus) this.profileTrigger?.nativeElement.focus();
     }
 
     onBrandClick(): void {
@@ -784,9 +808,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // ── Búsqueda global ──
     openGlobalSearch(): void {
+        this.searchTransitionRun++;
+        this.searchTransitionCleanup?.();
+        this.searchTransitionCleanup = undefined;
         this.closeProfileMenu();
         this.closeTopbarMenus();
         this.searchClosing.set(false);
+        this.searchControlsRestoring.set(false);
 
         if (!this.globalSearchOpen()) {
             const bar = this.topbarBar?.nativeElement;
@@ -802,6 +830,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     closeGlobalSearch(): void {
         if (!this.globalSearchOpen() || this.searchClosing()) return;
 
+        const transitionRun = ++this.searchTransitionRun;
+        this.searchTransitionCleanup?.();
+        this.searchTransitionCleanup = undefined;
+
         const bar = this.topbarBar?.nativeElement;
         const fromWidth = bar?.getBoundingClientRect().width ?? this.topbarWidth() ?? 0;
         const targetWidth = this.idleTopbarWidth != null
@@ -812,13 +844,26 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         // el modo de búsqueda mientras la isla recupera su ancho. Así los
         // iconos normales nunca aparecen fuera de una barra todavía compacta.
         this.searchClosing.set(true);
+        this.searchControlsRestoring.set(false);
         if (targetWidth > 0) this.topbarWidth.set(targetWidth);
         this.search.closeSearch();
 
+        // Montar el chrome normal en el siguiente frame permite que la isla
+        // empiece a recuperar su ancho con ambos estados presentes. La clase
+        // de restauración mantiene el contenido estable mientras entra.
+        requestAnimationFrame(() => {
+            if (transitionRun === this.searchTransitionRun && this.searchClosing()) {
+                this.searchControlsRestoring.set(true);
+            }
+        });
+
         const finish = () => {
+            if (transitionRun !== this.searchTransitionRun) return;
             this.searchClosing.set(false);
+            this.searchControlsRestoring.set(false);
             this.searchWasOpen = false;
             this.idleTopbarWidth = null;
+            this.searchTransitionCleanup = undefined;
             queueMicrotask(() => this.syncTopbarWidth());
         };
 
@@ -840,6 +885,12 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         };
         const fallback = window.setTimeout(done, 430);
         bar.addEventListener('transitionend', onEnd);
+        this.searchTransitionCleanup = () => {
+            bar.removeEventListener('transitionend', onEnd);
+            window.clearTimeout(fallback);
+            completed = true;
+            this.searchTransitionCleanup = undefined;
+        };
     }
     onTopbarSearchInput(event: Event): void {
         this.search.updateQuery((event.target as HTMLInputElement).value);
@@ -852,8 +903,16 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
     // ── Novedades ────────────────────────────────────────────────
-    openAppUpdates(): void { this.drawer.openAppUpdates(); }
-    openNotifications(): void { this.drawer.openNotifications(); }
+    openAppUpdates(): void {
+        this.closeTopbarMenus();
+        this.closeProfileMenu();
+        this.drawer.openAppUpdates();
+    }
+    openNotifications(): void {
+        this.closeTopbarMenus();
+        this.closeProfileMenu();
+        this.drawer.openNotifications();
+    }
 
     isClientUser(): boolean {
         return this.permisosService.esCliente();
@@ -899,14 +958,17 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 event.preventDefault();
                 this.closeGlobalSearch();
             }
-            if (this.profileMenuOpen()) this.closeProfileMenu();
+            if (this.profileMenuOpen()) {
+                event.preventDefault();
+                this.closeProfileMenu(true);
+            }
         }
     }
 
     @HostListener('document:click', ['$event'])
     handleDocumentClick(event: MouseEvent): void {
         const target = event.target as HTMLElement | null;
-        if (this.profileMenuOpen() && !target?.closest('.topbar-profile')) {
+        if (this.profileMenuOpen() && !target?.closest('.profile-dropdown, [data-profile-trigger]')) {
             this.closeProfileMenu();
         }
         if (
@@ -936,6 +998,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     @HostListener('window:resize')
     handleWindowResize(): void {
         this.syncTopbarWidth();
+        this.positionSmallMenu();
     }
 
 
@@ -1072,14 +1135,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     exact: true,
                     clientVisible: true,
                 },
-                {
-                    key: 'reservas-control',
-                    label: 'Control de Viaje',
-                    icon: 'bx bx-check-shield',
-                    route: '/Reservas/Confirmacion',
-                    permission: 'CONTROL_VIAJE.LEER',
-                    exact: true,
-                },
             ],
         },
         {
@@ -1167,6 +1222,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             exact: false,
         },
         {
+            key: 'control-viaje',
+            label: 'Control de Viaje',
+            icon: 'bx bx-check-shield',
+            group: 'gestion',
+            route: '/Reservas/Confirmacion',
+            permission: 'CONTROL_VIAJE.LEER',
+            exact: true,
+        },
+        {
             key: 'seguros',
             label: 'Seguros',
             icon: 'bx bx-shield',
@@ -1240,6 +1304,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return this.getVisibleMenuItems().filter(item => item.group === group);
     }
 
+    getNavigationPanelWidth(): number {
+        const items = this.getVisibleMenuItems();
+        const groups = new Set(items.map(item => item.group)).size;
+        const operationColumns = items.filter(item => item.group === 'operacion').length > 1 ? 2 : 1;
+        // Las categorías ocultas por permisos no reservan ancho en el panel.
+        return Math.min(1140, groups * 220 + (operationColumns - 1) * 220 + Math.max(0, groups - 1) * 16 + 32);
+    }
+
     getCreateActions(): SidebarItem[] {
         return this.getVisibleMenuItems().flatMap(item =>
             this.getVisibleChildren(item).filter(child => child.kind === 'action' && !!child.route)
@@ -1311,7 +1383,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.closeProfileMenu();
         this.closeGlobalSearch();
         this.navigationLauncherOpen.set(shouldOpen);
-        if (shouldOpen) this.focusFirstInteractive(this.navigationLauncher);
+        if (shouldOpen) this.focusFirstInteractive('navigation');
     }
 
     closeNavigationLauncher(restoreFocus = false): void {
@@ -1328,13 +1400,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.closeProfileMenu();
         this.closeGlobalSearch();
         this.createMenuOpen.set(shouldOpen);
-        if (shouldOpen) this.focusFirstInteractive(this.createMenu);
+        if (shouldOpen) this.focusFirstInteractive('create');
     }
 
     closeCreateMenu(restoreFocus = false): void {
         if (!this.createMenuOpen()) return;
         this.createMenuOpen.set(false);
-        if (restoreFocus) queueMicrotask(() => this.createTrigger?.nativeElement.focus());
+        if (restoreFocus) this.createTrigger?.nativeElement.focus();
     }
 
     closeTopbarMenus(): void {
@@ -1365,12 +1437,56 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         }
     }
 
-    private focusFirstInteractive(container?: ElementRef<HTMLElement>): void {
-        window.setTimeout(() => {
-            container?.nativeElement
-                .querySelector<HTMLElement>('a:not([tabindex="-1"]), button:not([disabled])')
-                ?.focus();
-        }, 40);
+    handleSmallMenuKeydown(event: KeyboardEvent, container: HTMLElement, menu: 'create' | 'profile'): void {
+        if (event.key === 'Tab' || event.key === 'Escape') {
+            if (menu === 'create') this.closeCreateMenu(true);
+            else this.closeProfileMenu(true);
+            if (event.key === 'Escape') event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        const items = this.getMenuItems(container);
+        if (!items.length) return;
+        event.preventDefault();
+        const index = items.indexOf(document.activeElement as HTMLElement);
+        const next = event.key === 'Home' ? 0
+            : event.key === 'End' ? items.length - 1
+            : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items[next].focus();
+    }
+
+    private getMenuItems(container: HTMLElement): HTMLElement[] {
+        return Array.from(container.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'))
+            .filter(element => element.offsetParent !== null);
+    }
+
+    private positionSmallMenu(): void {
+        const trigger = this.createMenuOpen() ? this.createTrigger : this.profileMenuOpen() ? this.profileTrigger : null;
+        const menu = this.createMenuOpen() ? this.createMenu : this.profileMenu;
+        if (!trigger || !menu) return;
+        const rect = trigger.nativeElement.getBoundingClientRect();
+        const bar = this.topbarBar?.nativeElement.getBoundingClientRect();
+        // offsetWidth no incluye el scale de la animación de apertura/cierre.
+        const width = menu.nativeElement.offsetWidth;
+        const position = this.createMenuOpen() ? this.createMenuPosition : this.profileMenuPosition;
+        position.set({
+            left: Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10)),
+            top: (bar?.bottom ?? rect.bottom) + 10,
+        });
+    }
+
+    private focusFirstInteractive(menu: 'navigation' | 'create' | 'profile'): void {
+        afterNextRender(() => {
+            const open = menu === 'navigation' ? this.navigationLauncherOpen()
+                : menu === 'create' ? this.createMenuOpen() : this.profileMenuOpen();
+            if (!open) return;
+            this.positionSmallMenu();
+            const container = menu === 'navigation' ? this.navigationLauncher
+                : menu === 'create' ? this.createMenu : this.profileMenu;
+            if (container) this.getMenuItems(container.nativeElement)[0]?.focus();
+        }, { injector: this.injector });
     }
 
 }

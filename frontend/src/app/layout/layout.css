@@ -349,6 +349,19 @@
 
 .topbar-bar.is-searching .topbar-island-content { width: 100%; }
 
+/* Durante la contracción la chrome normal vuelve a montarse y aparece
+   mientras la isla recupera su ancho, evitando saltos bruscos de posición. */
+.topbar-bar.is-search-restoring { overflow: hidden; }
+.topbar-bar.is-search-restoring .topbar-island-content { width: max-content; }
+.topbar-bar.is-search-restoring .topbar-island-content > * {
+  animation: topbarChromeRestore 240ms var(--ease-panel) both;
+}
+
+@keyframes topbarChromeRestore {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .topbar-search-mode input {
   flex: 1;
   min-width: 0;
@@ -500,22 +513,36 @@
   user-select: none;
 }
 
-/* ─── Dropdown perfil ─── */
-.profile-dropdown {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  min-width: 220px;
+/* Crear y Perfil comparten superficie, filas y movimiento. */
+.small-dropdown {
+  position: fixed;
+  width: min(256px, calc(100vw - 20px));
+  max-height: calc(100dvh - 90px);
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
   background: var(--bg-secondary);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--separator-color);
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 16px);
   box-shadow: var(--sidebar-shadow, 0 12px 40px rgba(0, 0, 0, 0.45));
   padding: 6px;
-  z-index: 100;
-  pointer-events: all;
+  z-index: 92;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.985);
   transform-origin: top right;
+  transition: opacity 180ms ease, transform 220ms var(--ease-panel), visibility 0s linear 220ms;
+}
+
+.small-dropdown.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition-delay: 0s;
 }
 
 .panel-enter { animation: panelIn 220ms cubic-bezier(.2, .8, .2, 1) both; }
@@ -551,32 +578,55 @@
 
 .profile-dropdown-sep {
   height: 1px;
-  background: var(--separator-translucent, rgba(255, 255, 255, 0.08));
+  background: var(--separator-color);
   margin: 4px 0;
 }
 
-.profile-dropdown-item {
+.small-dropdown-item {
   width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  font-size: 0.875rem;
+  font: inherit;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   background: transparent;
   border: none;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.profile-dropdown-item i { font-size: 16px; color: var(--text-secondary); }
+.small-dropdown-item > i,
+.small-dropdown-item > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  font-size: 18px;
+  color: var(--text-secondary);
+}
 
-.profile-dropdown-item:hover { background: rgba(255, 255, 255, 0.07); }
+.small-dropdown-item:hover,
+.small-dropdown-item:focus-visible { background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.topbar-create-menu .small-dropdown-item > i { color: var(--accent-blue); }
 .profile-dropdown-item.danger { color: var(--accent-red, #ff453a); }
+.profile-dropdown-item.danger > svg { color: inherit; }
 .profile-dropdown-item.danger:hover { background: rgba(255, 69, 58, 0.1); }
+
+.small-dropdown-item:focus-visible,
+.launcher-card:focus-visible,
+.launcher-subitem:focus-visible,
+.topbar-control:focus-visible,
+.topbar-avatar-btn:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -2px;
+}
 
 /* Items que solo tienen sentido en mobile (buscar/novedades/tema) —
    en desktop ya viven como iconos en el topbar, así que se ocultan
@@ -631,8 +681,8 @@
 
   /* El panel crece con los resultados y solo toma altura de dialogo cuando
      realmente la necesita. Evita el gran bloque vacio con 1 o 2 coincidencias. */
-  min-height: 150px;
-  max-height: min(70vh, 640px);
+  min-height: 0;
+  max-height: min(70dvh, 640px);
   display: flex;
   flex-direction: column;
 }
@@ -670,8 +720,7 @@
   opacity: 1;
 }
 
-.navigation-launcher,
-.topbar-create-menu {
+.navigation-launcher {
   position: fixed;
   z-index: 92;
   pointer-events: none;
@@ -680,16 +729,15 @@
   background: var(--bg-secondary-translucent, rgba(28, 28, 30, .94));
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, .1));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .42);
+  border: 1px solid var(--separator-color);
+  box-shadow: var(--sidebar-shadow);
   transition:
     opacity 190ms ease,
     transform 260ms cubic-bezier(.16, 1, .3, 1),
     visibility 0s linear 260ms;
 }
 
-.navigation-launcher.is-open,
-.topbar-create-menu.is-open {
+.navigation-launcher.is-open {
   pointer-events: all;
   visibility: visible;
   opacity: 1;
@@ -699,10 +747,12 @@
 .navigation-launcher {
   top: 76px;
   left: 50%;
-  width: min(850px, calc(100vw - 30px));
-  max-height: min(74vh, 640px);
-  padding: 15px;
+  width: min(var(--navigation-panel-width, 1140px), calc(100vw - 30px));
+  max-height: min(74dvh, calc(100dvh - 90px));
+  box-sizing: border-box;
+  padding: 16px;
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: 20px;
   transform: translateX(-50%) translateY(-10px) scale(.975);
   transform-origin: top center;
@@ -760,31 +810,46 @@
 .launcher-close:active { transform: scale(.9); }
 
 .navigation-launcher-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   align-items: start;
-  gap: 14px;
+  gap: 20px 16px;
 }
 
 .launcher-column {
+  flex: 1 1 190px;
   min-width: 0;
 }
 
+.launcher-column--wide { flex: 2 1 400px; }
+.launcher-column--operation { container: operation / inline-size; }
+
+.launcher-operation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+@container operation (min-width: 400px) {
+  .launcher-operation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.launcher-operation-grid > .launcher-subgroup:only-child { grid-column: 1 / -1; }
+
 .launcher-column > h3 {
   margin: 0 5px 8px;
-  color: var(--text-tertiary);
-  font-size: .59rem;
-  font-weight: 850;
+  color: var(--text-secondary);
+  font-size: .6875rem;
+  font-weight: 700;
   line-height: 1.2;
   letter-spacing: .09em;
   text-transform: uppercase;
 }
 
 .launcher-card,
-.launcher-subitem,
-.create-menu-list a {
+.launcher-subitem {
   text-decoration: none;
-  outline: none;
 }
 
 .launcher-card {
@@ -810,8 +875,7 @@
   background: color-mix(in srgb, var(--accent-blue) 13%, transparent);
 }
 
-.launcher-card-icon,
-.create-menu-icon {
+.launcher-card-icon {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
@@ -829,12 +893,11 @@
   background: color-mix(in srgb, var(--accent-blue) 15%, var(--bg-tertiary));
 }
 
-.launcher-card-icon i,
-.create-menu-icon i { font-size: 1.05rem; }
+.launcher-card-icon i { font-size: 1.05rem; }
 
 .launcher-card-copy { min-width: 0; flex: 1; }
-.launcher-card-copy strong { display: block; overflow: hidden; color: inherit; font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }
-.launcher-card-copy small { display: block; overflow: hidden; margin-top: 3px; color: var(--text-tertiary); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.launcher-card-copy strong { display: block; color: inherit; font-size: .8125rem; line-height: 1.35; }
+.launcher-card-copy small { display: block; margin-top: 3px; color: var(--text-secondary); font-size: .6875rem; line-height: 1.4; }
 
 .launcher-count {
   min-width: 19px;
@@ -851,25 +914,27 @@
 
 .launcher-subgroup {
   padding: 8px;
-  border: 1px solid var(--separator-translucent);
+  border: 1px solid var(--separator-color);
   border-radius: 14px;
   background: color-mix(in srgb, var(--text-primary) 1.5%, transparent);
   transition: border-color 150ms ease, background 150ms ease;
 }
 
-.launcher-subgroup + .launcher-subgroup { margin-top: 8px; }
+.launcher-column > .launcher-subgroup + .launcher-subgroup { margin-top: 8px; }
 .launcher-subgroup.has-active-child { border-color: color-mix(in srgb, var(--accent-blue) 32%, var(--separator-color)); }
-.launcher-subgroup h4 { margin: 2px 5px 6px; color: var(--text-primary); font-size: .67rem; }
+.launcher-subgroup h4 { margin: 2px 5px 6px; color: var(--text-primary); font-size: .8125rem; line-height: 1.4; }
 
 .launcher-subitem {
-  min-height: 35px;
+  min-height: 44px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 5px 8px;
   border-radius: 9px;
   color: var(--text-secondary);
-  font-size: .67rem;
+  font-size: .8125rem;
+  line-height: 1.35;
   transition: color 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
@@ -882,53 +947,20 @@
 .launcher-arrow { margin-left: auto; font-size: .9rem; opacity: .72; }
 
 .topbar-create-menu {
-  top: 76px;
-  right: max(15px, calc((100vw - 850px) / 2));
-  width: 270px;
-  padding: 9px;
-  border-radius: 16px;
-  transform: translateY(-9px) scale(.97);
-  transform-origin: top right;
+  width: min(240px, calc(100vw - 20px));
 }
 
-.topbar-create-menu.is-open { transform: translateY(0) scale(1); }
-.create-menu-header { padding: 4px 5px 7px 9px; }
+.create-menu-header { padding: 10px 12px 8px; }
+.create-menu-header h2 { font-size: .875rem; font-weight: 600; }
 
 .create-menu-list {
   display: grid;
   gap: 2px;
 }
 
-.create-menu-list a {
-  min-height: 43px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 8px;
-  border-radius: 11px;
-  color: var(--text-secondary);
-  font-size: .76rem;
-  font-weight: 650;
-  transition: color 150ms ease, background 150ms ease, transform 150ms ease;
-}
-
-.create-menu-list a:hover,
-.create-menu-list a:focus-visible {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
-  transform: translateX(2px);
-}
-
-.create-menu-icon { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 14%, transparent); }
-.create-menu-arrow { margin-left: auto; color: var(--text-tertiary); font-size: 1rem; }
-
 /* ═══════════════════════════════════════════════
    RESPONSIVE — TOPBAR
 ═══════════════════════════════════════════════ */
-@media (max-width: 1120px) {
-  .navigation-launcher-grid { grid-template-columns: 1fr 1fr; }
-}
-
 @media (max-width: 900px) {
   .topbar-bar { min-height: 52px; }
   .topbar-page-title { font-size: 1.02rem; }
@@ -959,12 +991,14 @@
   .topbar-expanded--search {
     width: calc(100% - 48px);
     translate: 0;
+    max-height: calc(100dvh - 86px);
   }
 
   .navigation-launcher {
-    inset: 72px 10px 10px;
-    width: auto;
-    max-height: none;
+    top: 72px;
+    left: 10px;
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 82px);
     padding: 13px;
     border-radius: 18px;
     transform: translateY(-9px) scale(.985);
@@ -972,23 +1006,14 @@
   }
 
   .navigation-launcher.is-open { transform: translateY(0) scale(1); }
-  .navigation-launcher-grid { grid-template-columns: 1fr; gap: 18px; }
+  .navigation-launcher-grid { flex-direction: column; gap: 18px; }
+  .launcher-column { flex: none; width: 100%; }
   .navigation-launcher-header { position: sticky; top: -13px; z-index: 2; margin: -1px -1px 0; padding: 4px 4px 12px; background: color-mix(in srgb, var(--bg-secondary) 92%, transparent); backdrop-filter: blur(18px); }
   .navigation-launcher-header p { display: none; }
   .launcher-card { min-height: 50px; }
-  .launcher-subitem { min-height: 42px; font-size: .73rem; }
+  .launcher-subitem { min-height: 44px; }
 
-  .topbar-create-menu {
-    top: 72px;
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-height: calc(100vh - 82px);
-    overflow: auto;
-    transform-origin: top center;
-  }
-
-  .create-menu-list a { min-height: 48px; }
+  .small-dropdown { max-height: calc(100dvh - 82px); }
 
   .topbar-island-content { width: 100%; }
 
@@ -1073,7 +1098,7 @@
 
   .topbar-overlay,
   .navigation-launcher,
-  .topbar-create-menu,
+  .small-dropdown,
   .launcher-column,
   .topbar-control,
   .launcher-card,
