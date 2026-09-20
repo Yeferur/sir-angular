@@ -175,6 +175,7 @@ export class Listado implements OnInit, OnDestroy {
   editorChangedFromBaseline = false;
   private isEditorRoute = false;
   private isPrivateRoute = false;
+  private isTransfersRoute = false;
   private editorRouteKey: string | null = null;
   private forceRegenerateFromRoute = false;
   private editorRouteOpenTimer?: ReturnType<typeof setTimeout>;
@@ -184,6 +185,10 @@ export class Listado implements OnInit, OnDestroy {
     if (!this.initializeRouteContext()) return;
     if (this.isPrivateRoute) {
       this.cargarPrivadosDelDia();
+      return;
+    }
+    if (this.isTransfersRoute) {
+      this.cargarTransfersDelDia();
       return;
     }
     this.cargarToursDelDia();
@@ -253,6 +258,7 @@ export class Listado implements OnInit, OnDestroy {
     const routeView = this.route.snapshot.data['programacionView'];
     this.isEditorRoute = routeView === 'editor';
     this.isPrivateRoute = routeView === 'privados';
+    this.isTransfersRoute = routeView === 'transfers';
 
     if (this.isPrivateRoute) {
       const routeDate = String(this.route.snapshot.paramMap.get('fecha') || '');
@@ -262,6 +268,17 @@ export class Listado implements OnInit, OnDestroy {
       }
       this.fechaSeleccionada = routeDate;
       this.modoVista = 'privados';
+      return true;
+    }
+
+    if (this.isTransfersRoute) {
+      const routeDate = String(this.route.snapshot.paramMap.get('fecha') || '');
+      if (!this.isValidIsoDate(routeDate)) {
+        void this.navigateToDashboard(true);
+        return false;
+      }
+      this.fechaSeleccionada = routeDate;
+      this.modoVista = 'transfers';
       return true;
     }
 
@@ -333,7 +350,40 @@ export class Listado implements OnInit, OnDestroy {
       this.cargarPrivadosDelDia();
       return;
     }
+    if (this.isTransfersRoute) {
+      this.cargarTransfersDelDia();
+      return;
+    }
     this.cargarToursDelDia();
+  }
+
+  private cargarTransfersDelDia(): void {
+    const requestSequence = ++this.loadSequence;
+    this.loadSubscription?.unsubscribe();
+    this.loadError = '';
+    this.transfersLoadError = false;
+    this.isPageLoading = true;
+
+    this.loadSubscription = this.programacionService.obtenerTransfersDia(this.fechaSeleccionada).pipe(
+      finalize(() => {
+        if (requestSequence !== this.loadSequence) return;
+        this.isPageLoading = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (response) => {
+        if (requestSequence !== this.loadSequence) return;
+        this.transfersDia = response || this.emptyTransfersResponse(this.fechaSeleccionada);
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (requestSequence !== this.loadSequence) return;
+        console.error('No fue posible cargar los transfers del día', error);
+        this.transfersLoadError = true;
+        this.loadError = 'No fue posible consultar los transfers de esta fecha. Revisa la conexión e inténtalo nuevamente.';
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   cargarToursDelDia(): void {
@@ -897,8 +947,10 @@ export class Listado implements OnInit, OnDestroy {
 
   abrirVistaTransfers(): void {
     if (this.transfersLoadError || this.transfersDia.totalTransfers === 0) return;
-    this.modoVista = 'transfers';
-    this.cdr.markForCheck();
+    this.confirmarPerdidaCambios(() => {
+      this.drawerService.close(true);
+      void this.router.navigate(['/Programacion/Transfers', this.fechaSeleccionada]);
+    });
   }
 
   exportarTransfersDia(): void {
@@ -933,7 +985,7 @@ export class Listado implements OnInit, OnDestroy {
 
   volverAlDashboard(): void {
     this.confirmarPerdidaCambios(() => {
-      if (this.isEditorRoute || this.isPrivateRoute) {
+      if (this.isEditorRoute || this.isPrivateRoute || this.isTransfersRoute) {
         this.resetEditorState();
         void this.navigateToDashboard();
         return;

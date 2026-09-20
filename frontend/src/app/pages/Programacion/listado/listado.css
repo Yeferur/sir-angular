@@ -19,13 +19,17 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--bg-secondary);
 }
 
 .operation-label {
   display: block;
   margin-bottom: 3px;
-  color: var(--text-tertiary);
+  color: var(--accent-blue);
   font-size: .7rem;
   font-weight: 700;
   letter-spacing: .06em;
@@ -35,7 +39,7 @@
 .operation-header p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: .9rem;
+  font-size: .78rem;
   font-weight: 500;
 }
 
@@ -45,6 +49,8 @@
   flex: 0 0 auto;
   flex-direction: column;
   gap: 7px;
+  padding-left: 16px;
+  border-left: 1px solid var(--separator-color);
 }
 
 .date-control label {
@@ -58,7 +64,7 @@
 .date-nav-control {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   overflow: visible;
 }
 
@@ -129,6 +135,10 @@
 
   .date-control {
     width: 100%;
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid var(--separator-color);
+    border-left: 0;
   }
 
   .date-nav-control {

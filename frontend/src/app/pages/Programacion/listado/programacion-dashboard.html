@@ -32,54 +32,116 @@
       <p>Selecciona otra fecha o revisa la configuración de los tours.</p>
     </div>
   } @else {
-    <div class="operation-grid">
-      @for (tour of tours(); track tour.Id_Tour) {
-        @let hasPassengers = (tour.totalPasajeros || 0) > 0;
-        @let generated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+    <section class="operation-section" aria-labelledby="tours-heading">
+      <header class="section-heading">
+        <div>
+          <span class="section-kicker">Servicios de la jornada</span>
+          <h2 id="tours-heading">Tours</h2>
+        </div>
+        <span class="section-note">Reservas y listados por servicio</span>
+      </header>
+
+      <div class="operation-grid">
+        @for (tour of tours(); track tour.Id_Tour) {
+          @let hasPassengers = (tour.totalPasajeros || 0) > 0;
+          @let generated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+          <button
+            type="button"
+            class="operation-card"
+            [class.is-ready]="generated"
+            [class.is-empty]="!hasPassengers"
+            [disabled]="(!generated && !canCreate()) || !hasPassengers || updating()"
+            (click)="openTour(tour)">
+            <span class="operation-top">
+              <span class="operation-name">{{ tour.NombreTour }}</span>
+              <span
+                class="status-chip"
+                [class.status-chip--ready]="generated"
+                [class.status-chip--pending]="hasPassengers && !generated">
+                {{ hasPassengers ? (generated ? 'Generado' : 'Por generar') : 'Sin reservas' }}
+              </span>
+            </span>
+
+            <span class="operation-numbers">
+              <span>
+                <strong [countUp]="tour.totalPasajeros || 0"></strong>
+                <small>pasajeros</small>
+              </span>
+              <span>
+                <strong [countUp]="tour.totalReservas || 0"></strong>
+                <small>reservas</small>
+              </span>
+              @if (tour.totalBuses) {
+                <span>
+                  <strong [countUp]="tour.totalBuses"></strong>
+                  <small>buses</small>
+                </span>
+              }
+            </span>
+
+            <span class="operation-progress" aria-hidden="true">
+              <span
+                [class.status-line--ready]="generated"
+                [class.status-line--pending]="hasPassengers && !generated">
+              </span>
+            </span>
+
+            <span class="operation-action">
+              {{ !hasPassengers ? 'Sin operación' : (generated ? 'Ver listado' : 'Generar listado') }}
+              @if (hasPassengers) {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
+              }
+            </span>
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="operation-section operation-section--support" aria-labelledby="support-heading">
+      <header class="section-heading">
+        <div>
+          <span class="section-kicker">Operación complementaria</span>
+          <h2 id="support-heading">Privados y transfers</h2>
+        </div>
+        <span class="section-note">Servicios que requieren preparación adicional</span>
+      </header>
+
+      <div class="support-grid">
         <button
           type="button"
-          class="operation-card"
-          [class.is-ready]="generated"
-          [class.is-empty]="!hasPassengers"
-          [disabled]="(!generated && !canCreate()) || !hasPassengers || updating()"
-          (click)="openTour(tour)">
+          class="operation-card private-card"
+          [class.is-empty]="totalReservasPrivadas() === 0"
+          [disabled]="totalReservasPrivadas() === 0 || updating()"
+          (click)="privadosSelected.emit()">
           <span class="operation-top">
-            <span class="operation-name">{{ tour.NombreTour }}</span>
-            <span
-              class="status-chip"
-              [class.status-chip--ready]="generated"
-              [class.status-chip--pending]="hasPassengers && !generated">
-              {{ hasPassengers ? (generated ? 'Generado' : 'Por generar') : 'Sin reservas' }}
+            <span class="operation-name">Reservas privadas</span>
+            <span class="status-chip status-chip--private">
+              {{ totalReservasPrivadas() > 0 ? 'Por completar' : 'Sin reservas' }}
             </span>
           </span>
-
           <span class="operation-numbers">
             <span>
-              <strong [countUp]="tour.totalPasajeros || 0"></strong>
+              <strong [countUp]="totalPaxPrivados()"></strong>
               <small>pasajeros</small>
             </span>
             <span>
-              <strong [countUp]="tour.totalReservas || 0"></strong>
+              <strong [countUp]="totalReservasPrivadas()"></strong>
               <small>reservas</small>
             </span>
-            @if (tour.totalBuses) {
-              <span>
-                <strong [countUp]="tour.totalBuses"></strong>
-                <small>buses</small>
-              </span>
-            }
-          </span>
-
-          <span class="operation-progress" aria-hidden="true">
-            <span
-              [class.status-line--ready]="generated"
-              [class.status-line--pending]="hasPassengers && !generated">
+            <span>
+              <strong [countUp]="totalBusesPrivados()"></strong>
+              <small>buses</small>
             </span>
           </span>
-
+          <span class="operation-progress" aria-hidden="true">
+            <span [class.status-line--private]="totalReservasPrivadas() > 0"></span>
+          </span>
           <span class="operation-action">
-            {{ !hasPassengers ? 'Sin operación' : (generated ? 'Ver listado' : 'Generar listado') }}
-            @if (hasPassengers) {
+            {{ totalReservasPrivadas() > 0 ? 'Preparar vehículos y guías' : 'Sin servicios privados' }}
+            @if (totalReservasPrivadas() > 0) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m9 18 6-6-6-6"/>
@@ -87,89 +149,49 @@
             }
           </span>
         </button>
-      }
 
-      <button
-        type="button"
-        class="operation-card private-card"
-        [class.is-empty]="totalReservasPrivadas() === 0"
-        [disabled]="totalReservasPrivadas() === 0 || updating()"
-        (click)="privadosSelected.emit()">
-        <span class="operation-top">
-          <span class="operation-name">Reservas privadas</span>
-          <span class="status-chip status-chip--private">
-            {{ totalReservasPrivadas() > 0 ? 'Por completar' : 'Sin reservas' }}
+        <button
+          type="button"
+          class="operation-card transfer-card"
+          [class.is-empty]="transfers().totalTransfers === 0"
+          [disabled]="transfersUnavailable() || transfers().totalTransfers === 0 || updating()"
+          (click)="transfersSelected.emit()">
+          <span class="operation-top">
+            <span class="operation-name">Transfers</span>
+            <span class="status-chip status-chip--transfer">
+              {{ transfersUnavailable() ? 'No disponible' : (transfers().totalPendientes > 0 ? (transfers().totalPendientes + ' pendientes') : (transfers().totalTransfers > 0 ? 'Disponible' : 'Sin transfers')) }}
+            </span>
           </span>
-        </span>
-        <span class="operation-numbers">
-          <span>
-            <strong [countUp]="totalPaxPrivados()"></strong>
-            <small>pasajeros</small>
-          </span>
-          <span>
-            <strong [countUp]="totalReservasPrivadas()"></strong>
-            <small>reservas</small>
-          </span>
-          <span>
-            <strong [countUp]="totalBusesPrivados()"></strong>
-            <small>buses</small>
-          </span>
-        </span>
-        <span class="operation-progress" aria-hidden="true">
-          <span [class.status-line--private]="totalReservasPrivadas() > 0"></span>
-        </span>
-        <span class="operation-action">
-          {{ totalReservasPrivadas() > 0 ? 'Preparar vehículos y guías' : 'Sin servicios privados' }}
-          @if (totalReservasPrivadas() > 0) {
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m9 18 6-6-6-6"/>
-            </svg>
-          }
-        </span>
-      </button>
 
-      <button
-        type="button"
-        class="operation-card transfer-card"
-        [class.is-empty]="transfers().totalTransfers === 0"
-        [disabled]="transfersUnavailable() || transfers().totalTransfers === 0 || updating()"
-        (click)="transfersSelected.emit()">
-        <span class="operation-top">
-          <span class="operation-name">Transfers</span>
-          <span class="status-chip status-chip--transfer">
-            {{ transfersUnavailable() ? 'No disponible' : (transfers().totalPendientes > 0 ? (transfers().totalPendientes + ' pendientes') : (transfers().totalTransfers > 0 ? 'Disponible' : 'Sin transfers')) }}
+          <span class="operation-numbers">
+            <span>
+              <strong [countUp]="transfers().totalTransfers"></strong>
+              <small>transfers</small>
+            </span>
+            <span>
+              <strong [countUp]="transfers().totalPasajeros"></strong>
+              <small>pasajeros</small>
+            </span>
+            <span>
+              <strong [countUp]="transfers().totalServicios"></strong>
+              <small>servicios</small>
+            </span>
           </span>
-        </span>
 
-        <span class="operation-numbers">
-          <span>
-            <strong [countUp]="transfers().totalTransfers"></strong>
-            <small>transfers</small>
+          <span class="operation-progress" aria-hidden="true">
+            <span [class.status-line--transfer]="transfers().totalTransfers > 0"></span>
           </span>
-          <span>
-            <strong [countUp]="transfers().totalPasajeros"></strong>
-            <small>pasajeros</small>
+          <span class="operation-action">
+            {{ transfersUnavailable() ? 'No fue posible consultar este servicio' : (transfers().totalTransfers > 0 ? 'Ver preparación y exportar' : 'Sin operación de transfers') }}
+            @if (transfers().totalTransfers > 0) {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+            }
           </span>
-          <span>
-            <strong [countUp]="transfers().totalServicios"></strong>
-            <small>servicios</small>
-          </span>
-        </span>
-
-        <span class="operation-progress" aria-hidden="true">
-          <span [class.status-line--transfer]="transfers().totalTransfers > 0"></span>
-        </span>
-        <span class="operation-action">
-          {{ transfersUnavailable() ? 'No fue posible consultar este servicio' : (transfers().totalTransfers > 0 ? 'Ver preparación y exportar' : 'Sin operación de transfers') }}
-          @if (transfers().totalTransfers > 0) {
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m9 18 6-6-6-6"/>
-            </svg>
-          }
-        </span>
-      </button>
-    </div>
+        </button>
+      </div>
+    </section>
   }
 </section>

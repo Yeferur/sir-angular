@@ -477,6 +477,7 @@ li small {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
   padding: 14px 24px 20px;
   border-top: 1px solid var(--separator-color);
   background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);

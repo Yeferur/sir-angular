@@ -164,12 +164,20 @@ export const routes: Routes = [
     title: 'Programación',
   },
   {
+    path: 'Programacion/Transfers/:fecha',
+    loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
+    canActivate: [authGuard, permisoGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: { programacionView: 'transfers', permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
+    title: 'Programación',
+  },
+  {
     path: 'Programacion/Privados/:fecha',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { programacionView: 'privados', permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
-    title: 'Programación privada',
+    title: 'Privados',
   },
 
   {
