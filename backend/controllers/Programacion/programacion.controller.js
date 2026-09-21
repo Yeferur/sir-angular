@@ -1,5 +1,6 @@
 // backend/controllers/Programacion/programacion.controller.inteligente.js
 const cerebro = require('../../services/Programacion/programacion.service');
+const { obtenerResumenToursProgramacion } = require('../../services/inicio.service');
 const { recordHistorial } = require('../../services/Historial/logger');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
@@ -323,6 +324,21 @@ exports.resumenPrivadosDiaController = async (req, res) => {
     } catch (error) {
         console.error('Error en resumenPrivadosDiaController:', error);
         return sendError(res, { status: 500, message: 'Error interno al consultar privados.', errorCode: 'INTERNAL_ERROR' });
+    }
+};
+
+exports.obtenerResumenDashboardProgramacionController = async (req, res) => {
+    const fecha = req.query?.fecha;
+    if (!fecha) {
+        return sendError(res, { status: 400, message: 'La fecha es obligatoria', errorCode: 'MISSING_PARAMS' });
+    }
+
+    try {
+        const tours = await obtenerResumenToursProgramacion(fecha);
+        return sendSuccess(res, { data: tours, message: 'Resumen de Programación obtenido correctamente' });
+    } catch (error) {
+        console.error('Error al obtener el resumen del dashboard de Programación:', error);
+        return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
     }
 };
 

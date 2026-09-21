@@ -21,6 +21,14 @@ export interface ProgramacionPrivadaResponse {
   privados: any[];
 }
 
+export interface ResumenTourProgramacion {
+  Id_Tour: number;
+  Nombre_Tour: string;
+  NombreTour: string;
+  NumeroPasajeros: number;
+  totalReservas: number;
+}
+
 export interface ListadoProgramacionResponse {
   exists: boolean;
   fromSnapshot?: boolean;
@@ -78,16 +86,12 @@ export class ProgramacionDashboardService {
 
   private http = inject(HttpClient);
 
-  /**
-   * Obtiene todos los tours activos desde el backend.
-   * @returns Observable con la lista de tours.
-   */
-  getTours(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/tours`).pipe(
-      map(tours => tours.map(tour => ({
-        ...tour,
-        NombreTour: tour.Nombre_Tour
-      })))
+  obtenerResumenDashboard(fecha: string): Observable<ResumenTourProgramacion[]> {
+    return this.http.get<Omit<ResumenTourProgramacion, 'NombreTour'>[]>(
+      `${this.apiUrl}/programacion/resumen-dashboard`,
+      { params: { fecha } },
+    ).pipe(
+      map(tours => tours.map(tour => ({ ...tour, NombreTour: tour.Nombre_Tour })))
     );
   }
 

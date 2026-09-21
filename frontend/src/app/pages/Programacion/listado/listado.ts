@@ -6,7 +6,6 @@ import {
   ProgramacionDashboardService,
   TransfersProgramacionResponse,
 } from '../../../services/Programacion/programacion';
-import { InicioService } from '../../../services/inicio';
 import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -70,7 +69,6 @@ interface ProgramacionMoveSnapshot {
 })
 export class Listado implements OnInit, OnDestroy {
   private programacionService = inject(ProgramacionDashboardService);
-  private inicioService = inject(InicioService);
   private cdr = inject(ChangeDetectorRef);
   private permisosService = inject(PermisosService);
   private drawerService = inject(SirDrawerService);
@@ -404,8 +402,7 @@ export class Listado implements OnInit, OnDestroy {
       this.isUpdatingDate = true;
     }
 
-    // Obtener tours
-    this.loadSubscription = this.programacionService.getTours().pipe(
+    this.loadSubscription = this.programacionService.obtenerResumenDashboard(this.fechaSeleccionada).pipe(
       switchMap(tours => {
         // Obtener datos del día y listados para los tours
         const listadoObservables: { [key: number]: any } = {};
@@ -438,7 +435,6 @@ export class Listado implements OnInit, OnDestroy {
 
         return forkJoin({
           tours: of(tours), // Mantener referencia a tours
-          datosDelDia: this.inicioService.getDatosInicio(this.fechaSeleccionada),
           listados: tours.length > 0 ? forkJoin(listadoObservables) : of({}),
           privadosDelDia: this.programacionService.resumenPrivadosDia(this.fechaSeleccionada, todosIds)
             .pipe(catchError(() => of({ totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] }))),
@@ -460,7 +456,6 @@ export class Listado implements OnInit, OnDestroy {
       next: (result: any) => {
         if (requestSequence !== this.loadSequence) return;
         const tours = result.tours;
-        const datosDelDia = result.datosDelDia;
         const listados = result.listados || {};
 
         // Poblar busesPrivados desde la consulta independiente del dashboard.
@@ -472,11 +467,11 @@ export class Listado implements OnInit, OnDestroy {
         }
         this.transfersDia = result.transfersDelDia || this.emptyTransfersResponse(this.fechaSeleccionada);
 
-        // Crear mapa de pasajeros y reservas por tour desde datosDelDia
+        // Crear mapas con los contadores operativos autorizados para Programación.
         const pasajerosPorTour = new Map<number, number>();
         const reservasPorTour = new Map<number, number>();
 
-        datosDelDia.tours.forEach((tour: any) => {
+        tours.forEach((tour: any) => {
           pasajerosPorTour.set(tour.Id_Tour, tour.NumeroPasajeros || 0);
           reservasPorTour.set(tour.Id_Tour, tour.totalReservas || 0);
         });

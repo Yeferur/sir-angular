@@ -26,7 +26,8 @@ const {
     exportarListadosZipController,
     exportarPrivadosZipController,
     obtenerTransfersProgramacionController,
-    exportarTransfersProgramacionController
+    exportarTransfersProgramacionController,
+    obtenerResumenDashboardProgramacionController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -34,6 +35,13 @@ const {
  * RUTAS PARA EL ASISTENTE DE LOGÍSTICA INTELIGENTE
  * ===================================================================================
  */
+
+router.get(
+    '/programacion/resumen-dashboard',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    obtenerResumenDashboardProgramacionController
+);
 
 /**
  * @route   POST /api/programacion/plan-logistico

@@ -13,56 +13,96 @@ function normalizarTourInicio(tour) {
   };
 }
 
+function crearConsultaTours({ fecha, incluirCupos = false, incluirPrivados = false, ordenarPorNombre = false } = {}) {
+  const estadosPlaceholders = ESTADOS_VALIDOS.map(() => '?').join(',');
+  const campos = ['t.Id_Tour', 't.Nombre_Tour'];
+  const params = [];
+
+  if (incluirCupos) {
+    campos.push(`COALESCE((
+      SELECT a.Cupo
+      FROM aforos a
+      WHERE a.Id_Tour = t.Id_Tour
+        AND a.Fecha_Aforo = ?
+      ORDER BY a.Id_Aforo DESC
+      LIMIT 1
+    ), t.Cupo_Base) AS cupos`);
+    params.push(fecha);
+  }
+
+  campos.push(`COALESCE((
+    SELECT SUM(cnt_pasajeros)
+    FROM (
+      SELECT COUNT(p.Id_Pasajero) AS cnt_pasajeros
+      FROM reservas r
+      JOIN horarios h ON h.Id_Horario = r.Id_Horario
+      JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+      WHERE h.Id_Tour = t.Id_Tour AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
+        AND r.Fecha_Tour = ?
+        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+      GROUP BY r.Id_Reserva
+    ) x
+  ), 0) AS NumeroPasajeros`);
+  params.push(fecha, ...ESTADOS_VALIDOS);
+
+  campos.push(`COALESCE((
+    SELECT COUNT(r.Id_Reserva)
+    FROM reservas r
+    JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    WHERE h.Id_Tour = t.Id_Tour
+      AND r.Fecha_Tour = ?
+      AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
+      AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+  ), 0) AS totalReservas`);
+  params.push(fecha, ...ESTADOS_VALIDOS);
+
+  if (incluirPrivados) {
+    campos.push(`COALESCE((
+      SELECT COUNT(*)
+      FROM reservas r
+      JOIN horarios h ON h.Id_Horario = r.Id_Horario
+      WHERE h.Id_Tour = t.Id_Tour
+        AND r.Fecha_Tour = ?
+        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
+        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+    ), 0) AS totalPrivados`);
+    params.push(fecha, ...ESTADOS_VALIDOS);
+  }
+
+  const query = `
+    SELECT
+      ${campos.join(',\n      ')}
+    FROM tours t
+    WHERE t.Activo = 1${ordenarPorNombre ? '\n    ORDER BY t.Nombre_Tour ASC' : ''}
+  `;
+
+  return { query, params };
+}
+
+function normalizarResumenTourProgramacion(tour) {
+  return {
+    Id_Tour: Number(tour.Id_Tour) || 0,
+    Nombre_Tour: String(tour.Nombre_Tour || ''),
+    NumeroPasajeros: Number(tour.NumeroPasajeros) || 0,
+    totalReservas: Number(tour.totalReservas) || 0,
+  };
+}
+
+async function obtenerResumenToursProgramacion(fecha) {
+  const { query, params } = crearConsultaTours({ fecha, ordenarPorNombre: true });
+  const [rows] = await db.query(query, params);
+  return (rows || []).map(normalizarResumenTourProgramacion);
+}
+
 async function obtenerDatosInicio(fecha) {
   // TOURS: cupo del día (aforos) con fallback a Cupo_Base,
-  //        pasajeros grupales y # de reservas privadas del día
-  const toursQuery = `
-    SELECT 
-      t.Id_Tour,
-      t.Nombre_Tour,
-      COALESCE((
-        SELECT a.Cupo
-        FROM aforos a
-        WHERE a.Id_Tour = t.Id_Tour
-          AND a.Fecha_Aforo = ?
-        ORDER BY a.Id_Aforo DESC
-        LIMIT 1
-      ), t.Cupo_Base) AS cupos,
-      COALESCE((
-        SELECT SUM(cnt_pasajeros)
-        FROM (
-          SELECT COUNT(p.Id_Pasajero) AS cnt_pasajeros
-          FROM reservas r
-          JOIN horarios h ON h.Id_Horario = r.Id_Horario
-          JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-          WHERE h.Id_Tour = t.Id_Tour AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
-            AND r.Fecha_Tour = ?
-            AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-            AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
-          GROUP BY r.Id_Reserva
-        ) x
-      ), 0) AS NumeroPasajeros,
-      COALESCE((
-        SELECT COUNT(r.Id_Reserva)
-        FROM reservas r
-        JOIN horarios h ON h.Id_Horario = r.Id_Horario
-        WHERE h.Id_Tour = t.Id_Tour
-          AND r.Fecha_Tour = ?
-          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
-      ), 0) AS totalReservas,
-      COALESCE((
-        SELECT COUNT(*)
-        FROM reservas r
-        JOIN horarios h ON h.Id_Horario = r.Id_Horario
-        WHERE h.Id_Tour = t.Id_Tour
-          AND r.Fecha_Tour = ?
-          AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
-          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
-      ), 0) AS totalPrivados
-    FROM tours t
-    WHERE t.Activo = 1
-  `;
+  // pasajeros grupales y # de reservas privadas del día.
+  const { query: toursQuery, params: toursQueryParams } = crearConsultaTours({
+    fecha,
+    incluirCupos: true,
+    incluirPrivados: true,
+  });
 
   // TRANSFERS: total por servicio en la fecha, excluyendo estados anulados/cancelados
   const transferQuery = `
@@ -136,12 +176,7 @@ async function obtenerDatosInicio(fecha) {
     const estadosParams = ESTADOS_VALIDOS.slice(); // copia
     const [tours] = await db.query(
       toursQuery,
-      [
-        fecha,                 // aforos.Fecha_Aforo
-        fecha, ...estadosParams, // pasajeros GRUPAL
-        fecha, ...estadosParams, // reservas GRUPAL (nuevo)
-        fecha, ...estadosParams  // count PRV
-      ]
+      toursQueryParams
     );
 
     // Normalize numeric fields to avoid string concatenation in frontend
@@ -260,4 +295,9 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
   }
 }
 
-module.exports = { obtenerDatosInicio, guardarAforo, normalizarTourInicio };
+module.exports = {
+  obtenerDatosInicio,
+  obtenerResumenToursProgramacion,
+  guardarAforo,
+  normalizarTourInicio,
+};

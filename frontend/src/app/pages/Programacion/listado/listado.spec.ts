@@ -5,9 +5,11 @@ import { of, Subject } from 'rxjs';
 
 import { TourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
-import { InicioService } from '../../../services/inicio';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
-import { ProgramacionDashboardService } from '../../../services/Programacion/programacion';
+import {
+  ProgramacionDashboardService,
+  TransfersProgramacionResponse,
+} from '../../../services/Programacion/programacion';
 import { Listado } from './listado';
 
 describe('Listado', () => {
@@ -26,7 +28,9 @@ describe('Listado', () => {
       'ProgramacionDashboardService',
       [
         'obtenerListadoFinal',
+        'obtenerResumenDashboard',
         'resumenPrivadosDia',
+        'obtenerTransfersDia',
         'generarPlanLogistico',
         'exportarTransfersDia',
         'exportarListadoBus',
@@ -48,7 +52,6 @@ describe('Listado', () => {
       providers: [
         provideZonelessChangeDetection(),
         { provide: ProgramacionDashboardService, useValue: programacionService },
-        { provide: InicioService, useValue: {} },
         {
           provide: PermisosService,
           useValue: { tienePermiso: (permission: string) => grantedPermissions.has(permission) },
@@ -93,6 +96,115 @@ describe('Listado', () => {
     expect(component.editorLoadingMode).toBeNull();
     expect(markForCheck).toHaveBeenCalledBefore(openDrawer);
     expect(drawer.drawer()?.type).toBe('programacion-listado');
+  });
+
+  it('carga métricas, tours combinados, estados, Privados y Transfers desde fuentes de Programación', () => {
+    const privateBuses = [{ Id_Reserva_Privada: 'P-1', Nombre_Tour: 'Medellín', ocupados: 3 }];
+    const transfers: TransfersProgramacionResponse = {
+      fecha: '2026-09-20',
+      totalTransfers: 2,
+      totalPasajeros: 5,
+      totalServicios: 1,
+      totalPendientes: 1,
+      servicios: [{
+        servicio: 'Aeropuerto a hotel',
+        totalTransfers: 2,
+        totalPasajeros: 5,
+        pendientes: 1,
+        primeraRecogida: null,
+        ultimaRecogida: null,
+      }],
+      transfers: [],
+    };
+    programacionService.obtenerResumenDashboard.and.returnValue(of([
+      { Id_Tour: 1, Nombre_Tour: 'Medellín', NombreTour: 'Medellín', NumeroPasajeros: 4, totalReservas: 2 },
+      { Id_Tour: 5, Nombre_Tour: 'Guatapé', NombreTour: 'Guatapé', NumeroPasajeros: 5, totalReservas: 3 },
+      { Id_Tour: 2, Nombre_Tour: 'Santa Fe', NombreTour: 'Santa Fe', NumeroPasajeros: 7, totalReservas: 4 },
+      { Id_Tour: 9, Nombre_Tour: 'Cañón', NombreTour: 'Cañón', NumeroPasajeros: 0, totalReservas: 0 },
+    ]));
+    programacionService.obtenerListadoFinal.and.callFake((payload: any) => {
+      if (payload.idTour === 9) {
+        return of({ exists: false, buses: [], reservasSinAsignar: [] });
+      }
+      return of({
+        exists: true,
+        buses: [{ reservas: Array.from({ length: 4 }, () => ({})) }],
+        reservasSinAsignar: payload.idsTours ? [{}] : [],
+      });
+    });
+    programacionService.resumenPrivadosDia.and.returnValue(of({
+      totalReservas: 1,
+      totalBuses: 1,
+      totalPax: 3,
+      privados: privateBuses,
+    }));
+    programacionService.obtenerTransfersDia.and.returnValue(of(transfers));
+
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    component.fechaSeleccionada = '2026-09-20';
+    component.cargarToursDelDia();
+
+    expect(programacionService.obtenerResumenDashboard).toHaveBeenCalledOnceWith('2026-09-20');
+    expect(programacionService.obtenerListadoFinal).toHaveBeenCalledTimes(3);
+    expect(programacionService.obtenerListadoFinal).toHaveBeenCalledWith({ fecha: '2026-09-20', idsTours: [1, 5] });
+    expect(component.toursDelDia.map((tour) => [tour.Id_Tour, tour.totalPasajeros, tour.totalReservas, tour.estado])).toEqual([
+      [2, 7, 4, 'Generado'],
+      [5, 9, 5, 'Generado'],
+      [9, 0, 0, 'Pendiente'],
+    ]);
+    expect(component.toursDelDia[1].NombreTour).toBe('Medellín Y Guatapé');
+    expect((component.toursDelDia[1] as any).idsTours).toEqual([1, 5]);
+    expect(component.busesPrivados).toEqual(privateBuses);
+    expect(component.transfersDia).toEqual(transfers);
+  });
+
+  it('cambia el resumen operativo cuando cambia la fecha y conserva el acceso al editor', () => {
+    programacionService.obtenerResumenDashboard.and.returnValues(
+      of([{ Id_Tour: 2, Nombre_Tour: 'Santa Fe', NombreTour: 'Santa Fe', NumeroPasajeros: 4, totalReservas: 2 }]),
+      of([{ Id_Tour: 2, Nombre_Tour: 'Santa Fe', NombreTour: 'Santa Fe', NumeroPasajeros: 8, totalReservas: 3 }]),
+    );
+    programacionService.obtenerListadoFinal.and.returnValue(of({ exists: false, buses: [], reservasSinAsignar: [] }));
+    programacionService.resumenPrivadosDia.and.returnValue(of({ totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] }));
+    const emptyTransfers: TransfersProgramacionResponse = {
+      fecha: '2026-09-20', totalTransfers: 0, totalPasajeros: 0, totalServicios: 0,
+      totalPendientes: 0, servicios: [], transfers: [],
+    };
+    programacionService.obtenerTransfersDia.and.returnValue(of(emptyTransfers));
+
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    component.fechaSeleccionada = '2026-09-20';
+    component.cargarToursDelDia();
+    expect(component.toursDelDia[0].totalPasajeros).toBe(4);
+
+    component.onFechaOperacionSelected('2026-09-21');
+    expect(programacionService.obtenerResumenDashboard.calls.allArgs()).toEqual([
+      ['2026-09-20'], ['2026-09-21'],
+    ]);
+    expect(component.toursDelDia[0].totalPasajeros).toBe(8);
+    expect(router.navigate).toHaveBeenCalledWith([], {
+      relativeTo: jasmine.any(Object),
+      queryParams: { fecha: '2026-09-21' },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+
+    jasmine.clock().install();
+    try {
+      grantedPermissions.add('PROGRAMACION.CREAR');
+      spyOn((component as any).cdr, 'detectChanges');
+      component.openTourFromDashboard({
+        Id_Tour: 2, NombreTour: 'Santa Fe', estado: 'Pendiente', planGenerado: null,
+      });
+      jasmine.clock().tick(0);
+      expect(router.navigate).toHaveBeenCalledWith(
+        ['/Programacion/Editor', '2026-09-21', '2'],
+        { queryParams: undefined },
+      );
+    } finally {
+      jasmine.clock().uninstall();
+    }
   });
 
   it('renderiza inmediatamente el mensaje al comenzar a generar en modo zoneless', () => {
