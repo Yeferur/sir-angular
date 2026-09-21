@@ -248,6 +248,11 @@ export class Listado implements OnInit, OnDestroy {
     return this.permisosService.tienePermiso('PROGRAMACION.CREAR');
   }
 
+  get canExportProgramacion(): boolean {
+    return this.permisosService.tienePermiso('PROGRAMACION.LEER')
+      && this.permisosService.tienePermiso('PROGRAMACION.EXPORTAR');
+  }
+
   get canRestoreInitialPlan(): boolean {
     return this.canUpdateProgramacion
       && Boolean(this.initialEditorSnapshot)
@@ -954,7 +959,7 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   exportarTransfersDia(): void {
-    if (this.isExportingTransfers || this.transfersDia.totalTransfers === 0) return;
+    if (!this.canExportProgramacion || this.isExportingTransfers || this.transfersDia.totalTransfers === 0) return;
     this.isExportingTransfers = true;
     this.programacionService.exportarTransfersDia(this.fechaSeleccionada).pipe(
       finalize(() => {
@@ -1473,7 +1478,7 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   descargarListadoBus(index: number, formato: FormatoListadoBus = 'operativo'): void {
-    if (!this.planSeleccionado || !this.tourSeleccionado) return;
+    if (!this.canExportProgramacion || !this.planSeleccionado || !this.tourSeleccionado) return;
     this.normalizeBusMetadata();
 
     const bus = this.planSeleccionado.buses[index];
@@ -1502,7 +1507,7 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   descargarTodosLosListados(formato: FormatoListadoBus = 'operativo'): void {
-    if (!this.planSeleccionado || !this.tourSeleccionado) return;
+    if (!this.canExportProgramacion || !this.planSeleccionado || !this.tourSeleccionado) return;
     this.normalizeBusMetadata();
     if (!this.validateUniqueBusIdentifiers()) return;
 
@@ -1768,6 +1773,7 @@ export class Listado implements OnInit, OnDestroy {
       buses: snapshot.buses,
       unassigned: pendientes,
       canEdit: this.canUpdateProgramacion,
+      canExport: this.canExportProgramacion,
       onEdit: () => {
         this.navigateToEditor(tour);
       },
@@ -1775,11 +1781,13 @@ export class Listado implements OnInit, OnDestroy {
         this.navigateToEditor(tour, { regenerate: true });
       },
       onExportBus: (index: number, formato: FormatoListadoBus) => {
+        if (!this.canExportProgramacion) return;
         this.planSeleccionado = snapshot;
         this.tourSeleccionado = tour;
         this.descargarListadoBus(index, formato);
       },
       onExportAll: (formato: FormatoListadoBus) => {
+        if (!this.canExportProgramacion) return;
         this.planSeleccionado = snapshot;
         this.tourSeleccionado = tour;
         this.descargarTodosLosListados(formato);

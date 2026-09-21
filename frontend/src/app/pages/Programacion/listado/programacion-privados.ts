@@ -61,6 +61,7 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
   @Input() operationDate = '';
   @Input() buses: PrivateBus[] = [];
   @Input() canUpdate = false;
+  @Input() canExport = false;
 
   @Output() closeRequested = new EventEmitter<void>();
   @Output() busesChange = new EventEmitter<PrivateBus[]>();
@@ -277,7 +278,7 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
   }
 
   exportSelected(group: PrivateGroup): void {
-    if (this.exportingReservationId || !this.validateGuides([group])) return;
+    if (!this.canExport || this.exportingReservationId || !this.validateGuides([group])) return;
     this.exportingReservationId = group.Id_Reserva;
 
     this.programacionService.exportarReservaPrivada({
@@ -306,7 +307,7 @@ export class ProgramacionPrivadosComponent implements OnChanges, OnDestroy {
   }
 
   exportAll(): void {
-    if (this.exportingAll || !this.groups.length || !this.validateGuides(this.groups)) return;
+    if (!this.canExport || this.exportingAll || !this.groups.length || !this.validateGuides(this.groups)) return;
     this.exportingAll = true;
 
     this.programacionService.exportarPrivadosZip({

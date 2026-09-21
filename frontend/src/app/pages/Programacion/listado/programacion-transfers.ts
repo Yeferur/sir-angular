@@ -18,6 +18,7 @@ export class ProgramacionTransfersComponent {
   operationDate = input.required<string>();
   data = input.required<TransfersProgramacionResponse>();
   exporting = input(false);
+  canExport = input(false);
 
   closeRequested = output<void>();
   exportRequested = output<void>();

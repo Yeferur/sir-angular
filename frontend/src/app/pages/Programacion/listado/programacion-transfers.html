@@ -23,14 +23,16 @@
     </div>
 
     <div class="command-actions">
-      <button
-        type="button"
-        class="export-button"
-        [disabled]="exporting() || data().totalTransfers === 0"
-        (click)="exportRequested.emit()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
-        {{ exporting() ? 'Generando…' : 'Exportar Excel' }}
-      </button>
+      @if (canExport()) {
+        <button
+          type="button"
+          class="export-button"
+          [disabled]="exporting() || data().totalTransfers === 0"
+          (click)="exportRequested.emit()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+          {{ exporting() ? 'Generando…' : 'Exportar Excel' }}
+        </button>
+      }
     </div>
   </header>
 

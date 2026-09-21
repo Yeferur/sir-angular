@@ -87,6 +87,7 @@
           [totalPaxUnassigned]="totalPaxUnassigned"
           [availableCapacities]="CAPACIDADES_BUSES"
           [canUpdate]="canUpdateProgramacion"
+          [canExport]="canExportProgramacion"
           [canRestore]="canRestoreInitialPlan"
           [saving]="isSaving"
           (closeRequested)="volverAlDashboard()"
@@ -116,6 +117,7 @@
         [operationDate]="fechaSeleccionada"
         [buses]="busesPrivados"
         [canUpdate]="canUpdateProgramacion"
+        [canExport]="canExportProgramacion"
         (busesChange)="updatePrivateBuses($event)"
         (dirtyChange)="onPrivateDirtyChange($event)"
         (closeRequested)="volverAlDashboard()">
@@ -127,6 +129,7 @@
         [operationDate]="fechaSeleccionada"
         [data]="transfersDia"
         [exporting]="isExportingTransfers"
+        [canExport]="canExportProgramacion"
         (closeRequested)="volverAlDashboard()"
         (exportRequested)="exportarTransfersDia()">
       </app-programacion-transfers>

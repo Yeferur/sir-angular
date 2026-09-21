@@ -29,11 +29,13 @@
           Restablecer
         </button>
       }
-      <button type="button" class="button button--secondary" title="Descarga un ZIP con un Excel por reserva"
-        [disabled]="exportingAll || !groups.length" (click)="exportAll()">
-        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
-        {{ exportingAll ? 'Preparando…' : 'Exportar todos' }}
-      </button>
+      @if (canExport) {
+        <button type="button" class="button button--secondary" title="Descarga un ZIP con un Excel por reserva"
+          [disabled]="exportingAll || !groups.length" (click)="exportAll()">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+          {{ exportingAll ? 'Preparando…' : 'Exportar todos' }}
+        </button>
+      }
       @if (canUpdate && !phoneReadOnly) {
         <button type="button" class="button button--primary" [disabled]="saving || !canSave" (click)="save()">
           @if (saving) {
@@ -126,10 +128,12 @@
             <button type="button" class="button button--quiet" (click)="viewReservation(group.Id_Reserva)">
               Ver reserva
             </button>
-            <button type="button" class="button button--quiet" title="Descarga el Excel de esta reserva"
-              [disabled]="!!exportingReservationId" (click)="exportSelected(group)">
-              {{ exportingReservationId === group.Id_Reserva ? 'Preparando…' : 'Exportar reserva' }}
-            </button>
+            @if (canExport) {
+              <button type="button" class="button button--quiet" title="Descarga el Excel de esta reserva"
+                [disabled]="!!exportingReservationId" (click)="exportSelected(group)">
+                {{ exportingReservationId === group.Id_Reserva ? 'Preparando…' : 'Exportar reserva' }}
+              </button>
+            }
           </div>
         </div>
 

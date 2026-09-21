@@ -57,6 +57,7 @@ export class ProgramacionEditorComponent implements OnDestroy {
   totalPaxUnassigned = input(0);
   availableCapacities = input<number[]>([]);
   canUpdate = input(false);
+  canExport = input(false);
   canRestore = input(false);
   saving = input(false);
 
@@ -94,11 +95,13 @@ export class ProgramacionEditorComponent implements OnDestroy {
 
   requestExportAll(formato: FormatoListadoBus, menu: HTMLDetailsElement): void {
     menu.open = false;
+    if (!this.canExport()) return;
     this.exportAllRequested.emit(formato);
   }
 
   requestExportBus(formato: FormatoListadoBus, menu: HTMLDetailsElement): void {
     menu.open = false;
+    if (!this.canExport()) return;
     this.exportBusRequested.emit({ index: this.activeBusIndex(), formato });
   }
 

@@ -103,19 +103,21 @@
                 }
               </ol>
 
-              <details class="export-menu export-menu--bus" #busExportMenu>
-                <summary class="btn-secondary">Descargar bus</summary>
-                <div class="export-menu__options">
-                  <button type="button" (click)="exportBus(busIndex, 'compacto', busExportMenu)">
-                    <strong>Formato compacto</strong>
-                    <small>Versión breve para guía y conductor</small>
-                  </button>
-                  <button type="button" (click)="exportBus(busIndex, 'operativo', busExportMenu)">
-                    <strong>Formato operativo</strong>
-                    <small>Incluye rutas, tipo y estado</small>
-                  </button>
-                </div>
-              </details>
+              @if (props().canExport) {
+                <details class="export-menu export-menu--bus" #busExportMenu>
+                  <summary class="btn-secondary">Descargar bus</summary>
+                  <div class="export-menu__options">
+                    <button type="button" (click)="exportBus(busIndex, 'compacto', busExportMenu)">
+                      <strong>Formato compacto</strong>
+                      <small>Versión breve para guía y conductor</small>
+                    </button>
+                    <button type="button" (click)="exportBus(busIndex, 'operativo', busExportMenu)">
+                      <strong>Formato operativo</strong>
+                      <small>Incluye rutas, tipo y estado</small>
+                    </button>
+                  </div>
+                </details>
+              }
             </div>
           </div>
         </article>
@@ -126,7 +128,7 @@
 
 @if ((props().buses?.length || 0) > 0 || props().canEdit) {
   <footer class="detail-footer">
-    @if ((props().buses?.length || 0) > 0) {
+    @if ((props().buses?.length || 0) > 0 && props().canExport) {
       <details class="export-menu export-menu--all" #allExportMenu>
         <summary class="btn-secondary">Descargar todos</summary>
         <div class="export-menu__options export-menu__options--footer">

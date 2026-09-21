@@ -9,6 +9,7 @@ interface ProgramacionListadoPanelProps {
   buses: Bus[];
   unassigned?: Reserva[];
   canEdit?: boolean;
+  canExport?: boolean;
   onEdit?: () => void;
   onRegenerate?: () => void;
   onExportBus?: (index: number, formato: 'compacto' | 'operativo') => void;
@@ -67,11 +68,13 @@ export class ProgramacionListadoPanelComponent {
 
   exportBus(index: number, formato: 'compacto' | 'operativo', menu: HTMLDetailsElement): void {
     menu.open = false;
+    if (!this.props().canExport) return;
     this.props().onExportBus?.(index, formato);
   }
 
   exportAll(formato: 'compacto' | 'operativo', menu: HTMLDetailsElement): void {
     menu.open = false;
+    if (!this.props().canExport) return;
     this.props().onExportAll?.(formato);
   }
 

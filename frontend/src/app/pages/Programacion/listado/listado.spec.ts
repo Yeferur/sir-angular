@@ -13,6 +13,7 @@ import { Listado } from './listado';
 describe('Listado', () => {
   let programacionService: jasmine.SpyObj<ProgramacionDashboardService>;
   let router: jasmine.SpyObj<Router>;
+  let grantedPermissions: Set<string>;
   let routeSnapshot: {
     data: Record<string, unknown>;
     url: unknown[];
@@ -23,8 +24,16 @@ describe('Listado', () => {
   beforeEach(async () => {
     programacionService = jasmine.createSpyObj<ProgramacionDashboardService>(
       'ProgramacionDashboardService',
-      ['obtenerListadoFinal', 'resumenPrivadosDia', 'generarPlanLogistico']
+      [
+        'obtenerListadoFinal',
+        'resumenPrivadosDia',
+        'generarPlanLogistico',
+        'exportarTransfersDia',
+        'exportarListadoBus',
+        'exportarListadosZip',
+      ]
     );
+    grantedPermissions = new Set(['PROGRAMACION.LEER', 'PROGRAMACION.EXPORTAR']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
     routeSnapshot = {
@@ -42,7 +51,7 @@ describe('Listado', () => {
         { provide: InicioService, useValue: {} },
         {
           provide: PermisosService,
-          useValue: { tienePermiso: () => true },
+          useValue: { tienePermiso: (permission: string) => grantedPermissions.has(permission) },
         },
         {
           provide: ActivatedRoute,
@@ -266,6 +275,51 @@ describe('Listado', () => {
     component.beforeUnload(event);
 
     expect(event.defaultPrevented).toBeTrue();
+  });
+
+  it('solo habilita las exportaciones cuando tiene lectura y exportación', () => {
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+
+    expect(component.canExportProgramacion).toBeTrue();
+
+    grantedPermissions = new Set(['PROGRAMACION.LEER']);
+    expect(component.canExportProgramacion).toBeFalse();
+
+    grantedPermissions = new Set(['PROGRAMACION.EXPORTAR']);
+    expect(component.canExportProgramacion).toBeFalse();
+
+    grantedPermissions = new Set(['PROGRAMACION.LEER', 'PROGRAMACION.ACTUALIZAR']);
+    expect(component.canExportProgramacion).toBeFalse();
+  });
+
+  it('no inicia exportaciones desde el dashboard sin el permiso conjunto', () => {
+    const component = TestBed.createComponent(Listado).componentInstance;
+    component.transfersDia = {
+      fecha: '2026-08-15',
+      totalTransfers: 1,
+      totalPasajeros: 1,
+      totalServicios: 1,
+      totalPendientes: 0,
+      servicios: [],
+      transfers: [],
+    };
+    component.tourSeleccionado = {
+      Id_Tour: 9,
+      NombreTour: 'Tour',
+      estado: 'Generado',
+      planGenerado: null,
+    };
+    component.planSeleccionado = { buses: [], reservasSinAsignar: [] } as any;
+
+    grantedPermissions = new Set(['PROGRAMACION.LEER']);
+    component.exportarTransfersDia();
+    component.descargarListadoBus(0);
+    component.descargarTodosLosListados();
+
+    expect(programacionService.exportarTransfersDia).not.toHaveBeenCalled();
+    expect(programacionService.exportarListadoBus).not.toHaveBeenCalled();
+    expect(programacionService.exportarListadosZip).not.toHaveBeenCalled();
   });
 
 });

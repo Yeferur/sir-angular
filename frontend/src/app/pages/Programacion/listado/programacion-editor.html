@@ -37,22 +37,24 @@
           Restablecer
         </button>
       }
-      <details class="export-menu" #exportAllMenu>
-        <summary class="button button--secondary" title="Descarga un ZIP con un archivo Excel por bus">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
-          Exportar todos
-        </summary>
-        <div class="export-menu__options export-menu__options--right">
-          <button type="button" (click)="requestExportAll('compacto', exportAllMenu)">
-            <strong>Formato compacto</strong>
-            <small>Versión breve para guía y conductor</small>
-          </button>
-          <button type="button" (click)="requestExportAll('operativo', exportAllMenu)">
-            <strong>Formato operativo</strong>
-            <small>Incluye rutas, tipo y estado</small>
-          </button>
-        </div>
-      </details>
+      @if (canExport()) {
+        <details class="export-menu" #exportAllMenu>
+          <summary class="button button--secondary" title="Descarga un ZIP con un archivo Excel por bus">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+            Exportar todos
+          </summary>
+          <div class="export-menu__options export-menu__options--right">
+            <button type="button" (click)="requestExportAll('compacto', exportAllMenu)">
+              <strong>Formato compacto</strong>
+              <small>Versión breve para guía y conductor</small>
+            </button>
+            <button type="button" (click)="requestExportAll('operativo', exportAllMenu)">
+              <strong>Formato operativo</strong>
+              <small>Incluye rutas, tipo y estado</small>
+            </button>
+          </div>
+        </details>
+      }
       @if (canUpdate() && !phoneReadOnly()) {
         <button
           type="button"
@@ -304,26 +306,28 @@
               <button type="button" class="button button--quiet" [disabled]="transferMode" (click)="mapRequested.emit({ bus, index: activeBusIndex() })">
                 Ver mapa
               </button>
-              <details class="export-menu" #exportBusMenu>
-                <summary
-                  class="button button--quiet"
-                  title="Descarga el archivo Excel de este bus"
-                  [class.is-disabled]="transferMode">
-                  Exportar bus
-                </summary>
-                @if (!transferMode) {
-                  <div class="export-menu__options export-menu__options--right">
-                    <button type="button" (click)="requestExportBus('compacto', exportBusMenu)">
-                      <strong>Formato compacto</strong>
-                      <small>Versión breve para guía y conductor</small>
-                    </button>
-                    <button type="button" (click)="requestExportBus('operativo', exportBusMenu)">
-                      <strong>Formato operativo</strong>
-                      <small>Incluye rutas, tipo y estado</small>
-                    </button>
-                  </div>
-                }
-              </details>
+              @if (canExport()) {
+                <details class="export-menu" #exportBusMenu>
+                  <summary
+                    class="button button--quiet"
+                    title="Descarga el archivo Excel de este bus"
+                    [class.is-disabled]="transferMode">
+                    Exportar bus
+                  </summary>
+                  @if (!transferMode) {
+                    <div class="export-menu__options export-menu__options--right">
+                      <button type="button" (click)="requestExportBus('compacto', exportBusMenu)">
+                        <strong>Formato compacto</strong>
+                        <small>Versión breve para guía y conductor</small>
+                      </button>
+                      <button type="button" (click)="requestExportBus('operativo', exportBusMenu)">
+                        <strong>Formato operativo</strong>
+                        <small>Incluye rutas, tipo y estado</small>
+                      </button>
+                    </div>
+                  }
+                </details>
+              }
             </div>
           }
           }

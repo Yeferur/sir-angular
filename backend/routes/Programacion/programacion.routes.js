@@ -4,6 +4,12 @@ const router = express.Router();
 const { authMiddleware } = require('../../middlewares/authMiddleware'); // Asumo que tienes un middleware de autenticación
 const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 
+const programacionExportAuthorization = () => [
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    checkPermission('PROGRAMACION.EXPORTAR'),
+];
+
 // Importamos el nuevo controlador inteligente
 const {
     generarPlanLogisticoController,
@@ -62,8 +68,7 @@ router.post(
  */
 router.post(
     '/exportar-listado-bus',
-    authMiddleware,
-    checkPermission('PROGRAMACION.LEER'),
+    ...programacionExportAuthorization(),
     exportarListadoBusController
 );
 
@@ -83,8 +88,7 @@ router.post(
 
 router.post(
     '/exportar-reserva-privada',
-    authMiddleware,
-    checkPermission('PROGRAMACION.LEER'),
+    ...programacionExportAuthorization(),
     exportarReservaPrivadaController
 );
 
@@ -97,8 +101,7 @@ router.post(
 
 router.post(
     '/exportar-privados-zip',
-    authMiddleware,
-    checkPermission('PROGRAMACION.LEER'),
+    ...programacionExportAuthorization(),
     exportarPrivadosZipController
 );
 
@@ -135,8 +138,7 @@ router.post(
 
 router.post(
     '/exportar-listados-zip',
-    authMiddleware,
-    checkPermission('PROGRAMACION.LEER'),
+    ...programacionExportAuthorization(),
     exportarListadosZipController
 );
 
@@ -149,8 +151,7 @@ router.get(
 
 router.get(
     '/exportar-transfers-dia',
-    authMiddleware,
-    checkPermission('PROGRAMACION.LEER'),
+    ...programacionExportAuthorization(),
     exportarTransfersProgramacionController
 );
 
