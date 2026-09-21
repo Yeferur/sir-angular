@@ -109,7 +109,7 @@ const programacionTools = [
     },
     riskLevel: 'read',
     requiresConfirmation: false,
-    requiredPermission: 'PROGRAMACION.LEER',
+    requiredPermission: 'PROGRAMACION.CREAR',
     module: 'programacion',
     execute: executeSimularListadoBuses,
   },
