@@ -23,6 +23,9 @@ function isApiEnvelope(value: unknown): value is ApiEnvelope {
 
 function getFriendlyErrorMessage(errorCode?: string, fallback?: string): string {
   const byCode: Record<string, string> = {
+    RESERVA_TOUR_DATE_PAST: 'No puedes guardar esta reserva porque la fecha del tour ya pasó. Selecciona una fecha vigente para continuar.',
+    RESERVA_CONTACT_REQUIRED: 'La reserva necesita al menos un teléfono de contacto válido. Completa el teléfono del reportante o el de un pasajero.',
+    RESERVA_PHONE_INVALID: 'Revisa el teléfono ingresado. Debe tener formato internacional, por ejemplo +573001234567. Los teléfonos adicionales son opcionales.',
     OVERBOOKING_CONFLICT: 'No hay cupos suficientes para este tour en la fecha seleccionada.',
     TOUR_RULE_INFANTE_NOT_ALLOWED: 'Este tour no permite infantes. Ajusta los pasajeros para continuar.',
     TOUR_RULE_MIN_AGE: 'La edad minima para ninos en este tour no se cumple.',

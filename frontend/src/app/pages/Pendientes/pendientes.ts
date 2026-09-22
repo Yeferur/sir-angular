@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { WebSocketService } from '../../services/WebSocket/web-socket';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
+import { catchError, EMPTY, filter, forkJoin, of, switchMap } from 'rxjs';
 
 import {
   OperationalPending,
@@ -29,6 +31,8 @@ export class PendientesComponent implements OnInit {
   private readonly permissions = inject(PermisosService);
   private readonly alerts = inject(SirAlertService);
   private readonly router = inject(Router);
+  private readonly websocket = inject(WebSocketService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -59,6 +63,11 @@ export class PendientesComponent implements OnInit {
   ngOnInit(): void {
     if (!this.canReadPending && this.canReadReminders) this.activeTab.set('recordatorios');
     this.load();
+    this.websocket.events$.pipe(
+      filter(event => event.type === 'programacionNovedadesActualizadas' && this.canReadPending),
+      switchMap(() => this.service.listPending(this.includeSuppressed()).pipe(catchError(() => EMPTY))),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(response => this.pending.set(response.pendientes || []));
   }
 
   load(): void {

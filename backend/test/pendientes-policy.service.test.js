@@ -32,5 +32,10 @@ test('la audiencia admite el usuario calculado o un permiso efectivo, sin rol ni
   const audience = pendingService.audienceClause(7, ['RESERVAS.LEER', 'PENDIENTES.LEER']);
   assert.match(audience.sql, /Id_Usuario_Destino = \?/);
   assert.match(audience.sql, /Permiso_Audiencia IN \(\?,\?\)/);
-  assert.deepEqual(audience.params, [7, 'RESERVAS.LEER', 'PENDIENTES.LEER']);
+  assert.deepEqual(audience.params, [
+    7,
+    '["RESERVAS.LEER","PENDIENTES.LEER"]',
+    'RESERVAS.LEER',
+    'PENDIENTES.LEER',
+  ]);
 });

@@ -11843,7 +11843,7 @@ CREATE TABLE IF NOT EXISTS `reglas_pendientes` (
   UNIQUE KEY `uq_reglas_pendientes_codigo` (`Codigo`),
   CONSTRAINT `chk_reglas_pendientes_recurrencia` CHECK ((`Recurrencia_Minutos` is null) or (`Recurrencia_Minutos` > 0)),
   CONSTRAINT `chk_reglas_pendientes_posposicion` CHECK ((`Posposicion_Max_Minutos` is null) or (`Posposicion_Max_Minutos` > 0))
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `reglas_pendientes` (`Id_Regla`, `Codigo`, `Nombre`, `Descripcion`, `Activa`, `Prioridad_Default`, `Recurrencia_Minutos`, `Permite_Descarte`, `Requiere_Justificacion`, `Posposicion_Max_Minutos`, `Ventanas_Urgencia`, `Configuracion`) VALUES
 (1, 'CONTROL_VIAJE_CIERRE_PENDIENTE', 'Cierre de control de viaje pendiente', 'La operación conserva un cierre de control de viaje pendiente.', 1, 'ALTA', 120, 0, 1, 60, '[{"prioridad": "ALTA", "minutosRestantes": 240}, {"prioridad": "CRITICA", "minutosRestantes": 60}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"]}'),
@@ -11851,7 +11851,8 @@ INSERT INTO `reglas_pendientes` (`Id_Regla`, `Codigo`, `Nombre`, `Descripcion`, 
 (3, 'SEGUROS_INCOMPLETOS', 'Seguros incompletos', 'La operación tiene información de seguros sin completar.', 1, 'ALTA', 120, 0, 1, 60, '[{"prioridad": "ALTA", "minutosRestantes": 360}, {"prioridad": "CRITICA", "minutosRestantes": 120}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"]}'),
 (4, 'COMISIONES_PENDIENTES', 'Comisiones pendientes', 'La operación conserva comisiones pendientes de revisión.', 1, 'MEDIA', 360, 1, 1, 240, '[{"prioridad": "MEDIA", "minutosRestantes": 1440}, {"prioridad": "ALTA", "minutosRestantes": 240}]', '{"canales": ["CENTRO", "INICIO", "NOTIFICACION"]}'),
 (5, 'RESERVA_ESTADO_PENDIENTE', 'Reserva que requiere atención', 'El estado calculado por Reservas indica que el proceso sigue incompleto.', 1, 'ALTA', 180, 0, 1, 120, '[{"prioridad": "ALTA", "minutosRestantes": 2880}, {"prioridad": "CRITICA", "minutosRestantes": 720}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"], "diasAnticipacion": 30}'),
-(6, 'TRANSFER_ESTADO_PENDIENTE', 'Transfer que requiere atención', 'El estado calculado por Transfers indica que el proceso sigue incompleto.', 1, 'ALTA', 120, 0, 1, 90, '[{"prioridad": "ALTA", "minutosRestantes": 1440}, {"prioridad": "CRITICA", "minutosRestantes": 360}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"], "diasAnticipacion": 30}');
+(6, 'TRANSFER_ESTADO_PENDIENTE', 'Transfer que requiere atención', 'El estado calculado por Transfers indica que el proceso sigue incompleto.', 1, 'ALTA', 120, 0, 1, 90, '[{"prioridad": "ALTA", "minutosRestantes": 1440}, {"prioridad": "CRITICA", "minutosRestantes": 360}]', '{"canales": ["CENTRO", "INICIO", "BADGE", "NOTIFICACION"], "diasAnticipacion": 30}'),
+(7, 'PROGRAMACION_CAMBIOS_OPERATIVOS', 'Cambios después de guardar la programación', 'Una reserva grupal o privada cambió después de guardar su programación.', 1, 'ALTA', NULL, 1, 0, NULL, '[{"prioridad":"ALTA","minutosRestantes":2880},{"prioridad":"CRITICA","minutosRestantes":360}]', '{"canales":["CENTRO","INICIO","BADGE","NOTIFICACION"]}');
 
 -- --------------------------------------------------------
 

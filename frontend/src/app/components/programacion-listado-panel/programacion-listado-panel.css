@@ -6,6 +6,33 @@
   color: var(--text-primary);
 }
 
+.novelty-detail { display: flex; flex-direction: column; gap: 18px; }
+.novelty-reservation { border: 1px solid var(--separator-color); border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+.novelty-reservation__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px; }
+.novelty-reservation h2 { font-size: .9rem; overflow-wrap: anywhere; }
+.novelty-open { border: 0; background: transparent; color: var(--accent-blue); font: inherit; font-size: .78rem; cursor: pointer; padding: 5px 0; }
+.novelty-columns, .novelty-change { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 10px 14px; }
+.novelty-columns { background: var(--bg-tertiary); color: var(--text-secondary); font-size: .7rem; }
+.novelty-change { border-top: 1px solid var(--separator-color); font-size: .8rem; line-height: 1.5; }
+.novelty-change > * { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.novelty-before, .novelty-muted { color: var(--text-secondary); }
+.novelty-after { font-weight: 600; }
+.novelty-muted, .novelty-empty, .novelty-error { font-size: .82rem; line-height: 1.5; }
+.novelty-reservation > .novelty-muted { padding: 0 14px 14px; }
+.novelty-error { color: var(--accent-red); }
+.novelty-followup { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--separator-color); }
+.novelty-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.novelty-postpone { display: grid; gap: 6px; font-size: .8rem; color: var(--text-secondary); }
+.novelty-postpone input { min-width: 0; padding: 9px 12px; border: 1px solid var(--separator-color); border-radius: 8px; color: var(--text-primary); background: var(--bg-secondary); font: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .novelty-columns { display: none; }
+  .novelty-change { grid-template-columns: 1fr 1fr; }
+  .novelty-change > strong { grid-column: 1 / -1; }
+  .novelty-change .sr-only { position: static; width: auto; height: auto; clip-path: none; display: block; font-size: .68rem; font-weight: 400; }
+}
+
 .detail-header {
   position: relative;
   display: flex;

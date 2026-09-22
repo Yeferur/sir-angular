@@ -148,11 +148,12 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Teléfono <span class="required-star">*</span></label>
+          <label class="form-label" for="crear-telefono-contacto">Teléfono del reportante</label>
           <input type="tel" class="form-input"
-            [ngClass]="form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid ? 'errorInput' : ''"
-            formControlName="Telefono_Reportante" placeholder="+573001234567" />
-          @if (form.get('Telefono_Reportante')?.touched && form.get('Telefono_Reportante')?.invalid) {
+            [ngClass]="form.get('Telefono_Reportante')?.touched && (form.get('Telefono_Reportante')?.invalid || form.hasError('contactRequired')) ? 'errorInput' : ''"
+            id="crear-telefono-contacto" formControlName="Telefono_Reportante" placeholder="+573001234567" />
+          <div class="field-hint">Obligatorio si ningún pasajero tiene teléfono de contacto.</div>
+          @if (form.get('Telefono_Reportante')?.touched && (form.get('Telefono_Reportante')?.invalid || form.hasError('contactRequired'))) {
           <div class="errorMessage">{{ getPhoneError('Telefono_Reportante') }}</div>
           }
         </div>
@@ -469,8 +470,8 @@
 
     <!-- Tarjetas de pasajeros -->
     <div class="passengers-list" style="margin-top: 20px;">
-      @for (pasajero of pasajeros.controls; let i = $index; track i) {
-      <div [formGroupName]="i" class="passenger-card" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value" [attr.id]="'crear-pasajero-card-' + i">
+      @for (pasajero of pasajeros.controls; let i = $index; track pasajero) {
+      <div [formGroup]="$any(pasajero)" class="passenger-card" [attr.data-type]="pasajero.get('Tipo_Pasajero')?.value" [attr.id]="'crear-pasajero-card-' + i">
 
         <div class="passenger-header">
           <div class="passenger-title">
@@ -500,15 +501,13 @@
             }
           </div>
 
-          @if (pasajero.get('Tipo_Pasajero')?.value === 'ADULTO') {
           <div class="form-group">
-            <label class="form-label">Teléfono</label>
+            <label class="form-label">Teléfono (opcional)</label>
             <input type="tel" class="form-input" formControlName="Telefono_Pasajero" [attr.id]="'crear-pasajero-' + i + '-telefono'" placeholder="+573001234567" />
             @if (pasajero.get('Telefono_Pasajero')?.touched && pasajero.get('Telefono_Pasajero')?.invalid) {
             <div class="errorMessage">Formato: +573001234567</div>
             }
           </div>
-          }
 
           <!-- CAMPO INDIVIDUAL: Nacionalidad -->
           @if (modoNacionalidad === 'individual') {
@@ -952,7 +951,7 @@
         </div>
 
         <div class="resumen-passengers-grid">
-          @for (ctrl of pasajeros.controls; let i = $index; track i) {
+          @for (ctrl of pasajeros.controls; let i = $index; track ctrl) {
           <div class="resumen-passenger-card">
             <div class="resumen-passenger-row">
               <div class="resumen-passenger-main">

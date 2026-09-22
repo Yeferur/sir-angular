@@ -3,6 +3,8 @@ const notifications = require('../Notificaciones/notificaciones.service');
 const websocketManager = require('../../websocketManager');
 const { toMysqlDateTime } = require('../../utils/dateTime');
 
+const PROGRAMACION_CAMBIOS_RULE = 'PROGRAMACION_CAMBIOS_OPERATIVOS';
+
 function parseJson(value, fallback = {}) {
   if (value == null) return fallback;
   if (typeof value === 'object') return value;
@@ -53,7 +55,7 @@ async function processDuePendings({ limit = 30 } = {}) {
     const [rows] = await connection.query(
       `SELECT p.Id_Pendiente, p.Id_Usuario_Destino, p.Permiso_Audiencia,
               p.Titulo, p.Descripcion, p.Entidad_Tipo, p.Entidad_Id, p.Datos,
-              r.Recurrencia_Minutos, r.Configuracion
+              r.Codigo AS Regla_Codigo, r.Recurrencia_Minutos, r.Configuracion
          FROM pendientes_operativos p
          INNER JOIN reglas_pendientes r ON r.Id_Regla = p.Id_Regla AND r.Activa = 1
         WHERE p.Estado = 'ACTIVO'
@@ -69,11 +71,24 @@ async function processDuePendings({ limit = 30 } = {}) {
       const channels = Array.isArray(config.canales) ? config.canales : [];
       let recipients = [];
       if (channels.includes('NOTIFICACION')) {
+        const audiencePermissions = String(row.Permiso_Audiencia || '')
+          .split('&')
+          .map((permission) => permission.trim())
+          .filter(Boolean);
         if (row.Id_Usuario_Destino) {
-          const authorized = await usersWithPermissions(connection, ['PENDIENTES.LEER']);
+          const targetAudiencePermissions = String(row.Permiso_Audiencia || '').includes('&')
+            ? audiencePermissions
+            : [];
+          const requiredPermissions = row.Regla_Codigo === PROGRAMACION_CAMBIOS_RULE
+            ? targetAudiencePermissions
+            : ['PENDIENTES.LEER', ...targetAudiencePermissions];
+          const authorized = await usersWithPermissions(connection, requiredPermissions);
           recipients = authorized.filter((userId) => userId === Number(row.Id_Usuario_Destino));
         } else {
-          recipients = await usersWithPermissions(connection, ['PENDIENTES.LEER', row.Permiso_Audiencia]);
+          const requiredPermissions = row.Regla_Codigo === PROGRAMACION_CAMBIOS_RULE
+            ? audiencePermissions
+            : ['PENDIENTES.LEER', ...audiencePermissions];
+          recipients = await usersWithPermissions(connection, requiredPermissions);
         }
       }
       const data = parseJson(row.Datos, null);
@@ -87,7 +102,14 @@ async function processDuePendings({ limit = 30 } = {}) {
           entityId: String(row.Entidad_Id),
           data: { ...(data || {}), pendienteId: String(row.Id_Pendiente), ruta: data?.ruta || '/Pendientes' },
         });
-        emitted.push({ userId, notificationId });
+        const notificationData = parseJson(row.Datos, null);
+        emitted.push({
+          userId,
+          notificationId,
+          programacionFecha: row.Regla_Codigo === PROGRAMACION_CAMBIOS_RULE
+            ? String(notificationData?.fecha || '')
+            : '',
+        });
       }
       await connection.query(
         `UPDATE pendientes_operativos
@@ -110,6 +132,12 @@ async function processDuePendings({ limit = 30 } = {}) {
       idNotificacion: item.notificationId,
       categoria: 'pendientes',
     });
+    if (item.programacionFecha) {
+      websocketManager.sendToUser(item.userId, {
+        type: 'programacionNovedadesActualizadas',
+        fecha: item.programacionFecha,
+      });
+    }
   }
   return { processed: emitted.length };
 }

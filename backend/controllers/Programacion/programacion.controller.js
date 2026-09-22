@@ -2,6 +2,9 @@
 const cerebro = require('../../services/Programacion/programacion.service');
 const { obtenerResumenToursProgramacion } = require('../../services/inicio.service');
 const { recordHistorial } = require('../../services/Historial/logger');
+const programacionNovedades = require('../../services/Programacion/programacion-novedades.service');
+const pendientesService = require('../../services/Pendientes/pendientes.service');
+const websocketManager = require('../../websocketManager');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
 
 /**
@@ -249,6 +252,9 @@ exports.guardarListadoFinalController = async (req, res) => {
             busesPrivados: Array.isArray(busesPrivados) ? busesPrivados : [],
             userId: req.user?.id || null
         });
+        void programacionNovedades.syncForDate(fecha).catch((error) => {
+            console.error('[Programacion] No se pudieron resolver novedades después de guardar el listado:', error?.message || error);
+        });
         return sendSuccess(res, { data: resultado, message: 'Listado final guardado correctamente' });
     } catch (error) {
         console.error('Error al guardar listado final:', error);
@@ -258,6 +264,77 @@ exports.guardarListadoFinalController = async (req, res) => {
             errorCode: error.errorCode || 'INTERNAL_ERROR',
             details: error.details || undefined
         });
+    }
+};
+
+exports.listarNovedadesProgramacionController = async (req, res) => {
+    try {
+        const fecha = req.query?.fecha;
+        if (!fecha) return sendError(res, { status: 400, message: 'La fecha es obligatoria.', errorCode: 'MISSING_PARAMS' });
+        await programacionNovedades.listForUser(fecha, req.user.id);
+        await programacionNovedades.syncForDate(fecha);
+        const novedades = await programacionNovedades.listForUser(fecha, req.user.id);
+        return sendSuccess(res, { data: { novedades, total: novedades.length } });
+    } catch (error) {
+        if (error.status) {
+            return sendError(res, { status: error.status, message: error.message, errorCode: error.code || 'PROGRAMACION_ALERTS_FAILED' });
+        }
+        console.error('No se pudieron consultar las novedades de Programación:', error);
+        return sendError(res, { status: 500, message: 'No se pudieron consultar las novedades de Programación.', errorCode: 'PROGRAMACION_ALERTS_FAILED' });
+    }
+};
+
+exports.revisarNovedadProgramacionController = async (req, res) => {
+    try {
+        if (!await programacionNovedades.hasRequiredPermissions(req.user.id)) {
+            return sendError(res, {
+                status: 403,
+                message: 'Se requieren PROGRAMACION.LEER y PROGRAMACION.ACTUALIZAR.',
+                errorCode: 'PROGRAMACION_ALERTS_FORBIDDEN'
+            });
+        }
+        const result = await pendientesService.dismiss(
+            req.params.id,
+            req.user.id,
+            req.userPermissions,
+            'Revisada desde Programación.',
+            programacionNovedades.RULE_CODE
+        );
+        websocketManager.sendToUser(req.user.id, { type: 'programacionNovedadesActualizadas' });
+        return sendSuccess(res, { data: result, message: 'Novedad marcada como revisada.' });
+    } catch (error) {
+        if (error instanceof pendientesService.PendingOperationError) {
+            return sendError(res, { status: error.status, message: error.message, errorCode: error.code });
+        }
+        console.error('No se pudo marcar la novedad de Programación como revisada:', error);
+        return sendError(res, { status: 500, message: 'No se pudo marcar la novedad como revisada.', errorCode: 'PROGRAMACION_ALERT_REVIEW_FAILED' });
+    }
+};
+
+exports.posponerNovedadProgramacionController = async (req, res) => {
+    try {
+        if (!await programacionNovedades.hasRequiredPermissions(req.user.id)) {
+            return sendError(res, {
+                status: 403,
+                message: 'Se requieren PROGRAMACION.LEER y PROGRAMACION.ACTUALIZAR.',
+                errorCode: 'PROGRAMACION_ALERTS_FORBIDDEN'
+            });
+        }
+        const result = await pendientesService.postpone(
+            req.params.id,
+            req.user.id,
+            req.userPermissions,
+            req.body?.suprimidoHasta,
+            programacionNovedades.RULE_CODE
+        );
+        websocketManager.sendToUser(req.user.id, { type: 'programacionNovedadesActualizadas' });
+        return sendSuccess(res, { data: result, message: 'Novedad pospuesta.' });
+    } catch (error) {
+        if (error instanceof pendientesService.PendingOperationError) {
+            return sendError(res, { status: error.status, message: error.message, errorCode: error.code });
+        }
+        console.error('No se pudo posponer la novedad de Programación:', error);
+        return sendError(res, { status: 500, message: 'No se pudo posponer la novedad.', errorCode: 'PROGRAMACION_ALERT_POSTPONE_FAILED' });
     }
 };
 
@@ -357,6 +434,9 @@ exports.guardarProgramacionPrivadaController = async (req, res) => {
             fecha,
             buses,
             userId: req.user?.id || null
+        });
+        void programacionNovedades.syncForDate(fecha).catch((error) => {
+            console.error('[Programacion] No se pudieron resolver novedades después de guardar privados:', error?.message || error);
         });
         return sendSuccess(res, {
             data: resultado,

@@ -45,6 +45,7 @@
         @for (tour of tours(); track tour.Id_Tour) {
           @let hasPassengers = (tour.totalPasajeros || 0) > 0;
           @let generated = tour.estado === 'Generado' || tour.estado === 'Confirmado';
+          <div class="operation-card-wrap">
           <button
             type="button"
             class="operation-card"
@@ -58,7 +59,7 @@
                 class="status-chip"
                 [class.status-chip--ready]="generated"
                 [class.status-chip--pending]="hasPassengers && !generated">
-                {{ hasPassengers ? (generated ? 'Generado' : 'Por generar') : 'Sin reservas' }}
+                {{ hasPassengers ? (generated ? 'Generado' : 'Por generar') : ((tour.totalReservas || 0) > 0 ? 'Sin pasajeros activos' : 'Sin reservas') }}
               </span>
             </span>
 
@@ -96,6 +97,14 @@
               }
             </span>
           </button>
+          @if (novedadesPorTour()[tour.Id_Tour]; as count) {
+            <button type="button" class="tour-novelty" [disabled]="updating()"
+              [attr.aria-label]="count + (count === 1 ? ' novedad de ' : ' novedades de ') + tour.NombreTour"
+              (click)="novedadesSelected.emit(tour)">
+              <span aria-hidden="true">●</span> {{ count }} {{ count === 1 ? 'novedad' : 'novedades' }}
+            </button>
+          }
+          </div>
         }
       </div>
     </section>

@@ -1,5 +1,6 @@
 // services/Reservas/reservas.service.js
 const db = require('../../database/db');
+const { hasReservaContact, validarContactoReserva } = require('./reserva-contact');
 const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
@@ -7,7 +8,14 @@ const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { assertReservationOwner } = require('../../utils/clientAccess');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
+const programacionNovedades = require('../Programacion/programacion-novedades.service');
 const fsp = fs.promises;
+
+function sincronizarNovedadesProgramacion(reservaId, fecha) {
+  void programacionNovedades.syncForReservationChange({ reservationId: reservaId, fecha }).catch((error) => {
+    console.error('[Programacion] No se pudieron sincronizar las novedades de la reserva:', error?.message || error);
+  });
+}
 
 /* ===========================
  * HELPERS
@@ -50,6 +58,7 @@ function validarFechaTourBogota(fechaTourIso) {
   if (fechaRecibidaDate < hoyBogotaDate) {
     const err = new Error(`La fecha reservada (${fechaRecibidaStr}) no puede ser pasada respecto a la fecha actual en America/Bogota.`);
     err.status = 400;
+    err.errorCode = 'RESERVA_TOUR_DATE_PAST';
     throw err;
   }
 }
@@ -368,7 +377,7 @@ function construirImpactoCuposReserva({
   };
 }
 
-function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null }) {
+function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null, telefonoReportante = null }) {
   const estadoBase = normalizarEstadoReservaLegacy(estadoActual);
 
   if (estadoBase === 'Completada') {
@@ -384,7 +393,7 @@ function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoAc
 
   const datosOk = pasajerosArray.length > 0
     && pasajerosArray.every((p) => tieneTexto(p?.Nombre_Pasajero) && tieneTexto(p?.DNI))
-    && pasajerosArray.some((p) => tieneTexto(p?.Telefono_Pasajero));
+    && hasReservaContact(telefonoReportante, pasajerosArray);
 
   const totalVenta = pasajerosArray.reduce((sum, p) => sum + Number(p?.Precio_Pasajero || 0), 0);
   const totalAbonado = pagosArray.reduce((sum, pago) => (
@@ -662,6 +671,9 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
         r.Tipo_Reserva,
         r.Fecha_Tour,
         r.Nombre_Reportante,
+        r.Telefono_Reportante,
+        r.Idioma_Reserva,
+        r.Observaciones,
         r.Id_Horario,
         r.Id_Moneda,
         r.Creado_Por,
@@ -1174,7 +1186,7 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
 
 async function normalizarEstadosReservasExistentes(conexion = db) {
   const [reservasRows] = await conexion.query(
-    `SELECT Id_Reserva, Fecha_Tour, Estado
+    `SELECT Id_Reserva, Fecha_Tour, Estado, Telefono_Reportante
        FROM reservas`
   );
 
@@ -1220,6 +1232,7 @@ async function normalizarEstadosReservasExistentes(conexion = db) {
     if (!['Cancelada', 'Completada'].includes(estadoActual)) {
       nuevoEstado = resolverEstadoReserva({
         fechaTour: reserva.Fecha_Tour,
+        telefonoReportante: reserva.Telefono_Reportante,
         pasajeros: pasajerosMap.get(idReserva) || [],
         pagos: pagosMap.get(idReserva) || [],
         estadoActual: estadoActual || null,
@@ -1445,6 +1458,7 @@ async function crearReservaConPasajerosYPagos(
 
     validarReglasPasajerosPorTour(payload);
     validarFechaTourBogota(payload.cabeceraReserva.Fecha_Tour);
+    validarContactoReserva(payload.cabeceraReserva.Telefono_Reportante, payload.pasajeros || []);
 
     conn = await db.getConnection();
 
@@ -1468,6 +1482,7 @@ async function crearReservaConPasajerosYPagos(
     const pagosArray = Array.isArray(payload.pagos) ? payload.pagos : [];
     const estadoCalculado = resolverEstadoReserva({
       fechaTour: r.Fecha_Tour,
+      telefonoReportante: r.Telefono_Reportante,
       pasajeros: pasajerosArray,
       pagos: pagosArray,
     });
@@ -1609,6 +1624,7 @@ async function crearReservaConPasajerosYPagos(
         ownerUserId: userId || null,
       });
     }
+    sincronizarNovedadesProgramacion(idReserva, r.Fecha_Tour || payload?.cabeceraReserva?.Fecha_Tour);
     
     return { Id_Reserva: idReserva };
   } catch (error) {
@@ -1814,9 +1830,17 @@ async function actualizarReservaConPasajerosYPagos(
     const currentReserva = impactoActual.reserva;
     const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
     const pagosArray = Array.isArray(payload?.pagos) ? payload.pagos : [];
+    const [puntosPasajerosAnteriores] = await conn.query(
+      'SELECT Id_Punto, Nombre_Pasajero, DNI, Telefono_Pasajero, Precio_Pasajero FROM pasajeros WHERE Id_Reserva = ? ORDER BY Id_Pasajero ASC',
+      [Id_Reserva]
+    );
 
     const idTourFinal = Number(r.Id_Tour || currentReserva.Id_Tour_Actual || 0);
     const fechaTourFinal = normalizarFechaYMD(r.Fecha_Tour || currentReserva.Fecha_Tour);
+    validarFechaTourBogota(fechaTourFinal);
+    const telefonoReportanteFinal = r.Telefono_Reportante !== undefined ? r.Telefono_Reportante : currentReserva.Telefono_Reportante;
+    const pasajerosFinales = payload?.pasajeros !== undefined ? pasajerosArray : puntosPasajerosAnteriores;
+    validarContactoReserva(telefonoReportanteFinal, pasajerosFinales);
     const tipoReservaFinal = String(r.Tipo_Reserva || currentReserva.Tipo_Reserva || 'Grupal');
 
     if (!idTourFinal || !Number.isFinite(idTourFinal)) {
@@ -1841,7 +1865,8 @@ async function actualizarReservaConPasajerosYPagos(
 
     const estadoCalculado = resolverEstadoReserva({
       fechaTour: fechaTourFinal,
-      pasajeros: pasajerosArray,
+      telefonoReportante: telefonoReportanteFinal,
+      pasajeros: pasajerosFinales,
       pagos: pagosArray,
       estadoActual: estadoAnterior,
     });
@@ -1981,10 +2006,34 @@ async function actualizarReservaConPasajerosYPagos(
       }
     }
 
+    const horarioAnterior = currentReserva.Id_Horario || null;
+    const horarioNuevo = r.Id_Horario !== undefined ? (r.Id_Horario || null) : horarioAnterior;
+    const [horariosRows] = horarioAnterior || horarioNuevo
+      ? await conn.query(
+        'SELECT Id_Horario, Hora_Salida FROM horarios WHERE Id_Horario IN (?)',
+        [[...new Set([horarioAnterior, horarioNuevo].filter(Boolean))]]
+      )
+      : [[]];
+    const horariosById = new Map((horariosRows || []).map((row) => [String(row.Id_Horario), row.Hora_Salida || null]));
+    const puntosAnteriores = (puntosPasajerosAnteriores || []).map((row) => row.Id_Punto).filter((id) => id != null);
+    const puntosNuevos = payload?.pasajeros !== undefined
+      ? pasajerosArray.map((pasajero) => pasajero.Id_Punto || r.Id_Punto || null).filter((id) => id != null)
+      : puntosAnteriores;
+    const cantidadPasajerosAnterior = (puntosPasajerosAnteriores || []).length;
+    const cantidadPasajerosNueva = payload?.pasajeros !== undefined ? pasajerosArray.length : cantidadPasajerosAnterior;
+    const serializePoints = (points) => JSON.stringify([...new Set(points.map(String))].sort());
     const detallesHistorial = [
       { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado },
       { columna: 'Id_Tour', anterior: currentReserva.Id_Tour_Actual, nuevo: idTourFinal },
-      { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal }
+      { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal },
+      { columna: 'Tipo_Reserva', anterior: currentReserva.Tipo_Reserva || null, nuevo: tipoReservaFinal },
+      { columna: 'Id_Horario', anterior: horarioAnterior, nuevo: horarioNuevo },
+      { columna: 'Hora_Salida', anterior: horariosById.get(String(horarioAnterior)) || null, nuevo: horariosById.get(String(horarioNuevo)) || null },
+      { columna: 'NumeroPasajeros', anterior: cantidadPasajerosAnterior, nuevo: cantidadPasajerosNueva },
+      { columna: 'Puntos_Recogida', anterior: serializePoints(puntosAnteriores), nuevo: serializePoints(puntosNuevos) },
+      { columna: 'Nombre_Reportante', anterior: currentReserva.Nombre_Reportante || null, nuevo: r.Nombre_Reportante !== undefined ? (r.Nombre_Reportante || null) : (currentReserva.Nombre_Reportante || null) },
+      { columna: 'Idioma_Reserva', anterior: currentReserva.Idioma_Reserva || null, nuevo: r.Idioma_Reserva !== undefined ? (r.Idioma_Reserva || null) : (currentReserva.Idioma_Reserva || null) },
+      { columna: 'Observaciones', anterior: currentReserva.Observaciones || null, nuevo: r.Observaciones !== undefined ? (r.Observaciones || null) : (currentReserva.Observaciones || null) },
     ];
     if (cuposLiberados?.cuposLiberados) {
       detallesHistorial.push({ columna: 'Cupos_Liberados', anterior: 0, nuevo: cuposLiberados.cuposLiberados });
@@ -2023,6 +2072,7 @@ async function actualizarReservaConPasajerosYPagos(
         ownerUserId: currentReserva.Creado_Por || null,
       });
     }
+    sincronizarNovedadesProgramacion(Id_Reserva, fechaTourFinal);
 
     return { Id_Reserva };
   } catch (error) {
@@ -2084,6 +2134,7 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       Id_Reserva,
       ownerUserId: impactoActual.reserva.Creado_Por || null,
     });
+    sincronizarNovedadesProgramacion(Id_Reserva, normalizarFechaYMD(impactoActual.fechaTour));
     return { Id_Reserva, Estado: 'Cancelada' };
   } catch (error) {
     if (conn) await conn.rollback();
@@ -2180,6 +2231,7 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       Id_Reserva,
       ownerUserId: reserva.Creado_Por || null,
     });
+    sincronizarNovedadesProgramacion(Id_Reserva, normalizarFechaYMD(impactoActual.fechaTour));
 
     return {
       Id_Reserva: String(Id_Reserva),

@@ -1,3 +1,4 @@
+import { CONTACT_REQUIRED_MESSAGE, RESERVA_PHONE_PATTERN, hasReservaContact, reservaContactValidator } from '../reserva-contact.utils';
 import {
   Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal,
   computed, NgZone, DestroyRef
@@ -357,7 +358,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   // RESTO DEL COMPONENTE (igual que antes, sin cambios lógicos)
   // ═══════════════════════════════════════════════════════════════════
 
-  private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+  private readonly e164WithTenDigitsPattern = RESERVA_PHONE_PATTERN;
   activePaisOrigenIndex: number | null = null;
 
   // openSummary: ya no aplica en wizard pero lo conservamos para no romper referencias
@@ -380,6 +381,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   private getFriendlyReservaErrorMessage(error: any): string {
+    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') return CONTACT_REQUIRED_MESSAGE;
     const raw = String(this.getApiErrorMessage(error));
     const normalized = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -616,6 +618,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private showApiError(error: any, title = 'No se pudo completar la operación'): void {
     const message = this.getFriendlyReservaErrorMessage(error);
+    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') {
+      this.form.get('Telefono_Reportante')?.markAsTouched();
+      this.focusValidationTarget(1, 'crear-telefono-contacto');
+    }
     this.alertService.showModal({
       type: 'error',
       title,
@@ -936,7 +942,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Id_Moneda:           [{ value: 1, disabled: false }, Validators.required],
       Id_Canal:            [null, Validators.required],
       Nombre_Reportante:   ['', Validators.required],
-      Telefono_Reportante: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
+      Telefono_Reportante: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones:       [''],
       Tipo_Reserva:        ['Grupal', Validators.required],
       Pasajeros:           this.fb.array([]),
@@ -953,7 +959,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       ComprobantePago:     [null],
       PagoObservaciones:   [''],
       NacionalidadGlobal:  [''],
-    });
+    }, { validators: reservaContactValidator });
 
     // WebSocket cupos
     this.wsService.reservationEvents$
@@ -1456,9 +1462,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     // Herencia de valores globales en el momento de creación
     const planInicial = this.form.get('Id_Plan')?.value ?? null;
-    const nacionalidadInicial = this.modoNacionalidad === 'global'
-      ? (String(this.form.get('NacionalidadGlobal')?.value ?? '').trim() || null)
-      : null;
+    const nacionalidadInicial = '';
 
     const fg = this.fb.group({
       Tipo_Pasajero:     [tipo, Validators.required],
@@ -1766,15 +1770,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   private syncPassengerPhoneValidator(ctrl: AbstractControl | null): void {
-    const tipo = normalizeReservaPassengerType(ctrl?.get('Tipo_Pasajero')?.value);
     const telefonoCtrl = ctrl?.get('Telefono_Pasajero');
     if (!telefonoCtrl) return;
 
-    if (tipo === 'ADULTO') {
-      telefonoCtrl.setValidators([Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]);
-    } else {
-      telefonoCtrl.clearValidators();
-    }
+    telefonoCtrl.setValidators([Validators.pattern(this.e164WithTenDigitsPattern)]);
 
     telefonoCtrl.updateValueAndValidity({ emitEvent: false });
   }
@@ -1833,15 +1832,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         return { message: `${prefix}: ese DNI o pasaporte ya tiene reserva para esta fecha`, step: 3, focusId: `crear-pasajero-${i}-dni` };
       }
 
-      if (tipo === 'ADULTO') {
-        const telefonoCtrl = ctrl.get('Telefono_Pasajero');
-        const telefono = String(telefonoCtrl?.value ?? '').trim();
-        if (telefonoCtrl?.hasError('required')) {
-          return { message: `${prefix}: el teléfono es obligatorio`, step: 3, focusId: `crear-pasajero-${i}-telefono` };
-        }
-        if (telefonoCtrl?.hasError('pattern') && telefono) {
-          return { message: `${prefix}: el teléfono debe tener formato +573001234567`, step: 3, focusId: `crear-pasajero-${i}-telefono` };
-        }
+      if (ctrl.get('Telefono_Pasajero')?.hasError('pattern')) {
+        return { message: `${prefix}: el teléfono debe tener formato +573001234567`, step: 3, focusId: `crear-pasajero-${i}-telefono` };
       }
 
       if (ctrl.get('Nacionalidad')?.errors?.['required']) {
@@ -1879,6 +1871,11 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       };
     }
 
+    if (this.form.hasError('contactRequired')) {
+      this.form.get('Telefono_Reportante')?.markAsTouched();
+      return { message: CONTACT_REQUIRED_MESSAGE, step: 1, focusId: 'crear-telefono-contacto' };
+    }
+
     const passengerIssue = this.getPassengerValidationIssue();
     if (passengerIssue) return passengerIssue;
 
@@ -1903,6 +1900,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     const first = invalid[0];
     return {
+      focusId: first === 'Telefono_Reportante' ? 'crear-telefono-contacto' : undefined,
       message: friendly[first] || `Revisa el campo ${first}`,
       step: first === 'SelectTour' || first === 'Fecha_Tour' ? 0 : first === 'Nombre_Reportante' || first === 'Telefono_Reportante' ? 1 : 2,
     };
@@ -2101,6 +2099,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   getPhoneError(controlName: string): string {
     const ctrl = this.form?.get(controlName);
+    if (this.form?.hasError('contactRequired')) return CONTACT_REQUIRED_MESSAGE;
     if (!ctrl) return 'Teléfono inválido.';
     if (ctrl.hasError('required')) return 'El teléfono es obligatorio.';
     if (ctrl.hasError('pattern')) return "Debe iniciar con '+' y tener indicativo + exactamente 10 dígitos (ej: +573001234567).";
@@ -2266,12 +2265,11 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     for (const p of pax) {
       const nombre = (p.Nombre_Pasajero ?? '').toString().trim();
       const dni = (p.DNI ?? '').toString().trim();
-      const tel = (p.Telefono_Pasajero ?? '').toString().trim();
       if (!nombre) faltanNombre++;
       if (!dni) faltanDni++;
-      if (tel) hayTelefonoPasajero = true;
     }
 
+    hayTelefonoPasajero = hasReservaContact(this.form.get('Telefono_Reportante')?.value, pax);
     const okNombres = faltanNombre === 0;
     const okDni = faltanDni === 0;
 
@@ -2289,7 +2287,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       const partes: string[] = [];
       if (!val.okNombres) partes.push(`faltan ${val.faltanNombre} nombre(s)`);
       if (!val.okDni) partes.push(`faltan ${val.faltanDni} DNI/pasaporte(s)`);
-      if (!val.hayTelefonoPasajero) partes.push('no hay ningún teléfono de pasajero');
+      if (!val.hayTelefonoPasajero) partes.push('no hay teléfono de contacto válido');
       return { estado: 'Pendiente', subestado: 'de datos', motivo: `Faltan datos básicos: ${partes.join('; ')}.` };
     }
 

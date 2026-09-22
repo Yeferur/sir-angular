@@ -72,7 +72,7 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
 
   openNotification(item: SirNotification): void {
     if (!item.leida) this.notifications.markRead(item.idNotificacion);
-    const route = item.datos?.['route'];
+    const route = item.datos?.['route'] ?? item.datos?.['ruta'];
     if (typeof route === 'string' && route.startsWith('/')) {
       this.drawer.close(true);
       void this.router.navigateByUrl(route);

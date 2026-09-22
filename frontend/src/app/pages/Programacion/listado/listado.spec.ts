@@ -1,21 +1,30 @@
 import { provideZonelessChangeDetection } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeEsCO from '@angular/common/locales/es-CO';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { ProgramacionListadoPanelComponent } from '../../../components/programacion-listado-panel/programacion-listado-panel';
 
 import { TourProgramacion } from '../../../interfaces/Programacion/reservas';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import {
   ProgramacionDashboardService,
+  ProgramacionNovedad,
   TransfersProgramacionResponse,
 } from '../../../services/Programacion/programacion';
+import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { Listado } from './listado';
+
+registerLocaleData(localeEsCO);
 
 describe('Listado', () => {
   let programacionService: jasmine.SpyObj<ProgramacionDashboardService>;
   let router: jasmine.SpyObj<Router>;
   let grantedPermissions: Set<string>;
+  let websocketEvents: Subject<any>;
+  let websocketState: BehaviorSubject<'disconnected' | 'connecting' | 'connected' | 'reconnecting'>;
   let routeSnapshot: {
     data: Record<string, unknown>;
     url: unknown[];
@@ -29,6 +38,9 @@ describe('Listado', () => {
       [
         'obtenerListadoFinal',
         'obtenerResumenDashboard',
+        'obtenerNovedadesProgramacion',
+        'marcarNovedadProgramacionRevisada',
+        'posponerNovedadProgramacion',
         'resumenPrivadosDia',
         'obtenerTransfersDia',
         'generarPlanLogistico',
@@ -38,6 +50,13 @@ describe('Listado', () => {
       ]
     );
     grantedPermissions = new Set(['PROGRAMACION.LEER', 'PROGRAMACION.EXPORTAR']);
+    websocketEvents = new Subject<any>();
+    websocketState = new BehaviorSubject<'disconnected' | 'connecting' | 'connected' | 'reconnecting'>('disconnected');
+    programacionService.obtenerNovedadesProgramacion.and.returnValue(of({ novedades: [], total: 0 }));
+    programacionService.marcarNovedadProgramacionRevisada.and.returnValue(of({ idPendiente: '1', estado: 'DESCARTADO' }));
+    programacionService.posponerNovedadProgramacion.and.returnValue(of({
+      idPendiente: '1', estado: 'ACTIVO', suprimidoHasta: '2026-09-21T15:00:00.000Z',
+    }));
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
     routeSnapshot = {
@@ -52,6 +71,10 @@ describe('Listado', () => {
       providers: [
         provideZonelessChangeDetection(),
         { provide: ProgramacionDashboardService, useValue: programacionService },
+        {
+          provide: WebSocketService,
+          useValue: { events$: websocketEvents.asObservable(), connectionState$: websocketState.asObservable() },
+        },
         {
           provide: PermisosService,
           useValue: { tienePermiso: (permission: string) => grantedPermissions.has(permission) },
@@ -228,6 +251,91 @@ describe('Listado', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Generando los listados y optimizando los recorridos'
     );
+  });
+
+  it('recupera novedades por WebSocket sin reemplazar el editor ni borrar cambios locales', () => {
+    grantedPermissions.add('PROGRAMACION.ACTUALIZAR');
+    const novelty: ProgramacionNovedad = {
+      idPendiente: '700',
+      regla: 'PROGRAMACION_CAMBIOS_OPERATIVOS',
+      titulo: 'Novedades de Programación: Guatapé',
+      descripcion: '1 reserva requiere revisión en el listado guardado.',
+      prioridad: 'ALTA',
+      estado: 'ACTIVO',
+      fechaOperacion: '2026-09-21',
+      datos: {
+        fecha: '2026-09-21',
+        programacionId: '44',
+        tourId: 10,
+        tourName: 'Guatapé',
+        novedades: [{
+          reservationId: 'R-700',
+          changes: [{ campo: 'Pasajeros', anterior: '2', actual: '3' }],
+        }],
+      },
+    };
+    programacionService.obtenerNovedadesProgramacion.and.returnValue(of({ novedades: [novelty], total: 1 }));
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    component.modoVista = 'editor';
+    component.listadoDirty = true;
+    component.planSeleccionado = { buses: [] } as any;
+    (component as any).subscribeProgramacionNovedades();
+    component.cargarNovedadesProgramacion();
+
+    websocketEvents.next({ type: 'programacionNovedadesActualizadas', payload: { fecha: component.fechaSeleccionada } });
+
+    expect(component.novedadesProgramacion).toEqual([novelty]);
+    expect(component.listadoDirty).toBeTrue();
+    expect(component.planSeleccionado).toEqual({ buses: [] } as any);
+    expect(programacionService.obtenerListadoFinal).not.toHaveBeenCalled();
+    expect(programacionService.obtenerNovedadesProgramacion).toHaveBeenCalledTimes(2);
+  });
+
+  it('permite posponer la propia novedad y la oculta hasta que vuelva a estar disponible', () => {
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    const novelty: ProgramacionNovedad = {
+      idPendiente: '702',
+      regla: 'PROGRAMACION_CAMBIOS_OPERATIVOS',
+      titulo: 'Novedades de Programación: Guatapé',
+      descripcion: 'Una reserva requiere revisión.',
+      prioridad: 'ALTA',
+      estado: 'ACTIVO',
+      fechaOperacion: '2026-09-21',
+      datos: {
+        fecha: '2026-09-21',
+        programacionId: '45',
+        tourId: 10,
+        tourName: 'Guatapé',
+        novedades: [{ reservationId: 'R-702', changes: [] }],
+      },
+    };
+    const until = new Date(Date.now() + 45 * 60 * 1000);
+    until.setSeconds(0, 0);
+    component.novedadesProgramacion = [novelty];
+    component.novedadPosponerHasta = new Date(until.getTime() - until.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 16);
+
+    component.confirmarPosponerNovedad(novelty);
+
+    expect(programacionService.posponerNovedadProgramacion).toHaveBeenCalledOnceWith(
+      '702', until.toISOString(),
+    );
+    expect(component.novedadesProgramacion).toEqual([]);
+  });
+
+  it('recupera el estado persistido al reconectarse el WebSocket', () => {
+    grantedPermissions.add('PROGRAMACION.ACTUALIZAR');
+    const fixture = TestBed.createComponent(Listado);
+    const component = fixture.componentInstance;
+    (component as any).subscribeProgramacionNovedades();
+    websocketState.next('connected');
+    websocketState.next('disconnected');
+    websocketState.next('reconnecting');
+    websocketState.next('connected');
+
+    expect(programacionService.obtenerNovedadesProgramacion).toHaveBeenCalledOnceWith(component.fechaSeleccionada);
   });
 
   it('conserva parada operativa y tour de forma independiente según sus coordenadas', () => {
@@ -432,6 +540,124 @@ describe('Listado', () => {
     expect(programacionService.exportarTransfersDia).not.toHaveBeenCalled();
     expect(programacionService.exportarListadoBus).not.toHaveBeenCalled();
     expect(programacionService.exportarListadosZip).not.toHaveBeenCalled();
+  });
+
+  function novelty(id = '701', tourId = 2): ProgramacionNovedad {
+    return { idPendiente: id, regla: 'PROGRAMACION_CAMBIOS_OPERATIVOS', titulo: 'Novedades', descripcion: 'Una reserva cambió', prioridad: 'ALTA', estado: 'ACTIVO', fechaOperacion: '2026-10-15',
+      datos: { fecha: '2026-10-15', programacionId: '45', tourId, tourName: 'Guatapé', novedades: [{ reservationId: 'R-701', changes: [
+        { campo: 'Pasajeros', anterior: '2', actual: '3' }, { campo: 'Observaciones', anterior: '', actual: 'Recoger en recepción' },
+      ] }] } };
+  }
+
+  function noveltyDashboard() {
+    grantedPermissions.add('PROGRAMACION.ACTUALIZAR');
+    const item = novelty();
+    programacionService.obtenerNovedadesProgramacion.and.returnValue(of({ novedades: [item], total: 1 }));
+    programacionService.obtenerResumenDashboard.and.returnValue(of([
+      { Id_Tour: 2, Nombre_Tour: 'Guatapé', NombreTour: 'Guatapé', NumeroPasajeros: 0, totalReservas: 1 },
+      { Id_Tour: 3, Nombre_Tour: 'City tour', NombreTour: 'City tour', NumeroPasajeros: 0, totalReservas: 0 },
+    ]));
+    programacionService.obtenerListadoFinal.and.returnValue(of({ exists: false, buses: [], reservasSinAsignar: [] }));
+    programacionService.resumenPrivadosDia.and.returnValue(of({ totalReservas: 0, totalBuses: 0, totalPax: 0, privados: [] }));
+    programacionService.obtenerTransfersDia.and.returnValue(of({ fecha: '2026-10-15', totalTransfers: 0, totalPasajeros: 0, totalServicios: 0, totalPendientes: 0, servicios: [], transfers: [] }));
+    routeSnapshot.queryParamMap.get = key => key === 'fecha' ? '2026-10-15' : null;
+    const fixture = TestBed.createComponent(Listado);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, item, drawer: TestBed.inject(SirDrawerService) };
+  }
+
+  it('sustituye el bloque por un indicador accesible aun con cero pasajeros, sin alterar tarjetas ni conteos', () => {
+    const { fixture, component, drawer } = noveltyDashboard();
+    const cards = fixture.nativeElement.querySelectorAll('.operation-grid .operation-card');
+    expect(fixture.nativeElement.querySelector('.programacion-novedades')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Reserva R-701');
+    expect(cards[0].textContent).toContain('Sin pasajeros activos');
+    expect(cards[1].textContent).toContain('Sin reservas');
+    expect(component.toursDelDia[0].totalPasajeros).toBe(0);
+    expect(component.toursDelDia[0].totalReservas).toBe(1);
+    const before = Array.from(cards).map((card: any) => card.getBoundingClientRect().height);
+    const indicator = fixture.nativeElement.querySelector('.tour-novelty') as HTMLButtonElement;
+    expect(indicator.textContent).toContain('1 novedad');
+    expect(indicator.closest('button.operation-card')).toBeNull();
+    indicator.click();
+    expect(drawer.drawer()?.type).toBe('programacion-listado');
+    expect(drawer.drawer()?.props?.['novedades']()).toBeDefined();
+    expect(programacionService.generarPlanLogistico).not.toHaveBeenCalled();
+    component.novedadesProgramacion = [];
+    fixture.changeDetectorRef.markForCheck(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.tour-novelty')).toBeNull();
+    expect(Array.from(cards).map((card: any) => card.getBoundingClientRect().height)).toEqual(before);
+  });
+
+  it('agrupa diferencias por reserva en el drawer existente y abre Ver reserva', () => {
+    const { fixture, component, item, drawer } = noveltyDashboard();
+    component.novedadesProgramacion = [item, { ...item, idPendiente: '702' }];
+    component.abrirNovedadesTour(component.toursDelDia[0]);
+    const panel = TestBed.createComponent(ProgramacionListadoPanelComponent); panel.detectChanges();
+    expect(panel.nativeElement.querySelectorAll('.novelty-reservation').length).toBe(1);
+    expect(panel.nativeElement.querySelectorAll('.novelty-change').length).toBe(2);
+    expect(panel.nativeElement.textContent).toContain('Guatapé');
+    expect(panel.nativeElement.textContent).toContain('Anterior');
+    expect(panel.nativeElement.textContent).toContain('Actual');
+    expect(panel.nativeElement.textContent).toContain('Sin dato');
+    expect(panel.nativeElement.querySelector('.buses-section')).toBeNull();
+    const open = spyOn(drawer, 'openReserva').and.stub();
+    (panel.nativeElement.querySelector('.novelty-open') as HTMLButtonElement).click();
+    expect(open).toHaveBeenCalledOnceWith('R-701');
+    expect(fixture.nativeElement.textContent).not.toContain('Recoger en recepción');
+  });
+
+  it('sincroniza indicador y detalle abierto por WebSocket y al marcar revisado', () => {
+    const { fixture, component, item } = noveltyDashboard();
+    component.abrirNovedadesTour(component.toursDelDia[0]);
+    const panel = TestBed.createComponent(ProgramacionListadoPanelComponent); panel.detectChanges();
+    const updated = structuredClone(item); updated.datos.novedades[0].changes[0].actual = '4';
+    programacionService.obtenerNovedadesProgramacion.and.returnValue(of({ novedades: [updated], total: 1 }));
+    websocketEvents.next({ type: 'programacionNovedadesActualizadas', payload: { fecha: '2026-10-15' } });
+    panel.detectChanges();
+    expect(panel.componentInstance.reservasConCambios()[0].changes[0].actual).toBe('4');
+    (panel.nativeElement.querySelector('.novelty-review') as HTMLButtonElement).click();
+    panel.detectChanges(); fixture.detectChanges();
+    expect(programacionService.marcarNovedadProgramacionRevisada).toHaveBeenCalledOnceWith('701');
+    expect(panel.nativeElement.textContent).toContain('No hay novedades pendientes');
+    expect(fixture.nativeElement.querySelector('.tour-novelty')).toBeNull();
+  });
+
+  it('pospone dentro del drawer y conserva el detalle si falla la acción', () => {
+    const { fixture, component, item } = noveltyDashboard();
+    component.abrirNovedadesTour(component.toursDelDia[0]);
+    const panel = TestBed.createComponent(ProgramacionListadoPanelComponent); panel.detectChanges();
+    programacionService.marcarNovedadProgramacionRevisada.and.returnValue(throwError(() => new Error('offline')));
+    (panel.nativeElement.querySelector('.novelty-review') as HTMLButtonElement).click(); panel.detectChanges();
+    expect(component.novedadesProgramacion).toEqual([item]);
+    expect(panel.componentInstance.novedades()?.guardando).toBeFalse();
+    (panel.nativeElement.querySelector('.novelty-postpone-button') as HTMLButtonElement).click(); panel.detectChanges();
+    expect(panel.nativeElement.querySelector('input[type="datetime-local"]')).toBeTruthy();
+    const confirm = Array.from(panel.nativeElement.querySelectorAll('button')).find((b: any) => b.textContent.trim() === 'Confirmar') as HTMLButtonElement;
+    confirm.click(); panel.detectChanges(); fixture.detectChanges();
+    expect(programacionService.posponerNovedadProgramacion.calls.mostRecent().args[0]).toBe('701');
+    expect(fixture.nativeElement.querySelector('.tour-novelty')).toBeNull();
+    expect(panel.nativeElement.textContent).toContain('No hay novedades pendientes');
+  });
+
+  it('filtra por fecha y tours combinados; no muestra avisos sin los permisos existentes', () => {
+    const { component } = noveltyDashboard();
+    component.toursDelDia = [{ Id_Tour: 5, idsTours: [1, 5], NombreTour: 'Combinado', estado: 'Pendiente', planGenerado: null } as any];
+    component.novedadesProgramacion = [novelty('1', 1), novelty('2', 5), novelty('3', 2), { ...novelty('4', 5), datos: { ...novelty('4', 5).datos, fecha: '2026-10-16' } }];
+    expect(component.novedadesPorTour[5]).toBe(2);
+    grantedPermissions.delete('PROGRAMACION.ACTUALIZAR');
+    expect(component.novedadesPorTour[5]).toBe(0);
+  });
+
+  it('retira el detalle y los indicadores de la fecha anterior al cambiar de día', () => {
+    const { fixture, component, drawer } = noveltyDashboard();
+    component.abrirNovedadesTour(component.toursDelDia[0]);
+    const pending = new Subject<any>();
+    programacionService.obtenerNovedadesProgramacion.and.returnValue(pending);
+    component.irDiaSiguiente(); fixture.detectChanges();
+    expect(drawer.drawer()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.tour-novelty')).toBeNull();
+    expect(programacionService.obtenerNovedadesProgramacion).toHaveBeenCalledWith('2026-10-16');
   });
 
 });

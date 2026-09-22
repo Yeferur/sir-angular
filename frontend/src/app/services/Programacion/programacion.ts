@@ -78,6 +78,33 @@ export interface TransfersProgramacionResponse {
   transfers: TransferProgramacion[];
 }
 
+export interface ProgramacionNovedadCambio {
+  campo: string;
+  anterior: string;
+  actual: string;
+  revision?: number | null;
+}
+
+export interface ProgramacionNovedad {
+  idPendiente: string;
+  regla: string;
+  titulo: string;
+  descripcion: string;
+  prioridad: string;
+  estado: string;
+  fechaOperacion: string | null;
+  datos: {
+    fecha: string;
+    programacionId: string;
+    tourId: number | null;
+    tourName: string;
+    novedades: Array<{
+      reservationId: string;
+      changes: ProgramacionNovedadCambio[];
+    }>;
+  };
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -92,6 +119,27 @@ export class ProgramacionDashboardService {
       { params: { fecha } },
     ).pipe(
       map(tours => tours.map(tour => ({ ...tour, NombreTour: tour.Nombre_Tour })))
+    );
+  }
+
+  obtenerNovedadesProgramacion(fecha: string): Observable<{ novedades: ProgramacionNovedad[]; total: number }> {
+    return this.http.get<{ novedades: ProgramacionNovedad[]; total: number }>(
+      `${this.apiUrl}/programacion/novedades`,
+      { params: { fecha } },
+    );
+  }
+
+  marcarNovedadProgramacionRevisada(idPendiente: string): Observable<{ idPendiente: string; estado: string }> {
+    return this.http.patch<{ idPendiente: string; estado: string }>(
+      `${this.apiUrl}/programacion/novedades/${encodeURIComponent(idPendiente)}/revisar`,
+      {},
+    );
+  }
+
+  posponerNovedadProgramacion(idPendiente: string, suprimidoHasta: string): Observable<{ idPendiente: string; estado: string; suprimidoHasta: string }> {
+    return this.http.patch<{ idPendiente: string; estado: string; suprimidoHasta: string }>(
+      `${this.apiUrl}/programacion/novedades/${encodeURIComponent(idPendiente)}/posponer`,
+      { suprimidoHasta },
     );
   }
 

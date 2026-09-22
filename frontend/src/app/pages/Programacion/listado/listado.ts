@@ -1,9 +1,11 @@
-import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, ChangeDetectorRef, HostListener, signal } from '@angular/core';
+import type { ProgramacionNovedadesPanelState } from '../../../components/programacion-listado-panel/programacion-listado-panel';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   ProgramacionDashboardService,
+  ProgramacionNovedad,
   TransfersProgramacionResponse,
 } from '../../../services/Programacion/programacion';
 import { Sugerencia, TourProgramacion, Bus, Reserva, DestinoTourProgramacion } from '../../../interfaces/Programacion/reservas';
@@ -11,6 +13,7 @@ import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, forkJoin, switchMap, of, finalize, Subscription } from 'rxjs';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { SirDrawerService, type DrawerMapDestination } from '../../../services/Drawer/drawer.service';
 import { SirAlertService, type AlertButton, type SirModalAlert } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
@@ -73,6 +76,7 @@ export class Listado implements OnInit, OnDestroy {
   private permisosService = inject(PermisosService);
   private drawerService = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
+  private websocket = inject(WebSocketService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -120,6 +124,16 @@ export class Listado implements OnInit, OnDestroy {
   busesPrivados: any[] = [];  // buses para reservas privadas del día
   privateDirty = false;
   transfersDia: TransfersProgramacionResponse = this.emptyTransfersResponse(this.fechaSeleccionada);
+  novedadesProgramacion: ProgramacionNovedad[] = [];
+  novedadesLoading = false;
+  novedadesError = '';
+  novedadPosponerId: string | null = null;
+  novedadPosponerHasta = '';
+  novedadGuardandoAccion = false;
+  private novedadesTour: TourProgramacion | null = null;
+  private readonly novedadesPanel = signal<ProgramacionNovedadesPanelState>({
+    items: [], loading: false, error: '', posponerId: null, posponerHasta: '', guardando: false,
+  });
   transfersLoadError = false;
   isExportingTransfers = false;
   destinoTourActual: DestinoTourProgramacion | null = null;
@@ -166,6 +180,8 @@ export class Listado implements OnInit, OnDestroy {
   private stopOrderByBus = new Map<number, string[]>();
   private loadSubscription?: Subscription;
   private editorSubscription?: Subscription;
+  private noveltyLoadSubscription?: Subscription;
+  private websocketSubscriptions = new Subscription();
   private loadSequence = 0;
   private lastMoveSnapshot: ProgramacionMoveSnapshot | null = null;
   private lastMoveToastId: string | null = null;
@@ -181,6 +197,8 @@ export class Listado implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (!this.initializeRouteContext()) return;
+    this.subscribeProgramacionNovedades();
+    this.cargarNovedadesProgramacion();
     if (this.isPrivateRoute) {
       this.cargarPrivadosDelDia();
       return;
@@ -193,8 +211,11 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cerrarNovedadesTour();
     this.loadSubscription?.unsubscribe();
     this.editorSubscription?.unsubscribe();
+    this.noveltyLoadSubscription?.unsubscribe();
+    this.websocketSubscriptions.unsubscribe();
     if (this.editorRouteOpenTimer) clearTimeout(this.editorRouteOpenTimer);
     if (this.editorNavigationTimer) clearTimeout(this.editorNavigationTimer);
   }
@@ -249,6 +270,165 @@ export class Listado implements OnInit, OnDestroy {
   get canExportProgramacion(): boolean {
     return this.permisosService.tienePermiso('PROGRAMACION.LEER')
       && this.permisosService.tienePermiso('PROGRAMACION.EXPORTAR');
+  }
+
+  get canReadProgramacionNovedades(): boolean {
+    return this.permisosService.tienePermiso('PROGRAMACION.LEER')
+      && this.permisosService.tienePermiso('PROGRAMACION.ACTUALIZAR');
+  }
+
+  private novedadesDelTour(tour: TourProgramacion): ProgramacionNovedad[] {
+    if (!this.canReadProgramacionNovedades) return [];
+    const ids = (tour as TourProgramacion & { idsTours?: number[] }).idsTours || [tour.Id_Tour];
+    return this.novedadesProgramacion.filter(item =>
+      item.datos?.fecha === this.fechaSeleccionada && ids.includes(Number(item.datos?.tourId))
+    );
+  }
+
+  get novedadesPorTour(): Record<number, number> {
+    return Object.fromEntries(this.toursDelDia.map(tour => [tour.Id_Tour, this.novedadesDelTour(tour).length]));
+  }
+
+  abrirNovedadesTour(tour: TourProgramacion): void {
+    if (!this.novedadesDelTour(tour).length) return;
+    this.novedadesTour = tour;
+    this.cancelarPosponerNovedad();
+    this.actualizarNovedadesPanel();
+    this.drawerService.openProgramacionListado({
+      tourName: tour.NombreTour,
+      operationDate: this.fechaSeleccionada,
+      novedades: this.novedadesPanel,
+      onRefresh: () => this.cargarNovedadesProgramacion(),
+      onViewReservation: (id: string) => this.viewReservation(id),
+      onReview: (item: ProgramacionNovedad) => this.marcarNovedadRevisada(item),
+      onPostpone: (item: ProgramacionNovedad) => this.iniciarPosponerNovedad(item),
+      onPostponeDate: (date: string) => { this.novedadPosponerHasta = date; this.actualizarNovedadesPanel(); },
+      onConfirmPostpone: (item: ProgramacionNovedad) => this.confirmarPosponerNovedad(item),
+      onCancelPostpone: () => this.cancelarPosponerNovedad(),
+    });
+  }
+
+  private actualizarNovedadesPanel(): void {
+    const items = this.novedadesTour ? this.novedadesDelTour(this.novedadesTour) : [];
+    if (this.novedadPosponerId && !items.some(item => item.idPendiente === this.novedadPosponerId)) {
+      this.novedadPosponerId = null;
+      this.novedadPosponerHasta = '';
+    }
+    this.novedadesPanel.set({ items, loading: this.novedadesLoading, error: this.novedadesError,
+      posponerId: this.novedadPosponerId, posponerHasta: this.novedadPosponerHasta, guardando: this.novedadGuardandoAccion });
+  }
+
+  private cerrarNovedadesTour(): void {
+    if (this.drawerService.drawer()?.props?.['novedades'] === this.novedadesPanel) this.drawerService.close(true);
+    this.novedadesTour = null;
+  }
+
+  private subscribeProgramacionNovedades(): void {
+    if (!this.canReadProgramacionNovedades) return;
+    this.websocketSubscriptions.add(this.websocket.events$.subscribe((event) => {
+      if (event.type !== 'programacionNovedadesActualizadas') return;
+      const eventDate = String(event.payload?.fecha || '');
+      if (!eventDate || eventDate === this.fechaSeleccionada) this.cargarNovedadesProgramacion();
+    }));
+
+    let hasConnected = false;
+    this.websocketSubscriptions.add(this.websocket.connectionState$.subscribe((state) => {
+      if (state !== 'connected') return;
+      if (hasConnected) this.cargarNovedadesProgramacion();
+      hasConnected = true;
+    }));
+  }
+
+  cargarNovedadesProgramacion(): void {
+    if (!this.canReadProgramacionNovedades) {
+      this.novedadesProgramacion = [];
+      this.actualizarNovedadesPanel();
+      return;
+    }
+    this.noveltyLoadSubscription?.unsubscribe();
+    this.novedadesLoading = true;
+    this.novedadesError = '';
+    this.actualizarNovedadesPanel();
+    const requestedDate = this.fechaSeleccionada;
+    this.noveltyLoadSubscription = this.programacionService.obtenerNovedadesProgramacion(requestedDate).subscribe({
+      next: (response) => {
+        if (requestedDate !== this.fechaSeleccionada) return;
+        this.novedadesProgramacion = Array.isArray(response?.novedades) ? response.novedades : [];
+        this.novedadesLoading = false;
+        this.actualizarNovedadesPanel();
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (requestedDate !== this.fechaSeleccionada) return;
+        console.error('No se pudieron cargar las novedades de Programación', error);
+        this.novedadesError = 'No fue posible consultar las novedades. Intenta actualizar.';
+        this.novedadesLoading = false;
+        this.actualizarNovedadesPanel();
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  marcarNovedadRevisada(novedad: ProgramacionNovedad): void {
+    if (this.novedadGuardandoAccion) return;
+    this.novedadGuardandoAccion = true;
+    this.actualizarNovedadesPanel();
+    this.programacionService.marcarNovedadProgramacionRevisada(novedad.idPendiente).subscribe({
+      next: () => {
+        this.novedadGuardandoAccion = false;
+        this.novedadesProgramacion = this.novedadesProgramacion.filter((item) => item.idPendiente !== novedad.idPendiente);
+        this.actualizarNovedadesPanel();
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.novedadGuardandoAccion = false;
+        this.actualizarNovedadesPanel();
+        console.error('No se pudo marcar la novedad como revisada', error);
+        this.alerts.warningToast('No se pudo marcar la novedad como revisada. Intenta nuevamente.');
+      },
+    });
+  }
+
+  iniciarPosponerNovedad(novedad: ProgramacionNovedad): void {
+    this.novedadPosponerId = novedad.idPendiente;
+    const until = new Date(Date.now() + 30 * 60 * 1000);
+    until.setMinutes(until.getMinutes() - until.getTimezoneOffset());
+    this.novedadPosponerHasta = until.toISOString().slice(0, 16);
+    this.actualizarNovedadesPanel();
+  }
+
+  cancelarPosponerNovedad(): void {
+    this.novedadPosponerId = null;
+    this.novedadPosponerHasta = '';
+    this.actualizarNovedadesPanel();
+  }
+
+  confirmarPosponerNovedad(novedad: ProgramacionNovedad): void {
+    if (!this.novedadPosponerHasta || this.novedadGuardandoAccion) return;
+    const until = new Date(this.novedadPosponerHasta);
+    if (Number.isNaN(until.getTime()) || until <= new Date()) {
+      this.alerts.warningToast('Selecciona una fecha futura para posponer la novedad.');
+      return;
+    }
+
+    this.novedadGuardandoAccion = true;
+    this.actualizarNovedadesPanel();
+    this.programacionService.posponerNovedadProgramacion(novedad.idPendiente, until.toISOString()).subscribe({
+      next: () => {
+        this.novedadGuardandoAccion = false;
+        this.cancelarPosponerNovedad();
+        this.novedadesProgramacion = this.novedadesProgramacion.filter((item) => item.idPendiente !== novedad.idPendiente);
+        this.actualizarNovedadesPanel();
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.novedadGuardandoAccion = false;
+        this.actualizarNovedadesPanel();
+        console.error('No se pudo posponer la novedad', error);
+        this.alerts.warningToast('No se pudo posponer la novedad. Intenta nuevamente.');
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   get canRestoreInitialPlan(): boolean {
@@ -750,9 +930,11 @@ export class Listado implements OnInit, OnDestroy {
     if (!iso || iso === this.fechaSeleccionada) return;
 
     this.confirmarPerdidaCambios(() => {
+      this.cerrarNovedadesTour();
       this.fechaSeleccionada = iso;
       this.resetEditorState();
       this.modoVista = 'dashboard';
+      this.cargarNovedadesProgramacion();
       void this.router.navigate([], {
         relativeTo: this.route,
         queryParams: { fecha: iso },

@@ -27,7 +27,10 @@ const {
     exportarPrivadosZipController,
     obtenerTransfersProgramacionController,
     exportarTransfersProgramacionController,
-    obtenerResumenDashboardProgramacionController
+    obtenerResumenDashboardProgramacionController,
+    listarNovedadesProgramacionController,
+    posponerNovedadProgramacionController,
+    revisarNovedadProgramacionController
 } = require('../../controllers/Programacion/programacion.controller');
 
 /**
@@ -41,6 +44,30 @@ router.get(
     authMiddleware,
     checkPermission('PROGRAMACION.LEER'),
     obtenerResumenDashboardProgramacionController
+);
+
+router.get(
+    '/programacion/novedades',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    checkPermission('PROGRAMACION.ACTUALIZAR'),
+    listarNovedadesProgramacionController
+);
+
+router.patch(
+    '/programacion/novedades/:id/posponer',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    checkPermission('PROGRAMACION.ACTUALIZAR'),
+    posponerNovedadProgramacionController
+);
+
+router.patch(
+    '/programacion/novedades/:id/revisar',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    checkPermission('PROGRAMACION.ACTUALIZAR'),
+    revisarNovedadProgramacionController
 );
 
 /**

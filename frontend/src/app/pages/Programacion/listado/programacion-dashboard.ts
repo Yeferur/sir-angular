@@ -21,8 +21,10 @@ export class ProgramacionDashboardComponent {
   totalPaxPrivados = input(0);
   transfers = input.required<TransfersProgramacionResponse>();
   transfersUnavailable = input(false);
+  novedadesPorTour = input<Record<number, number>>({});
 
   tourSelected = output<TourProgramacion>();
+  novedadesSelected = output<TourProgramacion>();
   privadosSelected = output<void>();
   transfersSelected = output<void>();
 

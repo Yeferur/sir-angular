@@ -1,3 +1,4 @@
+import { CONTACT_REQUIRED_MESSAGE, RESERVA_PHONE_PATTERN, hasReservaContact, reservaContactValidator } from '../reserva-contact.utils';
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
@@ -80,7 +81,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   Number = Number;
   showDuplicate: boolean = true;
   openSummary = false;
-  private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
+  private readonly e164WithTenDigitsPattern = RESERVA_PHONE_PATTERN;
   private readonly permisosService = inject(PermisosService);
   activePaisOrigenIndex: number | null = null;
   readonly wizardSteps: WizardStep[] = [
@@ -122,6 +123,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private getFriendlyReservaErrorMessage(error: any): string {
+    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') return CONTACT_REQUIRED_MESSAGE;
     const raw = String(this.getApiErrorMessage(error));
     const normalized = raw
       .normalize('NFD')
@@ -646,6 +648,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private showApiError(error: any, title = 'No se pudo completar la operación'): void {
     const message = this.getFriendlyReservaErrorMessage(error);
+    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') {
+      this.form.get('Telefono_Reportante')?.markAsTouched();
+      this.focusValidationTarget(1, 'editar-telefono-contacto');
+    }
     this.closeSummaryIfOpen();
 
     this.navbar.showAlert({
@@ -1068,7 +1074,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       // Responsable
       Id_Canal: [null, Validators.required],
       Nombre_Reportante: ['', Validators.required],
-      Telefono_Reportante: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
+      Telefono_Reportante: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
 
       // Tipo
@@ -1096,7 +1102,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       // Comprobante (pago completo)
       ComprobantePago: [null],
       PagoObservaciones: [''],
-    });
+    }, { validators: reservaContactValidator });
     this.wsService.reservationEvents$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((msg: any) => {
@@ -2850,15 +2856,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private syncPassengerPhoneValidator(ctrl: AbstractControl | null): void {
-    const tipo = normalizeReservaPassengerType(ctrl?.get('Tipo_Pasajero')?.value);
     const telefonoCtrl = ctrl?.get('Telefono_Pasajero');
     if (!telefonoCtrl) return;
 
-    if (tipo === 'ADULTO') {
-      telefonoCtrl.setValidators([Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]);
-    } else {
-      telefonoCtrl.clearValidators();
-    }
+    telefonoCtrl.setValidators([Validators.pattern(this.e164WithTenDigitsPattern)]);
 
     telefonoCtrl.updateValueAndValidity({ emitEvent: false });
   }
@@ -2917,15 +2918,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         return { message: `${prefix}: ese DNI o pasaporte ya tiene reserva para esta fecha`, step: 3, focusId: `editar-pasajero-${i}-dni` };
       }
 
-      if (tipo === 'ADULTO') {
-        const telefonoCtrl = ctrl.get('Telefono_Pasajero');
-        const telefono = String(telefonoCtrl?.value ?? '').trim();
-        if (telefonoCtrl?.hasError('required')) {
-          return { message: `${prefix}: el teléfono es obligatorio`, step: 3, focusId: `editar-pasajero-${i}-telefono` };
-        }
-        if (telefonoCtrl?.hasError('pattern') && telefono) {
-          return { message: `${prefix}: el teléfono debe tener formato +573001234567`, step: 3, focusId: `editar-pasajero-${i}-telefono` };
-        }
+      if (ctrl.get('Telefono_Pasajero')?.hasError('pattern')) {
+        return { message: `${prefix}: el teléfono debe tener formato +573001234567`, step: 3, focusId: `editar-pasajero-${i}-telefono` };
       }
 
       if (ctrl.get('Nacionalidad')?.errors?.['required']) {
@@ -2963,6 +2957,11 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       };
     }
 
+    if (this.form.hasError('contactRequired')) {
+      this.form.get('Telefono_Reportante')?.markAsTouched();
+      return { message: CONTACT_REQUIRED_MESSAGE, step: 1, focusId: 'editar-telefono-contacto' };
+    }
+
     const passengerIssue = this.getPassengerValidationIssue();
     if (passengerIssue) return passengerIssue;
 
@@ -2988,6 +2987,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
     const first = invalid[0];
     return {
+      focusId: first === 'Telefono_Reportante' ? 'editar-telefono-contacto' : undefined,
       message: friendly[first] || `Revisa el campo ${first}`,
       step: first === 'SelectTour' || first === 'Fecha_Tour' ? 0 : first === 'Nombre_Reportante' || first === 'Telefono_Reportante' ? 1 : 2,
     };
@@ -3317,11 +3317,10 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     for (const p of pax) {
       const nombre = (p.Nombre_Pasajero ?? '').toString().trim();
       const dni = (p.DNI ?? '').toString().trim();
-      const tel = (p.Telefono_Pasajero ?? '').toString().trim();
       if (!nombre) faltanNombre++;
       if (!dni) faltanDni++;
-      if (!!tel) hayTelefonoPasajero = true;
     }
+    hayTelefonoPasajero = hasReservaContact(this.form.get('Telefono_Reportante')?.value, pax);
     const okNombres = faltanNombre === 0;
     const okDni = faltanDni === 0;
     return { ok: okNombres && okDni && hayTelefonoPasajero, okNombres, okDni, hayTelefonoPasajero, faltanNombre, faltanDni };
@@ -3329,6 +3328,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   getPhoneError(controlName: string): string {
     const ctrl = this.form?.get(controlName);
+    if (this.form?.hasError('contactRequired')) return CONTACT_REQUIRED_MESSAGE;
     if (!ctrl) return 'Teléfono inválido.';
     if (ctrl.hasError('required')) return 'El teléfono es obligatorio.';
     if (ctrl.hasError('pattern')) {
@@ -3436,7 +3436,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       const partes: string[] = [];
       if (!val.okNombres) partes.push(`faltan ${val.faltanNombre} nombre(s)`);
       if (!val.okDni) partes.push(`faltan ${val.faltanDni} DNI/pasaporte(s)`);
-      if (!val.hayTelefonoPasajero) partes.push('no hay ningún teléfono de pasajero');
+      if (!val.hayTelefonoPasajero) partes.push('no hay teléfono de contacto válido');
       const razon = `Faltan datos básicos de pasajeros: ${partes.join('; ')}.`;
       return { estado: 'Pendiente', subestado: 'de datos', motivo: razon };
     }

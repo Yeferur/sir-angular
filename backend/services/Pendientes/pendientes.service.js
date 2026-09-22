@@ -47,11 +47,17 @@ function mapPending(row) {
 function audienceClause(userId, permissions) {
   const permissionList = [...new Set((permissions || []).map(String).filter(Boolean))];
   if (!permissionList.length) {
-    return { sql: 'p.Id_Usuario_Destino = ?', params: [userId] };
+    return {
+      sql: "p.Id_Usuario_Destino = ? AND (p.Permiso_Audiencia IS NULL OR p.Permiso_Audiencia NOT LIKE '%&%')",
+      params: [userId],
+    };
   }
   return {
-    sql: `(p.Id_Usuario_Destino = ? OR (p.Id_Usuario_Destino IS NULL AND p.Permiso_Audiencia IN (${permissionList.map(() => '?').join(',')})))`,
-    params: [userId, ...permissionList],
+    sql: `((p.Id_Usuario_Destino = ? AND (p.Permiso_Audiencia IS NULL OR p.Permiso_Audiencia NOT LIKE '%&%' OR
+              JSON_CONTAINS(CAST(? AS JSON),
+                CONCAT('["', REPLACE(p.Permiso_Audiencia, '&', '","'), '"]')) = 1))
+           OR (p.Id_Usuario_Destino IS NULL AND p.Permiso_Audiencia IN (${permissionList.map(() => '?').join(',')})))`,
+    params: [userId, JSON.stringify(permissionList), ...permissionList],
   };
 }
 
@@ -74,17 +80,20 @@ async function listMine(userId, permissions, { includeSuppressed = true } = {}) 
   return rows.map(mapPending);
 }
 
-async function findAccessibleForUpdate(connection, pendingId, userId, permissions) {
+async function findAccessibleForUpdate(connection, pendingId, userId, permissions, expectedRuleCode = null) {
   const audience = audienceClause(userId, permissions);
   const [rows] = await connection.query(
     `${SELECT_BASE} WHERE p.Id_Pendiente = ? AND ${audience.sql} LIMIT 1 FOR UPDATE`,
     [pendingId, ...audience.params]
   );
   if (!rows[0]) throw new PendingOperationError('Pendiente no encontrado.', 404, 'PENDING_NOT_FOUND');
+  if (expectedRuleCode && rows[0].Regla_Codigo !== expectedRuleCode) {
+    throw new PendingOperationError('Pendiente no encontrado.', 404, 'PENDING_NOT_FOUND');
+  }
   return { row: rows[0], pending: mapPending(rows[0]) };
 }
 
-async function postpone(pendingId, userId, permissions, suppressedUntil) {
+async function postpone(pendingId, userId, permissions, suppressedUntil, expectedRuleCode = null) {
   const until = new Date(suppressedUntil);
   const now = new Date();
   if (Number.isNaN(until.getTime()) || until <= now) {
@@ -93,7 +102,7 @@ async function postpone(pendingId, userId, permissions, suppressedUntil) {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const { row } = await findAccessibleForUpdate(connection, pendingId, userId, permissions);
+    const { row } = await findAccessibleForUpdate(connection, pendingId, userId, permissions, expectedRuleCode);
     if (row.Estado !== 'ACTIVO') throw new PendingOperationError('Solo se puede posponer un pendiente activo.', 409, 'PENDING_NOT_ACTIVE');
     if (row.Posposicion_Max_Minutos && until.getTime() > now.getTime() + Number(row.Posposicion_Max_Minutos) * 60000) {
       throw new PendingOperationError(
@@ -123,12 +132,12 @@ async function postpone(pendingId, userId, permissions, suppressedUntil) {
   }
 }
 
-async function dismiss(pendingId, userId, permissions, reason) {
+async function dismiss(pendingId, userId, permissions, reason, expectedRuleCode = null) {
   const normalizedReason = String(reason || '').trim();
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const { row } = await findAccessibleForUpdate(connection, pendingId, userId, permissions);
+    const { row } = await findAccessibleForUpdate(connection, pendingId, userId, permissions, expectedRuleCode);
     if (row.Estado !== 'ACTIVO') throw new PendingOperationError('Solo se puede descartar un pendiente activo.', 409, 'PENDING_NOT_ACTIVE');
     if (!row.Permite_Descarte) throw new PendingOperationError('Esta situación debe resolverse en su proceso de origen.', 422, 'DISMISS_NOT_ALLOWED');
     if (row.Requiere_Justificacion && !normalizedReason) {

@@ -21,7 +21,7 @@
                           drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
                           drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
                           drawer()!.type === 'notificaciones' ? 'Notificaciones' :
-                          drawer()!.type === 'programacion-listado' ? 'Listado de programación' : 'Novedades de la app'">
+                          drawer()!.type === 'programacion-listado' ? (drawer()!.props?.['novedades'] ? 'Novedades de Programación' : 'Listado de programación') : 'Novedades de la app'">
 
     @if (drawer()!.type === 'reserva') {
       <app-reserva

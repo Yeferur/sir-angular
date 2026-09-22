@@ -469,15 +469,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             this.pendingCenter.clear();
         }
 
-        if (!this.permisosService.tienePermiso('NOTIFICACIONES.LEER')) {
-            this.notifications.clear();
-            return;
-        }
-
         this.notifications.load();
         this.notificationEventSub = this.webSocket.events$.subscribe(event => {
-            if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado') {
+            if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado' || event.type === 'programacionNovedadesActualizadas') {
                 this.notifications.load();
+            }
+            if (event.type === 'programacionNovedadesActualizadas' && this.permisosService.tienePermiso('PENDIENTES.LEER')) {
+                this.pendingCenter.loadCount();
             }
         });
     }

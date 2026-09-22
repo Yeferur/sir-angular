@@ -1,3 +1,65 @@
+@if (novedades(); as detail) {
+  <header class="detail-header">
+    <div class="header-copy">
+      <span class="header-kicker">Novedades de Programación</span>
+      <h1>{{ props().tourName }}</h1>
+      <div class="header-subline">{{ props().operationDate | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}</div>
+    </div>
+    <button type="button" class="btn-close" (click)="close()" aria-label="Cerrar novedades">✕</button>
+  </header>
+  <main class="detail-scroll novelty-detail" aria-live="polite">
+    @if (detail.error) {
+      <p class="novelty-error" role="alert">{{ detail.error }}</p>
+      <button type="button" class="btn-secondary" (click)="props().onRefresh?.()">Reintentar</button>
+    }
+    @if (detail.loading) { <p class="novelty-muted" role="status">Actualizando novedades…</p> }
+    @if (!detail.items.length && !detail.loading && !detail.error) {
+      <p class="novelty-empty">No hay novedades pendientes para este tour y fecha.</p>
+    }
+    @for (reserva of reservasConCambios(); track reserva.id) {
+      <section class="novelty-reservation" [attr.aria-label]="'Cambios de la reserva ' + reserva.id">
+        <header class="novelty-reservation__header">
+          <h2>Reserva {{ reserva.id }}</h2>
+          <button type="button" class="novelty-open" (click)="props().onViewReservation?.(reserva.id)">Ver reserva</button>
+        </header>
+        @if (reserva.changes.length) {
+          <div class="novelty-differences">
+            <div class="novelty-columns" aria-hidden="true"><span>Dato</span><span>Anterior</span><span>Actual</span></div>
+            @for (cambio of reserva.changes; track $index) {
+              <div class="novelty-change">
+                <strong>{{ cambio.campo === 'Notas' ? 'Observaciones' : cambio.campo }}</strong>
+                <span class="novelty-before"><span class="sr-only">Anterior: </span>{{ changeValue(cambio.anterior) }}</span>
+                <span class="novelty-after"><span class="sr-only">Actual: </span>{{ changeValue(cambio.actual) }}</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="novelty-muted">La reserva tiene una novedad pendiente. No hay diferencias detalladas disponibles.</p>
+        }
+      </section>
+    }
+    @for (item of detail.items; track item.idPendiente) {
+      <section class="novelty-followup" [attr.aria-label]="'Seguimiento de ' + item.datos.tourName">
+        <div class="novelty-muted">{{ item.datos.tourName }} · {{ item.datos.novedades.length }} {{ item.datos.novedades.length === 1 ? 'reserva' : 'reservas' }}</div>
+        @if (!item.datos.novedades.length) { <p>{{ item.descripcion }}</p> }
+        @if (detail.posponerId === item.idPendiente) {
+          <label class="novelty-postpone">Volver a mostrar
+            <input type="datetime-local" [ngModel]="detail.posponerHasta" (ngModelChange)="props().onPostponeDate?.($event)" />
+          </label>
+          <div class="novelty-actions">
+            <button type="button" class="btn-secondary" [disabled]="detail.guardando" (click)="props().onCancelPostpone?.()">Cancelar</button>
+            <button type="button" class="btn-primary" [disabled]="detail.guardando" (click)="props().onConfirmPostpone?.(item)">Confirmar</button>
+          </div>
+        } @else {
+          <div class="novelty-actions">
+            <button type="button" class="btn-secondary novelty-postpone-button" [disabled]="detail.guardando" (click)="props().onPostpone?.(item)">Posponer</button>
+            <button type="button" class="btn-primary novelty-review" [disabled]="detail.guardando" (click)="props().onReview?.(item)">Marcar revisado</button>
+          </div>
+        }
+      </section>
+    }
+  </main>
+} @else {
 <header class="detail-header">
   <div class="header-copy">
     <span class="header-kicker">Listado guardado</span>
@@ -147,4 +209,6 @@
       <button type="button" class="btn-primary" (click)="edit()">Editar listado</button>
     }
   </footer>
+}
+
 }

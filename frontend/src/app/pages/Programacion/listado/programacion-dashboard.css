@@ -126,6 +126,40 @@
   font-weight: 650;
 }
 
+.operation-card-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.operation-card-wrap > .operation-card {
+  width: 100%;
+}
+
+.tour-novelty {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent-yellow) 25%, transparent);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: .67rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tour-novelty span { color: var(--accent-yellow); font-size: .5rem; }
+.tour-novelty:hover { background: var(--bg-tertiary); }
+.tour-novelty:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
+.operation-card-wrap:has(.tour-novelty) .operation-action { padding-right: 100px; }
+.operation-card-wrap:has(.tour-novelty) .operation-action svg { display: none; }
+
 .operation-card {
   position: relative;
   display: flex;

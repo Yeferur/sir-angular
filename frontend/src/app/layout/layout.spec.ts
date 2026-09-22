@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, Subject } from 'rxjs';
 import { LayoutComponent } from './layout';
 import { AuthService } from '../services/Login/login-service';
 import { PermisosService } from '../services/Permisos/permisos.service';
@@ -19,6 +19,9 @@ describe('Navegación superior', () => {
   let layout: LayoutComponent;
   let allowed: Set<string>;
   let role: string;
+  let notificationLoad: jasmine.Spy;
+  let notificationClear: jasmine.Spy;
+  let events: Subject<any>;
   const allPermissions = [
     'RESERVAS.LEER', 'RESERVAS.CREAR', 'CONTROL_VIAJE.LEER',
     'TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TOURS.LEER', 'TOURS.CREAR',
@@ -38,6 +41,9 @@ describe('Navegación superior', () => {
   beforeEach(async () => {
     allowed = new Set(allPermissions);
     role = 'Administrador';
+    notificationLoad = jasmine.createSpy('notificationLoad');
+    notificationClear = jasmine.createSpy('notificationClear');
+    events = new Subject<any>();
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
@@ -57,9 +63,11 @@ describe('Navegación superior', () => {
           getRoleSnapshot: () => role,
         } },
         { provide: UsuariosService, useValue: { getMiPerfil: () => of(null) } },
-        { provide: NotificacionesService, useValue: { noLeidas: signal(3), clear: () => {} } },
-        { provide: PendientesService, useValue: { activeCount: signal(4), clear: () => {} } },
-        { provide: WebSocketService, useValue: { events$: EMPTY } },
+        { provide: NotificacionesService, useValue: {
+          noLeidas: signal(3), load: notificationLoad, clear: notificationClear,
+        } },
+        { provide: PendientesService, useValue: { activeCount: signal(4), loadCount: jasmine.createSpy('pendingLoadCount'), clear: () => {} } },
+        { provide: WebSocketService, useValue: { events$: events.asObservable() } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(LayoutComponent);
@@ -88,6 +96,20 @@ describe('Navegación superior', () => {
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
   });
 
+  it('refresca Notificaciones y el conteo de Pendientes con las novedades de Programación', () => {
+    (layout as any).syncNotificationSession(true);
+    notificationLoad.calls.reset();
+    const count = TestBed.inject(PendientesService).loadCount as jasmine.Spy;
+    count.calls.reset();
+    events.next({ type: 'programacionNovedadesActualizadas', payload: {} });
+    expect(notificationLoad).toHaveBeenCalledTimes(1);
+    expect(count).toHaveBeenCalledTimes(1);
+    allowed.delete('PENDIENTES.LEER');
+    events.next({ type: 'programacionNovedadesActualizadas', payload: {} });
+    expect(notificationLoad).toHaveBeenCalledTimes(2);
+    expect(count).toHaveBeenCalledTimes(1);
+  });
+
   it('filtra Crear por permisos y conserva la restricción especial de Cliente', async () => {
     allowed = new Set(['RESERVAS.LEER', 'RESERVAS.CREAR', 'TOURS.CREAR']);
     role = 'Cliente';
@@ -96,6 +118,20 @@ describe('Navegación superior', () => {
     expect(element('#topbar-create-menu').querySelectorAll('a').length).toBe(1);
     expect(element('.launcher-operation-grid').children.length).toBe(1);
     expect(element('.launcher-column--wide')).toBeNull();
+  });
+
+  it('muestra y carga el centro personal sin NOTIFICACIONES.LEER', async () => {
+    allowed.delete('NOTIFICACIONES.LEER');
+    notificationLoad.calls.reset();
+    notificationClear.calls.reset();
+    await render();
+
+    (layout as any).syncNotificationSession(true);
+    await render();
+
+    expect(element('.notification-trigger')).toBeTruthy();
+    expect(notificationLoad).toHaveBeenCalled();
+    expect(notificationClear).not.toHaveBeenCalled();
   });
 
   it('oculta Crear cuando solo hay permisos de lectura y mantiene Mi horario para Asesor', async () => {

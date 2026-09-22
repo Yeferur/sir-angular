@@ -39,6 +39,7 @@
         </div>
       </div>
     </header>
+
   }
 
   @if (isPageLoading) {
@@ -57,6 +58,8 @@
     @if (modoVista === 'dashboard') {
       <app-programacion-day-dashboard
         [tours]="toursDelDia"
+        [novedadesPorTour]="novedadesPorTour"
+        (novedadesSelected)="abrirNovedadesTour($event)"
         [updating]="isUpdatingDate"
         [canCreate]="canCreateProgramacion"
         [totalReservasPrivadas]="totalReservasPrivadas"
