@@ -25,6 +25,7 @@ import { WebSocketConnectionState, WebSocketService } from '../../services/WebSo
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { CountUpDirective } from '../Aforos/count-up.directive';
 import { MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
+import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facade';
 
 const UPDATE_FEEDBACK_MS = 1100;
 
@@ -80,6 +81,7 @@ export class HomeComponent implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly turnosService = inject(TurnosService);
+  readonly activity = inject(MiActividadFacade);
 
   summary: HomeSummary | null = null;
   loading = true;
@@ -96,8 +98,19 @@ export class HomeComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSummary();
+    this.activity.start();
     this.listenForChanges();
     this.listenForConnectionState();
+  }
+
+  get homeActivityItems() {
+    const representedByProcesses = new Set([
+      'CONTROL_VIAJE_CIERRE_PENDIENTE', 'PROGRAMACION_NO_ACTIVA',
+      'SEGUROS_INCOMPLETOS', 'COMISIONES_PENDIENTES',
+    ]);
+    return this.activity.pendientesAtendibles()
+      .filter(item => !representedByProcesses.has(item.regla))
+      .slice(0, 2);
   }
 
   get firstName(): string {
@@ -415,6 +428,8 @@ export class HomeComponent implements OnInit {
       'transferActualizado',
       'transferEliminado',
       'listadoActualizado',
+      'actividadActualizada',
+      'programacionNovedadesActualizadas',
     ]);
 
     this.webSocket.events$

@@ -42,6 +42,10 @@
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, .12);
 }
+.sir-dp-field:focus-visible {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 14%, transparent);
+}
 
 .sir-dp-field.is-invalid {
   border-color: var(--accent-red, #ff453a);

@@ -41,7 +41,9 @@ import { TopbarTransitionService } from '../components/login/topbar-transition.s
 import { LoginContentComponent } from '../components/login/login';
 import { AppActivityService } from '../services/app-activity.service';
 import { NotificacionesService } from '../services/Notificaciones/notificaciones.service';
+import { DesktopNotificationsService } from '../services/Notificaciones/desktop-notifications.service';
 import { PendientesService } from '../services/Pendientes/pendientes.service';
+import { MiActividadFacade } from '../services/MiActividad/mi-actividad.facade';
 import { WebSocketService } from '../services/WebSocket/web-socket';
 
 
@@ -92,7 +94,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private activatedRoute = inject(ActivatedRoute);
     private activity = inject(AppActivityService);
     readonly notifications = inject(NotificacionesService);
+    readonly desktopNotifications = inject(DesktopNotificationsService);
     readonly pendingCenter = inject(PendientesService);
+    readonly miActividad = inject(MiActividadFacade);
     private webSocket = inject(WebSocketService);
     private injector = inject(Injector);
 
@@ -155,11 +159,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             microcopy: 'Nos vemos pronto en Maxitours',
         };
     });
-    readonly topbarFeedbackType = computed(() => {
-        const toasts = this.alerts.toasts();
-        return toasts.length ? toasts[toasts.length - 1].type : null;
-    });
-
     @ViewChild('topbarBar') private topbarBar?: ElementRef<HTMLElement>;
     @ViewChild('topbarContent') private topbarContent?: ElementRef<HTMLElement>;
     @ViewChild('topbarSearchInput') private topbarSearchInput?: ElementRef<HTMLInputElement>;
@@ -458,10 +457,14 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.notificationEventSub = undefined;
 
         if (!loggedIn) {
+            this.desktopNotifications.clearSession();
             this.notifications.clear();
             this.pendingCenter.clear();
+            this.miActividad.clear();
             return;
         }
+
+        this.desktopNotifications.configureUser(this.authService.getUser()?.id);
 
         if (this.permisosService.tienePermiso('PENDIENTES.LEER')) {
             this.pendingCenter.loadCount();
@@ -469,9 +472,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             this.pendingCenter.clear();
         }
 
-        this.notifications.load();
+        this.miActividad.start();
         this.notificationEventSub = this.webSocket.events$.subscribe(event => {
-            if (event.type === 'notificacionNueva' || event.type === 'turnoIntercambioActualizado' || event.type === 'programacionNovedadesActualizadas') {
+            if (event.type === 'turnoIntercambioActualizado') {
                 this.notifications.load();
             }
             if (event.type === 'programacionNovedadesActualizadas' && this.permisosService.tienePermiso('PENDIENTES.LEER')) {
@@ -915,10 +918,35 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.closeProfileMenu();
         this.drawer.openAppUpdates();
     }
+
+    async toggleDesktopNotifications(): Promise<void> {
+        const result = await this.desktopNotifications.toggle();
+        if (result === 'enabled') {
+            this.alerts.successToast('Avisos de escritorio activados', 'SIR te avisará cuando haya actividad relevante y estés trabajando en otra pestaña.');
+        } else if (result === 'disabled') {
+            this.alerts.infoToast('Avisos de escritorio desactivados', 'Los avisos internos de SIR continuarán funcionando.');
+        } else if (result === 'denied') {
+            this.alerts.warningToast('Permiso bloqueado', 'Habilita las notificaciones para este sitio desde la configuración del navegador.');
+        } else {
+            this.alerts.infoToast('Función no disponible', 'Este navegador no admite avisos de escritorio; los avisos internos continuarán funcionando.');
+        }
+    }
+    desktopNotificationLabel(): string {
+        switch (this.desktopNotifications.state()) {
+            case 'enabled': return 'Avisos de escritorio: Activados';
+            case 'blocked': return 'Avisos de escritorio: Bloqueados';
+            case 'pending': return 'Avisos de escritorio: Permiso pendiente';
+            case 'unsupported': return 'Avisos de escritorio: No disponibles';
+            default: return 'Avisos de escritorio: Desactivados';
+        }
+    }
     openNotifications(): void {
+        this.openActivity();
+    }
+    openActivity(): void {
         this.closeTopbarMenus();
         this.closeProfileMenu();
-        this.drawer.openNotifications();
+        this.miActividad.open();
     }
 
     isClientUser(): boolean {
@@ -1082,8 +1110,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         {
             key: 'pendientes',
-            label: 'Pendientes',
-            icon: 'bx bx-list-check',
+            label: 'Avisos',
+            icon: 'bx bx-bell',
             group: 'principal',
             route: '/Pendientes',
             permission: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
@@ -1329,7 +1357,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         const descriptions: Record<string, string> = {
             inicio: 'Resumen general',
             'mi-horario': 'Turnos y jornada',
-            pendientes: 'Recordatorios y tareas',
+            pendientes: 'Pendientes, recordatorios y novedades',
             aforos: 'Disponibilidad y cupos',
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',

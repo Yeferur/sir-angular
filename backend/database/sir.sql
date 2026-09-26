@@ -2076,7 +2076,7 @@ INSERT INTO `disponibilidad` (`Id_Disponibilidad`, `Id_Tour`, `Fecha_Tour`, `Cup
 DROP TABLE IF EXISTS `email_outbox`;
 CREATE TABLE IF NOT EXISTS `email_outbox` (
   `Id_Email` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `Tipo` enum('password_reset','schedule') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tipo` enum('password_reset','schedule','reminder') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Prioridad` smallint NOT NULL DEFAULT '0',
   `Destinatario` varchar(320) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Payload` json NOT NULL,
@@ -2125,7 +2125,7 @@ DROP TABLE IF EXISTS `email_outbox_dispatches`;
 CREATE TABLE IF NOT EXISTS `email_outbox_dispatches` (
   `Id_Despacho` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `Id_Email` bigint UNSIGNED NOT NULL,
-  `Tipo` enum('password_reset','schedule') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Tipo` enum('password_reset','schedule','reminder') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `Reservado_En` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`Id_Despacho`),
   KEY `idx_email_dispatches_quota` (`Reservado_En`,`Tipo`),
@@ -9080,7 +9080,8 @@ CREATE TABLE IF NOT EXISTS `notificaciones` (
   `Fecha_Lectura` datetime DEFAULT NULL,
   `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Notificacion`),
-  KEY `idx_notificaciones_usuario_estado` (`Id_Usuario`,`Leida`,`Fecha_Creacion`)
+  KEY `idx_notificaciones_usuario_estado` (`Id_Usuario`,`Leida`,`Fecha_Creacion`),
+  UNIQUE KEY `uq_notificaciones_usuario_deduplicacion` (`Id_Usuario`,`Clave_Deduplicacion`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -11884,6 +11885,7 @@ CREATE TABLE IF NOT EXISTS `pendientes_operativos` (
   `Ultima_Deteccion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Fecha_Resolucion` datetime DEFAULT NULL,
   `Datos` json DEFAULT NULL,
+  `Clave_Deduplicacion` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Fecha_Actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Id_Pendiente`),
@@ -11933,6 +11935,7 @@ CREATE TABLE IF NOT EXISTS `recordatorios` (
   `Intervalo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Recordar_Todo_El_Dia` tinyint(1) DEFAULT '0',
   `Intervalo_Todo_El_Dia` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Enviar_Correo` tinyint(1) NOT NULL DEFAULT '0',
   `Siguiente_Trigger` datetime DEFAULT NULL,
   `Estado` enum('ACTIVO','COMPLETADO') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVO',
   `Suprimido_Hasta` datetime DEFAULT NULL,

@@ -116,6 +116,10 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
   @Input() minDate: string | Date | null = null;
   @Input() maxDate: string | Date | null = null;
   @Input() invalid = false;
+  @Input() disabled = false;
+  @Input() inputId = '';
+  @Input() ariaLabelledby: string | null = null;
+  @Input() ariaDescribedby: string | null = null;
   @Input() dateFilter: ((date: Date) => boolean) | null = null;
 
   @Output() dateChange = new EventEmitter<string | null>();
@@ -144,6 +148,7 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
   get cursorMonth(): number     { return this.cursor.getMonth(); }
   get cursorYear():  number     { return this.cursor.getFullYear(); }
   get cursorMonthName(): string { return MESES[this.cursor.getMonth()]; }
+  get effectivelyDisabled(): boolean { return this.isDisabled || this.disabled; }
 
   get displayText(): string {
     if (!this.selected) return '';
@@ -189,7 +194,7 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
 
   // ── Abrir / cerrar ──────────────────────────────────────────
   toggle(): void {
-    if (this.isDisabled) return;
+    if (this.effectivelyDisabled) return;
     this.isOpen ? this.close() : this.open();
     this.onTouched();
   }

@@ -20,7 +20,7 @@
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
                           drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
                           drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
-                          drawer()!.type === 'notificaciones' ? 'Notificaciones' :
+                          drawer()!.type === 'mi-actividad' ? 'Avisos' :
                           drawer()!.type === 'programacion-listado' ? (drawer()!.props?.['novedades'] ? 'Novedades de Programación' : 'Listado de programación') : 'Novedades de la app'">
 
     @if (drawer()!.type === 'reserva') {
@@ -75,7 +75,7 @@
       <app-turnos-vacaciones-panel />
     }
 
-    @if (drawer()!.type === 'notificaciones') { <app-notifications-panel /> }
+    @if (drawer()!.type === 'mi-actividad') { <app-mi-actividad-panel /> }
     @if (drawer()!.type === 'turnos-intercambio') { <app-turnos-intercambio-panel /> }
 
   </div>

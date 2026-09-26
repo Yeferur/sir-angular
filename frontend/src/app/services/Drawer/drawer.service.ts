@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'notificaciones' | 'turnos-intercambio';
+export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'turnos-intercambio' | 'mi-actividad';
 
 export interface DrawerMapPoint {
   lat: number;
@@ -75,7 +75,12 @@ export class SirDrawerService {
     this.open({ type: 'app-updates' });
   }
 
-  openNotifications(): void { this.open({ type: 'notificaciones' }); }
+  /** Alias de compatibilidad: todos los avisos usan la bandeja unificada. */
+  openNotifications(): void { this.openActivity(); }
+
+  openActivity(props: { tab?: 'pendientes' | 'recordatorios'; focusId?: string } = {}): void {
+    this.open({ type: 'mi-actividad', props });
+  }
 
   openTurnosIntercambio(props: Record<string, any>): void { this.open({ type: 'turnos-intercambio', props }); }
 

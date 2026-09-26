@@ -26,7 +26,7 @@ export class NotificacionesService {
     this.items.set([]);
   }
 
-  load(): void {
+  load(onLoaded?: (items: SirNotification[]) => void): void {
     this.loadSub?.unsubscribe();
     const generation = ++this.loadGeneration;
     this.loadSub = this.http.get<{ noLeidas: number; notificaciones: SirNotification[] }>(this.baseUrl).subscribe({
@@ -34,6 +34,7 @@ export class NotificacionesService {
         if (generation !== this.loadGeneration) return;
         this.noLeidas.set(response.noLeidas || 0);
         this.items.set(response.notificaciones || []);
+        onLoaded?.(response.notificaciones || []);
       },
     });
   }
@@ -47,5 +48,20 @@ export class NotificacionesService {
     this.http.patch(`${this.baseUrl}/leer-todas`, {}).subscribe({ next: () => {
       this.items.update(items => items.map(item => ({ ...item, leida: true }))); this.noLeidas.set(0);
     }});
+  }
+
+  markActivityHandled(type: 'PENDIENTE' | 'RECORDATORIO', sourceId: string): void {
+    let changed = 0;
+    this.items.update(items => items.map(item => {
+      const matches = type === 'RECORDATORIO'
+        ? item.tipo.toUpperCase() === type
+          && String(item.datos?.['recordatorioId'] || item.entidadId || '') === sourceId
+        : item.tipo.toUpperCase() === type
+          && String(item.datos?.['pendienteId'] || '') === sourceId;
+      if (!matches || item.leida) return item;
+      changed += 1;
+      return { ...item, leida: true, fechaLectura: new Date().toISOString() };
+    }));
+    if (changed) this.noLeidas.update(value => Math.max(0, value - changed));
   }
 }

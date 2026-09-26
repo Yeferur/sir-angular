@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const { toMysqlDateTime } = require('../../utils/dateTime');
+const notifications = require('../Notificaciones/notificaciones.service');
 
 class ReminderOperationError extends Error {
   constructor(message, status = 400, code = 'REMINDER_OPERATION_INVALID') {
@@ -35,6 +36,7 @@ function normalizeInput(input, { partial = false } = {}) {
   if (!partial || Object.hasOwn(input, 'intervalo')) result.interval = optionalText(input.intervalo, 50);
   if (!partial || Object.hasOwn(input, 'recordarTodoElDia')) result.allDay = !!input.recordarTodoElDia;
   if (!partial || Object.hasOwn(input, 'intervaloTodoElDia')) result.allDayInterval = optionalText(input.intervaloTodoElDia, 50);
+  if (!partial || Object.hasOwn(input, 'enviarCorreo')) result.sendEmail = input.enviarCorreo === true;
   if (!partial || Object.hasOwn(input, 'entidadTipo')) result.entityType = optionalText(input.entidadTipo, 60);
   if (!partial || Object.hasOwn(input, 'entidadId')) result.entityId = optionalText(input.entidadId, 80);
   return result;
@@ -42,6 +44,13 @@ function normalizeInput(input, { partial = false } = {}) {
 
 function mapReminder(row) {
   const suppressedUntil = row.Suprimido_Hasta ? new Date(row.Suprimido_Hasta) : null;
+  const trigger = new Date(row.Siguiente_Trigger || row.Fecha);
+  const isSuppressed = !!(suppressedUntil && suppressedUntil.getTime() > Date.now());
+  const presentationState = row.Estado === 'COMPLETADO'
+    ? 'COMPLETADO'
+    : isSuppressed
+      ? 'POSPUESTO'
+      : (!Number.isNaN(trigger.getTime()) && trigger.getTime() <= Date.now() ? 'ATENDER' : 'PROGRAMADO');
   return {
     idRecordatorio: String(row.Id_Recordatorio),
     titulo: row.Titulo,
@@ -51,10 +60,13 @@ function mapReminder(row) {
     intervalo: row.Intervalo,
     recordarTodoElDia: !!row.Recordar_Todo_El_Dia,
     intervaloTodoElDia: row.Intervalo_Todo_El_Dia,
+    enviarCorreo: !!row.Enviar_Correo,
     siguienteTrigger: row.Siguiente_Trigger,
     estado: row.Estado,
     suprimidoHasta: row.Suprimido_Hasta,
-    estaSuprimido: !!(suppressedUntil && suppressedUntil.getTime() > Date.now()),
+    estaSuprimido: isSuppressed,
+    estadoPresentacion: presentationState,
+    requiereAtencion: presentationState === 'ATENDER',
     entidadTipo: row.Entidad_Tipo,
     entidadId: row.Entidad_Id == null ? null : String(row.Entidad_Id),
     fechaCreacion: row.Fecha_Creacion,
@@ -72,16 +84,25 @@ async function listMine(userId, { includeCompleted = false } = {}) {
   return rows.map(mapReminder);
 }
 
+async function getDeliveryProfile(userId) {
+  const [rows] = await db.query(
+    'SELECT Correo FROM usuarios WHERE Id_Usuario = ? LIMIT 1',
+    [userId]
+  );
+  return { email: String(rows[0]?.Correo || '').trim() };
+}
+
 async function create(userId, input) {
   const data = normalizeInput(input);
   const [result] = await db.query(
     `INSERT INTO recordatorios
       (Id_Usuario, Titulo, Descripcion, Fecha, Recurrencia, Intervalo,
        Recordar_Todo_El_Dia, Intervalo_Todo_El_Dia, Siguiente_Trigger,
-       Estado, Activo, Entidad_Tipo, Entidad_Id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', 1, ?, ?)`,
+       Enviar_Correo, Estado, Activo, Entidad_Tipo, Entidad_Id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO', 1, ?, ?)`,
     [userId, data.title, data.description, data.date, data.recurrence, data.interval,
-      data.allDay ? 1 : 0, data.allDayInterval, data.date, data.entityType, data.entityId]
+      data.allDay ? 1 : 0, data.allDayInterval, data.date, data.sendEmail ? 1 : 0,
+      data.entityType, data.entityId]
   );
   return getMineById(userId, result.insertId);
 }
@@ -103,6 +124,7 @@ async function update(userId, reminderId, input) {
   const fields = {
     title: 'Titulo', description: 'Descripcion', date: 'Fecha', recurrence: 'Recurrencia',
     interval: 'Intervalo', allDay: 'Recordar_Todo_El_Dia', allDayInterval: 'Intervalo_Todo_El_Dia',
+    sendEmail: 'Enviar_Correo',
     entityType: 'Entidad_Tipo', entityId: 'Entidad_Id',
   };
   Object.entries(fields).forEach(([key, column]) => {
@@ -141,18 +163,64 @@ async function postpone(userId, reminderId, suppressedUntil) {
     [until, until, reminderId, userId]
   );
   if (!result.affectedRows) throw new ReminderOperationError('Recordatorio no encontrado.', 404, 'REMINDER_NOT_FOUND');
+  await notifications.markReminderHandled(db, userId, reminderId);
   return getMineById(userId, reminderId);
 }
 
+function nextRecurringTrigger(row, now = new Date()) {
+  const recurrence = String(row.Recurrencia || '').trim().toUpperCase();
+  if (!['DIARIA', 'SEMANAL'].includes(recurrence)) return null;
+  const interval = Math.min(Math.max(Number.parseInt(row.Intervalo, 10) || 1, 1), 365);
+  const days = recurrence === 'SEMANAL' ? interval * 7 : interval;
+  const candidate = new Date(row.Siguiente_Trigger || row.Fecha || now);
+  if (Number.isNaN(candidate.getTime())) return null;
+  while (candidate.getTime() <= now.getTime()) candidate.setUTCDate(candidate.getUTCDate() + days);
+  return toMysqlDateTime(candidate);
+}
+
 async function complete(userId, reminderId) {
-  const [result] = await db.query(
-    `UPDATE recordatorios
-        SET Estado = 'COMPLETADO', Activo = 0, Suprimido_Hasta = NULL, Siguiente_Trigger = NULL
-      WHERE Id_Recordatorio = ? AND Id_Usuario = ? AND Estado = 'ACTIVO'`,
-    [reminderId, userId]
-  );
-  if (!result.affectedRows) throw new ReminderOperationError('Recordatorio activo no encontrado.', 404, 'REMINDER_NOT_FOUND');
-  return getMineById(userId, reminderId);
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.query(
+      `SELECT * FROM recordatorios
+        WHERE Id_Recordatorio = ? AND Id_Usuario = ? AND Estado = 'ACTIVO'
+        LIMIT 1 FOR UPDATE`,
+      [reminderId, userId]
+    );
+    const row = rows[0];
+    if (!row) throw new ReminderOperationError('Recordatorio activo no encontrado.', 404, 'REMINDER_NOT_FOUND');
+
+    const next = nextRecurringTrigger(row);
+    if (next) {
+      // Completar atiende la ocurrencia actual; eliminar es la acción que termina la serie.
+      await connection.query(
+        `UPDATE recordatorios
+            SET Siguiente_Trigger = ?, Suprimido_Hasta = NULL, Estado = 'ACTIVO', Activo = 1
+          WHERE Id_Recordatorio = ?`,
+        [next, reminderId]
+      );
+    } else {
+      await connection.query(
+        `UPDATE recordatorios
+            SET Estado = 'COMPLETADO', Activo = 0, Suprimido_Hasta = NULL, Siguiente_Trigger = NULL
+          WHERE Id_Recordatorio = ?`,
+        [reminderId]
+      );
+    }
+    await notifications.markReminderHandled(connection, userId, reminderId);
+    const [updatedRows] = await connection.query(
+      'SELECT * FROM recordatorios WHERE Id_Recordatorio = ? AND Id_Usuario = ? LIMIT 1',
+      [reminderId, userId]
+    );
+    await connection.commit();
+    return mapReminder(updatedRows[0]);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function remove(userId, reminderId) {
@@ -161,6 +229,7 @@ async function remove(userId, reminderId) {
     [reminderId, userId]
   );
   if (!result.affectedRows) throw new ReminderOperationError('Recordatorio no encontrado.', 404, 'REMINDER_NOT_FOUND');
+  await notifications.markReminderHandled(db, userId, reminderId);
   return true;
 }
 
@@ -168,7 +237,9 @@ module.exports = {
   ReminderOperationError,
   normalizeInput,
   mapReminder,
+  nextRecurringTrigger,
   listMine,
+  getDeliveryProfile,
   create,
   update,
   postpone,

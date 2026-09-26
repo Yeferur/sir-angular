@@ -36,8 +36,11 @@ export interface PersonalReminder {
   intervalo: string | null;
   recordarTodoElDia: boolean;
   intervaloTodoElDia: string | null;
+  enviarCorreo: boolean;
   siguienteTrigger: string | null;
   estado: 'ACTIVO' | 'COMPLETADO';
+  estadoPresentacion?: 'PROGRAMADO' | 'ATENDER' | 'POSPUESTO' | 'COMPLETADO';
+  requiereAtencion?: boolean;
   suprimidoHasta: string | null;
   estaSuprimido: boolean;
   entidadTipo: string | null;
@@ -53,6 +56,7 @@ export interface ReminderInput {
   recurrencia?: string | null;
   entidadTipo?: string | null;
   entidadId?: string | null;
+  enviarCorreo?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -83,8 +87,8 @@ export class PendientesService {
     return this.http.patch(`${this.pendingUrl}/${id}/descartar`, { motivo });
   }
 
-  listReminders(includeCompleted = false): Observable<{ recordatorios: PersonalReminder[]; total: number }> {
-    return this.http.get<{ recordatorios: PersonalReminder[]; total: number }>(
+  listReminders(includeCompleted = false): Observable<{ recordatorios: PersonalReminder[]; total: number; correoRecordatorios?: string }> {
+    return this.http.get<{ recordatorios: PersonalReminder[]; total: number; correoRecordatorios?: string }>(
       this.reminderUrl,
       { params: { incluirCompletados: String(includeCompleted) } },
     );

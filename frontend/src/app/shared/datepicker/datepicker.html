@@ -2,12 +2,18 @@
 <button
   type="button"
   class="sir-dp-field"
+  [id]="inputId || null"
   [class.is-open]="isOpen"
   [class.is-invalid]="invalid"
-  [class.is-disabled]="isDisabled"
+  [class.is-disabled]="effectivelyDisabled"
   [attr.aria-expanded]="isOpen"
-  [attr.aria-label]="selected ? displayText : placeholder"
-  [disabled]="isDisabled || null"
+  aria-haspopup="dialog"
+  [attr.aria-invalid]="invalid || null"
+  [attr.aria-labelledby]="ariaLabelledby"
+  [attr.aria-describedby]="ariaDescribedby"
+  [attr.aria-description]="selected ? displayText : placeholder"
+  [attr.aria-label]="ariaLabelledby ? null : (selected ? displayText : placeholder)"
+  [disabled]="effectivelyDisabled || null"
   (click)="toggle()"
 >
   <!-- Icono calendario -->

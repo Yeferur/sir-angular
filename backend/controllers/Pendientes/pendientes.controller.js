@@ -1,5 +1,6 @@
 const service = require('../../services/Pendientes/pendientes.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const websocketManager = require('../../websocketManager');
 
 function handleError(res, error, fallback) {
   if (error instanceof service.PendingOperationError) {
@@ -27,6 +28,7 @@ exports.postpone = async (req, res) => {
       req.userPermissions,
       req.body?.suprimidoHasta
     );
+    websocketManager.sendToUser(req.user.id, { type: 'actividadActualizada', categoria: 'pendientes' });
     return sendSuccess(res, { data, message: 'Pendiente pospuesto.' });
   } catch (error) {
     return handleError(res, error, 'No se pudo posponer el pendiente.');
@@ -41,6 +43,7 @@ exports.dismiss = async (req, res) => {
       req.userPermissions,
       req.body?.motivo
     );
+    websocketManager.sendToUser(req.user.id, { type: 'actividadActualizada', categoria: 'pendientes' });
     return sendSuccess(res, { data, message: 'Pendiente descartado.' });
   } catch (error) {
     return handleError(res, error, 'No se pudo descartar el pendiente.');

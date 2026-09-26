@@ -195,6 +195,20 @@ function sendToUser(userId, event) {
   return sent;
 }
 
+function broadcastToInternal(event) {
+  const payload = JSON.stringify(event || {});
+  let sent = 0;
+  for (const userMap of clientsByUser.values()) {
+    for (const set of userMap.values()) {
+      for (const ws of set) {
+        if (!isOpen(ws) || wsMeta.get(ws)?.isClient) continue;
+        try { ws.send(payload); sent++; } catch {}
+      }
+    }
+  }
+  return sent;
+}
+
 async function broadcastActiveUsers() {
   try {
     const usuarios = getAllActiveUsers();
@@ -366,6 +380,7 @@ module.exports = {
   getClients,
   getAllActiveUsers,
   sendToUser,
+  broadcastToInternal,
   broadcastActiveUsers,
   broadcastAforoActualizado,
   broadcastReservaEvento,

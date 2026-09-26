@@ -17,6 +17,13 @@ function nextReminder(recurrenceMinutes, now = new Date()) {
   return toMysqlDateTime(new Date(now.getTime() + minutes * 60000));
 }
 
+function pendingNotificationKey(row, data = parseJson(row?.Datos, null)) {
+  const lifecycle = Number(row?.Ciclo_Notificacion || 0);
+  const operationalIdentity = String(data?.notificationIdentity || '').trim();
+  const identity = operationalIdentity ? `:${operationalIdentity}` : '';
+  return `PENDIENTE:${row.Id_Pendiente}:CICLO:${lifecycle}${identity}`.slice(0, 191);
+}
+
 async function usersWithPermissions(connection, permissionCodes) {
   const codes = [...new Set(permissionCodes.filter(Boolean))];
   if (!codes.length) return [];
@@ -54,7 +61,13 @@ async function processDuePendings({ limit = 30 } = {}) {
     await connection.beginTransaction();
     const [rows] = await connection.query(
       `SELECT p.Id_Pendiente, p.Id_Usuario_Destino, p.Permiso_Audiencia,
-              p.Titulo, p.Descripcion, p.Entidad_Tipo, p.Entidad_Id, p.Datos,
+              p.Titulo, p.Descripcion, p.Prioridad, p.Entidad_Tipo, p.Entidad_Id, p.Datos,
+              COALESCE((
+                SELECT MAX(e.Id_Evento)
+                  FROM pendientes_eventos e
+                 WHERE e.Id_Pendiente = p.Id_Pendiente
+                   AND e.Tipo IN ('DETECTADO', 'REACTIVADO')
+              ), 0) AS Ciclo_Notificacion,
               r.Codigo AS Regla_Codigo, r.Recurrencia_Minutos, r.Configuracion
          FROM pendientes_operativos p
          INNER JOIN reglas_pendientes r ON r.Id_Regla = p.Id_Regla AND r.Activa = 1
@@ -92,7 +105,16 @@ async function processDuePendings({ limit = 30 } = {}) {
         }
       }
       const data = parseJson(row.Datos, null);
+      const deduplicationKey = pendingNotificationKey(row, data);
       for (const userId of recipients) {
+        const [existingNotifications] = await connection.query(
+          `SELECT Id_Notificacion
+             FROM notificaciones
+            WHERE Id_Usuario = ? AND Clave_Deduplicacion = ?
+            LIMIT 1`,
+          [userId, deduplicationKey]
+        );
+        if (existingNotifications[0]) continue;
         const notificationId = await notifications.createNotification(connection, {
           userId,
           type: 'PENDIENTE',
@@ -100,7 +122,15 @@ async function processDuePendings({ limit = 30 } = {}) {
           message: row.Descripcion || 'Hay una situación operativa que requiere atención.',
           entityType: row.Entidad_Tipo,
           entityId: String(row.Entidad_Id),
-          data: { ...(data || {}), pendienteId: String(row.Id_Pendiente), ruta: data?.ruta || '/Pendientes' },
+          data: {
+            ...(data || {}),
+            pendienteId: String(row.Id_Pendiente),
+            origenTipo: 'PENDIENTE',
+            origenId: String(row.Id_Pendiente),
+            prioridad: row.Prioridad,
+            ruta: data?.ruta || '/Pendientes',
+          },
+          deduplicationKey,
         });
         const notificationData = parseJson(row.Datos, null);
         emitted.push({
@@ -142,4 +172,4 @@ async function processDuePendings({ limit = 30 } = {}) {
   return { processed: emitted.length };
 }
 
-module.exports = { nextReminder, usersWithPermissions, processDuePendings };
+module.exports = { nextReminder, pendingNotificationKey, usersWithPermissions, processDuePendings };

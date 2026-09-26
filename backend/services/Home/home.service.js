@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const crypto = require('crypto');
 const { isClientRoleName } = require('../../utils/clientAccess');
 const { syncHomeProcesses } = require('../Pendientes/home-process-detector.service');
 
@@ -26,6 +27,40 @@ function bogotaDate(offsetDays = 0) {
 function hasAnyPermission(permissions, ...codes) {
   const available = new Set(Array.isArray(permissions) ? permissions : []);
   return codes.some((code) => available.has(code));
+}
+
+function commissionProcess(rows = []) {
+  const situations = (rows || []).map((row) => ({
+    reservationId: String(row.Id_Reserva),
+    date: String(row.Fecha_Tour),
+    tourId: row.Id_Tour == null ? null : String(row.Id_Tour),
+    tourName: String(row.Nombre_Tour || '').trim() || null,
+  })).sort((a, b) => `${a.date}:${a.reservationId}`.localeCompare(`${b.date}:${b.reservationId}`));
+  const dates = situations.map((item) => item.date).filter(Boolean);
+  const periodStart = dates[0] || null;
+  const periodEnd = dates[dates.length - 1] || null;
+  const count = situations.length;
+  const tours = new Map();
+  for (const item of situations) {
+    if (item.tourId && item.tourName) tours.set(item.tourId, item.tourName);
+  }
+  const uniqueTour = tours.size === 1 ? Array.from(tours.entries())[0] : null;
+  const period = periodStart && periodEnd
+    ? (periodStart === periodEnd ? `del ${periodStart}` : `entre ${periodStart} y ${periodEnd}`)
+    : '';
+  return {
+    count,
+    periodStart,
+    periodEnd,
+    tourId: uniqueTour?.[0] || null,
+    tourName: uniqueTour?.[1] || null,
+    notificationIdentity: count
+      ? crypto.createHash('sha256').update(situations.map((item) => `${item.reservationId}:${item.date}`).join('|')).digest('hex')
+      : null,
+    description: count
+      ? `${count} ${count === 1 ? 'reserva viajada' : 'reservas viajadas'} ${period} ${count === 1 ? 'tiene comisión pendiente' : 'tienen comisiones pendientes'}.`
+      : 'No hay reservas viajadas con comisiones pendientes.',
+  };
 }
 
 function normalizeOverview(rows, dates) {
@@ -337,24 +372,37 @@ async function getOperationalProcesses(dates, permissions) {
 
   if (hasAnyPermission(permissions, 'COMISIONES.LEER')) {
     const [rows] = await db.query(
-      `SELECT COUNT(DISTINCT r.Id_Reserva) AS Total
+      `SELECT DISTINCT r.Id_Reserva, DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha_Tour,
+              t.Id_Tour, t.Nombre_Tour
        FROM reservas r
+       LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+       LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
        INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
        LEFT JOIN liquidaciones l ON l.Id_Reserva = r.Id_Reserva
        WHERE r.Fecha_Tour <= ?
          AND p.Confirmacion = 1
          AND p.Comision > 0
          AND COALESCE(l.Estado, 'PENDIENTE') = 'PENDIENTE'
-         AND ${ACTIVE_RESERVATION_SQL}`,
+         AND ${ACTIVE_RESERVATION_SQL}
+       ORDER BY r.Fecha_Tour, r.Id_Reserva`,
       [dates.today],
     );
+    const commissions = commissionProcess(rows);
     processes.push({
       id: 'commissions',
       label: 'Comisiones',
-      description: 'Reservas viajadas que aún tienen comisión pendiente.',
-      count: Number(rows?.[0]?.Total || 0),
+      notificationTitle: commissions.count === 1
+        ? '1 reserva con comisión pendiente'
+        : `${commissions.count} reservas con comisiones pendientes`,
+      description: commissions.description,
+      count: commissions.count,
       route: '/Comisiones',
       permission: 'COMISIONES.LEER',
+      periodStart: commissions.periodStart,
+      periodEnd: commissions.periodEnd,
+      tourId: commissions.tourId,
+      tourName: commissions.tourName,
+      notificationIdentity: commissions.notificationIdentity,
     });
   }
 
@@ -456,4 +504,5 @@ module.exports = {
   bogotaDate,
   hasAnyPermission,
   normalizeOverview,
+  commissionProcess,
 };

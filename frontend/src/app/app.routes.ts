@@ -40,7 +40,7 @@ export const routes: Routes = [
       permisos: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
       redirectTo: '/',
     },
-    title: 'Pendientes y recordatorios',
+    title: 'Avisos',
   },
   {
     path: 'Informes',

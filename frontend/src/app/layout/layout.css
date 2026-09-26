@@ -406,7 +406,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Progreso de ruta y eco cromático de los toasts existentes. */
+/* Progreso de ruta. Los avisos contextuales no modifican la isla superior. */
 .topbar-navigation-progress {
   position: absolute;
   left: 12px;
@@ -416,26 +416,6 @@
   overflow: hidden;
   border-radius: 999px;
   pointer-events: none;
-}
-
-.topbar-feedback-glow {
-  position: absolute;
-  inset: auto 18% -1px;
-  height: 2px;
-  border-radius: 999px;
-  opacity: .85;
-  pointer-events: none;
-  animation: feedbackGlowIn 320ms ease both;
-}
-
-.topbar-feedback-glow[data-type="success"] { background: #30d158; box-shadow: 0 0 12px rgba(48,209,88,.7); }
-.topbar-feedback-glow[data-type="info"] { background: #0a84ff; box-shadow: 0 0 12px rgba(10,132,255,.7); }
-.topbar-feedback-glow[data-type="warning"] { background: #ffd60a; box-shadow: 0 0 12px rgba(255,214,10,.65); }
-.topbar-feedback-glow[data-type="error"] { background: #ff453a; box-shadow: 0 0 12px rgba(255,69,58,.7); }
-
-@keyframes feedbackGlowIn {
-  from { opacity: 0; transform: scaleX(.35); }
-  to { opacity: .85; transform: scaleX(1); }
 }
 
 /* ─── Botones icono ─── */
@@ -465,6 +445,9 @@
 
 .notification-trigger { position: relative; }
 .notification-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; display: grid; place-items: center; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 800; line-height: 1; }
+.activity-trigger { position: relative; color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent-blue) 18%, transparent); }
+.activity-trigger-icon { display: block; flex: 0 0 auto; }
+.activity-count { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; box-sizing: border-box; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 850; line-height: 1; }
 .menu-count { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 850; line-height: 1; box-shadow: 0 0 0 2px var(--bg-secondary); }
 .mobile-menu-count { margin-left: auto; min-width: 23px; height: 22px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--accent-red) 16%, transparent); color: var(--accent-red); font-size: 11px; font-weight: 850; }
 
@@ -1092,8 +1075,7 @@
   .topbar-search-mode,
   .topbar-island-content,
   .profile-dropdown,
-  .topbar-expanded,
-  .topbar-feedback-glow {
+  .topbar-expanded {
     animation: none !important;
     transition-duration: 0.01ms !important;
   }

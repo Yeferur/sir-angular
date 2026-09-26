@@ -120,11 +120,12 @@ function renderEmailDocument({ preheader, content }) {
               <td bgcolor="#17191c" style="padding:20px 28px;background-color:#17191c;border-radius:18px 18px 0 0;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td valign="middle" style="color:#ffffff;font-size:21px;font-weight:800;letter-spacing:-0.4px;">
-                      <span style="color:#168cff;">Maxi</span>tours
+                    <td valign="middle" style="color:#ffffff;font-size:23px;font-weight:800;letter-spacing:-0.4px;">
+                      <span style="color:#168cff;">SIR</span>
+                      <span style="display:block;margin-top:3px;color:#aeb4bc;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Sistema interno de reservas</span>
                     </td>
                     <td align="right" valign="middle">
-                      <span style="display:inline-block;padding:6px 10px;border:1px solid #3a3d42;border-radius:999px;color:#d7d9dc;font-size:11px;font-weight:700;letter-spacing:1px;">SIR</span>
+                      <span style="display:inline-block;padding:6px 10px;border:1px solid #3a3d42;border-radius:999px;color:#d7d9dc;font-size:11px;font-weight:700;letter-spacing:0.5px;">Maxitours</span>
                     </td>
                   </tr>
                 </table>
@@ -137,7 +138,7 @@ function renderEmailDocument({ preheader, content }) {
             </tr>
             <tr>
               <td align="center" style="padding:20px 20px 0;color:#7a8088;font-size:12px;line-height:1.6;">
-                Mensaje automático de SIR · Maxitours<br>
+                SIR · Operación Maxitours<br>
                 Por favor, no respondas a este correo.
               </td>
             </tr>
@@ -336,6 +337,53 @@ async function sendSchedulePublishedEmail(params, dependencies = {}) {
   return deliver(message, dependencies);
 }
 
+function buildReminderMessage({ to, name, title, description, scheduledAt, reminderUrl }, env = process.env) {
+  const safeName = String(name || '').trim() || 'hola';
+  const safeTitle = String(title || '').trim() || 'Recordatorio';
+  const safeDescription = String(description || '').trim();
+  const rawDate = String(scheduledAt || '').replace('T', ' ');
+  const dateLabel = formatDateLabel(rawDate);
+  const timeLabel = formatTime(rawDate.slice(11));
+  const url = reminderUrl || buildFrontendUrl('/Pendientes?tab=recordatorios', env);
+  const subject = `${safeTitle} - Recordatorio SIR`;
+  const text = [
+    `Hola ${safeName},`,
+    '',
+    `Este es tu recordatorio: ${safeTitle}`,
+    safeDescription || null,
+    `Programado para: ${dateLabel}, ${timeLabel}`,
+    '',
+    `Consulta Avisos en: ${url}`,
+    'La notificación interna continúa disponible en SIR.',
+  ].filter((line) => line != null).join('\n');
+
+  const html = renderEmailDocument({
+    preheader: `Recordatorio de SIR: ${safeTitle}`,
+    content: `
+      <div style="padding:30px 32px 18px;">
+        <p style="margin:0 0 10px;color:#0a84ff;font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;">Avisos</p>
+        <h1 style="margin:0 0 16px;color:#1d1f22;font-size:27px;line-height:1.2;letter-spacing:-0.5px;">${escapeHtml(safeTitle)}</h1>
+        <p style="margin:0;color:#5d636b;font-size:15px;line-height:1.7;">Hola ${escapeHtml(safeName)}, este es el recordatorio personal que programaste en SIR.</p>
+      </div>
+      ${safeDescription ? `<div style="padding:0 32px 18px;"><p style="margin:0;color:#454b53;font-size:15px;line-height:1.65;white-space:pre-line;">${escapeHtml(safeDescription)}</p></div>` : ''}
+      <div style="padding:0 32px 22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef7ff" style="width:100%;background-color:#eef7ff;border:1px solid #cfe7ff;border-radius:12px;">
+          <tr><td style="padding:14px 16px;color:#24577e;font-size:14px;line-height:1.55;"><strong style="color:#164a72;">Programado para</strong><br>${escapeHtml(dateLabel)}, ${escapeHtml(timeLabel)}</td></tr>
+        </table>
+      </div>
+      <div style="padding:0 32px 28px;">
+        ${renderCta('Ver en Avisos', url)}
+        <p style="margin:16px 0 0;color:#777d85;font-size:12px;line-height:1.6;">El correo complementa la notificación interna de SIR y no la reemplaza.</p>
+      </div>`,
+  });
+
+  return { to, subject, text, html };
+}
+
+async function sendReminderEmail(params, dependencies = {}) {
+  return deliver(buildReminderMessage(params, dependencies.env || process.env), dependencies);
+}
+
 async function verifySmtpConnection(dependencies = {}) {
   const config = getSmtpConfig(dependencies.env || process.env);
   const transporter = dependencies.transporter
@@ -348,9 +396,11 @@ async function verifySmtpConnection(dependencies = {}) {
 module.exports = {
   buildPasswordResetMessage,
   buildSchedulePublishedMessage,
+  buildReminderMessage,
   getSmtpConfig,
   sendPasswordResetEmail,
   sendSchedulePublishedEmail,
+  sendReminderEmail,
   verifySmtpConnection,
   _private: { buildScheduleLines, escapeHtml, formatDateLabel, formatTime, renderCta, renderEmailDocument },
 };

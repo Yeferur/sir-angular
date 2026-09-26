@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const policy = require('./pendientes-policy.service');
 const { toMysqlDateTime } = require('../../utils/dateTime');
+const notifications = require('../Notificaciones/notificaciones.service');
 
 class PendingOperationError extends Error {
   constructor(message, status = 400, code = 'PENDING_OPERATION_INVALID') {
@@ -122,6 +123,7 @@ async function postpone(pendingId, userId, permissions, suppressedUntil, expecte
        VALUES (?, 'POSPUESTO', ?, ?)`,
       [pendingId, userId, JSON.stringify({ suprimidoHasta: until.toISOString() })]
     );
+    await notifications.markPendingHandled(connection, pendingId);
     await connection.commit();
     return { idPendiente: String(pendingId), estado: 'ACTIVO', suprimidoHasta: until.toISOString() };
   } catch (error) {
@@ -155,6 +157,7 @@ async function dismiss(pendingId, userId, permissions, reason, expectedRuleCode 
        VALUES (?, 'DESCARTADO', ?, ?)`,
       [pendingId, userId, normalizedReason || null]
     );
+    await notifications.markPendingHandled(connection, pendingId);
     await connection.commit();
     return { idPendiente: String(pendingId), estado: 'DESCARTADO' };
   } catch (error) {
@@ -242,6 +245,11 @@ async function resolveCondition(deduplicationKey, connection = null) {
     [deduplicationKey]
   );
   if (!result.affectedRows) return false;
+  const [rows] = await executor.query(
+    'SELECT Id_Pendiente FROM pendientes_operativos WHERE Clave_Deduplicacion = ? LIMIT 1',
+    [deduplicationKey]
+  );
+  if (rows[0]) await notifications.markPendingHandled(executor, rows[0].Id_Pendiente);
   await executor.query(
     `INSERT INTO pendientes_eventos (Id_Pendiente, Tipo)
      SELECT Id_Pendiente, 'RESUELTO_AUTOMATICAMENTE'

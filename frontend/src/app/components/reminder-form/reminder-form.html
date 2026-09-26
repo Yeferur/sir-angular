@@ -1,0 +1,69 @@
+<form class="reminder-form" [class.reminder-form--compact]="compact" (ngSubmit)="submit()" novalidate>
+  <div class="form-heading">
+    <div>
+      <span class="form-kicker">Nuevo recordatorio</span>
+      <h2>¿Qué quieres recordar?</h2>
+      <p>El aviso aparecerá en Avisos.</p>
+    </div>
+    <button type="button" class="icon-button" [disabled]="saving" (click)="cancelForm()" aria-label="Cerrar formulario">
+      <i class="bx bx-x" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <label class="form-group form-group--wide" for="reminder-title">
+    <span class="form-label">Título <span class="required-star">*</span></span>
+    <input id="reminder-title" class="form-input" name="reminderTitle" maxlength="255" required [disabled]="saving"
+      [class.is-invalid]="titleInvalid" [ngModel]="value.titulo"
+      [attr.aria-invalid]="titleInvalid || null" [attr.aria-describedby]="titleInvalid ? 'reminder-title-error' : null"
+      (ngModelChange)="update('titulo', $event)" placeholder="Ej. Revisar la reserva CTG11014" />
+    @if (titleInvalid) { <span id="reminder-title-error" class="error-message">Escribe un título.</span> }
+  </label>
+
+  <div class="form-group">
+    <label id="reminder-date-label" class="form-label" for="reminder-date">Fecha <span class="required-star">*</span></label>
+    <app-datepicker [ngModel]="selectedDate" [ngModelOptions]="{ standalone: true }"
+      inputId="reminder-date" ariaLabelledby="reminder-date-label" [ariaDescribedby]="dateInvalid ? 'reminder-date-error' : null"
+      [minDate]="minDate" [invalid]="dateInvalid" [disabled]="saving" placeholder="Seleccionar fecha"
+      (dateChange)="updateDate($event)" />
+    @if (dateInvalid) { <span id="reminder-date-error" class="error-message">Selecciona una fecha válida.</span> }
+  </div>
+
+  <div class="form-group">
+    <label id="reminder-time-label" class="form-label" for="reminder-time">Hora <span class="required-star">*</span></label>
+    <app-timepicker inputId="reminder-time" ariaLabelledby="reminder-time-label"
+      [ariaDescribedby]="timeInvalid ? 'reminder-time-error' : null" mode="free"
+      [value]="selectedTime" [minTime]="minTime" [disabled]="saving"
+      [invalid]="timeInvalid" placeholder="Seleccionar hora" (valueChange)="updateTime($event)" />
+    @if (timeInvalid) { <span id="reminder-time-error" class="error-message">{{ timeErrorMessage }}</span> }
+  </div>
+
+  <label class="form-group form-group--wide">
+    <span class="form-label">Nota</span>
+    <textarea class="form-input form-textarea" name="reminderDescription" rows="3" maxlength="4000" [disabled]="saving"
+      [ngModel]="value.descripcion" (ngModelChange)="update('descripcion', $event)"
+      placeholder="Contexto útil para cuando vuelva a verlo"></textarea>
+  </label>
+
+  <div class="email-option form-group--wide">
+    <label class="email-toggle" [class.is-disabled]="!hasValidEmail || saving">
+      <input type="checkbox" name="reminderEmail" [disabled]="!hasValidEmail || saving"
+        [ngModel]="!!value.enviarCorreo" (ngModelChange)="update('enviarCorreo', $event)" />
+      <span class="checkbox-control" aria-hidden="true"><i class="bx bx-check"></i></span>
+      <span class="email-copy">
+        <strong>Recordarme también por correo</strong>
+        @if (hasValidEmail) {
+          <small>Se enviará a {{ registeredEmail }}.</small>
+        } @else {
+          <small>No tienes un correo válido registrado.</small>
+        }
+      </span>
+    </label>
+  </div>
+
+  <div class="form-actions">
+    <button type="button" class="button button--ghost" [disabled]="saving" (click)="cancelForm()">Cancelar</button>
+    <button type="submit" class="button button--primary" [disabled]="saving">
+      {{ saving ? 'Guardando…' : 'Crear recordatorio' }}
+    </button>
+  </div>
+</form>

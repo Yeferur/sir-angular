@@ -8,6 +8,7 @@ import { NotificacionesService, SirNotification } from '../../services/Notificac
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { IntercambioTurno, TurnosService } from '../../services/Turnos/turnos.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
+import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facade';
 
 @Component({
   selector: 'app-notifications-panel',
@@ -24,6 +25,7 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
   private readonly permissions = inject(PermisosService);
   private readonly router = inject(Router);
   private readonly webSocket = inject(WebSocketService);
+  private readonly activity = inject(MiActividadFacade);
   private eventSub?: Subscription;
   private exchangeSub?: Subscription;
 
@@ -72,6 +74,19 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
 
   openNotification(item: SirNotification): void {
     if (!item.leida) this.notifications.markRead(item.idNotificacion);
+    const type = item.tipo.toUpperCase();
+    if (type === 'PENDIENTE' && this.activity.canReadPending) {
+      this.activity.open('pendientes', String(item.datos?.['pendienteId'] || item.entidadId || '') || undefined);
+      return;
+    }
+    if (type === 'RECORDATORIO' && this.activity.canReadReminders) {
+      this.activity.open('recordatorios', item.entidadId || undefined);
+      return;
+    }
+    if (type === 'APP_UPDATE') {
+      this.drawer.openAppUpdates();
+      return;
+    }
     const route = item.datos?.['route'] ?? item.datos?.['ruta'];
     if (typeof route === 'string' && route.startsWith('/')) {
       this.drawer.close(true);

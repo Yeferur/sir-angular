@@ -9,16 +9,16 @@
   pointer-events: none;
 }
 
-/* Avisos efímeros: nacen visualmente debajo de la isla central. */
+/* Los mensajes comunes permanecen en la esquina; los operativos tienen una
+   superficie propia debajo de la isla superior. */
 .sir-toast-region {
   position: fixed;
-  top: 78px;
-  left: 50%;
+  right: 18px;
+  bottom: 18px;
   width: min(370px, calc(100vw - 28px));
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transform: translateX(-50%);
   pointer-events: none;
 }
 
@@ -45,6 +45,18 @@
   will-change: transform, opacity;
 }
 
+.sir-toast--operational {
+  position: fixed;
+  top: 78px;
+  left: 50%;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--tone) 5%, transparent), transparent 54%),
+    color-mix(in srgb, var(--bg-secondary, #fff) 96%, transparent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .1);
+}
+
 .sir-toast[data-type="success"] { --tone: var(--sir-success); }
 .sir-toast[data-type="warning"] { --tone: var(--sir-warning); }
 .sir-toast[data-type="error"] { --tone: var(--sir-error); }
@@ -54,16 +66,28 @@
   transform: translateY(-7px) scale(.99);
 }
 
+.sir-toast--operational[data-phase="enter"] {
+  transform: translate(-50%, -7px) scale(.99);
+}
+
 .sir-toast[data-phase="live"] {
   opacity: 1;
   transform: translateY(0) scale(1);
   transition: opacity 220ms ease, transform 280ms cubic-bezier(.2,.8,.25,1);
 }
 
+.sir-toast--operational[data-phase="live"] {
+  transform: translate(-50%, 0) scale(1);
+}
+
 .sir-toast[data-phase="exit"] {
   opacity: 0;
   transform: translateY(-8px) scale(.98);
   transition: opacity 190ms ease, transform 210ms ease;
+}
+
+.sir-toast--operational[data-phase="exit"] {
+  transform: translate(-50%, -7px) scale(.99);
 }
 
 .sir-toast-icon,
@@ -140,7 +164,15 @@
   cursor: pointer;
 }
 
+.sir-toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .75rem;
+  margin-top: .35rem;
+}
+
 .sir-toast-action:hover { filter: brightness(1.16); }
+.sir-toast-action:active { transform: translateY(1px); }
 .sir-toast-action:focus-visible,
 .sir-toast-close:focus-visible,
 .sir-dialog-close:focus-visible,
@@ -169,6 +201,66 @@
   color: var(--text-primary, #fff);
   background: var(--fill-tertiary, rgba(255,255,255,.08));
 }
+
+.sir-toast-close:active,
+.sir-dialog-close:active { transform: scale(.94); }
+
+.sir-toast-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--separator-color);
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .28);
+  animation: sirPopoverIn 160ms ease-out both;
+}
+
+.sir-toast-popover > strong {
+  display: block;
+  margin-bottom: 9px;
+  font-size: .78rem;
+}
+
+.sir-toast-datetime {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .75fr);
+  gap: 8px;
+}
+
+.sir-toast-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.sir-toast-popover-actions button {
+  min-height: 32px;
+  padding: 6px 11px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--separator-color);
+  border-radius: 9px;
+  font: inherit;
+  font-size: .71rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sir-toast-popover-actions button.is-primary {
+  color: #fff;
+  background: var(--accent-blue, #0a84ff);
+  border-color: transparent;
+}
+
+.sir-toast-popover-actions button:active { transform: translateY(1px); }
+.sir-toast-popover-actions button:disabled { opacity: .55; cursor: wait; }
 
 .sir-toast-close svg,
 .sir-dialog-close svg {
@@ -248,7 +340,7 @@
   border-radius: 22px;
   box-shadow: 0 28px 80px rgba(0,0,0,.48);
   outline: none;
-  animation: sirDialogIn 340ms cubic-bezier(.2,.9,.25,1.08) both;
+  animation: sirDialogIn 260ms cubic-bezier(.2,.8,.25,1) both;
 }
 
 .sir-dialog[data-type="success"] { --tone: var(--sir-success); }
@@ -272,7 +364,7 @@
   height: 54px;
   margin-bottom: 13px;
   border-radius: 17px;
-  animation: sirIconIn 430ms cubic-bezier(.34,1.56,.64,1) 80ms both;
+  animation: sirIconIn 260ms ease-out 50ms both;
 }
 
 .sir-dialog-icon--critical {
@@ -355,12 +447,14 @@
   from { opacity: 0; transform: translateY(14px) scale(.965); }
 }
 @keyframes sirIconIn {
-  from { opacity: 0; transform: scale(.68) rotate(-5deg); }
+  from { opacity: 0; transform: scale(.88); }
 }
+@keyframes sirPopoverIn { from { opacity: 0; transform: translateY(-4px); } }
 @keyframes sirSpin { to { transform: rotate(360deg); } }
 
 @media (max-width: 560px) {
-  .sir-toast-region { top: 72px; }
+  .sir-toast-region { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
+  .sir-toast--operational { top: 70px; width: calc(100vw - 20px); }
   .sir-toast {
     grid-template-columns: 32px minmax(0, 1fr) 25px;
     gap: 8px;
@@ -371,6 +465,7 @@
   .sir-toast-icon { width: 32px; height: 32px; border-radius: 10px; }
   .sir-dialog { padding: 24px 18px 19px; }
   .sir-dialog-actions { flex-direction: column-reverse; }
+  .sir-toast-datetime { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -378,6 +473,7 @@
   .sir-dialog,
   .sir-dialog-backdrop,
   .sir-dialog-icon,
+  .sir-toast-popover,
   .sir-button {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;

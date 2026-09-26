@@ -91,3 +91,31 @@ test('marcar todas como leídas solo actualiza notificaciones propias', async (t
   assert.match(captured.sql, /WHERE Id_Usuario = \? AND Leida = 0/);
   assert.deepEqual(captured.params, [63]);
 });
+
+test('crear una notificación admite una clave idempotente sin cambiar el contrato existente', async (t) => {
+  const originalQuery = db.query;
+  let captured;
+  db.query = async (sql, params) => { captured = { sql, params }; return [{ insertId: 77 }]; };
+  t.after(() => { db.query = originalQuery; });
+
+  const id = await service.createNotification(null, {
+    userId: 9, type: 'APP_UPDATE', title: 'Nueva versión', message: 'Consulta los cambios',
+    entityType: 'APP_UPDATE', entityId: 'v2', data: { version: 'v2' }, deduplicationKey: 'APP_UPDATE:v2',
+  });
+
+  assert.equal(id, '77');
+  assert.match(captured.sql, /ON DUPLICATE KEY UPDATE/);
+  assert.equal(captured.params.at(-1), 'APP_UPDATE:v2');
+});
+
+test('atender un origen marca como leídas sus notificaciones derivadas', async () => {
+  const queries = [];
+  const executor = { async query(sql, params) { queries.push({ sql, params }); return [{ affectedRows: 2 }]; } };
+
+  assert.equal(await service.markReminderHandled(executor, 9, '44'), 2);
+  assert.equal(await service.markPendingHandled(executor, '55'), 2);
+  assert.match(queries[0].sql, /Tipo = 'RECORDATORIO'.*Entidad_Id = \?/s);
+  assert.deepEqual(queries[0].params, [9, '44']);
+  assert.match(queries[1].sql, /JSON_EXTRACT\(Datos, '\$\.pendienteId'\)/);
+  assert.deepEqual(queries[1].params, ['55']);
+});

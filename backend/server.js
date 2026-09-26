@@ -79,6 +79,7 @@ const recordatoriosRoutes = require('./routes/Recordatorios/recordatorios.routes
 const { iniciarVencimientosJob, detenerVencimientosJob } = require('./jobs/vencimientos.job');
 const { iniciarEmailOutboxJob, detenerEmailOutboxJob } = require('./jobs/email-outbox.job');
 const { iniciarPendientesJob, detenerPendientesJob } = require('./jobs/pendientes.job');
+const { publishAppUpdateOnStartup } = require('./jobs/app-updates.job');
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
@@ -167,6 +168,7 @@ server.on('error', (err) => {
 iniciarVencimientosJob();
 iniciarEmailOutboxJob();
 iniciarPendientesJob();
+void publishAppUpdateOnStartup();
 startServer(DEFAULT_PORT);
 
 let shuttingDown = false;

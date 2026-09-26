@@ -7,11 +7,13 @@ const emailService = require('./email.service');
 const EMAIL_TYPES = Object.freeze({
   PASSWORD_RESET: 'password_reset',
   SCHEDULE: 'schedule',
+  REMINDER: 'reminder',
 });
 
 const EMAIL_PRIORITIES = Object.freeze({
   PASSWORD_RESET: 100,
   SCHEDULE: 10,
+  REMINDER: 20,
 });
 
 const WORKER_LOCK_NAME = 'sir:email_outbox:worker:v1';
@@ -192,7 +194,7 @@ function quotaDecision(type, usage, policy, now = new Date()) {
     waits.push(addMilliseconds(oldest, (24 * 60 * 60 * 1000) + 1000));
   }
 
-  if (type === EMAIL_TYPES.SCHEDULE && scheduleSent >= policy.scheduleLimit) {
+  if (type !== EMAIL_TYPES.PASSWORD_RESET && scheduleSent >= policy.scheduleLimit) {
     const oldest = usage.oldestSchedule ? new Date(usage.oldestSchedule) : now;
     waits.push(addMilliseconds(oldest, (24 * 60 * 60 * 1000) + 1000));
   }
@@ -336,6 +338,30 @@ async function enqueueScheduleEmail(message, publicationId, dependencies = {}) {
   }, { ...dependencies, executor });
 }
 
+async function enqueueReminderEmail(message, reminderId, occurrence, dependencies = {}) {
+  const recipient = normalizeRecipient(message.to);
+  if (!isSingleMailbox(recipient)) {
+    const error = new Error('El destinatario de correo no es válido.');
+    error.code = 'EMAIL_RECIPIENT_INVALID';
+    throw error;
+  }
+  const normalizedReminderId = String(reminderId || '').trim();
+  const normalizedOccurrence = String(occurrence || '').trim();
+  if (!normalizedReminderId || !normalizedOccurrence) {
+    const error = new Error('La ocurrencia del recordatorio no es válida.');
+    error.code = 'EMAIL_REMINDER_OCCURRENCE_INVALID';
+    throw error;
+  }
+  const executor = dependencies.executor || db;
+  return enqueueEmail({
+    type: EMAIL_TYPES.REMINDER,
+    to: recipient,
+    payload: { ...message, to: recipient, reminderId: normalizedReminderId, scheduledAt: normalizedOccurrence },
+    dedupeKey: `reminder:${hashDedupe([normalizedReminderId, normalizedOccurrence])}`,
+    priority: EMAIL_PRIORITIES.REMINDER,
+  }, { ...dependencies, executor });
+}
+
 async function cancelPendingScheduleEmail(message, dependencies = {}) {
   const recipient = normalizeRecipient(message.to);
   if (!isSingleMailbox(recipient)) return { cancelled: 0 };
@@ -363,11 +389,11 @@ async function loadUsage(connection) {
     `SELECT
        COALESCE(SUM(CASE WHEN Reservado_En >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
          THEN 1 ELSE 0 END), 0) AS Total_Enviados,
-       COALESCE(SUM(CASE WHEN Tipo = 'schedule'
+       COALESCE(SUM(CASE WHEN Tipo <> 'password_reset'
          AND Reservado_En >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END), 0) AS Horarios_Enviados,
        MIN(CASE WHEN Reservado_En >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
          THEN Reservado_En END) AS Primer_Envio,
-       MIN(CASE WHEN Tipo = 'schedule'
+       MIN(CASE WHEN Tipo <> 'password_reset'
          AND Reservado_En >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN Reservado_En END) AS Primer_Horario
      FROM email_outbox_dispatches`
   );
@@ -538,6 +564,17 @@ async function deliverRow(row, dependencies = {}) {
     }
     return (dependencies.emailService || emailService).sendSchedulePublishedEmail(payload, deliveryDependencies);
   }
+  if (row.Tipo === EMAIL_TYPES.REMINDER) {
+    if (!String(payload.title || '').trim()
+      || !/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/.test(String(payload.scheduledAt || ''))
+      || !String(payload.reminderId || '').trim()) {
+      const error = new Error('El correo de recordatorio no contiene una ocurrencia válida.');
+      error.code = 'EMAIL_PAYLOAD_INVALID';
+      error.permanent = true;
+      throw error;
+    }
+    return (dependencies.emailService || emailService).sendReminderEmail(payload, deliveryDependencies);
+  }
 
   const error = new Error(`Tipo de correo no soportado: ${row.Tipo}`);
   error.code = 'EMAIL_TYPE_INVALID';
@@ -574,7 +611,7 @@ async function releaseQuotaReservation(connection, dispatchId, row, usage) {
   );
   if (Number(result.affectedRows || 0) !== 1) return false;
   usage.totalSent = Math.max(0, Number(usage.totalSent || 0) - 1);
-  if (row.Tipo === EMAIL_TYPES.SCHEDULE) {
+  if (row.Tipo !== EMAIL_TYPES.PASSWORD_RESET) {
     usage.scheduleSent = Math.max(0, Number(usage.scheduleSent || 0) - 1);
   }
   return true;
@@ -717,7 +754,7 @@ async function processOutboxBatch(dependencies = {}) {
       );
       const dispatchId = dispatch.insertId;
       usage.totalSent += 1;
-      if (row.Tipo === EMAIL_TYPES.SCHEDULE) usage.scheduleSent += 1;
+      if (row.Tipo !== EMAIL_TYPES.PASSWORD_RESET) usage.scheduleSent += 1;
 
       try {
         const result = await deliverRow(row, { ...dependencies, policy });
@@ -776,6 +813,7 @@ module.exports = {
   enqueueEmail,
   enqueuePasswordResetEmail,
   enqueueScheduleEmail,
+  enqueueReminderEmail,
   cancelPendingScheduleEmail,
   isSingleMailbox,
   processOutboxBatch,

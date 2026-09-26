@@ -4,6 +4,8 @@
       class="sir-toast"
       [attr.data-phase]="toast.phase"
       [attr.data-type]="toast.type"
+      [class.sir-toast--operational]="toast.operational"
+      [class.has-context-popover]="postponeToastId === toast.id"
       [class.is-paused]="toast.paused"
       [style.--toast-duration]="toast.durationMs + 'ms'"
       [attr.role]="toast.type === 'error' ? 'alert' : 'status'"
@@ -34,10 +36,45 @@
         @if (toast.message) {
           <p class="sir-toast-message">{{ toast.message }}</p>
         }
-        @if (toast.action) {
-          <button class="sir-toast-action" type="button" (click)="runToastAction(toast)">
-            {{ toast.action.label }}
-          </button>
+        @if (toast.actions?.length || toast.action) {
+          <div class="sir-toast-actions">
+            @for (action of (toast.actions?.length ? toast.actions : [toast.action!]); track action.label) {
+              <button
+                class="sir-toast-action"
+                type="button"
+                [attr.aria-expanded]="action.postpone ? postponeToastId === toast.id : null"
+                (click)="runToastAction(toast, action)">
+                {{ action.label }}
+              </button>
+            }
+          </div>
+        }
+        @if (postponeToastId === toast.id) {
+          <div class="sir-toast-popover" role="dialog" aria-label="Recordar más tarde" (click)="$event.stopPropagation()">
+            <strong>Recordar más tarde</strong>
+            <div class="sir-toast-datetime">
+              <app-datepicker
+                [ngModel]="postponeDate"
+                [ngModelOptions]="{ standalone: true }"
+                [minDate]="minPostponeDate"
+                placeholder="Seleccionar fecha"
+                (dateChange)="updatePostponeDate($event)" />
+              <app-timepicker
+                mode="free"
+                [value]="postponeTime"
+                [minTime]="postponeMinTime"
+                placeholder="Seleccionar hora"
+                (valueChange)="updatePostponeTime($event)" />
+            </div>
+            <div class="sir-toast-popover-actions">
+              <button type="button" (click)="cancelPostpone(toast)">Cancelar</button>
+              <button
+                type="button"
+                class="is-primary"
+                [disabled]="postponeSaving"
+                (click)="confirmPostpone(toast)">Confirmar</button>
+            </div>
+          </div>
         }
       </div>
 

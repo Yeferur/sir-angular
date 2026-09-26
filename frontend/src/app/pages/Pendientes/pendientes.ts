@@ -1,92 +1,78 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { WebSocketService } from '../../services/WebSocket/web-socket';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { catchError, EMPTY, filter, forkJoin, of, switchMap } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
 
 import {
   OperationalPending,
   PendingPriority,
-  PendientesService,
   PersonalReminder,
   ReminderInput,
 } from '../../services/Pendientes/pendientes.service';
-import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facade';
+import { SirNotification } from '../../services/Notificaciones/notificaciones.service';
+import { ReminderFormComponent } from '../../components/reminder-form/reminder-form';
+import { DatepickerComponent } from '../../shared/datepicker/datepicker';
+import { TimepickerComponent } from '../../shared/timepicker/timepicker';
+import { isFutureSirDateTime, nextSirMinute, nextSirTime, sirLocalDateTimeToIso, sirToday, toSirLocalDateTime } from '../../shared/utils/sir-datetime';
 
-type CenterTab = 'pendientes' | 'recordatorios';
+type CenterTab = 'todos' | 'pendientes' | 'recordatorios' | 'novedades';
 
 @Component({
   selector: 'app-pendientes',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReminderFormComponent, DatepickerComponent, TimepickerComponent],
   templateUrl: './pendientes.html',
   styleUrl: './pendientes.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PendientesComponent implements OnInit {
-  private readonly service = inject(PendientesService);
-  private readonly permissions = inject(PermisosService);
+  readonly activity = inject(MiActividadFacade);
   private readonly alerts = inject(SirAlertService);
-  private readonly router = inject(Router);
-  private readonly websocket = inject(WebSocketService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
 
-  readonly loading = signal(true);
+  readonly loading = this.activity.loading;
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly pending = signal<OperationalPending[]>([]);
-  readonly reminders = signal<PersonalReminder[]>([]);
-  readonly activeTab = signal<CenterTab>('pendientes');
+  readonly error = this.activity.error;
+  readonly pending = this.activity.pendientes;
+  readonly reminders = this.activity.recordatorios;
+  readonly activeTab = signal<CenterTab>('todos');
   readonly showReminderForm = signal(false);
   readonly pendingActionId = signal<string | null>(null);
   readonly pendingAction = signal<'posponer' | 'descartar' | null>(null);
   readonly reminderActionId = signal<string | null>(null);
   readonly includeSuppressed = signal(true);
+  readonly priorityFilter = signal<PendingPriority | 'TODAS'>('TODAS');
+  readonly visiblePending = computed(() => this.pending().filter(item =>
+    (this.includeSuppressed() || !item.estaSuprimido)
+    && (this.priorityFilter() === 'TODAS' || item.prioridad === this.priorityFilter())));
 
   reminderForm: ReminderInput = { titulo: '', descripcion: '', fecha: '' };
   postponeUntil = '';
   dismissReason = '';
+  readonly minActivityDate = sirToday();
 
-  get canReadPending(): boolean { return this.permissions.tienePermiso('PENDIENTES.LEER'); }
-  get canManagePending(): boolean { return this.permissions.tienePermiso('PENDIENTES.GESTIONAR'); }
-  get canReadReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.LEER'); }
-  get canCreateReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.CREAR'); }
-  get canUpdateReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.ACTUALIZAR'); }
-  get canDeleteReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.ELIMINAR'); }
+  get canReadPending(): boolean { return this.activity.canReadPending; }
+  get canManagePending(): boolean { return this.activity.canManagePending; }
+  get canReadReminders(): boolean { return this.activity.canReadReminders; }
+  get canCreateReminders(): boolean { return this.activity.canCreateReminders; }
+  get canUpdateReminders(): boolean { return this.activity.canUpdateReminders; }
+  get canDeleteReminders(): boolean { return this.activity.canDeleteReminders; }
   get highPriorityCount(): number {
-    return this.pending().filter(item => item.prioridad === 'ALTA' || item.prioridad === 'CRITICA').length;
+    return this.activity.pendientesPrioritarios().length;
   }
 
   ngOnInit(): void {
-    if (!this.canReadPending && this.canReadReminders) this.activeTab.set('recordatorios');
-    this.load();
-    this.websocket.events$.pipe(
-      filter(event => event.type === 'programacionNovedadesActualizadas' && this.canReadPending),
-      switchMap(() => this.service.listPending(this.includeSuppressed()).pipe(catchError(() => EMPTY))),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe(response => this.pending.set(response.pendientes || []));
+    const requested = this.route.snapshot.queryParamMap.get('tab');
+    if (requested === 'recordatorios' && this.canReadReminders) this.activeTab.set('recordatorios');
+    else if (requested === 'pendientes' && this.canReadPending) this.activeTab.set('pendientes');
+    else if (requested === 'novedades') this.activeTab.set('novedades');
+    this.activity.start();
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    forkJoin({
-      pending: this.canReadPending ? this.service.listPending(this.includeSuppressed()) : of({ pendientes: [], total: 0 }),
-      reminders: this.canReadReminders ? this.service.listReminders() : of({ recordatorios: [], total: 0 }),
-    }).subscribe({
-      next: ({ pending, reminders }) => {
-        this.pending.set(pending.pendientes || []);
-        this.reminders.set(reminders.recordatorios || []);
-        this.loading.set(false);
-      },
-      error: (error) => {
-        this.error.set(this.errorMessage(error, 'No pudimos cargar tu centro de trabajo.'));
-        this.loading.set(false);
-      },
-    });
+    this.activity.refresh(true);
   }
 
   setTab(tab: CenterTab): void {
@@ -96,13 +82,10 @@ export class PendientesComponent implements OnInit {
 
   toggleSuppressed(): void {
     this.includeSuppressed.update(value => !value);
-    this.load();
   }
 
   openReminderForm(): void {
-    const date = new Date(Date.now() + 60 * 60 * 1000);
-    date.setMinutes(Math.ceil(date.getMinutes() / 5) * 5, 0, 0);
-    this.reminderForm = { titulo: '', descripcion: '', fecha: this.toLocalInput(date) };
+    this.reminderForm = { titulo: '', descripcion: '', fecha: nextSirMinute(), enviarCorreo: false };
     this.showReminderForm.set(true);
     this.activeTab.set('recordatorios');
   }
@@ -113,18 +96,18 @@ export class PendientesComponent implements OnInit {
 
   saveReminder(): void {
     const title = String(this.reminderForm.titulo || '').trim();
-    if (!title || !this.reminderForm.fecha) {
+    const dateIso = sirLocalDateTimeToIso(this.reminderForm.fecha);
+    if (!title || !dateIso || !isFutureSirDateTime(this.reminderForm.fecha)) {
       this.alerts.warningToast('Revisa el recordatorio', 'Escribe un título y selecciona fecha y hora.');
       return;
     }
     this.saving.set(true);
-    this.service.createReminder({
+    this.activity.createReminder({
       ...this.reminderForm,
       titulo: title,
-      fecha: new Date(this.reminderForm.fecha).toISOString(),
+      fecha: dateIso,
     }).subscribe({
-      next: reminder => {
-        this.reminders.update(items => [...items, reminder].sort((a, b) => +new Date(a.fecha) - +new Date(b.fecha)));
+      next: () => {
         this.saving.set(false);
         this.showReminderForm.set(false);
         this.alerts.successToast('Recordatorio creado', 'Lo verás aquí hasta que lo completes.');
@@ -142,7 +125,7 @@ export class PendientesComponent implements OnInit {
     this.dismissReason = '';
     if (action === 'posponer') {
       const minutes = Math.min(item.posposicionMaxMinutos || 30, 30);
-      this.postponeUntil = this.toLocalInput(new Date(Date.now() + minutes * 60000));
+      this.postponeUntil = toSirLocalDateTime(new Date(Date.now() + minutes * 60000));
     }
   }
 
@@ -154,14 +137,17 @@ export class PendientesComponent implements OnInit {
   }
 
   confirmPostpone(item: OperationalPending): void {
-    if (!this.postponeUntil) return;
+    const postponeIso = sirLocalDateTimeToIso(this.postponeUntil);
+    if (!postponeIso || !isFutureSirDateTime(this.postponeUntil)) {
+      this.alerts.warningToast('Revisa la fecha y hora', 'Selecciona un momento futuro válido.');
+      return;
+    }
     this.saving.set(true);
-    this.service.postponePending(item.idPendiente, new Date(this.postponeUntil).toISOString()).subscribe({
+    this.activity.postponePending(item, postponeIso).subscribe({
       next: () => {
         this.saving.set(false);
         this.cancelPendingAction();
         this.alerts.successToast('Pendiente pospuesto', 'Continúa activo y volverá a mostrarse en el momento indicado.');
-        this.load();
       },
       error: error => {
         this.saving.set(false);
@@ -176,11 +162,10 @@ export class PendientesComponent implements OnInit {
       return;
     }
     this.saving.set(true);
-    this.service.dismissPending(item.idPendiente, this.dismissReason).subscribe({
+    this.activity.dismissPending(item, this.dismissReason).subscribe({
       next: () => {
         this.saving.set(false);
         this.cancelPendingAction();
-        this.pending.update(items => items.filter(candidate => candidate.idPendiente !== item.idPendiente));
         this.alerts.successToast('Pendiente descartado', 'La decisión quedó registrada en auditoría.');
       },
       error: error => {
@@ -191,9 +176,8 @@ export class PendientesComponent implements OnInit {
   }
 
   completeReminder(item: PersonalReminder): void {
-    this.service.completeReminder(item.idRecordatorio).subscribe({
+    this.activity.completeReminder(item).subscribe({
       next: () => {
-        this.reminders.update(items => items.filter(candidate => candidate.idRecordatorio !== item.idRecordatorio));
         this.alerts.successToast('Recordatorio completado');
       },
       error: error => this.alerts.errorToast('No se pudo completar', this.errorMessage(error, 'Intenta nuevamente.')),
@@ -202,7 +186,7 @@ export class PendientesComponent implements OnInit {
 
   beginReminderPostpone(item: PersonalReminder): void {
     this.reminderActionId.set(item.idRecordatorio);
-    this.postponeUntil = this.toLocalInput(new Date(Date.now() + 30 * 60000));
+    this.postponeUntil = toSirLocalDateTime(new Date(Date.now() + 30 * 60000));
   }
 
   cancelReminderPostpone(): void {
@@ -211,11 +195,14 @@ export class PendientesComponent implements OnInit {
   }
 
   postponeReminder(item: PersonalReminder): void {
-    if (!this.postponeUntil) return;
+    const postponeIso = sirLocalDateTimeToIso(this.postponeUntil);
+    if (!postponeIso || !isFutureSirDateTime(this.postponeUntil)) {
+      this.alerts.warningToast('Revisa la fecha y hora', 'El momento seleccionado ya pasó.');
+      return;
+    }
     this.saving.set(true);
-    this.service.postponeReminder(item.idRecordatorio, new Date(this.postponeUntil).toISOString()).subscribe({
-      next: reminder => {
-        this.reminders.update(items => items.map(candidate => candidate.idRecordatorio === reminder.idRecordatorio ? reminder : candidate));
+    this.activity.postponeReminder(item, postponeIso).subscribe({
+      next: () => {
         this.saving.set(false);
         this.cancelReminderPostpone();
         this.alerts.successToast('Recordatorio pospuesto', 'Te avisaremos en el nuevo momento.');
@@ -234,9 +221,8 @@ export class PendientesComponent implements OnInit {
       { confirmText: 'Eliminar', destructive: true },
     );
     if (!confirmed) return;
-    this.service.deleteReminder(item.idRecordatorio).subscribe({
+    this.activity.deleteReminder(item).subscribe({
       next: () => {
-        this.reminders.update(items => items.filter(candidate => candidate.idRecordatorio !== item.idRecordatorio));
         this.alerts.successToast('Recordatorio eliminado');
       },
       error: error => this.alerts.errorToast('No se pudo eliminar', this.errorMessage(error, 'Intenta nuevamente.')),
@@ -244,10 +230,16 @@ export class PendientesComponent implements OnInit {
   }
 
   openEntity(item: OperationalPending): void {
-    const type = item.entidadTipo.toUpperCase();
-    if (type === 'RESERVA') void this.router.navigate(['/Reservas/EditarReserva', item.entidadId]);
-    else if (type === 'TRANSFER') void this.router.navigate(['/Transfers/EditarTransfer', item.entidadId]);
-    else if (item.datos?.['ruta']) void this.router.navigateByUrl(String(item.datos['ruta']));
+    this.activity.openOrigin(item);
+  }
+
+  openNotification(item: SirNotification): void {
+    this.activity.markNotificationRead(item);
+    this.activity.openNotification(item);
+  }
+
+  markNotificationRead(item: SirNotification): void {
+    this.activity.markNotificationRead(item);
   }
 
   priorityLabel(priority: PendingPriority): string {
@@ -257,9 +249,18 @@ export class PendientesComponent implements OnInit {
   trackPending(_index: number, item: OperationalPending): string { return item.idPendiente; }
   trackReminder(_index: number, item: PersonalReminder): string { return item.idRecordatorio; }
 
-  private toLocalInput(date: Date): string {
-    const offset = date.getTimezoneOffset();
-    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+  get postponeDate(): string { return this.postponeUntil.split('T')[0] || ''; }
+  get postponeTime(): string { return (this.postponeUntil.split('T')[1] || '').slice(0, 5); }
+  get postponeMinTime(): string | null {
+    return this.postponeDate === sirToday() ? nextSirTime(1) : null;
+  }
+
+  updatePostponeDate(value: string | null): void {
+    this.postponeUntil = `${value || ''}T${this.postponeTime}`;
+  }
+
+  updatePostponeTime(value: string | null): void {
+    this.postponeUntil = `${this.postponeDate}T${value || ''}`;
   }
 
   private errorMessage(error: any, fallback: string): string {

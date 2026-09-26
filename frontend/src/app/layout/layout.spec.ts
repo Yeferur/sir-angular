@@ -12,6 +12,8 @@ import { NotificacionesService } from '../services/Notificaciones/notificaciones
 import { PendientesService } from '../services/Pendientes/pendientes.service';
 import { WebSocketService } from '../services/WebSocket/web-socket';
 import { SirDrawerService } from '../services/Drawer/drawer.service';
+import { MiActividadFacade } from '../services/MiActividad/mi-actividad.facade';
+import { DesktopNotificationsService } from '../services/Notificaciones/desktop-notifications.service';
 
 // El shell real se prueba con una sesión ficticia y sin peticiones al backend.
 describe('Navegación superior', () => {
@@ -22,6 +24,7 @@ describe('Navegación superior', () => {
   let notificationLoad: jasmine.Spy;
   let notificationClear: jasmine.Spy;
   let events: Subject<any>;
+  let desktopToggle: jasmine.Spy;
   const allPermissions = [
     'RESERVAS.LEER', 'RESERVAS.CREAR', 'CONTROL_VIAJE.LEER',
     'TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TOURS.LEER', 'TOURS.CREAR',
@@ -44,6 +47,7 @@ describe('Navegación superior', () => {
     notificationLoad = jasmine.createSpy('notificationLoad');
     notificationClear = jasmine.createSpy('notificationClear');
     events = new Subject<any>();
+    desktopToggle = jasmine.createSpy('desktopToggle').and.resolveTo('enabled');
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
@@ -67,6 +71,16 @@ describe('Navegación superior', () => {
           noLeidas: signal(3), load: notificationLoad, clear: notificationClear,
         } },
         { provide: PendientesService, useValue: { activeCount: signal(4), loadCount: jasmine.createSpy('pendingLoadCount'), clear: () => {} } },
+        { provide: MiActividadFacade, useValue: {
+          isAvailable: true, attentionCount: signal(2), unifiedCount: signal(5), start: jasmine.createSpy('activityStart'),
+          clear: jasmine.createSpy('activityClear'), open: jasmine.createSpy('activityOpen'),
+        } },
+        { provide: DesktopNotificationsService, useValue: {
+          supported: signal(true), permission: signal('granted'), enabled: signal(false),
+          state: signal('disabled'),
+          configureUser: jasmine.createSpy('desktopConfigureUser'), clearSession: jasmine.createSpy('desktopClearSession'),
+          toggle: desktopToggle,
+        } },
         { provide: WebSocketService, useValue: { events$: events.asObservable() } },
       ],
     }).compileComponents();
@@ -96,18 +110,25 @@ describe('Navegación superior', () => {
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
   });
 
-  it('refresca Notificaciones y el conteo de Pendientes con las novedades de Programación', () => {
+  it('delega Mi actividad y refresca el conteo con las novedades de Programación', () => {
     (layout as any).syncNotificationSession(true);
     notificationLoad.calls.reset();
     const count = TestBed.inject(PendientesService).loadCount as jasmine.Spy;
     count.calls.reset();
     events.next({ type: 'programacionNovedadesActualizadas', payload: {} });
-    expect(notificationLoad).toHaveBeenCalledTimes(1);
+    expect(notificationLoad).not.toHaveBeenCalled();
     expect(count).toHaveBeenCalledTimes(1);
     allowed.delete('PENDIENTES.LEER');
     events.next({ type: 'programacionNovedadesActualizadas', payload: {} });
-    expect(notificationLoad).toHaveBeenCalledTimes(2);
+    expect(notificationLoad).not.toHaveBeenCalled();
     expect(count).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantiene un único acceso y contador para todos los avisos', () => {
+    const activityTrigger = element('.activity-trigger');
+    expect(fixture.nativeElement.querySelectorAll('.notification-trigger').length).toBe(1);
+    expect(activityTrigger.querySelector('.activity-count')?.textContent?.trim()).toBe('5');
+    expect(element('.topbar-avatar-btn').querySelector('.activity-count')).toBeNull();
   });
 
   it('filtra Crear por permisos y conserva la restricción especial de Cliente', async () => {
@@ -124,13 +145,15 @@ describe('Navegación superior', () => {
     allowed.delete('NOTIFICACIONES.LEER');
     notificationLoad.calls.reset();
     notificationClear.calls.reset();
+    const activityStart = TestBed.inject(MiActividadFacade).start as jasmine.Spy;
+    activityStart.calls.reset();
     await render();
 
     (layout as any).syncNotificationSession(true);
     await render();
 
     expect(element('.notification-trigger')).toBeTruthy();
-    expect(notificationLoad).toHaveBeenCalled();
+    expect(activityStart).toHaveBeenCalled();
     expect(notificationClear).not.toHaveBeenCalled();
   });
 
@@ -194,9 +217,11 @@ describe('Navegación superior', () => {
     expect(layout.createMenuOpen()).toBeFalse();
     layout.toggleProfileMenu();
     await render();
+    const activityOpen = TestBed.inject(MiActividadFacade).open as jasmine.Spy;
+    activityOpen.calls.reset();
     layout.openNotifications();
     expect(layout.profileMenuOpen()).toBeFalse();
-    expect(TestBed.inject(SirDrawerService).drawer()?.type).toBe('notificaciones');
+    expect(activityOpen).toHaveBeenCalledTimes(1);
     layout.toggleNavigationLauncher();
     await render();
     layout.openAppUpdates();
@@ -217,5 +242,15 @@ describe('Navegación superior', () => {
     expect(profile).toHaveBeenCalledTimes(1);
     expect(help).toHaveBeenCalledTimes(1);
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('activa los avisos de escritorio únicamente desde la acción del perfil', async () => {
+    layout.toggleProfileMenu();
+    await render();
+    const button = Array.from(element('#topbar-profile-menu').querySelectorAll<HTMLButtonElement>('button'))
+      .find(item => item.textContent?.includes('Avisos de escritorio: Desactivados'))!;
+    button.click();
+    await fixture.whenStable();
+    expect(desktopToggle).toHaveBeenCalledTimes(1);
   });
 });

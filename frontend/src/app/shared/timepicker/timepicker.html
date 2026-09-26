@@ -1,12 +1,19 @@
-<!-- ── TRIGGER (queda en el DOM normal del componente) ── -->
 <button
+  #triggerButton
   type="button"
   class="sir-tp-field"
+  [id]="resolvedInputId"
   [class.is-open]="isOpen"
   [class.is-invalid]="invalid"
   [class.is-disabled]="disabled"
+  [class.is-readonly]="readOnly"
   [attr.aria-expanded]="isOpen"
-  [attr.aria-label]="value ? displayText : placeholder"
+  [attr.aria-haspopup]="'dialog'"
+  [attr.aria-invalid]="invalid || null"
+  [attr.aria-labelledby]="ariaLabelledby"
+  [attr.aria-describedby]="ariaDescribedby"
+  [attr.aria-description]="value ? displayText : placeholder"
+  [attr.aria-label]="ariaLabelledby ? null : (value ? displayText : placeholder)"
   [disabled]="disabled || null"
   (click)="toggle()"
 >
@@ -15,26 +22,55 @@
     <circle cx="12" cy="12" r="9"/>
     <polyline points="12 7 12 12 15.5 14"/>
   </svg>
-
-  <span class="sir-tp-text" [class.placeholder]="!value">
-    {{ value ? displayText : placeholder }}
-  </span>
+  <span class="sir-tp-text" [class.placeholder]="!value">{{ value ? displayText : placeholder }}</span>
+  @if (!readOnly) {
+    <i class="bx bx-chevron-down sir-tp-caret" [class.rotated]="isOpen" aria-hidden="true"></i>
+  }
 </button>
 
-<!-- ── PANEL (montado por CDK Overlay fuera del flujo del padre) ── -->
 <ng-template #panelTpl>
-  <div class="sir-tp-panel" role="dialog" aria-modal="true" aria-label="Seleccionar hora">
-    <div class="sir-tp-list" #slotList>
-      @for (slot of slots; track trackBySlot($index, slot)) {
-        <button
-          type="button"
-          class="sir-tp-item"
-          [class.is-selected]="value === slot"
-          [disabled]="isSlotDisabled(slot) || null"
-          [attr.aria-pressed]="value === slot"
-          (click)="selectSlot(slot)"
-        >{{ slotLabel(slot) }}</button>
-      }
-    </div>
+  <div class="sir-tp-panel" [class.sir-tp-panel--free]="mode === 'free'" role="dialog" aria-modal="true" aria-label="Seleccionar hora">
+    @if (mode === 'free') {
+      <div class="sir-tp-free">
+        <div class="sir-tp-free-heading">
+          <strong>Seleccionar hora</strong>
+          <span>Hora y minuto exactos</span>
+        </div>
+        <div class="sir-tp-time-row">
+          <label>
+            <span>Hora</span>
+            <input #freeHourInput class="sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
+              maxlength="2" [value]="draftHour" aria-label="Hora, de 1 a 12"
+              (input)="updateDraftHour($event)" (keydown)="onFreeInputKeydown($event)" />
+          </label>
+          <span class="sir-tp-separator" aria-hidden="true">:</span>
+          <label>
+            <span>Minuto</span>
+            <input class="sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
+              maxlength="2" [value]="draftMinute" aria-label="Minutos, de 00 a 59"
+              (input)="updateDraftMinute($event)" (keydown)="onFreeInputKeydown($event)" />
+          </label>
+          <div class="sir-tp-period" role="group" aria-label="Periodo del día">
+            <button type="button" [class.active]="draftPeriod === 'AM'" [attr.aria-pressed]="draftPeriod === 'AM'" (click)="setDraftPeriod('AM')">a. m.</button>
+            <button type="button" [class.active]="draftPeriod === 'PM'" [attr.aria-pressed]="draftPeriod === 'PM'" (click)="setDraftPeriod('PM')">p. m.</button>
+          </div>
+        </div>
+        <p class="sir-tp-help">Puedes escribir cualquier minuto entre 00 y 59.</p>
+        @if (freeError) { <p class="sir-tp-error" role="alert">{{ freeError }}</p> }
+        <div class="sir-tp-actions">
+          <button type="button" class="sir-tp-cancel" (click)="close()">Cancelar</button>
+          <button type="button" class="sir-tp-confirm" (click)="confirmFreeTime()">Aceptar</button>
+        </div>
+      </div>
+    } @else {
+      <div class="sir-tp-list" #slotList role="listbox" aria-label="Horarios disponibles">
+        @for (slot of slots; track trackBySlot($index, slot)) {
+          <button type="button" class="sir-tp-item" role="option"
+            [class.is-selected]="value === slot" [disabled]="isSlotDisabled(slot) || null"
+            [attr.aria-selected]="value === slot" (click)="selectSlot(slot)"
+            (keydown)="onSlotKeydown($event, $index)">{{ slotLabel(slot) }}</button>
+        }
+      </div>
+    }
   </div>
 </ng-template>

@@ -62,10 +62,12 @@ test('la cuota móvil frena horarios al llegar a 90 pero conserva espacio para r
   };
 
   const schedule = _private.quotaDecision(EMAIL_TYPES.SCHEDULE, usage, policy, now);
+  const reminder = _private.quotaDecision(EMAIL_TYPES.REMINDER, usage, policy, now);
   const password = _private.quotaDecision(EMAIL_TYPES.PASSWORD_RESET, usage, policy, now);
 
   assert.equal(schedule.allowed, false);
   assert.equal(schedule.nextAt.toISOString(), '2026-08-13T13:30:01.000Z');
+  assert.equal(reminder.allowed, false);
   assert.equal(password.allowed, true);
 });
 
@@ -182,6 +184,22 @@ test('cada fila acepta exactamente un buzón para que una entrega sea una unidad
     }, { executor }), (error) => error.code === 'EMAIL_RECIPIENT_INVALID');
   }
   assert.equal(_private.isSingleMailbox('asesor+sir@viajesmaxitours.co'), true);
+});
+
+test('deduplica el correo por recordatorio y ocurrencia, pero permite la recurrencia siguiente', async () => {
+  const calls = [];
+  const executor = { async query(sql, params) { calls.push({ sql, params }); return [{ insertId: calls.length, affectedRows: 1 }]; } };
+  const message = { to: 'propietario@example.com', name: 'Usuario', title: 'Revisar', description: 'Detalle' };
+
+  await outbox.enqueueReminderEmail(message, '15', '2026-09-22 10:00:00', { executor });
+  await outbox.enqueueReminderEmail(message, '15', '2026-09-22 10:00:00', { executor });
+  await outbox.enqueueReminderEmail(message, '15', '2026-09-23 10:00:00', { executor });
+
+  assert.equal(calls[0].params[0], EMAIL_TYPES.REMINDER);
+  assert.equal(calls[0].params[2], 'propietario@example.com');
+  assert.equal(calls[0].params[4], calls[1].params[4]);
+  assert.notEqual(calls[1].params[4], calls[2].params[4]);
+  assert.match(calls[0].params[4], /^reminder:[a-f0-9]{64}$/);
 });
 
 test('deduplica un correo de horario dentro de la misma publicación', async () => {

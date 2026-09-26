@@ -111,21 +111,10 @@
           <i class="bx bx-search" aria-hidden="true"></i>
         </button>
 
-        <button class="topbar-icon-btn topbar-icon-btn--secondary notification-trigger" type="button" (click)="openNotifications()" aria-label="Notificaciones">
+        <button class="topbar-icon-btn topbar-icon-btn--secondary notification-trigger activity-trigger" type="button" (click)="openActivity()" aria-label="Avisos" title="Avisos">
           <i class="bx bx-bell" aria-hidden="true"></i>
-          @if (notifications.noLeidas()) { <span class="notification-count">{{ notifications.noLeidas() > 9 ? '9+' : notifications.noLeidas() }}</span> }
+          @if (miActividad.unifiedCount()) { <span class="notification-count activity-count">{{ miActividad.unifiedCount() > 99 ? '99+' : miActividad.unifiedCount() }}</span> }
         </button>
-        @if (!isClientUser()) {
-        <button class="topbar-icon-btn topbar-icon-btn--secondary" type="button" (click)="openAppUpdates()" aria-label="Novedades de la app">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 2a10 10 0 1 0 10 10"/>
-            <path d="M12 6v6l4 2"/>
-            <circle cx="18" cy="6" r="3" fill="currentColor" stroke="none" class="topbar-dot"/>
-          </svg>
-        </button>
-        }
 
         <button
           class="topbar-icon-btn topbar-icon-btn--secondary topbar-theme-btn"
@@ -220,9 +209,6 @@
         <div class="topbar-navigation-progress" role="progressbar" aria-label="La aplicación está procesando información">
           <span></span>
         </div>
-      }
-      @if (topbarFeedbackType() && showAppChrome()) {
-        <span class="topbar-feedback-glow" [attr.data-type]="topbarFeedbackType()" aria-hidden="true"></span>
       }
     </div><!-- /topbar-bar -->
   </div><!-- /topbar-row -->
@@ -380,14 +366,18 @@
           <i class="bx bx-search" aria-hidden="true"></i>
           Buscar
         </button>
-        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openNotifications(); closeProfileMenu()">
+        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openActivity(); closeProfileMenu()">
           <i class="bx bx-bell" aria-hidden="true"></i>
-          Notificaciones @if (notifications.noLeidas()) { ({{ notifications.noLeidas() }}) }
+          Avisos @if (miActividad.unifiedCount()) { ({{ miActividad.unifiedCount() }}) }
         </button>
         @if (!isClientUser()) {
-        <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
+        <button class="small-dropdown-item profile-dropdown-item" role="menuitem" (click)="openAppUpdates(); closeProfileMenu()">
           <i class="bx bx-history" aria-hidden="true"></i>
-          Novedades
+          Actualizaciones de SIR
+        </button>
+        <button class="small-dropdown-item profile-dropdown-item" role="menuitem" (click)="toggleDesktopNotifications()">
+          <i class="bx" [class.bx-desktop]="desktopNotifications.enabled()" [class.bx-bell]="!desktopNotifications.enabled()" aria-hidden="true"></i>
+          {{ desktopNotificationLabel() }}
         </button>
         }
         <button class="small-dropdown-item profile-dropdown-item profile-dropdown-item--mobile-only" role="menuitem" (click)="toggleTheme($event); closeProfileMenu(true)">

@@ -5,7 +5,9 @@ const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
 const backendRoot = path.resolve(__dirname, '..');
-for (const fileName of ['.env', path.join('env', '.env'), '.env.production']) {
+// El respaldo local usa la misma configuración efectiva que la aplicación
+// local; nunca cae silenciosamente en credenciales de producción.
+for (const fileName of ['.env', path.join('env', '.env')]) {
   const envPath = path.join(backendRoot, fileName);
   if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false, quiet: true });
 }
@@ -39,7 +41,7 @@ async function main() {
     ? process.env.BACKUP_DB_PASSWORD
     : (process.env.DB_PASSWORD || process.env.DB_PASS || '');
   const backupDatabase = process.env.BACKUP_DB_NAME || required('DB_NAME', 'DB_DATABASE');
-  const connection = await mysql.createConnection({
+  const connectionOptions = {
     host: required('DB_HOST'),
     user: backupUser,
     password: backupPassword,
@@ -48,7 +50,17 @@ async function main() {
     dateStrings: true,
     supportBigNumbers: true,
     bigNumberStrings: true,
-  });
+  };
+  let connection;
+  try {
+    connection = await mysql.createConnection(connectionOptions);
+  } catch (error) {
+    const appUser = required('DB_USER');
+    const appPassword = process.env.DB_PASSWORD || process.env.DB_PASS || '';
+    const hasDistinctBackupCredentials = backupUser !== appUser || backupPassword !== appPassword;
+    if (!hasDistinctBackupCredentials || error?.code !== 'ER_ACCESS_DENIED_ERROR') throw error;
+    connection = await mysql.createConnection({ ...connectionOptions, user: appUser, password: appPassword });
+  }
 
   const databaseName = backupDatabase;
   const baseName = `${databaseName}-${timestamp()}`;

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
+import { NotificacionesService, SirNotification } from '../../services/Notificaciones/notificaciones.service';
 
 @Component({
   selector: 'app-updates-panel',
@@ -9,8 +10,9 @@ import { SirDrawerService } from '../../services/Drawer/drawer.service';
   templateUrl: './app-updates-panel.html',
   styleUrls: ['./app-updates-panel.css'],
 })
-export class AppUpdatesPanelComponent {
+export class AppUpdatesPanelComponent implements OnInit {
   private drawer = inject(SirDrawerService);
+  private notifications = inject(NotificacionesService);
 
   readonly version = 'v1.2.0-beta';
   readonly status = 'Fase beta';
@@ -153,7 +155,19 @@ export class AppUpdatesPanelComponent {
     },
   ];
 
+  ngOnInit(): void {
+    this.notifications.load(items => this.markUpdatesRead(items));
+  }
+
   close(): void {
     this.drawer.close();
+  }
+
+  private markUpdatesRead(items: SirNotification[]): void {
+    for (const item of items) {
+      if (item.tipo.toUpperCase() === 'APP_UPDATE' && !item.leida) {
+        this.notifications.markRead(item.idNotificacion);
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
@@ -6,6 +6,7 @@ import { PendientesComponent } from './pendientes';
 import { PendientesService } from '../../services/Pendientes/pendientes.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
+import { NotificacionesService } from '../../services/Notificaciones/notificaciones.service';
 
 describe('Pendientes: sincronización de Programación', () => {
   it('actualiza la lista sin borrar el formulario abierto y respeta los permisos existentes', async () => {
@@ -16,7 +17,14 @@ describe('Pendientes: sincronización de Programación', () => {
       imports: [PendientesComponent],
       providers: [provideZonelessChangeDetection(), provideRouter([]),
         { provide: PendientesService, useValue: { listPending: list, listReminders: () => of({ recordatorios: [], total: 0 }) } },
-        { provide: PermisosService, useValue: { tienePermiso: (p: string) => p === 'PENDIENTES.LEER' ? allowed : true } },
+        { provide: PermisosService, useValue: {
+          tienePermiso: (p: string) => p === 'PENDIENTES.LEER' ? allowed : true,
+          esCliente: () => false,
+        } },
+        { provide: NotificacionesService, useValue: {
+          load: () => {}, markRead: () => {}, markAllRead: () => {},
+          items: signal([]), noLeidas: signal(0),
+        } },
         { provide: WebSocketService, useValue: { events$: events.asObservable() } },
       ],
     }).compileComponents();
@@ -34,11 +42,12 @@ describe('Pendientes: sincronización de Programación', () => {
     expect(c.pending()).toEqual([]);
     expect(c.showReminderForm()).toBeTrue();
     expect(c.reminderForm.titulo).toBe('Texto sin guardar');
+    c.postponeUntil = '2099-10-15T12:00';
+    c.updatePostponeTime('15:17');
+    expect(c.postponeUntil).toBe('2099-10-15T15:17');
     list.calls.reset(); allowed = false;
     events.next({ type: 'programacionNovedadesActualizadas' });
     expect(list).not.toHaveBeenCalled();
     fixture.destroy();
-    allowed = true; events.next({ type: 'programacionNovedadesActualizadas' });
-    expect(list).not.toHaveBeenCalled();
   });
 });

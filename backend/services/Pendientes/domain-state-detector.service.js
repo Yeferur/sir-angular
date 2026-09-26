@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const policy = require('./pendientes-policy.service');
 const pendingService = require('./pendientes.service');
+const websocketManager = require('../../websocketManager');
 
 const PENDING_STATES = ['Pendiente', 'Pendiente de datos', 'Pendiente de pago'];
 
@@ -16,9 +17,11 @@ async function syncRule(ruleCode, rows, mapper) {
   for (const detection of detections) await pendingService.upsertCondition(detection);
 
   const currentKeys = await pendingService.activeKeysForRule(ruleCode);
+  let resolved = 0;
   for (const key of currentKeys) {
-    if (!detectedKeys.has(key)) await pendingService.resolveCondition(key);
+    if (!detectedKeys.has(key) && await pendingService.resolveCondition(key)) resolved += 1;
   }
+  if (resolved) websocketManager.broadcastToInternal({ type: 'actividadActualizada', categoria: 'pendientes' });
   return detections.length;
 }
 
@@ -46,7 +49,11 @@ async function syncReservationPendings() {
     title: `Reserva ${row.Id_Reserva}: ${row.Estado}`,
     description: descriptionFor('La reserva', row.Estado),
     operationDate: row.Fecha_Tour,
-    data: { estadoOrigen: row.Estado, ruta: `/Reservas/EditarReserva/${row.Id_Reserva}` },
+    data: {
+      estadoOrigen: row.Estado,
+      ruta: `/Reservas/EditarReserva/${row.Id_Reserva}`,
+      notificationIdentity: `RESERVA:${row.Id_Reserva}:${row.Estado}:${row.Fecha_Tour}`,
+    },
   }));
 }
 
@@ -74,7 +81,11 @@ async function syncTransferPendings() {
     title: `Transfer TR-${String(row.Id_Transfer).padStart(4, '0')}: ${row.Estado}`,
     description: descriptionFor('El transfer', row.Estado),
     operationDate: row.Fecha_Transfer,
-    data: { estadoOrigen: row.Estado, ruta: `/Transfers/EditarTransfer/${row.Id_Transfer}` },
+    data: {
+      estadoOrigen: row.Estado,
+      ruta: `/Transfers/EditarTransfer/${row.Id_Transfer}`,
+      notificationIdentity: `TRANSFER:${row.Id_Transfer}:${row.Estado}:${row.Fecha_Transfer}`,
+    },
   }));
 }
 

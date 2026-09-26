@@ -1,5 +1,10 @@
 const service = require('../../services/Recordatorios/recordatorios.service');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const websocketManager = require('../../websocketManager');
+
+function notifyActivity(userId) {
+  websocketManager.sendToUser(userId, { type: 'actividadActualizada', categoria: 'recordatorios' });
+}
 
 function handleError(res, error, fallback) {
   if (error instanceof service.ReminderOperationError) {
@@ -12,14 +17,22 @@ function handleError(res, error, fallback) {
 exports.listMine = async (req, res) => {
   try {
     const includeCompleted = String(req.query.incluirCompletados || 'false') === 'true';
-    const reminders = await service.listMine(req.user.id, { includeCompleted });
-    return sendSuccess(res, { data: { recordatorios: reminders, total: reminders.length } });
+    const [reminders, deliveryProfile] = await Promise.all([
+      service.listMine(req.user.id, { includeCompleted }),
+      service.getDeliveryProfile(req.user.id),
+    ]);
+    return sendSuccess(res, { data: {
+      recordatorios: reminders,
+      total: reminders.length,
+      correoRecordatorios: deliveryProfile.email,
+    } });
   } catch (error) { return handleError(res, error, 'No se pudieron consultar los recordatorios.'); }
 };
 
 exports.create = async (req, res) => {
   try {
     const reminder = await service.create(req.user.id, req.body || {});
+    notifyActivity(req.user.id);
     return sendSuccess(res, { data: reminder, message: 'Recordatorio creado.', status: 201 });
   } catch (error) { return handleError(res, error, 'No se pudo crear el recordatorio.'); }
 };
@@ -27,6 +40,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const reminder = await service.update(req.user.id, req.params.id, req.body || {});
+    notifyActivity(req.user.id);
     return sendSuccess(res, { data: reminder, message: 'Recordatorio actualizado.' });
   } catch (error) { return handleError(res, error, 'No se pudo actualizar el recordatorio.'); }
 };
@@ -34,6 +48,7 @@ exports.update = async (req, res) => {
 exports.postpone = async (req, res) => {
   try {
     const reminder = await service.postpone(req.user.id, req.params.id, req.body?.suprimidoHasta);
+    notifyActivity(req.user.id);
     return sendSuccess(res, { data: reminder, message: 'Recordatorio pospuesto.' });
   } catch (error) { return handleError(res, error, 'No se pudo posponer el recordatorio.'); }
 };
@@ -41,6 +56,7 @@ exports.postpone = async (req, res) => {
 exports.complete = async (req, res) => {
   try {
     const reminder = await service.complete(req.user.id, req.params.id);
+    notifyActivity(req.user.id);
     return sendSuccess(res, { data: reminder, message: 'Recordatorio completado.' });
   } catch (error) { return handleError(res, error, 'No se pudo completar el recordatorio.'); }
 };
@@ -48,6 +64,7 @@ exports.complete = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     await service.remove(req.user.id, req.params.id);
+    notifyActivity(req.user.id);
     return sendSuccess(res, { data: { eliminado: true }, message: 'Recordatorio eliminado.' });
   } catch (error) { return handleError(res, error, 'No se pudo eliminar el recordatorio.'); }
 };

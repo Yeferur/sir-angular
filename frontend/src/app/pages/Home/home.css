@@ -119,6 +119,30 @@ button { font: inherit; }
 .home-section:nth-of-type(5) { animation-delay: .14s; }
 .home-section--last { padding-bottom: 8px; }
 
+.notice-summary-card { min-height: 64px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); display: grid; grid-template-columns: 150px minmax(0, 1fr); overflow: hidden; background: var(--bg-secondary); }
+.notice-summary-card app-loading-state { grid-column: 1 / -1; }
+.notice-count { min-width: 0; padding: 13px 15px; border: 0; border-right: 1px solid var(--separator-color); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; text-align: left; color: var(--text-primary); background: color-mix(in srgb, var(--accent-blue) 5%, var(--bg-secondary)); cursor: pointer; }
+.notice-count strong { color: var(--accent-blue); font-size: 1.35rem; line-height: 1; }
+.notice-count span { color: var(--text-secondary); font-size: .7rem; font-weight: 740; }
+.notice-count i { color: var(--text-tertiary); }
+.notice-preview { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(220px, .7fr); }
+.notice-preview--single { grid-template-columns: 1fr; }
+.notice-priority-list { min-width: 0; display: grid; }
+.notice-preview-item, .notice-next-reminder { width: 100%; min-width: 0; min-height: 52px; padding: 8px 11px; border: 0; border-bottom: 1px solid var(--separator-color); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; text-align: left; color: var(--text-primary); background: transparent; cursor: pointer; transition: background .15s var(--ease-soft, ease); }
+.notice-preview-item:last-child { border-bottom: 0; }
+.notice-preview-item:hover, .notice-next-reminder:hover, .notice-count:hover { background: color-mix(in srgb, var(--accent-blue) 6%, var(--bg-secondary)); }
+.notice-preview-item strong, .notice-preview-item small, .notice-next-reminder small, .notice-next-reminder strong, .notice-next-reminder time { display: block; }
+.notice-preview-item strong, .notice-next-reminder strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.notice-preview-item small, .notice-next-reminder small { margin-top: 2px; color: var(--text-tertiary); font-size: .61rem; }
+.notice-preview-item > i, .notice-next-reminder > i { color: var(--text-tertiary); }
+.activity-priority-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); }
+.activity-priority-dot[data-priority='MEDIA'] { background: var(--accent-yellow); }
+.activity-priority-dot[data-priority='ALTA'], .activity-priority-dot[data-priority='CRITICA'] { background: var(--accent-red); }
+.notice-next-reminder { min-height: 100%; border-bottom: 0; border-left: 1px solid var(--separator-color); grid-template-columns: minmax(0, 1fr) auto; }
+.notice-next-reminder time { margin-top: 3px; color: var(--accent-blue); font-size: .64rem; font-weight: 740; }
+.notice-preview-empty { min-height: 52px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: .68rem; }
+.notice-preview-empty i { color: var(--accent-green); font-size: 1rem; }
+
 .advisor-shift-section { margin-top: 16px; }
 
 .advisor-shift-card {
@@ -620,7 +644,10 @@ button:focus-visible {
 
   .day-grid,
   .work-grid,
-  .detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .detail-grid,
+  .notice-summary-card { grid-template-columns: 130px minmax(0, 1fr); }
+  .notice-preview { grid-template-columns: minmax(0, 1fr); }
+  .notice-next-reminder { min-height: 52px; border-top: 1px solid var(--separator-color); border-left: 0; }
 
   .welcome-card { padding: 16px; }
 }
@@ -634,6 +661,8 @@ button:focus-visible {
   .section-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
   .quick-grid,
   .process-grid { grid-template-columns: minmax(0, 1fr); }
+  .notice-summary-card { grid-template-columns: 1fr; }
+  .notice-count { border-right: 0; border-bottom: 1px solid var(--separator-color); }
   .quick-action { min-height: 72px; align-items: flex-start; }
   .metric { min-height: 72px; }
   .day-card { padding: 12px; }

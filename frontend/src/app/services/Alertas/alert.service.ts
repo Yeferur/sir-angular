@@ -5,7 +5,12 @@ export type AlertType = 'success' | 'info' | 'warning' | 'error';
 
 export interface ToastAction {
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
+  postpone?: {
+    initialMinutes?: number;
+    maxMinutes?: number | null;
+    onConfirm: (until: string) => boolean | Promise<boolean>;
+  };
 }
 
 export interface SirToast {
@@ -16,6 +21,10 @@ export interface SirToast {
   durationMs: number;
   dismissible: boolean;
   action?: ToastAction;
+  actions?: ToastAction[];
+  /** Los avisos operativos se presentan de uno en uno; los toasts comunes conservan su comportamiento. */
+  operational?: boolean;
+  priority?: number;
 }
 
 export interface AlertButton {
@@ -145,6 +154,9 @@ export class SirAlertService {
     durationMs?: number;
     dismissible?: boolean;
     action?: ToastAction;
+    actions?: ToastAction[];
+    operational?: boolean;
+    priority?: number;
   }): string {
     return this.showToast({
       ...opts,

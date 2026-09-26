@@ -68,6 +68,49 @@
       </section>
     }
 
+    @if (activity.isAvailable) {
+      <section class="home-section" aria-labelledby="notices-title">
+        <header class="section-heading">
+          <div><h2 id="notices-title">Avisos</h2><p>Un resumen breve de lo que requiere tu atención.</p></div>
+          <button type="button" class="text-action" (click)="navigate('/Pendientes')">Ver todos los avisos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
+        </header>
+
+        <article class="notice-summary-card">
+          @if (activity.loading() && !activity.loaded()) {
+            <app-loading-state mode="loading" label="Consultando tus avisos…" [showSlowMessage]="false" />
+          } @else if (activity.error() && !activity.loaded()) {
+            <app-loading-state mode="error" label="No pudimos consultar Avisos" [detail]="activity.error()" (action)="activity.refresh(true)" />
+          } @else {
+            <button type="button" class="notice-count" (click)="activity.open()">
+              <strong>{{ activity.attentionCount() }}</strong>
+              <span>Por atender</span>
+              <i class="bx bx-chevron-right" aria-hidden="true"></i>
+            </button>
+
+            <div class="notice-preview" [class.notice-preview--single]="!activity.nextReminder()">
+              <div class="notice-priority-list">
+                @for (item of homeActivityItems; track item.idPendiente) {
+                  <button type="button" class="notice-preview-item" (click)="activity.open('pendientes', item.idPendiente)">
+                    <span class="activity-priority-dot" [attr.data-priority]="item.prioridad"></span>
+                    <span><strong>{{ item.titulo }}</strong><small>{{ item.entidadTipo }} · {{ item.entidadId }}</small></span>
+                    <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                  </button>
+                } @empty {
+                  <div class="notice-preview-empty"><i class="bx bx-check-circle"></i><span>Sin avisos personales prioritarios.</span></div>
+                }
+              </div>
+              @if (activity.nextReminder(); as reminder) {
+                <button type="button" class="notice-next-reminder" (click)="activity.open('recordatorios', reminder.idRecordatorio)">
+                  <span><small>Próximo recordatorio</small><strong>{{ reminder.titulo }}</strong><time>{{ (reminder.siguienteTrigger || reminder.fecha) | date:'d MMM, h:mm a' }}</time></span>
+                  <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                </button>
+              }
+            </div>
+          }
+        </article>
+      </section>
+    }
+
     @if (quickActions.length) {
       <section class="home-section" aria-labelledby="quick-title">
         <header class="section-heading section-heading--compact">
@@ -317,7 +360,7 @@
       <header class="section-heading">
         <div>
           <h2 id="detail-title">
-            {{ summary.capabilities.management ? 'Alertas y actividad reciente' : 'Mi actividad reciente' }}
+            {{ summary.capabilities.management ? 'Alertas y actividad reciente' : 'Actividad reciente' }}
           </h2>
         </div>
         @if (summary.capabilities.canReadReports) {

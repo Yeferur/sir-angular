@@ -121,6 +121,29 @@ test('el correo de horario diferencia una actualización y resume los siete día
   }
 });
 
+test('el correo de recordatorio usa la plantilla SIR y no envía a un destinatario alterno', async () => {
+  let message;
+  await emailService.sendReminderEmail({
+    to: 'propietario@example.test',
+    name: '<Usuario>',
+    title: 'Confirmar reserva <CTG11014>',
+    description: 'Llamar antes de las 3.',
+    scheduledAt: '2026-09-22 14:30:00',
+  }, {
+    env: smtpEnv,
+    transporter: { sendMail: async (value) => { message = value; return { messageId: 'reminder-1' }; } },
+  });
+
+  assert.equal(message.to, 'propietario@example.test');
+  assert.match(message.subject, /Confirmar reserva/);
+  assert.match(message.text, /22 de septiembre de 2026, 2:30 p\. m\./);
+  assert.match(message.text, /Pendientes\?tab=recordatorios/);
+  assert.match(message.html, /Confirmar reserva &lt;CTG11014&gt;/);
+  assert.match(message.html, /Hola &lt;Usuario&gt;/);
+  assert.match(message.html, /notificación interna/);
+  assert.doesNotMatch(message.html, /Confirmar reserva <CTG11014>/);
+});
+
 test('permite previsualizar las plantillas sin crear un transporte SMTP', () => {
   const reset = emailService.buildPasswordResetMessage({
     to: 'persona@example.test',
@@ -130,7 +153,8 @@ test('permite previsualizar las plantillas sin crear un transporte SMTP', () => 
   });
   assert.equal(reset.to, 'persona@example.test');
   assert.match(reset.text, /15 minutos/);
-  assert.match(reset.html, /Maxi<\/span>tours/);
+  assert.match(reset.html, /<span style="color:#168cff;">SIR<\/span>/);
+  assert.match(reset.html, />Maxitours<\/span>/);
 
   const schedule = emailService.buildSchedulePublishedMessage({
     to: 'asesor@example.test',
@@ -142,6 +166,12 @@ test('permite previsualizar las plantillas sin crear un transporte SMTP', () => 
   assert.equal(schedule.to, 'asesor@example.test');
   assert.match(schedule.html, /href="https:\/\/sir\.example\.test\/MiHorario"/);
   assert.match(schedule.text, /versión más reciente/);
+
+  const reminder = emailService.buildReminderMessage({
+    to: 'persona@example.test', name: 'Valentina', title: 'Revisar', scheduledAt: '2026-09-22 14:30:00',
+  }, { FRONTEND_URL: 'https://sir.example.test' });
+  assert.equal(reminder.to, 'persona@example.test');
+  assert.match(reminder.html, /Ver en Avisos/);
 });
 
 test('rechaza FRONTEND_URL inválida antes de construir enlaces de horarios', () => {
