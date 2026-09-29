@@ -15,6 +15,7 @@ import { SirNotification } from '../../services/Notificaciones/notificaciones.se
 import { ReminderFormComponent } from '../../components/reminder-form/reminder-form';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { TimepickerComponent } from '../../shared/timepicker/timepicker';
+import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { isFutureSirDateTime, nextSirMinute, nextSirTime, sirLocalDateTimeToIso, sirToday, toSirLocalDateTime } from '../../shared/utils/sir-datetime';
 
 type CenterTab = 'todos' | 'pendientes' | 'recordatorios' | 'novedades';
@@ -22,7 +23,7 @@ type CenterTab = 'todos' | 'pendientes' | 'recordatorios' | 'novedades';
 @Component({
   selector: 'app-pendientes',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReminderFormComponent, DatepickerComponent, TimepickerComponent],
+  imports: [CommonModule, FormsModule, ReminderFormComponent, DatepickerComponent, TimepickerComponent, LoadingStateComponent],
   templateUrl: './pendientes.html',
   styleUrl: './pendientes.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,6 +34,7 @@ export class PendientesComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly loading = this.activity.loading;
+  readonly loaded = this.activity.loaded;
   readonly saving = signal(false);
   readonly error = this.activity.error;
   readonly pending = this.activity.pendientes;
@@ -110,7 +112,7 @@ export class PendientesComponent implements OnInit {
       next: () => {
         this.saving.set(false);
         this.showReminderForm.set(false);
-        this.alerts.successToast('Recordatorio creado', 'Lo verás aquí hasta que lo completes.');
+        this.alerts.successToast('Recordatorio creado');
       },
       error: error => {
         this.saving.set(false);
@@ -156,17 +158,23 @@ export class PendientesComponent implements OnInit {
     });
   }
 
-  confirmDismiss(item: OperationalPending): void {
+  async confirmDismiss(item: OperationalPending): Promise<void> {
     if (item.requiereJustificacion && !this.dismissReason.trim()) {
-      this.alerts.warningToast('Explica el descarte', 'Esta regla requiere una justificación para auditoría.');
+      this.alerts.warningToast('Explica el descarte', 'Escribe el motivo para continuar.');
       return;
     }
+    const confirmed = await this.alerts.confirmDecision(
+      'Descartar pendiente',
+      `“${item.titulo}” dejará de aparecer como pendiente.`,
+      { confirmText: 'Descartar', destructive: true },
+    );
+    if (!confirmed) return;
     this.saving.set(true);
     this.activity.dismissPending(item, this.dismissReason).subscribe({
       next: () => {
         this.saving.set(false);
         this.cancelPendingAction();
-        this.alerts.successToast('Pendiente descartado', 'La decisión quedó registrada en auditoría.');
+        this.alerts.successToast('Pendiente descartado');
       },
       error: error => {
         this.saving.set(false);

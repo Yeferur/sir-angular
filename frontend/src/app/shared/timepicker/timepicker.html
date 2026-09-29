@@ -32,35 +32,26 @@
   <div class="sir-tp-panel" [class.sir-tp-panel--free]="mode === 'free'" role="dialog" aria-modal="true" aria-label="Seleccionar hora">
     @if (mode === 'free') {
       <div class="sir-tp-free">
-        <div class="sir-tp-free-heading">
-          <strong>Seleccionar hora</strong>
-          <span>Hora y minuto exactos</span>
-        </div>
         <div class="sir-tp-time-row">
           <label>
-            <span>Hora</span>
-            <input #freeHourInput class="sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
+            <input #freeHourInput class="form-input sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
               maxlength="2" [value]="draftHour" aria-label="Hora, de 1 a 12"
-              (input)="updateDraftHour($event)" (keydown)="onFreeInputKeydown($event)" />
+              (input)="updateDraftHour($event)" (blur)="normalizeFreeInput('hour')"
+              (keydown)="onFreeInputKeydown($event, 'hour')" />
           </label>
           <span class="sir-tp-separator" aria-hidden="true">:</span>
           <label>
-            <span>Minuto</span>
-            <input class="sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
+            <input #freeMinuteInput class="form-input sir-tp-number" type="text" inputmode="numeric" autocomplete="off"
               maxlength="2" [value]="draftMinute" aria-label="Minutos, de 00 a 59"
-              (input)="updateDraftMinute($event)" (keydown)="onFreeInputKeydown($event)" />
+              (input)="updateDraftMinute($event)" (blur)="normalizeFreeInput('minute')"
+              (keydown)="onFreeInputKeydown($event, 'minute')" />
           </label>
           <div class="sir-tp-period" role="group" aria-label="Periodo del día">
-            <button type="button" [class.active]="draftPeriod === 'AM'" [attr.aria-pressed]="draftPeriod === 'AM'" (click)="setDraftPeriod('AM')">a. m.</button>
-            <button type="button" [class.active]="draftPeriod === 'PM'" [attr.aria-pressed]="draftPeriod === 'PM'" (click)="setDraftPeriod('PM')">p. m.</button>
+            <button #periodAmButton type="button" [class.active]="draftPeriod === 'AM'" [attr.aria-pressed]="draftPeriod === 'AM'" (keydown)="onPeriodKeydown($event)" (click)="setDraftPeriod('AM')">a. m.</button>
+            <button #periodPmButton type="button" [class.active]="draftPeriod === 'PM'" [attr.aria-pressed]="draftPeriod === 'PM'" (keydown)="onPeriodKeydown($event)" (click)="setDraftPeriod('PM')">p. m.</button>
           </div>
         </div>
-        <p class="sir-tp-help">Puedes escribir cualquier minuto entre 00 y 59.</p>
         @if (freeError) { <p class="sir-tp-error" role="alert">{{ freeError }}</p> }
-        <div class="sir-tp-actions">
-          <button type="button" class="sir-tp-cancel" (click)="close()">Cancelar</button>
-          <button type="button" class="sir-tp-confirm" (click)="confirmFreeTime()">Aceptar</button>
-        </div>
       </div>
     } @else {
       <div class="sir-tp-list" #slotList role="listbox" aria-label="Horarios disponibles">

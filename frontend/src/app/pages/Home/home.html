@@ -25,20 +25,6 @@
         <h1 id="home-title">{{ greeting }}, {{ firstName }}</h1>
         <p>{{ dayLabel(summary.dates.today) }}</p>
       </div>
-      <span class="live-indicator" [attr.data-state]="refreshing ? 'updating' : connectionState" aria-live="polite">
-        <span class="live-indicator-dot" aria-hidden="true"></span>
-        @if (refreshing) {
-          Actualizando
-        } @else if (connectionState === 'connected') {
-          En vivo
-        } @else if (connectionState === 'connecting') {
-          Conectando
-        } @else if (connectionState === 'reconnecting') {
-          Reconectando
-        } @else {
-          Sin conexión
-        }
-      </span>
     </section>
 
     @if (summary.profile.mode === 'advisor') {
@@ -71,7 +57,7 @@
     @if (activity.isAvailable) {
       <section class="home-section" aria-labelledby="notices-title">
         <header class="section-heading">
-          <div><h2 id="notices-title">Avisos</h2><p>Un resumen breve de lo que requiere tu atención.</p></div>
+          <div><h2 id="notices-title">Avisos</h2></div>
           <button type="button" class="text-action" (click)="navigate('/Pendientes')">Ver todos los avisos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
         </header>
 
@@ -92,7 +78,7 @@
                 @for (item of homeActivityItems; track item.idPendiente) {
                   <button type="button" class="notice-preview-item" (click)="activity.open('pendientes', item.idPendiente)">
                     <span class="activity-priority-dot" [attr.data-priority]="item.prioridad"></span>
-                    <span><strong>{{ item.titulo }}</strong><small>{{ item.entidadTipo }} · {{ item.entidadId }}</small></span>
+                    <span><strong>{{ item.titulo }}</strong></span>
                     <i class="bx bx-chevron-right" aria-hidden="true"></i>
                   </button>
                 } @empty {
@@ -315,7 +301,7 @@
       <section class="home-section" aria-labelledby="attention-title">
         <header class="section-heading">
           <div>
-            <h2 id="attention-title">Procesos que requieren atención</h2>
+            <h2 id="attention-title">Procesos operativos</h2>
           </div>
         </header>
 
@@ -325,12 +311,11 @@
               <button
                 type="button"
                 class="process-card"
-                [attr.data-tone]="processTone(process)"
                 (click)="navigate(process.route)"
               >
                 <span class="process-icon">
                   @switch (process.id) {
-                    @case ('confirmation') { <i class="bx bx-check-shield" aria-hidden="true"></i> }
+                    @case ('confirmation') { <i class="bx bx-trip" aria-hidden="true"></i> }
                     @case ('programming') { <i class="bx bx-list-check" aria-hidden="true"></i> }
                     @case ('insurance') { <i class="bx bx-shield" aria-hidden="true"></i> }
                     @case ('commissions') { <i class="bx bx-dollar" aria-hidden="true"></i> }
@@ -339,11 +324,7 @@
                 </span>
                 <span class="process-copy">
                   <strong>{{ process.label }}</strong>
-                  <small>{{ process.description }}</small>
-                </span>
-                <span class="process-count">
-                  <strong [countUp]="process.count"></strong>
-                  <small>{{ process.count === 1 ? 'pendiente' : 'pendientes' }}</small>
+                  <small>Abrir módulo</small>
                 </span>
                 <i class="bx bx-chevron-right process-arrow" aria-hidden="true"></i>
               </button>

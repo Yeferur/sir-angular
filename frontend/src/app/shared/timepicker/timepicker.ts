@@ -62,6 +62,9 @@ export class TimepickerComponent implements OnChanges, OnDestroy {
   @ViewChild('panelTpl', { static: true }) panelTpl!: TemplateRef<void>;
   @ViewChild('slotList') slotListRef?: ElementRef<HTMLElement>;
   @ViewChild('freeHourInput') freeHourInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('freeMinuteInput') freeMinuteInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('periodAmButton') periodAmButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild('periodPmButton') periodPmButton?: ElementRef<HTMLButtonElement>;
   @ViewChild('triggerButton') triggerButton?: ElementRef<HTMLButtonElement>;
 
   @Input() value: string | null = null;
@@ -176,34 +179,120 @@ export class TimepickerComponent implements OnChanges, OnDestroy {
   trackBySlot(_: number, slot: string): string { return slot; }
 
   updateDraftHour(event: Event): void {
-    this.draftHour = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 2);
-    this.freeError = '';
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, 2);
+    if (!digits) {
+      this.draftHour = '';
+    } else if (digits.length === 1) {
+      this.draftHour = digits === '0' ? '' : digits;
+    } else {
+      const numeric = Number(digits);
+      const lastDigit = Number(digits.at(-1));
+      this.draftHour = numeric >= 1 && numeric <= 12
+        ? String(numeric)
+        : lastDigit >= 1 ? String(lastDigit) : '12';
+    }
+    input.value = this.draftHour;
+    this.applyFreeTime(false);
+    if (this.draftHour.length === 2 || Number(this.draftHour) >= 2) {
+      queueMicrotask(() => {
+        this.freeMinuteInput?.nativeElement.focus();
+        this.freeMinuteInput?.nativeElement.select();
+      });
+    }
   }
 
   updateDraftMinute(event: Event): void {
-    this.draftMinute = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 2);
-    this.freeError = '';
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, 2);
+    if (!digits) {
+      this.draftMinute = '';
+    } else if (digits.length === 1 && Number(digits) <= 5) {
+      this.draftMinute = digits;
+    } else {
+      const numeric = Number(digits);
+      this.draftMinute = numeric <= 59 ? pad(numeric) : pad(Number(digits.at(-1)));
+    }
+    input.value = this.draftMinute;
+    this.applyFreeTime(false);
+    if (this.draftMinute.length === 2) {
+      queueMicrotask(() => (this.draftPeriod === 'AM' ? this.periodAmButton : this.periodPmButton)?.nativeElement.focus());
+    }
   }
 
   setDraftPeriod(period: Meridiem): void {
     this.draftPeriod = period;
-    this.freeError = '';
+    this.applyFreeTime(false);
     this.cdr.markForCheck();
   }
 
-  onFreeInputKeydown(event: KeyboardEvent): void {
+  onFreeInputKeydown(event: KeyboardEvent, field: 'hour' | 'minute'): void {
     if (event.key === 'Enter') {
       event.preventDefault();
       this.confirmFreeTime();
+      return;
     }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.close();
+      return;
+    }
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowUp' ? 1 : -1;
+    if (field === 'hour') {
+      const current = Number(this.draftHour) || 12;
+      this.draftHour = String(((current - 1 + delta + 12) % 12) + 1);
+      (event.target as HTMLInputElement).value = this.draftHour;
+    } else {
+      const current = Number(this.draftMinute) || 0;
+      this.draftMinute = pad((current + delta + 60) % 60);
+      (event.target as HTMLInputElement).value = this.draftMinute;
+    }
+    this.applyFreeTime(false);
+    (event.target as HTMLInputElement).select();
+  }
+
+  normalizeFreeInput(field: 'hour' | 'minute'): void {
+    if (field === 'hour') {
+      const hour = Number(this.draftHour);
+      this.draftHour = Number.isInteger(hour) && hour >= 1 && hour <= 12 ? String(hour) : '12';
+    } else {
+      const minute = Number(this.draftMinute);
+      this.draftMinute = Number.isInteger(minute) && minute >= 0 && minute <= 59 ? pad(minute) : '00';
+    }
+    this.applyFreeTime(false);
+    this.cdr.markForCheck();
+  }
+
+  onPeriodKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.confirmFreeTime();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.close();
+      return;
+    }
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    const next: Meridiem = this.draftPeriod === 'AM' ? 'PM' : 'AM';
+    this.setDraftPeriod(next);
+    queueMicrotask(() => (next === 'AM' ? this.periodAmButton : this.periodPmButton)?.nativeElement.focus());
   }
 
   confirmFreeTime(): void {
+    this.applyFreeTime(true);
+  }
+
+  private applyFreeTime(closeAfter: boolean): void {
     const candidate = this.freeCandidate();
     if (!candidate) {
-      this.freeError = 'Escribe una hora y minutos válidos.';
+      this.freeError = closeAfter ? 'Escribe una hora y minutos válidos.' : '';
       this.cdr.markForCheck();
-      this.freeHourInput?.nativeElement.focus();
+      if (closeAfter) this.freeHourInput?.nativeElement.focus();
       return;
     }
     if (this.isSlotDisabled(candidate)) {
@@ -213,10 +302,13 @@ export class TimepickerComponent implements OnChanges, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
-    this.value = candidate;
-    this.valueChange.emit(candidate);
+    this.freeError = '';
+    if (candidate !== this.value) {
+      this.value = candidate;
+      this.valueChange.emit(candidate);
+    }
     this.cdr.markForCheck();
-    this.close();
+    if (closeAfter) this.close();
   }
 
   onSlotKeydown(event: KeyboardEvent, index: number): void {
@@ -238,6 +330,7 @@ export class TimepickerComponent implements OnChanges, OnDestroy {
   }
 
   private freeCandidate(): string | null {
+    if (!this.draftHour || !this.draftMinute) return null;
     const hour = Number(this.draftHour);
     const minute = Number(this.draftMinute);
     if (!Number.isInteger(hour) || hour < 1 || hour > 12 || !Number.isInteger(minute) || minute < 0 || minute > 59) return null;

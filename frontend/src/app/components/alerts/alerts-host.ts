@@ -8,6 +8,7 @@ import {
   NgZone,
   OnDestroy,
 } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { TimepickerComponent } from '../../shared/timepicker/timepicker';
@@ -39,7 +40,7 @@ const TYPE_LABEL: Record<AlertType, string> = {
 @Component({
   selector: 'app-sir-alerts',
   standalone: true,
-  imports: [FormsModule, DatepickerComponent, TimepickerComponent],
+  imports: [CommonModule, FormsModule, DatepickerComponent, TimepickerComponent],
   templateUrl: './alerts-host.html',
   styleUrls: ['./alerts-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,24 +76,24 @@ export class SirAlertsHostComponent implements OnDestroy {
       this.mountToast(toast);
     }
 
-    if (this.visibleToasts.some(toast => toast.operational) || this.operationalMountTimer) return;
+    const operationalSlots = Math.max(0, 3 - this.visibleToasts.filter(toast => toast.operational).length);
+    if (!operationalSlots || this.operationalMountTimer) return;
     const nextOperational = available
       .filter(item => item.operational)
-      .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))[0];
-    if (!nextOperational) return;
+      .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))
+      .slice(0, operationalSlots);
+    if (!nextOperational.length) return;
     const sensitiveDelay = this.hasSensitiveInteraction() ? 1_200 : 0;
     const delay = Math.max(sensitiveDelay, 700 - (Date.now() - this.lastOperationalRemovedAt));
     if (!delay) {
-      this.mountToast(nextOperational);
+      nextOperational.forEach(toast => this.mountToast(toast));
       return;
     }
     this.operationalMountTimer = setTimeout(() => this.zone.run(() => {
       this.operationalMountTimer = undefined;
-      if (!this.hasSensitiveInteraction()
-        && !this.visibleToasts.some(toast => toast.operational)
-        && this.alertSvc.toasts().some(toast => toast.id === nextOperational.id)) {
-        this.mountToast(nextOperational);
-      } else if (this.alertSvc.toasts().some(toast => toast.id === nextOperational.id)) {
+      if (!this.hasSensitiveInteraction()) {
+        this.mountOperationalBatch();
+      } else if (nextOperational.some(toast => this.alertSvc.toasts().some(item => item.id === toast.id))) {
         this.requestOperationalRetry();
       }
     }), delay);
@@ -129,7 +130,7 @@ export class SirAlertsHostComponent implements OnDestroy {
 
     this.dialogWasOpen = dialogOpen;
     if (!dialogOpen
-      && !this.visibleToasts.some(toast => toast.operational)
+      && this.visibleToasts.filter(toast => toast.operational).length < 3
       && this.alertSvc.toasts().some(toast => toast.operational)) {
       this.requestOperationalRetry();
     }
@@ -342,16 +343,23 @@ export class SirAlertsHostComponent implements OnDestroy {
     clearTimeout(this.operationalMountTimer);
     this.operationalMountTimer = setTimeout(() => this.zone.run(() => {
       this.operationalMountTimer = undefined;
-      const next = this.alertSvc.toasts()
-        .filter(item => item.operational)
-        .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))[0];
-      if (!next || this.visibleToasts.some(toast => toast.operational)) return;
       if (this.hasSensitiveInteraction()) {
         this.requestOperationalRetry();
         return;
       }
-      this.mountToast(next);
+      this.mountOperationalBatch();
     }), 1_200);
+  }
+
+  private mountOperationalBatch(): void {
+    const slots = Math.max(0, 3 - this.visibleToasts.filter(toast => toast.operational).length);
+    if (!slots) return;
+    const visibleIds = new Set(this.visibleToasts.map(toast => toast.id));
+    this.alertSvc.toasts()
+      .filter(toast => toast.operational && !visibleIds.has(toast.id))
+      .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))
+      .slice(0, slots)
+      .forEach(toast => this.mountToast(toast));
   }
 
   private updateToast(id: string, replacement: ToastView): void {

@@ -102,7 +102,6 @@
           [attr.aria-expanded]="createMenuOpen()"
           aria-controls="topbar-create-menu"
           aria-haspopup="menu">
-          <i class="bx bx-plus" aria-hidden="true"></i>
           <span>Crear</span>
         </button>
         }
@@ -111,7 +110,7 @@
           <i class="bx bx-search" aria-hidden="true"></i>
         </button>
 
-        <button class="topbar-icon-btn topbar-icon-btn--secondary notification-trigger activity-trigger" type="button" (click)="openActivity()" aria-label="Avisos" title="Avisos">
+        <button class="topbar-icon-btn topbar-icon-btn--secondary notification-trigger activity-trigger" type="button" (click)="openActivity()" [class.active]="activityDrawerOpen()" [attr.aria-pressed]="activityDrawerOpen()" aria-label="Avisos" title="Avisos">
           <i class="bx bx-bell" aria-hidden="true"></i>
           @if (miActividad.unifiedCount()) { <span class="notification-count activity-count">{{ miActividad.unifiedCount() > 99 ? '99+' : miActividad.unifiedCount() }}</span> }
         </button>

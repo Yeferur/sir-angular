@@ -594,14 +594,15 @@ h2, h3, p { margin: 0; }
 }
 
 .report-dock-row {
-  width: min(860px, calc(100% - 28px));
+  width: fit-content;
+  max-width: calc(100% - 28px);
   min-height: 60px;
   margin: 0 auto;
   padding: 9px 13px;
   border: 1px solid var(--separator-translucent, rgba(255, 255, 255, .1));
   border-radius: 16px;
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+  grid-template-columns: minmax(0, auto) auto;
   align-items: center;
   gap: 14px;
   background: var(--bg-secondary-translucent, rgba(28, 28, 30, .85));
@@ -685,8 +686,8 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .commercial-grid,
   .operational-grid { grid-template-columns: minmax(0, 1fr); }
   .chart-card--reservation-type { grid-column: auto; }
-  .dock-context { display: none; }
-  .report-dock-row { width: fit-content; max-width: calc(100% - 22px); grid-template-columns: auto auto; }
+  .dock-context { max-width: 160px; }
+  .report-dock-row { width: fit-content; max-width: calc(100% - 22px); grid-template-columns: minmax(0, auto) auto; }
 }
 
 @media (max-width: 680px) {
@@ -711,7 +712,8 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .currency-values { width: 100%; overflow-x: auto; }
   .report-dock { padding-bottom: 8px; }
   .report-dock-row { width: calc(100% - 16px); max-width: none; grid-template-columns: minmax(0, 1fr); gap: 7px; }
-  .dock-sections { width: 100%; overflow-x: auto; }
+  .dock-context { max-width: 100%; text-align: center; }
+  .dock-sections { width: 100%; min-width: 0; overflow-x: auto; }
   .dock-sections button { flex: 1 0 auto; padding-inline: 10px; }
   .dock-live { justify-self: center; font-size: .72rem; }
 }

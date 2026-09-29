@@ -22,7 +22,7 @@ export interface SirToast {
   dismissible: boolean;
   action?: ToastAction;
   actions?: ToastAction[];
-  /** Los avisos operativos se presentan de uno en uno; los toasts comunes conservan su comportamiento. */
+  /** Los avisos operativos se apilan hasta tres; los toasts comunes conservan su comportamiento. */
   operational?: boolean;
   priority?: number;
 }

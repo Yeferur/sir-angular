@@ -445,7 +445,8 @@
 
 .notification-trigger { position: relative; }
 .notification-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; display: grid; place-items: center; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 800; line-height: 1; }
-.activity-trigger { position: relative; color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent-blue) 18%, transparent); }
+.activity-trigger { position: relative; border: 1px solid transparent; }
+.activity-trigger.active { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 12%, transparent); border-color: color-mix(in srgb, var(--accent-blue) 20%, transparent); }
 .activity-trigger-icon { display: block; flex: 0 0 auto; }
 .activity-count { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; box-sizing: border-box; border: 2px solid var(--bg-secondary); border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 850; line-height: 1; }
 .menu-count { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: 850; line-height: 1; box-shadow: 0 0 0 2px var(--bg-secondary); }

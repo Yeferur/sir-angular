@@ -108,6 +108,16 @@ describe('Navegación superior', () => {
         'Administrar Usuarios', 'Crear Usuarios', 'Turnos de asesores',
       ]);
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
+    expect(element('[data-create-trigger]').querySelector('.bx-plus')).toBeNull();
+  });
+
+  it('conserva el título anterior mientras inicia una navegación lazy', () => {
+    layout.pageTitle.set('Reservas');
+
+    (layout as any).startNavigationMotion(true);
+
+    expect(layout.pageTitle()).toBe('Reservas');
+    expect(layout.titleLeaving()).toBeFalse();
   });
 
   it('delega Mi actividad y refresca el conteo con las novedades de Programación', () => {
@@ -129,6 +139,20 @@ describe('Navegación superior', () => {
     expect(fixture.nativeElement.querySelectorAll('.notification-trigger').length).toBe(1);
     expect(activityTrigger.querySelector('.activity-count')?.textContent?.trim()).toBe('5');
     expect(element('.topbar-avatar-btn').querySelector('.activity-count')).toBeNull();
+  });
+
+  it('activa Avisos solo mientras el drawer de actividad está abierto', async () => {
+    const drawer = TestBed.inject(SirDrawerService);
+    expect(element('.activity-trigger').classList.contains('active')).toBeFalse();
+
+    drawer.openActivity();
+    await render();
+    expect(element('.activity-trigger').classList.contains('active')).toBeTrue();
+    expect(element('.activity-trigger').getAttribute('aria-pressed')).toBe('true');
+
+    drawer.close(true);
+    await render();
+    expect(element('.activity-trigger').classList.contains('active')).toBeFalse();
   });
 
   it('filtra Crear por permisos y conserva la restricción especial de Cliente', async () => {

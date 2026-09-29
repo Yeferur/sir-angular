@@ -105,11 +105,16 @@ export class MiActividadPanelComponent {
     });
   }
 
-  confirmDismiss(item: OperationalPending): void {
+  async confirmDismiss(item: OperationalPending): Promise<void> {
     if (item.requiereJustificacion && !this.dismissReason.trim()) {
       this.alerts.warningToast('Explica el descarte', 'Esta regla requiere una justificación.');
       return;
     }
+    if (!await this.alerts.confirmDecision(
+      'Descartar pendiente',
+      `“${item.titulo}” dejará de aparecer como pendiente.`,
+      { confirmText: 'Descartar', destructive: true },
+    )) return;
     this.saving.set(true);
     this.activity.dismissPending(item, this.dismissReason).subscribe({
       next: () => {

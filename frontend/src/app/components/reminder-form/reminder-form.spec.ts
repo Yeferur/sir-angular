@@ -94,6 +94,9 @@ describe('Formulario compartido de recordatorios', () => {
 
     const checkbox = fixture.nativeElement.querySelector('input[name="reminderEmail"]') as HTMLInputElement;
     expect(checkbox.disabled).toBeFalse();
+    expect(checkbox.closest('.switch-control')).toBeTruthy();
+    expect(checkbox.getAttribute('role')).toBe('switch');
+    expect(fixture.nativeElement.querySelector('.email-toggle')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('propietario@example.test');
     expect(fixture.nativeElement.querySelector('input[type="email"]')).toBeNull();
   });

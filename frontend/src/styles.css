@@ -484,6 +484,105 @@ textarea.form-input:hover {
   opacity: .72;
 }
 
+/* Controles compartidos de formulario y acciones compactas de SIR. */
+.sir-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.sir-checkbox__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.sir-checkbox__control {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex: 0 0 auto;
+  border: 1px solid var(--separator-color);
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  background: var(--bg-secondary);
+  transition:
+    border-color .15s var(--ease-soft),
+    background-color .15s var(--ease-soft),
+    color .15s var(--ease-soft),
+    box-shadow .15s var(--ease-soft);
+}
+
+.sir-checkbox__control i { font-size: .9rem; }
+.sir-checkbox:hover:not(:has(.sir-checkbox__input:disabled)) .sir-checkbox__control {
+  border-color: color-mix(in srgb, var(--accent-blue) 48%, var(--separator-color));
+}
+.sir-checkbox__input:checked + .sir-checkbox__control {
+  border-color: var(--accent-blue);
+  color: var(--text-on-accent);
+  background: var(--accent-blue);
+}
+.sir-checkbox__input:focus-visible + .sir-checkbox__control {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 14%, transparent);
+}
+.sir-checkbox:has(.sir-checkbox__input:disabled) { cursor: not-allowed; opacity: .58; }
+.sir-checkbox__copy { min-width: 0; display: grid; gap: 3px; }
+.sir-checkbox__copy strong { font-size: .8rem; }
+.sir-checkbox__copy small { color: var(--text-secondary); font-size: .72rem; overflow-wrap: anywhere; }
+.sir-checkbox--compact { align-items: center; color: var(--text-secondary); font-size: .76rem; }
+.sir-checkbox--compact .sir-checkbox__control { margin-top: 0; }
+
+.sir-action {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color .15s var(--ease-soft),
+    border-color .15s var(--ease-soft),
+    color .15s var(--ease-soft),
+    transform .12s ease;
+}
+.sir-action:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-blue) 32%, var(--separator-color)); }
+.sir-action:active:not(:disabled) { transform: translateY(1px); }
+.sir-action:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 55%, transparent); outline-offset: 2px; }
+.sir-action:disabled { opacity: .55; cursor: wait; }
+.sir-action--primary { color: var(--text-on-accent); background: var(--accent-blue); }
+.sir-action--primary:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent-blue) 90%, white); }
+.sir-action--secondary { border-color: var(--separator-color); background: color-mix(in srgb, var(--text-primary) 5%, var(--bg-secondary)); }
+.sir-action--ghost { color: var(--text-secondary); }
+.sir-action--ghost:hover:not(:disabled) { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+.sir-action--danger { color: var(--text-on-accent); background: var(--accent-red); }
+.sir-action--danger:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent-red) 90%, white); }
+.sir-action--danger-text { color: var(--accent-red); }
+.sir-action--danger-text:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-red) 28%, transparent); background: color-mix(in srgb, var(--accent-red) 8%, transparent); }
+.sir-action--compact { min-height: 34px; padding-inline: 11px; font-size: .71rem; }
+.sir-action--icon { width: 36px; padding: 0; flex: 0 0 auto; border-color: var(--separator-color); background: var(--bg-tertiary); font-size: 1rem; }
+.sir-action--icon.sir-action--danger-text { background: color-mix(in srgb, var(--accent-red) 8%, var(--bg-secondary)); }
+
 textarea.form-input {
   resize: vertical;
   min-height: 80px;

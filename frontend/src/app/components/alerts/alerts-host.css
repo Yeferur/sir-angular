@@ -13,13 +13,19 @@
    superficie propia debajo de la isla superior. */
 .sir-toast-region {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
   width: min(370px, calc(100vw - 28px));
   display: flex;
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
+}
+
+.sir-toast-region--regular { right: 18px; bottom: 18px; }
+.sir-toast-region--operational {
+  top: 78px;
+  left: 50%;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
 }
 
 .sir-toast {
@@ -46,15 +52,15 @@
 }
 
 .sir-toast--operational {
-  position: fixed;
-  top: 78px;
-  left: 50%;
-  width: min(560px, calc(100vw - 32px));
-  transform: translateX(-50%);
   background:
     linear-gradient(115deg, color-mix(in srgb, var(--tone) 5%, transparent), transparent 54%),
     color-mix(in srgb, var(--bg-secondary, #fff) 96%, transparent);
   box-shadow: 0 12px 32px rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .1);
+}
+
+.sir-toast.has-context-popover {
+  z-index: 3;
+  overflow: visible;
 }
 
 .sir-toast[data-type="success"] { --tone: var(--sir-success); }
@@ -66,28 +72,16 @@
   transform: translateY(-7px) scale(.99);
 }
 
-.sir-toast--operational[data-phase="enter"] {
-  transform: translate(-50%, -7px) scale(.99);
-}
-
 .sir-toast[data-phase="live"] {
   opacity: 1;
   transform: translateY(0) scale(1);
   transition: opacity 220ms ease, transform 280ms cubic-bezier(.2,.8,.25,1);
 }
 
-.sir-toast--operational[data-phase="live"] {
-  transform: translate(-50%, 0) scale(1);
-}
-
 .sir-toast[data-phase="exit"] {
   opacity: 0;
   transform: translateY(-8px) scale(.98);
   transition: opacity 190ms ease, transform 210ms ease;
-}
-
-.sir-toast--operational[data-phase="exit"] {
-  transform: translate(-50%, -7px) scale(.99);
 }
 
 .sir-toast-icon,
@@ -453,8 +447,8 @@
 @keyframes sirSpin { to { transform: rotate(360deg); } }
 
 @media (max-width: 560px) {
-  .sir-toast-region { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
-  .sir-toast--operational { top: 70px; width: calc(100vw - 20px); }
+  .sir-toast-region--regular { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
+  .sir-toast-region--operational { top: 70px; width: calc(100vw - 20px); }
   .sir-toast {
     grid-template-columns: 32px minmax(0, 1fr) 25px;
     gap: 8px;

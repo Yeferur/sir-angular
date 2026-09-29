@@ -1,11 +1,7 @@
-<form class="reminder-form" [class.reminder-form--compact]="compact" (ngSubmit)="submit()" novalidate>
+<form class="reminder-form form-grid" [class.reminder-form--compact]="compact" (ngSubmit)="submit()" novalidate>
   <div class="form-heading">
-    <div>
-      <span class="form-kicker">Nuevo recordatorio</span>
-      <h2>¿Qué quieres recordar?</h2>
-      <p>El aviso aparecerá en Avisos.</p>
-    </div>
-    <button type="button" class="icon-button" [disabled]="saving" (click)="cancelForm()" aria-label="Cerrar formulario">
+    <h2>Nuevo recordatorio</h2>
+    <button type="button" class="sir-action sir-action--icon" [disabled]="saving" (click)="cancelForm()" aria-label="Cerrar formulario">
       <i class="bx bx-x" aria-hidden="true"></i>
     </button>
   </div>
@@ -13,10 +9,10 @@
   <label class="form-group form-group--wide" for="reminder-title">
     <span class="form-label">Título <span class="required-star">*</span></span>
     <input id="reminder-title" class="form-input" name="reminderTitle" maxlength="255" required [disabled]="saving"
-      [class.is-invalid]="titleInvalid" [ngModel]="value.titulo"
+      [class.errorInput]="titleInvalid" [ngModel]="value.titulo"
       [attr.aria-invalid]="titleInvalid || null" [attr.aria-describedby]="titleInvalid ? 'reminder-title-error' : null"
       (ngModelChange)="update('titulo', $event)" placeholder="Ej. Revisar la reserva CTG11014" />
-    @if (titleInvalid) { <span id="reminder-title-error" class="error-message">Escribe un título.</span> }
+    @if (titleInvalid) { <span id="reminder-title-error" class="errorMessage">Escribe un título.</span> }
   </label>
 
   <div class="form-group">
@@ -25,7 +21,7 @@
       inputId="reminder-date" ariaLabelledby="reminder-date-label" [ariaDescribedby]="dateInvalid ? 'reminder-date-error' : null"
       [minDate]="minDate" [invalid]="dateInvalid" [disabled]="saving" placeholder="Seleccionar fecha"
       (dateChange)="updateDate($event)" />
-    @if (dateInvalid) { <span id="reminder-date-error" class="error-message">Selecciona una fecha válida.</span> }
+    @if (dateInvalid) { <span id="reminder-date-error" class="errorMessage">Selecciona una fecha válida.</span> }
   </div>
 
   <div class="form-group">
@@ -34,7 +30,7 @@
       [ariaDescribedby]="timeInvalid ? 'reminder-time-error' : null" mode="free"
       [value]="selectedTime" [minTime]="minTime" [disabled]="saving"
       [invalid]="timeInvalid" placeholder="Seleccionar hora" (valueChange)="updateTime($event)" />
-    @if (timeInvalid) { <span id="reminder-time-error" class="error-message">{{ timeErrorMessage }}</span> }
+    @if (timeInvalid) { <span id="reminder-time-error" class="errorMessage">{{ timeErrorMessage }}</span> }
   </div>
 
   <label class="form-group form-group--wide">
@@ -45,11 +41,8 @@
   </label>
 
   <div class="email-option form-group--wide">
-    <label class="email-toggle" [class.is-disabled]="!hasValidEmail || saving">
-      <input type="checkbox" name="reminderEmail" [disabled]="!hasValidEmail || saving"
-        [ngModel]="!!value.enviarCorreo" (ngModelChange)="update('enviarCorreo', $event)" />
-      <span class="checkbox-control" aria-hidden="true"><i class="bx bx-check"></i></span>
-      <span class="email-copy">
+    <label class="email-setting">
+      <span class="email-setting-copy">
         <strong>Recordarme también por correo</strong>
         @if (hasValidEmail) {
           <small>Se enviará a {{ registeredEmail }}.</small>
@@ -57,12 +50,18 @@
           <small>No tienes un correo válido registrado.</small>
         }
       </span>
+      <span class="switch-control">
+        <input type="checkbox" role="switch" name="reminderEmail" aria-label="Recordarme también por correo"
+          [attr.aria-checked]="!!value.enviarCorreo" [disabled]="!hasValidEmail || saving"
+          [ngModel]="!!value.enviarCorreo" (ngModelChange)="update('enviarCorreo', $event)" />
+        <i aria-hidden="true"></i>
+      </span>
     </label>
   </div>
 
   <div class="form-actions">
-    <button type="button" class="button button--ghost" [disabled]="saving" (click)="cancelForm()">Cancelar</button>
-    <button type="submit" class="button button--primary" [disabled]="saving">
+    <button type="button" class="btn-edit-aforo" [disabled]="saving" (click)="cancelForm()">Cancelar</button>
+    <button type="submit" class="sir-action sir-action--primary" [disabled]="saving">
       {{ saving ? 'Guardando…' : 'Crear recordatorio' }}
     </button>
   </div>

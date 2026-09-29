@@ -65,20 +65,12 @@
         </span>
 
         <div class="filter-meta-actions">
-          <span class="live-state" [attr.data-state]="isRefreshing ? 'updating' : connectionState" aria-live="polite">
-            <span class="live-state-dot" aria-hidden="true"></span>
-            @if (isRefreshing) {
-              Actualizando
-            } @else if (connectionState === 'connected') {
-              En vivo
-            } @else if (connectionState === 'connecting') {
-              Conectando
-            } @else if (connectionState === 'reconnecting') {
-              Reconectando
-            } @else {
-              Sin conexión
-            }
-          </span>
+          @if (isRefreshing || connectionState === 'reconnecting' || connectionState === 'disconnected') {
+            <span class="live-state" [attr.data-state]="isRefreshing ? 'updating' : connectionState" aria-live="polite">
+              <span class="live-state-dot" aria-hidden="true"></span>
+              {{ isRefreshing ? 'Actualizando' : connectionState === 'reconnecting' ? 'Reconectando' : 'Sin conexión' }}
+            </span>
+          }
           <button type="button" class="excel-button" (click)="exportExcel()">Exportar Excel</button>
           <button type="button" class="print-button" (click)="printReport()">Imprimir</button>
         </div>
@@ -423,9 +415,6 @@
         <button type="button" [class.active]="activeSection === 'ingresos'" [attr.aria-current]="activeSection === 'ingresos' ? 'true' : null" (click)="scrollToSection('ingresos')">Ingresos</button>
         <button type="button" [class.active]="activeSection === 'comercial'" [attr.aria-current]="activeSection === 'comercial' ? 'true' : null" (click)="scrollToSection('comercial')">Comercial</button>
       </div>
-      <span class="dock-live" [attr.data-state]="isRefreshing ? 'updating' : connectionState">
-        <i aria-hidden="true"></i>{{ isRefreshing ? 'Actualizando' : connectionState === 'connected' ? 'En vivo' : connectionState === 'reconnecting' ? 'Reconectando' : connectionState === 'connecting' ? 'Conectando' : 'Sin conexión' }}
-      </span>
     </div>
   </nav>
 }

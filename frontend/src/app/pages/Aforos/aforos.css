@@ -1,3 +1,5 @@
+@import "../../shared/operational-controls.css";
+
 /* ============================================================
    INICIO / AFOROS
    ============================================================ */
@@ -417,51 +419,6 @@
   margin-top: auto;
   padding: 10px 16px;
   border-top: 1px solid var(--separator-color);
-}
-
-.btn-open-results {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 6px 11px;
-  border: 1px solid color-mix(in srgb, var(--accent-blue) 28%, var(--separator-color));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
-  color: var(--accent-blue);
-  cursor: pointer;
-  font-family: var(--font-family);
-  font-size: .72rem;
-  font-weight: 700;
-  transition: border-color .15s, background .15s, transform .15s;
-}
-
-.btn-open-results:hover {
-  border-color: color-mix(in srgb, var(--accent-blue) 52%, var(--separator-color));
-  background: color-mix(in srgb, var(--accent-blue) 13%, transparent);
-  transform: translateY(-1px);
-}
-
-.btn-edit-aforo {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border: 1px solid var(--separator-color);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-family: var(--font-family);
-  font-size: .72rem;
-  font-weight: 600;
-  transition: border-color .15s, color .15s, background .15s;
-}
-
-.btn-edit-aforo:hover {
-  border-color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 /* ── SHARED-CAPACITY CARD ──────────────────────────────────── */

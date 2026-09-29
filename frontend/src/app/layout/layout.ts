@@ -124,6 +124,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     titleLeaving = signal(false);
     titleEntering = signal(false);
     readonly navigationActive = this.activity.visible;
+    readonly activityDrawerOpen = computed(() => this.drawer.drawer()?.type === 'mi-actividad');
 
     currentUrl = signal<string>(this.router.url);
     ready = signal(false);
@@ -382,8 +383,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 while (route.firstChild) route = route.firstChild;
                 const title = route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
                 const nextTitle = this.extractTitle(title);
-                const titleChanged = nextTitle !== this.pageTitle();
-                this.pageTitle.set(nextTitle);
+                const titleChanged = !!nextTitle && nextTitle !== this.pageTitle();
+                if (nextTitle) this.pageTitle.set(nextTitle);
                 this.finishNavigationMotion(titleChanged);
                 return;
             }
@@ -399,7 +400,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             while (route.firstChild) route = route.firstChild;
             return route.snapshot.title ?? route.snapshot.data?.['title'] ?? '';
         };
-        this.pageTitle.set(this.extractTitle(getLeafTitle()));
+        const initialTitle = this.extractTitle(getLeafTitle());
+        if (initialTitle) this.pageTitle.set(initialTitle);
 
         // Permisos y sidebar
         try {
@@ -1052,10 +1054,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.finishRouteActivity?.();
         this.finishRouteActivity = this.activity.begin();
 
-        if (pathChanged) {
-            this.titleEntering.set(false);
-            this.titleLeaving.set(true);
-        }
+        // Conserva el título anterior durante la carga lazy. La transición de
+        // entrada comienza cuando NavigationEnd dispone del siguiente título.
+        if (pathChanged) this.titleEntering.set(false);
     }
 
     private finishNavigationMotion(titleChanged: boolean): void {
@@ -1259,7 +1260,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         {
             key: 'control-viaje',
             label: 'Control de Viaje',
-            icon: 'bx bx-check-shield',
+            icon: 'bx bx-trip',
             group: 'gestion',
             route: '/Reservas/Confirmacion',
             permission: 'CONTROL_VIAJE.LEER',
@@ -1357,7 +1358,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         const descriptions: Record<string, string> = {
             inicio: 'Resumen general',
             'mi-horario': 'Turnos y jornada',
-            pendientes: 'Pendientes, recordatorios y novedades',
+            pendientes: 'Por atender',
             aforos: 'Disponibilidad y cupos',
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',

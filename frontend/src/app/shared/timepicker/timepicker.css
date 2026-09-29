@@ -142,27 +142,16 @@
   font-weight: 800;
 }
 
-.sir-tp-free { padding: 13px; }
-.sir-tp-free-heading { display: flex; flex-direction: column; gap: 2px; }
-.sir-tp-free-heading strong { color: var(--text-primary); font-size: .8rem; }
-.sir-tp-free-heading span, .sir-tp-help { color: var(--text-tertiary); font-size: .66rem; }
-.sir-tp-time-row { margin-top: 12px; display: grid; grid-template-columns: 54px 8px 54px minmax(0, 1fr); align-items: end; gap: 6px; }
-.sir-tp-time-row label { display: grid; gap: 5px; }
-.sir-tp-time-row label > span { color: var(--text-secondary); font-size: .64rem; font-weight: 720; }
-.sir-tp-number { box-sizing: border-box; width: 54px; height: 40px; padding: 0 7px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); outline: none; color: var(--text-primary); background: var(--bg-tertiary); font: inherit; font-size: .9rem; font-weight: 760; font-variant-numeric: tabular-nums; text-align: center; }
-.sir-tp-number:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 12%, transparent); }
-.sir-tp-separator { padding-bottom: 9px; color: var(--text-secondary); font-weight: 800; text-align: center; }
-.sir-tp-period { height: 40px; padding: 3px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--bg-tertiary); }
-.sir-tp-period button { min-width: 0; padding: 0 5px; border: 0; border-radius: 6px; color: var(--text-secondary); background: transparent; font: inherit; font-size: .65rem; font-weight: 740; cursor: pointer; }
-.sir-tp-period button.active { color: var(--text-on-accent); background: var(--accent-blue); }
+.sir-tp-free { padding: 10px; }
+.sir-tp-time-row { display: grid; grid-template-columns: 48px 8px 48px minmax(0, 1fr); align-items: center; gap: 6px; }
+.sir-tp-time-row label { min-width: 0; }
+.sir-tp-number.form-input { padding-inline: 6px; text-align: center; font-variant-numeric: tabular-nums; }
+.sir-tp-separator { color: var(--text-secondary); font-weight: 700; text-align: center; }
+.sir-tp-period { height: 40px; padding: 3px; border-radius: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; background: var(--bg-tertiary); }
+.sir-tp-period button { min-width: 0; padding: 0 5px; border: none; border-radius: 8px; color: var(--text-secondary); background: transparent; font: 600 .78rem var(--font-family); cursor: pointer; transition: background-color .25s, color .25s; }
+.sir-tp-period button.active { background: var(--bg-secondary); color: var(--text-primary); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 .sir-tp-period button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 60%, transparent); outline-offset: 1px; }
-.sir-tp-help { margin: 9px 0 0; line-height: 1.35; }
-.sir-tp-error { margin: 7px 0 0; color: var(--accent-red); font-size: .67rem; line-height: 1.35; }
-.sir-tp-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--separator-color); display: flex; justify-content: flex-end; gap: 6px; }
-.sir-tp-actions button { min-height: 32px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--radius-sm); font: inherit; font-size: .69rem; font-weight: 750; cursor: pointer; }
-.sir-tp-cancel { color: var(--text-secondary); background: transparent; }
-.sir-tp-confirm { color: var(--text-on-accent); background: var(--accent-blue); }
-.sir-tp-actions button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 55%, transparent); outline-offset: 2px; }
+.sir-tp-error { margin: 7px 0 0; color: var(--accent-red); font-size: .72rem; line-height: 1.35; }
 
 @media (max-width: 360px) {
   .sir-tp-panel--free { width: min(272px, calc(100vw - 16px)); }

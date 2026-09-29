@@ -1,223 +1,118 @@
-<main class="work-center">
-  <header class="center-header">
-    <div>
-      <h1>Avisos</h1>
-      <p>Pendientes, recordatorios y novedades en un solo lugar.</p>
-    </div>
-    @if (canCreateReminders) {
-      <button type="button" class="button button--primary" (click)="openReminderForm()">
-        Nuevo recordatorio
-      </button>
+<main class="page-container notices-page">
+  <div class="notices-actions">
+    @if (loading() && loaded()) {
+      <span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span>
     }
-  </header>
+    @if (canCreateReminders) {
+      <button type="button" class="sir-action sir-action--primary" (click)="openReminderForm()">Nuevo recordatorio</button>
+    }
+  </div>
 
-  <section class="center-summary" aria-label="Resumen">
-    <article>
-      <strong>{{ activity.attentionCount() }}</strong>
-      <span>Por atender</span>
-    </article>
-    <article>
-      <strong>{{ highPriorityCount }}</strong>
-      <span>Alta o crítica</span>
-    </article>
-    <article>
-      <strong>{{ activity.postponedCount() }}</strong>
-      <span>Pospuestos</span>
-    </article>
-    <article>
-      <strong>{{ reminders().length }}</strong>
-      <span>Recordatorios</span>
-    </article>
+  <section class="center-summary" aria-label="Resumen de avisos">
+    <article><strong>{{ activity.attentionCount() }}</strong><span>Por atender</span></article>
+    <article><strong>{{ highPriorityCount }}</strong><span>Prioritarios</span></article>
+    <article><strong>{{ activity.postponedCount() }}</strong><span>Pospuestos</span></article>
+    <article><strong>{{ reminders().length }}</strong><span>Recordatorios</span></article>
   </section>
 
-  <nav class="center-tabs" aria-label="Secciones">
-    <button type="button" [class.active]="activeTab() === 'todos'" (click)="setTab('todos')">
-      Todos <span>{{ activity.allFeedCount() }}</span>
-    </button>
+  <nav class="center-tabs" aria-label="Secciones de Avisos">
+    <button type="button" [class.active]="activeTab() === 'todos'" (click)="setTab('todos')">Todos <span>{{ activity.allFeedCount() }}</span></button>
     @if (canReadPending) {
-      <button type="button" [class.active]="activeTab() === 'pendientes'" (click)="setTab('pendientes')">
-        Pendientes <span>{{ visiblePending().length }}</span>
-      </button>
+      <button type="button" [class.active]="activeTab() === 'pendientes'" (click)="setTab('pendientes')">Por atender <span>{{ visiblePending().length }}</span></button>
     }
     @if (canReadReminders) {
-      <button type="button" [class.active]="activeTab() === 'recordatorios'" (click)="setTab('recordatorios')">
-        Mis recordatorios <span>{{ reminders().length }}</span>
-      </button>
+      <button type="button" [class.active]="activeTab() === 'recordatorios'" (click)="setTab('recordatorios')">Recordatorios <span>{{ reminders().length }}</span></button>
     }
-    <button type="button" [class.active]="activeTab() === 'novedades'" (click)="setTab('novedades')">
-      Novedades <span>{{ activity.feedNotifications().length }}</span>
-    </button>
+    <button type="button" [class.active]="activeTab() === 'novedades'" (click)="setTab('novedades')">Novedades <span>{{ activity.feedNotifications().length }}</span></button>
   </nav>
 
-  @if (loading()) {
-    <section class="state-card" aria-live="polite">
-      <span class="spinner"></span>
-      <div><strong>Organizando tu información</strong><p>Estamos consultando lo que necesita atención.</p></div>
-    </section>
-  } @else if (error()) {
-    <section class="state-card state-card--error">
-      <i class="bx bx-error-circle" aria-hidden="true"></i>
-      <div><strong>No pudimos cargar el centro</strong><p>{{ error() }}</p></div>
-      <button type="button" class="button button--secondary" (click)="load()">Reintentar</button>
-    </section>
-  } @else if (activeTab() === 'todos') {
-    <div class="section-toolbar"><div><h2>Todos los avisos</h2><p>Una vista conjunta de novedades, pendientes operativos y recordatorios personales.</p></div></div>
-    <section class="item-list" aria-label="Todos los avisos">
-      @for (item of activity.pendientes(); track item.idPendiente) {
-        <article class="attention-card" [attr.data-priority]="item.prioridad" [class.is-suppressed]="item.estaSuprimido" [class.has-popover]="pendingActionId() === item.idPendiente">
-          <div class="attention-content"><div class="attention-topline"><span class="priority-chip" [attr.data-priority]="item.prioridad">Pendiente · {{ priorityLabel(item.prioridad) }}</span>@if (activity.pendingContext(item); as context) { <span class="entity-chip">{{ context }}</span> }</div><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }</div>
-          <div class="card-actions">@if (activity.canOpenOrigin(item)) { <button type="button" class="button button--secondary" (click)="openEntity(item)">{{ activity.pendingActionLabel(item) }}</button> }</div>
-        </article>
-      }
-      @for (item of reminders(); track item.idRecordatorio) {
-        <article class="attention-card" [class.is-suppressed]="item.estaSuprimido"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Recordatorio · {{ (item.siguienteTrigger || item.fecha) | date:'d MMM, h:mm a' }}</span><span class="muted-chip">{{ activity.reminderStateLabel(item) }}</span></div><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }</div><div class="card-actions">@if (canUpdateReminders && activity.reminderState(item) === 'ATENDER') { <button type="button" class="button button--secondary" (click)="completeReminder(item)"><i class="bx bx-check"></i> Completar</button> }</div></article>
-      }
-      @for (item of activity.feedNotifications(); track item.idNotificacion) {
-        <article class="attention-card" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Novedad</span>@if (!item.leida) { <span class="muted-chip">Sin leer</span> }</div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="button button--secondary" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="button button--ghost" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
-      }
-      @if (!activity.pendientes().length && !reminders().length && !activity.feedNotifications().length) { <section class="empty-state"><span class="empty-icon"><i class="bx bx-check"></i></span><h2>Todo al día</h2><p>No hay avisos que requieran tu atención.</p></section> }
-    </section>
-  } @else if (activeTab() === 'pendientes') {
-    <div class="section-toolbar">
-      <div>
-        <h2>Pendientes automáticos</h2>
-        <p>Se cierran solos cuando completas el proceso que los originó.</p>
-      </div>
-      <div class="toolbar-filters">
-        <label class="switch-label">
-          <input type="checkbox" [checked]="includeSuppressed()" (change)="toggleSuppressed()" />
-          Mostrar pospuestos
-        </label>
-        <label class="filter-label">Prioridad
-          <select [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)">
-            <option value="TODAS">Todas</option><option value="CRITICA">Crítica</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option><option value="BAJA">Baja</option>
-          </select>
-        </label>
-      </div>
-    </div>
-
-    @if (!visiblePending().length) {
-      <section class="empty-state">
-        <span class="empty-icon"><i class="bx bx-check" aria-hidden="true"></i></span>
-        <h2>Todo al día</h2>
-        <p>SIR no detecta situaciones operativas pendientes para ti.</p>
-      </section>
-    } @else {
-      <section class="item-list" aria-label="Pendientes automáticos">
-        @for (item of visiblePending(); track trackPending($index, item)) {
-          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [attr.data-priority]="item.prioridad" [class.is-suppressed]="item.estaSuprimido">
-            <div class="attention-content">
-              <div class="attention-topline">
-                <span class="priority-chip" [attr.data-priority]="item.prioridad">{{ priorityLabel(item.prioridad) }}</span>
-                @if (item.estaSuprimido) {
-                  <span class="muted-chip"><i class="bx bx-time-five"></i> Pospuesto hasta {{ item.suprimidoHasta | date:'d MMM, h:mm a' }}</span>
-                }
-                @if (activity.pendingContext(item); as context) { <span class="entity-chip">{{ context }}</span> }
-              </div>
-              <h3>{{ item.titulo }}</h3>
-              @if (item.descripcion) { <p>{{ item.descripcion }}</p> }
-              <div class="attention-meta">
-                @if (item.fechaLimite) { <span><i class="bx bx-alarm"></i> Límite: {{ item.fechaLimite | date:'d MMM, h:mm a' }}</span> }
-                @else if (item.fechaOperacion) { <span><i class="bx bx-calendar"></i> Operación: {{ item.fechaOperacion | date:'d MMM, h:mm a' }}</span> }
-                <span><i class="bx bx-refresh"></i> Verificado {{ item.ultimaDeteccion | date:'d MMM, h:mm a' }}</span>
-              </div>
-
-              @if (pendingActionId() === item.idPendiente && pendingAction() === 'posponer') {
-                <div class="inline-action" role="dialog" aria-label="Recordar más tarde">
-                  <span class="inline-action-label">Recordar más tarde</span>
-                  <div class="datetime-fields">
-                    <app-datepicker [ngModel]="postponeDate" [ngModelOptions]="{ standalone: true }"
-                      [minDate]="minActivityDate" placeholder="Seleccionar fecha"
-                      (dateChange)="updatePostponeDate($event)" />
-                    <app-timepicker mode="free" [value]="postponeTime" [minTime]="postponeMinTime"
-                      placeholder="Seleccionar hora" (valueChange)="updatePostponeTime($event)" />
-                  </div>
-                  @if (item.posposicionMaxMinutos) { <small>Máximo {{ item.posposicionMaxMinutos }} minutos según esta regla.</small> }
-                  <div class="inline-buttons">
-                    <button type="button" class="button button--ghost" (click)="cancelPendingAction()">Cancelar</button>
-                    <button type="button" class="button button--primary" [disabled]="saving()" (click)="confirmPostpone(item)">Confirmar</button>
-                  </div>
-                </div>
-              }
-
-              @if (pendingActionId() === item.idPendiente && pendingAction() === 'descartar') {
-                <div class="inline-action" role="dialog" aria-label="Descartar pendiente">
-                  <label>Motivo {{ item.requiereJustificacion ? '(obligatorio)' : '(opcional)' }}
-                    <textarea rows="2" maxlength="500" [(ngModel)]="dismissReason" placeholder="Explica por qué esta situación no requiere acción"></textarea>
-                  </label>
-                  <small>El descarte quedará registrado en auditoría.</small>
-                  <div class="inline-buttons">
-                    <button type="button" class="button button--ghost" (click)="cancelPendingAction()">Cancelar</button>
-                    <button type="button" class="button button--danger" [disabled]="saving()" (click)="confirmDismiss(item)">Descartar</button>
-                  </div>
-                </div>
-              }
-            </div>
-            <div class="card-actions">
-              @if (activity.canOpenOrigin(item)) { <button type="button" class="button button--secondary" (click)="openEntity(item)">{{ activity.pendingActionLabel(item) }}</button> }
-              @if (canManagePending) {
-                <button type="button" class="button button--ghost" (click)="beginPendingAction(item, 'posponer')">Recordar más tarde</button>
-                @if (item.permiteDescarte) {
-                  <button type="button" class="button button--ghost button--danger-text" (click)="beginPendingAction(item, 'descartar')">Descartar</button>
-                }
-              }
-            </div>
-          </article>
-        }
-      </section>
-    }
-  } @else if (activeTab() === 'recordatorios') {
-    <div class="section-toolbar">
-      <div><h2>Mis recordatorios</h2><p>Son privados: nadie más puede verlos ni administrarlos.</p></div>
-    </div>
-
-    @if (showReminderForm()) {
-      <div class="reminder-form-shell"><app-reminder-form [(value)]="reminderForm" [saving]="saving()" [registeredEmail]="activity.registeredEmail()"
-        (save)="saveReminder()" (cancel)="closeReminderForm()" /></div>
-    }
-
-    @if (!reminders().length && !showReminderForm()) {
-      <section class="empty-state">
-        <span class="empty-icon empty-icon--reminder"><i class="bx bx-bell-plus" aria-hidden="true"></i></span>
-        <h2>No tienes recordatorios</h2>
-        <p>Crea uno para volver a una tarea en el momento adecuado.</p>
-        @if (canCreateReminders) { <button type="button" class="button button--primary" (click)="openReminderForm()">Crear recordatorio</button> }
-      </section>
-    } @else {
-      <section class="reminder-grid" aria-label="Recordatorios personales">
-        @for (item of reminders(); track trackReminder($index, item)) {
-          <article class="reminder-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-suppressed]="item.estaSuprimido" [class.has-popover]="reminderActionId() === item.idRecordatorio" [attr.data-state]="activity.reminderState(item)">
-            <div class="reminder-date"><span>{{ (item.siguienteTrigger || item.fecha) | date:'d' }}</span><small>{{ (item.siguienteTrigger || item.fecha) | date:'MMM' }}</small></div>
-            <div class="reminder-content"><span class="reminder-time">{{ (item.siguienteTrigger || item.fecha) | date:'h:mm a' }}</span><span class="muted-chip">{{ activity.reminderStateLabel(item) }}</span><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }@if (activity.reminderContext(item); as context) { <span class="entity-chip">{{ context }}</span> }@if (item.estaSuprimido) { <span class="reminder-postponed"><i class="bx bx-time-five"></i> Pospuesto hasta {{ item.suprimidoHasta | date:'d MMM, h:mm a' }}</span> }
-              @if (reminderActionId() === item.idRecordatorio) {
-                <div class="inline-action reminder-inline-action" role="dialog" aria-label="Recordar más tarde">
-                  <span class="inline-action-label">Recordar más tarde</span>
-                  <div class="datetime-fields">
-                    <app-datepicker [ngModel]="postponeDate" [ngModelOptions]="{ standalone: true }"
-                      [minDate]="minActivityDate" placeholder="Seleccionar fecha"
-                      (dateChange)="updatePostponeDate($event)" />
-                    <app-timepicker mode="free" [value]="postponeTime" [minTime]="postponeMinTime"
-                      placeholder="Seleccionar hora" (valueChange)="updatePostponeTime($event)" />
-                  </div>
-                  <div class="inline-buttons"><button type="button" class="button button--ghost" (click)="cancelReminderPostpone()">Cancelar</button><button type="button" class="button button--primary" [disabled]="saving()" (click)="postponeReminder(item)">Confirmar</button></div>
-                </div>
-              }
-            </div>
-            <div class="card-actions">
-              @if (canUpdateReminders) { <button type="button" class="button button--ghost" (click)="beginReminderPostpone(item)">Recordar más tarde</button> }
-              @if (canUpdateReminders && activity.reminderState(item) === 'ATENDER') { <button type="button" class="button button--secondary" (click)="completeReminder(item)">Completar</button> }
-              @if (canDeleteReminders) { <button type="button" class="icon-button icon-button--danger" (click)="deleteReminder(item)" aria-label="Eliminar"><i class="bx bx-trash"></i></button> }
-            </div>
-          </article>
-        }
-      </section>
-    }
+  @if (loading() && !loaded()) {
+    <app-loading-state mode="loading" label="Cargando avisos…" />
+  } @else if (error() && !loaded()) {
+    <app-loading-state mode="error" label="No pudimos cargar los avisos" [detail]="error()" actionLabel="Reintentar" (action)="load()" />
   } @else {
-    <div class="section-toolbar"><div><h2>Novedades informativas</h2><p>Puedes consultarlas sin interrumpir tu trabajo.</p></div></div>
-    <section class="item-list" aria-label="Novedades informativas">
-      @for (item of activity.feedNotifications(); track item.idNotificacion) {
-        <article class="attention-card" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline">@if (!item.leida) { <span class="muted-chip">Sin leer</span> }<span class="entity-chip">{{ item.fechaCreacion | date:'d MMM, h:mm a' }}</span></div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="button button--secondary" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="button button--ghost" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
-      } @empty { <section class="empty-state"><span class="empty-icon"><i class="bx bx-bell"></i></span><h2>Sin novedades</h2><p>Las actualizaciones informativas aparecerán aquí.</p></section> }
-    </section>
+    @if (error()) {
+      <div class="refresh-error" role="status"><span>No se pudieron actualizar los avisos.</span><button type="button" class="btn-edit-aforo" (click)="load()">Reintentar</button></div>
+    }
+
+    @if (activeTab() === 'todos') {
+      <section class="item-list" aria-label="Todos los avisos">
+        @for (item of activity.pendientes(); track item.idPendiente) {
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [attr.data-priority]="item.prioridad" [class.is-suppressed]="item.estaSuprimido">
+            <div class="attention-content"><div class="attention-topline"><span class="priority-chip" [attr.data-priority]="item.prioridad">Pendiente · {{ priorityLabel(item.prioridad) }}</span>@if (activity.pendingContext(item); as context) { <span class="entity-chip">{{ context }}</span> }</div><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }</div>
+            <div class="card-actions">@if (activity.canOpenOrigin(item)) { <button type="button" class="btn-open-results" (click)="openEntity(item)">{{ activity.pendingActionLabel(item) }}</button> }</div>
+          </article>
+        }
+        @for (item of reminders(); track item.idRecordatorio) {
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-suppressed]="item.estaSuprimido"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Recordatorio · {{ (item.siguienteTrigger || item.fecha) | date:'d MMM, h:mm a' }}</span><span class="muted-chip">{{ activity.reminderStateLabel(item) }}</span></div><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }</div><div class="card-actions">@if (canUpdateReminders && activity.reminderState(item) === 'ATENDER') { <button type="button" class="btn-open-results" (click)="completeReminder(item)"><i class="bx bx-check"></i>Completar</button> }</div></article>
+        }
+        @for (item of activity.feedNotifications(); track item.idNotificacion) {
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Novedad</span>@if (!item.leida) { <span class="muted-chip">Sin leer</span> }</div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
+        }
+        @if (!activity.pendientes().length && !reminders().length && !activity.feedNotifications().length) {
+          <section class="empty-state"><span class="empty-icon"><i class="bx bx-check"></i></span><h2>Todo al día</h2><p>No hay avisos pendientes.</p></section>
+        }
+      </section>
+    } @else if (activeTab() === 'pendientes') {
+      <div class="section-toolbar">
+        <h2>Por atender</h2>
+        <div class="toolbar-filters">
+          <label class="filter-label"><span>Mostrar pospuestos</span><span class="switch-control switch-control--small"><input type="checkbox" role="switch" aria-label="Mostrar pospuestos" [attr.aria-checked]="includeSuppressed()" [checked]="includeSuppressed()" (change)="toggleSuppressed()" /><i aria-hidden="true"></i></span></label>
+          <label class="filter-label">Prioridad
+            <select class="form-select" [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)"><option value="TODAS">Todas</option><option value="CRITICA">Crítica</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option><option value="BAJA">Baja</option></select>
+          </label>
+        </div>
+      </div>
+
+      @if (!visiblePending().length) {
+        <section class="empty-state"><span class="empty-icon"><i class="bx bx-check" aria-hidden="true"></i></span><h2>Todo al día</h2><p>No hay pendientes operativos.</p></section>
+      } @else {
+        <section class="item-list" aria-label="Pendientes operativos">
+          @for (item of visiblePending(); track trackPending($index, item)) {
+            <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [attr.data-priority]="item.prioridad" [class.is-suppressed]="item.estaSuprimido" [class.has-popover]="pendingActionId() === item.idPendiente">
+              <div class="attention-content">
+                <div class="attention-topline"><span class="priority-chip" [attr.data-priority]="item.prioridad">{{ priorityLabel(item.prioridad) }}</span>@if (item.estaSuprimido) { <span class="muted-chip"><i class="bx bx-time-five"></i>Pospuesto hasta {{ item.suprimidoHasta | date:'d MMM, h:mm a' }}</span> }@if (activity.pendingContext(item); as context) { <span class="entity-chip">{{ context }}</span> }</div>
+                <h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }
+                <div class="attention-meta">@if (item.fechaLimite) { <span><i class="bx bx-alarm"></i>Límite: {{ item.fechaLimite | date:'d MMM, h:mm a' }}</span> } @else if (item.fechaOperacion) { <span><i class="bx bx-calendar"></i>Operación: {{ item.fechaOperacion | date:'d MMM, h:mm a' }}</span> }<span><i class="bx bx-refresh"></i>Verificado {{ item.ultimaDeteccion | date:'d MMM, h:mm a' }}</span></div>
+                @if (pendingActionId() === item.idPendiente && pendingAction() === 'posponer') {
+                  <div class="inline-action" role="dialog" aria-label="Recordar más tarde"><span class="inline-action-label">Recordar más tarde</span><div class="datetime-fields"><app-datepicker [ngModel]="postponeDate" [ngModelOptions]="{ standalone: true }" [minDate]="minActivityDate" placeholder="Seleccionar fecha" (dateChange)="updatePostponeDate($event)" /><app-timepicker mode="free" [value]="postponeTime" [minTime]="postponeMinTime" placeholder="Seleccionar hora" (valueChange)="updatePostponeTime($event)" /></div>@if (item.posposicionMaxMinutos) { <small>Máximo {{ item.posposicionMaxMinutos }} minutos.</small> }<div class="inline-buttons"><button type="button" class="btn-edit-aforo" (click)="cancelPendingAction()">Cancelar</button><button type="button" class="sir-action sir-action--primary" [disabled]="saving()" (click)="confirmPostpone(item)">Confirmar</button></div></div>
+                }
+                @if (pendingActionId() === item.idPendiente && pendingAction() === 'descartar') {
+                  <div class="inline-action" role="dialog" aria-label="Descartar pendiente"><label>Motivo {{ item.requiereJustificacion ? '(obligatorio)' : '(opcional)' }}<textarea class="form-input" rows="2" maxlength="500" [(ngModel)]="dismissReason" placeholder="Motivo del descarte"></textarea></label><div class="inline-buttons"><button type="button" class="btn-edit-aforo" (click)="cancelPendingAction()">Cancelar</button><button type="button" class="btn-row-cancel" [disabled]="saving()" (click)="confirmDismiss(item)">Continuar</button></div></div>
+                }
+              </div>
+              <div class="card-actions">@if (activity.canOpenOrigin(item)) { <button type="button" class="btn-open-results" (click)="openEntity(item)">{{ activity.pendingActionLabel(item) }}</button> }@if (canManagePending) { <button type="button" class="btn-edit-aforo" (click)="beginPendingAction(item, 'posponer')">Recordar más tarde</button>@if (item.permiteDescarte) { <button type="button" class="btn-row-cancel" (click)="beginPendingAction(item, 'descartar')">Descartar</button> } }</div>
+            </article>
+          }
+        </section>
+      }
+    } @else if (activeTab() === 'recordatorios') {
+      <div class="section-toolbar"><h2>Recordatorios</h2></div>
+      @if (showReminderForm()) {
+        <div class="reminder-form-shell"><app-reminder-form [(value)]="reminderForm" [saving]="saving()" [registeredEmail]="activity.registeredEmail()" (save)="saveReminder()" (cancel)="closeReminderForm()" /></div>
+      }
+      @if (!reminders().length && !showReminderForm()) {
+        <section class="empty-state"><span class="empty-icon empty-icon--reminder"><i class="bx bx-bell-plus" aria-hidden="true"></i></span><h2>No tienes recordatorios</h2>@if (canCreateReminders) { <button type="button" class="sir-action sir-action--primary" (click)="openReminderForm()">Crear recordatorio</button> }</section>
+      } @else {
+        <section class="reminder-grid" aria-label="Recordatorios personales">
+          @for (item of reminders(); track trackReminder($index, item)) {
+            <article class="reminder-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-suppressed]="item.estaSuprimido" [class.has-popover]="reminderActionId() === item.idRecordatorio" [attr.data-state]="activity.reminderState(item)">
+              <div class="reminder-date"><span>{{ (item.siguienteTrigger || item.fecha) | date:'d' }}</span><small>{{ (item.siguienteTrigger || item.fecha) | date:'MMM' }}</small></div>
+              <div class="reminder-content"><span class="reminder-time">{{ (item.siguienteTrigger || item.fecha) | date:'h:mm a' }}</span><span class="muted-chip">{{ activity.reminderStateLabel(item) }}</span><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }@if (activity.reminderContext(item); as context) { <span class="entity-chip">{{ context }}</span> }@if (item.estaSuprimido) { <span class="reminder-postponed"><i class="bx bx-time-five"></i>Pospuesto hasta {{ item.suprimidoHasta | date:'d MMM, h:mm a' }}</span> }
+                @if (reminderActionId() === item.idRecordatorio) { <div class="inline-action reminder-inline-action" role="dialog" aria-label="Recordar más tarde"><span class="inline-action-label">Recordar más tarde</span><div class="datetime-fields"><app-datepicker [ngModel]="postponeDate" [ngModelOptions]="{ standalone: true }" [minDate]="minActivityDate" placeholder="Seleccionar fecha" (dateChange)="updatePostponeDate($event)" /><app-timepicker mode="free" [value]="postponeTime" [minTime]="postponeMinTime" placeholder="Seleccionar hora" (valueChange)="updatePostponeTime($event)" /></div><div class="inline-buttons"><button type="button" class="btn-edit-aforo" (click)="cancelReminderPostpone()">Cancelar</button><button type="button" class="sir-action sir-action--primary" [disabled]="saving()" (click)="postponeReminder(item)">Confirmar</button></div></div> }
+              </div>
+              <div class="card-actions">@if (canUpdateReminders) { <button type="button" class="btn-edit-aforo" (click)="beginReminderPostpone(item)">Recordar más tarde</button> }@if (canUpdateReminders && activity.reminderState(item) === 'ATENDER') { <button type="button" class="btn-open-results" (click)="completeReminder(item)">Completar</button> }@if (canDeleteReminders) { <button type="button" class="sir-action sir-action--icon sir-action--danger-text" (click)="deleteReminder(item)" aria-label="Eliminar recordatorio"><i class="bx bx-trash"></i></button> }</div>
+            </article>
+          }
+        </section>
+      }
+    } @else {
+      <div class="section-toolbar"><h2>Novedades</h2></div>
+      <section class="item-list" aria-label="Novedades">
+        @for (item of activity.feedNotifications(); track item.idNotificacion) {
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline">@if (!item.leida) { <span class="muted-chip">Sin leer</span> }<span class="entity-chip">{{ item.fechaCreacion | date:'d MMM, h:mm a' }}</span></div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
+        } @empty { <section class="empty-state"><span class="empty-icon"><i class="bx bx-bell"></i></span><h2>Sin novedades</h2></section> }
+      </section>
+    }
   }
 </main>

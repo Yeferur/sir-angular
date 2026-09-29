@@ -1,41 +1,18 @@
+@import "../../shared/operational-controls.css";
+
 :host { display: block; }
-.reminder-form { box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: min(100%, 720px); padding: 18px; margin-bottom: 18px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-secondary); animation: reminder-form-in .16s var(--ease-soft); }
+.reminder-form { box-sizing: border-box; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; padding: 18px; margin-bottom: 18px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-secondary); animation: reminder-form-in .16s var(--ease-soft); }
 .form-heading, .form-actions, .form-group--wide { grid-column: 1 / -1; }
 .form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.form-heading h2 { margin: 3px 0 0; color: var(--text-primary); font-size: 1.12rem; letter-spacing: -.015em; }
-.form-heading p { margin: 5px 0 0; color: var(--text-secondary); font-size: .82rem; }
-.form-kicker, .form-label { color: var(--text-secondary); font-size: .72rem; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
-.form-group { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
-.required-star, .error-message { color: var(--accent-red); }
-.form-input { box-sizing: border-box; width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); outline: none; color: var(--text-primary); background: var(--bg-tertiary); font: inherit; transition: border-color .18s, box-shadow .18s; }
-.form-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 12%, transparent); }
-.form-input.is-invalid { border-color: var(--accent-red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-red) 12%, transparent); }
-.form-textarea { min-height: 78px; resize: vertical; }
-.error-message { font-size: .72rem; }
-.email-option { padding: 12px 14px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent-blue) 4%, var(--bg-tertiary)); }
-.email-toggle { position: relative; display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.email-toggle input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
-.checkbox-control { width: 18px; height: 18px; margin-top: 1px; flex: 0 0 auto; border: 1px solid var(--separator-color); border-radius: 5px; display: grid; place-items: center; color: transparent; background: var(--bg-secondary); transition: border-color .15s var(--ease-soft), background .15s var(--ease-soft), color .15s var(--ease-soft); }
-.checkbox-control i { font-size: .9rem; }
-.email-toggle:hover:not(.is-disabled) .checkbox-control { border-color: color-mix(in srgb, var(--accent-blue) 48%, var(--separator-color)); }
-.email-toggle input:checked + .checkbox-control { border-color: var(--accent-blue); color: var(--text-on-accent); background: var(--accent-blue); }
-.email-toggle input:focus-visible + .checkbox-control { outline: 2px solid color-mix(in srgb, var(--accent-blue) 34%, transparent); outline-offset: 2px; }
-.email-copy { display: grid; gap: 3px; min-width: 0; }
-.email-toggle strong { color: var(--text-primary); font-size: .8rem; }
-.email-toggle small { color: var(--text-secondary); font-size: .72rem; overflow-wrap: anywhere; }
-.email-toggle.is-disabled { cursor: not-allowed; opacity: .58; }
+.form-heading h2 { margin: 6px 0 0; color: var(--text-primary); font-size: 1.05rem; letter-spacing: -.015em; }
+.form-group { min-width: 0; }
+.email-setting { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.email-setting-copy { min-width: 0; display: grid; gap: 4px; }
+.email-setting-copy strong { color: var(--text-primary); font-size: .78rem; font-weight: 700; }
+.email-setting-copy small { color: var(--text-secondary); font-size: .72rem; overflow-wrap: anywhere; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
-.button, .icon-button { min-height: 38px; border: 1px solid transparent; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-primary); font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; transition: background .15s var(--ease-soft), border-color .15s var(--ease-soft), transform .12s ease; }
-.button:active, .icon-button:active { transform: translateY(1px); }
-.button:focus-visible, .icon-button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 55%, transparent); outline-offset: 2px; }
-.button { padding: 0 14px; }
-.button:disabled { opacity: .55; cursor: wait; }
-.button--primary { color: var(--text-on-accent); background: var(--accent-blue); }
-.button--ghost { color: var(--text-secondary); background: transparent; }
-.icon-button { width: 38px; padding: 0; flex: 0 0 auto; border-color: var(--separator-color); background: var(--bg-tertiary); font-size: 1.1rem; }
 .reminder-form--compact { grid-template-columns: 1fr; width: 100%; padding: 14px; gap: 13px; }
 .reminder-form--compact .form-heading, .reminder-form--compact .form-actions, .reminder-form--compact .form-group--wide { grid-column: 1; }
-.reminder-form--compact .form-heading p { display: none; }
 @keyframes reminder-form-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 620px) { .reminder-form { grid-template-columns: 1fr; padding: 16px; }.form-heading, .form-actions, .form-group--wide { grid-column: 1; }.form-actions .button { flex: 1; } }
-@media (prefers-reduced-motion: reduce) { .reminder-form { animation: none; } .button, .icon-button { transition: none; } }
+@media (max-width: 620px) { .reminder-form { grid-template-columns: 1fr; padding: 16px; }.form-heading, .form-actions, .form-group--wide { grid-column: 1; }.form-actions .sir-action { flex: 1; } }
+@media (prefers-reduced-motion: reduce) { .reminder-form { animation: none; } }
