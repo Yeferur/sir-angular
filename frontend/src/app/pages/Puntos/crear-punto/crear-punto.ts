@@ -1,4 +1,5 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { SirSelectComponent } from '../../../shared/select/select';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -26,7 +27,7 @@ const NAME_SIMILARITY_THRESHOLD = 0.75;
   templateUrl: './crear-punto.html',
   styleUrls: ['./crear-punto.css'],
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
+  imports: [SirSelectComponent, ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
 })
 export class CrearPuntoComponent implements OnInit, OnDestroy {
   isLoading = signal<boolean>(true);
@@ -49,6 +50,11 @@ export class CrearPuntoComponent implements OnInit, OnDestroy {
   tours = signal<any[]>([]);
   rutas = signal<string[]>([]);
   puntosRuta = signal<any[]>([]);
+  readonly routeSelectOptions = computed(() => this.rutas().map(ruta => ({ value: ruta, label: 'Ruta ' + ruta })));
+  readonly positionSelectOptions = computed(() => [
+    { value: null, label: 'Al final de la ruta' },
+    ...this.puntosRuta().map(punto => ({ value: punto.Id_Punto, label: 'Después de ' + (punto.NombrePunto || punto.Nombre_Punto) + ' · Posición ' + (punto.posicion || punto.Posicion) })),
+  ]);
   coordinateStatus = signal<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   coordinateDetail = signal('');
   horariosMap: Record<number | string, string> = {};

@@ -28,20 +28,13 @@
         </div>
         <div class="form-group form-group--tour">
           <label class="form-label" for="dashboard-tour">Tour</label>
-          <select id="dashboard-tour" class="form-select" [ngModel]="selectedTourId" (ngModelChange)="onTourChange($event)">
-            <option [ngValue]="null">Todos los tours</option>
-            @for (tour of tours; track tour.Id_Tour) {
-              <option [ngValue]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-            }
-          </select>
+          <app-select inputId="dashboard-tour" [options]="tourSelectOptions"
+            [ngModel]="selectedTourId" (ngModelChange)="onTourChange($event)" />
         </div>
         <div class="form-group">
           <label class="form-label" for="dashboard-reservation-type">Tipo de reserva</label>
-          <select id="dashboard-reservation-type" class="form-select" [ngModel]="selectedReservationType" (ngModelChange)="onReservationTypeChange($event)">
-            <option value="">Grupales y privadas</option>
-            <option value="Grupal">Solo grupales</option>
-            <option value="Privada">Solo privadas</option>
-          </select>
+          <app-select inputId="dashboard-reservation-type" [options]="reservationTypeOptions"
+            [ngModel]="selectedReservationType" (ngModelChange)="onReservationTypeChange($event)" />
         </div>
         <div class="form-group quick-group">
           <label class="form-label">Periodo</label>

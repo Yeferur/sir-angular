@@ -15,13 +15,10 @@
 
         <div class="field-group field-group--tour">
           <label class="form-label" for="insurance-tour">Tour</label>
-          <select id="insurance-tour" class="form-control" [ngModel]="idTour"
-            (ngModelChange)="actualizarTour($event)">
-            <option value="">Seleccionar tour</option>
-            @for (tour of tours; track tour.Id_Tour) {
-              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-            }
-          </select>
+          <app-select inputId="insurance-tour" [ngModel]="idTour"
+            (ngModelChange)="actualizarTour($event)"
+            [options]="tourSelectOptions" [compareWith]="compareSelectValues"
+            ariaLabel="Tour" placeholder="" />
         </div>
 
         <button type="button" class="button button--primary search-button" (click)="buscar()"

@@ -11,6 +11,8 @@ import { WebSocketService } from '../../services/WebSocket/web-socket';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { apiEnvelopeInterceptor } from '../../interceptors/api-envelope.interceptor';
+import { By } from '@angular/platform-browser';
+import { SirSelectComponent } from '../../shared/select/select';
 
 for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', EditarReservaComponent]] as const) {
   describe(`${mode} reserva: pasajeros y contacto`, () => {
@@ -30,7 +32,7 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
         imports: [component],
         providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([apiEnvelopeInterceptor])), provideHttpClientTesting(),
           { provide: Reservas, useValue: {
-            getTours: () => of([{ Id_Tour: 2, Nombre_Tour: 'GUATAPÉ' }]), getCanales: () => of([]), getMonedas: () => of([]),
+            getTours: () => of([{ Id_Tour: 2, Nombre_Tour: 'GUATAPÉ' }, { Id_Tour: 3, Nombre_Tour: 'SANTA FE' }]), getCanales: () => of([]), getMonedas: () => of([]),
             verificarDniDuplicado: () => of({ exists: false }), crearReserva: save, actualizarReserva: save,
           } },
           { provide: WebSocketService, useValue: { reservationEvents$: EMPTY, aforoEvents$: EMPTY } },
@@ -53,6 +55,74 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       spyOn(c, 'verificarCuposDisponibles').and.resolveTo(true);
       spyOn(c, mode === 'crear' ? 'confirmarReserva' : 'confirmar').and.resolveTo(true);
       render();
+    });
+
+    it('conserva el tour numérico precargado y el cambio string del select nativo al editar/crear', () => {
+      c.currentStep = 0; render();
+      const select = fixture.debugElement.query(By.directive(SirSelectComponent)).componentInstance as SirSelectComponent;
+      const tourChange = spyOn(c, 'onTourChange');
+      expect(fixture.nativeElement.querySelector(`#${mode}-reserva-tour`).textContent).toContain('GUATAPÉ');
+      select.open(); select.choose(0); render();
+      expect(c.form.get('SelectTour').value).toBe(2);
+      expect(tourChange).not.toHaveBeenCalled();
+      select.open(); select.choose(1); render();
+      expect(c.form.get('SelectTour').value).toBe('3');
+      expect(tourChange).toHaveBeenCalledTimes(1);
+      c.form.get('SelectTour').reset(''); render();
+      expect(c.form.get('SelectTour').invalid).toBeTrue();
+      expect(fixture.nativeElement.querySelector(`#${mode}-reserva-tour`).textContent).toContain('Seleccionar un tour...');
+    });
+
+    it('migra moneda/idioma/canal conservando precarga, tipos y eventos secundarios', () => {
+      const field = (id: string) => fixture.debugElement.queryAll(By.directive(SirSelectComponent))
+        .map(el => el.componentInstance as SirSelectComponent).find(el => el.inputId === id)!;
+      c.monedas.set([{ Id_Moneda: 1, Nombre_Moneda: 'COP' }, { Id_Moneda: 2, Nombre_Moneda: 'USD' }]);
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'Directo' }, { Id_Canal: 2, Nombre_Canal: 'Agencia' }]);
+      const pricing = spyOn(c, 'onPlanMonedaChange');
+      const commissions = spyOn(c, 'recalcularComisionesPorCanal');
+      const prices = spyOn(c, 'autollenarPrecios');
+      c.currentStep = 0; render();
+      expect(field(`${mode}-reserva-moneda`).selectedOption?.label).toBe('COP');
+      field(`${mode}-reserva-moneda`).choose(1); render();
+      expect(c.form.get('Id_Moneda').value).toBe('2');
+      expect(pricing).toHaveBeenCalledTimes(1);
+      field(`${mode}-reserva-idioma`).choose(1); render();
+      expect(c.form.get('Idioma_Reserva').value).toBe('INGLÉS');
+      c.form.get('Id_Moneda').disable(); render();
+      expect(field(`${mode}-reserva-moneda`).effectivelyDisabled).toBeTrue();
+      c.currentStep = 1; render();
+      field(`${mode}-reserva-canal`).choose(1); render();
+      expect(c.form.get('Id_Canal').value).toBe('2');
+      expect(commissions).toHaveBeenCalledTimes(1);
+      expect(prices).toHaveBeenCalledTimes(1);
+      c.form.get('Id_Canal').reset(); c.form.get('Id_Canal').markAsTouched(); render();
+      expect(field(`${mode}-reserva-canal`).invalid).toBeTrue();
+    });
+
+    it('actualiza planes/puntos dinámicos y conserva null disabled y controles de cada pasajero', async () => {
+      const field = (id: string) => fixture.debugElement.queryAll(By.directive(SirSelectComponent))
+        .map(el => el.componentInstance as SirSelectComponent).find(el => el.inputId === id)!;
+      c.planes.set([{ Id_Plan: 1, Nombre_Plan: 'Básico' }, { Id_Plan: 2, Nombre_Plan: 'Completo' }]);
+      c.puntosSeleccionados.set([{ Id_Punto: 397, NombrePunto: 'Centro' }, { Id_Punto: 398, NombrePunto: 'Norte' }]);
+      spyOn(c, 'onPlanMonedaChange');
+      c.modoPlan = 'global'; c.currentStep = 2; c.form.get('Id_Plan').setValue(null); render();
+      const global = field(`${mode}-reserva-plan-global`);
+      expect(global.selectedOption?.label).toBe('Seleccione un plan...');
+      global.choose(0); expect(c.form.get('Id_Plan').value).toBeNull();
+      global.choose(2); render(); expect(c.form.get('Id_Plan').value).toBe('2');
+      c.planes.set([]); render(); expect(c.planGlobalSelectOptions().length).toBe(1);
+      c.planes.set([{ Id_Plan: 1, Nombre_Plan: 'Básico' }, { Id_Plan: 2, Nombre_Plan: 'Completo' }]);
+      c.currentStep = 3; c.modoPlan = 'individual';
+      await add('ADULTO'); await add('ADULTO'); render();
+      field(`${mode}-pasajero-0-punto`).choose(1); render();
+      expect(c.pasajeros.at(0).get('Id_Punto').value).toBe('398');
+      expect(c.pasajeros.at(1).get('Id_Punto').value).not.toBe('398');
+      if (mode === 'crear') {
+        field('crear-pasajero-0-plan').choose(2); render();
+        expect(c.pasajeros.at(0).get('Id_Plan').value).toBe('2');
+        expect(fixture.nativeElement.querySelectorAll('#crear-pasajero-0-plan').length).toBe(1);
+        expect(fixture.nativeElement.querySelectorAll('#crear-pasajero-1-plan').length).toBe(1);
+      }
     });
 
     it('acepta un solo teléfono del reportante con adultos, niños e infantes sin teléfono', async () => {

@@ -75,16 +75,12 @@
 
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Tipo de servicio <span class="required-star">*</span></label>
-          <select formControlName="TipoServicio" class="form-select"
-            [ngClass]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'errorInput' : ''">
-            <option value="Seleccionar" disabled>SELECCIONAR</option>
-            @for (servicio of resultsServicioTransfer; track servicio.Id_Servicio ?? servicio.id) {
-            <option [value]="servicio.Id_Servicio ?? servicio.id">{{ servicio.Servicio }}</option>
-            }
-          </select>
+          <label class="form-label" for="editar-transfer-TipoServicio">Tipo de servicio <span class="required-star">*</span></label>
+          <app-select inputId="editar-transfer-TipoServicio" formControlName="TipoServicio" [options]="resultsServicioTransfer | selectOptions:'Id_Servicio':'Servicio':true:'id'" [compareWith]="compareSelectValues"
+            placeholder="SELECCIONAR" [required]="true" [invalid]="!!(form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid)"
+            [ariaDescribedby]="form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid ? 'editar-transfer-TipoServicio-error' : null" />
           @if (form.get('TipoServicio')?.touched && form.get('TipoServicio')?.invalid) {
-          <div class="errorMessage">Tipo de servicio es requerido.</div>
+          <div class="errorMessage" id="editar-transfer-TipoServicio-error">Tipo de servicio es requerido.</div>
           }
         </div>
         <div class="form-group">
@@ -160,15 +156,12 @@
 
         @if (showFlightFields) {
         <div class="form-group">
-          <label class="form-label">Tipo de vuelo <span class="required-star">*</span></label>
-          <select formControlName="TipoVuelo" class="form-select"
-            [ngClass]="form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid ? 'errorInput' : ''">
-            <option value="" selected disabled>Seleccionar</option>
-            <option value="Nacional">Nacional</option>
-            <option value="Internacional">Internacional</option>
-          </select>
+          <label class="form-label" for="editar-transfer-TipoVuelo">Tipo de vuelo <span class="required-star">*</span></label>
+          <app-select inputId="editar-transfer-TipoVuelo" formControlName="TipoVuelo" [options]="flightSelectOptions"
+            placeholder="Seleccionar" [required]="true" [invalid]="!!(form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid)"
+            [ariaDescribedby]="form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid ? 'editar-transfer-TipoVuelo-error' : null" />
           @if (form.get('TipoVuelo')?.touched && form.get('TipoVuelo')?.invalid) {
-          <div class="errorMessage">Tipo de vuelo es requerido.</div>
+          <div class="errorMessage" id="editar-transfer-TipoVuelo-error">Tipo de vuelo es requerido.</div>
           }
         </div>
         <div class="form-group">
@@ -247,12 +240,11 @@
           <small class="hint">{{ valorEsEditable ? 'Puedes ajustar el valor guardado cuando sea necesario.' : 'Se calcula automáticamente según el rango y la moneda.' }}</small>
         </div>
         <div class="form-group">
-          <label class="form-label">Moneda</label>
-          <select formControlName="Moneda" class="form-select">
-            @for (m of resultsMonedas; track m.Id_Moneda) {
-            <option [value]="m.Codigo">{{ m.Codigo }} - {{ m.Nombre_Moneda }}</option>
-            }
-          </select>
+          <label class="form-label" for="editar-transfer-Moneda">Moneda</label>
+          <app-select inputId="editar-transfer-Moneda" formControlName="Moneda"
+            [options]="monedaSelectOptions" [compareWith]="compareSelectValues"
+            ariaLabel="Moneda" placeholder=""
+            [invalid]="!!(form.get('Moneda')?.touched && form.get('Moneda')?.invalid)" />
         </div>
       </div>
 

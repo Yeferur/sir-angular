@@ -1,60 +1,63 @@
 const permisosService = require('../services/Permisos/permisos.service');
 
 /**
- * Cache de permisos por usuario (en memoria, se limpia cada cierto tiempo)
- * Formato: { userId: { permisos: [...], timestamp: Date } }
+ * Caché local con revisión compartida en MySQL: nunca reutilizar un resultado
+ * positivo sin comprobar primero las revisiones de usuario y rol.
  */
-const permisosCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
-/**
- * Limpiar cache expirado
- */
-function limpiarCacheExpirado() {
-  const ahora = Date.now();
-  for (const [userId, data] of permisosCache.entries()) {
-    if (ahora - data.timestamp > CACHE_DURATION) {
-      permisosCache.delete(userId);
+function sameRevision(a, b) {
+  return a?.idRol === b?.idRol && a?.usuario === b?.usuario && a?.rol === b?.rol;
+}
+
+function createPermissionCache(service = permisosService) {
+  const cache = new Map();
+
+  async function obtenerPermisosUsuario(userId, { forceRefresh = false } = {}) {
+    const key = String(userId);
+    // Si MySQL falla, el error se propaga aunque exista una entrada positiva.
+    let revision = await service.obtenerRevisionPermisosUsuario(userId);
+    const cached = cache.get(key);
+    if (!forceRefresh && cached && sameRevision(cached.revision, revision)
+      && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.permisos;
+    }
+
+    // No asociar permisos anteriores a una revisión nueva si una transacción
+    // se confirma durante la lectura. Reintentos acotados y fail closed.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const permisos = await service.obtenerPermisosPorUsuario(userId);
+      const confirmed = await service.obtenerRevisionPermisosUsuario(userId);
+      if (sameRevision(revision, confirmed)) {
+        const codes = permisos.map((p) => p.Codigo_Permiso);
+        cache.set(key, { permisos: codes, revision: confirmed, timestamp: Date.now() });
+        return codes;
+      }
+      revision = confirmed;
+    }
+    const error = new Error('Los permisos cambiaron repetidamente durante la autorización.');
+    error.status = 503;
+    throw error;
+  }
+
+  function invalidarCacheUsuario(userId) {
+    cache.delete(String(userId));
+  }
+
+  function limpiarCacheExpirado() {
+    const now = Date.now();
+    for (const [key, data] of cache.entries()) {
+      if (now - data.timestamp >= CACHE_DURATION) cache.delete(key);
     }
   }
+
+  return { obtenerPermisosUsuario, invalidarCacheUsuario, limpiarCacheExpirado };
 }
 
-// Limpiar cache cada 10 minutos sin mantener vivo el proceso por este timer.
-const cacheCleanupTimer = setInterval(limpiarCacheExpirado, 10 * 60 * 1000);
+const permissionsCache = createPermissionCache();
+const { obtenerPermisosUsuario, invalidarCacheUsuario } = permissionsCache;
+const cacheCleanupTimer = setInterval(permissionsCache.limpiarCacheExpirado, 10 * 60 * 1000);
 cacheCleanupTimer.unref?.();
-
-/**
- * Obtener permisos de usuario (con cache)
- * @param {number} userId
- * @returns {Promise<Array>} Lista de códigos de permisos
- */
-async function obtenerPermisosUsuario(userId, { forceRefresh = false } = {}) {
-  // Verificar cache
-  const cached = permisosCache.get(userId);
-  if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
-    return cached.permisos;
-  }
-
-  // Obtener de BD
-  const permisos = await permisosService.obtenerPermisosPorUsuario(userId);
-  const codigosPermisos = permisos.map(p => p.Codigo_Permiso);
-
-  // Guardar en cache
-  permisosCache.set(userId, {
-    permisos: codigosPermisos,
-    timestamp: Date.now()
-  });
-
-  return codigosPermisos;
-}
-
-/**
- * Invalidar cache de permisos de un usuario
- * @param {number} userId
- */
-function invalidarCacheUsuario(userId) {
-  permisosCache.delete(userId);
-}
 
 /**
  * Middleware para verificar permisos específicos
@@ -100,7 +103,7 @@ function checkPermission(codigoPermiso) {
       next();
     } catch (error) {
       console.error('Error verificando permisos:', error);
-      return res.status(500).json({
+      return res.status(error.status || 500).json({
         error: 'Error al verificar permisos',
         mensaje: error.message
       });
@@ -147,7 +150,7 @@ function checkAnyPermission(codigosPermisos) {
       next();
     } catch (error) {
       console.error('Error verificando permisos:', error);
-      return res.status(500).json({
+      return res.status(error.status || 500).json({
         error: 'Error al verificar permisos',
         mensaje: error.message
       });
@@ -188,7 +191,7 @@ function requireAdmin() {
       next();
     } catch (error) {
       console.error('Error verificando admin:', error);
-      return res.status(500).json({
+      return res.status(error.status || 500).json({
         error: 'Error al verificar permisos',
         mensaje: error.message
       });
@@ -201,5 +204,6 @@ module.exports = {
   checkAnyPermission,
   requireAdmin,
   invalidarCacheUsuario,
-  obtenerPermisosUsuario
+  obtenerPermisosUsuario,
+  createPermissionCache,
 };

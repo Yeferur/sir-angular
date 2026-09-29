@@ -93,15 +93,67 @@ async function obtenerPermisosPorUsuario(userId) {
     conexion.release();
   }
 }
+// Una lectura indexada por autorización. CAST evita pérdida de precisión de
+// BIGINT en mysql2/Number; la comparación usa las revisiones como cadenas.
+async function obtenerRevisionPermisosUsuario(userId) {
+  const [rows] = await pool.query(`
+    SELECT
+      CAST(u.Id_Rol AS CHAR) AS Id_Rol,
+      CAST(COALESCE(usuario_revision.Revision, 0) AS CHAR) AS Revision_Usuario,
+      CAST(COALESCE(rol_revision.Revision, 0) AS CHAR) AS Revision_Rol
+    FROM usuarios u
+    LEFT JOIN permisos_cache_revision usuario_revision
+      ON usuario_revision.Tipo = 'USUARIO'
+     AND usuario_revision.Id_Entidad = u.Id_Usuario
+    LEFT JOIN permisos_cache_revision rol_revision
+      ON rol_revision.Tipo = 'ROL'
+     AND rol_revision.Id_Entidad = u.Id_Rol
+    WHERE u.Id_Usuario = ?
+    LIMIT 1
+  `, [userId]);
+  const row = rows?.[0];
+  return {
+    idRol: row?.Id_Rol == null ? null : String(row.Id_Rol),
+    usuario: String(row?.Revision_Usuario ?? 0),
+    rol: String(row?.Revision_Rol ?? 0),
+  };
+}
+
+// Usar siempre el ejecutor de la transacción que modifica los permisos.
+async function incrementarRevisionPermisos(executor, tipo, idEntidad) {
+  if (!['ROL', 'USUARIO'].includes(tipo)) throw new Error('Tipo de revisión de permisos no válido.');
+  await executor.query(`
+    INSERT INTO permisos_cache_revision (Tipo, Id_Entidad, Revision)
+    VALUES (?, ?, 1)
+    ON DUPLICATE KEY UPDATE Revision = Revision + 1
+  `, [tipo, idEntidad]);
+}
+
+async function incrementarRevisionRol(executor, idRol) {
+  return incrementarRevisionPermisos(executor, 'ROL', idRol);
+}
+
+async function incrementarRevisionUsuario(executor, idUsuario) {
+  return incrementarRevisionPermisos(executor, 'USUARIO', idUsuario);
+}
+
+async function incrementarRevisionUsuarioCompartida(idUsuario) {
+  const conexion = await pool.getConnection();
+  try {
+    await conexion.beginTransaction();
+    await incrementarRevisionUsuario(conexion, idUsuario);
+    await conexion.commit();
+  } catch (error) {
+    await conexion.rollback();
+    throw error;
+  } finally {
+    conexion.release();
+  }
+}
+
 /**
- * Verificar si un usuario tiene un permiso específico
- * Considera:
- * 1. Permisos del rol
- * 2. Permisos individuales adicionales (ALLOW) de usuario_permisos
- * 3. Permisos individuales revocados (DENY), con precedencia sobre el rol
- * @param {number} userId - ID del usuario
- * @param {string} codigoPermiso - Código del permiso (ej: 'TOURS.CREAR')
- * @returns {Promise<boolean>}
+ * Verificar un permiso efectivo: DENY individual prevalece sobre ALLOW y rol.
+ * Cliente conserva su plantilla fija.
  */
 async function verificarPermiso(userId, codigoPermiso) {
   const conexion = await pool.getConnection();
@@ -245,6 +297,7 @@ async function obtenerPermisosPorRol(idRol) {
 async function asignarPermisoARol(idRol, idPermiso) {
   const conexion = await pool.getConnection();
   try {
+    await conexion.beginTransaction();
     if (await esRolClientePorId(conexion, idRol)) {
       const error = new Error('Los permisos del rol Cliente son fijos y no se pueden modificar.');
       error.status = 409;
@@ -252,11 +305,16 @@ async function asignarPermisoARol(idRol, idPermiso) {
       throw error;
     }
 
-    await conexion.query(`
+    const [result] = await conexion.query(`
       INSERT INTO rol_permisos (Id_Rol, Id_Permiso)
       VALUES (?, ?)
       ON DUPLICATE KEY UPDATE Id_Rol = Id_Rol
     `, [idRol, idPermiso]);
+    if (result.affectedRows > 0) await incrementarRevisionRol(conexion, idRol);
+    await conexion.commit();
+  } catch (error) {
+    await conexion.rollback();
+    throw error;
   } finally {
     conexion.release();
   }
@@ -271,6 +329,7 @@ async function asignarPermisoARol(idRol, idPermiso) {
 async function revocarPermisoDeRol(idRol, idPermiso) {
   const conexion = await pool.getConnection();
   try {
+    await conexion.beginTransaction();
     if (await esRolClientePorId(conexion, idRol)) {
       const error = new Error('Los permisos del rol Cliente son fijos y no se pueden modificar.');
       error.status = 409;
@@ -278,10 +337,15 @@ async function revocarPermisoDeRol(idRol, idPermiso) {
       throw error;
     }
 
-    await conexion.query(`
+    const [result] = await conexion.query(`
       DELETE FROM rol_permisos
       WHERE Id_Rol = ? AND Id_Permiso = ?
     `, [idRol, idPermiso]);
+    if (result.affectedRows > 0) await incrementarRevisionRol(conexion, idRol);
+    await conexion.commit();
+  } catch (error) {
+    await conexion.rollback();
+    throw error;
   } finally {
     conexion.release();
   }
@@ -314,6 +378,7 @@ async function crearRol(rol) {
 async function actualizarRol(idRol, rol) {
   const conexion = await pool.getConnection();
   try {
+    await conexion.beginTransaction();
     if (await esRolClientePorId(conexion, idRol)) {
       const error = new Error('El rol Cliente es un rol del sistema y no se puede modificar.');
       error.status = 409;
@@ -321,13 +386,18 @@ async function actualizarRol(idRol, rol) {
       throw error;
     }
 
-    await conexion.query(`
+    const [result] = await conexion.query(`
       UPDATE roles
       SET Nombre_Rol = ?,
           Descripcion = ?,
           Activo = ?
       WHERE Id_Rol = ?
     `, [rol.Nombre_Rol, rol.Descripcion, rol.Activo, idRol]);
+    if (result.affectedRows > 0) await incrementarRevisionRol(conexion, idRol);
+    await conexion.commit();
+  } catch (error) {
+    await conexion.rollback();
+    throw error;
   } finally {
     conexion.release();
   }
@@ -365,6 +435,11 @@ async function eliminarRol(idRol) {
 
 module.exports = {
   obtenerPermisosPorUsuario,
+  obtenerRevisionPermisosUsuario,
+  incrementarRevisionPermisos,
+  incrementarRevisionRol,
+  incrementarRevisionUsuario,
+  incrementarRevisionUsuarioCompartida,
   verificarPermiso,
   obtenerMenuPorUsuario,
   obtenerRoles,

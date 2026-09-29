@@ -1,4 +1,5 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../../shared/select/select';
+import { computed, ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -26,9 +27,16 @@ const NAME_SIMILARITY_THRESHOLD = 0.75;
   templateUrl: './editar-punto.html',
   styleUrls: ['../crear-punto/crear-punto.css'],
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
+  imports: [SirSelectComponent, ReactiveFormsModule, FormsModule, CommonModule, LoadingStateComponent]
 })
 export class EditarPuntoComponent implements OnInit, OnDestroy {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly rutaSelectOptions = computed<SirSelectOption[]>(() => [...(this.rutas() || []).map((ruta: any) => ({ value: String(ruta), label: "Ruta " + String(ruta) }))]);
+
+  readonly posicionSelectOptions = computed<SirSelectOption[]>(() => [{ value: null, label: "Al final de la ruta" },
+      ...(this.puntosRuta() || []).map((punto: any) => ({ value: punto.Id_Punto, label: "Después de " + String(punto.NombrePunto || punto.Nombre_Punto) + " · Posición " + String(punto.posicion || punto.Posicion) }))]);
+
   isLoading = signal(true);
   loadError = signal('');
   isSubmitting = signal(false);

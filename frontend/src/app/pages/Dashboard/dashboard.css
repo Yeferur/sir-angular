@@ -594,17 +594,15 @@ h2, h3, p { margin: 0; }
 }
 
 .report-dock-row {
-  width: fit-content;
+  width: max-content;
   max-width: calc(100% - 28px);
-  min-height: 60px;
   margin: 0 auto;
-  padding: 9px 13px;
-  border: 1px solid var(--separator-translucent, rgba(255, 255, 255, .1));
-  border-radius: 16px;
-  display: grid;
-  grid-template-columns: minmax(0, auto) auto;
+  padding: 6px 10px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-lg);
+  display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   background: var(--bg-secondary-translucent, rgba(28, 28, 30, .85));
   box-shadow: 0 4px 24px rgba(0, 0, 0, .2);
   backdrop-filter: blur(24px) saturate(180%);
@@ -614,18 +612,20 @@ h2, h3, p { margin: 0; }
 }
 
 .dock-context {
+  flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
+  max-width: 240px;
   color: var(--text-secondary);
   font-size: .76rem;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .dock-sections {
+  flex: 0 0 auto;
   padding: 3px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -633,14 +633,16 @@ h2, h3, p { margin: 0; }
 }
 
 .dock-sections button {
+  flex: 0 0 auto;
   min-height: 36px;
   padding: 0 13px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   background: transparent;
   font-size: .78rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: color .16s ease, background-color .16s ease, border-color .16s ease, transform .16s ease;
 }
@@ -648,7 +650,6 @@ h2, h3, p { margin: 0; }
 .dock-sections button:hover { color: var(--text-primary); }
 .dock-sections button:active { transform: scale(.97); }
 .dock-sections button.active { border-color: var(--separator-color); color: var(--text-primary); background: var(--bg-secondary); box-shadow: 0 1px 5px rgba(0, 0, 0, .18); }
-.dock-live { justify-self: end; }
 
 button:focus-visible,
 select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 70%, transparent); outline-offset: 2px; }
@@ -686,8 +687,7 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .commercial-grid,
   .operational-grid { grid-template-columns: minmax(0, 1fr); }
   .chart-card--reservation-type { grid-column: auto; }
-  .dock-context { max-width: 160px; }
-  .report-dock-row { width: fit-content; max-width: calc(100% - 22px); grid-template-columns: minmax(0, auto) auto; }
+  .report-dock-row { max-width: calc(100% - 22px); }
 }
 
 @media (max-width: 680px) {
@@ -711,11 +711,11 @@ select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent-blue) 
   .currency-notice { align-items: flex-start; flex-direction: column; }
   .currency-values { width: 100%; overflow-x: auto; }
   .report-dock { padding-bottom: 8px; }
-  .report-dock-row { width: calc(100% - 16px); max-width: none; grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .report-dock-row { width: max-content; max-width: calc(100% - 16px); flex-direction: column; gap: 6px; }
   .dock-context { max-width: 100%; text-align: center; }
-  .dock-sections { width: 100%; min-width: 0; overflow-x: auto; }
+  .dock-sections { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .dock-sections::-webkit-scrollbar { display: none; }
   .dock-sections button { flex: 1 0 auto; padding-inline: 10px; }
-  .dock-live { justify-self: center; font-size: .72rem; }
 }
 
 @media print {

@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -43,12 +44,24 @@ interface PanelSeguroState {
 @Component({
   selector: 'app-seguros',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './seguros.html',
   styleUrl: './seguros.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SegurosComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  private tourSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get tourSelectOptions(): SirSelectOption[] {
+    const source = this.tours;
+    if (this.tourSelectOptionsCache?.source !== source) {
+      this.tourSelectOptionsCache = { source, options: [{ value: "", label: "Seleccionar tour" },
+      ...(this.tours || []).map((tour: any) => ({ value: String(tour.Id_Tour), label: String(tour.Nombre_Tour) }))] };
+    }
+    return this.tourSelectOptionsCache.options;
+  }
+
   private readonly segurosService = inject(SegurosService);
   private readonly toursService = inject(Tours);
   private readonly alerts = inject(SirAlertService);

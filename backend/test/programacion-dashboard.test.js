@@ -50,6 +50,8 @@ async function runMiddleware(middleware, req) {
 async function withEffectivePermissions(codes, callback) {
   const userId = ++nextUserId;
   const original = permissionsService.obtenerPermisosPorUsuario;
+  const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+  permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: 'test', usuario: '0', rol: '0' });
   invalidarCacheUsuario(userId);
   permissionsService.obtenerPermisosPorUsuario = async () => (
     codes.map((Codigo_Permiso) => ({ Codigo_Permiso }))
@@ -59,6 +61,7 @@ async function withEffectivePermissions(codes, callback) {
     await callback(userId);
   } finally {
     permissionsService.obtenerPermisosPorUsuario = original;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
     invalidarCacheUsuario(userId);
   }
 }
@@ -174,6 +177,8 @@ test('una denegación individual elimina PROGRAMACION.LEER heredado del rol', as
   const handlers = findEndpoint(programacionRouter, 'get', '/programacion/resumen-dashboard');
   const userId = ++nextUserId;
   const originalGetConnection = db.getConnection;
+  const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+  permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: '17', usuario: '0', rol: '0' });
   let effectivePermissionSql = '';
   invalidarCacheUsuario(userId);
   db.getConnection = async () => ({
@@ -195,6 +200,7 @@ test('una denegación individual elimina PROGRAMACION.LEER heredado del rol', as
     assert.match(effectivePermissionSql, /COALESCE\(permiso_individual\.Tipo, ''\) <> 'DENY'/);
   } finally {
     db.getConnection = originalGetConnection;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
     invalidarCacheUsuario(userId);
   }
 });

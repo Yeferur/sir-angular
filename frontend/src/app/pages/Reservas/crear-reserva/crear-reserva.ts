@@ -14,6 +14,7 @@ import {
 import { firstValueFrom, of, from } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
+import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { isTourDateAvailable, toDateOnly } from '../../../shared/utils/calendar-date';
@@ -53,12 +54,27 @@ interface SubmitValidationIssue {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, DecimalPipe,
-    DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
+    SirSelectComponent, SirSelectOptionsPipe, DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
   ],
   templateUrl: './crear-reserva.html',
   styleUrls: ['../reserva-shared.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
+  readonly monedaSelectOptions = computed<SirSelectOption[]>(() => [...(this.monedas() || []).map((m: any) => ({ value: String(m.Id_Moneda), label: String(m.Nombre_Moneda) }))]);
+
+  readonly idiomaSelectOptions: SirSelectOption[] = [{ value: "ESPAÑOL", label: "Español" },
+      { value: "INGLÉS", label: "Inglés" }];
+
+  readonly canalSelectOptions = computed<SirSelectOption[]>(() => [...(this.canales() || []).map((canal: any) => ({ value: String(canal.Id_Canal), label: String(canal.Nombre_Canal) }))]);
+
+  readonly planGlobalSelectOptions = computed<SirSelectOption[]>(() => [{ value: null, label: "Seleccione un plan...", disabled: true },
+      ...(this.planes() || []).map((p: any) => ({ value: String(p.Id_Plan), label: String(p.Nombre_Plan) }))]);
+
+  readonly puntoPasajeroSelectOptions = computed<SirSelectOption[]>(() => [...(this.puntosSeleccionados() || []).map((punto: any) => ({ value: String(punto.Id_Punto), label: String(punto.NombrePunto) }))]);
+
+  readonly planPasajeroSelectOptions = computed<SirSelectOption[]>(() => [{ value: null, label: "Seleccione...", disabled: true },
+      ...(this.planes() || []).map((p: any) => ({ value: String(p.Id_Plan), label: String(p.Nombre_Plan) }))]);
+
   private readonly router = inject(Router);
   private readonly drawer = inject(SirDrawerService);
 
@@ -746,6 +762,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   Number = Number;
 
   tours = signal<Tour[]>([]);
+  readonly compareSelectValues = compareSelectValuesAsStrings;
   canales = signal<Canal[]>([]);
   monedas = signal<Moneda[]>([]);
   planes = signal<Plan[]>([]);

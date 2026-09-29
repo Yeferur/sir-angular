@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
 import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
 import { finalize, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -23,15 +24,26 @@ interface WizardStep {
 @Component({
   selector: 'app-editar-transfer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './editar-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })
 export class EditarTransferComponent implements OnInit, OnDestroy {
+  private monedaSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get monedaSelectOptions(): SirSelectOption[] {
+    const source = this.resultsMonedas;
+    if (this.monedaSelectOptionsCache?.source !== source) {
+      this.monedaSelectOptionsCache = { source, options: [...(this.resultsMonedas || []).map((m: any) => ({ value: String(m.Codigo), label: String(m.Codigo) + " - " + String(m.Nombre_Moneda) }))] };
+    }
+    return this.monedaSelectOptionsCache.options;
+  }
+
   private alerts = inject(SirAlertService);
   private uiState = inject(UiStateService);
   private drawer = inject(SirDrawerService);
   form!: FormGroup;
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+  readonly flightSelectOptions = [{ value: 'Nacional', label: 'Nacional' }, { value: 'Internacional', label: 'Internacional' }];
   private readonly e164WithTenDigitsPattern = /^\+[1-9]\d{10,12}$/;
   private originalTransfer: any = null;
 

@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -56,12 +57,43 @@ interface PanelPagoState {
 @Component({
   selector: 'app-comisiones',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './comisiones.html',
   styleUrl: './comisiones.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ComisionesComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  private tourSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get tourSelectOptions(): SirSelectOption[] {
+    const source = this.tours;
+    if (this.tourSelectOptionsCache?.source !== source) {
+      this.tourSelectOptionsCache = { source, options: [{ value: "", label: "Todos los tours" },
+      ...(this.tours || []).map((tour: any) => ({ value: String(tour.Id_Tour), label: String(tour.Nombre_Tour) }))] };
+    }
+    return this.tourSelectOptionsCache.options;
+  }
+
+  private canalSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get canalSelectOptions(): SirSelectOption[] {
+    const source = this.canalesDisponibles;
+    if (this.canalSelectOptionsCache?.source !== source) {
+      this.canalSelectOptionsCache = { source, options: [{ value: "", label: "Todos los canales" },
+      ...(this.canalesDisponibles || []).map((canal: any) => ({ value: String(canal.Id_Canal), label: String(canal.Nombre_Canal) }))] };
+    }
+    return this.canalSelectOptionsCache.options;
+  }
+
+  readonly estadoSelectOptions: SirSelectOption[] = [{ value: "", label: "Todos los estados" },
+      { value: "PENDIENTE", label: "Pendientes" },
+      { value: "PAGADO", label: "Pagadas" }];
+
+  readonly formaPagoSelectOptions: SirSelectOption[] = [{ value: "", label: "Sin especificar" },
+      { value: "TRANSFERENCIA_BANCOLOMBIA", label: "Bancolombia" },
+      { value: "NEQUI", label: "Nequi" },
+      { value: "EFECTIVO", label: "Efectivo" }];
+
   private readonly comisionesService = inject(ComisionesService);
   private readonly toursService = inject(Tours);
   private readonly reservasService = inject(Reservas);

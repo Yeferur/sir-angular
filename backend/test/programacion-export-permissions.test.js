@@ -51,6 +51,8 @@ async function runMiddleware(middleware, req) {
 async function withEffectivePermissions(codes, callback) {
   const userId = ++nextUserId;
   const original = permissionsService.obtenerPermisosPorUsuario;
+  const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+  permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: 'test', usuario: '0', rol: '0' });
   invalidarCacheUsuario(userId);
   permissionsService.obtenerPermisosPorUsuario = async () => (
     codes.map((Codigo_Permiso) => ({ Codigo_Permiso }))
@@ -60,6 +62,7 @@ async function withEffectivePermissions(codes, callback) {
     await callback(userId);
   } finally {
     permissionsService.obtenerPermisosPorUsuario = original;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
     invalidarCacheUsuario(userId);
   }
 }

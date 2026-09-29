@@ -17,8 +17,7 @@ h2,
 p { margin: 0; }
 
 button,
-input,
-select { font: inherit; }
+input { font: inherit; }
 
 .button {
   min-height: 40px;

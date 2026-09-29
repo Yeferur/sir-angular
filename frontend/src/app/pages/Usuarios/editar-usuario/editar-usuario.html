@@ -272,17 +272,12 @@
 
             <div class="role-control">
               <div class="form-group role-select-group">
-                <label class="form-label">Rol <span class="required-star">*</span></label>
-                <select
-                  class="form-select"
-                  formControlName="Id_Rol"
-                  (change)="onRolChange()"
-                  [class.errorInput]="c('Id_Rol').touched && c('Id_Rol').invalid">
-                  <option value="" disabled>Selecciona un rol</option>
-                  @for (role of roles; track role.Id_Rol) {
-                    <option [value]="role.Id_Rol">{{ role.Nombre_Rol }}</option>
-                  }
-                </select>
+                <label class="form-label" for="editar-usuario-rol">Rol <span class="required-star">*</span></label>
+                <app-select inputId="editar-usuario-rol" formControlName="Id_Rol"
+                  (valueChange)="onRolChange()"
+                  [invalid]="c('Id_Rol').touched && c('Id_Rol').invalid"
+                  [options]="rolSelectOptions" [compareWith]="compareSelectValues"
+                  ariaLabel="Rol" placeholder="Selecciona un rol" [required]="true" />
                 @if (c('Id_Rol').touched && c('Id_Rol').invalid) {
                   <div class="errorMessage">Selecciona un rol.</div>
                 }
@@ -290,13 +285,11 @@
 
               @if (isAdvisorRole) {
                 <div class="form-group role-select-group">
-                  <label class="form-label">Canal de ventas</label>
-                  <select class="form-select" formControlName="Id_Canal">
-                    <option [value]="null">Sin asignar</option>
-                    @for (canal of canales; track canal.idCanal) {
-                      <option [value]="canal.idCanal">{{ canal.nombreCanal }}</option>
-                    }
-                  </select>
+                  <label class="form-label" for="editar-usuario-canal">Canal de ventas</label>
+                  <app-select inputId="editar-usuario-canal" formControlName="Id_Canal"
+                    [options]="canalSelectOptions" [compareWith]="compareSelectValues"
+                    ariaLabel="Canal de ventas" placeholder=""
+                    [invalid]="!!(form.get('Id_Canal')?.touched && form.get('Id_Canal')?.invalid)" />
                 </div>
               }
             </div>

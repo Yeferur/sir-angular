@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -70,10 +71,15 @@ interface ScheduleWarning {
 
 @Component({
   selector: 'app-turnos', standalone: true,
-  imports: [CommonModule, FormsModule, LoadingStateComponent, TimepickerComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, TimepickerComponent],
   templateUrl: './turnos.html', styleUrl: './turnos.css',
 })
 export class TurnosComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly canalSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Sin canal asignado" },
+      ...(this.canales() || []).map((channel: any) => ({ value: String(channel.idCanal), label: String(channel.nombreCanal) }))]);
+
   private readonly drawer = inject(SirDrawerService);
   private readonly route = inject(ActivatedRoute);
   readonly fechaReferencia = signal(new Date().toISOString().slice(0, 10));

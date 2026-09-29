@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption } from '../../shared/select/select';
 import { CommonModule }         from '@angular/common';
 import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy, DestroyRef, ChangeDetectionStrategy, HostListener } from '@angular/core';
 import { FormsModule }          from '@angular/forms';
@@ -101,12 +102,15 @@ const EMPTY_INCOME_SET: IncomeSeriesSet = { categories: [], empresa: [], tours: 
 @Component({
   selector:    'app-dashboard',
   standalone:  true,
-  imports:     [CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports:     [SirSelectComponent, CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './dashboard.html',
   styleUrls:   ['./dashboard.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
+  readonly reservationTypeOptions = [{ value: '', label: 'Grupales y privadas' }, { value: 'Grupal', label: 'Solo grupales' }, { value: 'Privada', label: 'Solo privadas' }];
+  readonly allToursOption: SirSelectOption<number | null> = { value: null, label: 'Todos los tours' };
+  tourSelectOptions: SirSelectOption<number | null>[] = [this.allToursOption];
 
   private svc   = inject(DashboardService);
   private toursSvc = inject(Tours);
@@ -273,6 +277,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.toursSvc.getTours().pipe(catchError(() => of([]))).subscribe((list) => {
       this.tours = (list || [])
         .filter((tour): tour is TourOption => typeof tour?.Id_Tour === 'number' && typeof tour?.Nombre_Tour === 'string');
+      this.tourSelectOptions = [this.allToursOption, ...this.tours.map(tour => ({ value: tour.Id_Tour, label: tour.Nombre_Tour }))];
       this.cdr.detectChanges();
     });
   }

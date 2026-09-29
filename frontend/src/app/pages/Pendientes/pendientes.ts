@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,12 +24,20 @@ type CenterTab = 'todos' | 'pendientes' | 'recordatorios' | 'novedades';
 @Component({
   selector: 'app-pendientes',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReminderFormComponent, DatepickerComponent, TimepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, ReminderFormComponent, DatepickerComponent, TimepickerComponent, LoadingStateComponent],
   templateUrl: './pendientes.html',
   styleUrl: './pendientes.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PendientesComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly prioridadSelectOptions: SirSelectOption[] = [{ value: "TODAS", label: "Todas" },
+      { value: "CRITICA", label: "Crítica" },
+      { value: "ALTA", label: "Alta" },
+      { value: "MEDIA", label: "Media" },
+      { value: "BAJA", label: "Baja" }];
+
   readonly activity = inject(MiActividadFacade);
   private readonly alerts = inject(SirAlertService);
   private readonly route = inject(ActivatedRoute);

@@ -1,3 +1,4 @@
+import { SirSelectComponent } from '../../../shared/select/select';
 import { ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -17,11 +18,12 @@ import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './ver-reservas.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })
 export class VerReservasComponent implements OnInit, OnDestroy {
+  readonly reservationTypeOptions = [{ value: '', label: 'Grupales y privadas' }, { value: 'Grupal', label: 'Solo grupales' }, { value: 'Privada', label: 'Solo privadas' }];
   readonly estadoOptions = ['Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completada', 'Cancelada'];
   mainInputFocused = signal(false);
 private settingFromAutocomplete = false;

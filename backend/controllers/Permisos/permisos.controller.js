@@ -252,6 +252,7 @@ async function invalidarCache(req, res) {
     const { userId } = req.body;
     
     if (userId) {
+      await permisosService.incrementarRevisionUsuarioCompartida(userId);
       invalidarCacheUsuario(userId);
     }
     

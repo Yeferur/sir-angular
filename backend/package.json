@@ -5,6 +5,8 @@
   "scripts": {
     "test": "node --test",
     "db:backup": "node scripts/backup-database.js",
+    "db:migrate:permissions-cache": "node scripts/run-migration.js 20260920_revision_cache_permisos.sql",
+    "test:permissions-cache:mysql": "node --test test/permissions-cache.mysql.test.js",
     "test:programacion-shadow": "node --test test/programacion-shadow.optimizer.test.js",
     "db:migrate:email-outbox": "node scripts/run-migration.js 20260813_email_outbox.sql",
     "email:outbox:status": "node scripts/email-outbox-status.js",

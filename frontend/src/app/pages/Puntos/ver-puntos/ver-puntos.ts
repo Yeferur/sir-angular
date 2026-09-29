@@ -1,5 +1,6 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../../shared/select/select';
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { computed, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -27,11 +28,16 @@ type PuntoOperationalIssue = {
 @Component({
   selector: 'app-ver-puntos',
   standalone: true,
-  imports: [CommonModule, FormsModule, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent],
   templateUrl: './ver-puntos.html',
   styleUrls: ['../../listado-reservas-transfers.css', './ver-puntos.css']
 })
 export class VerPuntos implements OnInit, OnDestroy {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly rutaSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Todas las rutas" },
+      ...(this.rutas() || []).map((ruta: any) => ({ value: String(ruta), label: String(this.routeLabel(ruta)) }))]);
+
   private puntosSvc = inject(puntosService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);

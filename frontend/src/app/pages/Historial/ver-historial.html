@@ -100,28 +100,18 @@
               (change)="updateFilter('Usuario', $any($event.target).value)" />
           </div>
           <div class="form-group">
-            <label class="form-label">Tipo de Acción</label>
-            <select
-              class="form-select"
-              [value]="filters().Tipo_Accion"
-              (change)="updateFilter('Tipo_Accion', $any($event.target).value)">
-              <option value="">Todas</option>
-              @for (tipo of tiposAccion(); track tipo) {
-                <option [value]="tipo">{{ getAccionLabel(tipo) }}</option>
-              }
-            </select>
+            <label class="form-label" for="Historial-accion">Tipo de Acción</label>
+            <app-select inputId="Historial-accion" [value]="filters().Tipo_Accion"
+              (valueChange)="updateFilter('Tipo_Accion', $event)"
+              [options]="accionSelectOptions()" [compareWith]="compareSelectValues"
+              ariaLabel="Tipo de Acción" placeholder="" />
           </div>
           <div class="form-group">
-            <label class="form-label">Tabla Afectada</label>
-            <select
-              class="form-select"
-              [value]="filters().Tabla_Afectada"
-              (change)="updateFilter('Tabla_Afectada', $any($event.target).value)">
-              <option value="">Todas</option>
-              @for (tabla of tablasAfectadas(); track tabla) {
-                <option [value]="tabla">{{ tabla }}</option>
-              }
-            </select>
+            <label class="form-label" for="Historial-tabla">Tabla Afectada</label>
+            <app-select inputId="Historial-tabla" [value]="filters().Tabla_Afectada"
+              (valueChange)="updateFilter('Tabla_Afectada', $event)"
+              [options]="tablaSelectOptions()" [compareWith]="compareSelectValues"
+              ariaLabel="Tabla Afectada" placeholder="" />
           </div>
           <div class="form-group">
             <label class="form-label">Desde</label>

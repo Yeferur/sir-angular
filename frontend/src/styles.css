@@ -3,6 +3,8 @@
 
 /*========== VARIABLES CSS ==========*/
 :root {
+  --content-padding-inline: 24px;
+  --wizard-max-width: 1350px;
   --ease-panel: cubic-bezier(.23, 1, .32, 1);
   --ease-soft: cubic-bezier(.22, 1, .36, 1);
   --ease-panel: cubic-bezier(.23, 1, .32, 1);
@@ -1182,7 +1184,7 @@ input[type=number] {
 }
 
 .wizard-shell {
-  max-width: 1350px;
+  max-width: var(--wizard-max-width);
   margin: 0 auto;
   padding-bottom: 110px;
 }
@@ -1411,7 +1413,7 @@ input[type=number] {
 
 .wizard-nav-row {
   /* Mantiene la misma caja de lectura que los formularios (.wizard-shell). */
-  width: min(1350px, 100%);
+  width: min(var(--wizard-max-width), 100%);
   margin: 0 auto;
   padding: 10px 18px;
   min-height: 60px;
@@ -1424,6 +1426,66 @@ input[type=number] {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+/* Los wizards comparten los márgenes del contenido, sin reservar el rail antiguo. */
+.wizard-shell ~ .wizard-nav {
+  left: var(--content-padding-inline);
+  right: var(--content-padding-inline);
+}
+
+.wizard-shell ~ .wizard-nav .wizard-nav-row {
+  width: min(var(--wizard-max-width), 100%);
+}
+
+@media (min-width: 641px) {
+  .wizard-shell ~ .wizard-nav .wizard-nav-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) fit-content(60%) minmax(0, 1fr);
+  }
+
+  .wizard-shell ~ .wizard-nav .wizard-nav-left {
+    justify-self: start;
+  }
+
+  .wizard-shell ~ .wizard-nav .wizard-nav-center {
+    justify-self: center;
+    width: 100%;
+  }
+
+  .wizard-shell ~ .wizard-nav .wizard-nav-right {
+    justify-self: end;
+  }
+
+  .wizard-shell ~ .wizard-nav .wizard-nav-summary {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1120px) {
+  .wizard-shell ~ .wizard-nav .wizard-nav-row {
+    grid-template-columns: minmax(0, 1fr) fit-content(55%) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .wizard-shell ~ .wizard-nav .wizard-nav-row {
+    grid-template-columns: minmax(0, 1fr) fit-content(45%) minmax(0, 1fr);
+  }
+
+  /* Dos líneas de contexto caben dentro de la altura existente de la barra. */
+  .wizard-shell ~ .wizard-nav .wizard-nav-summary {
+    flex-wrap: wrap;
+    row-gap: 0;
+    line-height: 1.2;
+    max-height: 38px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 766px) {
+  .wizard-shell ~ .wizard-nav .wizard-nav-row {
+    grid-template-columns: minmax(0, 1fr) fit-content(34%) minmax(0, 1fr);
+  }
 }
 
 .wizard-nav-left,

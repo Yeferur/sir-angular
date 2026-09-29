@@ -14,13 +14,10 @@
         </div>
         <div class="field-group field-group--tour">
           <label class="form-label" for="trip-tour">Tour</label>
-          <select id="trip-tour" [ngModel]="filters.Id_Tour"
-            (ngModelChange)="updateSearchFilter('Id_Tour', $event)" class="form-select">
-            <option value="" disabled>Seleccionar tour</option>
-            @for (tour of toursList; track tour.Id_Tour) {
-              <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-            }
-          </select>
+          <app-select inputId="trip-tour" [ngModel]="filters.Id_Tour"
+            (ngModelChange)="updateSearchFilter('Id_Tour', $event)"
+            [options]="tourSelectOptions" [compareWith]="compareSelectValues"
+            ariaLabel="Tour" placeholder="Seleccionar tour" />
         </div>
         <button type="button" class="action-button action-button--primary" (click)="search()"
           [disabled]="isLoading || isSubmitting || !filters.Fecha || !filters.Id_Tour">

@@ -306,11 +306,14 @@ test('los recordatorios de Pendientes siguen requiriendo PENDIENTES.LEER', async
 
 test('las rutas de novedades exigen autenticación y PROGRAMACION.LEER más ACTUALIZAR', async (t) => {
   const original = permissionsService.obtenerPermisosPorUsuario;
+  const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+  permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: 'test', usuario: '0', rol: '0' });
   const userId = 880001;
   const getHandlers = findEndpoint('get', '/programacion/novedades');
   const reviewHandlers = findEndpoint('patch', '/programacion/novedades/:id/revisar');
   t.after(() => {
     permissionsService.obtenerPermisosPorUsuario = original;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
     invalidarCacheUsuario(userId);
   });
 

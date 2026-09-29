@@ -58,56 +58,16 @@
 }
 
 .route-filter-inline {
-  position: relative;
   display: flex;
   align-items: center;
   flex: 0 0 190px;
-  height: 42px;
-  border: 1.5px solid var(--separator-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  transition: border-color .18s ease, box-shadow .18s ease;
-}
-
-.route-filter-inline:focus-within {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 14%, transparent);
+  gap: 8px;
+  min-width: 0;
 }
 
 .route-filter-inline > svg {
-  position: absolute;
-  left: 12px;
-  z-index: 1;
+  flex-shrink: 0;
   color: var(--text-secondary);
-  pointer-events: none;
-}
-
-.route-filter-inline select {
-  width: 100%;
-  height: 100%;
-  padding: 0 30px 0 34px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font: 700 .82rem var(--font-family);
-  cursor: pointer;
-  color-scheme: dark;
-}
-
-.route-filter-inline option {
-  background: #1c1c1e;
-  color: #f5f5f7;
-}
-
-:host-context([data-theme="light"]) .route-filter-inline select {
-  color-scheme: light;
-}
-
-:host-context([data-theme="light"]) .route-filter-inline option {
-  background: #fff;
-  color: #1c1c1e;
 }
 
 .points-list {

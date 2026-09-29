@@ -1,0 +1,34 @@
+<button #trigger type="button" class="form-select sir-select-trigger"
+  [id]="resolvedInputId" role="combobox" aria-haspopup="listbox"
+  [disabled]="effectivelyDisabled" [class.errorInput]="invalid" [class.is-open]="isOpen"
+  [attr.aria-expanded]="isOpen" [attr.aria-controls]="isOpen ? listId : null"
+  [attr.aria-activedescendant]="isOpen && activeIndex >= 0 ? optionId(activeIndex) : null"
+  [attr.aria-label]="ariaLabel" [attr.aria-labelledby]="ariaLabelledby"
+  [attr.aria-describedby]="ariaDescribedby" [attr.aria-required]="required" [attr.aria-invalid]="invalid"
+  (click)="toggle()" (keydown)="onKeydown($event)" (blur)="onBlur($event)">
+  <span class="sir-select-label" [class.is-placeholder]="!selectedOption">{{ selectedOption?.label ?? placeholder }}</span>
+  <svg class="sir-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+</button>
+
+<ng-template #panelTpl>
+  <div class="sir-select-list" role="listbox" [id]="listId"
+    [attr.aria-label]="ariaLabel" [attr.aria-labelledby]="ariaLabelledby || resolvedInputId">
+    @for (option of options; track $index) {
+      <div class="sir-select-option" role="option" [id]="optionId($index)"
+        [attr.aria-selected]="compareWith(option.value, value)" [attr.aria-disabled]="!!option.disabled"
+        [class.is-selected]="compareWith(option.value, value)" [class.is-active]="activeIndex === $index"
+        [class.is-disabled]="option.disabled" (mousedown)="$event.preventDefault()"
+        (mouseenter)="setActive($index)" (click)="choose($index)">
+        <span>{{ option.label }}</span>
+        @if (compareWith(option.value, value)) {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        }
+      </div>
+    }
+  </div>
+</ng-template>

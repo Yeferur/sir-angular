@@ -266,15 +266,8 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="reservation-type-filter">Tipo de reserva</label>
-          <select
-            id="reservation-type-filter"
-            class="type-filter-select"
-            [ngModel]="filters().TipoReserva"
-            (ngModelChange)="updateFilter('TipoReserva', $event)">
-            <option value="">Grupales y privadas</option>
-            <option value="Grupal">Solo grupales</option>
-            <option value="Privada">Solo privadas</option>
-          </select>
+          <app-select inputId="reservation-type-filter" [options]="reservationTypeOptions"
+            [ngModel]="filters().TipoReserva" (ngModelChange)="updateFilter('TipoReserva', $event)" />
         </div>
       </div>
     </div>

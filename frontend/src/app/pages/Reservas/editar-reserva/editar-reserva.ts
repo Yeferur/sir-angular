@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
 import { CONTACT_REQUIRED_MESSAGE, RESERVA_PHONE_PATTERN, hasReservaContact, reservaContactValidator } from '../reserva-contact.utils';
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
@@ -73,11 +74,23 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
   templateUrl: './editar-reserva.html',
   styleUrls: ['../reserva-shared.css'],
 })
 export class EditarReservaComponent implements OnInit, OnDestroy {
+  readonly monedaSelectOptions = computed<SirSelectOption[]>(() => [...(this.monedas() || []).map((m: any) => ({ value: String(m.Id_Moneda), label: String(m.Nombre_Moneda) }))]);
+
+  readonly idiomaSelectOptions: SirSelectOption[] = [{ value: "ESPAÑOL", label: "Español" },
+      { value: "INGLÉS", label: "Inglés" }];
+
+  readonly canalSelectOptions = computed<SirSelectOption[]>(() => [...(this.canales() || []).map((canal: any) => ({ value: String(canal.Id_Canal), label: String(canal.Nombre_Canal) }))]);
+
+  readonly planGlobalSelectOptions = computed<SirSelectOption[]>(() => [{ value: null, label: "Seleccione un plan...", disabled: true },
+      ...(this.planes() || []).map((p: any) => ({ value: String(p.Id_Plan), label: String(p.Nombre_Plan) }))]);
+
+  readonly puntoPasajeroSelectOptions = computed<SirSelectOption[]>(() => [...(this.puntosSeleccionados() || []).map((punto: any) => ({ value: String(punto.Id_Punto), label: String(punto.NombrePunto) }))]);
+
   Number = Number;
   showDuplicate: boolean = true;
   openSummary = false;
@@ -838,6 +851,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   // Catálogos
   tours = signal<Tour[]>([]);
+  readonly compareSelectValues = compareSelectValuesAsStrings;
   canales = signal<Canal[]>([]);
   monedas = signal<Moneda[]>([]);
   planes = signal<Plan[]>([]);

@@ -106,17 +106,14 @@
 
         <!-- Tour -->
         <div class="form-group">
-          <label class="form-label">Tour <span class="required-star">*</span></label>
-          <select class="form-select"
-            [ngClass]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'errorInput' : ''"
-            formControlName="SelectTour" (change)="onTourChange()">
-            <option value="" disabled>Seleccionar un tour...</option>
-            @for (tour of tours(); track tour.Id_Tour) {
-            <option [value]="tour.Id_Tour">{{ tour.Nombre_Tour }}</option>
-            }
-          </select>
+          <label class="form-label" for="editar-reserva-tour">Tour <span class="required-star">*</span></label>
+          <app-select inputId="editar-reserva-tour" formControlName="SelectTour"
+            [options]="tours() | selectOptions:'Id_Tour':'Nombre_Tour':true" [compareWith]="compareSelectValues"
+            placeholder="Seleccionar un tour..." [required]="true"
+            [invalid]="!!(form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid)"
+            [ariaDescribedby]="form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid ? 'editar-reserva-tour-error' : null" (valueChange)="onTourChange()" />
           @if (form.get('SelectTour')?.touched && form.get('SelectTour')?.invalid) {
-          <div class="errorMessage">Selecciona un tour.</div>
+          <div class="errorMessage" id="editar-reserva-tour-error">Selecciona un tour.</div>
           }
         </div>
 
@@ -135,21 +132,20 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Moneda</label>
-          <select class="form-select" formControlName="Id_Moneda" (change)="onPlanMonedaChange()">
-            @for (m of monedas(); track m.Id_Moneda) {
-            <option [value]="m.Id_Moneda">{{ m.Nombre_Moneda }}</option>
-            }
-          </select>
+          <label class="form-label" for="editar-reserva-moneda">Moneda</label>
+          <app-select inputId="editar-reserva-moneda" formControlName="Id_Moneda" (valueChange)="onPlanMonedaChange()"
+            [options]="monedaSelectOptions()" [compareWith]="compareSelectValues"
+            ariaLabel="Moneda" placeholder=""
+            [invalid]="!!(form.get('Id_Moneda')?.touched && form.get('Id_Moneda')?.invalid)" [required]="true" />
         </div>
 
         <!-- Idioma -->
         <div class="form-group">
-          <label class="form-label">Idioma</label>
-          <select class="form-select" formControlName="Idioma_Reserva">
-            <option value="ESPAÑOL">Español</option>
-            <option value="INGLÉS">Inglés</option>
-          </select>
+          <label class="form-label" for="editar-reserva-idioma">Idioma</label>
+          <app-select inputId="editar-reserva-idioma" formControlName="Idioma_Reserva"
+            [options]="idiomaSelectOptions" [compareWith]="compareSelectValues"
+            ariaLabel="Idioma" placeholder=""
+            [invalid]="!!(form.get('Idioma_Reserva')?.touched && form.get('Idioma_Reserva')?.invalid)" />
         </div>
 
       </div>
@@ -199,13 +195,12 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Canal <span class="required-star">*</span></label>
-          <select class="form-select" formControlName="Id_Canal"
-            (change)="recalcularComisionesPorCanal(); autollenarPrecios()">
-            @for (canal of canales(); track canal.Id_Canal) {
-            <option [value]="canal.Id_Canal">{{ canal.Nombre_Canal }}</option>
-            }
-          </select>
+          <label class="form-label" for="editar-reserva-canal">Canal <span class="required-star">*</span></label>
+          <app-select inputId="editar-reserva-canal" formControlName="Id_Canal"
+            (valueChange)="recalcularComisionesPorCanal(); autollenarPrecios()"
+            [options]="canalSelectOptions()" [compareWith]="compareSelectValues"
+            ariaLabel="Canal" placeholder=""
+            [invalid]="!!(form.get('Id_Canal')?.touched && form.get('Id_Canal')?.invalid)" [required]="true" />
         </div>
 
         <div class="form-group full-width">
@@ -303,12 +298,10 @@
                   (click)="setModoPlan('individual')">Individual</button>
               </div>
             </div>
-            <select class="form-select" formControlName="Id_Plan" (change)="onPlanMonedaChange()">
-              <option [ngValue]="null" disabled>Seleccione un plan...</option>
-              @for (p of planes(); track p.Id_Plan) {
-              <option [value]="p.Id_Plan">{{ p.Nombre_Plan }}</option>
-              }
-            </select>
+            <app-select inputId="editar-reserva-plan-global" formControlName="Id_Plan" (valueChange)="onPlanMonedaChange()"
+              [options]="planGlobalSelectOptions()" [compareWith]="compareSelectValues"
+              ariaLabel="Plan" placeholder="Seleccione un plan..."
+              [invalid]="!!(form.get('Id_Plan')?.touched && form.get('Id_Plan')?.invalid)" />
             @if (form.get('Id_Plan')?.touched && form.get('Id_Plan')?.invalid) {
             <div class="errorMessage">Selecciona un plan.</div>
             }
@@ -566,12 +559,11 @@
 
           @if (puntosSeleccionados().length > 1) {
           <div class="form-group">
-            <label class="form-label">Punto de encuentro</label>
-            <select class="form-select" formControlName="Id_Punto" [attr.id]="'editar-pasajero-' + i + '-punto'">
-              @for (punto of puntosSeleccionados(); track punto.Id_Punto) {
-              <option [value]="punto.Id_Punto">{{ punto.NombrePunto }}</option>
-              }
-            </select>
+            <label class="form-label" [for]="'editar-pasajero-' + i + '-punto'">Punto de encuentro</label>
+            <app-select [inputId]="'editar-pasajero-' + i + '-punto'" formControlName="Id_Punto"
+              [options]="puntoPasajeroSelectOptions()" [compareWith]="compareSelectValues"
+              ariaLabel="Punto de encuentro" placeholder=""
+              [invalid]="!!(pasajero.get('Id_Punto')?.touched && pasajero.get('Id_Punto')?.invalid)" />
           </div>
           }
 

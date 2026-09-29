@@ -63,7 +63,9 @@
           </header>
 
           <div class="advisor-settings">
-            <label class="setting-field"><span>Canal esta semana</span><select [ngModel]="advisor.canal?.idCanal || ''" [disabled]="!canUpdate()" (ngModelChange)="changeChannel(advisor, $event)"><option value="">Sin canal asignado</option>@for (channel of canales(); track channel.idCanal) { <option [value]="channel.idCanal">{{ channel.nombreCanal }}</option> }</select></label>
+            <label class="setting-field" for="Turnos-canal"><span>Canal esta semana</span><app-select inputId="Turnos-canal" [ngModel]="advisor.canal?.idCanal || ''" [disabled]="!canUpdate()" (ngModelChange)="changeChannel(advisor, $event)"
+            [options]="canalSelectOptions()" [compareWith]="compareSelectValues"
+            ariaLabel="Canal esta semana" placeholder="" /></label>
             <label class="super-setting"><span><strong>Supernumerario</strong><small>Cubre su canal esta semana.</small></span><span class="switch-control"><input type="checkbox" [checked]="advisor.esSupernumerario" [disabled]="!canUpdate()" (change)="toggleSuper(advisor, $any($event.target).checked)" /><i aria-hidden="true"></i></span></label>
             <div class="vacation-setting"><span><strong>{{ advisor.vacacion ? 'Vacaciones programadas' : 'Sin vacaciones esta semana' }}</strong><small>@if (advisor.vacacion) { {{ shortDate(advisor.vacacion.fechaInicio) }}–{{ shortDate(advisor.vacacion.fechaFin) }} · regreso {{ shortDate(advisor.vacacion.fechaRegreso) }} } @else { Puedes programarlas sin salir de Turnos. }</small></span><button type="button" class="button-quiet" (click)="openVacation(advisor)">{{ advisor.vacacion ? 'Editar' : 'Programar' }}</button></div>
           </div>

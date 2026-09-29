@@ -1,0 +1,58 @@
+/* Only this component's overlay container uses the layer above drawers/modals. */
+.cdk-overlay-container.sir-select-overlay-container { z-index: calc(var(--z-modal) + 1); }
+app-select { display: block; width: 100%; min-width: 0; }
+.sir-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sir-select-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sir-select-label.is-placeholder { color: var(--text-tertiary); }
+.sir-select-caret { flex-shrink: 0; color: var(--text-secondary); }
+.sir-select-trigger.is-open {
+  border-color: var(--accent-blue);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent);
+}
+.sir-select-trigger.is-open .sir-select-caret { transform: rotate(180deg); }
+.sir-select-overlay-panel { max-width: calc(100vw - 16px); }
+.sir-select-list {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: inherit;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: .875rem;
+  box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color));
+}
+.sir-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+  cursor: pointer;
+}
+.sir-select-option span { overflow-wrap: anywhere; min-width: 0; }
+.sir-select-option svg { flex-shrink: 0; }
+.sir-select-option.is-active:not(.is-disabled), .sir-select-option:hover:not(.is-disabled) {
+  background: var(--bg-tertiary);
+}
+.sir-select-option.is-selected { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary)); }
+.sir-select-option.is-active { outline: 1px solid color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color)); outline-offset: -1px; }
+.sir-select-option.is-disabled { color: var(--text-secondary); opacity: .72; cursor: not-allowed; }
+@media (pointer: coarse) { .sir-select-option { min-height: 40px; } }

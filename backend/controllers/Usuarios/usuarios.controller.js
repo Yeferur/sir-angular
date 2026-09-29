@@ -1,4 +1,5 @@
 const sesionesService = require('../../services/Usuarios/usuarios.service');
+const permisosService = require('../../services/Permisos/permisos.service');
 const bcrypt = require('bcrypt');
 const db = require('../../database/db');
 const { recordHistorial } = require('../../services/Historial/logger');
@@ -678,6 +679,7 @@ exports.actualizarUsuario = async (req, res) => {
       ],
     });
 
+    await permisosService.incrementarRevisionUsuario(conn, id);
     await conn.commit();
     invalidarCacheUsuario(Number(id));
 
@@ -809,6 +811,7 @@ exports.eliminarUsuario = async (req, res) => {
       ],
     });
 
+    await permisosService.incrementarRevisionUsuario(conn, id);
     await conn.commit();
     invalidarCacheUsuario(Number(id));
     deactivatedUserId = Number(id);
@@ -1060,6 +1063,7 @@ exports.crearUsuario = async (req, res) => {
       ],
     });
 
+    await permisosService.incrementarRevisionUsuario(conn, Id_Usuario);
     await conn.commit();
 
     invalidarCacheUsuario(Number(Id_Usuario));

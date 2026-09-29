@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -9,11 +10,19 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state'
 @Component({
   selector: 'app-ver-historial',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './ver-historial.html',
   styleUrls: ['./ver-historial.css']
 })
 export class VerHistorialComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly accionSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Todas" },
+      ...(this.tiposAccion() || []).map((tipo: any) => ({ value: String(tipo), label: String(this.getAccionLabel(tipo)) }))]);
+
+  readonly tablaSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Todas" },
+      ...(this.tablasAfectadas() || []).map((tabla: any) => ({ value: String(tabla), label: String(tabla) }))]);
+
   private historialService = inject(HistorialService);
   private alerts = inject(SirAlertService);
 

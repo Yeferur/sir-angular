@@ -58,8 +58,10 @@
         <h2>Por atender</h2>
         <div class="toolbar-filters">
           <label class="filter-label"><span>Mostrar pospuestos</span><span class="switch-control switch-control--small"><input type="checkbox" role="switch" aria-label="Mostrar pospuestos" [attr.aria-checked]="includeSuppressed()" [checked]="includeSuppressed()" (change)="toggleSuppressed()" /><i aria-hidden="true"></i></span></label>
-          <label class="filter-label">Prioridad
-            <select class="form-select" [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)"><option value="TODAS">Todas</option><option value="CRITICA">Crítica</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option><option value="BAJA">Baja</option></select>
+          <label class="filter-label" for="Pendientes-prioridad">Prioridad
+            <app-select inputId="Pendientes-prioridad" [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)"
+              [options]="prioridadSelectOptions" [compareWith]="compareSelectValues"
+              ariaLabel="Prioridad" placeholder="" />
           </label>
         </div>
       </div>

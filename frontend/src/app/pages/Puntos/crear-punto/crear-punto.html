@@ -171,27 +171,13 @@
               <div class="form-grid route-fields">
                 <div class="form-group">
                   <label class="form-label" for="rutaExistente">Ruta <span class="required-star">*</span></label>
-                  <select
-                    id="rutaExistente"
-                    class="form-input"
-                    formControlName="rutaExistente"
-                    [class.errorInput]="routeStepAttempted && !routeSelectionIsValid()"
-                    (change)="onRutaExistenteChange($any($event.target).value)">
-                    @for (ruta of rutas(); track ruta) {
-                      <option [value]="ruta">Ruta {{ ruta }}</option>
-                    }
-                  </select>
+                  <app-select inputId="rutaExistente" formControlName="rutaExistente" [options]="routeSelectOptions()"
+                    [required]="true" [invalid]="routeStepAttempted && !routeSelectionIsValid()"
+                    (valueChange)="onRutaExistenteChange($event)" />
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="puntoAnterior">Posición</label>
-                  <select id="puntoAnterior" class="form-input" formControlName="IdPuntoAnterior">
-                    <option [ngValue]="null">Al final de la ruta</option>
-                    @for (punto of puntosRuta(); track punto.Id_Punto) {
-                      <option [ngValue]="punto.Id_Punto">
-                        Después de {{ punto.NombrePunto || punto.Nombre_Punto }} · Posición {{ punto.posicion || punto.Posicion }}
-                      </option>
-                    }
-                  </select>
+                  <app-select inputId="puntoAnterior" formControlName="IdPuntoAnterior" [options]="positionSelectOptions()" />
                 </div>
               </div>
             } @else if (form.value.routeMode === 'new') {

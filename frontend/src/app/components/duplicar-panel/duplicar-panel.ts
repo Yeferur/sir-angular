@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../shared/select/select';
 import { ChangeDetectorRef, Component, inject, OnInit, signal, computed } from '@angular/core';
 import { isTourDateAvailable, toDateOnly } from '../../shared/utils/calendar-date';
 
@@ -32,7 +33,7 @@ type DuplicarPanelProps = {
 @Component({
   selector: 'app-duplicar-panel',
   standalone: true,
-  imports: [FormsModule, DatepickerComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, FormsModule, DatepickerComponent],
   templateUrl: './duplicar-panel.html',
   styleUrls: ['./duplicar-panel.css'],
 })
@@ -45,6 +46,7 @@ export class DuplicarPanelComponent implements OnInit {
   props: DuplicarPanelProps = {};
 
   tours: TourLite[] = [];
+  readonly compareSelectValues = compareSelectValuesAsStrings;
 
   // Form state
   Id_Tour = signal<number | null>(null);

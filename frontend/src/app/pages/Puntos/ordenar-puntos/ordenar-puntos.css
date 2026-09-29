@@ -74,23 +74,6 @@
   text-transform: uppercase;
 }
 
-.field select {
-  height: 44px;
-  padding: 0 12px;
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  outline: none;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-family: var(--font-family);
-  font-size: .94rem;
-}
-
-.field select:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .12);
-}
-
 .route-summary {
   display: flex;
   align-items: center;

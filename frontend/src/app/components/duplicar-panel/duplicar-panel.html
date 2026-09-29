@@ -3,13 +3,10 @@
   <p>Selecciona Tour y Fecha para la nueva reserva:</p>
 
   <div class="field">
-    <label>Tour</label>
-    <select [ngModel]="Id_Tour()" (ngModelChange)="onTourChange($event)">
-      <option [ngValue]="null" disabled selected>Seleccione un tour</option>
-      @for (t of tours; track t) {
-        <option [value]="t.Id_Tour">{{ t.Nombre_Tour }}</option>
-      }
-    </select>
+    <label for="duplicar-reserva-tour">Tour</label>
+    <app-select inputId="duplicar-reserva-tour" [options]="tours | selectOptions:'Id_Tour':'Nombre_Tour':true"
+      [compareWith]="compareSelectValues" placeholder="Seleccione un tour" [required]="true"
+      [ngModel]="Id_Tour()" (ngModelChange)="onTourChange($event)" />
   </div>
 
   <div class="field">

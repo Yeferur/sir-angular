@@ -78,15 +78,11 @@
           stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <path d="M3 6h18M7 12h10M10 18h4"/>
         </svg>
-        <select
-          aria-label="Filtrar puntos por ruta"
+        <app-select inputId="ver-puntos-ruta"
           [ngModel]="selectedRoute"
-          (ngModelChange)="onRouteChange($event)">
-          <option value="">Todas las rutas</option>
-          @for (ruta of rutas(); track ruta) {
-            <option [value]="ruta">{{ routeLabel(ruta) }}</option>
-          }
-        </select>
+          (ngModelChange)="onRouteChange($event)"
+          [options]="rutaSelectOptions()" [compareWith]="compareSelectValues"
+          ariaLabel="Filtrar puntos por ruta" placeholder="" />
       </div>
 
       <button

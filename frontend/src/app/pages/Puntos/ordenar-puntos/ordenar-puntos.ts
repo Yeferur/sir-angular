@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../../shared/select/select';
+import { computed, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -12,11 +13,16 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 @Component({
   selector: 'app-ordenar-puntos',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DragDropModule, LoadingStateComponent],
   templateUrl: './ordenar-puntos.html',
   styleUrls: ['./ordenar-puntos.css']
 })
 export class OrdenarPuntosComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  readonly rutaSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Seleccionar ruta...", disabled: true },
+      ...(this.rutas() || []).map((ruta: any) => ({ value: String(ruta), label: "Ruta " + String(ruta) }))]);
+
   private puntosSvc = inject(puntosService);
   private alerts = inject(SirAlertService);
   private router = inject(Router);

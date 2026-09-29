@@ -1,5 +1,7 @@
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { SirSelectComponent } from '../../shared/select/select';
 import { provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { PendientesComponent } from './pendientes';
@@ -33,13 +35,19 @@ describe('Pendientes: sincronización de Programación', () => {
     const c = fixture.componentInstance;
     c.reminderForm = { titulo: 'Texto sin guardar', fecha: '2099-10-15T12:00' };
     c.showReminderForm.set(true);
-    const item = { idPendiente: '10', titulo: 'Guatapé', prioridad: 'ALTA' };
+    const item = { idPendiente: '10', titulo: 'Guatapé', prioridad: 'ALTA', entidadTipo: 'RESERVA', entidadId: 'R-10', datos: {} };
     list.and.returnValue(of({ pendientes: [item], total: 1 }));
     events.next({ type: 'programacionNovedadesActualizadas' });
     expect(c.pending()[0].idPendiente).toBe('10');
+    c.activeTab.set('pendientes'); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const priority = fixture.debugElement.query(By.directive(SirSelectComponent)).componentInstance as SirSelectComponent;
+    priority.choose(2); fixture.detectChanges();
+    expect(c.priorityFilter()).toBe('ALTA');
+    expect(c.visiblePending().length).toBe(1);
     list.and.returnValue(of({ pendientes: [], total: 0 }));
     events.next({ type: 'programacionNovedadesActualizadas' });
     expect(c.pending()).toEqual([]);
+    expect(c.priorityFilter()).toBe('ALTA');
     expect(c.showReminderForm()).toBeTrue();
     expect(c.reminderForm.titulo).toBe('Texto sin guardar');
     c.postponeUntil = '2099-10-15T12:00';

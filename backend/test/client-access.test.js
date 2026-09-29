@@ -134,7 +134,12 @@ test('las rutas de Aforos no conservan autorizaciones alternativas de Inicio', (
 
 test('el middleware de Aforos rechaza permisos antiguos y conserva lectura/escritura específicas', async (t) => {
   const originalObtenerPermisos = permissionsService.obtenerPermisosPorUsuario;
-  t.after(() => { permissionsService.obtenerPermisosPorUsuario = originalObtenerPermisos; });
+  const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+  permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: 'test', usuario: '0', rol: '0' });
+  t.after(() => {
+    permissionsService.obtenerPermisosPorUsuario = originalObtenerPermisos;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
+  });
 
   let userId = 900000001;
   const run = async (permissions, required) => {

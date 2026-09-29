@@ -1,42 +1,39 @@
 <div class="programacion-page" [class.is-editor]="modoVista === 'editor' || modoVista === 'privados'">
   @if (modoVista === 'dashboard') {
     <header class="operation-header">
-      <div>
+      <div class="operation-date">
         <span class="operation-label">Operación del día</span>
-        <p>Listados, capacidad y distribución de pasajeros por servicio.</p>
+        <p>{{ fechaSeleccionada | date:"EEEE, d 'de' MMMM" : '' : 'es-CO' }}</p>
       </div>
 
-      <div class="date-control">
-        <label>Fecha de operación</label>
-        <div class="date-nav-control">
-          <button type="button" class="date-nav-btn" (click)="irDiaAnterior()" aria-label="Día anterior">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6"/>
-            </svg>
-          </button>
+      <div class="date-nav-control" role="group" aria-label="Fecha de operación">
+        <button type="button" class="date-nav-btn" (click)="irDiaAnterior()" aria-label="Día anterior">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
 
-          <div class="date-picker-wrap">
-            <app-datepicker
-              [ngModel]="fechaSeleccionada"
-              (dateChange)="onFechaOperacionSelected($event)">
-            </app-datepicker>
-          </div>
-
-          <button type="button" class="date-nav-btn" (click)="irDiaSiguiente()" aria-label="Día siguiente">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m9 18 6-6-6-6"/>
-            </svg>
-          </button>
-
-          <button type="button" class="date-shortcut-btn date-shortcut-btn--tomorrow" [class.active]="isTomorrowSelected()" (click)="irManana()">
-            {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
-          </button>
-          <button type="button" class="date-shortcut-btn date-shortcut-btn--today" [class.active]="isTodaySelected()" (click)="irHoy()">
-            Hoy
-          </button>
+        <div class="date-picker-wrap">
+          <app-datepicker
+            [ngModel]="fechaSeleccionada"
+            (dateChange)="onFechaOperacionSelected($event)">
+          </app-datepicker>
         </div>
+
+        <button type="button" class="date-nav-btn" (click)="irDiaSiguiente()" aria-label="Día siguiente">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </button>
+
+        <button type="button" class="date-shortcut-btn date-shortcut-btn--tomorrow" [class.active]="isTomorrowSelected()" (click)="irManana()">
+          {{ getTomorrowIso() | date:"d 'de' MMMM" : '' : 'es-CO' | titlecase }}
+        </button>
+        <button type="button" class="date-shortcut-btn date-shortcut-btn--today" [class.active]="isTodaySelected()" (click)="irHoy()">
+          Hoy
+        </button>
       </div>
     </header>
 

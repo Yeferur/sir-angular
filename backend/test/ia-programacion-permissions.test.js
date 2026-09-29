@@ -7,6 +7,8 @@ const permissionsMiddleware = require('../middlewares/permissionsMiddleware');
 
 const originalVerifyPermission = permissionsService.verificarPermiso;
 const originalGetPermissions = permissionsService.obtenerPermisosPorUsuario;
+const originalRevision = permissionsService.obtenerRevisionPermisosUsuario;
+permissionsService.obtenerRevisionPermisosUsuario = async () => ({ idRol: 'test', usuario: '0', rol: '0' });
 const originalGenerate = programacionService.generarPlanLogistico;
 const originalGetSaved = programacionService.obtenerListadoFinal;
 const originalSaveList = programacionService.guardarListadoFinal;
@@ -78,6 +80,7 @@ test('la simulación de Programación por IA exige CREAR y sigue siendo de solo 
   t.after(() => {
     permissionsService.verificarPermiso = originalVerifyPermission;
     permissionsService.obtenerPermisosPorUsuario = originalGetPermissions;
+    permissionsService.obtenerRevisionPermisosUsuario = originalRevision;
     programacionService.generarPlanLogistico = originalGenerate;
     programacionService.obtenerListadoFinal = originalGetSaved;
     programacionService.guardarListadoFinal = originalSaveList;

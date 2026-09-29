@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
@@ -75,12 +76,35 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 @Component({
   selector: 'app-editar-usuario',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, UppercaseInputDirective, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, ReactiveFormsModule, UppercaseInputDirective, LoadingStateComponent],
   templateUrl: './editar-usuario.html',
   styleUrls: ['../usuario-shared.css', '../usuario-wizard.css', './editar-usuario.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EditarUsuarioComponent implements OnInit, OnDestroy {
+  // Native [value]=null matches the string 'null', including preloaded/reset values.
+  readonly compareSelectValues = (a: unknown, b: unknown): boolean => String(a) === String(b);
+
+  private rolSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get rolSelectOptions(): SirSelectOption[] {
+    const source = this.roles;
+    if (this.rolSelectOptionsCache?.source !== source) {
+      this.rolSelectOptionsCache = { source, options: [{ value: "", label: "Selecciona un rol", disabled: true },
+      ...(this.roles || []).map((role: any) => ({ value: String(role.Id_Rol), label: String(role.Nombre_Rol) }))] };
+    }
+    return this.rolSelectOptionsCache.options;
+  }
+
+  private canalSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get canalSelectOptions(): SirSelectOption[] {
+    const source = this.canales;
+    if (this.canalSelectOptionsCache?.source !== source) {
+      this.canalSelectOptionsCache = { source, options: [{ value: String(null), label: "Sin asignar" },
+      ...(this.canales || []).map((canal: any) => ({ value: String(canal.idCanal), label: String(canal.nombreCanal) }))] };
+    }
+    return this.canalSelectOptionsCache.options;
+  }
+
   form: FormGroup;
   userId: string | null = null;
 

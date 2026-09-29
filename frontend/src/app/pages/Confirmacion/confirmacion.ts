@@ -1,3 +1,4 @@
+import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } from '../../shared/select/select';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -34,12 +35,24 @@ interface ReservaControlViaje {
 @Component({
   selector: 'app-confirmacion',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
   templateUrl: './confirmacion.html',
   styleUrl: './confirmacion.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ConfirmacionComponent implements OnInit {
+  readonly compareSelectValues = compareSelectValuesAsStrings;
+
+  private tourSelectOptionsCache?: { source: readonly any[]; options: SirSelectOption[] };
+  get tourSelectOptions(): SirSelectOption[] {
+    const source = this.toursList;
+    if (this.tourSelectOptionsCache?.source !== source) {
+      this.tourSelectOptionsCache = { source, options: [{ value: "", label: "Seleccionar tour", disabled: true },
+      ...(this.toursList || []).map((tour: any) => ({ value: String(tour.Id_Tour), label: String(tour.Nombre_Tour) }))] };
+    }
+    return this.tourSelectOptionsCache.options;
+  }
+
   private readonly permisosService = inject(PermisosService);
   private readonly toursService = inject(Tours);
   private readonly confirmacionService = inject(ConfirmacionService);

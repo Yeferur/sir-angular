@@ -178,31 +178,19 @@
                 <div class="form-grid route-fields">
                   <div class="form-group">
                     <label class="form-label" for="editarRutaExistente">Ruta <span class="required-star">*</span></label>
-                    <select
-                      id="editarRutaExistente"
-                      class="form-input"
-                      formControlName="rutaExistente"
-                      [class.errorInput]="routeStepAttempted && !routeSelectionIsValid()"
-                      (change)="onRutaExistenteChange($any($event.target).value)">
-                      @for (ruta of rutas(); track ruta) {
-                        <option [value]="ruta">Ruta {{ ruta }}</option>
-                      }
-                    </select>
+                    <app-select inputId="editarRutaExistente" formControlName="rutaExistente"
+                      [invalid]="routeStepAttempted && !routeSelectionIsValid()"
+                      (valueChange)="onRutaExistenteChange($event)"
+                      [options]="rutaSelectOptions()" [compareWith]="compareSelectValues"
+                      ariaLabel="Ruta existente" placeholder="" />
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="editarPuntoAnterior">Posición</label>
-                    <select
-                      id="editarPuntoAnterior"
-                      class="form-input"
-                      formControlName="IdPuntoAnterior"
-                      (change)="onPosicionChange()">
-                      <option [ngValue]="null">Al final de la ruta</option>
-                      @for (punto of puntosRuta(); track punto.Id_Punto) {
-                        <option [ngValue]="punto.Id_Punto">
-                          Después de {{ punto.NombrePunto || punto.Nombre_Punto }} · Posición {{ punto.posicion || punto.Posicion }}
-                        </option>
-                      }
-                    </select>
+                    <app-select inputId="editarPuntoAnterior" formControlName="IdPuntoAnterior"
+                      (valueChange)="onPosicionChange()"
+                      [options]="posicionSelectOptions()"
+                      ariaLabel="Insertar después de" placeholder=""
+                      [invalid]="!!(form.get('IdPuntoAnterior')?.touched && form.get('IdPuntoAnterior')?.invalid)" />
                   </div>
                 </div>
               } @else if (form.value.routeMode === 'new') {
