@@ -11,7 +11,7 @@
         <label><span>Salida a vacaciones</span><app-datepicker [ngModel]="vacation.fechaInicio" placeholder="Seleccionar fecha de salida" (dateChange)="updateStart($event || '')" /></label>
         <label><span>Último día de vacaciones</span><app-datepicker [ngModel]="vacation.fechaFin" [minDate]="vacation.fechaInicio" placeholder="Seleccionar último día" (dateChange)="update('fechaFin', $event || '')" /></label>
         <label><span>Regreso al trabajo</span><app-datepicker [ngModel]="vacation.fechaRegreso" [minDate]="vacation.fechaFin" placeholder="Seleccionar fecha de regreso" (dateChange)="update('fechaRegreso', $event || '')" /></label>
-        <label><span>Nota opcional</span><textarea rows="3" [ngModel]="vacation.observaciones" (ngModelChange)="update('observaciones', $event)"></textarea></label>
+        <label><span>Observaciones opcionales</span><textarea rows="3" [ngModel]="vacation.observaciones" (ngModelChange)="update('observaciones', $event)"></textarea></label>
       </div>
       @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
     </div>

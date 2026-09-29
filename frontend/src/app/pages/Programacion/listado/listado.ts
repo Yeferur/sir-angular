@@ -131,6 +131,7 @@ export class Listado implements OnInit, OnDestroy {
   novedadPosponerHasta = '';
   novedadGuardandoAccion = false;
   private novedadesTour: TourProgramacion | null = null;
+  private novedadesTransfersOpen = false;
   private readonly novedadesPanel = signal<ProgramacionNovedadesPanelState>({
     items: [], loading: false, error: '', posponerId: null, posponerHasta: '', guardando: false,
   });
@@ -285,6 +286,13 @@ export class Listado implements OnInit, OnDestroy {
     );
   }
 
+  get novedadesTransfers(): ProgramacionNovedad[] {
+    if (!this.canReadProgramacionNovedades) return [];
+    return this.novedadesProgramacion.filter(item =>
+      item.datos?.tipo === 'TRANSFER' && item.datos.fecha === this.fechaSeleccionada
+    );
+  }
+
   get novedadesPorTour(): Record<number, number> {
     return Object.fromEntries(this.toursDelDia.map(tour => [tour.Id_Tour, this.novedadesDelTour(tour).length]));
   }
@@ -292,6 +300,7 @@ export class Listado implements OnInit, OnDestroy {
   abrirNovedadesTour(tour: TourProgramacion): void {
     if (!this.novedadesDelTour(tour).length) return;
     this.novedadesTour = tour;
+    this.novedadesTransfersOpen = false;
     this.cancelarPosponerNovedad();
     this.actualizarNovedadesPanel();
     this.drawerService.openProgramacionListado({
@@ -308,8 +317,29 @@ export class Listado implements OnInit, OnDestroy {
     });
   }
 
+  abrirNovedadesTransfers(): void {
+    if (!this.novedadesTransfers.length) return;
+    this.novedadesTour = null;
+    this.novedadesTransfersOpen = true;
+    this.cancelarPosponerNovedad();
+    this.actualizarNovedadesPanel();
+    this.drawerService.openProgramacionListado({
+      tourName: 'Transfers',
+      operationDate: this.fechaSeleccionada,
+      novedades: this.novedadesPanel,
+      onRefresh: () => this.cargarNovedadesProgramacion(),
+      onViewTransfer: (id: string) => this.drawerService.openTransfer(id),
+      onReview: (item: ProgramacionNovedad) => this.marcarNovedadRevisada(item),
+      onPostpone: (item: ProgramacionNovedad) => this.iniciarPosponerNovedad(item),
+      onPostponeDate: (date: string) => { this.novedadPosponerHasta = date; this.actualizarNovedadesPanel(); },
+      onConfirmPostpone: (item: ProgramacionNovedad) => this.confirmarPosponerNovedad(item),
+      onCancelPostpone: () => this.cancelarPosponerNovedad(),
+    });
+  }
+
   private actualizarNovedadesPanel(): void {
-    const items = this.novedadesTour ? this.novedadesDelTour(this.novedadesTour) : [];
+    const items = this.novedadesTour ? this.novedadesDelTour(this.novedadesTour)
+      : this.novedadesTransfersOpen ? this.novedadesTransfers : [];
     if (this.novedadPosponerId && !items.some(item => item.idPendiente === this.novedadPosponerId)) {
       this.novedadPosponerId = null;
       this.novedadPosponerHasta = '';
@@ -321,6 +351,7 @@ export class Listado implements OnInit, OnDestroy {
   private cerrarNovedadesTour(): void {
     if (this.drawerService.drawer()?.props?.['novedades'] === this.novedadesPanel) this.drawerService.close(true);
     this.novedadesTour = null;
+    this.novedadesTransfersOpen = false;
   }
 
   private subscribeProgramacionNovedades(): void {
@@ -1136,7 +1167,8 @@ export class Listado implements OnInit, OnDestroy {
   }
 
   exportarTransfersDia(): void {
-    if (!this.canExportProgramacion || this.isExportingTransfers || this.transfersDia.totalTransfers === 0) return;
+    if (!this.canExportProgramacion || this.isExportingTransfers
+      || (this.transfersDia.totalTransfers === 0 && this.novedadesTransfers.length === 0)) return;
     this.isExportingTransfers = true;
     this.programacionService.exportarTransfersDia(this.fechaSeleccionada).pipe(
       finalize(() => {

@@ -1,6 +1,7 @@
 const { syncDomainStatePendings } = require('../services/Pendientes/domain-state-detector.service');
 const { processDueReminders } = require('../services/Recordatorios/recordatorios-trigger.service');
 const { processDuePendings } = require('../services/Pendientes/pendientes-trigger.service');
+const transferNovedades = require('../services/Programacion/programacion-transfers-novedades.service');
 
 const DEFAULT_INTERVAL_MS = 60 * 1000;
 let timer = null;
@@ -14,7 +15,7 @@ function getInterval(env = process.env) {
 
 async function execute() {
   if (activeRun) return activeRun;
-  activeRun = Promise.all([syncDomainStatePendings(), processDueReminders(), processDuePendings()])
+  activeRun = Promise.all([syncDomainStatePendings(), processDueReminders(), processDuePendings(), transferNovedades.syncSavedLists()])
     .catch((error) => {
       if (error?.code === 'ER_NO_SUCH_TABLE') {
         console.warn('[Pendientes] Falta aplicar la migración del módulo; la detección queda en espera.');

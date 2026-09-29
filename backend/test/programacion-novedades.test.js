@@ -469,6 +469,7 @@ test('la operación de Programación no permite posponer un pendiente de otra re
   assert.ok(captured.params.includes(79));
 });
 
-test('Transfers no se alertan sin un snapshot persistido que identifique qué se preparó', () => {
-  assert.match(service.describeTransferSupport(), /no guarda un snapshot ni una relación/);
+test('Transfers usa el listado exportado y consultar en vivo no crea referencia ni alertas', () => {
+  assert.match(service.describeTransferSupport(), /listado diario exportado/);
+  assert.match(service.describeTransferSupport(), /consultar en vivo no crea/);
 });

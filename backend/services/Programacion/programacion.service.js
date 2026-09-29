@@ -5,6 +5,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const { recordHistorial } = require('../Historial/logger');
+const transferNovedades = require('./programacion-transfers-novedades.service');
 const {
     generarPlanSombra,
     normalizarReservas: normalizarReservasSombra,
@@ -3032,32 +3033,7 @@ function resumirTransfersPorServicio(transfers = []) {
 
 async function obtenerTransfersProgramacion(fecha) {
     const fechaValida = validarFechaProgramacionTransfer(fecha);
-    const [rows] = await db.query(
-        `SELECT
-            tr.Id_Transfer,
-            CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
-            tr.Fecha_Transfer,
-            tr.Hora_Recogida,
-            tr.Estado,
-            tr.Punto_Salida,
-            tr.Punto_Destino,
-            tr.Nombre_Titular,
-            tr.Telefono_Titular,
-            tr.DNI,
-            tr.Cantidad_Personas,
-            tr.Vuelo,
-            tr.TipoVuelo,
-            tr.Observaciones,
-            COALESCE(NULLIF(s.Nombre_Servicio, ''), 'Sin servicio') AS Nombre_Servicio,
-            COALESCE(NULLIF(rg.Descripcion, ''), 'Sin rango') AS Rango_Descripcion
-         FROM transfers tr
-         LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
-         LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
-         WHERE tr.Fecha_Transfer = ?
-           AND LOWER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('cancelado', 'cancelada')
-         ORDER BY Nombre_Servicio ASC, tr.Id_Transfer ASC`,
-        [fechaValida]
-    );
+    const rows = await transferNovedades.loadRows(db, { fecha: fechaValida });
     const transfers = (rows || []).map((row) => {
         const normalizedTime = normalizarHoraProgramacionTransfer(row.Hora_Recogida);
         return {
@@ -3083,7 +3059,7 @@ async function obtenerTransfersProgramacion(fecha) {
     };
 }
 
-async function exportarTransfersProgramacion(fecha) {
+async function exportarTransfersProgramacion(fecha, userId = null) {
     const data = await obtenerTransfersProgramacion(fecha);
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Maxitours SIR';
@@ -3158,7 +3134,12 @@ async function exportarTransfersProgramacion(fecha) {
             if (rowNumber > (sheet === summary ? 5 : 4)) row.eachCell((cell) => { cell.border = border; });
         });
     }
-    return { buffer: await workbook.xlsx.writeBuffer(), fileName: `${data.fecha}_transfers.xlsx` };
+    const buffer = await workbook.xlsx.writeBuffer();
+    // Referencia exacta de los datos usados para generar este archivo; consultar
+    // el listado en vivo nunca confirma ni modifica la referencia preparada.
+    await transferNovedades.saveExportedList(data, userId);
+    await transferNovedades.syncForDate(data.fecha);
+    return { buffer, fileName: `${data.fecha}_transfers.xlsx` };
 }
 
 async function generarZipPrivados({ fecha, buses }) {

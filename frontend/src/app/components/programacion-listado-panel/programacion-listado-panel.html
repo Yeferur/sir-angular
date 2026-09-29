@@ -14,7 +14,7 @@
     }
     @if (detail.loading) { <p class="novelty-muted" role="status">Actualizando novedades…</p> }
     @if (!detail.items.length && !detail.loading && !detail.error) {
-      <p class="novelty-empty">No hay novedades pendientes para este tour y fecha.</p>
+      <p class="novelty-empty">No hay novedades pendientes para este listado y fecha.</p>
     }
     @for (reserva of reservasConCambios(); track reserva.id) {
       <section class="novelty-reservation" [attr.aria-label]="'Cambios de la reserva ' + reserva.id">
@@ -38,10 +38,34 @@
         }
       </section>
     }
+    @for (transfer of transfersConCambios(); track transfer.id) {
+      <section class="novelty-reservation" [attr.aria-label]="'Cambios del Transfer ' + transfer.id">
+        <header class="novelty-reservation__header">
+          <h2>Transfer TRS{{ transfer.id.padStart(5, '0') }}</h2>
+          @if (transferDisponible(transfer.changes)) {
+            <button type="button" class="novelty-open" (click)="props().onViewTransfer?.(transfer.id)">Ver transfer</button>
+          }
+        </header>
+        <div class="novelty-differences">
+          <div class="novelty-columns" aria-hidden="true"><span>Dato</span><span>Anterior</span><span>Actual</span></div>
+          @for (cambio of transfer.changes; track $index) {
+            <div class="novelty-change">
+              <strong>{{ cambio.campo === 'Notas' ? 'Observaciones' : cambio.campo }}</strong>
+              <span class="novelty-before"><span class="sr-only">Anterior: </span>{{ changeValue(cambio.anterior) }}</span>
+              <span class="novelty-after"><span class="sr-only">Actual: </span>{{ changeValue(cambio.actual) }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
     @for (item of detail.items; track item.idPendiente) {
-      <section class="novelty-followup" [attr.aria-label]="'Seguimiento de ' + item.datos.tourName">
-        <div class="novelty-muted">{{ item.datos.tourName }} · {{ item.datos.novedades.length }} {{ item.datos.novedades.length === 1 ? 'reserva' : 'reservas' }}</div>
-        @if (!item.datos.novedades.length) { <p>{{ item.descripcion }}</p> }
+      <section class="novelty-followup" [attr.aria-label]="'Seguimiento de ' + (item.datos.tipo === 'TRANSFER' ? 'Transfer ' + item.datos.transferId : item.datos.tourName)">
+        @if (item.datos.tipo === 'TRANSFER') {
+          <div class="novelty-muted">Transfer TRS{{ (item.datos.transferId || '').padStart(5, '0') }} · listado de {{ item.datos.fecha }}</div>
+        } @else {
+          <div class="novelty-muted">{{ item.datos.tourName }} · {{ item.datos.novedades.length }} {{ item.datos.novedades.length === 1 ? 'reserva' : 'reservas' }}</div>
+        }
+        @if (!item.datos.novedades?.length && item.datos.tipo !== 'TRANSFER') { <p>{{ item.descripcion }}</p> }
         @if (detail.posponerId === item.idPendiente) {
           <label class="novelty-postpone">Volver a mostrar
             <input type="datetime-local" [ngModel]="detail.posponerHasta" (ngModelChange)="props().onPostponeDate?.($event)" />

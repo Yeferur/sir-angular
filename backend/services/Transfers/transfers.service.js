@@ -4,6 +4,13 @@ const fs = require('fs');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
+const transferNovedades = require('../Programacion/programacion-transfers-novedades.service');
+
+function sincronizarListadoPreparado(idTransfer) {
+  void transferNovedades.syncForTransferChange(idTransfer).catch((error) => {
+    console.error('[Programacion] No se pudieron sincronizar novedades del Transfer:', error?.message || error);
+  });
+}
 
 const COMPROBANTE_TRANSFER_FILE_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -1249,6 +1256,7 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
 
     // Commit transacción
     await conn.commit();
+    sincronizarListadoPreparado(Id_Transfer);
 
     if (rutasPendientesEliminar.length > 0) {
       await Promise.all(
@@ -1309,6 +1317,7 @@ async function cancelarTransferSvc(Id_Transfer, userId = null) {
     });
 
     await conn.commit();
+    sincronizarListadoPreparado(Id_Transfer);
     return { Id_Transfer, Codigo_Transfer: formatoCodigoTransfer(Id_Transfer), Estado: 'Cancelado' };
   } catch (error) {
     await conn.rollback();
@@ -1381,6 +1390,8 @@ async function eliminarTransferSvc(Id_Transfer, userId = null, clientIp = null) 
 
     await conn.commit();
     committed = true;
+
+    sincronizarListadoPreparado(Id_Transfer);
 
     const resultadosEliminacion = await Promise.all(
       rutasComprobantes.map((ruta) => eliminarArchivoComprobanteTransferFisico(ruta).catch((error) => {

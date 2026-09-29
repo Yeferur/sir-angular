@@ -3,6 +3,7 @@ const cerebro = require('../../services/Programacion/programacion.service');
 const { obtenerResumenToursProgramacion } = require('../../services/inicio.service');
 const { recordHistorial } = require('../../services/Historial/logger');
 const programacionNovedades = require('../../services/Programacion/programacion-novedades.service');
+const transferNovedades = require('../../services/Programacion/programacion-transfers-novedades.service');
 const pendientesService = require('../../services/Pendientes/pendientes.service');
 const websocketManager = require('../../websocketManager');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
@@ -273,6 +274,7 @@ exports.listarNovedadesProgramacionController = async (req, res) => {
         if (!fecha) return sendError(res, { status: 400, message: 'La fecha es obligatoria.', errorCode: 'MISSING_PARAMS' });
         await programacionNovedades.listForUser(fecha, req.user.id);
         await programacionNovedades.syncForDate(fecha);
+        await transferNovedades.syncForDate(fecha);
         const novedades = await programacionNovedades.listForUser(fecha, req.user.id);
         return sendSuccess(res, { data: { novedades, total: novedades.length } });
     } catch (error) {
@@ -522,7 +524,7 @@ exports.obtenerTransfersProgramacionController = async (req, res) => {
 
 exports.exportarTransfersProgramacionController = async (req, res) => {
     try {
-        const resultado = await cerebro.exportarTransfersProgramacion(req.query?.fecha);
+        const resultado = await cerebro.exportarTransfersProgramacion(req.query?.fecha, req.user?.id || null);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${resultado.fileName}"`);
         res.send(resultado.buffer);

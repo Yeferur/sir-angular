@@ -28,6 +28,7 @@ interface ProgramacionListadoPanelProps {
   novedades?: Signal<ProgramacionNovedadesPanelState>;
   onRefresh?: () => void;
   onViewReservation?: (id: string) => void;
+  onViewTransfer?: (id: string) => void;
   onReview?: (item: ProgramacionNovedad) => void;
   onPostpone?: (item: ProgramacionNovedad) => void;
   onPostponeDate?: (date: string) => void;
@@ -66,9 +67,15 @@ export class ProgramacionListadoPanelComponent {
     }
     return [...groups.values()];
   });
+  readonly transfersConCambios = computed(() => (this.novedades()?.items || [])
+    .filter(item => item.datos?.tipo === 'TRANSFER' && item.datos.transferId)
+    .map(item => ({ id: String(item.datos.transferId), changes: item.datos.cambios || [] })));
 
   changeValue(value: unknown): string {
     return value == null || String(value).trim() === '' ? 'Sin dato' : String(value);
+  }
+  transferDisponible(changes: ProgramacionNovedadCambio[]): boolean {
+    return !changes.some(change => change.campo === 'Transfer');
   }
   readonly totalPax = computed(() =>
     this.props().buses?.reduce((total, bus) => total + Number(bus.ocupados || 0), 0) || 0

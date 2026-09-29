@@ -19,9 +19,11 @@ export class ProgramacionTransfersComponent {
   data = input.required<TransfersProgramacionResponse>();
   exporting = input(false);
   canExport = input(false);
+  novedadesCount = input(0);
 
   closeRequested = output<void>();
   exportRequested = output<void>();
+  novedadesRequested = output<void>();
 
   searchTerm = '';
   selectedService = '';

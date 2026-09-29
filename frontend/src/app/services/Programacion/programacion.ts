@@ -98,6 +98,10 @@ export interface ProgramacionNovedad {
     programacionId: string;
     tourId: number | null;
     tourName: string;
+    tipo?: 'TRANSFER';
+    transferId?: string;
+    revisionListado?: string;
+    cambios?: ProgramacionNovedadCambio[];
     novedades: Array<{
       reservationId: string;
       changes: ProgramacionNovedadCambio[];

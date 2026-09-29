@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "db:migrate:programacion-transfers": "node scripts/migrate-programacion-transfers.js",
+    "test:programacion-transfers:mysql": "node --test test/programacion-transfers.mysql.test.js",
     "test": "node --test",
     "db:backup": "node scripts/backup-database.js",
     "db:migrate:permissions-cache": "node scripts/run-migration.js 20260920_revision_cache_permisos.sql",

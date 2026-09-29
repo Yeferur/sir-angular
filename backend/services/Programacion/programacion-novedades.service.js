@@ -522,6 +522,7 @@ async function resolveStaleForDate(connection, fecha, expectedKeys, eligibleUser
        INNER JOIN reglas_pendientes r ON r.Id_Regla = p.Id_Regla
       WHERE r.Codigo = ? AND p.Estado = 'ACTIVO'
         AND p.Entidad_Tipo = 'PROGRAMACION_CAMBIO'
+        AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.Datos, '$.tipo')), '') <> 'TRANSFER'
         AND JSON_UNQUOTE(JSON_EXTRACT(p.Datos, '$.fecha')) = ?`,
     [RULE_CODE, fecha]
   );
@@ -649,7 +650,7 @@ async function hasRequiredPermissions(userId) {
 }
 
 function describeTransferSupport() {
-  return 'Transfers no generan novedades: la programación actual no guarda un snapshot ni una relación entre transfers preparados y programaciones.';
+  return 'Transfers compara su listado diario exportado con snapshots persistidos; consultar en vivo no crea una referencia ni alertas.';
 }
 
 module.exports = {

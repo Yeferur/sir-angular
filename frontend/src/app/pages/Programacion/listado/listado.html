@@ -128,9 +128,11 @@
       <app-programacion-transfers
         [operationDate]="fechaSeleccionada"
         [data]="transfersDia"
+        [novedadesCount]="novedadesTransfers.length"
         [exporting]="isExportingTransfers"
         [canExport]="canExportProgramacion"
         (closeRequested)="volverAlDashboard()"
+        (novedadesRequested)="abrirNovedadesTransfers()"
         (exportRequested)="exportarTransfersDia()">
       </app-programacion-transfers>
     }
