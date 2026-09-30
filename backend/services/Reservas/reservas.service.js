@@ -610,21 +610,6 @@ function validarReglasPasajerosPorTour(payload) {
   }
 }
 
-async function ensureDisponibilidadTable(conn) {
-  await conn.query(
-    `CREATE TABLE IF NOT EXISTS Disponibilidad (
-      Id_Disponibilidad BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      Id_Tour BIGINT UNSIGNED NOT NULL,
-      Fecha_Tour DATE NOT NULL,
-      Cupos_Totales INT NOT NULL DEFAULT 0,
-      Cupos_Disponibles INT NOT NULL DEFAULT 0,
-      Updated_At DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      PRIMARY KEY (Id_Disponibilidad),
-      UNIQUE KEY ux_disponibilidad_tour_fecha (Id_Tour, Fecha_Tour)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-  );
-}
-
 async function obtenerCupoTotalBase(conn, idTour, fechaTour) {
   const [cupoRows] = await conn.query(
     `SELECT COALESCE(
@@ -706,11 +691,10 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
 }
 
 async function bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId = null) {
-  await ensureDisponibilidadTable(conn);
 
   const [rows] = await conn.query(
     `SELECT Cupos_Totales, Cupos_Disponibles
-       FROM Disponibilidad
+       FROM disponibilidad
       WHERE Id_Tour = ? AND Fecha_Tour = ?
       FOR UPDATE`,
     [idTour, fechaTour]
@@ -728,14 +712,14 @@ async function bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId 
   const cuposDisponibles = Math.max(0, cupoTotal - ocupados);
 
   await conn.query(
-    `INSERT INTO Disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
+    `INSERT INTO disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
      VALUES (?, ?, ?, ?)`,
     [idTour, fechaTour, cupoTotal, cuposDisponibles]
   );
 
   const [rows2] = await conn.query(
     `SELECT Cupos_Totales, Cupos_Disponibles
-       FROM Disponibilidad
+       FROM disponibilidad
       WHERE Id_Tour = ? AND Fecha_Tour = ?
       FOR UPDATE`,
     [idTour, fechaTour]
@@ -763,7 +747,7 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
 
   const restantes = efectivos - Number(cantidadNueva || 0);
   await conn.query(
-    `UPDATE Disponibilidad
+    `UPDATE disponibilidad
         SET Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
       WHERE Id_Tour = ? AND Fecha_Tour = ?`,
     [restantes, idTour, fechaTour]
@@ -782,7 +766,7 @@ async function liberarCuposReserva({ conn, impacto }) {
   );
 
   await conn.query(
-    `UPDATE Disponibilidad
+    `UPDATE disponibilidad
         SET Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
       WHERE Id_Tour = ? AND Fecha_Tour = ?`,
     [nuevosDisponibles, impacto.idTour, impacto.fechaTour]

@@ -7,6 +7,7 @@
     "test:programacion-transfers:mysql": "node --test test/programacion-transfers.mysql.test.js",
     "test": "node --test",
     "db:backup": "node scripts/backup-database.js",
+    "db:release:sir2": "node scripts/release-migrate-sir2.js",
     "db:migrate:permissions-cache": "node scripts/run-migration.js 20260920_revision_cache_permisos.sql",
     "test:permissions-cache:mysql": "node --test test/permissions-cache.mysql.test.js",
     "test:programacion-shadow": "node --test test/programacion-shadow.optimizer.test.js",

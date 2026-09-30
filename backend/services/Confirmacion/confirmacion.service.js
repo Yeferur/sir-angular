@@ -2,33 +2,6 @@ const db = require('../../database/db');
 const { recordHistorial } = require('../Historial/logger');
 
 const MAX_CAMBIOS = 1500;
-let jornadaSchemaPromise = null;
-
-function ensureJornadaSchema() {
-  if (!jornadaSchemaPromise) {
-    jornadaSchemaPromise = db.query(
-      `CREATE TABLE IF NOT EXISTS confirmaciones_jornada (
-        Id_Confirmacion BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        Id_Tour BIGINT UNSIGNED NOT NULL,
-        Fecha_Tour DATE NOT NULL,
-        Total_Pasajeros INT UNSIGNED NOT NULL DEFAULT 0,
-        Total_Viajaron INT UNSIGNED NOT NULL DEFAULT 0,
-        Total_No_Viajaron INT UNSIGNED NOT NULL DEFAULT 0,
-        Confirmada_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        Confirmada_Por BIGINT UNSIGNED NULL,
-        PRIMARY KEY (Id_Confirmacion),
-        UNIQUE KEY ux_confirmaciones_jornada_tour_fecha (Id_Tour, Fecha_Tour),
-        KEY idx_confirmaciones_jornada_fecha (Fecha_Tour),
-        KEY idx_confirmaciones_jornada_usuario (Confirmada_Por)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-    ).catch((error) => {
-      jornadaSchemaPromise = null;
-      throw error;
-    });
-  }
-  return jornadaSchemaPromise;
-}
-
 function serviceError(message, status = 400, errorCode = 'VALIDATION_ERROR', details = null) {
   const error = new Error(message);
   error.status = status;
@@ -138,7 +111,6 @@ async function obtenerEstadoConfirmacion(fechaValue, idTourValue = null) {
     }
   }
 
-  await ensureJornadaSchema();
   const params = [Fecha];
   const tourCondition = Id_Tour ? 'AND H.Id_Tour = ?' : '';
   if (Id_Tour) params.push(Id_Tour);
@@ -177,7 +149,6 @@ async function actualizarConfirmacion(payload, userId = null) {
   const cambios = normalizarCambios(payload?.pasajeros);
   const ids = cambios.map((item) => item.Id_Pasajero);
   const placeholders = ids.map(() => '?').join(',');
-  await ensureJornadaSchema();
   const conn = await db.getConnection();
 
   try {
@@ -292,5 +263,4 @@ module.exports = {
   normalizarCambios,
   validarFiltros,
   normalizarEstadoJornadas,
-  ensureJornadaSchema,
 };

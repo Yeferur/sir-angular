@@ -1,7 +1,5 @@
 const db = require('../../database/db');
 
-let historialIdRegistroSchemaPromise = null;
-
 function normalizeOptionalUserId(idUsuario) {
   if (idUsuario === null || idUsuario === undefined) return null;
 
@@ -20,49 +18,6 @@ function normalizeOptionalUserId(idUsuario) {
   }
 
   return null;
-}
-
-async function ensureHistorialCambiosTable(conn) {
-  await conn.query(
-    `CREATE TABLE IF NOT EXISTS historial_cambios (
-      Id_Cambio BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      Tabla VARCHAR(100) NOT NULL,
-      Id_Registro VARCHAR(50) DEFAULT NULL,
-      Id_Usuario BIGINT UNSIGNED DEFAULT NULL,
-      Cambio_JSON JSON NOT NULL,
-      IP_Cliente VARCHAR(64) DEFAULT NULL,
-      Fecha_Registro DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-      PRIMARY KEY (Id_Cambio),
-      KEY idx_historial_cambios_tabla (Tabla),
-      KEY idx_historial_cambios_registro (Id_Registro),
-      KEY idx_historial_cambios_usuario (Id_Usuario)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-  );
-}
-
-async function ensureHistorialIdRegistroTextColumn() {
-  if (!historialIdRegistroSchemaPromise) {
-    historialIdRegistroSchemaPromise = (async () => {
-      const [rows] = await db.query(
-        `SELECT DATA_TYPE
-           FROM INFORMATION_SCHEMA.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = 'historial'
-            AND COLUMN_NAME = 'Id_Registro'
-          LIMIT 1`
-      );
-
-      const dataType = String(rows?.[0]?.DATA_TYPE || '').toLowerCase();
-      if (dataType !== 'varchar' && dataType !== 'text' && dataType !== 'mediumtext' && dataType !== 'longtext') {
-        await db.query('ALTER TABLE historial MODIFY COLUMN Id_Registro VARCHAR(50) NULL');
-      }
-    })().catch((error) => {
-      historialIdRegistroSchemaPromise = null;
-      throw error;
-    });
-  }
-
-  return historialIdRegistroSchemaPromise;
 }
 
 function normalizeHistorialInput(input, maybeData = {}) {
@@ -87,8 +42,6 @@ async function registrarHistorial(input, maybeData = {}) {
   const conn = data.conexion || await db.getConnection();
 
   try {
-    await ensureHistorialIdRegistroTextColumn();
-
     // En tablas con FK a usuarios, usar NULL cuando no exista usuario válido
     const safeUser = normalizeOptionalUserId(data.id_usuario);
     const safeRegistro = (data.id_registro == null || data.id_registro === '') ? null : String(data.id_registro);
@@ -186,8 +139,6 @@ async function recordHistorialCambioReserva({
   const useExternalConn = !!conexion;
   const conn = conexion || await db.getConnection();
   try {
-    await ensureHistorialCambiosTable(conn);
-
     const payload = {
       estadoAnterior: estado_anterior,
       estadoNuevo: estado_nuevo,
@@ -213,4 +164,4 @@ async function recordHistorialCambioReserva({
   }
 }
 
-module.exports = { registrarHistorial, recordHistorial, logSistema, recordHistorialCambioReserva, ensureHistorialCambiosTable };
+module.exports = { registrarHistorial, recordHistorial, logSistema, recordHistorialCambioReserva };

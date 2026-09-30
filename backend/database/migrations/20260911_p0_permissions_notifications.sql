@@ -1,5 +1,13 @@
-ALTER TABLE notificaciones
-  MODIFY COLUMN Entidad_Id varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+SET @sql_notificaciones_entidad_id = IF(
+  EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notificaciones'
+            AND COLUMN_NAME = 'Entidad_Id' AND COLUMN_TYPE = 'varchar(80)'),
+  'DO 0',
+  'ALTER TABLE notificaciones MODIFY COLUMN Entidad_Id varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL'
+);
+PREPARE stmt_notificaciones_entidad_id FROM @sql_notificaciones_entidad_id;
+EXECUTE stmt_notificaciones_entidad_id;
+DEALLOCATE PREPARE stmt_notificaciones_entidad_id;
 
 INSERT INTO permisos (Accion, Codigo_Permiso, Descripcion, Modulo_Permiso)
 VALUES
