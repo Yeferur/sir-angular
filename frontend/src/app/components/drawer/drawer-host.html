@@ -11,6 +11,8 @@
        aria-modal="true"
        tabindex="-1"
        [class.is-closing]="drawerSvc.closing()"
+       [class.is-replacing-exit]="drawerSvc.replacePhase() === 'exit'"
+       [class.is-replacing-enter]="drawerSvc.replacePhase() === 'enter'"
        (keydown)="onPanelKeydown($event)"
        [attr.aria-label]="drawer()!.type === 'reserva' ? 'Detalle de reserva' :
                           drawer()!.type === 'transfer' ? 'Detalle de transfer' :

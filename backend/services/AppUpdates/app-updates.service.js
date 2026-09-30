@@ -1,10 +1,10 @@
 const db = require('../../database/db');
 
 const CURRENT_RELEASE = Object.freeze({
-  version: 'v1.2.0-beta',
+  version: 'v1.3.0-beta',
   title: 'SIR tiene una nueva actualización',
   message: 'Consulta los cambios y mejoras disponibles en esta versión.',
-  publishedAt: '2026-09-22',
+  publishedAt: '2026-09-30',
 });
 
 async function publishCurrentRelease(release = CURRENT_RELEASE) {

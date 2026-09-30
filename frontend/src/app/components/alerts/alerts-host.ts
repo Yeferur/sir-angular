@@ -71,12 +71,13 @@ export class SirAlertsHostComponent implements OnDestroy {
     const queued = this.alertSvc.toasts();
     const visibleIds = new Set(this.visibleToasts.map((toast) => toast.id));
     const available = queued.filter((toast) => !visibleIds.has(toast.id));
-    const normalSlots = Math.max(0, 3 - this.visibleToasts.filter(toast => !toast.operational).length);
+    const reservedOperationalSlots = Math.min(3, available.filter(toast => toast.operational).length);
+    const normalSlots = Math.max(0, 3 - this.visibleToasts.length - reservedOperationalSlots);
     for (const toast of available.filter(item => !item.operational).slice(0, normalSlots)) {
       this.mountToast(toast);
     }
 
-    const operationalSlots = Math.max(0, 3 - this.visibleToasts.filter(toast => toast.operational).length);
+    const operationalSlots = Math.max(0, 3 - this.visibleToasts.length);
     if (!operationalSlots || this.operationalMountTimer) return;
     const nextOperational = available
       .filter(item => item.operational)
@@ -130,7 +131,7 @@ export class SirAlertsHostComponent implements OnDestroy {
 
     this.dialogWasOpen = dialogOpen;
     if (!dialogOpen
-      && this.visibleToasts.filter(toast => toast.operational).length < 3
+      && this.visibleToasts.length < 3
       && this.alertSvc.toasts().some(toast => toast.operational)) {
       this.requestOperationalRetry();
     }
@@ -149,10 +150,6 @@ export class SirAlertsHostComponent implements OnDestroy {
 
   get operationalToasts(): ToastView[] {
     return this.visibleToasts.filter(toast => toast.operational);
-  }
-
-  get regularToasts(): ToastView[] {
-    return this.visibleToasts.filter(toast => !toast.operational);
   }
 
   pauseToast(id: string): void {
@@ -352,7 +349,7 @@ export class SirAlertsHostComponent implements OnDestroy {
   }
 
   private mountOperationalBatch(): void {
-    const slots = Math.max(0, 3 - this.visibleToasts.filter(toast => toast.operational).length);
+    const slots = Math.max(0, 3 - this.visibleToasts.length);
     if (!slots) return;
     const visibleIds = new Set(this.visibleToasts.map(toast => toast.id));
     this.alertSvc.toasts()

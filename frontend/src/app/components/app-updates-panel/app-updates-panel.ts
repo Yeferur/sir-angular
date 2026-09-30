@@ -14,9 +14,16 @@ export class AppUpdatesPanelComponent implements OnInit {
   private drawer = inject(SirDrawerService);
   private notifications = inject(NotificacionesService);
 
-  readonly version = 'v1.2.0-beta';
+  readonly version = 'v1.3.0-beta';
   readonly status = 'Fase beta';
-  readonly date = 'Agosto 2026';
+  readonly date = 'Septiembre 2026';
+
+  readonly currentHighlights = [
+    'Avisos reúne pendientes, recordatorios y novedades con acciones directas.',
+    'Puedes crear recordatorios personales y elegir si también deseas recibirlos por correo.',
+    'Los avisos de escritorio te informan de situaciones relevantes cuando SIR no está visible.',
+    'Programación advierte cambios relevantes en reservas o transfers después de preparar los listados.',
+  ];
 
   readonly mainNotice =
     'SIR recibió una renovación integral de su operación, diseño y seguridad. Reservas, transfers, tours, puntos, programación, control de viaje, informes, usuarios y turnos ahora trabajan bajo una experiencia más clara y consistente. La aplicación aún se encuentra en fase beta, por lo que pueden presentarse errores o inconsistencias que deben ser reportados.';

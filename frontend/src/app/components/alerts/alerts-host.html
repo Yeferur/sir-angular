@@ -87,14 +87,8 @@
     </article>
  </ng-template>
 
-<section class="sir-toast-region sir-toast-region--regular" aria-label="Mensajes de la aplicación" aria-live="polite" aria-relevant="additions">
-  @for (toast of regularToasts; track toast.id) {
-    <ng-container [ngTemplateOutlet]="toastCard" [ngTemplateOutletContext]="{ $implicit: toast }" />
-  }
-</section>
-
-<section class="sir-toast-region sir-toast-region--operational" aria-label="Avisos operativos" aria-live="polite" aria-relevant="additions">
-  @for (toast of operationalToasts; track toast.id) {
+<section class="sir-toast-region" aria-label="Avisos de la aplicación" aria-live="polite" aria-relevant="additions">
+  @for (toast of visibleToasts; track toast.id) {
     <ng-container [ngTemplateOutlet]="toastCard" [ngTemplateOutletContext]="{ $implicit: toast }" />
   }
 </section>

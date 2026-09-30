@@ -28,6 +28,27 @@ describe('SirAlertsHostComponent', () => {
     fixture.destroy();
   });
 
+  it('sitúa éxito y avisos operativos en un único stack superior de tres', () => {
+    const fixture = TestBed.createComponent(SirAlertsHostComponent);
+    const alerts = TestBed.inject(SirAlertService);
+    fixture.detectChanges();
+
+    alerts.successToast('Avisos de escritorio activados', '', 10_000);
+    alerts.notify({ type: 'warning', title: 'Pendiente', operational: true, durationMs: 10_000 });
+    alerts.notify({ type: 'info', title: 'Recordatorio', operational: true, durationMs: 10_000 });
+    alerts.infoToast('Mensaje adicional', '', 10_000);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const region = fixture.nativeElement.querySelector('.sir-toast-region') as HTMLElement;
+    expect(fixture.nativeElement.querySelectorAll('.sir-toast-region').length).toBe(1);
+    expect(region.querySelectorAll('.sir-toast').length).toBeLessThanOrEqual(3);
+    expect(getComputedStyle(region).top).toBe('78px');
+    const bounds = region.getBoundingClientRect();
+    expect(bounds.left + bounds.width / 2).toBeCloseTo(document.documentElement.clientWidth / 2, 0);
+    fixture.destroy();
+  });
+
   it('abre Recordar más tarde con el selector de minutos libres', () => {
     const fixture = TestBed.createComponent(SirAlertsHostComponent);
     const alerts = TestBed.inject(SirAlertService);

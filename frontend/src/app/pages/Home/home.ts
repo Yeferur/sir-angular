@@ -106,20 +106,23 @@ export class HomeComponent implements OnInit {
     this.listenForConnectionState();
   }
 
-  get homeActivityItems() {
-    const representedByProcesses = new Set([
-      'CONTROL_VIAJE_CIERRE_PENDIENTE', 'PROGRAMACION_NO_ACTIVA',
-      'SEGUROS_INCOMPLETOS', 'COMISIONES_PENDIENTES',
-    ]);
-    return this.activity.pendientesAtendibles()
-      .filter(item => !representedByProcesses.has(item.regla))
-      .slice(0, 2);
+  get homeAttentionItems() {
+    return [
+      ...this.activity.pendientesAtendibles().map(item => ({
+        id: item.idPendiente, kind: 'pendientes' as const,
+        title: item.titulo, priority: item.prioridad,
+      })),
+      ...this.activity.recordatoriosVencidos().map(item => ({
+        id: item.idRecordatorio, kind: 'recordatorios' as const,
+        title: item.titulo, priority: 'ALTA',
+      })),
+    ].slice(0, 2);
   }
 
   // La API distingue client, management y advisor; operations es una capacidad
   // transversal que depende de permisos, no un cuarto modo de perfil.
   get showNotices(): boolean {
-    return this.activity.attentionCount() > 0 || this.homeActivityItems.length > 0
+    return this.activity.attentionCount() > 0 || this.homeAttentionItems.length > 0
       || !!this.activity.nextReminder() || !!this.activity.error();
   }
 

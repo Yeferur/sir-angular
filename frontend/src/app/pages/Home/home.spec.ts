@@ -46,7 +46,8 @@ describe('Home por perfil y datos disponibles', () => {
     summary = baseSummary();
     activity = {
       start: jasmine.createSpy('start'),
-      pendientesAtendibles: signal<any[]>([]), attentionCount: signal(0),
+      pendientesAtendibles: signal<any[]>([]), recordatoriosVencidos: signal<any[]>([]),
+      feedNotifications: signal<any[]>([]), attentionCount: signal(0),
       nextReminder: signal<any>(null), loading: signal(false), loaded: signal(true), error: signal(''),
       open: jasmine.createSpy('open'), refresh: jasmine.createSpy('refresh'),
     };
@@ -82,7 +83,58 @@ describe('Home por perfil y datos disponibles', () => {
     expect(page.textContent).not.toContain('Abrir informes');
   });
 
-  it('resume avisos sin repetir procesos y adapta aforos y actividad real', async () => {
+  it('explica un único pendiente de Comisiones aunque exista su proceso operativo', async () => {
+    summary.operations.processes = [
+      { id: 'commissions', label: 'Comisiones', count: 77, description: '', route: '/Comisiones', permission: 'COMISIONES.LEER' },
+    ];
+    activity.pendientesAtendibles.set([
+      { regla: 'COMISIONES_PENDIENTES', idPendiente: 'comisiones', titulo: '77 reservas con comisiones pendientes', prioridad: 'ALTA' },
+    ]);
+    activity.attentionCount.set(1);
+    const page = await render();
+    expect(page.querySelector('.notice-count')?.textContent).toContain('1');
+    expect(page.querySelectorAll('.notice-preview-item').length).toBe(1);
+    expect(page.querySelector('.notice-preview-item')?.textContent).toContain('77 reservas con comisiones pendientes');
+    page.querySelector<HTMLButtonElement>('.notice-preview-item')!.click();
+    expect(activity.open).toHaveBeenCalledWith('pendientes', 'comisiones');
+  });
+
+  it('muestra dos situaciones de Programación y Reserva y limita tres o más a dos', async () => {
+    activity.pendientesAtendibles.set([
+      { regla: 'PROGRAMACION_NO_ACTIVA', idPendiente: 'programacion', titulo: 'Revisar programación', prioridad: 'ALTA' },
+      { regla: 'RESERVA_CAMBIO', idPendiente: 'reserva', titulo: 'Revisar reserva', prioridad: 'MEDIA' },
+      { regla: 'COMISIONES_PENDIENTES', idPendiente: 'comisiones', titulo: 'Revisar comisiones', prioridad: 'BAJA' },
+    ]);
+    activity.attentionCount.set(3);
+    const page = await render();
+    const rows = Array.from(page.querySelectorAll('.notice-preview-item'));
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toContain('Revisar programación');
+    expect(rows[1].textContent).toContain('Revisar reserva');
+    expect(page.querySelector('.notice-count')?.textContent).toContain('3');
+    activity.pendientesAtendibles.set(activity.pendientesAtendibles().slice(0, 2));
+    activity.attentionCount.set(2);
+    fixture.detectChanges();
+    expect(page.querySelectorAll('.notice-preview-item').length).toBe(2);
+  });
+
+  it('explica un recordatorio vencido y no cuenta una novedad informativa', async () => {
+    activity.recordatoriosVencidos.set([{ idRecordatorio: 'recordatorio', titulo: 'Llamar al cliente' }]);
+    activity.attentionCount.set(1);
+    let page = await render();
+    expect(page.querySelector('.notice-preview-item')?.textContent).toContain('Llamar al cliente');
+    page.querySelector<HTMLButtonElement>('.notice-preview-item')!.click();
+    expect(activity.open).toHaveBeenCalledWith('recordatorios', 'recordatorio');
+
+    fixture.destroy();
+    activity.recordatoriosVencidos.set([]);
+    activity.feedNotifications.set([{ tipo: 'APP_UPDATE', titulo: 'Novedad de SIR' }]);
+    activity.attentionCount.set(0);
+    page = await render();
+    expect(page.querySelector('.notice-summary-card')).toBeNull();
+  });
+
+  it('muestra los avisos aunque también tengan acceso en Procesos y adapta aforos y actividad real', async () => {
     summary.operations.processes = [
       { id: 'programming', label: 'Programación', count: 2, description: '', route: '/Programacion/Listado', permission: 'PROGRAMACION.LEER' },
       { id: 'insurance', label: 'Seguros', count: 0, description: '', route: '/Seguros', permission: 'SEGUROS.LEER' },
@@ -99,7 +151,7 @@ describe('Home por perfil y datos disponibles', () => {
     ]);
     activity.attentionCount.set(2);
     const page = await render();
-    expect(page.querySelectorAll('.notice-preview-item').length).toBe(1);
+    expect(page.querySelectorAll('.notice-preview-item').length).toBe(2);
     expect(page.querySelectorAll('.process-card').length).toBe(2);
     expect(page.querySelectorAll('.process-count').length).toBe(1);
     expect(page.querySelectorAll('.capacity-item').length).toBe(1);
@@ -168,7 +220,8 @@ describe('Home por perfil y datos disponibles', () => {
     page.style.width = '1024px';
     await new Promise(resolve => requestAnimationFrame(resolve));
     const invite = page.querySelector<HTMLElement>('.desktop-invite')!;
-    expect(invite.textContent).toContain('Recibe avisos aunque SIR no esté visible');
+    expect(invite.textContent).toContain('Activar avisos de escritorio');
+    expect(invite.textContent).toContain('selecciona «Permitir» en el navegador.');
     expect(invite.getBoundingClientRect().height).toBeLessThan(90);
     expect(getComputedStyle(invite).display).toBe('flex');
     expect(desktop.toggle).not.toHaveBeenCalled();
@@ -196,6 +249,9 @@ describe('Home por perfil y datos disponibles', () => {
       date: '2026-09-30', capacity: 20, occupied: 18, percentage: 90, status: 'critical' }];
     summary.operations.recentActivity = [{ Accion: 'ACTUALIZAR_ASISTENCIA', Tabla: 'reservas',
       Id_Registro: 1, Fecha_Hora_Registro: '2026-09-29T12:00:00Z' }];
+    activity.pendientesAtendibles.set([
+      { regla: 'COMISIONES_PENDIENTES', idPendiente: 'comisiones', titulo: 'Revisar comisiones', prioridad: 'ALTA' },
+    ]);
     activity.attentionCount.set(1);
     desktop.onboardingEligible.set(true);
     const host = await render();

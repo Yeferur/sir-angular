@@ -9,24 +9,20 @@
   pointer-events: none;
 }
 
-/* Los mensajes comunes permanecen en la esquina; los operativos tienen una
-   superficie propia debajo de la isla superior. */
 .sir-toast-region {
   position: fixed;
-  width: min(370px, calc(100vw - 28px));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-}
-
-.sir-toast-region--regular { right: 18px; bottom: 18px; }
-.sir-toast-region--operational {
   top: 78px;
   left: 50%;
   width: min(560px, calc(100vw - 32px));
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
 }
+
+.sir-toast:not(.sir-toast--operational) { max-width: 370px; }
 
 .sir-toast {
   --tone: var(--sir-info);
@@ -447,8 +443,7 @@
 @keyframes sirSpin { to { transform: rotate(360deg); } }
 
 @media (max-width: 560px) {
-  .sir-toast-region--regular { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
-  .sir-toast-region--operational { top: 70px; width: calc(100vw - 20px); }
+  .sir-toast-region { top: 70px; width: calc(100vw - 20px); }
   .sir-toast {
     grid-template-columns: 32px minmax(0, 1fr) 25px;
     gap: 8px;

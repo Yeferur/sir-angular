@@ -33,8 +33,8 @@
       <section class="desktop-invite" aria-label="Avisos de escritorio">
         <i class="bx bx-desktop" aria-hidden="true"></i>
         <div class="desktop-invite-copy">
-          <strong>Recibe avisos aunque SIR no esté visible</strong>
-          <p>SIR puede mostrarte recordatorios y avisos importantes mientras trabajas en otra pestaña o aplicación.</p>
+          <strong>Activar avisos de escritorio</strong>
+          <p>Para recibir avisos cuando SIR no esté visible, activa el permiso y selecciona «Permitir» en el navegador.</p>
         </div>
         <div class="desktop-invite-actions">
           <button type="button" (click)="dismissDesktopInvite()">Ahora no</button>
@@ -50,7 +50,7 @@
           <button type="button" class="text-action" (click)="navigate('/Pendientes')">Ver todos los avisos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
         </header>
 
-        <article class="notice-summary-card" [class.notice-summary-card--solo]="!homeActivityItems.length && !activity.nextReminder()">
+        <article class="notice-summary-card" [class.notice-summary-card--solo]="!homeAttentionItems.length && !activity.nextReminder()">
           @if (activity.loading() && !activity.loaded()) {
             <app-loading-state mode="loading" label="Consultando tus avisos…" [showSlowMessage]="false" />
           } @else if (activity.error() && !activity.loaded()) {
@@ -62,14 +62,14 @@
               <i class="bx bx-chevron-right" aria-hidden="true"></i>
             </button>
 
-            @if (homeActivityItems.length || activity.nextReminder()) {
-            <div class="notice-preview" [class.notice-preview--single]="!activity.nextReminder() || !homeActivityItems.length">
-              @if (homeActivityItems.length) {
+            @if (homeAttentionItems.length || activity.nextReminder()) {
+            <div class="notice-preview" [class.notice-preview--single]="!activity.nextReminder() || !homeAttentionItems.length">
+              @if (homeAttentionItems.length) {
               <div class="notice-priority-list">
-                @for (item of homeActivityItems; track item.idPendiente) {
-                  <button type="button" class="notice-preview-item" (click)="activity.open('pendientes', item.idPendiente)">
-                    <span class="activity-priority-dot" [attr.data-priority]="item.prioridad"></span>
-                    <span><strong>{{ item.titulo }}</strong></span>
+                @for (item of homeAttentionItems; track item.kind + item.id) {
+                  <button type="button" class="notice-preview-item" (click)="activity.open(item.kind, item.id)">
+                    <span class="activity-priority-dot" [attr.data-priority]="item.priority"></span>
+                    <span><strong>{{ item.title }}</strong></span>
                     <i class="bx bx-chevron-right" aria-hidden="true"></i>
                   </button>
                 }

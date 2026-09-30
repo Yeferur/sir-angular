@@ -1,6 +1,9 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap");
 
+::selection { background: var(--accent-blue); color: var(--text-on-accent); }
+::-moz-selection { background: var(--accent-blue); color: var(--text-on-accent); }
+
 /*========== VARIABLES CSS ==========*/
 :root {
   --content-padding-inline: 24px;

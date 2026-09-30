@@ -37,6 +37,9 @@ export class SirDrawerService {
   private _closing = signal(false);
   readonly closing = this._closing.asReadonly();
   private closeTimer?: ReturnType<typeof setTimeout>;
+  private _replacePhase = signal<'exit' | 'enter' | null>(null);
+  readonly replacePhase = this._replacePhase.asReadonly();
+  private replaceTimer?: ReturnType<typeof setTimeout>;
 
   readonly isOpen = () => !!this._drawer();
 
@@ -44,6 +47,27 @@ export class SirDrawerService {
     if (this.closeTimer) clearTimeout(this.closeTimer);
     this.closeTimer = undefined;
     this._closing.set(false);
+    if (this.replaceTimer) clearTimeout(this.replaceTimer);
+    this.replaceTimer = undefined;
+    const currentType = this._drawer()?.type;
+    const switchingActivity = currentType !== drawer.type
+      && (currentType === 'mi-actividad' || currentType === 'app-updates')
+      && (drawer.type === 'mi-actividad' || drawer.type === 'app-updates');
+    const reduceMotion = typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (switchingActivity && !reduceMotion) {
+      this._replacePhase.set('exit');
+      this.replaceTimer = setTimeout(() => {
+        this._drawer.set(drawer);
+        this._replacePhase.set('enter');
+        this.replaceTimer = setTimeout(() => {
+          this._replacePhase.set(null);
+          this.replaceTimer = undefined;
+        }, 260);
+      }, 90);
+      return;
+    }
+    this._replacePhase.set(null);
     this._drawer.set(drawer);
   }
 
@@ -94,6 +118,9 @@ export class SirDrawerService {
 
   close(immediate = false): void {
     if (!this._drawer() || this._closing()) return;
+    if (this.replaceTimer) clearTimeout(this.replaceTimer);
+    this.replaceTimer = undefined;
+    this._replacePhase.set(null);
 
     const reduceMotion = typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

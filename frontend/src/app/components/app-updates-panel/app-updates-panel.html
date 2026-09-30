@@ -20,6 +20,14 @@
   </header>
 
   <div class="updates-scroll">
+    <article class="update-card current-changes-card">
+      <span class="card-kicker">Esta actualización</span>
+      <h3>Novedades de esta actualización</h3>
+      <ul>
+        <li *ngFor="let highlight of currentHighlights">{{ highlight }}</li>
+      </ul>
+    </article>
+
     <article class="hero-card">
       <span class="status-pill">{{ status }}</span>
       <h3>SIR sigue en fase beta</h3>

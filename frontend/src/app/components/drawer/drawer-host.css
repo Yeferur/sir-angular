@@ -42,6 +42,21 @@
 
   animation: drawerSlideIn 0.26s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
   transform-origin: right center;
+  transition: width 0.24s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.sir-drawer-panel.is-replacing-exit > * {
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+
+.sir-drawer-panel.is-replacing-enter > * {
+  animation: drawerContentIn 180ms ease 80ms both;
+}
+
+@keyframes drawerContentIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes drawerSlideIn {
@@ -134,6 +149,8 @@
   .sir-drawer-panel.is-closing {
     animation-name: drawerSlideOut;
   }
+
+  .sir-drawer-panel { transition: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -142,4 +159,10 @@
   .sir-drawer-panel.is-closing {
     animation: none;
   }
+  .sir-drawer-panel.is-replacing-exit > *,
+  .sir-drawer-panel.is-replacing-enter > * {
+    animation: none;
+    transition: none;
+  }
+  .sir-drawer-panel { transition: none; }
 }
