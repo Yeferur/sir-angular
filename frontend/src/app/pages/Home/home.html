@@ -20,12 +20,73 @@
     />
   } @else {
     <section class="welcome-card" aria-labelledby="home-title">
-      <div class="profile-mark" aria-hidden="true">{{ initials }}</div>
+      <div class="profile-mark" aria-hidden="true">
+        @if (summary.profile.avatar) { <img [src]="summary.profile.avatar" alt="" /> } @else { {{ initials }} }
+      </div>
       <div class="welcome-copy">
         <h1 id="home-title">{{ greeting }}, {{ firstName }}</h1>
         <p>{{ dayLabel(summary.dates.today) }}</p>
       </div>
     </section>
+
+    @if (showDesktopInvite) {
+      <section class="desktop-invite" aria-label="Avisos de escritorio">
+        <i class="bx bx-desktop" aria-hidden="true"></i>
+        <div class="desktop-invite-copy">
+          <strong>Recibe avisos aunque SIR no esté visible</strong>
+          <p>SIR puede mostrarte recordatorios y avisos importantes mientras trabajas en otra pestaña o aplicación.</p>
+        </div>
+        <div class="desktop-invite-actions">
+          <button type="button" (click)="dismissDesktopInvite()">Ahora no</button>
+          <button type="button" class="desktop-invite-enable" [disabled]="activatingDesktopInvite" (click)="activateDesktopInvite()">Activar</button>
+        </div>
+      </section>
+    }
+
+    @if (showNotices) {
+      <section class="home-section" aria-labelledby="notices-title">
+        <header class="section-heading">
+          <div><h2 id="notices-title">Avisos</h2></div>
+          <button type="button" class="text-action" (click)="navigate('/Pendientes')">Ver todos los avisos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
+        </header>
+
+        <article class="notice-summary-card" [class.notice-summary-card--solo]="!homeActivityItems.length && !activity.nextReminder()">
+          @if (activity.loading() && !activity.loaded()) {
+            <app-loading-state mode="loading" label="Consultando tus avisos…" [showSlowMessage]="false" />
+          } @else if (activity.error() && !activity.loaded()) {
+            <app-loading-state mode="error" label="No pudimos consultar Avisos" [detail]="activity.error()" (action)="activity.refresh(true)" />
+          } @else {
+            <button type="button" class="notice-count" (click)="activity.open()">
+              <strong>{{ activity.attentionCount() }}</strong>
+              <span>Por atender</span>
+              <i class="bx bx-chevron-right" aria-hidden="true"></i>
+            </button>
+
+            @if (homeActivityItems.length || activity.nextReminder()) {
+            <div class="notice-preview" [class.notice-preview--single]="!activity.nextReminder() || !homeActivityItems.length">
+              @if (homeActivityItems.length) {
+              <div class="notice-priority-list">
+                @for (item of homeActivityItems; track item.idPendiente) {
+                  <button type="button" class="notice-preview-item" (click)="activity.open('pendientes', item.idPendiente)">
+                    <span class="activity-priority-dot" [attr.data-priority]="item.prioridad"></span>
+                    <span><strong>{{ item.titulo }}</strong></span>
+                    <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                  </button>
+                }
+              </div>
+              }
+              @if (activity.nextReminder(); as reminder) {
+                <button type="button" class="notice-next-reminder" (click)="activity.open('recordatorios', reminder.idRecordatorio)">
+                  <span><small>Próximo recordatorio</small><strong>{{ reminder.titulo }}</strong><time>{{ (reminder.siguienteTrigger || reminder.fecha) | date:'d MMM, h:mm a' }}</time></span>
+                  <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                </button>
+              }
+            </div>
+            }
+          }
+        </article>
+      </section>
+    }
 
     @if (summary.profile.mode === 'advisor') {
       <section class="home-section advisor-shift-section" aria-labelledby="my-shift-title">
@@ -39,7 +100,6 @@
               <strong>{{ scheduleError }}</strong>
             } @else {
               <h2 id="my-shift-title">{{ todayShiftLabel }}</h2>
-              <small>Horario de Bogotá · Administrado por tu equipo autorizado</small>
             }
           </div>
           @if (!scheduleLoading && !scheduleError) {
@@ -50,49 +110,6 @@
           <button type="button" class="advisor-shift-action" (click)="navigate('/MiHorario')">
             Ver semana <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
           </button>
-        </article>
-      </section>
-    }
-
-    @if (activity.isAvailable) {
-      <section class="home-section" aria-labelledby="notices-title">
-        <header class="section-heading">
-          <div><h2 id="notices-title">Avisos</h2></div>
-          <button type="button" class="text-action" (click)="navigate('/Pendientes')">Ver todos los avisos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
-        </header>
-
-        <article class="notice-summary-card">
-          @if (activity.loading() && !activity.loaded()) {
-            <app-loading-state mode="loading" label="Consultando tus avisos…" [showSlowMessage]="false" />
-          } @else if (activity.error() && !activity.loaded()) {
-            <app-loading-state mode="error" label="No pudimos consultar Avisos" [detail]="activity.error()" (action)="activity.refresh(true)" />
-          } @else {
-            <button type="button" class="notice-count" (click)="activity.open()">
-              <strong>{{ activity.attentionCount() }}</strong>
-              <span>Por atender</span>
-              <i class="bx bx-chevron-right" aria-hidden="true"></i>
-            </button>
-
-            <div class="notice-preview" [class.notice-preview--single]="!activity.nextReminder()">
-              <div class="notice-priority-list">
-                @for (item of homeActivityItems; track item.idPendiente) {
-                  <button type="button" class="notice-preview-item" (click)="activity.open('pendientes', item.idPendiente)">
-                    <span class="activity-priority-dot" [attr.data-priority]="item.prioridad"></span>
-                    <span><strong>{{ item.titulo }}</strong></span>
-                    <i class="bx bx-chevron-right" aria-hidden="true"></i>
-                  </button>
-                } @empty {
-                  <div class="notice-preview-empty"><i class="bx bx-check-circle"></i><span>Sin avisos personales prioritarios.</span></div>
-                }
-              </div>
-              @if (activity.nextReminder(); as reminder) {
-                <button type="button" class="notice-next-reminder" (click)="activity.open('recordatorios', reminder.idRecordatorio)">
-                  <span><small>Próximo recordatorio</small><strong>{{ reminder.titulo }}</strong><time>{{ (reminder.siguienteTrigger || reminder.fecha) | date:'d MMM, h:mm a' }}</time></span>
-                  <i class="bx bx-chevron-right" aria-hidden="true"></i>
-                </button>
-              }
-            </div>
-          }
         </article>
       </section>
     }
@@ -116,7 +133,7 @@
               <span class="quick-icon"><i [class]="action.icon" aria-hidden="true"></i></span>
               <span class="quick-copy">
                 <strong>{{ action.label }}</strong>
-                <small>{{ action.detail }}</small>
+                @if (action.detail) { <small>{{ action.detail }}</small> }
               </span>
               <i class="bx bx-chevron-right quick-arrow" aria-hidden="true"></i>
             </button>
@@ -130,11 +147,6 @@
         <div>
           <h2 id="overview-title">Hoy y mañana</h2>
         </div>
-        @if (summary.capabilities.canReadAforos) {
-          <button type="button" class="text-action" (click)="navigate('/Aforos')">
-            Ver aforos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-          </button>
-        }
       </header>
 
       <div class="day-grid">
@@ -149,14 +161,10 @@
           <div class="metric-grid">
             @for (metric of overviewMetrics(summary.overview.today); track metric.label + metric.detail) {
               <div class="metric">
-                <span class="metric-icon"><i [class]="metric.icon" aria-hidden="true"></i></span>
                 <div>
                   <strong [countUp]="metric.value"></strong>
                   <span>{{ metric.label }}</span>
-                  <small>
-                    @if (metric.detailValue !== undefined) { <span [countUp]="metric.detailValue"></span> }
-                    {{ metric.detail }}
-                  </small>
+                  @if (metric.detail) { <small><span [countUp]="metric.detailValue || 0"></span> {{ metric.detail }}</small> }
                 </div>
               </div>
             }
@@ -169,19 +177,14 @@
               <span class="day-kicker">Mañana</span>
               <h3>{{ dayLabel(summary.overview.tomorrow.date) }}</h3>
             </div>
-            <span class="badge home-badge home-badge--neutral home-badge--date"><i class="bx bx-calendar" aria-hidden="true"></i> Próxima jornada</span>
           </header>
           <div class="metric-grid">
             @for (metric of overviewMetrics(summary.overview.tomorrow); track metric.label + metric.detail) {
               <div class="metric">
-                <span class="metric-icon"><i [class]="metric.icon" aria-hidden="true"></i></span>
                 <div>
                   <strong [countUp]="metric.value"></strong>
                   <span>{{ metric.label }}</span>
-                  <small>
-                    @if (metric.detailValue !== undefined) { <span [countUp]="metric.detailValue"></span> }
-                    {{ metric.detail }}
-                  </small>
+                  @if (metric.detail) { <small><span [countUp]="metric.detailValue || 0"></span> {{ metric.detail }}</small> }
                 </div>
               </div>
             }
@@ -190,7 +193,7 @@
       </div>
     </section>
 
-    @if (!summary.capabilities.management) {
+    @if (showPersonalWork) {
       <section class="home-section" aria-labelledby="agenda-title">
         <header class="section-heading">
           <div>
@@ -206,13 +209,11 @@
               <span [countUp]="summary.personalWork.pendingReservations"></span>
               {{ summary.personalWork.pendingReservations === 1 ? 'reserva pendiente' : 'reservas pendientes' }}
             </span>
-          } @else {
-            <span class="badge badge--success home-badge"><i class="bx bx-check" aria-hidden="true"></i> Sin pendientes</span>
           }
         </header>
 
-        <div class="work-grid" [class.work-grid--single]="summary.capabilities.clientMode">
-          @if (summary.capabilities.canReadReservations) {
+        <div class="work-grid">
+          @if (summary.capabilities.canReadReservations && summary.personalWork.upcomingReservations.length) {
           <article class="list-card">
             <header class="card-header">
               <div>
@@ -255,7 +256,7 @@
 
           }
 
-          @if (summary.capabilities.canReadTransfers) {
+          @if (summary.capabilities.canReadTransfers && summary.personalWork.upcomingTransfers.length) {
           <article class="list-card">
             <header class="card-header">
               <div>
@@ -297,7 +298,7 @@
       </section>
     }
 
-    @if (summary.capabilities.operations) {
+    @if (summary.capabilities.operations && summary.operations.processes.length) {
       <section class="home-section" aria-labelledby="attention-title">
         <header class="section-heading">
           <div>
@@ -305,7 +306,6 @@
           </div>
         </header>
 
-        @if (summary.operations.processes.length) {
           <div class="process-grid">
             @for (process of summary.operations.processes; track process.id) {
               <button
@@ -324,35 +324,32 @@
                 </span>
                 <span class="process-copy">
                   <strong>{{ process.label }}</strong>
-                  <small>Abrir módulo</small>
                 </span>
+                @if (process.count > 0) {
+                  <span class="process-count">{{ process.count }} pendiente{{ process.count === 1 ? '' : 's' }}</span>
+                }
                 <i class="bx bx-chevron-right process-arrow" aria-hidden="true"></i>
               </button>
             }
           </div>
-        } @else {
-          <div class="inline-empty"><i class="bx bx-check-circle" aria-hidden="true"></i> No hay procesos operativos pendientes para tu perfil.</div>
-        }
       </section>
     }
 
-    @if (!summary.capabilities.clientMode) {
+    @if (showDetails) {
     <section class="home-section home-section--last" aria-labelledby="detail-title">
       <header class="section-heading">
         <div>
           <h2 id="detail-title">
-            {{ summary.capabilities.management ? 'Alertas y actividad reciente' : 'Actividad reciente' }}
+            {{ showCapacityAlerts && recentActivityItems.length ? 'Alertas y actividad reciente' : showCapacityAlerts ? 'Alertas de aforo' : 'Actividad reciente' }}
           </h2>
         </div>
-        @if (summary.capabilities.canReadReports) {
-          <button type="button" class="text-action" (click)="navigate('/Informes')">
-            Abrir informes <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-          </button>
+        @if (summary.capabilities.management && summary.operations.recentActivity.length) {
+          <button type="button" class="text-action" (click)="navigate('/Historial')">Ver historial</button>
         }
       </header>
 
-      <div class="detail-grid" [class.detail-grid--single]="!summary.capabilities.management">
-        @if (summary.capabilities.management) {
+      <div class="detail-grid">
+        @if (showCapacityAlerts) {
           <article class="list-card">
             <header class="card-header">
               <div>
@@ -364,7 +361,6 @@
               }
             </header>
 
-            @if (summary.operations.capacityAlerts.length) {
               <div class="item-list">
                 @for (alert of summary.operations.capacityAlerts; track alert.tourId + '-' + alert.date) {
                   <button type="button" class="capacity-item" (click)="navigate('/Aforos')">
@@ -393,30 +389,13 @@
                   </button>
                 }
               </div>
-            } @else {
-              <div class="compact-empty compact-empty--success">
-                <i class="bx bx-check-circle" aria-hidden="true"></i>
-                <strong>Aforos bajo control</strong>
-                <span>No hay tours sobre el 80% de ocupación en los próximos 7 días.</span>
-              </div>
-            }
           </article>
         }
 
+        @if (recentActivityItems.length) {
         <article class="list-card">
-          <header class="card-header">
-            <div>
-              <span class="card-icon card-icon--green"><i class="bx bx-pulse" aria-hidden="true"></i></span>
-              <div><h3>Actividad reciente</h3><p>{{ summary.capabilities.management ? 'Últimas acciones realizadas por el equipo' : 'Tus acciones más recientes' }}</p></div>
-            </div>
-            @if (summary.capabilities.management && summary.operations.recentActivity.length) {
-              <button type="button" (click)="navigate('/Historial')">Ver historial</button>
-            }
-          </header>
-
-          @if ((summary.capabilities.management ? summary.operations.recentActivity : summary.personalWork.recentActivity).length) {
             <div class="activity-list">
-              @for (activity of (summary.capabilities.management ? summary.operations.recentActivity : summary.personalWork.recentActivity); track $index) {
+              @for (activity of recentActivityItems; track $index) {
                 <div class="activity-item">
                   <span class="activity-icon"><i [class]="activityIcon(activity)" aria-hidden="true"></i></span>
                   <span class="activity-copy">
@@ -429,14 +408,8 @@
                 </div>
               }
             </div>
-          } @else {
-            <div class="compact-empty">
-              <i class="bx bx-pulse" aria-hidden="true"></i>
-              <strong>Aún no hay actividad reciente</strong>
-              <span>Los cambios realizados aparecerán aquí.</span>
-            </div>
-          }
         </article>
+        }
       </div>
     </section>
     }

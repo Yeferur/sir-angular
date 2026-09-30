@@ -57,6 +57,79 @@ describe('DesktopNotificationsService', () => {
     expect(desktop.enabled()).toBeTrue();
   });
 
+  it('ofrece la invitación solo con permiso pendiente y sin una preferencia anterior', () => {
+    FakeNotification.permission = 'default';
+    const desktop = service();
+    desktop.configureUser('7');
+    expect(desktop.onboardingEligible()).toBeTrue();
+    expect(requested).toBe(0);
+
+    localStorage.setItem('sir.desktop-notifications.enabled:7', '0');
+    desktop.refreshPermissionState();
+    expect(desktop.onboardingEligible()).toBeFalse();
+    localStorage.removeItem('sir.desktop-notifications.enabled:7');
+    FakeNotification.permission = 'granted';
+    desktop.refreshPermissionState();
+    expect(desktop.onboardingEligible()).toBeFalse();
+    FakeNotification.permission = 'denied';
+    desktop.refreshPermissionState();
+    expect(desktop.onboardingEligible()).toBeFalse();
+    expect(desktop.state()).toBe('blocked');
+  });
+
+  it('Ahora no persiste por usuario en el navegador, incluso tras recarga y logout/login', () => {
+    FakeNotification.permission = 'default';
+    const desktop = service();
+    desktop.configureUser('7');
+    desktop.dismissOnboarding();
+    expect(desktop.onboardingEligible()).toBeFalse();
+    expect(requested).toBe(0);
+    expect(localStorage.getItem('sir.desktop-notifications.enabled:7')).toBeNull();
+
+    desktop.clearSession();
+    desktop.configureUser('7');
+    expect(desktop.onboardingEligible()).toBeFalse();
+    const reloaded = service();
+    reloaded.configureUser('7');
+    expect(reloaded.onboardingEligible()).toBeFalse();
+    reloaded.configureUser('8');
+    expect(reloaded.onboardingEligible()).toBeTrue();
+  });
+
+  it('Activar desde la invitación habilita Perfil si se concede el permiso', async () => {
+    FakeNotification.permission = 'default';
+    const desktop = service();
+    desktop.configureUser('7');
+    expect(await desktop.toggle()).toBe('enabled');
+    expect(requested).toBe(1);
+    expect(desktop.onboardingEligible()).toBeFalse();
+    expect(desktop.state()).toBe('enabled');
+    expect(localStorage.getItem('sir.desktop-notifications.enabled:7')).toBe('1');
+  });
+
+  it('retira la invitación si el navegador deniega el permiso', async () => {
+    FakeNotification.permission = 'default';
+    spyOn(FakeNotification, 'requestPermission').and.callFake(async () => {
+      requested += 1;
+      FakeNotification.permission = 'denied';
+      return 'denied';
+    });
+    const desktop = service();
+    desktop.configureUser('7');
+    expect(await desktop.toggle()).toBe('denied');
+    expect(requested).toBe(1);
+    expect(desktop.onboardingEligible()).toBeFalse();
+    expect(desktop.state()).toBe('blocked');
+  });
+
+  it('no invita cuando el navegador carece de Notifications API', () => {
+    delete (window as Window & { Notification?: typeof Notification }).Notification;
+    const desktop = service();
+    desktop.configureUser('7');
+    expect(desktop.onboardingEligible()).toBeFalse();
+    expect(desktop.state()).toBe('unsupported');
+  });
+
   it('muestra una sola notificación aunque dos pestañas reciban el mismo evento', async () => {
     FakeNotification.permission = 'granted';
     localStorage.setItem('sir.desktop-notifications.enabled:7', '1');

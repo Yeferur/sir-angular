@@ -26,6 +26,7 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state'
 import { CountUpDirective } from '../Aforos/count-up.directive';
 import { MiJornadaSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facade';
+import { DesktopNotificationsService } from '../../services/Notificaciones/desktop-notifications.service';
 
 const UPDATE_FEEDBACK_MS = 1100;
 
@@ -59,7 +60,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 interface QuickAction {
   label: string;
-  detail: string;
+  detail?: string;
   icon: string;
   route: string;
   visible: boolean;
@@ -82,6 +83,7 @@ export class HomeComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly turnosService = inject(TurnosService);
   readonly activity = inject(MiActividadFacade);
+  readonly desktopNotifications = inject(DesktopNotificationsService);
 
   summary: HomeSummary | null = null;
   loading = true;
@@ -92,6 +94,7 @@ export class HomeComponent implements OnInit {
   mySchedule: MiJornadaSemana | null = null;
   scheduleLoading = false;
   scheduleError = '';
+  activatingDesktopInvite = false;
   private refreshTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackTimer?: ReturnType<typeof setTimeout>;
   private updateFeedbackStartTimer?: ReturnType<typeof setTimeout>;
@@ -111,6 +114,54 @@ export class HomeComponent implements OnInit {
     return this.activity.pendientesAtendibles()
       .filter(item => !representedByProcesses.has(item.regla))
       .slice(0, 2);
+  }
+
+  // La API distingue client, management y advisor; operations es una capacidad
+  // transversal que depende de permisos, no un cuarto modo de perfil.
+  get showNotices(): boolean {
+    return this.activity.attentionCount() > 0 || this.homeActivityItems.length > 0
+      || !!this.activity.nextReminder() || !!this.activity.error();
+  }
+
+  get showDesktopInvite(): boolean {
+    return this.summary?.profile.mode !== 'client' && this.desktopNotifications.onboardingEligible();
+  }
+
+  get showPersonalWork(): boolean {
+    return !!this.summary && !this.summary.capabilities.management
+      && ((this.summary.capabilities.canReadReservations && this.summary.personalWork.upcomingReservations.length > 0)
+        || (this.summary.capabilities.canReadTransfers && this.summary.personalWork.upcomingTransfers.length > 0));
+  }
+
+  get recentActivityItems(): HomeActivity[] {
+    if (!this.summary || this.summary.capabilities.clientMode) return [];
+    const source = this.summary.capabilities.management
+      ? this.summary.operations.recentActivity : this.summary.personalWork.recentActivity;
+    return source.slice(0, 5);
+  }
+
+  get showCapacityAlerts(): boolean {
+    return !!this.summary?.capabilities.management && this.summary.capabilities.canReadAforos
+      && this.summary.operations.capacityAlerts.length > 0;
+  }
+
+  get showDetails(): boolean {
+    return this.showCapacityAlerts || this.recentActivityItems.length > 0;
+  }
+
+  dismissDesktopInvite(): void {
+    this.desktopNotifications.dismissOnboarding();
+  }
+
+  async activateDesktopInvite(): Promise<void> {
+    if (this.activatingDesktopInvite) return;
+    this.activatingDesktopInvite = true;
+    try {
+      await this.desktopNotifications.toggle();
+    } finally {
+      this.activatingDesktopInvite = false;
+      this.cdr.markForCheck();
+    }
   }
 
   get firstName(): string {
@@ -143,7 +194,6 @@ export class HomeComponent implements OnInit {
     return [
       {
         label: 'Nueva reserva',
-        detail: 'Registrar una reserva para un tour.',
         icon: 'bx bx-calendar-plus',
         route: '/Reservas/NuevaReserva',
         visible: capabilities.canCreateReservations,
@@ -151,49 +201,46 @@ export class HomeComponent implements OnInit {
       },
       {
         label: 'Nuevo transfer',
-        detail: 'Programar un servicio de traslado.',
         icon: 'bx bx-car',
         route: '/Transfers/NuevoTransfer',
         visible: capabilities.canCreateTransfers,
       },
       {
         label: 'Reservas',
-        detail: 'Consultar y gestionar las reservas.',
+        detail: 'Consultar y gestionar',
         icon: 'bx bx-list-ul',
         route: '/Reservas/VerReservas',
         visible: capabilities.canReadReservations,
       },
       {
         label: 'Aforos',
-        detail: 'Consultar la disponibilidad de los tours.',
+        detail: 'Disponibilidad de tours',
         icon: 'bx bxs-dashboard',
         route: '/Aforos',
         visible: capabilities.canReadAforos,
       },
       {
         label: 'Programación',
-        detail: 'Consultar y preparar listados de pasajeros y buses.',
+        detail: 'Listados de pasajeros',
         icon: 'bx bx-list-check',
         route: '/Programacion/Listado',
         visible: capabilities.canReadProgramming,
       },
       {
         label: 'Informes',
-        detail: 'Consultar informes operativos y administrativos.',
+        detail: 'Resultados de operación',
         icon: 'bx bx-line-chart',
         route: '/Informes',
         visible: capabilities.canReadReports,
       },
       {
         label: 'Mi perfil',
-        detail: 'Actualizar mis datos personales.',
         icon: 'bx bx-user-circle',
         route: '/Perfil/Editar',
         visible: capabilities.clientMode,
       },
       {
         label: 'Mi horario',
-        detail: 'Consultar mi jornada de trabajo.',
         icon: 'bx bx-time-five',
         route: '/MiHorario',
         visible: this.summary?.profile.mode === 'advisor',
@@ -257,12 +304,16 @@ export class HomeComponent implements OnInit {
     this.navigate('/Transfers/VerTransfers');
   }
 
-  overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail: string; detailValue?: number; icon: string }> {
+  overviewMetrics(day: HomeDayOverview): Array<{ label: string; value: number; detail?: string; detailValue?: number }> {
     const metrics = [
-      { label: 'Reservas', value: day.reservations, detail: 'privadas', detailValue: day.privateReservations, icon: 'bx bx-calendar-check' },
-      { label: 'Pasajeros', value: day.passengers, detail: 'privados', detailValue: day.privatePassengers, icon: 'bx bx-group' },
-      { label: 'Transfers', value: day.transfers, detail: 'servicios', icon: 'bx bx-car' },
-      { label: 'Pasajeros', value: day.transferPassengers, detail: 'en transfers', icon: 'bx bx-user-voice' },
+      { label: 'Reservas', value: day.reservations,
+        detail: day.privateReservations > 0 ? 'privadas' : undefined,
+        detailValue: day.privateReservations > 0 ? day.privateReservations : undefined },
+      { label: 'Pasajeros', value: day.passengers,
+        detail: day.privatePassengers > 0 ? 'privados' : undefined,
+        detailValue: day.privatePassengers > 0 ? day.privatePassengers : undefined },
+      { label: 'Transfers', value: day.transfers },
+      { label: 'Pasajeros de transfers', value: day.transferPassengers },
     ];
     return this.summary?.capabilities.canReadTransfers ? metrics : metrics.slice(0, 2);
   }

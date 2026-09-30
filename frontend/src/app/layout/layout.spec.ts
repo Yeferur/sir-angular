@@ -25,6 +25,7 @@ describe('Navegación superior', () => {
   let notificationClear: jasmine.Spy;
   let events: Subject<any>;
   let desktopToggle: jasmine.Spy;
+  let desktopState: ReturnType<typeof signal<'enabled' | 'disabled' | 'blocked'>>;
   const allPermissions = [
     'RESERVAS.LEER', 'RESERVAS.CREAR', 'CONTROL_VIAJE.LEER',
     'TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TOURS.LEER', 'TOURS.CREAR',
@@ -48,6 +49,7 @@ describe('Navegación superior', () => {
     notificationClear = jasmine.createSpy('notificationClear');
     events = new Subject<any>();
     desktopToggle = jasmine.createSpy('desktopToggle').and.resolveTo('enabled');
+    desktopState = signal<'enabled' | 'disabled' | 'blocked'>('disabled');
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
@@ -77,7 +79,7 @@ describe('Navegación superior', () => {
         } },
         { provide: DesktopNotificationsService, useValue: {
           supported: signal(true), permission: signal('granted'), enabled: signal(false),
-          state: signal('disabled'),
+          state: desktopState,
           configureUser: jasmine.createSpy('desktopConfigureUser'), clearSession: jasmine.createSpy('desktopClearSession'),
           toggle: desktopToggle,
         } },
@@ -276,5 +278,16 @@ describe('Navegación superior', () => {
     button.click();
     await fixture.whenStable();
     expect(desktopToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('refleja en Perfil el permiso concedido o bloqueado', async () => {
+    layout.toggleProfileMenu();
+    desktopState.set('enabled');
+    await render();
+    expect(element('#topbar-profile-menu').textContent).toContain('Avisos de escritorio: Activados');
+
+    desktopState.set('blocked');
+    await render();
+    expect(element('#topbar-profile-menu').textContent).toContain('Avisos de escritorio: Bloqueados');
   });
 });

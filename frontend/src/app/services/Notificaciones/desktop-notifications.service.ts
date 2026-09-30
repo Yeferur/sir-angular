@@ -8,6 +8,7 @@ export class DesktopNotificationsService implements OnDestroy {
   readonly supported = signal(false);
   readonly permission = signal<NotificationPermission>('default');
   readonly enabled = signal(false);
+  readonly onboardingEligible = signal(false);
   readonly state = computed<'enabled' | 'disabled' | 'pending' | 'blocked' | 'unsupported'>(() => {
     if (!this.supported()) return 'unsupported';
     if (this.permission() === 'denied') return 'blocked';
@@ -65,17 +66,31 @@ export class DesktopNotificationsService implements OnDestroy {
   clearSession(): void {
     this.userId = null;
     this.enabled.set(false);
+    this.onboardingEligible.set(false);
   }
 
   /** Relee el permiso real: puede cambiar fuera de SIR desde la configuración del navegador. */
   refreshPermissionState(): void {
     if (!this.supported()) {
       this.enabled.set(false);
+      this.onboardingEligible.set(false);
       return;
     }
     const permission = Notification.permission;
     this.permission.set(permission);
     this.enabled.set(permission === 'granted' && this.readPreference());
+    const preferenceKey = this.preferenceKey();
+    const dismissalKey = this.onboardingKey();
+    this.onboardingEligible.set(!!preferenceKey && permission === 'default'
+      && localStorage.getItem(preferenceKey) === null
+      && !!dismissalKey && localStorage.getItem(dismissalKey) !== '1');
+  }
+
+  dismissOnboarding(): void {
+    const key = this.onboardingKey();
+    if (!key) return;
+    localStorage.setItem(key, '1');
+    this.onboardingEligible.set(false);
   }
 
   isCurrentTabActive(): boolean {
@@ -94,6 +109,7 @@ export class DesktopNotificationsService implements OnDestroy {
     if (this.enabled()) {
       this.writePreference(false);
       this.enabled.set(false);
+      this.onboardingEligible.set(false);
       return 'disabled';
     }
 
@@ -103,11 +119,13 @@ export class DesktopNotificationsService implements OnDestroy {
     if (permission !== 'granted') {
       this.writePreference(false);
       this.enabled.set(false);
+      this.onboardingEligible.set(false);
       return 'denied';
     }
 
     this.writePreference(true);
     this.enabled.set(true);
+    this.onboardingEligible.set(false);
     return 'enabled';
   }
 
@@ -151,6 +169,10 @@ export class DesktopNotificationsService implements OnDestroy {
 
   private preferenceKey(): string | null {
     return this.userId ? `sir.desktop-notifications.enabled:${this.userId}` : null;
+  }
+
+  private onboardingKey(): string | null {
+    return this.userId ? `sir.desktop-notifications.onboarding-dismissed:${this.userId}` : null;
   }
 
   private readPreference(): boolean {
