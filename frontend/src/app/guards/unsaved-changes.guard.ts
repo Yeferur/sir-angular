@@ -6,7 +6,10 @@ export interface HasUnsavedChanges {
   hasUnsavedChanges: () => boolean;
 }
 
-export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (component) => {
+export function confirmLeavingUnsavedChanges(
+  component: Partial<HasUnsavedChanges> | null | undefined,
+  alertService: SirAlertService,
+): boolean | Promise<boolean> {
   if (!component || typeof component.hasUnsavedChanges !== 'function') {
     return true;
   }
@@ -14,8 +17,6 @@ export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (componen
   if (!component.hasUnsavedChanges()) {
     return true;
   }
-
-  const alertService = inject(SirAlertService);
 
   return alertService.confirmDecision(
     'Cambios sin guardar',
@@ -27,4 +28,8 @@ export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (componen
       destructive: true,
     }
   );
+}
+
+export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (component) => {
+  return confirmLeavingUnsavedChanges(component, inject(SirAlertService));
 };

@@ -67,7 +67,7 @@
             (click)="openNotification(item)">
             <span class="notification-icon"><i [class]="'bx ' + notificationIcon(item)" aria-hidden="true"></i></span>
             <span class="notification-copy">
-              <strong>{{ item.titulo }}</strong>
+              <strong>{{ notificationDisplayTitle(item) }}</strong>
               <small>{{ item.mensaje }}</small>
               <time>{{ relative(item.fechaCreacion) }}</time>
             </span>

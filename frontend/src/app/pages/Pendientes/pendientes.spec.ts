@@ -33,6 +33,16 @@ describe('Pendientes: sincronización de Programación', () => {
     const fixture = TestBed.createComponent(PendientesComponent);
     fixture.detectChanges();
     const c = fixture.componentInstance;
+    const createButton = fixture.nativeElement.querySelector('.notices-actions button') as HTMLButtonElement;
+    c.loaded.set(true);
+    c.loading.set(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.notices-actions').textContent).not.toContain('Actualizando');
+    expect(fixture.nativeElement.querySelector('.notices-actions button')).toBe(createButton);
+    expect(fixture.nativeElement.querySelector('main').getAttribute('aria-busy')).toBe('true');
+    c.loading.set(false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('main').getAttribute('aria-busy')).toBe('false');
     c.reminderForm = { titulo: 'Texto sin guardar', fecha: '2099-10-15T12:00' };
     c.showReminderForm.set(true);
     const item = { idPendiente: '10', titulo: 'Guatapé', prioridad: 'ALTA', entidadTipo: 'RESERVA', entidadId: 'R-10', datos: {} };

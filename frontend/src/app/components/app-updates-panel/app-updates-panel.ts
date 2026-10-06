@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { NotificacionesService, SirNotification } from '../../services/Notificaciones/notificaciones.service';
+import { LOADED_SIR_VERSION } from '../../services/AppUpdates/app-version.service';
 
 @Component({
   selector: 'app-updates-panel',
@@ -14,7 +15,7 @@ export class AppUpdatesPanelComponent implements OnInit {
   private drawer = inject(SirDrawerService);
   private notifications = inject(NotificacionesService);
 
-  readonly version = 'v1.3.0-beta';
+  readonly version = inject(LOADED_SIR_VERSION);
   readonly status = 'Fase beta';
   readonly date = 'Septiembre 2026';
 

@@ -12,7 +12,7 @@ import {
 } from '../../services/Pendientes/pendientes.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facade';
-import { SirNotification } from '../../services/Notificaciones/notificaciones.service';
+import { SirNotification, notificationDisplayTitle } from '../../services/Notificaciones/notificaciones.service';
 import { ReminderFormComponent } from '../../components/reminder-form/reminder-form';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { TimepickerComponent } from '../../shared/timepicker/timepicker';
@@ -30,6 +30,7 @@ type CenterTab = 'todos' | 'pendientes' | 'recordatorios' | 'novedades';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PendientesComponent implements OnInit {
+  readonly notificationDisplayTitle = notificationDisplayTitle;
   readonly compareSelectValues = compareSelectValuesAsStrings;
 
   readonly prioridadSelectOptions: SirSelectOption[] = [{ value: "TODAS", label: "Todas" },

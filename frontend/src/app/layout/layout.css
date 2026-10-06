@@ -970,6 +970,8 @@
   .topbar-bar:not(.is-transitioning) {
     /* Ocupa el área útil de la fila sin depender de 100vw, que puede
        incluir zonas desbordadas durante la apertura del drawer. */
+    flex: 1 1 0;
+    min-width: 0;
     width: 100% !important;
     max-width: none;
   }
@@ -1001,7 +1003,11 @@
 
   .small-dropdown { max-height: calc(100dvh - 82px); }
 
-  .topbar-island-content { width: 100%; }
+  .topbar-bar:not(.is-transitioning) .topbar-island-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
 
   .topbar-bar.is-searching .topbar-brand,
   .topbar-bar.is-searching .topbar-sep { display: none; }
@@ -1012,7 +1018,14 @@
   }
 
   .topbar-bar.is-transitioning {
-    width: var(--logout-start-width);
+    left: clamp(0px, var(--logout-start-left, 10px), 10px);
+    width: min(var(--logout-start-width, calc(100vw - 20px)), calc(100vw - 20px));
+  }
+
+  .topbar-bar.is-transitioning .topbar-island-content {
+    width: calc(100% - 28px);
+    max-width: calc(100% - 28px);
+    min-width: 0;
   }
 
   .topbar-bar.is-transitioning.is-wide {
@@ -1022,9 +1035,9 @@
   /* Título siempre visible pero muy truncado: apenas unas letras
      y puntos suspensivos — hay poco espacio junto al resto de la isla. */
   .topbar-title-zone {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     max-width: none;
-    min-width: 40px;
+    min-width: 0;
     width: auto !important;
     justify-content: flex-start;
     padding-left: 6px;

@@ -85,6 +85,7 @@
               [class.dp-disabled]="cell.isDisabled"
               [class.dp-today]="cell.isToday && !cell.isSelected"
               [class.dp-selected]="cell.isSelected"
+              [attr.aria-label]="dayAriaLabel(cell)"
               [attr.aria-pressed]="cell.isSelected"
               [disabled]="cell.isDisabled || null"
               (click)="selectDay(cell)"

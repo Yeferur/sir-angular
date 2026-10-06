@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
-import { NotificacionesService, SirNotification } from '../../services/Notificaciones/notificaciones.service';
+import { NotificacionesService, SirNotification, notificationDisplayTitle } from '../../services/Notificaciones/notificaciones.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { IntercambioTurno, TurnosService } from '../../services/Turnos/turnos.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
@@ -18,6 +18,7 @@ import { MiActividadFacade } from '../../services/MiActividad/mi-actividad.facad
   styleUrl: './notifications-panel.css',
 })
 export class NotificationsPanelComponent implements OnInit, OnDestroy {
+  readonly notificationDisplayTitle = notificationDisplayTitle;
   readonly notifications = inject(NotificacionesService);
   private readonly turnos = inject(TurnosService);
   private readonly drawer = inject(SirDrawerService);

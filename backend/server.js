@@ -76,6 +76,7 @@ const turnosRoutes = require('./routes/Turnos/turnos.routes');
 const notificacionesRoutes = require('./routes/Notificaciones/notificaciones.routes');
 const pendientesRoutes = require('./routes/Pendientes/pendientes.routes');
 const recordatoriosRoutes = require('./routes/Recordatorios/recordatorios.routes');
+const appUpdatesRoutes = require('./routes/AppUpdates/app-updates.routes');
 const { iniciarVencimientosJob, detenerVencimientosJob } = require('./jobs/vencimientos.job');
 const { iniciarEmailOutboxJob, detenerEmailOutboxJob } = require('./jobs/email-outbox.job');
 const { iniciarPendientesJob, detenerPendientesJob } = require('./jobs/pendientes.job');
@@ -101,6 +102,7 @@ app.use('/api/turnos', turnosRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
 app.use('/api/pendientes', pendientesRoutes);
 app.use('/api/recordatorios', recordatoriosRoutes);
+app.use('/api/app-updates', appUpdatesRoutes);
 const dashboardRoutes = require('./routes/Dashboard/dashboard.routes');
 app.use('/api/dashboard', dashboardRoutes);
 

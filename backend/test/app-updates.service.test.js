@@ -22,4 +22,5 @@ test('publica una versión para usuarios internos con deduplicación por usuario
   assert.match(captured.sql, /LOWER\(TRIM\(r\.Nombre_Rol\)\) <> 'cliente'/);
   assert.match(captured.sql, /ON DUPLICATE KEY UPDATE/);
   assert.equal(captured.params.at(-1), 'APP_UPDATE:v9.9.9');
+  assert.equal(captured.params[0], 'Nueva versión · v9.9.9');
 });

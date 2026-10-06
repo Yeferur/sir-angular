@@ -83,7 +83,9 @@
         </button>
       }
 
-      <span class="sir-toast-progress" aria-hidden="true"></span>
+      @if (!toast.persistent) {
+        <span class="sir-toast-progress" aria-hidden="true"></span>
+      }
     </article>
  </ng-template>
 

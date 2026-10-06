@@ -236,16 +236,16 @@
   font-family: var(--font-family);
   transition: background .1s, color .1s, border-color .1s;
 }
-.sir-dp-day:hover:not(.dp-other):not(.dp-selected):not(:disabled) {
+.sir-dp-day:hover:not(.dp-selected):not(:disabled) {
   background: rgba(10, 132, 255, .12);
   color: var(--accent-blue, #0a84ff);
 }
 .sir-dp-day.dp-other {
-  color: var(--text-tertiary, rgba(255,255,255,.2));
-  opacity: .3;
-  pointer-events: none;
+  color: var(--text-secondary, rgba(255,255,255,.6));
+  opacity: .7;
 }
-.sir-dp-day.dp-disabled {
+.sir-dp-day.dp-disabled,
+.sir-dp-day.dp-other.dp-disabled {
   opacity: .2;
   color: var(--text-tertiary);
   cursor: not-allowed;

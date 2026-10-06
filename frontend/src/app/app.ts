@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, computed, inject, signal, effect } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild, computed, inject, signal, effect } from '@angular/core';
 import { RouterOutlet, Router, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { SirAlertsHostComponent } from './components/alerts/alerts-host';
 import {SirDrawerHostComponent} from "./components/drawer/drawer-host";
@@ -10,6 +10,8 @@ import { Subject, takeUntil, distinctUntilChanged } from 'rxjs';
 import { LayoutComponent } from './layout/layout';
 import { SirAlertService } from './services/Alertas/alert.service';
 import { TopbarTransitionService } from './components/login/topbar-transition.service';
+import { AppVersionService } from './services/AppUpdates/app-version.service';
+import { HasUnsavedChanges, confirmLeavingUnsavedChanges } from './guards/unsaved-changes.guard';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +21,7 @@ import { TopbarTransitionService } from './components/login/topbar-transition.se
   styleUrls: ['./app.css']
 })
 export class App implements OnInit, OnDestroy {
+  @ViewChild(RouterOutlet) private activeOutlet?: RouterOutlet;
   loggedIn = false;
   publicAuthRoute = false;
   routeTransitioning = signal(false);
@@ -52,6 +55,7 @@ export class App implements OnInit, OnDestroy {
       this.shellEntering.set(true);
       clearTimeout(this.shellEntryTimer);
       this.shellEntryTimer = setTimeout(() => this.shellEntering.set(false), 650);
+      if (this.loggedIn) this.startVersionCheck();
     }
     if (phase === 'login') this.viewLoggedIn.set(false);
     this.cdr.markForCheck();
@@ -84,8 +88,21 @@ export class App implements OnInit, OnDestroy {
     private permisosService: PermisosService,
     private cdr: ChangeDetectorRef,
     private router: Router,
-    private alerts: SirAlertService
+    private alerts: SirAlertService,
+    private appVersion: AppVersionService
   ) {}
+
+  private async mayReloadForUpdate(): Promise<boolean> {
+    const component = this.activeOutlet?.isActivated
+      ? this.activeOutlet.component as Partial<HasUnsavedChanges>
+      : null;
+    return confirmLeavingUnsavedChanges(component, this.alerts);
+  }
+
+  private startVersionCheck(): void {
+    const userId = this.auth.getUser()?.id;
+    if (userId != null) this.appVersion.start(userId, () => this.mayReloadForUpdate());
+  }
 
   private isPublicAuthRoute(url: string): boolean {
     const normalizedUrl = url || '';
@@ -252,6 +269,7 @@ export class App implements OnInit, OnDestroy {
         }
 
         if (logged) {
+          if (this.transition.phase() === 'app') this.startVersionCheck();
           const token = this.auth.getToken();
           if (token && !this.wsStarted) {
             this.ws.connect(token);
@@ -259,6 +277,7 @@ export class App implements OnInit, OnDestroy {
           }
           this.permisosService.cargarPermisosDesdeLocalStorage();
         } else {
+          this.appVersion.stop();
           if (this.transition.phase() === 'app') {
             this.transition.markLoginReady();
           }
@@ -271,6 +290,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.appVersion.stop();
     this.destroy$.next();
     this.destroy$.complete();
     clearTimeout(this.pendingViewSyncTimer);

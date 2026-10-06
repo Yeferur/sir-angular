@@ -11,6 +11,7 @@
     "skipLibCheck": true,
     "strictNullChecks": false,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "experimentalDecorators": true,
     "importHelpers": true,
     "ignoreDeprecations": "5.0",

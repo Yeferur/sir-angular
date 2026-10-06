@@ -69,6 +69,10 @@ export class SirAlertsHostComponent implements OnDestroy {
 
   private readonly toastEffect = effect(() => {
     const queued = this.alertSvc.toasts();
+    const queuedIds = new Set(queued.map(toast => toast.id));
+    for (const visible of this.visibleToasts) {
+      if (!queuedIds.has(visible.id) && visible.phase !== 'exit') this.dismissToast(visible.id);
+    }
     const visibleIds = new Set(this.visibleToasts.map((toast) => toast.id));
     const available = queued.filter((toast) => !visibleIds.has(toast.id));
     const reservedOperationalSlots = Math.min(3, available.filter(toast => toast.operational).length);
@@ -194,7 +198,7 @@ export class SirAlertsHostComponent implements OnDestroy {
     try {
       action?.onClick();
     } finally {
-      this.dismissToast(toast.id);
+      if (!action.keepOpen) this.dismissToast(toast.id);
     }
   }
 
@@ -300,6 +304,7 @@ export class SirAlertsHostComponent implements OnDestroy {
 
   private scheduleDismiss(toast: ToastView): void {
     this.clearToastTimer(toast.id);
+    if (toast.persistent) return;
     this.zone.runOutsideAngular(() => {
       const timer = setTimeout(() => this.zone.run(() => this.dismissToast(toast.id)), toast.remainingMs);
       this.timers.set(toast.id, timer);

@@ -9,6 +9,12 @@ export interface SirNotification {
   fechaLectura: string | null; fechaCreacion: string;
 }
 
+export function notificationDisplayTitle(item: SirNotification): string {
+  if (item.tipo.toUpperCase() !== 'APP_UPDATE') return item.titulo;
+  const version = String(item.datos?.['version'] || item.entidadId || '').trim();
+  return version && !item.titulo.includes(version) ? `${item.titulo} · ${version}` : item.titulo;
+}
+
 @Injectable({ providedIn: 'root' })
 export class NotificacionesService {
   private readonly http = inject(HttpClient);

@@ -13,8 +13,6 @@ h2, h3, p { margin: 0; }
 
 .notices-actions { min-height: 40px; margin-bottom: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .notices-actions:empty { display: none; }
-.updating-pill { min-height: 28px; padding: 0 10px; border-radius: var(--radius-pill); display: inline-flex; align-items: center; gap: 7px; color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 9%, transparent); font-size: .7rem; font-weight: 760; }
-.updating-pill > span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); animation: updatingPulse 1.2s ease-out infinite; }
 
 .center-summary { min-height: 62px; margin-bottom: 16px; padding: 7px 10px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--bg-secondary); }
 .center-summary article { min-width: 0; min-height: 46px; padding: 5px 12px; border-right: 1px solid var(--separator-color); display: grid; place-content: center; justify-items: center; gap: 3px; text-align: center; }
@@ -90,7 +88,6 @@ h2, h3, p { margin: 0; }
 .refresh-error { min-height: 40px; margin-bottom: 12px; padding: 4px 8px 4px 13px; border: 1px solid color-mix(in srgb, var(--accent-red) 24%, var(--separator-color)); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-secondary); background: color-mix(in srgb, var(--accent-red) 5%, var(--bg-secondary)); font-size: .76rem; }
 
 @keyframes pageEnter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes updatingPulse { 0%, 100% { opacity: .45; transform: scale(.86); } 50% { opacity: 1; transform: scale(1); } }
 @keyframes popover-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .card-enter { animation: card-in .16s ease-out both; }
 .card-leave { animation: card-out .14s ease-in both; }
@@ -124,6 +121,6 @@ h2, h3, p { margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-container, .updating-pill > span, .inline-action, .card-enter, .card-leave { animation: none !important; }
+  .page-container, .inline-action, .card-enter, .card-leave { animation: none !important; }
   .center-tabs button, .attention-card, .reminder-card { transition: none; }
 }

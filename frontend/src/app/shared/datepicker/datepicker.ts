@@ -317,7 +317,7 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
 
   // ── Seleccionar día ─────────────────────────────────────────
   selectDay(cell: DayCell): void {
-    if (!cell.isCurrentMonth || cell.isDisabled) return;
+    if (cell.isDisabled) return;
     this.selected = cell.date;
     this.cursor   = new Date(cell.date.getFullYear(), cell.date.getMonth(), 1);
     const iso = toISO(cell.date);
@@ -363,7 +363,12 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
     for (let i = firstDow - 1; i >= 0; i--) {
       const d    = dimPrev - i;
       const date = new Date(y, m - 1, d);
-      cells.push({ day: d, date, isCurrentMonth: false, isToday: false, isSelected: false, isDisabled: true });
+      cells.push({
+        day: d, date, isCurrentMonth: false,
+        isToday: isSameDay(date, today),
+        isSelected: this.selected ? isSameDay(date, this.selected) : false,
+        isDisabled: !this.isDateAllowed(date),
+      });
     }
     for (let d = 1; d <= dim; d++) {
       const date = new Date(y, m, d);
@@ -379,7 +384,12 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
     const padding = total % 7 === 0 ? 0 : 7 - (total % 7);
     for (let d = 1; d <= padding; d++) {
       const date = new Date(y, m + 1, d);
-      cells.push({ day: d, date, isCurrentMonth: false, isToday: false, isSelected: false, isDisabled: true });
+      cells.push({
+        day: d, date, isCurrentMonth: false,
+        isToday: isSameDay(date, today),
+        isSelected: this.selected ? isSameDay(date, this.selected) : false,
+        isDisabled: !this.isDateAllowed(date),
+      });
     }
 
     this.days = cells;
@@ -393,6 +403,10 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
 
   trackByDay(_: number, cell: DayCell): string {
     return cell.date.toISOString();
+  }
+
+  dayAriaLabel(cell: DayCell): string {
+    return `${cell.day} de ${MESES[cell.date.getMonth()]} de ${cell.date.getFullYear()}`;
   }
 
   private isDateAllowed(date: Date): boolean {

@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { MiActividadFacade, MiActividadTab } from '../../services/MiActividad/mi-actividad.facade';
-import { SirNotification } from '../../services/Notificaciones/notificaciones.service';
+import { SirNotification, notificationDisplayTitle } from '../../services/Notificaciones/notificaciones.service';
 import { OperationalPending, PendingPriority, PersonalReminder, ReminderInput } from '../../services/Pendientes/pendientes.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { ReminderFormComponent } from '../reminder-form/reminder-form';
@@ -23,6 +23,7 @@ import { isFutureSirDateTime, nextSirMinute, nextSirTime, sirLocalDateTimeToIso,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MiActividadPanelComponent {
+  readonly notificationDisplayTitle = notificationDisplayTitle;
   readonly activity = inject(MiActividadFacade);
   private readonly drawer = inject(SirDrawerService);
   private readonly alerts = inject(SirAlertService);

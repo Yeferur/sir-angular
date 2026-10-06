@@ -1,8 +1,5 @@
-<main class="page-container notices-page">
+<main class="page-container notices-page" [attr.aria-busy]="loading()">
   <div class="notices-actions">
-    @if (loading() && loaded()) {
-      <span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span>
-    }
     @if (canCreateReminders) {
       <button type="button" class="sir-action sir-action--primary" (click)="openReminderForm()">Nuevo recordatorio</button>
     }
@@ -47,7 +44,7 @@
           <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-suppressed]="item.estaSuprimido"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Recordatorio · {{ (item.siguienteTrigger || item.fecha) | date:'d MMM, h:mm a' }}</span><span class="muted-chip">{{ activity.reminderStateLabel(item) }}</span></div><h3>{{ item.titulo }}</h3>@if (item.descripcion) { <p>{{ item.descripcion }}</p> }</div><div class="card-actions">@if (canUpdateReminders && activity.reminderState(item) === 'ATENDER') { <button type="button" class="btn-open-results" (click)="completeReminder(item)"><i class="bx bx-check"></i>Completar</button> }</div></article>
         }
         @for (item of activity.feedNotifications(); track item.idNotificacion) {
-          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Novedad</span>@if (!item.leida) { <span class="muted-chip">Sin leer</span> }</div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline"><span class="entity-chip">Novedad</span>@if (!item.leida) { <span class="muted-chip">Sin leer</span> }</div><h3>{{ notificationDisplayTitle(item) }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
         }
         @if (!activity.pendientes().length && !reminders().length && !activity.feedNotifications().length) {
           <section class="empty-state"><span class="empty-icon"><i class="bx bx-check"></i></span><h2>Todo al día</h2><p>No hay avisos pendientes.</p></section>
@@ -112,7 +109,7 @@
       <div class="section-toolbar"><h2>Novedades</h2></div>
       <section class="item-list" aria-label="Novedades">
         @for (item of activity.feedNotifications(); track item.idNotificacion) {
-          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline">@if (!item.leida) { <span class="muted-chip">Sin leer</span> }<span class="entity-chip">{{ item.fechaCreacion | date:'d MMM, h:mm a' }}</span></div><h3>{{ item.titulo }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
+          <article class="attention-card" animate.enter="card-enter" animate.leave="card-leave" [class.is-unread]="!item.leida"><div class="attention-content"><div class="attention-topline">@if (!item.leida) { <span class="muted-chip">Sin leer</span> }<span class="entity-chip">{{ item.fechaCreacion | date:'d MMM, h:mm a' }}</span></div><h3>{{ notificationDisplayTitle(item) }}</h3>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }</div><div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markNotificationRead(item)">Marcar como leída</button> }</div></article>
         } @empty { <section class="empty-state"><span class="empty-icon"><i class="bx bx-bell"></i></span><h2>Sin novedades</h2></section> }
       </section>
     }

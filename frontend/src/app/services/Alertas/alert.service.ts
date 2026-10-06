@@ -6,6 +6,7 @@ export type AlertType = 'success' | 'info' | 'warning' | 'error';
 export interface ToastAction {
   label: string;
   onClick?: () => void;
+  keepOpen?: boolean;
   postpone?: {
     initialMinutes?: number;
     maxMinutes?: number | null;
@@ -19,6 +20,7 @@ export interface SirToast {
   title: string;
   message?: string;
   durationMs: number;
+  persistent?: boolean;
   dismissible: boolean;
   action?: ToastAction;
   actions?: ToastAction[];
@@ -131,7 +133,7 @@ export class SirAlertService {
 
   showToast(toast: Omit<SirToast, 'id' | 'dismissible'> & { dismissible?: boolean }): string {
     const id = uid();
-    const safeDuration = Math.max(2500, Number(toast.durationMs || 4500));
+    const safeDuration = toast.persistent ? 0 : Math.max(2500, Number(toast.durationMs || 4500));
     const next: SirToast = {
       ...toast,
       message: toast.type === 'error'
@@ -143,7 +145,11 @@ export class SirAlertService {
     };
 
     // Evita crecimiento sin límite si un proceso defectuoso emite en ráfaga.
-    this._toasts.update((list) => [...list.slice(-11), next]);
+    this._toasts.update((list) => [
+      ...list.filter(item => item.persistent),
+      ...list.filter(item => !item.persistent).slice(-11),
+      next,
+    ]);
     return id;
   }
 
@@ -152,6 +158,7 @@ export class SirAlertService {
     title: string;
     message?: string;
     durationMs?: number;
+    persistent?: boolean;
     dismissible?: boolean;
     action?: ToastAction;
     actions?: ToastAction[];

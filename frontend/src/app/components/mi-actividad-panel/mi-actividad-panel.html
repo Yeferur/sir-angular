@@ -54,7 +54,7 @@
         @for (item of activity.feedNotifications(); track item.idNotificacion) {
           <article class="activity-card notification-card" [class.is-unread]="!item.leida">
             <div class="card-topline"><span class="kind-label">Novedad</span>@if (!item.leida) { <span class="unread-dot">Sin leer</span> }</div>
-            <h4>{{ item.titulo }}</h4>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }
+            <h4>{{ notificationDisplayTitle(item) }}</h4>@if (item.mensaje) { <p>{{ item.mensaje }}</p> }
             <div class="card-meta"><span>{{ item.fechaCreacion | date:'d MMM, h:mm a' }}</span></div>
             <div class="card-actions"><button type="button" class="btn-open-results" (click)="openNotification(item)">{{ activity.notificationActionLabel(item) }}</button>@if (!item.leida) { <button type="button" class="btn-edit-aforo" (click)="markRead(item)">Marcar como leída</button> }</div>
           </article>

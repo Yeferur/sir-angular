@@ -122,6 +122,30 @@ describe('Navegación superior', () => {
     expect(layout.titleLeaving()).toBeFalse();
   });
 
+  it('mantiene la isla dentro del viewport con Inicio, Avisos y Aforos', async () => {
+    for (const title of ['Inicio', 'Avisos', 'Aforos']) {
+      layout.pageTitle.set(title);
+      await render();
+      const bar = element('.topbar-bar').getBoundingClientRect();
+      const viewport = document.documentElement.clientWidth;
+      expect(bar.left).withContext(`${title}: borde izquierdo a ${viewport}px`).toBeGreaterThanOrEqual(0);
+      expect(bar.right).withContext(`${title}: borde derecho a ${viewport}px`).toBeLessThanOrEqual(viewport);
+      expect(element('.topbar-page-title').textContent?.trim()).toBe(title);
+      expect(document.documentElement.scrollWidth).withContext(`${title}: scroll horizontal a ${viewport}px`).toBeLessThanOrEqual(viewport);
+    }
+  });
+
+  it('conserva una geometría móvil válida antes de medir la transición', () => {
+    if (document.documentElement.clientWidth > 766) return;
+    const bar = element('.topbar-bar');
+    bar.style.transition = 'none';
+    bar.classList.add('is-transitioning');
+    const rect = bar.getBoundingClientRect();
+    expect(rect.left).toBeGreaterThanOrEqual(0);
+    expect(rect.right).toBeLessThanOrEqual(document.documentElement.clientWidth);
+    expect(rect.width).toBeGreaterThan(200);
+  });
+
   it('delega Mi actividad y refresca el conteo con las novedades de Programación', () => {
     (layout as any).syncNotificationSession(true);
     notificationLoad.calls.reset();

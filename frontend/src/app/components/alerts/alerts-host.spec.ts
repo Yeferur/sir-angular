@@ -69,4 +69,29 @@ describe('SirAlertsHostComponent', () => {
     expect(fixture.nativeElement.querySelector('.sir-toast-popover')).toBeTruthy();
     fixture.destroy();
   });
+
+  it('mantiene un aviso persistente hasta una acción y permite retirarlo desde el servicio', () => {
+    const fixture = TestBed.createComponent(SirAlertsHostComponent);
+    const alerts = TestBed.inject(SirAlertService);
+    const action = jasmine.createSpy('actualizar');
+    fixture.detectChanges();
+
+    const id = alerts.notify({
+      type: 'warning', title: 'Hay una nueva versión de SIR disponible',
+      persistent: true, dismissible: false,
+      action: { label: 'Actualizar ahora', keepOpen: true, onClick: action },
+    });
+    fixture.detectChanges();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.sir-toast-progress')).toBeNull();
+    (fixture.nativeElement.querySelector('.sir-toast-action') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(alerts.toasts().some(toast => toast.id === id)).toBeTrue();
+
+    alerts.dismissToast(id);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.visibleToasts.find(toast => toast.id === id)?.phase).toBe('exit');
+    fixture.destroy();
+  });
 });
