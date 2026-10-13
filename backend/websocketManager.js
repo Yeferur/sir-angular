@@ -195,6 +195,17 @@ function sendToUser(userId, event) {
   return sent;
 }
 
+// Una conexión conserva metadatos de rol desde su autenticación. Tras cambiar
+// el rol, forzamos su reconexión para reconstruirlos desde la sesión vigente.
+function reconnectUserSockets(userId) {
+  let closed = 0;
+  for (const ws of getClients(userId)) {
+    if (!isOpen(ws)) continue;
+    try { ws.close(1000, 'permissions_changed'); closed++; } catch {}
+  }
+  return closed;
+}
+
 function broadcastToInternal(event) {
   const payload = JSON.stringify(event || {});
   let sent = 0;
@@ -380,6 +391,7 @@ module.exports = {
   getClients,
   getAllActiveUsers,
   sendToUser,
+  reconnectUserSockets,
   broadcastToInternal,
   broadcastActiveUsers,
   broadcastAforoActualizado,

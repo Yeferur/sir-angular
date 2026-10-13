@@ -9,7 +9,7 @@ app-select { display: block; width: 100%; min-width: 0; }
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.sir-select-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sir-select-label { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .sir-select-label.is-placeholder { color: var(--text-tertiary); }
 .sir-select-caret { flex-shrink: 0; color: var(--text-secondary); }
 .sir-select-trigger.is-open {
@@ -18,7 +18,19 @@ app-select { display: block; width: 100%; min-width: 0; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent);
 }
 .sir-select-trigger.is-open .sir-select-caret { transform: rotate(180deg); }
+.sir-select-caret { transition: transform .18s var(--ease-soft, ease); }
 .sir-select-overlay-panel { max-width: calc(100vw - 16px); }
+.sir-select-overlay-panel .sir-select-list { animation: sirSelectEnter .18s var(--ease-soft, ease) both; }
+.sir-select-overlay-panel.is-closing { pointer-events: none; }
+.sir-select-overlay-panel.is-closing .sir-select-list { animation: sirSelectExit .16s ease both; }
+@keyframes sirSelectEnter {
+  from { opacity: 0; transform: translateY(-5px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sirSelectExit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(.99); }
+}
 .sir-select-list {
   box-sizing: border-box;
   width: 100%;
@@ -56,3 +68,8 @@ app-select { display: block; width: 100%; min-width: 0; }
 .sir-select-option.is-active { outline: 1px solid color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color)); outline-offset: -1px; }
 .sir-select-option.is-disabled { color: var(--text-secondary); opacity: .72; cursor: not-allowed; }
 @media (pointer: coarse) { .sir-select-option { min-height: 40px; } }
+@media (prefers-reduced-motion: reduce) {
+  .sir-select-caret { transition: none; }
+  .sir-select-overlay-panel .sir-select-list,
+  .sir-select-overlay-panel.is-closing .sir-select-list { animation: none; }
+}

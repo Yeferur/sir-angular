@@ -1,0 +1,22 @@
+<div class="sir-filter-bar">
+  <div class="sir-filter-primary"><ng-content select="[sirPrimaryFilters]" /></div>
+  <div class="sir-filter-actions">
+    @if (showFilters) {
+      <button type="button" class="sir-action sir-action--secondary sir-filter-toggle"
+        [class.is-active]="expanded" [attr.aria-controls]="panelId || null"
+        [attr.aria-expanded]="expanded" [attr.aria-label]="filterCount ? 'Filtros, ' + filterCount + ' activos' : 'Filtros'"
+        (click)="toggleFilters.emit()">
+        <i class="bx bx-filter-alt" aria-hidden="true"></i> Filtros
+        @if (filterCount) { <span class="sir-filter-count" aria-hidden="true">{{ filterCount }}</span> }
+      </button>
+    }
+    @if (showClear) {
+      <button type="button" class="sir-action sir-action--secondary" [disabled]="busy" (click)="clear.emit()">{{ clearLabel }}</button>
+    }
+    @if (showSearch) {
+      <button type="button" class="sir-action sir-action--primary" [disabled]="busy || !canSearch"
+        [attr.aria-busy]="busy" (click)="search.emit()">{{ searchLabel }}</button>
+    }
+    <ng-content select="[sirFilterActions]" />
+  </div>
+</div>

@@ -294,61 +294,14 @@
               }
             </div>
 
-            <div
-              class="permissions-section"
-              [class.permissions-section--disabled]="!selectedRole"
-              [class.permissions-section--syncing]="rolePermissionsLoading()"
-              [attr.aria-busy]="rolePermissionsLoading()">
-              <div class="permissions-section-head">
-                <div>
-                  <strong>{{ isClientRole ? 'Permisos fijos del Cliente' : 'Permisos asignables' }}</strong>
-                  <p>
-                    @if (isClientRole) {
-                      Este rol tiene acceso fijo para consultar, crear y actualizar únicamente sus propias reservas. No puede acceder a otros módulos ni cancelar o eliminar reservas.
-                    } @else {
-                      Los incluidos por el rol ya están seleccionados; puedes activar o retirar cualquiera.
-                    }
-                  </p>
-                </div>
-                <span class="permission-selection-count">
-                  <strong>{{ selectedPermisos.length }}</strong>
-                  seleccionados
-                </span>
-              </div>
-
-              @if (isClientRole) {
-                <div class="client-fixed-permissions" aria-label="Capacidades fijas del Cliente">
-                  @for (permission of clientPermissions; track permission.Id_Permiso) {
-                    <div class="client-fixed-permission">
-                      <span class="client-fixed-permission__mark" aria-hidden="true"><i class="bx bx-check"></i></span>
-                      <span class="permission-copy">
-                        <strong>{{ permission.Descripcion || permissionAction(permission) }}</strong>
-                        <small>Capacidad fija del Cliente</small>
-                      </span>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <div class="permissions-grid">
-                  @for (module of permissionsByModule; track module.key) {
-                    @for (permission of module.permisos; track permission.Id_Permiso) {
-                      <button
-                        type="button"
-                        class="permission-option"
-                        [class.permission-option--selected]="isSelected(permission.Id_Permiso)"
-                        [disabled]="!selectedRole || rolePermissionsLoading()"
-                        (click)="togglePermiso(permission.Id_Permiso)"
-                        [attr.aria-pressed]="isSelected(permission.Id_Permiso)">
-                        <span class="permission-copy">
-                          <strong>{{ permission.Descripcion || permissionAction(permission) }}</strong>
-                          <small>{{ module.label }}</small>
-                        </span>
-                      </button>
-                    }
-                  }
-                </div>
-              }
-            </div>
+            <app-permission-picker
+              [groups]="permissionsByModule"
+              [clientPermissions]="clientPermissions"
+              [selectedIds]="selectedPermisos"
+              [hasRole]="!!selectedRole"
+              [isClientRole]="isClientRole"
+              [loading]="rolePermissionsLoading()"
+              (permissionToggle)="togglePermiso($event)" />
           </section>
         }
 

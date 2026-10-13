@@ -660,8 +660,7 @@ exports.actualizarUsuario = async (req, res) => {
     }
 
     shouldForceLogout = !!hash
-      || Number(Activo) === 0
-      || Number(current.Id_Rol || 0) !== Number(Id_Rol || 0);
+      || Number(Activo) === 0;
     if (shouldForceLogout) {
       await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
     }
@@ -685,15 +684,20 @@ exports.actualizarUsuario = async (req, res) => {
 
     if (shouldForceLogout) {
       try {
-        const logoutReason = hash
-          ? 'password_changed_by_admin'
-          : Number(Activo) === 0
-            ? 'user_deactivated'
-            : 'role_changed';
+        const logoutReason = hash ? 'password_changed_by_admin' : 'user_deactivated';
         wsManager.sendForceLogout(Number(id), logoutReason);
         await wsManager.broadcastActiveUsers();
       } catch (socketError) {
         console.error('actualizarUsuario websocket warning:', socketError);
+      }
+    } else {
+      try {
+        wsManager.sendToUser(Number(id), { type: 'permissions:updated' });
+        if (Number(current.Id_Rol || 0) !== Number(Id_Rol || 0)) {
+          wsManager.reconnectUserSockets(Number(id));
+        }
+      } catch (socketError) {
+        console.error('actualizarUsuario permisos websocket warning:', socketError);
       }
     }
 

@@ -1,0 +1,9 @@
+<div class="sir-search-input" [class.is-disabled]="effectivelyDisabled">
+  <i class="bx bx-search" aria-hidden="true"></i>
+  <input type="search" [id]="resolvedId" [value]="value" [disabled]="effectivelyDisabled"
+    [placeholder]="placeholder" [attr.aria-label]="ariaLabel" autocomplete="off"
+    (input)="update($any($event.target).value)" (keyup.enter)="submit()" (blur)="touch()" />
+  @if (value && !effectivelyDisabled) {
+    <button type="button" aria-label="Limpiar búsqueda" (click)="clearValue()"><i class="bx bx-x" aria-hidden="true"></i></button>
+  }
+</div>

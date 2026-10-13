@@ -41,11 +41,23 @@ test('SQL de reservas y runtime usan disponibilidad en minúscula', async () => 
   }
 });
 
-test('las nueve migraciones se leen, incluida la rutina histórica', async () => {
+test('las migraciones se leen, incluida la rutina histórica', async () => {
   const migrations = await readMigrations();
-  assert.equal(migrations.length, 9);
+  assert.equal(migrations.length, 10);
   assert.deepEqual(migrations.map(x => x.name), [...MIGRATIONS]);
   const historical = migrations.find(x => x.name === '20260911_pendientes_recordatorios_mvp.sql');
   assert.equal(historical.statements.filter(x => x.startsWith('CREATE PROCEDURE')).length, 1);
   assert.ok(historical.statements.some(x => x === 'CALL migrate_recordatorios_mvp()'));
+});
+
+test('migración Mercadeo idempotente por inspección de índice y sin cambios destructivos', async () => {
+  const sql = await fs.readFile(path.join(__dirname, '../database/migrations/20261010_mercadeo_reservas.sql'), 'utf8');
+  assert.match(sql, /ON DUPLICATE KEY UPDATE/);
+  assert.equal((sql.match(/FROM information_schema\.STATISTICS/g) || []).length, 3);
+  assert.doesNotMatch(sql, /\b(?:DROP|TRUNCATE|DELETE)\s+(?:TABLE\s+)?(?:reservas|pasajeros|permisos)\b/i);
+  assert.match(sql, /idx_reservas_fecha_registro_id/);
+  assert.match(sql, /idx_pasajeros_dni/);
+  assert.match(sql, /idx_pasajeros_nombre/);
+  const mercadeo = MIGRATIONS.indexOf('20261010_mercadeo_reservas.sql');
+  assert.ok(mercadeo > MIGRATIONS.indexOf('20260930_runtime_schema.sql'));
 });

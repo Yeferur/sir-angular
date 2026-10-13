@@ -1,17 +1,17 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild, computed, inject, signal, effect } from '@angular/core';
-import { RouterOutlet, Router, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
+import { RouterOutlet, Router, ActivatedRouteSnapshot, Event as RouterEvent, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { SirAlertsHostComponent } from './components/alerts/alerts-host';
 import {SirDrawerHostComponent} from "./components/drawer/drawer-host";
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/Login/login-service';
 import { WebSocketService } from './services/WebSocket/web-socket';
 import { PermisosService } from './services/Permisos/permisos.service';
-import { Subject, takeUntil, distinctUntilChanged } from 'rxjs';
+import { Subject, takeUntil, distinctUntilChanged, EMPTY, catchError, map, switchMap } from 'rxjs';
 import { LayoutComponent } from './layout/layout';
 import { SirAlertService } from './services/Alertas/alert.service';
 import { TopbarTransitionService } from './components/login/topbar-transition.service';
 import { AppVersionService } from './services/AppUpdates/app-version.service';
-import { HasUnsavedChanges, confirmLeavingUnsavedChanges } from './guards/unsaved-changes.guard';
+import { HasUnsavedChanges, UnsavedChangesService, confirmLeavingUnsavedChanges } from './guards/unsaved-changes.guard';
 
 @Component({
   selector: 'app-root',
@@ -64,6 +64,24 @@ export class App implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private wsStarted = false;
 
+  private currentRouteAllowed(): boolean {
+    let route: ActivatedRouteSnapshot | null = this.router.routerState.snapshot.root;
+    while (route) {
+      const data = route.data || {};
+      const required = Array.isArray(data['permisos'])
+        ? data['permisos'].map((value: unknown) => String(value || '').trim()).filter(Boolean)
+        : (data['permiso'] ? [String(data['permiso']).trim()] : []);
+      if (required.length) {
+        const allowed = data['requireAll']
+          ? this.permisosService.tieneTodosPermisos(required)
+          : this.permisosService.tieneAlgunPermiso(required);
+        if (!allowed) return false;
+      }
+      route = route.firstChild;
+    }
+    return true;
+  }
+
   private isAdminForceLogoutEvent(msg: any): boolean {
     const type = String(msg?.type || '');
     const reason = String(msg?.reason || '');
@@ -89,8 +107,17 @@ export class App implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private router: Router,
     private alerts: SirAlertService,
-    private appVersion: AppVersionService
+    private appVersion: AppVersionService,
+    private unsavedChanges: UnsavedChangesService,
   ) {}
+
+  onPrivateRouteActivated(component: unknown): void {
+    this.unsavedChanges.activate(component);
+  }
+
+  onPrivateRouteDeactivated(component: unknown): void {
+    this.unsavedChanges.deactivate(component);
+  }
 
   private async mayReloadForUpdate(): Promise<boolean> {
     const component = this.activeOutlet?.isActivated
@@ -195,6 +222,37 @@ export class App implements OnInit, OnDestroy {
       });
 
     this.permisosService.cargarPermisosDesdeLocalStorage();
+
+    this.ws.permissionEvents$
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap((event: any) => {
+          if (!this.auth.getToken()) return EMPTY;
+          return this.permisosService.obtenerMisPermisos().pipe(
+            map(() => event),
+            catchError((error) => {
+              console.error('No se pudieron actualizar los permisos de la sesión:', error);
+              if (event?.type === 'permissions:updated') {
+                this.permisosService.limpiarPermisos();
+                void this.router.navigateByUrl('/');
+                this.alerts.warningToast('Permisos actualizados', 'No fue posible verificar tu acceso. Inténtalo de nuevo en unos momentos.');
+                this.cdr.markForCheck();
+              }
+              return EMPTY;
+            })
+          );
+        })
+      )
+      .subscribe((event: any) => {
+        const revokedCurrentRoute = !this.currentRouteAllowed();
+        if (revokedCurrentRoute) {
+          void this.router.navigateByUrl('/');
+          this.alerts.infoToast('Permisos actualizados', 'Tu acceso a esta sección cambió.');
+        } else if (event?.type === 'permissions:updated') {
+          this.alerts.infoToast('Permisos actualizados', 'Tu acceso se actualizó.');
+        }
+        this.cdr.markForCheck();
+      });
 
     this.ws.systemEvents$
       .pipe(takeUntil(this.destroy$))

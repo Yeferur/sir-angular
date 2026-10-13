@@ -1,0 +1,43 @@
+<button #trigger type="button" class="sir-range-trigger" [id]="resolvedInputId"
+  [disabled]="effectivelyDisabled" [class.is-open]="isOpen" [class.is-invalid]="invalid"
+  aria-haspopup="dialog" [attr.aria-expanded]="isOpen" [attr.aria-invalid]="invalid || null"
+  [attr.aria-labelledby]="ariaLabelledby" [attr.aria-describedby]="ariaDescribedby"
+  [attr.aria-label]="ariaLabelledby ? null : displayText" (click)="toggle()">
+  <i class="bx bx-calendar" aria-hidden="true"></i>
+  <span [class.is-placeholder]="!range.start && !draftStart">{{ displayText }}</span>
+  <i class="bx bx-chevron-down sir-range-chevron" aria-hidden="true"></i>
+</button>
+
+<ng-template #panelTpl>
+  <section class="sir-range-panel" role="dialog" aria-label="Seleccionar rango de fechas">
+    <header class="sir-range-heading">
+      <button type="button" aria-label="Mes anterior" (click)="moveMonth(-1)"><i class="bx bx-chevron-left" aria-hidden="true"></i></button>
+      <strong>Rango de fechas</strong>
+      <button type="button" aria-label="Mes siguiente" (click)="moveMonth(1)"><i class="bx bx-chevron-right" aria-hidden="true"></i></button>
+    </header>
+    <div class="sir-range-months">
+      @for (month of visibleMonths; track month.key; let monthIndex = $index) {
+        <div class="sir-range-month" [class.sir-range-month--second]="monthIndex === 1">
+          <h3>{{ month.label }}</h3>
+          <div class="sir-range-days">
+            @for (weekday of weekdays; track weekday) { <span class="sir-range-weekday">{{ weekday }}</span> }
+            @for (cell of month.cells; track $index) {
+              @if (cell) {
+                <button type="button" class="sir-range-day"
+                  [class.is-start]="isStart(cell.iso)" [class.is-end]="isEnd(cell.iso)"
+                  [class.is-between]="isBetween(cell.iso)" [disabled]="cell.disabled"
+                  [attr.aria-label]="dayLabel(cell.iso)"
+                  [attr.aria-pressed]="isStart(cell.iso) || isEnd(cell.iso)"
+                  (click)="selectDate(cell.iso)">{{ cell.day }}</button>
+              } @else { <span aria-hidden="true"></span> }
+            }
+          </div>
+        </div>
+      }
+    </div>
+    <footer class="sir-range-footer">
+      <span [id]="statusId" role="status">{{ selectionHint }}</span>
+      @if (range.start || draftStart) { <button type="button" (click)="clearRange()">Limpiar</button> }
+    </footer>
+  </section>
+</ng-template>

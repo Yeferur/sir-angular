@@ -45,6 +45,7 @@ import { DesktopNotificationsService } from '../services/Notificaciones/desktop-
 import { PendientesService } from '../services/Pendientes/pendientes.service';
 import { MiActividadFacade } from '../services/MiActividad/mi-actividad.facade';
 import { WebSocketService } from '../services/WebSocket/web-socket';
+import { UnsavedChangesService } from '../guards/unsaved-changes.guard';
 
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -99,6 +100,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     readonly miActividad = inject(MiActividadFacade);
     private webSocket = inject(WebSocketService);
     private injector = inject(Injector);
+    private unsavedChanges = inject(UnsavedChangesService);
 
     // ── Señales del servicio global ──────────────────────────────
     globalSearchOpen = this.search.open;
@@ -177,6 +179,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     private routerSub?: Subscription;
     private sessionBeatTimer?: number;
     private transitionRun = 0;
+    private logoutPending = false;
     private idleTopbarWidth: number | null = null;
     private searchWasOpen = false;
     private searchRestoreTimer?: number;
@@ -356,7 +359,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             distinctUntilChanged(([prevLogged, prevPermissions], [nextLogged, nextPermissions]) => (
                 prevLogged === nextLogged && prevPermissions.join('|') === nextPermissions.join('|')
             )),
-        ).subscribe(([loggedIn]) => this.syncNotificationSession(loggedIn));
+        ).subscribe(([loggedIn]) => {
+            this.syncNotificationSession(loggedIn);
+            this.cdr.markForCheck();
+        });
 
         // Título de la página desde datos de ruta. También mantiene
         // currentUrl al día siempre (con o sin sesión) — showAuthSlot
@@ -688,7 +694,18 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     async handleLogout(): Promise<void> {
-        if (!this.showAppChrome()) return;
+        if (!this.showAppChrome() || this.logoutPending) return;
+        this.logoutPending = true;
+        try {
+            if (!await this.unsavedChanges.confirmLogout()) {
+                this.logoutPending = false;
+                return;
+            }
+        } catch (error) {
+            this.logoutPending = false;
+            throw error;
+        }
+        this.unsavedChanges.approveLogoutNavigation();
         this.closeProfileMenu();
         this.closeTopbarMenus();
         this.closeGlobalSearch();
@@ -749,7 +766,10 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         this.authService.logout();
         this.user.set(null);
         this.avatarUrl.set(null);
-        this.router.navigateByUrl('/');
+        void this.router.navigateByUrl('/').finally(() => {
+            this.unsavedChanges.clearLogoutApproval();
+            this.logoutPending = false;
+        });
         this.transitionStage.set('fullscreen');
         this.transitionService.markLoginReady();
     }
@@ -1258,6 +1278,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             exact: false,
         },
         {
+            key: 'mercadeo',
+            label: 'Mercadeo',
+            icon: 'bx bx-bar-chart-alt-2',
+            group: 'gestion',
+            route: '/Mercadeo/Reservas',
+            permission: 'MERCADEO.RESERVAS.LEER',
+            exact: false,
+        },
+        {
             key: 'control-viaje',
             label: 'Control de Viaje',
             icon: 'bx bx-trip',
@@ -1363,6 +1392,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',
             programacion: 'Programación operativa',
+            mercadeo: 'Análisis comercial',
             seguros: 'Vehículos, guías y conductores',
             comisiones: 'Pendientes por liquidar',
         };

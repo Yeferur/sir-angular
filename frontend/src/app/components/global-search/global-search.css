@@ -153,6 +153,7 @@
 .gs-result-copy { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .gs-result-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
 .gs-result-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gs-text-2); font-size: .73rem; }
+.gs-result-copy--system strong, .gs-result-copy--system small { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .gs-result-badge { color: var(--gs-blue); background: var(--gs-blue-glow); border-radius: 999px; padding: 3px 7px; font-size: .64rem; }
 .gs-result-actions {
   display: flex;

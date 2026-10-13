@@ -10,7 +10,7 @@
     <app-sir-drawer></app-sir-drawer>
     <div class="main-shell">
       <main class="content">
-        <router-outlet></router-outlet>
+        <router-outlet (activate)="onPrivateRouteActivated($event)" (deactivate)="onPrivateRouteDeactivated($event)"></router-outlet>
       </main>
     </div>
   </div>

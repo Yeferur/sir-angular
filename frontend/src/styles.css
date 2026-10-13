@@ -1189,7 +1189,7 @@ input[type=number] {
 .wizard-shell {
   max-width: var(--wizard-max-width);
   margin: 0 auto;
-  padding-bottom: 110px;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
 }
 
 .wizard-shell .card {
@@ -1399,7 +1399,7 @@ input[type=number] {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 0 14px;
+  padding: 0 0 calc(14px + env(safe-area-inset-bottom, 0px));
   z-index: 100;
   background: transparent;
 }
@@ -1709,7 +1709,7 @@ input[type=number] {
   }
 
   .wizard-nav {
-    padding: 0 0 8px;
+    padding: 0 0 calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
   .wizard-nav-row {

@@ -15,6 +15,7 @@ const MIGRATIONS = Object.freeze([
   '20260922_reminder_email.sql',
   '20260929_programacion_transfers_snapshot.sql',
   '20260930_runtime_schema.sql',
+  '20261010_mercadeo_reservas.sql',
 ]);
 
 function assertTargetConfiguration(env) {

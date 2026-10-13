@@ -56,7 +56,7 @@
                 [class.is-selected]="isSelected(getFlatIndex(groupIndex, itemIndex))"
                 (mouseenter)="onResultHover(getFlatIndex(groupIndex, itemIndex))"
               >
-                <span class="gs-result-copy">
+                <span class="gs-result-copy" [class.gs-result-copy--system]="result.type === 'module' || result.type === 'action'">
                   <strong>{{ result.title }}</strong>
                   @if (result.subtitle) { <small>{{ result.subtitle }}</small> }
                 </span>

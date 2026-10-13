@@ -81,6 +81,7 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
   activeIndex = -1;
   private formDisabled = false;
   private overlayRef: OverlayRef | null = null;
+  private closeTimer?: ReturnType<typeof setTimeout>;
   private subscriptions = new Subscription();
   private resizeObserver?: ResizeObserver;
   private onChange: (value: any) => void = () => {};
@@ -118,6 +119,11 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
 
   open(): void {
     if (this.isOpen || this.effectivelyDisabled) return;
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+      this.closeTimer = undefined;
+      this.disposeOverlay();
+    }
     const origin = this.trigger.nativeElement;
     const strategy = this.overlay.position().flexibleConnectedTo(origin)
       .withPositions([
@@ -155,7 +161,16 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
   close(restoreFocus = false): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.disposeOverlay();
+    const panel = this.overlayRef?.overlayElement;
+    if (panel && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      panel.classList.add('is-closing');
+      this.closeTimer = setTimeout(() => {
+        this.closeTimer = undefined;
+        this.disposeOverlay();
+      }, 170);
+    } else {
+      this.disposeOverlay();
+    }
     this.onTouched();
     this.cdr.markForCheck();
     if (restoreFocus && !this.effectivelyDisabled) this.trigger.nativeElement.focus({ preventScroll: true });
@@ -248,5 +263,8 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
     this.overlayRef = null;
   }
 
-  ngOnDestroy(): void { this.disposeOverlay(); }
+  ngOnDestroy(): void {
+    if (this.closeTimer) clearTimeout(this.closeTimer);
+    this.disposeOverlay();
+  }
 }

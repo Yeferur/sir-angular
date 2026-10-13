@@ -1,0 +1,59 @@
+Initial chunk files | Names               |  Raw size | Estimated transfer size
+main-5SG23VTQ.js    | main                |   2.41 MB |               464.62 kB
+chunk-WPALX627.js   | -                   | 221.19 kB |                63.86 kB
+styles-ANDDYRUB.css | styles              | 132.51 kB |                18.91 kB
+chunk-UNTAI36G.js   | -                   |  93.90 kB |                23.70 kB
+chunk-2PJ5YTUI.js   | -                   |  56.37 kB |                13.52 kB
+chunk-FW6FJBGH.js   | -                   |  47.32 kB |                 9.34 kB
+chunk-BVD4N4CK.js   | -                   |  40.59 kB |                 9.65 kB
+chunk-TNAVCZDY.js   | -                   |  23.21 kB |                 5.86 kB
+chunk-Q2OZUMV5.js   | -                   |  21.13 kB |                 4.96 kB
+chunk-QKK5U2NM.js   | -                   |  18.73 kB |                 5.41 kB
+chunk-HIJ6MKPI.js   | -                   |  16.85 kB |                 4.91 kB
+chunk-ZIP65KAW.js   | -                   |  13.57 kB |                 3.83 kB
+chunk-2UANO6W5.js   | -                   |  10.97 kB |                 3.58 kB
+chunk-HVMHLBUW.js   | -                   |   7.28 kB |                 2.35 kB
+chunk-CB4UA24V.js   | -                   |   5.38 kB |                 1.87 kB
+chunk-MCDK34RZ.js   | -                   |   4.65 kB |                 1.32 kB
+chunk-PYSHCY3J.js   | -                   |   4.36 kB |                 1.39 kB
+chunk-RKVJ2SJJ.js   | -                   |   4.29 kB |                 1.41 kB
+chunk-PXFKEMVM.js   | -                   |   3.82 kB |                 1.14 kB
+chunk-WOC6TS6J.js   | -                   |   3.58 kB |                 1.14 kB
+chunk-IGYF7KYN.js   | -                   |   3.06 kB |                 1.11 kB
+chunk-AHDQ22GU.js   | -                   |   2.27 kB |               706 bytes
+chunk-3CJMAQ65.js   | -                   |   2.22 kB |               801 bytes
+chunk-O7O5HOOA.js   | -                   |   2.19 kB |               679 bytes
+chunk-55GY6K5S.js   | -                   |   1.36 kB |               594 bytes
+chunk-KHV54GNI.js   | -                   |   1.31 kB |               505 bytes
+chunk-HNYCCNKM.js   | -                   |   1.25 kB |               450 bytes
+chunk-4CCLNC6I.js   | -                   |   1.15 kB |               566 bytes
+chunk-PE6TXR6M.js   | -                   |   1.00 kB |                 1.00 kB
+chunk-T5E3QSTY.js   | -                   | 830 bytes |               830 bytes
+chunk-VZRTI3Q6.js   | -                   | 513 bytes |               513 bytes
+chunk-OUPTQ5M6.js   | -                   | 471 bytes |               471 bytes
+chunk-FK6H3RFT.js   | -                   | 272 bytes |               272 bytes
+
+                    | Initial total       |   3.16 MB |               651.27 kB
+
+Lazy chunk files    | Names               |  Raw size | Estimated transfer size
+chunk-LSXPQFGZ.js   | dashboard           |   1.35 MB |               318.06 kB
+chunk-EDV4OFV2.js   | apexcharts-ssr-esm  | 620.39 kB |               140.38 kB
+chunk-6EMT64SP.js   | apexcharts-esm      | 615.27 kB |               139.05 kB
+chunk-OXH4MKYK.js   | core-esm            | 375.72 kB |                87.40 kB
+chunk-YWHILAFZ.js   | html2canvas         | 202.84 kB |                38.52 kB
+chunk-FUFLVB4V.js   | index-es            | 159.05 kB |                46.94 kB
+chunk-P5Z2SXOV.js   | editar-reserva      | 154.51 kB |                31.14 kB
+chunk-JNQYNFQH.js   | crear-reserva       | 128.43 kB |                25.69 kB
+chunk-57DEL7PG.js   | listado             | 126.42 kB |                25.13 kB
+chunk-2W5SSXDR.js   | crear-tour          |  84.72 kB |                17.10 kB
+chunk-WRKBNINA.js   | editar-transfer     |  74.51 kB |                16.41 kB
+chunk-6PENAW72.js   | comisiones          |  69.10 kB |                14.51 kB
+chunk-HSL2YNY3.js   | crear-transfer      |  66.11 kB |                14.62 kB
+chunk-3ETDQ3UW.js   | home                |  61.08 kB |                12.40 kB
+chunk-3ODE67DW.js   | programacion-editor |  59.70 kB |                11.56 kB
+...and 29 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [12.511 seconds] - 2026-10-12T23:35:22.088Z
+
+Output location: C:\Users\USUARIO\OneDrive\Documentos\Sir-Angular\frontend\dist\frontend
+

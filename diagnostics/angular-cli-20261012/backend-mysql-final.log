@@ -1,0 +1,18 @@
+TAP version 13
+# [dotenv@17.2.3] injecting env (0) from .env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+# [dotenv@17.2.3] injecting env (0) from env\\.env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+# Subtest: MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autoría
+ok 1 - MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autoría
+  ---
+  duration_ms: 357.0091
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 629.3633

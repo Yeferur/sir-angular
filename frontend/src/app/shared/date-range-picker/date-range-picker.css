@@ -1,0 +1,51 @@
+app-date-range-picker { display: block; min-width: 0; }
+.cdk-overlay-container.sir-range-overlay-container { z-index: calc(var(--z-modal) + 1); }
+.sir-range-trigger {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 40px;
+  padding: 9px 12px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm);
+  background: var(--bg-tertiary); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+.sir-range-trigger > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sir-range-trigger .is-placeholder { color: var(--text-tertiary); }
+.sir-range-trigger:hover:not(:disabled) { border-color: var(--accent-blue); }
+.sir-range-trigger:focus-visible, .sir-range-day:focus-visible, .sir-range-heading button:focus-visible,
+.sir-range-footer button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.sir-range-trigger.is-open { border-color: var(--accent-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.sir-range-trigger.is-invalid { border-color: var(--accent-red); }
+.sir-range-trigger:disabled { cursor: not-allowed; opacity: .55; }
+.sir-range-chevron { transition: transform .18s var(--ease-soft, ease); }
+.sir-range-trigger.is-open .sir-range-chevron { transform: rotate(180deg); }
+.sir-range-backdrop { background: transparent; }
+.sir-range-panel {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--separator-color);
+  border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--text-primary);
+  font-family: var(--font-family); box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color));
+  animation: sirRangeEnter .2s var(--ease-soft, ease) both; overflow: hidden;
+}
+@keyframes sirRangeEnter { from { opacity: 0; transform: translateY(-5px) scale(.99); } to { opacity: 1; transform: none; } }
+.sir-range-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--separator-color); }
+.sir-range-heading strong { font-size: .82rem; }
+.sir-range-heading button, .sir-range-footer button { border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: inherit; cursor: pointer; }
+.sir-range-heading button { width: 34px; height: 34px; font-size: 1.15rem; }
+.sir-range-heading button:hover, .sir-range-footer button:hover { background: var(--bg-tertiary); color: var(--accent-blue); }
+.sir-range-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 12px; }
+.sir-range-month h3 { margin: 0 0 8px; font-size: .78rem; text-align: center; text-transform: capitalize; }
+.sir-range-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.sir-range-weekday { padding: 5px 0; color: var(--text-tertiary); font-size: .63rem; text-align: center; }
+.sir-range-day { min-width: 0; aspect-ratio: 1; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font: inherit; font-size: .7rem; cursor: pointer; }
+.sir-range-day:hover:not(:disabled) { background: var(--bg-tertiary); border-color: var(--accent-blue); }
+.sir-range-day.is-between { border-radius: 2px; background: color-mix(in srgb, var(--accent-blue) 14%, var(--bg-secondary)); }
+.sir-range-day.is-start, .sir-range-day.is-end { background: var(--accent-blue); color: var(--text-on-accent); font-weight: 700; }
+.sir-range-day:disabled { color: var(--text-tertiary); opacity: .38; cursor: not-allowed; }
+.sir-range-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 8px 12px; border-top: 1px solid var(--separator-color); }
+.sir-range-footer span { color: var(--text-secondary); font-size: .7rem; line-height: 1.35; }
+.sir-range-footer button { flex: 0 0 auto; padding: 6px 8px; font-size: .72rem; }
+@media (max-width: 639px) {
+  .sir-range-months { grid-template-columns: 1fr; }
+  .sir-range-month--second { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sir-range-panel { animation: none; }
+  .sir-range-trigger, .sir-range-chevron { transition: none; }
+}

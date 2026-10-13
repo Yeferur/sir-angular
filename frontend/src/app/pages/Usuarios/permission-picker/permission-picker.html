@@ -1,0 +1,68 @@
+<div class="permissions-section" [class.permissions-section--disabled]="!hasRole"
+  [attr.aria-busy]="loading">
+  <div class="permissions-section-head">
+    <div>
+      <strong>{{ isClientRole ? 'Permisos fijos del Cliente' : 'Permisos asignables' }}</strong>
+      <p>
+        @if (!hasRole) { Selecciona un rol para cargar su selección inicial. }
+        @else if (isClientRole) { Este rol tiene acceso fijo para consultar, crear y actualizar únicamente sus propias reservas. No puede acceder a otros módulos ni cancelar o eliminar reservas. }
+        @else { Los incluidos por el rol ya están seleccionados; puedes activar o retirar cualquiera. }
+      </p>
+    </div>
+    <span class="permission-selection-count"><strong>{{ selectedIds.length }}</strong> {{ selectedIds.length === 1 ? 'seleccionado' : 'seleccionados' }}</span>
+  </div>
+
+  @if (isClientRole) {
+    <div class="permissions-grid" aria-label="Capacidades fijas del Cliente">
+      @for (permission of clientPermissions; track permission.Id_Permiso) {
+        <div class="permission-option permission-option--selected permission-option--fixed">
+          <i class="bx bx-check" aria-hidden="true"></i>
+          <span class="permission-copy"><strong>{{ label(permission) }}</strong><small>Capacidad fija del Cliente</small></span>
+        </div>
+      }
+    </div>
+  } @else {
+    <label class="permission-search-label" for="permission-search">Buscar permiso</label>
+    <input id="permission-search" class="permission-search" type="search" [(ngModel)]="query"
+      [ngModelOptions]="{ standalone: true }"
+      placeholder="Nombre, módulo o código" autocomplete="off" />
+    <div class="permission-workspace">
+      <nav class="permission-module-nav" aria-label="Módulos de permisos">
+        @for (group of groups; track group.key) {
+          <button type="button" class="permission-module"
+            [class.permission-module--active]="activeGroup?.key === group.key"
+            [attr.aria-current]="activeGroup?.key === group.key ? 'true' : null"
+            (click)="selectModule(group.key)">
+            <span>{{ group.label }}</span>
+            <small>{{ selectedCount(group) }}/{{ group.permisos.length }}</small>
+          </button>
+        }
+      </nav>
+      <label class="permission-module-mobile-label" for="permission-module-select">Módulo</label>
+      <app-select class="permission-module-select" inputId="permission-module-select"
+        [value]="activeGroup?.key || ''" [options]="moduleOptions"
+        (valueChange)="selectModule($event)" ariaLabel="Módulo de permisos" />
+      <div class="permission-results" [attr.aria-label]="searching ? 'Resultados de búsqueda de permisos' : 'Permisos del módulo seleccionado'">
+        @for (group of displayedGroups; track group.key) {
+          <section class="permission-group" [attr.aria-label]="group.label">
+            <h3>{{ group.label }} <span>{{ group.permisos.length }} {{ group.permisos.length === 1 ? 'permiso' : 'permisos' }}</span></h3>
+            <div class="permissions-grid">
+              @for (permission of group.permisos; track permission.Id_Permiso) {
+                <button type="button" class="permission-option"
+                  [class.permission-option--selected]="selected(permission.Id_Permiso)"
+                  [disabled]="!hasRole || loading"
+                  [attr.aria-pressed]="selected(permission.Id_Permiso)"
+                  (click)="permissionToggle.emit(permission.Id_Permiso)">
+                  <span class="permission-copy"><strong>{{ label(permission) }}</strong><small>{{ group.label }}</small></span>
+                  @if (selected(permission.Id_Permiso)) { <i class="bx bx-check" aria-hidden="true"></i> }
+                </button>
+              }
+            </div>
+          </section>
+        } @empty {
+          <p class="permission-empty">{{ searching ? 'No hay permisos que coincidan con la búsqueda.' : 'No hay permisos disponibles.' }}</p>
+        }
+      </div>
+    </div>
+  }
+</div>

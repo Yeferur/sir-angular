@@ -115,6 +115,9 @@ app.use('/api/comisiones', comisionesRoutes);
 const segurosRoutes = require('./routes/Seguros/seguros.routes');
 app.use('/api/seguros', segurosRoutes);
 
+const mercadeoRoutes = require('./routes/Mercadeo/mercadeo.routes');
+app.use('/api/mercadeo', mercadeoRoutes);
+
 // ✅ Crear server HTTP (para compartir con WS)
 const DEFAULT_PORT = Number(process.env.PORT || 4000);
 const isDevelopment = process.env.NODE_ENV !== 'production';

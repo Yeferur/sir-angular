@@ -286,7 +286,7 @@
   width: clamp(180px, 20vw, 280px);
   min-width: 0;
   max-width: none;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
   padding: 0 12px;
   display: flex;
@@ -298,12 +298,12 @@
   display: block;
   font-size: clamp(1.18rem, 0.95rem + 0.6vw, 1.5rem);
   font-weight: 700;
-  line-height: 2.2;
+  line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   transition: opacity 150ms ease, transform 180ms var(--ease-panel), filter 180ms ease;
 }
 
@@ -1032,8 +1032,7 @@
     width: 100vw;
   }
 
-  /* Título siempre visible pero muy truncado: apenas unas letras
-     y puntos suspensivos — hay poco espacio junto al resto de la isla. */
+  /* El título conserva su texto completo y puede ocupar dos líneas. */
   .topbar-title-zone {
     flex: 1 1 0;
     max-width: none;

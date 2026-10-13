@@ -1,0 +1,28 @@
+root node PID=31332
+2026-10-12T18:42:39.1386637-05:00 {"ProcessName":"node","Id":31332}
+2026-10-12T18:42:39.6665137-05:00 {"ProcessName":"node","Id":31332}
+2026-10-12T18:42:40.1808499-05:00 [{"ProcessName":"node","Id":31332},{"ProcessName":"node","Id":34052}]
+2026-10-12T18:42:40.6881440-05:00 {"ProcessName":"node","Id":31332}
+2026-10-12T18:42:41.2029791-05:00 {"ProcessName":"node","Id":31332}
+2026-10-12T18:42:41.7127118-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:42.2292715-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:42.7519363-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:43.2751382-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:43.7846345-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:44.3133913-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:44.8399447-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:45.3568191-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:45.8664955-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:46.3756594-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:46.9014668-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:47.4091596-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:47.9192349-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:48.4357085-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:48.9535344-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:49.4724594-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:49.9816646-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:50.4974213-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:51.0297955-05:00 [{"ProcessName":"esbuild","Id":26744},{"ProcessName":"node","Id":31332}]
+2026-10-12T18:42:51.5709095-05:00 {"ProcessName":"node","Id":31332}
+2026-10-12T18:42:52.0860473-05:00 {"ProcessName":"node","Id":31332}
+exit=1

@@ -32,7 +32,7 @@ describe('SirSelectComponent: formulario, interacción y overlay', () => {
   let fixture: ComponentFixture<SelectTestHost>;
   let host: SelectTestHost;
   let trigger: HTMLButtonElement;
-  const panel = () => document.querySelector<HTMLElement>('.sir-select-list')!;
+  const panel = () => document.querySelector<HTMLElement>('.sir-select-overlay-panel:not(.is-closing) .sir-select-list')!;
   const render = () => { fixture.changeDetectorRef.markForCheck(); fixture.detectChanges(); };
   const key = (value: string, shiftKey = false) => {
     trigger.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, cancelable: true }));
@@ -160,7 +160,7 @@ describe('SirSelectComponent: formulario, interacción y overlay', () => {
     expect(fixture.nativeElement.contains(panel())).toBeFalse();
     const container = panel().closest('.sir-select-overlay-container')!;
     expect(+getComputedStyle(container).zIndex).toBeGreaterThan(1500);
-    expect(panel().getBoundingClientRect().width).toBeCloseTo(trigger.getBoundingClientRect().width, 0);
+    expect(Number.parseFloat(getComputedStyle(panel()).width)).toBeCloseTo(trigger.getBoundingClientRect().width, 0);
   });
 
   it('abre arriba cerca del borde inferior y mantiene el panel dentro del viewport', () => {
@@ -179,6 +179,20 @@ describe('SirSelectComponent: formulario, interacción y overlay', () => {
     fixture.destroy();
     expect(panel()).toBeNull();
     expect(document.querySelector('.sir-select-overlay-container')).toBeNull();
+  });
+
+  it('anima la salida sin mantener abierto el combobox y respeta movimiento reducido', async () => {
+    trigger.click(); render();
+    expect(getComputedStyle(panel()).animationName).toBe('sirSelectEnter');
+    host.select.close(); render();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      expect(document.querySelector('.sir-select-overlay-panel')).toBeNull();
+    } else {
+      expect(document.querySelector('.sir-select-overlay-panel.is-closing')).not.toBeNull();
+      await new Promise(resolve => setTimeout(resolve, 190));
+      expect(document.querySelector('.sir-select-overlay-panel')).toBeNull();
+    }
   });
 
   it('hace visible la selección precargada al final de una lista sin desplazar la página', () => {

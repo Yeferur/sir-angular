@@ -1,0 +1,5 @@
+[13992:28344:1012/183049.242:ERROR:chrome\browser\component_updater\edge_optimization_guide_models_manifest_installer.cc:264] Edge LLM: catalog update failed: 5
+[13992:28344:1012/183049.258:ERROR:components\device_event_log\device_event_log_impl.cc:257] [18:30:49.259] USB: usb_device_win.cc:66 Failed to open \\?\usb#root_hub30#7&1fe0cc32&0&0#{f18a0e88-c30c-11d0-8815-00a0c906bed8}: Acceso denegado. (0x5)
+[13992:28344:1012/183049.265:ERROR:components\device_event_log\device_event_log_impl.cc:257] [18:30:49.265] USB: usb_device_win.cc:66 Failed to open \\?\usb#vid_1a86&pid_8095#8&36b1eaa7&0&17#{f18a0e88-c30c-11d0-8815-00a0c906bed8}: Acceso denegado. (0x5)
+[13992:28344:1012/183049.270:ERROR:components\device_event_log\device_event_log_impl.cc:257] [18:30:49.270] USB: usb_device_win.cc:66 Failed to open \\?\usb#root_hub30#5&2175998c&0&0#{f18a0e88-c30c-11d0-8815-00a0c906bed8}: Acceso denegado. (0x5)
+[13992:28344:1012/183049.272:ERROR:chrome\browser\component_updater\edge_language_detection_model_installer.cc:97] Edge Language Detection Model: On-demand update failed with error: 5

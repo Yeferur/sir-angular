@@ -2,8 +2,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
-import { EMPTY, of, Subject } from 'rxjs';
+import { provideRouter, Router } from '@angular/router';
+import { EMPTY, of, Subject, BehaviorSubject } from 'rxjs';
 import { LayoutComponent } from './layout';
 import { AuthService } from '../services/Login/login-service';
 import { PermisosService } from '../services/Permisos/permisos.service';
@@ -14,6 +14,9 @@ import { WebSocketService } from '../services/WebSocket/web-socket';
 import { SirDrawerService } from '../services/Drawer/drawer.service';
 import { MiActividadFacade } from '../services/MiActividad/mi-actividad.facade';
 import { DesktopNotificationsService } from '../services/Notificaciones/desktop-notifications.service';
+import { SirAlertService } from '../services/Alertas/alert.service';
+import { UnsavedChangesService } from '../guards/unsaved-changes.guard';
+import { TopbarTransitionService } from '../components/login/topbar-transition.service';
 
 // El shell real se prueba con una sesión ficticia y sin peticiones al backend.
 describe('Navegación superior', () => {
@@ -24,8 +27,10 @@ describe('Navegación superior', () => {
   let notificationLoad: jasmine.Spy;
   let notificationClear: jasmine.Spy;
   let events: Subject<any>;
+  let permissionChanges: BehaviorSubject<string[]>;
   let desktopToggle: jasmine.Spy;
   let desktopState: ReturnType<typeof signal<'enabled' | 'disabled' | 'blocked'>>;
+  let authLogout: jasmine.Spy;
   const allPermissions = [
     'RESERVAS.LEER', 'RESERVAS.CREAR', 'CONTROL_VIAJE.LEER',
     'TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TOURS.LEER', 'TOURS.CREAR',
@@ -48,20 +53,23 @@ describe('Navegación superior', () => {
     notificationLoad = jasmine.createSpy('notificationLoad');
     notificationClear = jasmine.createSpy('notificationClear');
     events = new Subject<any>();
+    permissionChanges = new BehaviorSubject<string[]>(allPermissions);
     desktopToggle = jasmine.createSpy('desktopToggle').and.resolveTo('enabled');
+    authLogout = jasmine.createSpy('authLogout');
     desktopState = signal<'enabled' | 'disabled' | 'blocked'>('disabled');
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
-        provideZonelessChangeDetection(), provideRouter([]),
+        provideZonelessChangeDetection(), provideRouter([{ path: 'Mercadeo/Reservas', children: [] }]),
         provideHttpClient(), provideHttpClientTesting(),
         { provide: AuthService, useValue: {
           getToken: () => 'test-session',
           getUser: () => ({ name: 'Usuario', apellidos: 'Prueba', email: 'prueba@example.test' }),
           isLoggedIn: () => of(false),
+          logout: authLogout,
         } },
         { provide: PermisosService, useValue: {
-          permisos$: of(allPermissions),
+          permisos$: permissionChanges.asObservable(),
           loadSessionData: () => Promise.resolve(true),
           tienePermiso: (code: string) => allowed.has(code),
           tieneAlgunPermiso: (codes: string[]) => codes.some(code => allowed.has(code)),
@@ -216,6 +224,54 @@ describe('Navegación superior', () => {
     expect(element('a[href="/Reservas/VerReservas"]')).not.toBeNull();
   });
 
+  it('muestra Mercadeo solo cuando el usuario tiene MERCADEO.RESERVAS.LEER', async () => {
+    allowed = new Set(['RESERVAS.LEER']);
+    await render();
+    expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+
+    allowed.add('MERCADEO.RESERVAS.LEER');
+    await render();
+    const link = element<HTMLAnchorElement>('a[href="/Mercadeo/Reservas"]');
+    expect(link).not.toBeNull();
+    expect(link.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Gestión');
+    expect(link.querySelector('strong')?.textContent?.trim()).toBe('Mercadeo');
+    expect(link.querySelector('small')?.textContent?.trim()).toBe('Análisis comercial');
+
+    layout.toggleNavigationLauncher();
+    await render();
+    link.click();
+    await render();
+    expect(TestBed.inject(Router).url).toBe('/Mercadeo/Reservas');
+    expect(link.classList.contains('active')).toBeTrue();
+    expect(link.getAttribute('aria-current')).toBe('page');
+
+    allowed.delete('MERCADEO.RESERVAS.LEER');
+    await render();
+    expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+  });
+
+  it('actualiza el menú y las acciones al emitir nuevos permisos sin recargar', async () => {
+    allowed = new Set(['RESERVAS.LEER']);
+    permissionChanges.next([...allowed]);
+    await fixture.whenStable();
+    expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+    expect(element('[data-create-trigger]')).toBeNull();
+
+    allowed.add('MERCADEO.RESERVAS.LEER');
+    allowed.add('RESERVAS.CREAR');
+    permissionChanges.next([...allowed]);
+    await fixture.whenStable();
+    expect(element('a[href="/Mercadeo/Reservas"]')).not.toBeNull();
+    expect(element('[data-create-trigger]')).not.toBeNull();
+
+    allowed.delete('MERCADEO.RESERVAS.LEER');
+    allowed.delete('RESERVAS.CREAR');
+    permissionChanges.next([...allowed]);
+    await fixture.whenStable();
+    expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+    expect(element('[data-create-trigger]')).toBeNull();
+  });
+
   it('excluye los paneles incompatibles y hace inertes los dropdowns cerrados', async () => {
     layout.toggleNavigationLauncher();
     await render();
@@ -292,6 +348,63 @@ describe('Navegación superior', () => {
     expect(profile).toHaveBeenCalledTimes(1);
     expect(help).toHaveBeenCalledTimes(1);
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin cambios inicia logout sin diálogo', async () => {
+    TestBed.inject(TopbarTransitionService).markAppReady();
+    await render();
+    const coordinator = TestBed.inject(UnsavedChangesService);
+    const alerts = TestBed.inject(SirAlertService);
+    const confirm = spyOn(alerts, 'confirmDecision').and.resolveTo(false);
+    const expand = spyOn(TestBed.inject(TopbarTransitionService), 'requestExpandToFullscreen');
+    const navigation = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    spyOn<any>(layout, 'runLogoutTransition').and.resolveTo();
+    const draft = { hasUnsavedChanges: () => false };
+    coordinator.activate(draft);
+    await layout.handleLogout();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(expand).toHaveBeenCalledTimes(1);
+    (layout as any).finishLogout();
+    expect(authLogout).toHaveBeenCalledTimes(1);
+    expect(navigation).toHaveBeenCalledWith('/');
+  });
+
+  it('con cambios pregunta antes de cerrar y cancelar conserva sesión y formulario', async () => {
+    TestBed.inject(TopbarTransitionService).markAppReady();
+    await render();
+    const coordinator = TestBed.inject(UnsavedChangesService);
+    const draft = { hasUnsavedChanges: () => true };
+    coordinator.activate(draft);
+    const confirm = spyOn(TestBed.inject(SirAlertService), 'confirmDecision').and.resolveTo(false);
+    const expand = spyOn(TestBed.inject(TopbarTransitionService), 'requestExpandToFullscreen');
+    layout.profileMenuOpen.set(true);
+    await layout.handleLogout();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(expand).not.toHaveBeenCalled();
+    expect(layout.profileMenuOpen()).toBeTrue();
+    expect(draft.hasUnsavedChanges()).toBeTrue();
+    expect(authLogout).not.toHaveBeenCalled();
+    expect(coordinator.isApprovedLogoutNavigation('/')).toBeFalse();
+  });
+
+  it('al confirmar cambios pendientes cierra sesión con una sola decisión', async () => {
+    TestBed.inject(TopbarTransitionService).markAppReady();
+    await render();
+    const coordinator = TestBed.inject(UnsavedChangesService);
+    coordinator.activate({ hasUnsavedChanges: () => true });
+    const confirm = spyOn(TestBed.inject(SirAlertService), 'confirmDecision').and.resolveTo(true);
+    const expand = spyOn(TestBed.inject(TopbarTransitionService), 'requestExpandToFullscreen');
+    const navigation = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    spyOn<any>(layout, 'runLogoutTransition').and.resolveTo();
+    await layout.handleLogout();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(expand).toHaveBeenCalledTimes(1);
+    expect(coordinator.isApprovedLogoutNavigation('/')).toBeTrue();
+    expect(authLogout).not.toHaveBeenCalled();
+    (layout as any).finishLogout();
+    expect(authLogout).toHaveBeenCalledTimes(1);
+    expect(navigation).toHaveBeenCalledWith('/');
+    expect(confirm).toHaveBeenCalledTimes(1);
   });
 
   it('activa los avisos de escritorio únicamente desde la acción del perfil', async () => {

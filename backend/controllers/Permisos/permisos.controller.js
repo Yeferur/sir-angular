@@ -1,6 +1,7 @@
 const permisosService = require('../../services/Permisos/permisos.service');
 const { invalidarCacheUsuario } = require('../../middlewares/permissionsMiddleware');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+const permissionEvents = require('../../services/Permisos/permissions-events');
 
 /**
  * Obtener permisos del usuario actual
@@ -131,6 +132,7 @@ async function asignarPermiso(req, res) {
     }
 
     await permisosService.asignarPermisoARol(idRol, idPermiso);
+    await permissionEvents.safelyNotifyRole(idRol);
     
     return sendSuccess(res, { data: null, message: 'Permiso asignado correctamente' });
   } catch (error) {
@@ -155,6 +157,7 @@ async function revocarPermiso(req, res) {
     }
 
     await permisosService.revocarPermisoDeRol(idRol, idPermiso);
+    await permissionEvents.safelyNotifyRole(idRol);
     
     return sendSuccess(res, { data: null, message: 'Permiso revocado correctamente' });
   } catch (error) {
@@ -207,6 +210,7 @@ async function actualizarRol(req, res) {
       Descripcion: descripcion,
       Activo: activo !== undefined ? activo : 1
     });
+    await permissionEvents.safelyNotifyRole(idRol, { reconnectSockets: true });
     
     return sendSuccess(res, { data: null, message: 'Rol actualizado correctamente' });
   } catch (error) {
@@ -254,6 +258,7 @@ async function invalidarCache(req, res) {
     if (userId) {
       await permisosService.incrementarRevisionUsuarioCompartida(userId);
       invalidarCacheUsuario(userId);
+      await permissionEvents.safelyNotifyUser(userId);
     }
     
     return sendSuccess(res, { data: null, message: 'Cache invalidado correctamente' });

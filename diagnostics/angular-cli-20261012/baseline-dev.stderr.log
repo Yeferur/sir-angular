@@ -1,0 +1,32 @@
+X [ERROR] TS2307: Cannot find module '../../../../../release-metadata.json' or its corresponding type declarations. [plugin angular-compiler]
+
+    src/app/services/AppUpdates/app-version.service.ts:4:28:
+      4 │ import releaseMetadata from '../../../../../release-metadata.json';
+        ╵                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] Could not resolve "../../../../../release-metadata.json"
+
+    src/app/services/AppUpdates/app-version.service.ts:4:28:
+      4 │ import releaseMetadata from '../../../../../release-metadata.json';
+        ╵                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] Could not resolve "node_modules/leaflet/dist/leaflet.css"
+
+    angular:styles/global:styles:3:8:
+      3 │ @import 'node_modules/leaflet/dist/leaflet.css';
+        ╵         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  You can mark the path "node_modules/leaflet/dist/leaflet.css" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+
+X [ERROR] Could not resolve "node_modules/leaflet-routing-machine/dist/leaflet-routing-machine.css"
+
+    angular:styles/global:styles:4:8:
+      4 │ @import 'node_modules/leaflet-routing-machine/dist/leaflet-routing-...
+        ╵         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  You can mark the path "node_modules/leaflet-routing-machine/dist/leaflet-routing-machine.css" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+

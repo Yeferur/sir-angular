@@ -1,0 +1,59 @@
+Initial chunk files | Names               |  Raw size
+main.js             | main                |   4.39 MB | 
+chunk-YFOWXDM7.js   | -                   |   1.06 MB | 
+chunk-46X75RPJ.js   | -                   | 259.56 kB | 
+chunk-3LPRLUCK.js   | -                   | 152.84 kB | 
+styles.css          | styles              | 143.53 kB | 
+chunk-V7YXYXSM.js   | -                   | 116.18 kB | 
+chunk-J3O2DDQM.js   | -                   | 105.58 kB | 
+chunk-YDDF7UDA.js   | -                   |  86.17 kB | 
+chunk-Q7EXBX2P.js   | -                   |  63.47 kB | 
+chunk-I534XF5E.js   | -                   |  57.08 kB | 
+chunk-DNC3O577.js   | -                   |  40.14 kB | 
+chunk-67YPU4JZ.js   | -                   |  40.03 kB | 
+chunk-INBGOGS6.js   | -                   |  32.25 kB | 
+chunk-CMQTBHOD.js   | -                   |  25.32 kB | 
+chunk-DX6FGCQT.js   | -                   |  13.80 kB | 
+chunk-4GRSXDXR.js   | -                   |   8.51 kB | 
+chunk-7G62WX26.js   | -                   |   7.40 kB | 
+chunk-OONX7VON.js   | -                   |   7.33 kB | 
+chunk-WCDBPVDC.js   | -                   |   7.22 kB | 
+chunk-MEAINILD.js   | -                   |   6.50 kB | 
+chunk-QUZHTHOJ.js   | -                   |   6.27 kB | 
+chunk-MBKT2DA6.js   | -                   |   4.79 kB | 
+chunk-RD6VNWAF.js   | -                   |   4.01 kB | 
+chunk-BNE4VKQ3.js   | -                   |   3.98 kB | 
+chunk-ME6IHFG4.js   | -                   |   3.42 kB | 
+chunk-7PLCLRNK.js   | -                   |   3.06 kB | 
+chunk-GQ3QC4FL.js   | -                   |   2.91 kB | 
+chunk-ZJXJHKJC.js   | -                   |   2.52 kB | 
+chunk-CH4VVEQC.js   | -                   |   2.15 kB | 
+chunk-6ZM4HNRR.js   | -                   |   1.93 kB | 
+chunk-ZFONJRNA.js   | -                   |   1.62 kB | 
+chunk-D6CFVP7A.js   | -                   |   1.07 kB | 
+chunk-7YWLATDR.js   | -                   | 459 bytes | 
+
+                    | Initial total       |   6.66 MB
+
+Lazy chunk files    | Names               |  Raw size
+chunk-3HCHZCMQ.js   | dashboard           |   2.29 MB | 
+chunk-WDT3YABX.js   | apexcharts-ssr-esm  |   1.32 MB | 
+chunk-4FVGDLWM.js   | apexcharts-esm      |   1.31 MB | 
+chunk-R6GU75G7.js   | core-esm            | 803.44 kB | 
+chunk-CCTQ5NAV.js   | html2canvas         | 399.42 kB | 
+chunk-2LMKU75F.js   | editar-reserva      | 376.08 kB | 
+chunk-5UTHHA46.js   | index-es            | 368.72 kB | 
+chunk-XFTZ7LM6.js   | crear-reserva       | 329.21 kB | 
+chunk-56TINLJL.js   | listado             | 287.41 kB | 
+chunk-FGXBBJ2F.js   | crear-tour          | 219.57 kB | 
+chunk-YIGZ474D.js   | editar-transfer     | 188.05 kB | 
+chunk-4RSJJCKW.js   | crear-transfer      | 168.75 kB | 
+chunk-K6XAHRQT.js   | comisiones          | 165.88 kB | 
+chunk-5GADIUFC.js   | programacion-editor | 162.48 kB | 
+chunk-VAU6NYME.js   | home                | 153.29 kB | 
+...and 29 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [9.251 seconds] - 2026-10-12T23:38:40.506Z
+
+Output location: C:\Users\USUARIO\OneDrive\Documentos\Sir-Angular\frontend\dist\frontend
+

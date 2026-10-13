@@ -85,7 +85,7 @@
 .readonly-day.is-off { color: var(--text-tertiary); background: color-mix(in srgb, var(--bg-tertiary) 42%, var(--bg-secondary)); }
 .day-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .day-name > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.day-name > div > strong { overflow: hidden; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.day-name > div > strong { font-size: .78rem; white-space: normal; overflow-wrap: anywhere; }
 .day-date { display: grid; width: 48px; height: 46px; flex: 0 0 auto; place-content: center; border: 1px solid var(--separator-color); border-radius: var(--radius-sm, 10px); background: var(--bg-primary); text-align: center; }
 .day-date strong { color: var(--text-primary); font-size: 1rem; font-weight: 780; line-height: 1; font-variant-numeric: tabular-nums; }
 .day-date small { margin-top: 4px; color: var(--accent-blue); font-size: .56rem; font-weight: 800; line-height: 1; letter-spacing: .04em; text-transform: uppercase; }

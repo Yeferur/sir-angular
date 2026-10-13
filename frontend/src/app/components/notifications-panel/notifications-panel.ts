@@ -32,8 +32,10 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
 
   readonly exchanges = signal<IntercambioTurno[]>([]);
   readonly busy = signal(false);
-  readonly isAdvisor = String(this.permissions.getRoleSnapshot() || '')
-    .trim().toLocaleLowerCase('es-CO') === 'asesor';
+  get isAdvisor(): boolean {
+    return String(this.permissions.getRoleSnapshot() || '')
+      .trim().toLocaleLowerCase('es-CO') === 'asesor';
+  }
   readonly pending = computed(() => this.exchanges()
     .filter((item) => !item.esSolicitante && item.estado === 'pendiente'));
   readonly outgoing = computed(() => this.exchanges()
@@ -41,11 +43,9 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.reload();
-    if (this.isAdvisor) {
-      this.eventSub = this.webSocket.events$.subscribe((event) => {
-        if (event.type === 'turnoIntercambioActualizado') this.reloadExchanges();
-      });
-    }
+    this.eventSub = this.webSocket.events$.subscribe((event) => {
+      if (event.type === 'turnoIntercambioActualizado' && this.isAdvisor) this.reloadExchanges();
+    });
   }
 
   ngOnDestroy(): void {

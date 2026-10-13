@@ -1,0 +1,7 @@
+<section class="sir-query-empty" [class.sir-query-empty--compact]="compact" [attr.aria-labelledby]="titleId">
+  <span class="sir-query-empty-icon" aria-hidden="true"><i class="bx" [class]="'bx ' + icon"></i></span>
+  @if (headingLevel === 2) { <h2 [id]="titleId">{{ title }}</h2> }
+  @else { <h3 [id]="titleId">{{ title }}</h3> }
+  @if (description) { <p>{{ description }}</p> }
+  <ng-content />
+</section>

@@ -56,14 +56,14 @@ button, input { font: inherit; }
 }
 
 .title-line h2 {
-  overflow: hidden;
+  overflow: visible;
   margin: 0;
   color: var(--text-primary);
   font-size: 1rem;
   font-weight: 850;
   letter-spacing: -.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .pending-chip {

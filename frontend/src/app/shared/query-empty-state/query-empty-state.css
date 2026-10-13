@@ -1,0 +1,13 @@
+:host { display: block; }
+.sir-query-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  min-height: 154px; padding: 22px 18px; border: 1px dashed var(--separator-color);
+  border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  color: var(--text-primary); text-align: center; box-sizing: border-box;
+}
+.sir-query-empty--compact { min-height: 0; padding: 16px; }
+.sir-query-empty-icon { display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 3px;
+  border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary);
+  color: var(--text-secondary); font-size: 1.3rem; }
+.sir-query-empty h2, .sir-query-empty h3 { margin: 0; font-size: .94rem; font-weight: 700; }
+.sir-query-empty p { max-width: 520px; margin: 0; color: var(--text-secondary); font-size: .78rem; line-height: 1.5; }

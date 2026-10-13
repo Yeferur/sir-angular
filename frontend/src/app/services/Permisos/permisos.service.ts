@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, firstValueFrom } from 'rxjs';
 import { tap, map } from 'rxjs/operators';
@@ -60,9 +61,11 @@ export class PermisosService {
   // permisos actuales (solo códigos)
   private permisosSubject = new BehaviorSubject<string[]>([]);
   public permisos$ = this.permisosSubject.asObservable();
+  private readonly permisosSignal = toSignal(this.permisos$, { initialValue: [] as string[] });
 
   private roleSubject = new BehaviorSubject<string | null>(null);
   public role$ = this.roleSubject.asObservable();
+  private readonly roleSignal = toSignal(this.role$, { initialValue: null as string | null });
 
   // menú dinámico
   private menuSubject = new BehaviorSubject<MenuItem[]>([]);
@@ -147,21 +150,21 @@ export class PermisosService {
   // =====================================================
 
   tienePermiso(codigoPermiso: string): boolean {
-    return this.permisosSubject.value.includes(codigoPermiso);
+    return this.permisosSignal().includes(codigoPermiso);
   }
 
   tieneAlgunPermiso(codigosPermisos: string[]): boolean {
-    const permisos = this.permisosSubject.value;
+    const permisos = this.permisosSignal();
     return codigosPermisos.some(codigo => permisos.includes(codigo));
   }
 
   tieneTodosPermisos(codigosPermisos: string[]): boolean {
-    const permisos = this.permisosSubject.value;
+    const permisos = this.permisosSignal();
     return codigosPermisos.every(codigo => permisos.includes(codigo));
   }
 
   getPermisosSnapshot(): string[] {
-    return [...this.permisosSubject.value];
+    return [...this.permisosSignal()];
   }
 
   isReady(): boolean {
@@ -169,11 +172,11 @@ export class PermisosService {
   }
 
   esCliente(): boolean {
-    return String(this.roleSubject.value || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
+    return String(this.roleSignal() || '').trim().toLocaleLowerCase('es-CO') === 'cliente';
   }
 
   getRoleSnapshot(): string | null {
-    return this.roleSubject.value;
+    return this.roleSignal();
   }
 
   // =====================================================
