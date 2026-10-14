@@ -55,6 +55,19 @@ describe('Primitivas de consulta', () => {
     expect(root.querySelector<HTMLButtonElement>('.sir-filter-actions .sir-action--primary')!.disabled).toBeTrue();
   });
 
+  it('anima el cierre del panel y después lo oculta del árbol accesible', async () => {
+    host.open = true; render();
+    const panel = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('#test-panel')!;
+    expect(panel.hidden).toBeFalse();
+    host.open = false; render();
+    expect(panel.classList.contains('is-closing')).toBeTrue();
+    expect(panel.getAttribute('aria-hidden')).toBe('true');
+    expect(panel.hasAttribute('inert')).toBeTrue();
+    await new Promise(resolve => setTimeout(resolve, 190));
+    render();
+    expect(panel.hidden).toBeTrue();
+  });
+
   it('mantiene SearchInput sincronizado con Reactive Forms y limpia sin buscar automáticamente', () => {
     const root = fixture.nativeElement as HTMLElement;
     host.query.setValue('TG123'); render();

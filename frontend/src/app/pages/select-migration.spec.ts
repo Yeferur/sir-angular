@@ -128,12 +128,17 @@ describe('Comisiones: select en modal', () => {
 
 describe('Historial y rutas: filtros por valor/evento', () => {
   it('mantiene los filtros independientes de Historial', async () => {
-    const { c, render, select } = await mount(VerHistorialComponent);
-    c.isInitialLoading.set(false); c.advancedFiltersVisible.set(true); render();
-    select('Historial-accion').choose(1); render(); expect(c.filters().Tipo_Accion).toBe('CREATE');
-    select('Historial-tabla').choose(1); render(); expect(c.filters().Tabla_Afectada).toBe('usuarios');
-    select('Historial-accion').choose(0); render(); expect(c.filters().Tipo_Accion).toBe('');
-    expect(c.filters().Tabla_Afectada).toBe('usuarios');
+    const { c } = await mount(VerHistorialComponent);
+    c.toggleUser(5, true);
+    c.toggleAction('LOGIN', true);
+    c.toggleModule('reservas', true);
+    expect(c.draftFilters().usuarios).toEqual([5]);
+    expect(c.draftFilters().acciones).toEqual(['LOGIN']);
+    expect(c.draftFilters().modulos).toEqual(['reservas']);
+    expect(c.appliedFilters().usuarios).toEqual([]);
+    expect(c.appliedFilters().acciones).toEqual([]);
+    expect(c.appliedFilters().modulos).toEqual([]);
+    expect(c.appliedGroupCount()).toBe(0);
   });
 
   for (const [component, id] of [[VerPuntos, 'ver-puntos-ruta'], [OrdenarPuntosComponent, 'ruta']] as const) {

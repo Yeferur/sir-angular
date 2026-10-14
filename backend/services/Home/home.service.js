@@ -418,7 +418,8 @@ async function getManagementActivity(permissions) {
   if (!hasAnyPermission(permissions, 'HISTORIAL.LEER')) return [];
   const [rows] = await db.query(
     `SELECT h.Accion, h.Tabla, h.Id_Registro, h.Fecha_Hora_Registro,
-            u.Nombres_Apellidos AS Usuario
+            COALESCE(h.Actor_Nombre, u.Nombres_Apellidos) AS Usuario,
+            h.Actor_Rol
        FROM historial h
        LEFT JOIN usuarios u ON u.Id_Usuario = h.Id_Usuario
       ORDER BY h.Fecha_Hora_Registro DESC, h.Id_Historial DESC

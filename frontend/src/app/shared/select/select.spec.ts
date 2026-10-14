@@ -10,6 +10,7 @@ import { SirSelectComponent, SirSelectOption, compareSelectValuesAsStrings } fro
     <div class="test-clip" style="overflow:hidden; width:240px">
       <label for="test-select">Tour</label>
       <app-select inputId="test-select" [formControl]="control" [options]="options"
+        [multiple]="multiple" [searchable]="searchable"
         [required]="true" [invalid]="control.touched && control.invalid" [compareWith]="compareWith"
         placeholder="Seleccionar tour" (valueChange)="changes.push($event)" />
     </div><button id="after-select">Después</button>`,
@@ -25,6 +26,8 @@ class SelectTestHost {
     { value: 5, label: 'Último' },
   ];
   compareWith = Object.is;
+  multiple = false;
+  searchable = false;
   changes: any[] = [];
 }
 
@@ -60,6 +63,32 @@ describe('SirSelectComponent: formulario, interacción y overlay', () => {
     expect(host.control.pristine).toBeTrue();
     expect(host.control.untouched).toBeTrue();
     expect(host.changes).toEqual(['3']);
+  });
+
+  it('admite selección múltiple con búsqueda, mantiene abierto el overlay y emite arrays tipados', () => {
+    host.multiple = true;
+    host.searchable = true;
+    host.control.setValue([2]);
+    render();
+    expect(trigger.textContent).toContain('1 seleccionado');
+    trigger.click(); render();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(panel().getAttribute('aria-multiselectable')).toBe('true');
+    const search = document.querySelector<HTMLInputElement>('.sir-select-search input')!;
+    search.value = 'santa';
+    search.dispatchEvent(new Event('input', { bubbles: true })); render();
+    expect(panel().querySelectorAll('[role="option"]').length).toBe(1);
+    expect(panel().textContent).toContain('Santa Fe');
+    host.select.choose(2); render();
+    expect(host.control.value).toEqual([2, '3']);
+    expect(host.changes).toEqual([[2, '3']]);
+    expect(host.select.isOpen).toBeTrue();
+    expect(trigger.textContent).toContain('2 seleccionados');
+    host.select.choose(2); render();
+    expect(host.control.value).toEqual([2]);
+    expect(host.changes).toEqual([[2, '3'], [2]]);
+    host.select.choose(3);
+    expect(host.control.value).toEqual([2]);
   });
 
   it('respeta la equivalencia explícita de selects nativos precargados sin convertir lo emitido', () => {

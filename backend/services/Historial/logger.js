@@ -42,8 +42,27 @@ async function registrarHistorial(input, maybeData = {}) {
   const conn = data.conexion || await db.getConnection();
 
   try {
-    // En tablas con FK a usuarios, usar NULL cuando no exista usuario válido
-    const safeUser = normalizeOptionalUserId(data.id_usuario);
+    // Capture the actor while the event is written so later user edits/deletion
+    // cannot rewrite who the event described at the time.
+    const requestedUser = normalizeOptionalUserId(data.id_usuario);
+    let safeUser = requestedUser;
+    let actorName = null;
+    let actorRole = null;
+    if (requestedUser !== null) {
+      const [[actor]] = await conn.query(
+        `SELECT u.Id_Usuario,
+                COALESCE(NULLIF(TRIM(u.Nombres_Apellidos), ''), NULLIF(TRIM(u.Usuario), '')) AS Actor_Nombre,
+                r.Nombre_Rol AS Actor_Rol
+           FROM usuarios u
+           LEFT JOIN roles r ON r.Id_Rol = u.Id_Rol
+          WHERE u.Id_Usuario = ?
+          LIMIT 1`,
+        [requestedUser]
+      );
+      safeUser = actor?.Id_Usuario ?? null;
+      actorName = actor?.Actor_Nombre ?? null;
+      actorRole = actor?.Actor_Rol ?? null;
+    }
     const safeRegistro = (data.id_registro == null || data.id_registro === '') ? null : String(data.id_registro);
 
     // Resolver acción concreta si viniera como 'CREAR_O_ACTUALIZAR'
@@ -86,8 +105,10 @@ async function registrarHistorial(input, maybeData = {}) {
     }
 
     const [res] = await conn.query(
-      'INSERT INTO historial (Tabla, Id_Registro, Accion, Id_Usuario) VALUES (?, ?, ?, ?)',
-      [data.tabla, safeRegistro, finalAccion, safeUser]
+      `INSERT INTO historial
+        (Tabla, Id_Registro, Accion, Id_Usuario, Actor_Nombre, Actor_Rol)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [data.tabla, safeRegistro, finalAccion, safeUser, actorName, actorRole]
     );
 
     const Id_Historial = res.insertId;

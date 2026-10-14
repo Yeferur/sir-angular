@@ -51,7 +51,7 @@ async function actualizarPersonalBus(req, res) {
             Conductor,
             DNI_Conductor,
             DNI_Guia
-        });
+        }, req.user?.id || null);
 
         if (result.affected === 0) {
             return sendError(res, { status: 404, message: 'Bus no encontrado', errorCode: 'NOT_FOUND' });

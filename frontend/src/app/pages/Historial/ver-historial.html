@@ -1,302 +1,279 @@
-<div class="page-container">
-
-  <!-- HEADER -->
-  <div class="page-header">
+<main class="page-container reservation-browser">
+  <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input
-          type="text"
-          class="search-input"
-          placeholder="Buscar por usuario, descripción, tabla..."
-          [value]="filters().searchText"
-          (input)="updateFilter('searchText', $any($event.target).value)"
-          (keyup.enter)="buscar()"
-          autocomplete="off" />
+        <input type="text" class="search-input" placeholder="Buscar por código de reserva o transfer"
+          [value]="draftFilters().referencia" (input)="onReferenceInput($any($event.target).value)"
+          (keyup.enter)="buscar()" autocomplete="off" aria-label="Buscar por código de reserva o transfer" />
+        @if (draftFilters().referencia) {
+          <button type="button" class="search-clear" (click)="onReferenceInput('')" aria-label="Limpiar búsqueda por código">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        }
+        @if (referenceInputError()) { <span class="visually-hidden" role="alert">{{ referenceInputError() }}</span> }
       </div>
-
-      <button class="btn-filter" [class.btn-filter--active]="advancedFiltersVisible()" (click)="advancedFiltersVisible.set(!advancedFiltersVisible())">
-        <i class="bx bx-filter-alt"></i>
-        Filtros
+      <button type="button" class="btn-filter" (click)="toggleAdvancedFilters()"
+          [class.btn-filter--active]="advancedFiltersVisible()"
+          aria-controls="historial-advanced-filters"
+          [attr.aria-label]="appliedGroupCount() ? 'Filtros, ' + appliedGroupCount() + ' activos' : 'Filtros'"
+          [attr.aria-expanded]="advancedFiltersVisible()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+          </svg>
+          Filtros
+          <span class="filter-count" [class.filter-count--empty]="appliedGroupCount() === 0" aria-hidden="true">{{ appliedGroupCount() || 0 }}</span>
       </button>
-      <button class="btn-filter btn-export" (click)="exportarHistorial()">
-        <i class="bx bx-download"></i>
-        Exportar
-      </button>
-      <button class="btn-filter" (click)="limpiarFiltros()">
-        <i class="bx bx-refresh"></i>
-        Limpiar
-      </button>
-      <button class="btn-primary" (click)="buscar()" [disabled]="isTableRefreshing() || isInitialLoading()">
-        Buscar
+      <button type="button" class="btn-primary reservation-search-button" (click)="buscar()"
+          [disabled]="isInitialLoading() || isTableRefreshing()" [attr.aria-busy]="isInitialLoading() || isTableRefreshing()"
+          [attr.aria-label]="isTableRefreshing() ? 'Buscando historial' : 'Buscar historial'">
+          <span class="search-button-label" [class.search-button-label--hidden]="isTableRefreshing()">Buscar</span>
+          <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isTableRefreshing()" aria-hidden="true"></span>
       </button>
     </div>
-
-    <!-- FILTER TOKENS -->
-    @if (filters().Usuario || filters().Tipo_Accion || filters().Tabla_Afectada || filters().FechaInicio || filters().FechaFin) {
-      <div class="active-filters">
-        @if (filters().Usuario) {
-          <div class="filter-token">
-            <span>{{ filters().Usuario }}</span>
-            <button class="remove-token-btn" (click)="updateFilter('Usuario', '')" aria-label="Remover filtro">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
+    @if (hasApplied('period') || hasApplied('usuarios') || hasApplied('acciones') || hasApplied('modulos')) {
+      <div class="active-filters" aria-label="Filtros aplicados">
+        @for (group of ['period', 'usuarios', 'modulos', 'acciones']; track group) {
+          @if (hasApplied($any(group))) {
+            <div class="filter-token">
+              {{ pillLabel($any(group)) }}
+              <button type="button" class="remove-token-btn" [attr.aria-label]="'Quitar filtro ' + pillLabel($any(group))"
+                (click)="removeAppliedFilter($any(group))">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          }
         }
-        @if (filters().Tipo_Accion) {
-          <div class="filter-token">
-            <span>{{ getAccionLabel(filters().Tipo_Accion) }}</span>
-            <button class="remove-token-btn" (click)="updateFilter('Tipo_Accion', '')" aria-label="Remover filtro">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        }
-        @if (filters().Tabla_Afectada) {
-          <div class="filter-token">
-            <span>{{ filters().Tabla_Afectada }}</span>
-            <button class="remove-token-btn" (click)="updateFilter('Tabla_Afectada', '')" aria-label="Remover filtro">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        }
-        @if (filters().FechaInicio) {
-          <div class="filter-token">
-            <span>Desde: {{ filters().FechaInicio | date:'d MMM yyyy':'':'es-CO' }}</span>
-            <button class="remove-token-btn" (click)="updateFilter('FechaInicio', '')" aria-label="Remover filtro">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        }
-        @if (filters().FechaFin) {
-          <div class="filter-token">
-            <span>Hasta: {{ filters().FechaFin | date:'d MMM yyyy':'':'es-CO' }}</span>
-            <button class="remove-token-btn" (click)="updateFilter('FechaFin', '')" aria-label="Remover filtro">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        }
+        @if (hasMultipleAppliedGroups()) { <button type="button" class="clear-filters-link" (click)="limpiarFiltros()">Limpiar filtros</button> }
       </div>
     }
   </div>
 
-  @if (isInitialLoading()) {
-    <app-loading-state label="Cargando historial de actividad…"></app-loading-state>
-
-  } @else {
-
-    <!-- FILTROS AVANZADOS -->
-    @if (advancedFiltersVisible()) {
-      <div class="advanced-filters-panel">
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Usuario</label>
-            <input
-              type="text"
-              class="form-input"
-              placeholder="Nombre del usuario"
-              [value]="filters().Usuario"
-              (change)="updateFilter('Usuario', $any($event.target).value)" />
+  @if (advancedFiltersVisible()) {
+    <div id="historial-advanced-filters" class="advanced-filters-panel">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="historial-period">Período</label>
+          <app-date-range-picker
+            inputId="historial-period"
+            [value]="draftFilters().period"
+            placeholder="Seleccionar período"
+            [allowClear]="false"
+            (rangeChange)="onPeriodChange($event)" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Usuario</label>
+          <div class="multi-filter">
+            <button type="button" class="multi-filter-trigger"
+              [class.active]="openFilterDropdown() === 'usuarios'"
+              [class.multi-filter-trigger-active]="draftFilters().usuarios.length > 0"
+              (click)="toggleDropdown('usuarios')"
+              [attr.aria-expanded]="openFilterDropdown() === 'usuarios'">
+              <span>{{ multiFilterLabel('usuarios') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (openFilterDropdown() === 'usuarios') {
+              <div class="multi-filter-menu">
+                @for (user of filterOptions().usuarios; track user.id) {
+                  <button type="button" class="multi-filter-option" (click)="toggleUser(user.id, !isDraftSelected('usuarios', user.id))">
+                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('usuarios', user.id)">
+                      @if (isDraftSelected('usuarios', user.id)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ user.label }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="setDraftUsers([])">Limpiar selección</button>
+              </div>
+            }
           </div>
-          <div class="form-group">
-            <label class="form-label" for="Historial-accion">Tipo de Acción</label>
-            <app-select inputId="Historial-accion" [value]="filters().Tipo_Accion"
-              (valueChange)="updateFilter('Tipo_Accion', $event)"
-              [options]="accionSelectOptions()" [compareWith]="compareSelectValues"
-              ariaLabel="Tipo de Acción" placeholder="" />
+        </div>
+        <div class="form-group hist-filter-module">
+          <label class="form-label">Módulo</label>
+          <div class="multi-filter">
+            <button type="button" class="multi-filter-trigger"
+              [class.active]="openFilterDropdown() === 'modulos'"
+              [class.multi-filter-trigger-active]="draftFilters().modulos.length > 0"
+              (click)="toggleDropdown('modulos')"
+              [attr.aria-expanded]="openFilterDropdown() === 'modulos'">
+              <span>{{ multiFilterLabel('modulos') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (openFilterDropdown() === 'modulos') {
+              <div class="multi-filter-menu">
+                @for (module of filterOptions().modulos; track module.value) {
+                  <button type="button" class="multi-filter-option" (click)="toggleModule(module.value, !isDraftSelected('modulos', module.value))">
+                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('modulos', module.value)">
+                      @if (isDraftSelected('modulos', module.value)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ module.label }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="setDraftModules([])">Limpiar selección</button>
+              </div>
+            }
           </div>
-          <div class="form-group">
-            <label class="form-label" for="Historial-tabla">Tabla Afectada</label>
-            <app-select inputId="Historial-tabla" [value]="filters().Tabla_Afectada"
-              (valueChange)="updateFilter('Tabla_Afectada', $event)"
-              [options]="tablaSelectOptions()" [compareWith]="compareSelectValues"
-              ariaLabel="Tabla Afectada" placeholder="" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Desde</label>
-            <app-datepicker [ngModel]="filters().FechaInicio" (dateChange)="updateFilter('FechaInicio', $event)"></app-datepicker>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Hasta</label>
-            <app-datepicker [ngModel]="filters().FechaFin" (dateChange)="updateFilter('FechaFin', $event)"></app-datepicker>
+        </div>
+        <div class="form-group hist-filter-action">
+          <label class="form-label">Acción</label>
+          <div class="multi-filter">
+            <button type="button" class="multi-filter-trigger"
+              [class.active]="openFilterDropdown() === 'acciones'"
+              [class.multi-filter-trigger-active]="draftFilters().acciones.length > 0"
+              (click)="toggleDropdown('acciones')"
+              [attr.aria-expanded]="openFilterDropdown() === 'acciones'">
+              <span>{{ multiFilterLabel('acciones') }}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            @if (openFilterDropdown() === 'acciones') {
+              <div class="multi-filter-menu">
+                @for (action of filterOptions().acciones; track action.value) {
+                  <button type="button" class="multi-filter-option" (click)="toggleAction(action.value, !isDraftSelected('acciones', action.value))">
+                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('acciones', action.value)">
+                      @if (isDraftSelected('acciones', action.value)) {
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      }
+                    </span>
+                    <span>{{ action.label }}</span>
+                  </button>
+                }
+                <button type="button" class="multi-filter-clear" (click)="setDraftActions([])">Limpiar selección</button>
+              </div>
+            }
           </div>
         </div>
       </div>
-    }
-
-    <!-- KPI CHIPS -->
-    <div class="kpi-row">
-      <div class="kpi-chip">
-        <span class="kpi-label">Total registros</span>
-        <strong>{{ totalRecords() }}</strong>
-      </div>
-      <div class="kpi-chip">
-        <span class="kpi-label">Página</span>
-        <strong>{{ currentPage() }} / {{ totalPages() }}</strong>
-      </div>
-      @if (kpiConteos()['create']) {
-        <div class="kpi-chip kpi-chip--create">
-          <i class="bx bx-plus-circle kpi-icon"></i>
-          <span class="kpi-label">Creaciones</span>
-          <strong>{{ kpiConteos()['create'] }}</strong>
-        </div>
-      }
-      @if (kpiConteos()['update']) {
-        <div class="kpi-chip kpi-chip--update">
-          <i class="bx bx-pencil kpi-icon"></i>
-          <span class="kpi-label">Actualizaciones</span>
-          <strong>{{ kpiConteos()['update'] }}</strong>
-        </div>
-      }
-      @if (kpiConteos()['delete']) {
-        <div class="kpi-chip kpi-chip--delete">
-          <i class="bx bx-x-circle kpi-icon"></i>
-          <span class="kpi-label">Eliminaciones</span>
-          <strong>{{ kpiConteos()['delete'] }}</strong>
-        </div>
-      }
-      @if (kpiConteos()['export']) {
-        <div class="kpi-chip kpi-chip--export">
-          <i class="bx bx-export kpi-icon"></i>
-          <span class="kpi-label">Exportaciones</span>
-          <strong>{{ kpiConteos()['export'] }}</strong>
-        </div>
-      }
-      @if (kpiConteos()['login']) {
-        <div class="kpi-chip kpi-chip--login">
-          <i class="bx bx-log-in-circle kpi-icon"></i>
-          <span class="kpi-label">Logins</span>
-          <strong>{{ kpiConteos()['login'] }}</strong>
-        </div>
-      }
     </div>
+  }
 
-    <!-- TABLA -->
-    <div class="table-card" [class.table-refreshing]="isTableRefreshing()">
-      @if (isTableRefreshing()) {
-        <div class="table-refresh-overlay">
-          <span class="refresh-pulse"></span>
-          <span>Actualizando...</span>
+
+  <div class="results-area">
+    @if (isInitialLoading()) {
+      <app-loading-state label="Cargando historial…"></app-loading-state>
+    } @else if (!hasQueried()) {
+      <div class="empty-state" role="status">
+        <div class="empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
         </div>
-      }
+        <h3>Listo para consultar</h3>
+        <p>Busca una reserva o transfer por código, o utiliza los filtros para consultar actividad del sistema.</p>
+      </div>
+    } @else {
+      <section class="results-section" aria-label="Resultados del historial">
+      <div class="results-heading">
+        <p class="results-summary" aria-live="polite">{{ summaryText() }}</p>
+        <button type="button" class="sir-action sir-action--secondary export-button" (click)="exportarHistorial()"
+          [disabled]="totalRecords() === 0 || isTableRefreshing()" aria-label="Exportar todos los resultados a Excel">
+          <i class="bx bx-download" aria-hidden="true"></i> Exportar Excel
+        </button>
+      </div>
 
-      @if (historialList().length === 0) {
-        <div class="empty-state">
-          <h3>No hay registros para mostrar</h3>
-          <p>Ajusta los filtros o intenta una nueva búsqueda.</p>
+      @if (errorMessage()) {
+        <div class="result-state result-error" role="alert">
+          <h2>No se pudo cargar el historial</h2>
+          <p>{{ errorMessage() }}</p>
+          <button type="button" class="secondary-button" (click)="buscar()">Reintentar</button>
+        </div>
+      } @else if (historialList().length === 0) {
+        <div class="result-state" role="status">
+          <i class="bx bx-time-five" aria-hidden="true"></i>
+          <h2>{{ appliedFilters().referencia && !appliedFilters().periodExplicit ? 'No hay actividad para este código' : isSingleDay() ? 'No hay actividad para este día' : 'No hay actividad para este período' }}</h2>
+          <p>{{ appliedFilters().referencia && !appliedFilters().periodExplicit ? 'Prueba otro código o ajusta los filtros adicionales.' : 'Prueba otro período o ajusta los filtros adicionales.' }}</p>
         </div>
       } @else {
-        <div class="table-scroll">
-          <table class="historial-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Usuario</th>
-                <th>Acción</th>
-                <th>Tabla</th>
-                <th>ID</th>
-                <th>Descripción</th>
-                <th class="th-expand"></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (record of historialList(); track record.Id_Historial) {
-                <!-- FILA PRINCIPAL -->
-                <tr
-                  class="data-row"
-                  [class.row-expanded]="expandedId() === record.Id_Historial"
-                  (click)="toggleRow(record.Id_Historial)">
-                  <td class="date-cell">{{ record.Fecha_Accion | date:'dd/MM/yy HH:mm' }}</td>
-                  <td><span class="user-badge">{{ record.Usuario_Nombre }}</span></td>
-                  <td>
-                    <span class="accion-badge" [ngClass]="getAccionClass(record.Tipo_Accion!)">
-                      <i class="bx" [ngClass]="getAccionIcon(record.Tipo_Accion!)" aria-hidden="true"></i>
-                      {{ getAccionLabel(record.Tipo_Accion!) }}
-                    </span>
-                  </td>
-                  <td><span class="table-badge">{{ record.Tabla_Afectada }}</span></td>
-                  <td class="id-cell">{{ record.Id_Registro || '—' }}</td>
-                  <td class="descripcion-cell">
-                    @if (record.Detalles && record.Detalles.length) {
-                      <div class="detalle-chips-inline">
-                        @for (d of record.Detalles.slice(0, 2); track d.columna) {
-                          <span class="detalle-chip-inline">
-                            <span class="chip-col">{{ d.columna }}</span>
-                          </span>
-                        }
-                        @if (record.Detalles.length > 2) {
-                          <span class="detalle-more">+{{ record.Detalles.length - 2 }}</span>
-                        }
-                      </div>
-                    } @else if (record.Descripcion) {
-                      <span class="text-truncate" [attr.title]="record.Descripcion">{{ record.Descripcion }}</span>
-                    } @else {
-                      <span class="text-muted-dash">—</span>
-                    }
-                  </td>
-                  <td class="td-expand">
-                    <i class="bx bx-chevron-down expand-chevron" [class.rotated]="expandedId() === record.Id_Historial" aria-hidden="true"></i>
-                  </td>
-                </tr>
-
-                <!-- PANEL DE DETALLE -->
-                @if (expandedId() === record.Id_Historial) {
-                  <tr class="detail-row">
-                    <td colspan="7">
-                      <div class="detail-panel">
-                        @if (record.Detalles && record.Detalles.length) {
-                          <div class="detail-cambios-grid">
-                            @for (d of record.Detalles; track d.columna) {
-                              <div class="detalle-cambio-card">
-                                <span class="detalle-columna">{{ d.columna }}</span>
-                                <div class="detalle-valores">
-                                  <span class="detalle-val detalle-val--ant">{{ d.anterior || '—' }}</span>
-                                  <i class="bx bx-right-arrow-alt detalle-arrow" aria-hidden="true"></i>
-                                  <span class="detalle-val detalle-val--nvo">{{ d.nuevo || '—' }}</span>
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        } @else {
-                          <p class="detail-empty">Sin cambios de campo registrados para esta acción.</p>
-                        }
-                      </div>
+        <div class="table-card" [class.is-refreshing]="isTableRefreshing()">
+          @if (isTableRefreshing()) { <div class="refresh-status" role="status">Actualizando…</div> }
+          <div class="table-scroll">
+            <table class="historial-table">
+              <thead>
+                <tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Referencia</th><th>Resumen</th><th><span class="visually-hidden">Detalle</span></th></tr>
+              </thead>
+              <tbody>
+                @for (record of historialList(); track record.Id_Historial) {
+                  <tr class="data-row" [class.row-expanded]="hasDetails(record) && expandedId() === record.Id_Historial"
+                    [attr.tabindex]="hasDetails(record) ? 0 : null"
+                    [attr.aria-expanded]="hasDetails(record) ? expandedId() === record.Id_Historial : null"
+                    [attr.aria-label]="hasDetails(record) ? 'Evento de ' + (record.Actor_Nombre || record.Usuario_Nombre || 'Sistema') + ', ' + selectedActionLabel(record.Tipo_Accion) + '. Enter o espacio para ver u ocultar detalle.' : null"
+                    (click)="onRowClick($event, record)" (keydown)="onRowKeydown($event, record)">
+                    <td data-label="Fecha" class="date-cell">{{ formatTimestamp(record.Fecha_Accion) }}</td>
+                    <td data-label="Usuario" class="user-cell">
+                      <span>{{ record.Actor_Nombre || record.Usuario_Nombre || 'Sistema' }}</span>
+                    </td>
+                    <td data-label="Acción"><span class="action-badge" [ngClass]="actionClass(record.Tipo_Accion)">{{ selectedActionLabel(record.Tipo_Accion) }}</span></td>
+                    <td data-label="Módulo"><span class="module-label">{{ record.Modulo }}</span></td>
+                    <td data-label="Referencia" class="resource-cell">{{ record.Id_Registro ?? '—' }}</td>
+                    <td data-label="Resumen" class="summary-cell" [attr.title]="record.Descripcion">{{ record.Descripcion || '—' }}</td>
+                    <td class="expand-cell">
+                      @if (hasDetails(record)) {
+                        <button type="button" class="expand-button" [attr.aria-expanded]="expandedId() === record.Id_Historial"
+                        [attr.aria-label]="expandedId() === record.Id_Historial ? 'Ocultar detalle' : 'Ver detalle'"
+                        (click)="toggleRow(record)">
+                        <i class="bx bx-chevron-down" [class.is-expanded]="expandedId() === record.Id_Historial" aria-hidden="true"></i>
+                        </button>
+                      }
                     </td>
                   </tr>
+                  @if (hasDetails(record) && expandedId() === record.Id_Historial) {
+                    <tr class="detail-row">
+                      <td colspan="7">
+                        <div class="detail-panel">
+                          <div class="detail-meta">
+                            <span><strong>Actor:</strong> {{ record.Actor_Nombre || record.Usuario_Nombre || 'Sistema' }}</span>
+                            @if (record.Actor_Rol) { <span><strong>Rol al registrar:</strong> {{ record.Actor_Rol }}</span> }
+                            <span><strong>Referencia:</strong> {{ record.Modulo }} · {{ record.Id_Registro ?? '—' }}</span>
+                          </div>
+                          <div class="detail-table-wrap">
+                            <table class="detail-table">
+                              <thead><tr><th>Campo</th><th>Anterior</th><th>Nuevo</th></tr></thead>
+                              <tbody>
+                                @for (detail of record.Detalles; track $index) {
+                                  <tr><th scope="row">{{ detailColumnLabel(detail.columna) }}</th><td>{{ detail.anterior || '—' }}</td><td>{{ detail.nuevo || '—' }}</td></tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
-              }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       }
-    </div>
-  }
 
-  <!-- PAGINACIÓN -->
-  @if (totalPages() > 1) {
-    <div class="pagination-container">
-      <button
-        class="btn-pagination"
-        (click)="previousPage()"
-        [disabled]="currentPage() === 1 || isTableRefreshing()"
-        aria-label="Página anterior">
-        <i class="bx bx-chevron-left"></i>
-        <span>Anterior</span>
-      </button>
-      <div class="page-info">
-        Página <strong>{{ currentPage() }}</strong> de <strong>{{ totalPages() }}</strong>
-        <span class="total-records">({{ totalRecords() }} registros)</span>
-      </div>
-      <button
-        class="btn-pagination"
-        (click)="nextPage()"
-        [disabled]="currentPage() === totalPages() || isTableRefreshing()"
-        aria-label="Siguiente página">
-        <span>Siguiente</span>
-        <i class="bx bx-chevron-right"></i>
-      </button>
-    </div>
-  }
-
-</div>
+      @if (totalPages() > 1) {
+        <nav class="pagination" aria-label="Paginación del historial">
+          <button type="button" class="secondary-button" (click)="previousPage()" [disabled]="currentPage() === 1 || isTableRefreshing()">Anterior</button>
+          <span>Página <strong>{{ currentPage() }}</strong> de <strong>{{ totalPages() }}</strong></span>
+          <button type="button" class="secondary-button" (click)="nextPage()" [disabled]="currentPage() === totalPages() || isTableRefreshing()">Siguiente</button>
+        </nav>
+      }
+      </section>
+    }
+  </div>
+</main>

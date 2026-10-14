@@ -1971,6 +1971,16 @@ async function obtenerReservasSnapshotPorIds(conn, reservaIds) {
     );
 }
 
+async function insertarCabeceraProgramacion(conn, { fecha, tourId, userId = null, tipo = 'grupal' }) {
+    const [result] = await conn.query(
+        `INSERT INTO programaciones
+         (Fecha_Tour, Id_Tour, Confirmado_Por, Creado_Por, Estado, Tipo_Programacion)
+         VALUES (?, ?, ?, ?, 'activa', ?)`,
+        [fecha, tourId, userId || null, userId || null, tipo]
+    );
+    return result.insertId;
+}
+
 async function guardarSnapshotProgramacion(conn, { fecha, tours, primaryTourId, busesValidados, userId = null }) {
     const reservaIds = busesValidados.flatMap(bus => bus.reservas.map(reserva => reserva.idReserva));
     const reservasSnapshotMap = await obtenerReservasSnapshotPorIds(conn, reservaIds);
@@ -1992,16 +2002,9 @@ async function guardarSnapshotProgramacion(conn, { fecha, tours, primaryTourId, 
         [userId || null, fecha, tours]
     );
 
-    const [programacionResult] = await conn.query(
-        `
-        INSERT INTO programaciones
-        (Fecha_Tour, Id_Tour, Confirmado_Por, Estado, Tipo_Programacion)
-        VALUES (?, ?, ?, 'activa', 'grupal')
-        `,
-        [fecha, primaryTourId, userId || null]
-    );
-
-    const idProgramacion = programacionResult.insertId;
+    const idProgramacion = await insertarCabeceraProgramacion(conn, {
+        fecha, tourId: primaryTourId, userId, tipo: 'grupal'
+    });
 
     for (const idTour of tours) {
         await conn.query(
@@ -2664,15 +2667,9 @@ async function guardarProgramacionPrivada({ fecha, buses, userId = null }) {
             [userId || null, fecha]
         );
 
-        const [programacionResult] = await conn.query(
-            `
-            INSERT INTO programaciones
-            (Fecha_Tour, Id_Tour, Confirmado_Por, Estado, Tipo_Programacion)
-            VALUES (?, ?, ?, 'activa', 'privada')
-            `,
-            [fecha, primaryTourId, userId || null]
-        );
-        const idProgramacion = programacionResult.insertId;
+        const idProgramacion = await insertarCabeceraProgramacion(conn, {
+            fecha, tourId: primaryTourId, userId, tipo: 'privada'
+        });
 
         for (const idTour of tourIds) {
             await conn.query(
@@ -3214,7 +3211,8 @@ module.exports = {
     normalizarHoraProgramacionTransfer,
     detectarDuplicadosAsignacion,
     normalizarCapacidadProgramacion,
-    resolverDestinoTour
+    resolverDestinoTour,
+    insertarCabeceraProgramacion
 };
 
 async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour, nombreReportante, idTour }) {

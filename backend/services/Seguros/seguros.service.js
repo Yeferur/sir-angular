@@ -1,6 +1,7 @@
 const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
+const { recordHistorial } = require('../Historial/logger');
 
 function createServiceError(message, statusCode = 400, errorCode = 'SEGUROS_ERROR', details = []) {
     const error = new Error(message);
@@ -262,7 +263,7 @@ async function listarSeguros(filtros) {
     }));
 }
 
-async function actualizarPersonalBus(idBusProg, campos) {
+async function actualizarPersonalBus(idBusProg, campos, userId = null) {
     const permitidos = {
         Placa_Display: 20,
         Guia: 100,
@@ -335,6 +336,25 @@ async function actualizarPersonalBus(idBusProg, campos) {
             `UPDATE programacion_buses SET ${sets.join(', ')} WHERE Id_Bus_Prog = ?`,
             params
         );
+        const details = [];
+        for (const [field, value] of Object.entries(normalizedFields)) {
+            const nextValue = field === 'Placa_Display' && value === null
+                ? `Bus ${currentBus.Orden_Bus}`
+                : value;
+            const previousValue = currentBus[field] ?? null;
+            if (String(previousValue ?? '') !== String(nextValue ?? '')) {
+                details.push({ columna: field, anterior: previousValue, nuevo: nextValue });
+            }
+        }
+        if (details.length) {
+            await recordHistorial({ conexion: conn, tabla: 'programacion_buses', id_registro: idBusProg,
+                accion: 'ACTUALIZAR_ASIGNACION_SEGUROS', id_usuario: userId,
+                detalles: [
+                    { columna: 'Id_Programacion', anterior: null, nuevo: currentBus.Id_Programacion },
+                    { columna: 'Fecha_Tour', anterior: null, nuevo: currentBus.Fecha_Tour },
+                    ...details,
+                ] });
+        }
         await conn.commit();
         return { affected: result.affectedRows };
     } catch (error) {

@@ -5,6 +5,7 @@
   "scripts": {
     "db:migrate:programacion-transfers": "node scripts/migrate-programacion-transfers.js",
     "test:programacion-transfers:mysql": "node --test test/programacion-transfers.mysql.test.js",
+    "test:authoring-audit:mysql": "node --test test/authoring-audit.mysql.test.js",
     "test": "node --test",
     "db:backup": "node scripts/backup-database.js",
     "db:release:sir2": "node scripts/release-migrate-sir2.js",

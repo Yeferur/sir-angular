@@ -5,6 +5,7 @@ const { authMiddleware } = require('../../middlewares/authMiddleware');
 const { checkPermission } = require('../../middlewares/permissionsMiddleware');
 
 // Obtener historial con filtros
+router.get('/options', authMiddleware, checkPermission('HISTORIAL.LEER'), historialController.getFilterOptions);
 router.get('/', authMiddleware, checkPermission('HISTORIAL.LEER'), historialController.getHistorial);
 
 // Exportar historial a CSV

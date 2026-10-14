@@ -62,7 +62,7 @@ function createPublicationHarness({ previousStatus = 'borrador', enqueueError = 
     release() {
       events.push('release');
     },
-    async query(sql) {
+    async query(sql, params) {
       const statement = String(sql).replace(/\s+/g, ' ').trim();
 
       if (statement.startsWith('SELECT Id_Semana, Fecha_Inicio, Estado FROM turnos_semanas')) {
@@ -77,6 +77,13 @@ function createPublicationHarness({ previousStatus = 'borrador', enqueueError = 
           Id_Usuario: 41,
           Nombres_Apellidos: 'Ana Asesora',
           Correo: 'ana@example.com',
+        }]];
+      }
+      if (statement.startsWith('SELECT u.Id_Usuario, COALESCE(NULLIF(TRIM(u.Nombres_Apellidos)')) {
+        return [[{
+          Id_Usuario: Number(params[0]),
+          Actor_Nombre: 'Ana Asesora',
+          Actor_Rol: 'Asesor',
         }]];
       }
       if (statement.startsWith('SELECT Id_Usuario, Id_Canal, Es_Supernumerario')) {

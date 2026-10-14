@@ -30,6 +30,7 @@ const MIGRATIONS = Object.freeze([
   '20261013_0011_financial_restrict_fks_mysql.sql',
   '20261013_0012_entidades_reportantes.sql',
   '20261013_0013_entidades_mercadeo.sql',
+  '20261013_0014_final_authoring_audit_schema.sql',
 ]);
 
 function assertTargetConfiguration(env) {
@@ -157,6 +158,11 @@ const REQUIRED_COLUMNS = Object.freeze({
   programacion_exportacion_filas: ['Id_Row', 'Id_Exportacion', 'Snapshot_JSON'],
   entidades_reportantes: ['Id_Entidad_Reportante', 'Tipo', 'Nombre', 'Estado_Validacion', 'Creado_Por', 'Fecha_Creacion'],
   entidad_reportante_puntos: ['Id_Entidad_Reportante', 'Id_Punto', 'Estado_Validacion', 'Validado_Por', 'Validado_En'],
+  tours: ['Creado_Por', 'Actualizado_Por'],
+  puntos: ['Creado_Por', 'Actualizado_Por'],
+  liquidaciones: ['Creado_Por', 'Actualizado_Por'],
+  programaciones: ['Creado_Por'],
+  historial: ['Actor_Nombre', 'Actor_Rol'],
 });
 
 const REQUIRED_FKS = Object.freeze([
@@ -171,6 +177,13 @@ const REQUIRED_FKS = Object.freeze([
   ['reservas', 'fk_reservas_entidad_reportante', 'RESTRICT'],
   ['entidad_reportante_puntos', 'fk_entidad_puntos_entidad', 'RESTRICT'],
   ['entidad_reportante_puntos', 'fk_entidad_puntos_punto', 'RESTRICT'],
+  ['tours', 'fk_tours_creado_por', 'SET NULL'],
+  ['tours', 'fk_tours_actualizado_por', 'SET NULL'],
+  ['puntos', 'fk_puntos_creado_por', 'SET NULL'],
+  ['puntos', 'fk_puntos_actualizado_por', 'SET NULL'],
+  ['liquidaciones', 'fk_liquidaciones_creado_por', 'SET NULL'],
+  ['liquidaciones', 'fk_liquidaciones_actualizado_por', 'SET NULL'],
+  ['programaciones', 'fk_programaciones_creado_por', 'SET NULL'],
 ]);
 
 function migrationVersion(name) { return name.match(/^\d{8}_(\d{4})_/)?.[1] || '0000'; }
@@ -395,7 +408,7 @@ module.exports = {
   TARGET_DATABASE, MIGRATIONS, assertTargetConfiguration,
   assertConnectedDatabase, assertConfirmation, selectMigrationsThrough, parseMigrationSql,
   assertMigrationSafe, readMigrations, applyMigrations, readMigrationStatus,
-  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS,
+  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS, REQUIRED_FKS,
   classifyDatabase,
   readAvailabilityPreflight,
 };

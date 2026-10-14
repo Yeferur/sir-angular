@@ -457,6 +457,8 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
           grupo.DNI_Receptor,
           estado,
           fechaPago,
+          userId || null,
+          userId || null,
         ]);
       }
     }
@@ -464,7 +466,8 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
     await conn.query(
       `INSERT INTO liquidaciones
        (Id_Reserva, Id_Beneficiario_Comision, Nombre_Beneficiario_Snap,
-        Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap, Estado, Fecha_Pago)
+        Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap, Estado, Fecha_Pago,
+        Creado_Por, Actualizado_Por)
        VALUES ?
        ON DUPLICATE KEY UPDATE
          Id_Beneficiario_Comision = VALUES(Id_Beneficiario_Comision),
@@ -474,7 +477,8 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
          Nombre_Receptor_Snap = VALUES(Nombre_Receptor_Snap),
          DNI_Receptor_Snap = VALUES(DNI_Receptor_Snap),
          Estado = VALUES(Estado),
-         Fecha_Pago = VALUES(Fecha_Pago)`,
+         Fecha_Pago = VALUES(Fecha_Pago),
+         Actualizado_Por = VALUES(Actualizado_Por)`,
       [values],
     );
 
@@ -536,13 +540,16 @@ async function actualizarDatosPago(payload, userId = null) {
         pago.Numero_Cuenta,
         receptor.Nombre_Receptor,
         receptor.DNI_Receptor,
+        userId || null,
+        userId || null,
       ];
     });
 
     await conn.query(
       `INSERT INTO liquidaciones
        (Id_Reserva, Id_Beneficiario_Comision, Nombre_Beneficiario_Snap,
-        Estado, Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap)
+        Estado, Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap,
+        Creado_Por, Actualizado_Por)
        VALUES ?
        ON DUPLICATE KEY UPDATE
          Id_Beneficiario_Comision = VALUES(Id_Beneficiario_Comision),
@@ -550,7 +557,8 @@ async function actualizarDatosPago(payload, userId = null) {
          Forma_Pago = VALUES(Forma_Pago),
          Cuenta_Bancaria = VALUES(Cuenta_Bancaria),
          Nombre_Receptor_Snap = VALUES(Nombre_Receptor_Snap),
-         DNI_Receptor_Snap = VALUES(DNI_Receptor_Snap)`,
+         DNI_Receptor_Snap = VALUES(DNI_Receptor_Snap),
+         Actualizado_Por = VALUES(Actualizado_Por)`,
       [values],
     );
 

@@ -10,17 +10,18 @@ export interface HistorialDetalle {
 }
 
 export interface Historial {
-  Id_Historial?: number;
-  Id_Usuario?: number;
-  Usuario_Nombre?: string;
-  Tipo_Accion?: string;
-  Descripcion?: string;
-  Tabla_Afectada?: string;
-  Id_Registro?: number;
-  Fecha_Accion?: string;
-  IP_Address?: string;
-  User_Agent?: string;
-  Detalles?: HistorialDetalle[];
+  Id_Historial: number;
+  Id_Usuario: number | null;
+  Usuario_Nombre: string;
+  Actor_Nombre: string | null;
+  Actor_Rol: string | null;
+  Tipo_Accion: string;
+  Descripcion: string;
+  Tabla_Afectada: string;
+  Modulo: string;
+  Id_Registro: string | number | null;
+  Fecha_Accion: string;
+  Detalles: HistorialDetalle[];
 }
 
 export interface HistorialResponse {
@@ -31,69 +32,71 @@ export interface HistorialResponse {
   totalPages: number;
 }
 
+export interface HistorialUserOption { id: number; label: string; }
+export interface HistorialOption { value: string; label: string; }
+export interface HistorialFilterOptions {
+  usuarios: HistorialUserOption[];
+  acciones: HistorialOption[];
+  modulos: HistorialOption[];
+}
+
 export interface HistorialFilters {
-  usuario?: string;
-  tipoAccion?: string;
-  tablaAfectada?: string;
+  usuarios?: number[];
+  acciones?: string[];
+  modulos?: string[];
+  referencia?: string;
   fechaInicio?: string;
   fechaFin?: string;
-  search?: string;
   page?: number;
   limit?: number;
 }
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class HistorialService {
-  private http = inject(HttpClient);
-  private apiUrl = `${environment.apiUrl}/historial`;
+  private readonly http = inject(HttpClient);
+  private readonly apiUrl = `${environment.apiUrl}/historial`;
 
-  /**
-   * Obtener historial con filtros y paginación
-   */
+  getFilterOptions(): Observable<HistorialFilterOptions> {
+    return this.http.get<HistorialFilterOptions>(`${this.apiUrl}/options`);
+  }
+
   getHistorial(filters: HistorialFilters): Observable<HistorialResponse> {
-    let params = new HttpParams();
-
-    if (filters.usuario) params = params.set('usuario', filters.usuario);
-    if (filters.tipoAccion) params = params.set('tipoAccion', filters.tipoAccion);
-    if (filters.tablaAfectada) params = params.set('tablaAfectada', filters.tablaAfectada);
-    if (filters.fechaInicio) params = params.set('fechaInicio', filters.fechaInicio);
-    if (filters.fechaFin) params = params.set('fechaFin', filters.fechaFin);
-    if (filters.search) params = params.set('search', filters.search);
-    if (filters.page) params = params.set('page', filters.page.toString());
-    if (filters.limit) params = params.set('limit', filters.limit.toString());
-
-    return this.http.get<HistorialResponse>(this.apiUrl, { params });
+    return this.http.get<HistorialResponse>(this.apiUrl, { params: this.toParams(filters, true) });
   }
 
-  /**
-   * Exportar historial a CSV
-   */
   exportarHistorial(filters: HistorialFilters): Observable<Blob> {
-    let params = new HttpParams();
-
-    if (filters.usuario) params = params.set('usuario', filters.usuario);
-    if (filters.tipoAccion) params = params.set('tipoAccion', filters.tipoAccion);
-    if (filters.tablaAfectada) params = params.set('tablaAfectada', filters.tablaAfectada);
-    if (filters.fechaInicio) params = params.set('fechaInicio', filters.fechaInicio);
-    if (filters.fechaFin) params = params.set('fechaFin', filters.fechaFin);
-
-    return this.http.get(`${this.apiUrl}/export`, {
-      params,
-      responseType: 'blob'
-    });
+    return this.http.get(`${this.apiUrl}/export`, { params: this.toParams(filters, false), responseType: 'blob' });
   }
 
-  /**
-   * Descargar archivo CSV
-   */
-  descargarCSV(blob: Blob, nombreArchivo: string = `historial-${new Date().toISOString().split('T')[0]}.csv`): void {
+  descargarExcel(blob: Blob, nombreArchivo = `historial-${this.todayBogota()}.xlsx`): void {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = nombreArchivo;
     link.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  private toParams(filters: HistorialFilters, includePage: boolean): HttpParams {
+    let params = new HttpParams();
+    if (filters.referencia) params = params.set('referencia', filters.referencia);
+    if (filters.fechaInicio && filters.fechaFin) {
+      params = params.set('desde', filters.fechaInicio).set('hasta', filters.fechaFin);
+    }
+    for (const id of filters.usuarios || []) params = params.append('usuarios', String(id));
+    for (const action of filters.acciones || []) params = params.append('acciones', action);
+    for (const module of filters.modulos || []) params = params.append('modulos', module);
+    if (includePage) {
+      params = params.set('page', String(filters.page || 1)).set('limit', String(filters.limit || 10));
+    }
+    return params;
+  }
+
+  private todayBogota(): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
   }
 }

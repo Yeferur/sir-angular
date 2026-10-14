@@ -19,11 +19,15 @@ interface CalendarDay {
 
 interface CalendarMonth {
   key: string;
-  label: string;
+  year: number;
+  month: number;
   cells: (CalendarDay | null)[];
 }
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const FULL_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+type CalendarView = 'day' | 'month' | 'year';
 let rangeId = 0;
 
 @Injectable()
@@ -59,7 +63,7 @@ function parseLocalDate(value: string | Date | null | undefined): Date | null {
     { provide: OverlayContainer, useClass: SirRangeOverlayContainer },
   ],
   templateUrl: './date-range-picker.html',
-  styleUrl: './date-range-picker.css',
+  styleUrls: ['../datepicker/datepicker.css', './date-range-picker.css'],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -81,6 +85,7 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
   @Input() minDate: string | Date | null = null;
   @Input() maxDate: string | Date | null = null;
   @Input() dateFilter: ((date: Date) => boolean) | null = null;
+  @Input() allowClear = true;
   @Input() disabled = false;
   @Input() invalid = false;
   @Input() ariaLabelledby: string | null = null;
@@ -89,8 +94,13 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
   @Output() rangeChange = new EventEmitter<SirDateRange>();
 
   readonly weekdays = WEEKDAYS;
+  readonly months = MONTHS;
+  readonly fullMonths = FULL_MONTHS;
+  readonly todayIso = isoFromDate(new Date());
   isOpen = false;
   cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  rightCursor = new Date(this.cursor.getFullYear(), this.cursor.getMonth() + 1, 1);
+  calendarView: { side: number; view: CalendarView } = { side: 0, view: 'day' };
   draftStart: string | null = null;
   rangeError = '';
 
@@ -99,19 +109,22 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
   get effectivelyDisabled(): boolean { return this.disabled || this.formDisabled; }
   get range(): SirDateRange { return this.selectedRange; }
   get visibleMonths(): CalendarMonth[] {
-    return [this.buildMonth(this.cursor), this.buildMonth(new Date(this.cursor.getFullYear(), this.cursor.getMonth() + 1, 1))];
+    return [this.buildMonth(this.cursor), this.buildMonth(this.rightCursor)];
+  }
+  get years(): number[] {
+    const year = this.monthForSide(this.calendarView.side).getFullYear();
+    return Array.from({ length: 25 }, (_, index) => year + 12 - index);
   }
   get displayText(): string {
-    if (this.draftStart) return `${this.formatDate(this.draftStart)} — Elige la fecha final`;
+    if (this.draftStart) return this.formatDate(this.draftStart);
     if (this.selectedRange.start && this.selectedRange.end) {
+      if (this.selectedRange.start === this.selectedRange.end) return this.formatDate(this.selectedRange.start);
       return `${this.formatDate(this.selectedRange.start)} — ${this.formatDate(this.selectedRange.end)}`;
     }
     return this.placeholder;
   }
   get selectionHint(): string {
-    return this.rangeError || (this.draftStart
-      ? `Inicio: ${this.formatDate(this.draftStart)}. Selecciona la fecha final.`
-      : 'Selecciona la fecha inicial y después la fecha final. Puedes elegir un solo día.');
+    return this.rangeError || 'Selecciona otra fecha para completar el rango.';
   }
 
   writeValue(value: SirDateRange | null): void {
@@ -123,16 +136,18 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
     if (this.selectedRange.start) {
       const date = parseLocalDate(this.selectedRange.start)!;
       this.cursor = new Date(date.getFullYear(), date.getMonth(), 1);
+      this.rightCursor = new Date(date.getFullYear(), date.getMonth() + 1, 1);
     }
     this.draftStart = null;
     this.rangeError = '';
+    this.calendarView = { side: 0, view: 'day' };
     this.cdr.markForCheck();
   }
   registerOnChange(fn: (value: SirDateRange) => void): void { this.onChange = fn; }
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
   setDisabledState(disabled: boolean): void {
     this.formDisabled = disabled;
-    if (disabled) this.close();
+    if (disabled) this.cancelSelection();
     this.cdr.markForCheck();
   }
 
@@ -158,53 +173,104 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
     });
     this.overlayRef.backdropClick().subscribe(() => this.close());
     this.overlayRef.keydownEvents().subscribe(event => {
-      if (event.key === 'Escape') { event.preventDefault(); this.close(); origin.focus({ preventScroll: true }); }
+      if (event.key === 'Escape') { event.preventDefault(); this.cancelSelection(); origin.focus({ preventScroll: true }); }
     });
     this.overlayRef.attach(new TemplatePortal(this.panelTpl, this.vcr));
     this.isOpen = true;
     this.cdr.markForCheck();
+    const focusedDay = this.overlayRef.overlayElement.querySelector<HTMLElement>(
+      '.sir-range-day.is-start:not(:disabled), .sir-range-day:not(:disabled)',
+    );
+    focusedDay?.focus({ preventScroll: true });
   }
-  close(): void {
+  close(commitSingleDay = true): void {
     if (!this.isOpen && !this.overlayRef) return;
+    if (commitSingleDay && this.draftStart) {
+      this.selectedRange = { start: this.draftStart, end: this.draftStart };
+      this.onChange({ ...this.selectedRange });
+      this.rangeChange.emit({ ...this.selectedRange });
+    }
     this.overlayRef?.dispose();
     this.overlayRef = null;
     this.isOpen = false;
+    this.calendarView = { side: 0, view: 'day' };
     this.draftStart = null;
     this.rangeError = '';
     this.onTouched();
     this.cdr.markForCheck();
   }
+  cancelSelection(): void { this.close(false); }
   ngOnDestroy(): void { this.overlayRef?.dispose(); }
 
   moveMonth(delta: number): void {
     this.cursor = new Date(this.cursor.getFullYear(), this.cursor.getMonth() + delta, 1);
+    this.rightCursor = new Date(this.rightCursor.getFullYear(), this.rightCursor.getMonth() + delta, 1);
+    this.calendarView = { side: 0, view: 'day' };
+    this.cdr.markForCheck();
+  }
+  viewForSide(side: number): CalendarView {
+    return this.calendarView.side === side ? this.calendarView.view : 'day';
+  }
+  showView(side: number, view: CalendarView): void {
+    this.calendarView = { side, view };
+    this.cdr.markForCheck();
+  }
+  selectMonth(side: number, month: number): void {
+    if (!Number.isInteger(month) || month < 0 || month > 11) return;
+    const current = this.monthForSide(side);
+    let selected = new Date(current.getFullYear(), month, 1);
+    // Al elegir enero a la derecha de octubre, continuar en el año siguiente.
+    if (side === 1 && selected <= this.cursor) {
+      selected = new Date(this.cursor.getFullYear() + 1, month, 1);
+    }
+    this.setMonthForSide(side, selected);
+  }
+  selectYear(side: number, year: number): void {
+    if (!Number.isInteger(year) || year < 1 || year > 9999) return;
+    const current = this.monthForSide(side);
+    this.setMonthForSide(side, new Date(year, current.getMonth(), 1));
+  }
+  private monthForSide(side: number): Date { return side === 1 ? this.rightCursor : this.cursor; }
+  private setMonthForSide(side: number, selected: Date): void {
+    if (side === 0) {
+      this.cursor = selected;
+      if (this.rightCursor <= selected) this.rightCursor = new Date(selected.getFullYear(), selected.getMonth() + 1, 1);
+    } else {
+      this.rightCursor = selected;
+      if (this.cursor >= selected) this.cursor = new Date(selected.getFullYear(), selected.getMonth() - 1, 1);
+    }
+    this.calendarView = { side, view: 'day' };
     this.cdr.markForCheck();
   }
   selectDate(iso: string): void {
     const date = parseLocalDate(iso);
     if (!date || !this.isAllowed(date)) return;
     this.rangeError = '';
-    if (!this.draftStart || iso < this.draftStart) {
+    if (!this.draftStart) {
       this.draftStart = iso;
       this.cdr.markForCheck();
       return;
     }
-    if (!this.isRangeAllowed(this.draftStart, iso)) {
+    const start = iso < this.draftStart ? iso : this.draftStart;
+    const end = iso < this.draftStart ? this.draftStart : iso;
+    if (!this.isRangeAllowed(start, end)) {
       this.rangeError = 'El rango incluye fechas no disponibles. Elige otra fecha final.';
       this.cdr.markForCheck();
       return;
     }
-    this.selectedRange = { start: this.draftStart, end: iso };
+    this.selectedRange = { start, end };
+    this.draftStart = null;
     this.onChange({ ...this.selectedRange });
     this.rangeChange.emit({ ...this.selectedRange });
     this.close();
     this.trigger.nativeElement.focus({ preventScroll: true });
   }
   clearRange(): void {
+    if (!this.allowClear) return;
     this.selectedRange = { start: null, end: null };
     this.onChange({ ...this.selectedRange });
     this.rangeChange.emit({ ...this.selectedRange });
-    this.close();
+    this.close(false);
     this.trigger.nativeElement.focus({ preventScroll: true });
   }
   isStart(iso: string): boolean { return iso === (this.draftStart || this.selectedRange.start); }
@@ -248,7 +314,8 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
     }
     return {
       key: `${year}-${month}`,
-      label: new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(date),
+      year,
+      month,
       cells,
     };
   }

@@ -20,6 +20,14 @@ app-select { display: block; width: 100%; min-width: 0; }
 .sir-select-trigger.is-open .sir-select-caret { transform: rotate(180deg); }
 .sir-select-caret { transition: transform .18s var(--ease-soft, ease); }
 .sir-select-overlay-panel { max-width: calc(100vw - 16px); }
+.sir-select-overlay-panel--searchable { box-sizing: border-box; padding: 6px; border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md); background: var(--bg-secondary); box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color)); }
+.sir-select-overlay-panel--searchable .sir-select-list { max-height: 220px; border: 0; border-radius: var(--radius-sm); box-shadow: none; padding: 0; }
+.sir-select-search { display: block; padding: 0 0 6px; }
+.sir-select-search input { box-sizing: border-box; width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--separator-color);
+  border-radius: var(--radius-sm); outline: 0; background: var(--bg-tertiary); color: var(--text-primary); font: inherit; font-size: .84rem; }
+.sir-select-search input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.sir-select-no-options { margin: 0; padding: 10px; color: var(--text-secondary); font-size: .82rem; }
 .sir-select-overlay-panel .sir-select-list { animation: sirSelectEnter .18s var(--ease-soft, ease) both; }
 .sir-select-overlay-panel.is-closing { pointer-events: none; }
 .sir-select-overlay-panel.is-closing .sir-select-list { animation: sirSelectExit .16s ease both; }
@@ -47,6 +55,7 @@ app-select { display: block; width: 100%; min-width: 0; }
   font-size: .875rem;
   box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color));
 }
+.sir-select-list--multiple { max-height: min(240px, calc(100vh - 120px)); }
 .sir-select-option {
   display: flex;
   align-items: center;

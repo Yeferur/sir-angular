@@ -1,4 +1,6 @@
 <button #trigger type="button" class="form-select sir-select-trigger"
+  [class.multi-filter-trigger]="multiple" [class.multi-filter-trigger-active]="multiple && selectedCount > 0"
+  [class.active]="multiple && isOpen"
   [id]="resolvedInputId" role="combobox" aria-haspopup="listbox"
   [disabled]="effectivelyDisabled" [class.errorInput]="invalid" [class.is-open]="isOpen"
   [attr.aria-expanded]="isOpen" [attr.aria-controls]="isOpen ? listId : null"
@@ -6,7 +8,7 @@
   [attr.aria-label]="ariaLabel" [attr.aria-labelledby]="ariaLabelledby"
   [attr.aria-describedby]="ariaDescribedby" [attr.aria-required]="required" [attr.aria-invalid]="invalid"
   (click)="toggle()" (keydown)="onKeydown($event)" (blur)="onBlur($event)">
-  <span class="sir-select-label" [class.is-placeholder]="!selectedOption">{{ selectedOption?.label ?? placeholder }}</span>
+  <span class="sir-select-label" [class.is-placeholder]="selectedCount === 0">{{ selectionText }}</span>
   <svg class="sir-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <polyline points="6 9 12 15 18 9"></polyline>
@@ -14,21 +16,40 @@
 </button>
 
 <ng-template #panelTpl>
-  <div class="sir-select-list" role="listbox" [id]="listId"
+  @if (searchable) {
+    <label class="sir-select-search">
+      <span class="visually-hidden">{{ searchPlaceholder }}</span>
+      <input #searchInput type="search" [placeholder]="searchPlaceholder" [value]="searchTerm"
+        [attr.aria-label]="searchPlaceholder" (input)="onSearchInput($event)" (keydown)="onSearchKeydown($event)" />
+    </label>
+  }
+  <div class="sir-select-list" [class.sir-select-list--multiple]="multiple" role="listbox" [id]="listId"
+    [attr.aria-multiselectable]="multiple ? 'true' : null"
     [attr.aria-label]="ariaLabel" [attr.aria-labelledby]="ariaLabelledby || resolvedInputId">
-    @for (option of options; track $index) {
-      <div class="sir-select-option" role="option" [id]="optionId($index)"
-        [attr.aria-selected]="compareWith(option.value, value)" [attr.aria-disabled]="!!option.disabled"
-        [class.is-selected]="compareWith(option.value, value)" [class.is-active]="activeIndex === $index"
-        [class.is-disabled]="option.disabled" (mousedown)="$event.preventDefault()"
-        (mouseenter)="setActive($index)" (click)="choose($index)">
-        <span>{{ option.label }}</span>
-        @if (compareWith(option.value, value)) {
+    @for (entry of visibleOptions; track entry.index) {
+      <div class="sir-select-option" [class.multi-filter-option]="multiple" role="option" [id]="optionId(entry.index)"
+        [attr.aria-selected]="isOptionSelected(entry.option.value)" [attr.aria-disabled]="!!entry.option.disabled"
+        [class.is-selected]="isOptionSelected(entry.option.value)" [class.is-active]="activeIndex === entry.index"
+        [class.is-disabled]="entry.option.disabled" (mousedown)="$event.preventDefault()"
+        (mouseenter)="setActive(entry.index)" (click)="choose(entry.index)">
+        @if (multiple) {
+          <span class="multi-filter-checkbox" [class.checked]="isOptionSelected(entry.option.value)">
+            @if (isOptionSelected(entry.option.value)) {
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            }
+          </span>
+        }
+        <span>{{ entry.option.label }}</span>
+        @if (!multiple && isOptionSelected(entry.option.value)) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         }
       </div>
+    } @empty {
+      @if (searchable && searchTerm) { <p class="sir-select-no-options">No hay opciones que coincidan.</p> }
     }
   </div>
 </ng-template>

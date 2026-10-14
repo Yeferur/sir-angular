@@ -287,15 +287,17 @@ async function crearTour(data, userId = null) {
     // 1) Crear el tour
     const [result] = await conn.query(
       `INSERT INTO tours
-        (Nombre_Tour, Abreviacion, Cupo_Base, Nombre_Primera_Parada, Latitud_Primera_Parada, Longitud_Primera_Parada, Activo)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        (Nombre_Tour, Abreviacion, Cupo_Base, Nombre_Primera_Parada, Latitud_Primera_Parada, Longitud_Primera_Parada, Activo, Creado_Por, Actualizado_Por)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         Nombre_Tour,
         Abreviacion || null,
         Number(Cupo_Base) || 0,
         String(Nombre_Primera_Parada || '').trim() || null,
         Latitud_Primera_Parada,
-        Longitud_Primera_Parada
+        Longitud_Primera_Parada,
+        userId || null,
+        userId || null
       ]
     );
 
@@ -678,7 +680,8 @@ async function actualizarTour(Id_Tour, data, userId = null) {
             Cupo_Base = ?,
             Nombre_Primera_Parada = ?,
             Latitud_Primera_Parada = ?,
-            Longitud_Primera_Parada = ?
+           Longitud_Primera_Parada = ?,
+           Actualizado_Por = ?
        WHERE Id_Tour = ?`,
       [
         Nombre_Tour,
@@ -687,6 +690,7 @@ async function actualizarTour(Id_Tour, data, userId = null) {
         String(Nombre_Primera_Parada || '').trim() || null,
         Latitud_Primera_Parada,
         Longitud_Primera_Parada,
+        userId || null,
         Id_Tour
       ]
     );
@@ -812,7 +816,7 @@ async function eliminarTour(Id_Tour, userId = null) {
     let result;
     let accion;
     if (reservasAsociadas > 0) {
-      [result] = await conn.query('UPDATE tours SET Activo = 0 WHERE Id_Tour = ?', [Id_Tour]);
+      [result] = await conn.query('UPDATE tours SET Activo = 0, Actualizado_Por = ? WHERE Id_Tour = ?', [userId || null, Id_Tour]);
       accion = 'DESACTIVADO';
     } else {
       await conn.query('DELETE FROM programacion_tours WHERE Id_Tour = ?', [Id_Tour]);

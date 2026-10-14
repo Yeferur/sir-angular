@@ -63,9 +63,13 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
 
   @ViewChild('trigger', { static: true }) trigger!: ElementRef<HTMLButtonElement>;
   @ViewChild('panelTpl', { static: true }) panelTpl!: TemplateRef<void>;
+  @ViewChild('searchInput') searchInput?: ElementRef<HTMLInputElement>;
 
   @Input() value: any = null;
   @Input() options: readonly SirSelectOption[] = [];
+  @Input() multiple = false;
+  @Input() searchable = false;
+  @Input() searchPlaceholder = 'Buscar opciones';
   @Input() disabled = false;
   @Input() invalid = false;
   @Input() required = false;
@@ -79,6 +83,7 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
 
   isOpen = false;
   activeIndex = -1;
+  searchTerm = '';
   private formDisabled = false;
   private overlayRef: OverlayRef | null = null;
   private closeTimer?: ReturnType<typeof setTimeout>;
@@ -90,8 +95,27 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
   get resolvedInputId(): string { return this.inputId || this.generatedId; }
   get listId(): string { return `${this.generatedId}-list`; }
   get effectivelyDisabled(): boolean { return this.disabled || this.formDisabled; }
-  get selectedIndex(): number { return this.options.findIndex(option => this.compareWith(option.value, this.value)); }
+  get selectedIndex(): number {
+    const values = this.multiple && Array.isArray(this.value) ? this.value : [this.value];
+    return this.options.findIndex(option => values.some(value => this.compareWith(option.value, value)));
+  }
   get selectedOption(): SirSelectOption | undefined { return this.options[this.selectedIndex]; }
+  get selectedCount(): number { return this.multiple && Array.isArray(this.value) ? this.value.length : Number(this.selectedIndex >= 0); }
+  get selectionText(): string {
+    if (!this.multiple) return this.selectedOption?.label ?? this.placeholder;
+    if (this.selectedCount === 0) return this.placeholder;
+    if (this.selectedCount === 1) return '1 seleccionado';
+    return `${this.selectedCount} seleccionados`;
+  }
+  get visibleOptions(): Array<{ option: SirSelectOption; index: number }> {
+    const search = this.searchable ? this.searchTerm.trim().toLocaleLowerCase('es-CO') : '';
+    return this.options.map((option, index) => ({ option, index }))
+      .filter(({ option }) => !search || option.label.toLocaleLowerCase('es-CO').includes(search));
+  }
+  isOptionSelected(value: any): boolean {
+    const values = this.multiple && Array.isArray(this.value) ? this.value : [this.value];
+    return values.some(selected => this.compareWith(value, selected));
+  }
   optionId(index: number): string { return `${this.generatedId}-option-${index}`; }
 
   ngOnChanges(): void {
@@ -125,6 +149,7 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
       this.disposeOverlay();
     }
     const origin = this.trigger.nativeElement;
+    this.searchTerm = '';
     const strategy = this.overlay.position().flexibleConnectedTo(origin)
       .withPositions([
         { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top', offsetY: 6 },
@@ -136,7 +161,9 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
       scrollStrategy: this.overlay.scrollStrategies.reposition(),
       width: Math.min(origin.getBoundingClientRect().width, this.viewport.getViewportSize().width - 16),
       maxHeight: 280,
-      panelClass: 'sir-select-overlay-panel',
+      panelClass: this.searchable
+        ? ['sir-select-overlay-panel', 'sir-select-overlay-panel--searchable']
+        : 'sir-select-overlay-panel',
     });
     // No backdrop: clicking another field closes the select and activates that field.
     this.subscriptions.add(this.overlayRef.outsidePointerEvents().subscribe(event => {
@@ -156,6 +183,7 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
     this.cdr.detectChanges();
     this.overlayRef.updatePosition();
     this.scrollActiveOption();
+    if (this.searchable) this.searchInput?.nativeElement.focus({ preventScroll: true });
   }
 
   close(restoreFocus = false): void {
@@ -179,6 +207,19 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
   choose(index: number): void {
     const option = this.options[index];
     if (!option || option.disabled || this.effectivelyDisabled) return;
+    if (this.multiple) {
+      const current = Array.isArray(this.value) ? [...this.value] : [];
+      const selected = current.some(value => this.compareWith(option.value, value));
+      const next = selected
+        ? current.filter(value => !this.compareWith(option.value, value))
+        : [...current, option.value];
+      this.value = next;
+      this.onChange(next);
+      this.valueChange.emit(next);
+      this.activeIndex = index;
+      this.cdr.markForCheck();
+      return;
+    }
     const changed = !this.compareWith(option.value, this.value);
     if (changed) {
       this.value = option.value;
@@ -224,23 +265,41 @@ export class SirSelectComponent implements ControlValueAccessor, OnChanges, OnDe
     }
   }
 
+  onSearchInput(event: Event): void {
+    this.searchTerm = (event.target as HTMLInputElement).value;
+    this.activeIndex = this.initialIndex();
+    this.cdr.markForCheck();
+    this.scrollActiveOption();
+  }
+
+  onSearchKeydown(event: KeyboardEvent): void {
+    if (!['Tab', 'Escape', 'Enter', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    if (event.key !== 'Tab') event.stopPropagation();
+    this.onKeydown(event);
+  }
+
   setActive(index: number): void {
     if (!this.options[index]?.disabled) this.activeIndex = index;
   }
 
   private initialIndex(): number {
-    return this.selectedIndex >= 0 && !this.options[this.selectedIndex].disabled
-      ? this.selectedIndex : this.options.findIndex(option => !option.disabled);
+    const visible = this.visibleOptions;
+    const selected = visible.find(({ option }) => this.isOptionSelected(option.value) && !option.disabled);
+    return selected?.index ?? visible.find(({ option }) => !option.disabled)?.index ?? -1;
   }
 
   private move(step: number): void {
-    for (let i = this.activeIndex + step; i >= 0 && i < this.options.length; i += step) {
-      if (!this.options[i].disabled) { this.activeIndex = i; this.scrollActiveOption(); break; }
+    const visibleIndexes = this.visibleOptions.map(({ index }) => index);
+    let position = visibleIndexes.indexOf(this.activeIndex) + step;
+    while (position >= 0 && position < visibleIndexes.length) {
+      const index = visibleIndexes[position];
+      if (!this.options[index].disabled) { this.activeIndex = index; this.scrollActiveOption(); break; }
+      position += step;
     }
   }
 
   private moveToEdge(first: boolean): void {
-    const enabled = this.options.map((option, index) => option.disabled ? -1 : index).filter(index => index >= 0);
+    const enabled = this.visibleOptions.filter(({ option }) => !option.disabled).map(({ index }) => index);
     this.activeIndex = (first ? enabled[0] : enabled.at(-1)) ?? -1;
     this.scrollActiveOption();
   }

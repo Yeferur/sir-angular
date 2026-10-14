@@ -5,6 +5,7 @@ const path = require('node:path');
 const {
   MIGRATIONS, assertTargetConfiguration, assertConnectedDatabase,
   assertConfirmation, selectMigrationsThrough, assertMigrationSafe, readMigrations,
+  REQUIRED_COLUMNS, REQUIRED_FKS,
 } = require('../scripts/release-migrate-sir2');
 
 test('el guard rechaza sir, destino vacío y un nombre confirmado distinto', () => {
@@ -70,4 +71,25 @@ test('migración Mercadeo idempotente por inspección de índice y sin cambios d
   assert.match(sql, /idx_pasajeros_nombre/);
   const mercadeo = MIGRATIONS.indexOf('20261010_mercadeo_reservas.sql');
   assert.ok(mercadeo > MIGRATIONS.indexOf('20260930_runtime_schema.sql'));
+});
+
+test('migración final de autoría/auditoría está en release y protege columnas y FKs', async () => {
+  const name = '20261013_0014_final_authoring_audit_schema.sql';
+  assert.equal(MIGRATIONS.at(-1), name);
+  assert.deepEqual(REQUIRED_COLUMNS.tours, ['Creado_Por', 'Actualizado_Por']);
+  assert.deepEqual(REQUIRED_COLUMNS.puntos, ['Creado_Por', 'Actualizado_Por']);
+  assert.deepEqual(REQUIRED_COLUMNS.liquidaciones, ['Creado_Por', 'Actualizado_Por']);
+  assert.deepEqual(REQUIRED_COLUMNS.programaciones, ['Creado_Por']);
+  assert.deepEqual(REQUIRED_COLUMNS.historial, ['Actor_Nombre', 'Actor_Rol']);
+  for (const [table, constraint] of [
+    ['tours', 'fk_tours_creado_por'], ['tours', 'fk_tours_actualizado_por'],
+    ['puntos', 'fk_puntos_creado_por'], ['puntos', 'fk_puntos_actualizado_por'],
+    ['liquidaciones', 'fk_liquidaciones_creado_por'], ['liquidaciones', 'fk_liquidaciones_actualizado_por'],
+    ['programaciones', 'fk_programaciones_creado_por'],
+  ]) assert.ok(REQUIRED_FKS.some(([fkTable, fkName, onDelete]) =>
+    fkTable === table && fkName === constraint && onDelete === 'SET NULL'));
+  const migration = (await readMigrations()).at(-1);
+  assert.equal(migration.name, name);
+  assert.ok(migration.statements.some(statement => statement.startsWith('UPDATE historial h')));
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
 });

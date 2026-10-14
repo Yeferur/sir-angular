@@ -42,7 +42,7 @@ async function lockRuta(conn, ruta) {
  * Compacta posiciones para una ruta: 1..N sin huecos.
  * MySQL 5.7+ (usa variables).
  */
-async function compactarRuta(conn, ruta) {
+async function compactarRuta(conn, ruta, userId = null) {
   await lockRuta(conn, ruta);
   await conn.query(`SET @n := 0;`);
   await conn.query(
@@ -54,25 +54,27 @@ async function compactarRuta(conn, ruta) {
       WHERE ruta = ? AND Activo = 1
       ORDER BY posicion ASC, Id_Punto ASC
     ) x ON x.Id_Punto = p.Id_Punto
-    SET p.posicion = x.rn
-    WHERE p.ruta = ? AND p.Activo = 1;
+    SET p.posicion = x.rn,
+        p.Actualizado_Por = IF(? IS NULL, p.Actualizado_Por, ?)
+    WHERE p.ruta = ? AND p.Activo = 1 AND p.posicion <> x.rn;
     `,
-    [ruta, ruta]
+    [userId || null, userId || null, ruta, ruta]
   );
 }
 
 /**
  * Asigna posición al final de una ruta (MAX+1).
  */
-async function asignarAlFinal(conn, idPunto, ruta) {
+async function asignarAlFinal(conn, idPunto, ruta, userId = null) {
   await lockRuta(conn, ruta);
   const [[mx]] = await conn.query(
     `SELECT COALESCE(MAX(posicion), 0) AS m FROM puntos WHERE ruta = ? AND Activo = 1`,
     [ruta]
   );
   const nextPos = Number(mx?.m ?? 0) + 1;
-  await conn.query(`UPDATE puntos SET posicion = ? WHERE Id_Punto = ?`, [nextPos, idPunto]);
-  await compactarRuta(conn, ruta);
+  await conn.query(`UPDATE puntos SET posicion = ?, Actualizado_Por = IF(? IS NULL, Actualizado_Por, ?) WHERE Id_Punto = ?`,
+    [nextPos, userId || null, userId || null, idPunto]);
+  await compactarRuta(conn, ruta, userId);
   return nextPos;
 }
 
@@ -134,12 +136,13 @@ async function reordenarPuntosRuta(rutaInput, idsOrdenados, userId = null) {
     const inList = finalOrder.join(',');
 
     await conn.query(
-      `UPDATE puntos SET posicion = CASE Id_Punto ${cases} ELSE posicion END
+      `UPDATE puntos SET posicion = CASE Id_Punto ${cases} ELSE posicion END,
+       Actualizado_Por = IF(? IS NULL, Actualizado_Por, ?)
        WHERE ruta = ? AND Activo = 1 AND Id_Punto IN (${inList})`,
-      [ruta]
+      [userId || null, userId || null, ruta]
     );
 
-    await compactarRuta(conn, ruta);
+    await compactarRuta(conn, ruta, userId);
 
     await recordHistorial({
       conexion: conn,
@@ -285,13 +288,14 @@ async function actualizarOrdenPuntosRuta(rutaInput, ordenItems, userId = null) {
     await conn.query(
       `
       UPDATE puntos
-      SET posicion = CASE Id_Punto ${cases} ELSE posicion END
+      SET posicion = CASE Id_Punto ${cases} ELSE posicion END,
+          Actualizado_Por = IF(? IS NULL, Actualizado_Por, ?)
       WHERE ruta = ? AND Activo = 1 AND Id_Punto IN (${inList})
       `,
-      [ruta]
+      [userId || null, userId || null, ruta]
     );
 
-    await compactarRuta(conn, ruta);
+    await compactarRuta(conn, ruta, userId);
     await recordHistorial({
       conexion: conn,
       tabla: 'puntos',
@@ -539,8 +543,8 @@ async function crearPunto(punto, userId = null) {
       if (!anterior) throw new Error('El punto seleccionado como referencia no pertenece a la ruta.');
       nextPos = Number(anterior.posicion) + 1;
       await conn.query(
-      'UPDATE puntos SET posicion = posicion + 1 WHERE ruta = ? AND Activo = 1 AND posicion >= ?',
-        [ruta, nextPos]
+      'UPDATE puntos SET posicion = posicion + 1, Actualizado_Por = IF(? IS NULL, Actualizado_Por, ?) WHERE ruta = ? AND Activo = 1 AND posicion >= ?',
+        [userId || null, userId || null, ruta, nextPos]
       );
     } else {
       const [[mx]] = await conn.query(
@@ -551,8 +555,8 @@ async function crearPunto(punto, userId = null) {
     }
 
     const sql = `
-      INSERT INTO puntos (Nombre_Punto, Sector, Direccion, Latitud, Longitud, ruta, posicion)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO puntos (Nombre_Punto, Sector, Direccion, Latitud, Longitud, ruta, posicion, Creado_Por, Actualizado_Por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [
       punto.Nombre_Punto || punto.NombrePunto || null,
@@ -561,7 +565,9 @@ async function crearPunto(punto, userId = null) {
       punto.Latitud || null,
       punto.Longitud || null,
       ruta,
-      nextPos
+      nextPos,
+      userId || null,
+      userId || null
     ];
 
     const [result] = await conn.query(sql, params);
@@ -574,21 +580,23 @@ async function crearPunto(punto, userId = null) {
         horarios.set(idTour, String(h.Hora_Salida ?? h.HoraSalida ?? 'Pendiente').trim() || 'Pendiente');
       }
       if (horarios.size) {
-        const rows = [...horarios.entries()].map(([idTour, hora]) => [result.insertId, idTour, hora]);
-        await conn.query(
-          `INSERT INTO horarios (Id_Punto, Id_Tour, Hora_Salida)
-           VALUES ${rows.map(() => '(?,?,?)').join(',')}`,
-          rows.flat()
-        );
+        for (const [idTour, hora] of horarios.entries()) {
+          const [scheduleResult] = await conn.query(
+            'INSERT INTO horarios (Id_Punto, Id_Tour, Hora_Salida) VALUES (?, ?, ?)',
+            [result.insertId, idTour, hora]
+          );
+          await recordHistorial({ conexion: conn, tabla: 'horarios', id_registro: scheduleResult.insertId,
+            accion: 'CREAR_HORARIO_PUNTO', id_usuario: userId,
+            detalles: [{ columna: 'Id_Punto', anterior: null, nuevo: result.insertId },
+              { columna: 'Id_Tour', anterior: null, nuevo: idTour },
+              { columna: 'Hora_Salida', anterior: null, nuevo: hora }] });
+        }
       }
     }
 
-    await compactarRuta(conn, ruta);
-
-    await conn.commit();
-
-    try {
-      await recordHistorial({
+    await compactarRuta(conn, ruta, userId);
+    await recordHistorial({
+        conexion: conn,
         tabla: 'puntos',
         id_registro: result.insertId,
         accion: 'CREAR_PUNTO',
@@ -599,9 +607,7 @@ async function crearPunto(punto, userId = null) {
           { columna: 'posicion', anterior: null, nuevo: nextPos }
         ]
       });
-    } catch (err) {
-      console.error('Failed to write historial for crearPunto:', err);
-    }
+    await conn.commit();
 
     return { insertId: result.insertId };
   } catch (e) {
@@ -623,28 +629,29 @@ async function crearHorariosParaPunto(Id_Punto, horarios, userId = null) {
     if (Id_Tour && Hora_Salida) horariosMap.set(Id_Tour, String(Hora_Salida));
   }
 
-  const rows = Array.from(horariosMap.entries()).map(([Id_Tour, Hora_Salida]) => [Id_Punto, Id_Tour, Hora_Salida]);
-  if (!rows.length) return { affectedRows: 0 };
-
-  const placeholders = rows.map(() => '(?, ?, ?)').join(',');
-  const flat = rows.flat();
-
-  const sql = `INSERT INTO horarios (Id_Punto, Id_Tour, Hora_Salida) VALUES ${placeholders}`;
-  const [result] = await db.query(sql, flat);
-
+  if (!horariosMap.size) return { affectedRows: 0 };
+  const conn = await db.getConnection();
   try {
-    await recordHistorial({
-      tabla: 'horarios',
-      id_registro: Id_Punto,
-      accion: 'CREAR_HORARIOS',
-      id_usuario: userId,
-      detalles: [{ columna: 'count', anterior: null, nuevo: result.affectedRows }]
-    });
-  } catch (err) {
-    console.error('Failed to write historial for crearHorariosParaPunto:', err);
-  }
-
-  return { insertId: result.insertId, affectedRows: result.affectedRows };
+    await conn.beginTransaction();
+    let insertId = 0;
+    for (const [Id_Tour, Hora_Salida] of horariosMap.entries()) {
+      const [result] = await conn.query(
+        'INSERT INTO horarios (Id_Punto, Id_Tour, Hora_Salida) VALUES (?, ?, ?)',
+        [Id_Punto, Id_Tour, Hora_Salida]
+      );
+      insertId ||= result.insertId;
+      await recordHistorial({ conexion: conn, tabla: 'horarios', id_registro: result.insertId,
+        accion: 'CREAR_HORARIO_PUNTO', id_usuario: userId,
+        detalles: [{ columna: 'Id_Punto', anterior: null, nuevo: Id_Punto },
+          { columna: 'Id_Tour', anterior: null, nuevo: Id_Tour },
+          { columna: 'Hora_Salida', anterior: null, nuevo: Hora_Salida }] });
+    }
+    await conn.commit();
+    return { insertId, affectedRows: horariosMap.size };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally { conn.release(); }
 }
 
 async function obtenerPuntoPorId(Id_Punto) {
@@ -723,7 +730,7 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
     await conn.query(
       `
       UPDATE puntos
-      SET Nombre_Punto = ?, Sector = ?, Direccion = ?, Latitud = ?, Longitud = ?, ruta = ?
+      SET Nombre_Punto = ?, Sector = ?, Direccion = ?, Latitud = ?, Longitud = ?, ruta = ?, Actualizado_Por = ?
       WHERE Id_Punto = ?
       `,
       [
@@ -733,6 +740,7 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
         punto.Latitud ?? null,
         punto.Longitud ?? null,
         rutaNueva,
+        userId || null,
         Id_Punto
       ]
     );
@@ -758,15 +766,16 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
       const cases = orden.map((id, index) => `WHEN ${id} THEN ${index + 1}`).join(' ');
       await conn.query(
         `UPDATE puntos
-         SET posicion = CASE Id_Punto ${cases} ELSE posicion END
+         SET posicion = CASE Id_Punto ${cases} ELSE posicion END,
+             Actualizado_Por = IF(? IS NULL, Actualizado_Por, ?)
          WHERE ruta = ? AND Activo = 1 AND Id_Punto IN (${orden.join(',')})`,
-        [rutaNueva]
+        [userId || null, userId || null, rutaNueva]
       );
-      await compactarRuta(conn, rutaVieja);
-      await compactarRuta(conn, rutaNueva);
+      await compactarRuta(conn, rutaVieja, userId);
+      await compactarRuta(conn, rutaNueva, userId);
     } else {
       // por seguridad: compactar siempre mantiene el 1..N aunque haya datos viejos raros
-      await compactarRuta(conn, rutaNueva);
+      await compactarRuta(conn, rutaNueva, userId);
     }
 
     if (Array.isArray(punto.horarios)) {
@@ -780,7 +789,7 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
 
       for (const [Id_Tour, Hora_Salida] of map.entries()) {
         const [existingRows] = await conn.query(
-          `SELECT Id_Horario
+          `SELECT Id_Horario, Hora_Salida
            FROM horarios
            WHERE Id_Punto = ? AND Id_Tour = ?
            ORDER BY Id_Horario ASC
@@ -790,15 +799,27 @@ async function actualizarPunto(Id_Punto, punto, userId = null) {
         );
         const existing = existingRows?.[0];
         if (existing) {
-          await conn.query(
-            'UPDATE horarios SET Hora_Salida = ? WHERE Id_Horario = ?',
-            [Hora_Salida, existing.Id_Horario]
-          );
+          if (String(existing.Hora_Salida ?? '') !== Hora_Salida) {
+            await conn.query(
+              'UPDATE horarios SET Hora_Salida = ? WHERE Id_Horario = ?',
+              [Hora_Salida, existing.Id_Horario]
+            );
+            await recordHistorial({ conexion: conn, tabla: 'horarios', id_registro: existing.Id_Horario,
+              accion: 'ACTUALIZAR_HORARIO_PUNTO', id_usuario: userId,
+              detalles: [{ columna: 'Id_Punto', anterior: Id_Punto, nuevo: Id_Punto },
+                { columna: 'Id_Tour', anterior: Id_Tour, nuevo: Id_Tour },
+                { columna: 'Hora_Salida', anterior: existing.Hora_Salida, nuevo: Hora_Salida }] });
+          }
         } else {
-          await conn.query(
+          const [scheduleResult] = await conn.query(
             'INSERT INTO horarios (Id_Punto, Id_Tour, Hora_Salida) VALUES (?, ?, ?)',
             [Id_Punto, Id_Tour, Hora_Salida]
           );
+          await recordHistorial({ conexion: conn, tabla: 'horarios', id_registro: scheduleResult.insertId,
+            accion: 'CREAR_HORARIO_PUNTO', id_usuario: userId,
+            detalles: [{ columna: 'Id_Punto', anterior: null, nuevo: Id_Punto },
+              { columna: 'Id_Tour', anterior: null, nuevo: Id_Tour },
+              { columna: 'Hora_Salida', anterior: null, nuevo: Hora_Salida }] });
         }
       }
     }
@@ -851,15 +872,26 @@ async function eliminarPunto(Id_Punto, userId = null) {
     let result;
     let accion;
     if (reservasAsociadas > 0) {
-      [result] = await conn.query('UPDATE puntos SET Activo = 0, posicion = 0 WHERE Id_Punto = ?', [Id_Punto]);
+      [result] = await conn.query('UPDATE puntos SET Activo = 0, posicion = 0, Actualizado_Por = ? WHERE Id_Punto = ?', [userId || null, Id_Punto]);
       accion = 'DESACTIVADO';
     } else {
+      const [horarios] = await conn.query(
+        'SELECT Id_Horario, Id_Tour, Hora_Salida FROM horarios WHERE Id_Punto = ? FOR UPDATE',
+        [Id_Punto]
+      );
+      for (const horario of horarios || []) {
+        await recordHistorial({ conexion: conn, tabla: 'horarios', id_registro: horario.Id_Horario,
+          accion: 'ELIMINAR_HORARIO_PUNTO', id_usuario: userId,
+          detalles: [{ columna: 'Id_Punto', anterior: Id_Punto, nuevo: null },
+            { columna: 'Id_Tour', anterior: horario.Id_Tour, nuevo: null },
+            { columna: 'Hora_Salida', anterior: horario.Hora_Salida, nuevo: null }] });
+      }
       await conn.query('DELETE FROM horarios WHERE Id_Punto = ?', [Id_Punto]);
       [result] = await conn.query('DELETE FROM puntos WHERE Id_Punto = ?', [Id_Punto]);
       accion = 'ELIMINADO';
     }
 
-    await compactarRuta(conn, ruta);
+    await compactarRuta(conn, ruta, userId);
 
     const detalles = [
       { columna: 'Nombre_Punto', anterior: prev.Nombre_Punto, nuevo: null },

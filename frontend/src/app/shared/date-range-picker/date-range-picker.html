@@ -1,43 +1,91 @@
-<button #trigger type="button" class="sir-range-trigger" [id]="resolvedInputId"
+<button #trigger type="button" class="sir-dp-field sir-range-trigger" [id]="resolvedInputId"
   [disabled]="effectivelyDisabled" [class.is-open]="isOpen" [class.is-invalid]="invalid"
+  [class.is-disabled]="effectivelyDisabled"
   aria-haspopup="dialog" [attr.aria-expanded]="isOpen" [attr.aria-invalid]="invalid || null"
   [attr.aria-labelledby]="ariaLabelledby" [attr.aria-describedby]="ariaDescribedby"
   [attr.aria-label]="ariaLabelledby ? null : displayText" (click)="toggle()">
-  <i class="bx bx-calendar" aria-hidden="true"></i>
-  <span [class.is-placeholder]="!range.start && !draftStart">{{ displayText }}</span>
-  <i class="bx bx-chevron-down sir-range-chevron" aria-hidden="true"></i>
+  <svg class="sir-dp-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+  <span class="sir-dp-text" [class.placeholder]="!range.start && !draftStart">{{ displayText }}</span>
+  <svg class="sir-dp-caret" [class.rotated]="isOpen" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
 </button>
 
 <ng-template #panelTpl>
-  <section class="sir-range-panel" role="dialog" aria-label="Seleccionar rango de fechas">
-    <header class="sir-range-heading">
-      <button type="button" aria-label="Mes anterior" (click)="moveMonth(-1)"><i class="bx bx-chevron-left" aria-hidden="true"></i></button>
-      <strong>Rango de fechas</strong>
-      <button type="button" aria-label="Mes siguiente" (click)="moveMonth(1)"><i class="bx bx-chevron-right" aria-hidden="true"></i></button>
+  <section class="sir-dp-panel sir-range-panel" role="dialog" aria-label="Seleccionar período">
+    <header class="sir-dp-nav sir-range-heading">
+      <button type="button" class="sir-dp-nav-btn" aria-label="Mes anterior" (click)="moveMonth(-1)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <strong class="sir-range-title">Seleccionar período</strong>
+      <button type="button" class="sir-dp-nav-btn" aria-label="Mes siguiente" (click)="moveMonth(1)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
     </header>
     <div class="sir-range-months">
       @for (month of visibleMonths; track month.key; let monthIndex = $index) {
         <div class="sir-range-month" [class.sir-range-month--second]="monthIndex === 1">
-          <h3>{{ month.label }}</h3>
-          <div class="sir-range-days">
-            @for (weekday of weekdays; track weekday) { <span class="sir-range-weekday">{{ weekday }}</span> }
-            @for (cell of month.cells; track $index) {
-              @if (cell) {
-                <button type="button" class="sir-range-day"
-                  [class.is-start]="isStart(cell.iso)" [class.is-end]="isEnd(cell.iso)"
-                  [class.is-between]="isBetween(cell.iso)" [disabled]="cell.disabled"
-                  [attr.aria-label]="dayLabel(cell.iso)"
-                  [attr.aria-pressed]="isStart(cell.iso) || isEnd(cell.iso)"
-                  (click)="selectDate(cell.iso)">{{ cell.day }}</button>
-              } @else { <span aria-hidden="true"></span> }
-            }
+          <div class="sir-dp-nav-center sir-range-month-heading">
+            <button type="button" class="sir-dp-pill" [attr.aria-label]="'Elegir mes del calendario ' + (monthIndex + 1)"
+              (click)="showView(monthIndex, 'month')">{{ fullMonths[month.month] }}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button type="button" class="sir-dp-pill" [attr.aria-label]="'Elegir año del calendario ' + (monthIndex + 1)"
+              (click)="showView(monthIndex, 'year')">{{ month.year }}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
           </div>
+          @if (viewForSide(monthIndex) === 'month') {
+            <div class="sir-dp-month-grid sir-dp-anim">
+              @for (name of months; track name; let i = $index) {
+                <button type="button" class="sir-dp-month-item" [class.active]="i === month.month"
+                  (click)="selectMonth(monthIndex, i)">{{ name }}</button>
+              }
+            </div>
+          } @else if (viewForSide(monthIndex) === 'year') {
+            <div class="sir-dp-year-grid sir-dp-anim">
+              @for (year of years; track year) {
+                <button type="button" class="sir-dp-year-item" [class.active]="year === month.year"
+                  (click)="selectYear(monthIndex, year)">{{ year }}</button>
+              }
+            </div>
+          } @else {
+            <div class="sir-dp-weekdays">
+              @for (weekday of weekdays; track weekday) { <span class="sir-dp-wd">{{ weekday }}</span> }
+            </div>
+            <div class="sir-dp-days sir-range-days">
+              @for (cell of month.cells; track $index) {
+                @if (cell) {
+                  <button type="button" class="sir-dp-day sir-range-day"
+                    [class.dp-today]="cell.iso === todayIso && !isStart(cell.iso) && !isEnd(cell.iso)"
+                    [class.dp-selected]="isStart(cell.iso) || isEnd(cell.iso)"
+                    [class.dp-disabled]="cell.disabled" [class.is-between]="isBetween(cell.iso)" [disabled]="cell.disabled"
+                    [attr.aria-label]="dayLabel(cell.iso)"
+                    [attr.aria-pressed]="isStart(cell.iso) || isEnd(cell.iso)"
+                    (click)="selectDate(cell.iso)">{{ cell.day }}</button>
+                } @else { <span aria-hidden="true"></span> }
+              }
+            </div>
+          }
         </div>
       }
     </div>
-    <footer class="sir-range-footer">
-      <span [id]="statusId" role="status">{{ selectionHint }}</span>
-      @if (range.start || draftStart) { <button type="button" (click)="clearRange()">Limpiar</button> }
-    </footer>
+    @if (draftStart || rangeError || (allowClear && range.start)) {
+      <footer class="sir-dp-footer sir-range-footer">
+        @if (draftStart || rangeError) { <span [id]="statusId" role="status">{{ selectionHint }}</span> }
+        @if (allowClear && (range.start || draftStart)) { <button type="button" class="sir-dp-btn-clear" (click)="clearRange()">Limpiar</button> }
+      </footer>
+    }
   </section>
 </ng-template>
