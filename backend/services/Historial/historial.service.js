@@ -1,5 +1,5 @@
 const db = require('../../database/db');
-const { MODULOS_HISTORIAL, ACCIONES_CONOCIDAS, etiquetaAccion, moduloDeTabla } = require('./catalogos');
+const { MODULOS_HISTORIAL, ACCIONES_CONOCIDAS, TIPOS_ACTIVIDAD, tipoActividadDeAccion, etiquetaAccion, moduloDeTabla } = require('./catalogos');
 
 const SECRET_FIELD = /pass(word|wd)?|contrasena|clave|token|credencial|secret|cookie|authorization|autorizacion|session|sesion|correo|email|telefono|phone|api.?key|usuario|user(name)?|login|documento|identificacion|cedula/i;
 const SECRET_VALUE = /\bBearer\s+[^\s,;]+|\b(token|api[_-]?key|password|passwd|secret|credential)\s*[:=]\s*[^\s,;]+/i;
@@ -55,6 +55,7 @@ function buildWhere(filters = {}) {
   const conditions = [];
   const userIds = list(filters.usuarios ?? filters.usuario);
   const actions = list(filters.acciones ?? filters.tipoAccion);
+  const activities = list(filters.actividad);
   const modules = list(filters.modulos ?? filters.modulo);
   const referencia = normalizarReferencia(filters.referencia);
   const from = filters.fechaInicio ? parseDate(filters.fechaInicio) : null;
@@ -71,7 +72,25 @@ function buildWhere(filters = {}) {
     conditions.push(`h.Id_Usuario IN (${ids.map(() => '?').join(',')})`);
     params.push(...ids);
   }
-  if (actions.length) {
+  if (activities.length) {
+    const selected = new Set(activities);
+    if ([...selected].some((value) => !TIPOS_ACTIVIDAD.some((tipo) => tipo.value === value))) {
+      throw new Error('tipo de actividad no reconocido');
+    }
+    const mapped = TIPOS_ACTIVIDAD.filter((tipo) => selected.has(tipo.value) && tipo.value !== 'otros')
+      .flatMap((tipo) => tipo.acciones);
+    const parts = [];
+    if (mapped.length) {
+      parts.push(`h.Accion IN (${mapped.map(() => '?').join(',')})`);
+      params.push(...mapped);
+    }
+    if (selected.has('otros')) {
+      const classified = TIPOS_ACTIVIDAD.filter((tipo) => tipo.value !== 'otros').flatMap((tipo) => tipo.acciones);
+      parts.push(`h.Accion NOT IN (${classified.map(() => '?').join(',')})`);
+      params.push(...classified);
+    }
+    conditions.push(`(${parts.join(' OR ')})`);
+  } else if (actions.length) {
     conditions.push(`h.Accion IN (${actions.map(() => '?').join(',')})`);
     params.push(...actions);
   }
@@ -137,7 +156,8 @@ async function getFilterOptions() {
   const actionValues = [...new Set([...ACCIONES_CONOCIDAS, ...(actions || []).map((row) => row.accion)])].sort((a, b) => a.localeCompare(b, 'es'));
   return {
     usuarios: (users || []).map((user) => ({ id: Number(user.id), label: user.label || `Usuario #${user.id}` })),
-    acciones: actionValues.map((value) => ({ value, label: etiquetaAccion(value) })),
+    acciones: actionValues.map((value) => ({ value, label: etiquetaAccion(value), actividad: tipoActividadDeAccion(value) })),
+    actividades: TIPOS_ACTIVIDAD.map(({ value, label }) => ({ value, label })),
     modulos: modules.map(({ value, label }) => ({ value, label })),
   };
 }

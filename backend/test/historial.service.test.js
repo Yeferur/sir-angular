@@ -2,9 +2,50 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../database/db');
 const service = require('../services/Historial/historial.service');
+const { TIPOS_ACTIVIDAD, ACCIONES_CONOCIDAS, tipoActividadDeAccion } = require('../services/Historial/catalogos');
 
 const originalQuery = db.query;
 test.afterEach(() => { db.query = originalQuery; });
+
+test('mapping único cubre creaciones, modificaciones, cancelaciones, accesos, operación, validaciones y Otros', () => {
+  const examples = {
+    CREAR_RESERVA: 'creaciones', ACTUALIZAR_RESERVA: 'modificaciones',
+    AGREGAR_PASAJERO: 'creaciones', ACTUALIZAR_PASAJERO: 'modificaciones',
+    ELIMINAR_PASAJERO: 'cancelaciones',
+    CANCELAR_TRANSFER: 'cancelaciones', LOGIN: 'accesos',
+    ACTUALIZAR_ASIGNACION_SEGUROS: 'operacion', VALIDAR: 'validaciones',
+    EXPORTAR_EXCEL_LISTADO: 'otros', ACCION_FUTURA: 'otros',
+  };
+  for (const [action, expected] of Object.entries(examples)) assert.equal(tipoActividadDeAccion(action), expected);
+  assert.equal(TIPOS_ACTIVIDAD.length, 7);
+  assert.equal(new Set(ACCIONES_CONOCIDAS).size, ACCIONES_CONOCIDAS.length);
+  assert.equal(require('../services/Historial/catalogos').etiquetaAccion('AGREGAR_PASAJERO'), 'Pasajero agregado');
+  assert.equal(require('../services/Historial/catalogos').etiquetaAccion('ACTUALIZAR_PASAJERO'), 'Pasajero actualizado');
+  assert.equal(require('../services/Historial/catalogos').etiquetaAccion('ELIMINAR_PASAJERO'), 'Pasajero eliminado');
+});
+
+test('filtra un tipo o varios con IDs estables y Otros incluye acciones futuras', () => {
+  const filters = { fechaInicio: '2026-10-13', fechaFin: '2026-10-13' };
+  for (const [activity, action] of [
+    ['creaciones', 'CREAR_RESERVA'], ['modificaciones', 'ACTUALIZAR_RESERVA'],
+    ['cancelaciones', 'ELIMINAR_RESERVA'], ['accesos', 'LOGIN'],
+    ['operacion', 'GUARDAR_LISTADO'], ['validaciones', 'VALIDAR'],
+  ]) {
+    const where = service.buildWhere({ ...filters, actividad: [activity] });
+    assert.match(where.sql, /h\.Accion IN \(/);
+    assert.ok(where.params.includes(action));
+  }
+  const combined = service.buildWhere({ ...filters, actividad: ['creaciones', 'modificaciones'] });
+  assert.ok(combined.params.includes('CREAR_RESERVA'));
+  assert.ok(combined.params.includes('ACTUALIZAR_RESERVA'));
+  const other = service.buildWhere({ ...filters, actividad: ['otros'] });
+  assert.match(other.sql, /h\.Accion NOT IN \(/);
+  assert.equal(other.params.includes('ACCION_FUTURA'), false);
+  assert.equal(other.params.includes('LOGIN'), true);
+  const mixed = service.buildWhere({ ...filters, actividad: ['accesos', 'otros'] });
+  assert.match(mixed.sql, /h\.Accion IN \([\s\S]+ OR h\.Accion NOT IN \(/);
+  assert.throws(() => service.buildWhere({ ...filters, actividad: ['inexistente'] }), /actividad no reconocido/);
+});
 
 test('Historial combina periodo calendario, usuarios, acciones y módulos sin búsqueda libre', () => {
   const where = service.buildWhere({
@@ -122,7 +163,8 @@ test('catálogos incluyen todos los usuarios, inactivos y actores históricos si
     { id: 12, label: 'Julieta' }, { id: 13, label: 'María (inactivo)' }, { id: 14, label: 'Actor histórico' },
   ]);
   assert.ok(options.acciones.some((action) => action.value === 'LOGIN' && action.label === 'Inicio de sesión'));
-  assert.ok(options.acciones.some((action) => action.value === 'ACCION_HEREDADA'));
+  assert.ok(options.acciones.some((action) => action.value === 'ACCION_HEREDADA' && action.actividad === 'otros'));
+  assert.deepEqual(options.actividades.map((activity) => activity.value), TIPOS_ACTIVIDAD.map((activity) => activity.value));
   assert.ok(options.modulos.some((module) => module.value === 'usuarios' && module.label === 'Usuarios'));
   assert.ok(options.modulos.some((module) => module.value === 'otros' && module.label === 'Otros registros'));
   assert.ok(!options.modulos.some((module) => module.label === 'tabla_nueva'));

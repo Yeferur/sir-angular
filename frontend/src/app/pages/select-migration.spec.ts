@@ -130,13 +130,13 @@ describe('Historial y rutas: filtros por valor/evento', () => {
   it('mantiene los filtros independientes de Historial', async () => {
     const { c } = await mount(VerHistorialComponent);
     c.toggleUser(5, true);
-    c.toggleAction('LOGIN', true);
+    c.toggleActivity('accesos', true);
     c.toggleModule('reservas', true);
     expect(c.draftFilters().usuarios).toEqual([5]);
-    expect(c.draftFilters().acciones).toEqual(['LOGIN']);
+    expect(c.draftFilters().actividad).toEqual(['accesos']);
     expect(c.draftFilters().modulos).toEqual(['reservas']);
     expect(c.appliedFilters().usuarios).toEqual([]);
-    expect(c.appliedFilters().acciones).toEqual([]);
+    expect(c.appliedFilters().actividad).toEqual([]);
     expect(c.appliedFilters().modulos).toEqual([]);
     expect(c.appliedGroupCount()).toBe(0);
   });

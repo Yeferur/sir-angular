@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
 const { recordHistorial, logSistema } = require('../Historial/logger');
+const { changedDetail, sameHistoryValue, uniquePointIds, pointSetLabel,
+  passengerLabel, reconcilePassengers, passengerChangeDetails } = require('./reserva-auditoria');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { assertReservationOwner } = require('../../utils/clientAccess');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
@@ -1620,6 +1622,8 @@ async function crearReservaConPasajerosYPagos(
         { columna: 'Id_Moneda', anterior: null, nuevo: idMoneda },
         { columna: 'Fecha_Tour', anterior: null, nuevo: r.Fecha_Tour },
         { columna: 'Estado', anterior: null, nuevo: estadoCalculado },
+        ...(pasajerosArray.length ? [{ columna: 'Pasajeros iniciales', anterior: null,
+          nuevo: pasajerosArray.map(passengerLabel).join(' · ') }] : []),
         ...(esDuplicado ? [
           { columna: 'Id_Reserva_Origen', anterior: null, nuevo: idReservaOrigen || 'N/A' },
           { columna: 'Id_Reserva_Nueva', anterior: null, nuevo: idReserva }
@@ -1858,9 +1862,34 @@ async function actualizarReservaConPasajerosYPagos(
     const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
     const pagosArray = Array.isArray(payload?.pagos) ? payload.pagos : [];
     const [puntosPasajerosAnteriores] = await conn.query(
-      'SELECT Id_Punto, Nombre_Pasajero, DNI, Telefono_Pasajero, Precio_Pasajero FROM pasajeros WHERE Id_Reserva = ? ORDER BY Id_Pasajero ASC',
+      `SELECT Id_Pasajero,Id_Punto,Nombre_Pasajero,DNI,Nacionalidad,Telefono_Pasajero,
+        Tipo_Pasajero,Id_Plan,Precio_Tour,Precio_Pasajero,Comision,Confirmacion
+       FROM pasajeros WHERE Id_Reserva = ? ORDER BY Id_Pasajero ASC`,
       [Id_Reserva]
     );
+    const pasajerosConIdentidad = pasajerosArray.map(p => ({ ...p }));
+    if (payload?.pasajeros !== undefined) {
+      const idsAnteriores = new Set(puntosPasajerosAnteriores.map(p => String(p.Id_Pasajero)));
+      const idsRecibidos = new Set();
+      for (const p of pasajerosConIdentidad) {
+        if (p.Id_Pasajero == null || p.Id_Pasajero === '') continue;
+        const id = String(p.Id_Pasajero);
+        if (!idsAnteriores.has(id) || idsRecibidos.has(id)) {
+          const err = new Error('La identidad de un pasajero no pertenece a esta reserva o está repetida.');
+          err.status = 400;
+          err.errorCode = 'INVALID_PASSENGER_ID';
+          throw err;
+        }
+        idsRecibidos.add(id);
+      }
+      // Los clientes anteriores no enviaban IDs: solo conservarlos cuando DNI o nombre
+      // establezcan una correspondencia única; en caso ambiguo se tratarán como alta/baja.
+      for (const [previous, next] of reconcilePassengers(puntosPasajerosAnteriores, pasajerosConIdentidad).matches) {
+        if (next.passenger.Id_Pasajero == null || next.passenger.Id_Pasajero === '') {
+          next.passenger.Id_Pasajero = previous.passenger.Id_Pasajero;
+        }
+      }
+    }
 
     const idTourFinal = Number(r.Id_Tour || currentReserva.Id_Tour_Actual || 0);
     const fechaTourFinal = normalizarFechaYMD(r.Fecha_Tour || currentReserva.Fecha_Tour);
@@ -1941,19 +1970,14 @@ async function actualizarReservaConPasajerosYPagos(
       }
     }
 
-    // 2) Reemplazo total de pasajeros
-    if (pasajerosArray.length > 0 || payload.pasajeros !== undefined) {
-      await conn.query('DELETE FROM pasajeros WHERE Id_Reserva = ?', [Id_Reserva]);
-
-      for (const p of pasajerosArray) {
+    // 2) Conservar la PK de cada pasajero existente durante la edición.
+    if (payload?.pasajeros !== undefined) {
+      const idsConservados = new Set(pasajerosConIdentidad
+        .filter(p => p.Id_Pasajero != null && p.Id_Pasajero !== '')
+        .map(p => String(p.Id_Pasajero)));
+      for (const p of pasajerosConIdentidad) {
         const idPuntoPasajero = Number(p.Id_Punto || r.Id_Punto || 0) || null;
-        await conn.query(
-          `INSERT INTO pasajeros
-           (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
-            Id_Plan, Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            Id_Reserva,
+        const values = [
             p.Nombre_Pasajero || '',
             p.DNI || null,
             normalizarNacionalidad(p.Nacionalidad),
@@ -1965,20 +1989,43 @@ async function actualizarReservaConPasajerosYPagos(
             p.Comision ?? 0,
             idPuntoPasajero,
             p.Confirmacion ? 1 : 0
-          ]
-        );
+          ];
+        if (p.Id_Pasajero != null && p.Id_Pasajero !== '') {
+          await conn.query(
+            `UPDATE pasajeros SET Nombre_Pasajero=?, DNI=?, Nacionalidad=?, Telefono_Pasajero=?,
+              Tipo_Pasajero=?, Id_Plan=?, Precio_Tour=?, Precio_Pasajero=?, Comision=?,
+              Id_Punto=?, Confirmacion=? WHERE Id_Pasajero=? AND Id_Reserva=?`,
+            [...values, p.Id_Pasajero, Id_Reserva]
+          );
+        } else {
+          await conn.query(
+            `INSERT INTO pasajeros
+             (Id_Reserva, Nombre_Pasajero, DNI, Nacionalidad, Telefono_Pasajero, Tipo_Pasajero,
+              Id_Plan, Precio_Tour, Precio_Pasajero, Comision, Id_Punto, Confirmacion)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [Id_Reserva, ...values]
+          );
+        }
+      }
+      for (const oldPassenger of puntosPasajerosAnteriores) {
+        if (!idsConservados.has(String(oldPassenger.Id_Pasajero))) {
+          await conn.query('DELETE FROM pasajeros WHERE Id_Pasajero=? AND Id_Reserva=?',
+            [oldPassenger.Id_Pasajero, Id_Reserva]);
+        }
       }
     }
 
+    let pagosResumenAnterior = null;
     // 3) Pagos
     if (payload.pagos !== undefined) {
       const [pagosActualesRows] = await conn.query(
-        `SELECT Id_Pago, Ruta_Comprobante
+        `SELECT Id_Pago, Ruta_Comprobante, Tipo, Monto
            FROM pagos_reservas
           WHERE Id_Reserva = ?
           FOR UPDATE`,
         [Id_Reserva]
       );
+      pagosResumenAnterior = (pagosActualesRows || []).map(({ Tipo, Monto }) => ({ Tipo, Monto: Number(Monto) }));
 
       const rutasActuales = new Set(
         (pagosActualesRows || [])
@@ -2049,36 +2096,71 @@ async function actualizarReservaConPasajerosYPagos(
       : puntosAnteriores;
     const cantidadPasajerosAnterior = (puntosPasajerosAnteriores || []).length;
     const cantidadPasajerosNueva = payload?.pasajeros !== undefined ? pasajerosArray.length : cantidadPasajerosAnterior;
-    const serializePoints = (points) => JSON.stringify([...new Set(points.map(String))].sort());
+    const pasajerosNuevosHistorial = pasajerosConIdentidad.map(p => ({
+      ...p, Id_Punto: Number(p.Id_Punto || r.Id_Punto || 0) || null,
+      Nacionalidad: normalizarNacionalidad(p.Nacionalidad),
+      Tipo_Pasajero: passengerTypeForDatabase(p.Tipo_Pasajero),
+      Precio_Tour: Number(p.Precio_Tour || 0), Precio_Pasajero: Number(p.Precio_Pasajero || 0),
+      Comision: Number(p.Comision ?? 0), Confirmacion: p.Confirmacion ? 1 : 0,
+    }));
+    const idsPuntos = uniquePointIds([...puntosAnteriores, ...puntosNuevos]);
+    const [puntosRows] = idsPuntos.length
+      ? await conn.query('SELECT Id_Punto,Nombre_Punto FROM puntos WHERE Id_Punto IN (?)', [idsPuntos])
+      : [[]];
+    const pointLabels = new Map(puntosRows.map(point => [String(point.Id_Punto), point.Nombre_Punto]));
     const detallesHistorial = [
-      { columna: 'Estado', anterior: estadoAnterior, nuevo: estadoCalculado },
-      { columna: 'Id_Tour', anterior: currentReserva.Id_Tour_Actual, nuevo: idTourFinal },
-      { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(currentReserva.Fecha_Tour), nuevo: fechaTourFinal },
-      { columna: 'Tipo_Reserva', anterior: currentReserva.Tipo_Reserva || null, nuevo: tipoReservaFinal },
-      { columna: 'Id_Horario', anterior: horarioAnterior, nuevo: horarioNuevo },
-      { columna: 'Hora_Salida', anterior: horariosById.get(String(horarioAnterior)) || null, nuevo: horariosById.get(String(horarioNuevo)) || null },
-      { columna: 'NumeroPasajeros', anterior: cantidadPasajerosAnterior, nuevo: cantidadPasajerosNueva },
-      { columna: 'Puntos_Recogida', anterior: serializePoints(puntosAnteriores), nuevo: serializePoints(puntosNuevos) },
-      { columna: 'Nombre_Reportante', anterior: currentReserva.Nombre_Reportante || null, nuevo: r.Nombre_Reportante !== undefined ? (r.Nombre_Reportante || null) : (currentReserva.Nombre_Reportante || null) },
-      { columna: 'Id_Entidad_Reportante', anterior: currentReserva.Id_Entidad_Reportante || null, nuevo: idEntidadReportante || null },
-      { columna: 'Idioma_Reserva', anterior: currentReserva.Idioma_Reserva || null, nuevo: r.Idioma_Reserva !== undefined ? (r.Idioma_Reserva || null) : (currentReserva.Idioma_Reserva || null) },
-      { columna: 'Observaciones', anterior: currentReserva.Observaciones || null, nuevo: r.Observaciones !== undefined ? (r.Observaciones || null) : (currentReserva.Observaciones || null) },
-    ];
-    if (cuposLiberados?.cuposLiberados) {
-      detallesHistorial.push({ columna: 'Cupos_Liberados', anterior: 0, nuevo: cuposLiberados.cuposLiberados });
-    }
-    if (cuposAplicados?.cuposAplicados) {
-      detallesHistorial.push({ columna: 'Cupos_Aplicados', anterior: 0, nuevo: cuposAplicados.cuposAplicados });
+      changedDetail('Estado', estadoAnterior, estadoCalculado),
+      changedDetail('Id_Tour', currentReserva.Id_Tour_Actual, idTourFinal, { numeric: true }),
+      changedDetail('Fecha_Tour', normalizarFechaYMD(currentReserva.Fecha_Tour), fechaTourFinal),
+      changedDetail('Tipo_Reserva', currentReserva.Tipo_Reserva, tipoReservaFinal),
+      changedDetail('Id_Horario', horarioAnterior, horarioNuevo, { numeric: true }),
+      changedDetail('Hora_Salida', horariosById.get(String(horarioAnterior)) || null, horariosById.get(String(horarioNuevo)) || null),
+      changedDetail('Id_Canal', currentReserva.Id_Canal, idCanalFinal, { numeric: true }),
+      changedDetail('Id_Moneda', currentReserva.Id_Moneda, r.Id_Moneda !== undefined ? r.Id_Moneda : currentReserva.Id_Moneda, { numeric: true }),
+      changedDetail('NumeroPasajeros', cantidadPasajerosAnterior, cantidadPasajerosNueva, { numeric: true }),
+      !sameHistoryValue(uniquePointIds(puntosAnteriores), uniquePointIds(puntosNuevos))
+        ? { columna: 'Puntos_Recogida', anterior: pointSetLabel(puntosAnteriores, pointLabels),
+          nuevo: pointSetLabel(puntosNuevos, pointLabels) } : null,
+      changedDetail('Nombre_Reportante', currentReserva.Nombre_Reportante,
+        r.Nombre_Reportante !== undefined ? r.Nombre_Reportante : currentReserva.Nombre_Reportante),
+      changedDetail('Id_Entidad_Reportante', currentReserva.Id_Entidad_Reportante, idEntidadReportante, { numeric: true }),
+      changedDetail('Idioma_Reserva', currentReserva.Idioma_Reserva,
+        r.Idioma_Reserva !== undefined ? r.Idioma_Reserva : currentReserva.Idioma_Reserva),
+      !sameHistoryValue(currentReserva.Observaciones,
+        r.Observaciones !== undefined ? r.Observaciones : currentReserva.Observaciones)
+        ? { columna: 'Observaciones', anterior: '', nuevo: 'Modificadas' } : null,
+      !sameHistoryValue(currentReserva.Telefono_Reportante, telefonoReportanteFinal)
+        ? { columna: 'Teléfono de contacto', anterior: '', nuevo: 'Modificado' } : null,
+      pagosResumenAnterior !== null && !sameHistoryValue(pagosResumenAnterior,
+        pagosArray.map(({ Tipo, Monto }) => ({ Tipo, Monto: Number(Monto || 0) })), { unordered: true })
+        ? { columna: 'Pagos', anterior: '', nuevo: 'Modificados' } : null,
+    ].filter(Boolean);
+    if (detallesHistorial.length) {
+      await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva,
+        accion: 'ACTUALIZAR_RESERVA', id_usuario: userId, detalles: detallesHistorial });
     }
 
-    await recordHistorial({
-      conexion: conn,
-      tabla: 'reservas',
-      id_registro: Id_Reserva,
-      accion: 'ACTUALIZAR_RESERVA',
-      id_usuario: userId,
-      detalles: detallesHistorial
-    });
+    if (payload?.pasajeros !== undefined) {
+      const changes = reconcilePassengers(puntosPasajerosAnteriores, pasajerosNuevosHistorial);
+      for (const { passenger } of changes.added) {
+        await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva,
+          accion: 'AGREGAR_PASAJERO', id_usuario: userId,
+          detalles: [{ columna: 'Pasajero', anterior: null, nuevo: passengerLabel(passenger) }] });
+      }
+      for (const [previous, next] of changes.matches) {
+        const changed = passengerChangeDetails(previous.passenger, next.passenger, pointLabels);
+        if (!changed.length) continue;
+        await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva,
+          accion: 'ACTUALIZAR_PASAJERO', id_usuario: userId,
+          detalles: [{ columna: 'Pasajero afectado', anterior: null,
+            nuevo: passengerLabel(previous.passenger) }, ...changed] });
+      }
+      for (const { passenger } of changes.removed) {
+        await recordHistorial({ conexion: conn, tabla: 'reservas', id_registro: Id_Reserva,
+          accion: 'ELIMINAR_PASAJERO', id_usuario: userId,
+          detalles: [{ columna: 'Pasajero', anterior: passengerLabel(passenger), nuevo: null }] });
+      }
+    }
 
     await conn.commit();
     committed = true;

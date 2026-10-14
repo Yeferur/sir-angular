@@ -1398,6 +1398,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
           ? puntoPasajero
           : null;
         const fg = this.fb.group({
+          Id_Pasajero: [p.Id_Pasajero ?? null],
           Tipo_Pasajero: [p.Tipo_Pasajero ?? p.TipoPasajero ?? 'ADULTO', Validators.required],
           Nombre_Pasajero: [p.Nombre_Pasajero ?? p.NombrePasajero ?? ''],
           DNI: [p.DNI ?? p.IdPas ?? ''],
@@ -2093,6 +2094,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const comisionInicial = this.comisionGlobalPorTipo(tipo);
 
     const fg = this.fb.group({
+      Id_Pasajero: [null],
       Tipo_Pasajero: [tipo, Validators.required],
       Nombre_Pasajero: [''],
       DNI: [''],
@@ -3203,6 +3205,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.sincronizarPuntosPasajeros();
       // Pasajeros payload
       const pax = this.pasajeros.controls.map(c => ({
+        Id_Pasajero: c.get('Id_Pasajero')?.value ?? null,
         Nombre_Pasajero: this.toUpperText(c.get('Nombre_Pasajero')?.value),
         DNI: this.normalizarDni(c.get('DNI')?.value) || null,
         Nacionalidad: this.normalizarNacionalidad(c.get('Nacionalidad')?.value),

@@ -69,6 +69,7 @@ export interface CabeceraReserva {
 }
 
 export interface Pasajero {
+  Id_Pasajero?: number | string | null;
   Tipo_Pasajero: 'ADULTO' | 'NIÑO' | 'INFANTE';
   Nombre_Pasajero: string;
   DNI: string | null;

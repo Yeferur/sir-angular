@@ -33,16 +33,17 @@ export interface HistorialResponse {
 }
 
 export interface HistorialUserOption { id: number; label: string; }
-export interface HistorialOption { value: string; label: string; }
+export interface HistorialOption { value: string; label: string; actividad?: string; }
 export interface HistorialFilterOptions {
   usuarios: HistorialUserOption[];
   acciones: HistorialOption[];
+  actividades: HistorialOption[];
   modulos: HistorialOption[];
 }
 
 export interface HistorialFilters {
   usuarios?: number[];
-  acciones?: string[];
+  actividad?: string[];
   modulos?: string[];
   referencia?: string;
   fechaInicio?: string;
@@ -84,7 +85,7 @@ export class HistorialService {
       params = params.set('desde', filters.fechaInicio).set('hasta', filters.fechaFin);
     }
     for (const id of filters.usuarios || []) params = params.append('usuarios', String(id));
-    for (const action of filters.acciones || []) params = params.append('acciones', action);
+    for (const activity of filters.actividad || []) params = params.append('actividad', activity);
     for (const module of filters.modulos || []) params = params.append('modulos', module);
     if (includePage) {
       params = params.set('page', String(filters.page || 1)).set('limit', String(filters.limit || 10));

@@ -1,5 +1,11 @@
 const db = require('../../database/db');
 
+function isSecretColumn(column) {
+  const compact = String(column || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+  return /(password|passwd|contrasena|clave|token|secret|authorization|autorizacion|cookie|apikey|credential|credencial|sessionsecret|sesionsecret)/.test(compact);
+}
+
 function normalizeOptionalUserId(idUsuario) {
   if (idUsuario === null || idUsuario === undefined) return null;
 
@@ -113,10 +119,12 @@ async function registrarHistorial(input, maybeData = {}) {
 
     const Id_Historial = res.insertId;
 
-    if (Array.isArray(data.detalles) && data.detalles.length) {
-      const placeholders = data.detalles.map(() => '(?, ?, ?, ?)').join(',');
+    const safeDetails = Array.isArray(data.detalles)
+      ? data.detalles.filter(detail => !isSecretColumn(detail?.columna)) : [];
+    if (safeDetails.length) {
+      const placeholders = safeDetails.map(() => '(?, ?, ?, ?)').join(',');
       const params = [];
-      for (const d of data.detalles) {
+      for (const d of safeDetails) {
         params.push(Id_Historial, d.columna || '', (d.anterior == null) ? '' : String(d.anterior), (d.nuevo == null) ? '' : String(d.nuevo));
       }
       await conn.query(
@@ -184,4 +192,4 @@ async function recordHistorialCambioReserva({
   }
 }
 
-module.exports = { registrarHistorial, recordHistorial, logSistema, recordHistorialCambioReserva };
+module.exports = { registrarHistorial, recordHistorial, logSistema, recordHistorialCambioReserva, isSecretColumn };

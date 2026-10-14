@@ -16,7 +16,12 @@ describe('VerHistorialComponent', () => {
   const result: HistorialResponse = { data: [], total: 25, page: 1, limit: 10, totalPages: 3 };
   const options = {
     usuarios: [{ id: 3, label: 'Julieta' }, { id: 4, label: 'Yeferson' }],
-    acciones: [{ value: 'LOGIN', label: 'Inicio de sesión' }, { value: 'CREAR_USUARIO', label: 'Creación de usuario' }],
+    acciones: [{ value: 'LOGIN', label: 'Inicio de sesión', actividad: 'accesos' },
+      { value: 'CREAR_USUARIO', label: 'Creación de usuario', actividad: 'creaciones' }],
+    actividades: [{ value: 'creaciones', label: 'Creaciones' }, { value: 'modificaciones', label: 'Modificaciones' },
+      { value: 'cancelaciones', label: 'Cancelaciones y eliminaciones' }, { value: 'accesos', label: 'Accesos y sesiones' },
+      { value: 'operacion', label: 'Asignaciones y operación' }, { value: 'validaciones', label: 'Validaciones y aprobaciones' },
+      { value: 'otros', label: 'Otros' }],
     modulos: [{ value: 'reservas', label: 'Reservas' }],
   };
 
@@ -47,8 +52,8 @@ describe('VerHistorialComponent', () => {
 
   it('inicia sin consultar y muestra el estado listo con período vacío', () => {
     expect(service.getHistorial).not.toHaveBeenCalled();
-    expect(component.draftFilters()).toEqual({ period: null, periodExplicit: false, referencia: '', usuarios: [], acciones: [], modulos: [] });
-    expect(component.appliedFilters()).toEqual({ period: null, periodExplicit: false, referencia: '', usuarios: [], acciones: [], modulos: [] });
+    expect(component.draftFilters()).toEqual({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
+    expect(component.appliedFilters()).toEqual({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
     expect(component.hasQueried()).toBeFalse();
     expect(fixture.nativeElement.textContent).toContain('Listo para consultar');
     expect(fixture.nativeElement.textContent).toContain('Busca una reserva o transfer por código, o utiliza los filtros para consultar actividad del sistema.');
@@ -68,6 +73,12 @@ describe('VerHistorialComponent', () => {
     expect(picker.querySelector('.sir-range-trigger')?.textContent).toContain('Seleccionar período');
     expect(window.getComputedStyle(fixture.nativeElement.querySelector('.hist-filter-action')).order).toBe('3');
     expect(window.getComputedStyle(fixture.nativeElement.querySelector('.hist-filter-module')).order).toBe('4');
+    expect(fixture.nativeElement.querySelector('.hist-filter-action .form-label')?.textContent).toContain('Tipo de actividad');
+    component.toggleDropdown('actividad'); fixture.detectChanges();
+    const labels = Array.from(fixture.nativeElement.querySelectorAll('.hist-filter-action .multi-filter-option') as NodeListOf<HTMLElement>)
+      .map((option) => option.textContent?.trim());
+    expect(labels).toEqual(options.actividades.map((activity) => activity.label));
+    expect(labels).not.toContain('Inicio de sesión');
   });
 
   it('no permite expandir un LOGIN sin detalles y no muestra controles de expansión', () => {
@@ -143,17 +154,17 @@ describe('VerHistorialComponent', () => {
 
   it('mantiene separado el borrador hasta Buscar y sincroniza la consulta aplicada', async () => {
     component.toggleUser(3, true);
-    component.toggleAction('LOGIN', true);
+    component.toggleActivity('accesos', true);
     component.onPeriodChange({ start: '2026-10-13', end: '2026-10-13' });
     expect(component.appliedFilters().usuarios).toEqual([]);
     expect(component.appliedGroupCount()).toBe(0);
     component.buscar();
     await Promise.resolve();
     expect(component.appliedFilters().usuarios).toEqual([3]);
-    expect(component.appliedFilters().acciones).toEqual(['LOGIN']);
+    expect(component.appliedFilters().actividad).toEqual(['accesos']);
     expect(component.appliedGroupCount()).toBe(3);
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [3], acciones: ['LOGIN'], modulos: [],
+      usuarios: [3], actividad: ['accesos'], modulos: [],
       referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 10,
     });
     expect(router.navigate).toHaveBeenCalled();
@@ -162,15 +173,38 @@ describe('VerHistorialComponent', () => {
   it('restaura el período, multiselects y página desde query params', () => {
     queryParams.next(convertToParamMap({
       desde: '2026-10-01', hasta: '2026-10-13', usuarios: ['3', '4'],
-      acciones: ['LOGIN', 'CREAR_USUARIO'], modulos: ['reservas'], page: '3',
+      actividad: ['accesos', 'creaciones'], modulos: ['reservas'], page: '3',
     }));
     fixture.detectChanges();
     expect(component.appliedFilters()).toEqual({
       period: { start: '2026-10-01', end: '2026-10-13' }, periodExplicit: true, referencia: '', usuarios: [3, 4],
-      acciones: ['LOGIN', 'CREAR_USUARIO'], modulos: ['reservas'],
+      actividad: ['accesos', 'creaciones'], modulos: ['reservas'],
     });
     expect(component.currentPage()).toBe(3);
     expect(service.getHistorial.calls.mostRecent().args[0].page).toBe(3);
+  });
+
+  it('selecciona varios tipos, muestra pills legibles y serializa solo IDs estables', async () => {
+    queryParams.next(convertToParamMap({ desde: '2026-10-13', hasta: '2026-10-13', page: '3' }));
+    component.toggleActivity('modificaciones', true);
+    component.toggleActivity('creaciones', true);
+    expect(component.appliedFilters().actividad).toEqual([]);
+    component.buscar();
+    await Promise.resolve();
+    fixture.detectChanges();
+    expect(component.currentPage()).toBe(1);
+    expect(component.appliedGroupCount()).toBe(2);
+    expect(component.pillLabel('actividad')).toBe('Actividad: Modificaciones, Creaciones');
+    expect(service.getHistorial.calls.mostRecent().args[0].actividad).toEqual(['modificaciones', 'creaciones']);
+    const params = router.navigate.calls.mostRecent().args[1]?.queryParams as Record<string, unknown>;
+    expect(params['actividad']).toEqual(['modificaciones', 'creaciones']);
+    expect(params['acciones']).toBeNull();
+  });
+
+  it('restaura URLs antiguas de acciones técnicas mediante el catálogo del servidor', () => {
+    queryParams.next(convertToParamMap({ desde: '2026-10-13', hasta: '2026-10-13', acciones: ['LOGIN', 'CREAR_USUARIO', 'ACCION_HEREDADA'] }));
+    expect(component.appliedFilters().actividad).toEqual(['accesos', 'creaciones', 'otros']);
+    expect(service.getHistorial.calls.mostRecent().args[0].actividad).toEqual(['accesos', 'creaciones', 'otros']);
   });
 
   it('formatea DATETIME de MySQL como hora de pared sin desplazar el día por timezone', () => {
@@ -190,32 +224,32 @@ describe('VerHistorialComponent', () => {
 
   it('limpiar filtros elimina también el período explícito y no consulta sin código ni período', async () => {
     queryParams.next(convertToParamMap({
-      desde: '2026-09-29', hasta: '2026-10-13', usuarios: ['3'], acciones: ['LOGIN'], modulos: ['reservas'],
+      desde: '2026-09-29', hasta: '2026-10-13', usuarios: ['3'], actividad: ['accesos'], modulos: ['reservas'],
     }));
     const callsBefore = service.getHistorial.calls.count();
     component.limpiarFiltros();
     await Promise.resolve();
     expect(component.appliedFilters().periodExplicit).toBeFalse();
     expect(component.appliedFilters().usuarios).toEqual([]);
-    expect(component.appliedFilters().acciones).toEqual([]);
+    expect(component.appliedFilters().actividad).toEqual([]);
     expect(component.appliedFilters().modulos).toEqual([]);
     expect(component.appliedFilters().period).toBeNull();
     expect(service.getHistorial.calls.count()).toBe(callsBefore);
   });
 
   it('cambiar de página preserva los filtros y exporta todos los filtros aplicados', async () => {
-    queryParams.next(convertToParamMap({ desde: '2026-10-13', hasta: '2026-10-13', usuarios: ['4'], acciones: ['LOGIN'], modulos: ['reservas'] }));
+    queryParams.next(convertToParamMap({ desde: '2026-10-13', hasta: '2026-10-13', usuarios: ['4'], actividad: ['accesos'], modulos: ['reservas'] }));
     component.totalPages.set(3);
     component.goToPage(2);
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [4], acciones: ['LOGIN'], modulos: ['reservas'],
+      usuarios: [4], actividad: ['accesos'], modulos: ['reservas'],
       referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 2, limit: 10,
     });
     component.totalRecords.set(21);
     component.exportarHistorial();
     expect(service.exportarHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [4], acciones: ['LOGIN'], modulos: ['reservas'],
+      usuarios: [4], actividad: ['accesos'], modulos: ['reservas'],
       referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 10,
     });
   });
@@ -239,7 +273,7 @@ describe('VerHistorialComponent', () => {
     component.buscar();
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [], acciones: [], modulos: [], referencia: undefined,
+      usuarios: [], actividad: [], modulos: [], referencia: undefined,
       fechaInicio: '2026-10-01', fechaFin: '2026-10-13', page: 1, limit: 10,
     });
   });
@@ -249,7 +283,7 @@ describe('VerHistorialComponent', () => {
     component.buscar();
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [], acciones: [], modulos: [], referencia: 'TG82673',
+      usuarios: [], actividad: [], modulos: [], referencia: 'TG82673',
       fechaInicio: undefined, fechaFin: undefined, page: 1, limit: 10,
     });
   });
@@ -260,7 +294,7 @@ describe('VerHistorialComponent', () => {
     component.buscar();
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
-      usuarios: [], acciones: [], modulos: [], referencia: 'TG82673',
+      usuarios: [], actividad: [], modulos: [], referencia: 'TG82673',
       fechaInicio: '2026-10-01', fechaFin: '2026-10-13', page: 1, limit: 10,
     });
     expect(router.navigate.calls.mostRecent().args[1]?.queryParams).toEqual(jasmine.objectContaining({

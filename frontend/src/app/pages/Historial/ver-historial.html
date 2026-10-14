@@ -35,9 +35,9 @@
           <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isTableRefreshing()" aria-hidden="true"></span>
       </button>
     </div>
-    @if (hasApplied('period') || hasApplied('usuarios') || hasApplied('acciones') || hasApplied('modulos')) {
+    @if (hasApplied('period') || hasApplied('usuarios') || hasApplied('actividad') || hasApplied('modulos')) {
       <div class="active-filters" aria-label="Filtros aplicados">
-        @for (group of ['period', 'usuarios', 'modulos', 'acciones']; track group) {
+        @for (group of ['period', 'usuarios', 'modulos', 'actividad']; track group) {
           @if (hasApplied($any(group))) {
             <div class="filter-token">
               {{ pillLabel($any(group)) }}
@@ -132,33 +132,33 @@
           </div>
         </div>
         <div class="form-group hist-filter-action">
-          <label class="form-label">Acción</label>
+          <label class="form-label">Tipo de actividad</label>
           <div class="multi-filter">
             <button type="button" class="multi-filter-trigger"
-              [class.active]="openFilterDropdown() === 'acciones'"
-              [class.multi-filter-trigger-active]="draftFilters().acciones.length > 0"
-              (click)="toggleDropdown('acciones')"
-              [attr.aria-expanded]="openFilterDropdown() === 'acciones'">
-              <span>{{ multiFilterLabel('acciones') }}</span>
+              [class.active]="openFilterDropdown() === 'actividad'"
+              [class.multi-filter-trigger-active]="draftFilters().actividad.length > 0"
+              (click)="toggleDropdown('actividad')"
+              [attr.aria-expanded]="openFilterDropdown() === 'actividad'">
+              <span>{{ multiFilterLabel('actividad') }}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
-            @if (openFilterDropdown() === 'acciones') {
+            @if (openFilterDropdown() === 'actividad') {
               <div class="multi-filter-menu">
-                @for (action of filterOptions().acciones; track action.value) {
-                  <button type="button" class="multi-filter-option" (click)="toggleAction(action.value, !isDraftSelected('acciones', action.value))">
-                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('acciones', action.value)">
-                      @if (isDraftSelected('acciones', action.value)) {
+                @for (activity of filterOptions().actividades; track activity.value) {
+                  <button type="button" class="multi-filter-option" (click)="toggleActivity(activity.value, !isDraftSelected('actividad', activity.value))">
+                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('actividad', activity.value)">
+                      @if (isDraftSelected('actividad', activity.value)) {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                       }
                     </span>
-                    <span>{{ action.label }}</span>
+                    <span>{{ activity.label }}</span>
                   </button>
                 }
-                <button type="button" class="multi-filter-clear" (click)="setDraftActions([])">Limpiar selección</button>
+                <button type="button" class="multi-filter-clear" (click)="setDraftActivity([])">Limpiar selección</button>
               </div>
             }
           </div>

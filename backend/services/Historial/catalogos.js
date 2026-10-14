@@ -12,30 +12,51 @@ const MODULOS_HISTORIAL = Object.freeze([
   { value: 'otros', label: 'Otros registros', tablas: [] },
 ]);
 
-const ACCIONES_CONOCIDAS = Object.freeze([
-  'LOGIN', 'LOGOUT', 'LOGOUT_ALL_SESSIONS', 'FORCE_LOGOUT_USER',
-  'PASSWORD_RESET_REQUEST', 'PASSWORD_CHANGED_BY_RESET',
-  'CREAR_USUARIO', 'ACTUALIZAR_USUARIO', 'ACTUALIZAR_PERFIL', 'ELIMINAR_USUARIO',
-  'ACTUALIZAR_AVATAR', 'ELIMINAR_AVATAR',
-  'CREAR_RESERVA', 'DUPLICAR_RESERVA', 'ACTUALIZAR_RESERVA', 'CANCELAR_RESERVA',
-  'ELIMINAR_RESERVA', 'ELIMINAR_COMPROBANTE_RESERVA', 'ACTUALIZAR_ESTADO_AUTOMATICO', 'CAMBIO_ESTADO_RESERVA',
-  'CREAR_TRANSFER', 'ACTUALIZAR_TRANSFER', 'CANCELAR_TRANSFER', 'ELIMINAR_TRANSFER',
-  'AGREGAR_COMPROBANTE_TRANSFER',
-  'CREAR_TOUR', 'ACTUALIZAR_TOUR', 'ELIMINAR_TOUR', 'DESACTIVAR_TOUR', 'UPSERT_PRECIOS',
-  'CREAR_PUNTO', 'ACTUALIZAR_PUNTO', 'ELIMINAR_PUNTO', 'DESACTIVAR_PUNTO', 'REORDENAR_RUTA',
-  'CREAR_HORARIO_PUNTO', 'ACTUALIZAR_HORARIO_PUNTO', 'ELIMINAR_HORARIO_PUNTO',
-  'CAMBIAR_AFORO_TOUR', 'RETIRAR_AFORO_TOUR',
-  'GUARDAR_LISTADO', 'EXPORTAR_EXCEL_LISTADO', 'EXPORTAR_EXCEL_PRIVADO', 'GUARDAR_PROGRAMACION_PRIVADA',
-  'ACTUALIZAR_ASIGNACION_SEGUROS',
-  'PAGAR_COMISIONES', 'REABRIR_COMISIONES', 'ACTUALIZAR_DATOS_PAGO_COMISION',
-  'CREAR_BENEFICIARIO_COMISION', 'ACTUALIZAR_BENEFICIARIO_COMISION',
-  'VALIDAR', 'ASOCIAR', 'DESASOCIAR', 'ACTUALIZAR_ASISTENCIA',
-  'ACTUALIZAR_TURNOS_SEMANA', 'COPIAR_TURNOS_SEMANA_ANTERIOR', 'PUBLICAR_TURNOS_SEMANA',
-  'ACEPTAR_INTERCAMBIO_TURNO', 'RECHAZAR_INTERCAMBIO_TURNO', 'CAMBIO_ESTADO_RESERVA',
-  'CREAR', 'ACTUALIZAR', 'ELIMINAR',
-]);
+// Fuente única para el filtro: las acciones siguen guardándose con su código técnico.
+// Cualquier código nuevo que aún no figure aquí pertenece a «Otros».
+const TIPOS_ACTIVIDAD = Object.freeze([
+  { value: 'creaciones', label: 'Creaciones', acciones: [
+    'CREAR', 'CREAR_USUARIO', 'CREAR_RESERVA', 'DUPLICAR_RESERVA', 'CREAR_TRANSFER', 'AGREGAR_PASAJERO',
+    'CREAR_TOUR', 'CREAR_PUNTO', 'CREAR_HORARIO_PUNTO', 'CREAR_BENEFICIARIO_COMISION',
+  ] },
+  { value: 'modificaciones', label: 'Modificaciones', acciones: [
+    'ACTUALIZAR', 'ACTUALIZAR_USUARIO', 'ACTUALIZAR_PERFIL', 'ACTUALIZAR_AVATAR',
+    'ACTUALIZAR_RESERVA', 'ACTUALIZAR_PASAJERO', 'ACTUALIZAR_ESTADO_AUTOMATICO', 'CAMBIO_ESTADO_RESERVA',
+    'ACTUALIZAR_TRANSFER', 'AGREGAR_COMPROBANTE_TRANSFER', 'ACTUALIZAR_TOUR', 'UPSERT_PRECIOS',
+    'ACTUALIZAR_PUNTO', 'ACTUALIZAR_HORARIO_PUNTO', 'ACTUALIZAR_DATOS_PAGO_COMISION',
+    'ACTUALIZAR_BENEFICIARIO_COMISION',
+  ] },
+  { value: 'cancelaciones', label: 'Cancelaciones y eliminaciones', acciones: [
+    'ELIMINAR', 'ELIMINAR_USUARIO', 'ELIMINAR_AVATAR', 'ELIMINAR_PASAJERO', 'CANCELAR_RESERVA', 'ELIMINAR_RESERVA',
+    'ELIMINAR_COMPROBANTE_RESERVA', 'CANCELAR_TRANSFER', 'ELIMINAR_TRANSFER',
+    'ELIMINAR_TOUR', 'DESACTIVAR_TOUR', 'ELIMINAR_PUNTO', 'DESACTIVAR_PUNTO',
+    'ELIMINAR_HORARIO_PUNTO', 'RETIRAR_AFORO_TOUR', 'DESASOCIAR',
+  ] },
+  { value: 'accesos', label: 'Accesos y sesiones', acciones: [
+    'LOGIN', 'LOGOUT', 'LOGOUT_ALL_SESSIONS', 'FORCE_LOGOUT_USER',
+    'PASSWORD_RESET_REQUEST', 'PASSWORD_CHANGED_BY_RESET',
+  ] },
+  { value: 'operacion', label: 'Asignaciones y operación', acciones: [
+    'REORDENAR_RUTA', 'CAMBIAR_AFORO_TOUR', 'GUARDAR_LISTADO', 'GUARDAR_PROGRAMACION_PRIVADA',
+    'ACTUALIZAR_ASIGNACION_SEGUROS', 'PAGAR_COMISIONES', 'REABRIR_COMISIONES', 'ASOCIAR',
+    'ACTUALIZAR_ASISTENCIA', 'ACTUALIZAR_TURNOS_SEMANA', 'COPIAR_TURNOS_SEMANA_ANTERIOR',
+    'PUBLICAR_TURNOS_SEMANA',
+  ] },
+  { value: 'validaciones', label: 'Validaciones y aprobaciones', acciones: [
+    'VALIDAR', 'ACEPTAR_INTERCAMBIO_TURNO', 'RECHAZAR_INTERCAMBIO_TURNO',
+  ] },
+  { value: 'otros', label: 'Otros', acciones: [
+    'EXPORTAR_EXCEL_LISTADO', 'EXPORTAR_EXCEL_PRIVADO', 'CREAR_O_ACTUALIZAR',
+  ] },
+].map((tipo) => Object.freeze({ ...tipo, acciones: Object.freeze(tipo.acciones) })));
+
+const ACCIONES_CONOCIDAS = Object.freeze([...new Set(TIPOS_ACTIVIDAD.flatMap((tipo) => tipo.acciones))]);
+const ACTIVIDAD_POR_ACCION = new Map(TIPOS_ACTIVIDAD.flatMap((tipo) => tipo.acciones.map((accion) => [accion, tipo.value])));
+function tipoActividadDeAccion(accion) { return ACTIVIDAD_POR_ACCION.get(String(accion || '').trim().toUpperCase()) || 'otros'; }
 
 const ETIQUETAS_ACCION = Object.freeze({
+  AGREGAR_PASAJERO: 'Pasajero agregado', ACTUALIZAR_PASAJERO: 'Pasajero actualizado',
+  ELIMINAR_PASAJERO: 'Pasajero eliminado',
   LOGIN: 'Inicio de sesión', LOGOUT: 'Cierre de sesión',
   LOGOUT_ALL_SESSIONS: 'Cierre de todas las sesiones', FORCE_LOGOUT_USER: 'Cierre forzado de sesión',
   PASSWORD_RESET_REQUEST: 'Solicitud de restablecimiento de contraseña',
@@ -63,4 +84,4 @@ function etiquetaAccion(value) {
 const tablaAModulo = new Map(MODULOS_HISTORIAL.flatMap((module) => module.tablas.map((table) => [table, module])));
 function moduloDeTabla(table) { return tablaAModulo.get(String(table || '')) || MODULOS_HISTORIAL.at(-1); }
 
-module.exports = { MODULOS_HISTORIAL, ACCIONES_CONOCIDAS, etiquetaAccion, moduloDeTabla };
+module.exports = { MODULOS_HISTORIAL, ACCIONES_CONOCIDAS, TIPOS_ACTIVIDAD, tipoActividadDeAccion, etiquetaAccion, moduloDeTabla };

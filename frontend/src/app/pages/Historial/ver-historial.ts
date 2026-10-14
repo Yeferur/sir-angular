@@ -12,11 +12,11 @@ interface HistorialFilterState {
   periodExplicit: boolean;
   referencia: string;
   usuarios: number[];
-  acciones: string[];
+  actividad: string[];
   modulos: string[];
 }
 
-const emptyOptions: HistorialFilterOptions = { usuarios: [], acciones: [], modulos: [] };
+const emptyOptions: HistorialFilterOptions = { usuarios: [], acciones: [], actividades: [], modulos: [] };
 
 function isCalendarDate(value: string | null): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -27,7 +27,7 @@ function isCalendarDate(value: string | null): value is string {
 
 function cloneFilters(filters: HistorialFilterState): HistorialFilterState {
   return { period: filters.period ? { ...filters.period } : null, periodExplicit: filters.periodExplicit, referencia: filters.referencia,
-    usuarios: [...filters.usuarios], acciones: [...filters.acciones], modulos: [...filters.modulos] };
+    usuarios: [...filters.usuarios], actividad: [...filters.actividad], modulos: [...filters.modulos] };
 }
 
 function normalizeReference(value: string): string { return String(value || '').trim().toUpperCase(); }
@@ -49,9 +49,11 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   private readonly subscriptions = new Subscription();
   private requestId = 0;
   private pendingOwnNavigation = false;
+  private optionsLoaded = false;
+  private pendingQueryParams: import('@angular/router').ParamMap | null = null;
 
-  readonly draftFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], acciones: [], modulos: [] });
-  readonly appliedFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], acciones: [], modulos: [] });
+  readonly draftFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
+  readonly appliedFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
   readonly filterOptions = signal<HistorialFilterOptions>(emptyOptions);
   readonly historialList = signal<Historial[]>([]);
   readonly totalRecords = signal(0);
@@ -64,13 +66,13 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   readonly referenceInputError = signal('');
   readonly hasQueried = signal(false);
   readonly advancedFiltersVisible = signal(false);
-  readonly openFilterDropdown = signal<'usuarios' | 'acciones' | 'modulos' | null>(null);
+  readonly openFilterDropdown = signal<'usuarios' | 'actividad' | 'modulos' | null>(null);
   readonly expandedId = signal<number | null>(null);
   readonly pageSize = 10;
 
   readonly appliedGroupCount = computed(() => {
     const applied = this.appliedFilters();
-    return Number(applied.periodExplicit) + Number(applied.usuarios.length > 0) + Number(applied.acciones.length > 0) + Number(applied.modulos.length > 0);
+    return Number(applied.periodExplicit) + Number(applied.usuarios.length > 0) + Number(applied.actividad.length > 0) + Number(applied.modulos.length > 0);
   });
   readonly hasMultipleAppliedGroups = computed(() => this.appliedGroupCount() >= 2);
   readonly summaryText = computed(() => {
@@ -81,8 +83,23 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.isOptionsLoading.set(true);
     this.subscriptions.add(this.historialService.getFilterOptions().pipe(finalize(() => this.isOptionsLoading.set(false)))
-      .subscribe({ next: (options) => this.filterOptions.set(options || emptyOptions), error: () => this.filterOptions.set(emptyOptions) }));
-    this.subscriptions.add(this.route.queryParamMap.subscribe((params) => this.restoreFromQuery(params)));
+      .subscribe({
+        next: (options) => this.finishOptionsLoad(options || emptyOptions),
+        error: () => this.finishOptionsLoad(emptyOptions),
+      }));
+    this.subscriptions.add(this.route.queryParamMap.subscribe((params) => {
+      if (this.optionsLoaded) this.restoreFromQuery(params);
+      else this.pendingQueryParams = params;
+    }));
+  }
+
+  private finishOptionsLoad(options: HistorialFilterOptions): void {
+    this.filterOptions.set(options);
+    this.optionsLoaded = true;
+    if (this.pendingQueryParams) {
+      this.restoreFromQuery(this.pendingQueryParams);
+      this.pendingQueryParams = null;
+    }
   }
 
   ngOnDestroy(): void { this.subscriptions.unsubscribe(); }
@@ -93,7 +110,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.advancedFiltersVisible.set(shouldOpen);
   }
 
-  toggleDropdown(group: 'usuarios' | 'acciones' | 'modulos'): void {
+  toggleDropdown(group: 'usuarios' | 'actividad' | 'modulos'): void {
     this.openFilterDropdown.update((current) => current === group ? null : group);
   }
 
@@ -110,7 +127,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   private closeFilterDropdowns(): void { this.openFilterDropdown.set(null); }
 
-  multiFilterLabel(group: 'usuarios' | 'acciones' | 'modulos'): string {
+  multiFilterLabel(group: 'usuarios' | 'actividad' | 'modulos'): string {
     const values = this.draftFilters()[group];
     if (!values.length) return 'Todos';
     return values.length === 1 ? '1 seleccionado' : `${values.length} seleccionados`;
@@ -123,8 +140,8 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.referenceInputError.set('');
     this.draftFilters.update((current) => ({ ...current, referencia: normalizeReference(value) }));
   }
-  setDraftActions(values: string[] | null): void {
-    this.draftFilters.update((current) => ({ ...current, acciones: Array.isArray(values) ? [...values] : [] }));
+  setDraftActivity(values: string[] | null): void {
+    this.draftFilters.update((current) => ({ ...current, actividad: Array.isArray(values) ? [...values] : [] }));
   }
   setDraftModules(values: string[] | null): void {
     this.draftFilters.update((current) => ({ ...current, modulos: Array.isArray(values) ? [...values] : [] }));
@@ -140,8 +157,8 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   toggleUser(id: number, checked: boolean): void {
     this.draftFilters.update((current) => ({ ...current, usuarios: this.toggleValue(current.usuarios, id, checked) }));
   }
-  toggleAction(value: string, checked: boolean): void {
-    this.draftFilters.update((current) => ({ ...current, acciones: this.toggleValue(current.acciones, value, checked) }));
+  toggleActivity(value: string, checked: boolean): void {
+    this.draftFilters.update((current) => ({ ...current, actividad: this.toggleValue(current.actividad, value, checked) }));
   }
   toggleModule(value: string, checked: boolean): void {
     this.draftFilters.update((current) => ({ ...current, modulos: this.toggleValue(current.modulos, value, checked) }));
@@ -175,7 +192,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.syncUrlAndLoad();
   }
 
-  removeAppliedFilter(group: 'period' | 'usuarios' | 'acciones' | 'modulos'): void {
+  removeAppliedFilter(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): void {
     const applied = cloneFilters(this.appliedFilters());
     const draft = cloneFilters(this.draftFilters());
     if (group === 'period') {
@@ -192,7 +209,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   limpiarFiltros(): void {
     const applied: HistorialFilterState = { ...cloneFilters(this.appliedFilters()), period: null, periodExplicit: false,
-      usuarios: [], acciones: [], modulos: [] };
+      usuarios: [], actividad: [], modulos: [] };
     this.appliedFilters.set(applied);
     this.draftFilters.set(cloneFilters(applied));
     this.currentPage.set(1);
@@ -240,18 +257,19 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   selectedUserLabel(id: number): string { return this.filterOptions().usuarios.find((option) => option.id === id)?.label || `Usuario #${id}`; }
   selectedActionLabel(value: string): string { return this.filterOptions().acciones.find((option) => option.value === value)?.label || value; }
+  selectedActivityLabel(value: string): string { return this.filterOptions().actividades.find((option) => option.value === value)?.label || value; }
   selectedModuleLabel(value: string): string { return this.filterOptions().modulos.find((option) => option.value === value)?.label || value; }
 
-  groupSummary(group: 'usuarios' | 'acciones' | 'modulos', applied = false): string {
+  groupSummary(group: 'usuarios' | 'actividad' | 'modulos', applied = false): string {
     const values = (applied ? this.appliedFilters() : this.draftFilters())[group];
-    if (!values.length) return group === 'usuarios' ? 'Todos los usuarios' : group === 'acciones' ? 'Todas las acciones' : 'Todos los módulos';
+    if (!values.length) return group === 'usuarios' ? 'Todos los usuarios' : group === 'actividad' ? 'Todos los tipos' : 'Todos los módulos';
     const labels = group === 'usuarios'
       ? (values as number[]).map((id) => this.selectedUserLabel(id))
-      : (values as string[]).map((value) => group === 'acciones' ? this.selectedActionLabel(value) : this.selectedModuleLabel(value));
+      : (values as string[]).map((value) => group === 'actividad' ? this.selectedActivityLabel(value) : this.selectedModuleLabel(value));
     return labels.length === 1 ? labels[0] : `${labels.length} seleccionados`;
   }
 
-  pillLabel(group: 'period' | 'usuarios' | 'acciones' | 'modulos'): string {
+  pillLabel(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): string {
     if (group === 'period') {
       const { start, end } = this.appliedFilters().period || { start: '', end: '' };
       const format = (value: string) => new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
@@ -260,16 +278,16 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     const applied = this.appliedFilters()[group];
     const labels = group === 'usuarios'
       ? (applied as number[]).map((id) => this.selectedUserLabel(id))
-      : (applied as string[]).map((value) => group === 'acciones' ? this.selectedActionLabel(value) : this.selectedModuleLabel(value));
-    const groupLabel = group === 'usuarios' ? 'Usuario' : group === 'acciones' ? 'Acción' : 'Módulo';
-    return `${groupLabel}: ${labels.length <= 2 ? labels.join(', ') : `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`}`;
+      : (applied as string[]).map((value) => group === 'actividad' ? this.selectedActivityLabel(value) : this.selectedModuleLabel(value));
+    const groupLabel = group === 'usuarios' ? 'Usuario' : group === 'actividad' ? 'Actividad' : 'Módulo';
+    return `${groupLabel}: ${labels.join(', ')}`;
   }
 
-  hasApplied(group: 'period' | 'usuarios' | 'acciones' | 'modulos'): boolean {
+  hasApplied(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): boolean {
     const applied = this.appliedFilters();
     return group === 'period' ? applied.periodExplicit : applied[group].length > 0;
   }
-  isDraftSelected(group: 'usuarios' | 'acciones' | 'modulos', value: number | string): boolean {
+  isDraftSelected(group: 'usuarios' | 'actividad' | 'modulos', value: number | string): boolean {
     return (this.draftFilters()[group] as Array<number | string>).includes(value);
   }
 
@@ -321,7 +339,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     const referencia = normalizeReference(filters.referencia);
     const period = filters.periodExplicit ? filters.period : null;
     return {
-      usuarios: [...filters.usuarios], acciones: [...filters.acciones], modulos: [...filters.modulos],
+      usuarios: [...filters.usuarios], actividad: [...filters.actividad], modulos: [...filters.modulos],
       referencia: referencia || undefined,
       fechaInicio: period?.start || undefined,
       fechaFin: period?.end || undefined,
@@ -336,7 +354,8 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
       hasta: filters.periodExplicit ? filters.period?.end : null,
       referencia: filters.referencia || null,
       usuarios: filters.usuarios.length ? filters.usuarios : null,
-      acciones: filters.acciones.length ? filters.acciones : null,
+      actividad: filters.actividad.length ? filters.actividad : null,
+      acciones: null,
       modulos: filters.modulos.length ? filters.modulos : null,
       page: this.currentPage() > 1 ? this.currentPage() : null,
       search: null,
@@ -360,6 +379,18 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     });
   }
 
+  private restoreActivity(params: import('@angular/router').ParamMap): string[] {
+    const values = params.getAll('actividad').flatMap((value) => value.split(',')).filter(Boolean);
+    const available = new Set(this.filterOptions().actividades.map((option) => option.value));
+    if (values.length) return [...new Set(values.filter((value) => available.has(value)))];
+    // URLs anteriores guardaban acciones técnicas; el catálogo del servidor las traduce.
+    const legacy = [...params.getAll('acciones'), ...params.getAll('tipoAccion')]
+      .flatMap((value) => value.split(',')).filter(Boolean);
+    return [...new Set(legacy.map((value) =>
+      this.filterOptions().acciones.find((option) => option.value === value)?.actividad || 'otros'))]
+      .filter((value) => available.has(value));
+  }
+
   private restoreFromQuery(params: import('@angular/router').ParamMap): void {
     if (this.pendingOwnNavigation) this.pendingOwnNavigation = false;
     const from = params.get('desde');
@@ -368,7 +399,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     const restored: HistorialFilterState = {
       period: periodExplicit ? { start: from!, end: to! } : null, periodExplicit, referencia: normalizeReference(params.get('referencia') || ''),
       usuarios: params.getAll('usuarios').flatMap((value) => value.split(',')).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0),
-      acciones: params.getAll('acciones').flatMap((value) => value.split(',')).filter(Boolean),
+      actividad: this.restoreActivity(params),
       modulos: params.getAll('modulos').flatMap((value) => value.split(',')).filter(Boolean),
     };
     const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
