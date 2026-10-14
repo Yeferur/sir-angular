@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db'); // Asegúrate de que la ruta a tu conexión de DB sea correcta
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -119,7 +120,7 @@ async function obtenerReservas(fecha, idsTours) {
             pt.posicion AS ordenRuta,
             pt.posicion AS Posicion,
             pc.NumeroPasajeros
-        FROM reservas r
+        FROM ${reservasOperativasSource('r')}
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
         LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
@@ -1697,7 +1698,7 @@ async function validarIntegridadBuses(conn, { fecha, tours, buses }) {
                 r.Estado,
                 r.Tipo_Reserva,
                 COUNT(p.Id_Pasajero) AS NumeroPasajeros
-            FROM reservas r
+            FROM ${reservasOperativasSource('r')}
             INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
             LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
             WHERE r.Id_Reserva IN (?)
@@ -1945,7 +1946,7 @@ async function obtenerReservasSnapshotPorIds(conn, reservaIds) {
             pt.posicion AS ordenRuta,
             pt.posicion AS Posicion,
             pc.NumeroPasajeros
-        FROM reservas r
+        FROM ${reservasOperativasSource('r')}
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
         LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
@@ -2543,7 +2544,7 @@ async function obtenerReservasPrivadasActivas(fecha, idsTours = null, connection
             r.Idioma_Reserva,
             r.Observaciones,
             COUNT(p.Id_Pasajero) AS NumeroPasajeros
-        FROM reservas r
+        FROM ${reservasOperativasSource('r')}
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
         LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -3253,7 +3254,7 @@ async function generarExcelReservaPrivada({ fecha, idReserva, buses, nombreTour,
                 h.Id_Tour,
                 t.Nombre_Tour,
                 COUNT(p.Id_Pasajero) AS NumeroPasajeros
-            FROM reservas r
+            FROM ${reservasOperativasSource('r')}
             LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
             LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
             LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -3467,7 +3468,7 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour, formato 
                 WHERE pr.Id_Reserva = r.Id_Reserva
                   AND UPPER(TRIM(COALESCE(pr.Tipo, ''))) = 'ABONO'
             ), 0) AS TotalAbonos
-        FROM reservas r
+        FROM ${reservasOperativasSource('r')}
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
         LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal

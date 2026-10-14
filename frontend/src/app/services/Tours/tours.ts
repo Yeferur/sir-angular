@@ -43,7 +43,7 @@ export interface Tour {
       Id_Moneda: number;
       Codigo?: string;
       Nombre_Moneda?: string;
-      Precios?: { ADULTO?: number; NINO?: number; INFANTE?: number };
+      Precios?: { ADULTO?: number; NIÑO?: number; INFANTE?: number };
     }>;
   }>;
   Comisiones?: Array<{ Id_Canal: number; Nombre_Canal?: string; Valor: number }>;

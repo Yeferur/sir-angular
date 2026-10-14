@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 
 const LIMITS = {
@@ -379,7 +380,7 @@ async function searchReservas(query, permisos, ownerUserId = null) {
       r.Telefono_Reportante,
       t.Nombre_Tour,
       GROUP_CONCAT(DISTINCT p.Nombre_Pasajero ORDER BY p.Nombre_Pasajero SEPARATOR ', ') AS Pasajeros
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva

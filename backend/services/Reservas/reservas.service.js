@@ -1,6 +1,7 @@
 // services/Reservas/reservas.service.js
 const db = require('../../database/db');
 const { hasReservaContact, validarContactoReserva } = require('./reserva-contact');
+const { validateReservationEntity } = require('../EntidadesReportantes/entidades-reportantes.service');
 const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
@@ -9,6 +10,17 @@ const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { assertReservationOwner } = require('../../utils/clientAccess');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
 const programacionNovedades = require('../Programacion/programacion-novedades.service');
+const {
+  getSchemaCapabilities,
+  reservaNoEliminadaPredicate,
+  reservaDeletionColumn,
+  requireSchemaCapability,
+  passengerTypeForDatabase,
+} = require('../schema-capabilities');
+const {
+  normalizePassengerType, sharedSeatsForPassengers, reservationConsumesSharedSeats,
+  passengerSeatSql, consumingReservationSql,
+} = require('./cupos-compartidos');
 const fsp = fs.promises;
 
 function sincronizarNovedadesProgramacion(reservaId, fecha) {
@@ -161,7 +173,7 @@ const TOUR_PASSENGER_RULES = {
 };
 
 function normalizarTipoPasajero(tipo) {
-  return String(tipo || '').trim().toUpperCase();
+  return normalizePassengerType(tipo);
 }
 
 async function guardarComprobanteReserva(idReserva, file) {
@@ -205,10 +217,7 @@ async function resolverMonedaReserva(connection, idMonedaValue, { required = fal
 }
 
 function contarCuposSolicitados(pasajerosArray = []) {
-  return (pasajerosArray || []).reduce((acc, p) => {
-    const tipo = normalizarTipoPasajero(p?.Tipo_Pasajero);
-    return (tipo === 'ADULTO' || tipo === 'NINO') ? acc + 1 : acc;
-  }, 0);
+  return sharedSeatsForPassengers(pasajerosArray || []);
 }
 
 function normalizarDni(dni) {
@@ -261,6 +270,7 @@ async function validarDnisUnicosPorFecha(
     WHERE DATE(R.Fecha_Tour) = DATE(?)
       AND UPPER(REPLACE(TRIM(P.DNI), ' ', '')) IN (?)
       AND (R.Estado IS NULL OR R.Estado NOT IN ('Cancelado', 'Anulado'))
+      AND ${reservaNoEliminadaPredicate('R')}
   `;
 
   const params = [fechaTour, dnis];
@@ -346,10 +356,9 @@ function expandirEstadoReservaFiltro(estado) {
   return normalized ? [normalized] : [];
 }
 
-function reservaOcupaCupos({ tipoReserva, estado, idTour, fechaTour, cantidad }) {
-  return String(tipoReserva || '').trim().toLowerCase() === 'grupal'
+function reservaOcupaCupos({ tipoReserva, estado, idTour, fechaTour, cantidad, eliminadaEn = null }) {
+  return reservationConsumesSharedSeats({ tipoReserva, estado, eliminadaEn })
     && Number(cantidad || 0) > 0
-    && String(estado || '').trim() !== 'Cancelada'
     && Number(idTour || 0) > 0
     && !!normalizarFechaYMD(fechaTour);
 }
@@ -361,6 +370,7 @@ function construirImpactoCuposReserva({
   idTour = null,
   fechaTour = null,
   cantidad = 0,
+  eliminadaEn = null,
 }) {
   const impacto = {
     idReserva: idReserva ? String(idReserva) : null,
@@ -369,6 +379,7 @@ function construirImpactoCuposReserva({
     idTour: Number(idTour || 0) || null,
     fechaTour: normalizarFechaYMD(fechaTour),
     cantidad: Number(cantidad || 0),
+    eliminadaEn,
   };
 
   return {
@@ -456,11 +467,12 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     const [candidatos] = await conn.query(
       `SELECT Id_Reserva, Estado, Fecha_Tour
          FROM reservas
-        WHERE Estado IN ('Activo', 'Activa', 'Confirmado', 'Completado', 'Cancelado')
+        WHERE ${reservaNoEliminadaPredicate('reservas')} AND (
+             Estado IN ('Activo', 'Activa', 'Confirmado', 'Completado', 'Cancelado')
            OR (
              Fecha_Tour < ?
              AND Estado IN ('Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
-           )`,
+           ))`,
       [hoyBogota]
     );
 
@@ -469,6 +481,19 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     for (const row of candidatos || []) {
       const transicion = resolverTransicionReservaVencida(row.Estado, row.Fecha_Tour);
       if (!transicion || transicion.nuevoEstado === row.Estado) continue;
+
+      // Lock and recalculate through the same availability service used by
+      // cancellation. The state is rechecked under lock for idempotency.
+      const impacto = await obtenerImpactoCuposReservaActual(conn, row.Id_Reserva);
+      if (!impacto || impacto.reserva.Estado !== row.Estado || impacto.reserva.Eliminada_En) continue;
+      const sigueConsumiendo = reservationConsumesSharedSeats({
+        tipoReserva: impacto.reserva.Tipo_Reserva,
+        estado: transicion.nuevoEstado,
+        eliminadaEn: impacto.reserva.Eliminada_En,
+      });
+      if (impacto.ocupaCupos && !sigueConsumiendo) {
+        await liberarCuposReserva({ conn, impacto });
+      }
 
       const [updateResult] = await conn.query(
         `UPDATE reservas
@@ -601,8 +626,8 @@ function validarReglasPasajerosPorTour(payload) {
     }
 
     const edadRaw = p?.Edad ?? p?.Edad_Pasajero ?? p?.age ?? null;
-    if (tipo === 'NINO' && rules.minChildAge != null && edadRaw != null && Number(edadRaw) < Number(rules.minChildAge)) {
-      const err = new Error(`El tour ${tourId} requiere edad mínima de ${rules.minChildAge} años para tipo NINO.`);
+    if (tipo === 'NIÑO' && rules.minChildAge != null && edadRaw != null && Number(edadRaw) < Number(rules.minChildAge)) {
+      const err = new Error(`El tour ${tourId} requiere edad mínima de ${rules.minChildAge} años para tipo NIÑO.`);
       err.status = 400;
       err.errorCode = 'TOUR_RULE_MIN_AGE';
       throw err;
@@ -611,26 +636,29 @@ function validarReglasPasajerosPorTour(payload) {
 }
 
 async function obtenerCupoTotalBase(conn, idTour, fechaTour) {
+  // Lock order for capacity writers: tour row, then availability row.
+  const [[tour]] = await conn.query('SELECT Cupo_Base FROM tours WHERE Id_Tour = ? FOR UPDATE', [idTour]);
+  const aforoOperation = getSchemaCapabilities().aforoOperation;
+  const overrideQuery = aforoOperation
+    ? `(SELECT CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END
+         FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1)`
+    : `(SELECT a.Cupo FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1)`;
   const [cupoRows] = await conn.query(
-    `SELECT COALESCE(
-      (SELECT a.Cupo FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1),
-      (SELECT t.Cupo_Base FROM tours t WHERE t.Id_Tour = ? LIMIT 1)
-    ) AS CupoTotal`,
-    [idTour, fechaTour, idTour]
+    `SELECT COALESCE(${overrideQuery}, ?) AS CupoTotal`,
+    [idTour, fechaTour, Number(tour?.Cupo_Base || 0)]
   );
   return Number(cupoRows?.[0]?.CupoTotal || 0);
 }
 
 async function contarOcupadosGrupales(conn, idTour, fechaTour, excludeReservaId = null) {
   const sql = `
-    SELECT COALESCE(SUM(CASE WHEN px.Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Ocupados
+    SELECT COALESCE(SUM(${passengerSeatSql('px')}), 0) AS Ocupados
     FROM reservas res
     LEFT JOIN horarios h ON h.Id_Horario = res.Id_Horario
     LEFT JOIN pasajeros px ON px.Id_Reserva = res.Id_Reserva
     WHERE h.Id_Tour = ?
       AND res.Fecha_Tour = ?
-      AND (res.Estado IS NULL OR res.Estado <> 'Cancelada')
-      AND res.Tipo_Reserva = 'Grupal'
+      AND ${consumingReservationSql('res', { softDelete: getSchemaCapabilities().reservasSoftDelete })}
       ${excludeReservaId ? 'AND res.Id_Reserva <> ?' : ''}`;
 
   const params = excludeReservaId ? [idTour, fechaTour, excludeReservaId] : [idTour, fechaTour];
@@ -640,8 +668,8 @@ async function contarOcupadosGrupales(conn, idTour, fechaTour, excludeReservaId 
 
 async function obtenerCuposActualesReserva(conn, idReserva) {
   const [rows] = await conn.query(
-    `SELECT COALESCE(SUM(CASE WHEN Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Cupos
-       FROM pasajeros
+    `SELECT COALESCE(SUM(${passengerSeatSql('p')}), 0) AS Cupos
+       FROM pasajeros p
       WHERE Id_Reserva = ?`,
     [idReserva]
   );
@@ -657,11 +685,14 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
         r.Fecha_Tour,
         r.Nombre_Reportante,
         r.Telefono_Reportante,
+        r.Id_Canal,
+        r.Id_Entidad_Reportante,
         r.Idioma_Reserva,
         r.Observaciones,
         r.Id_Horario,
         r.Id_Moneda,
         r.Creado_Por,
+        ${reservaDeletionColumn('r')} AS Eliminada_En,
         h.Id_Tour,
         h.Id_Tour AS Id_Tour_Actual
        FROM reservas r
@@ -686,12 +717,19 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
       idTour: normalizarTourParaCupos(reserva.Id_Tour),
       fechaTour: reserva.Fecha_Tour,
       cantidad,
+      eliminadaEn: reserva.Eliminada_En,
     }),
   };
 }
 
 async function bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId = null) {
-
+  const cupoTotal = await obtenerCupoTotalBase(conn, idTour, fechaTour);
+  await conn.query(
+    `INSERT INTO disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE Id_Disponibilidad = Id_Disponibilidad`,
+    [idTour, fechaTour, cupoTotal, cupoTotal]
+  );
   const [rows] = await conn.query(
     `SELECT Cupos_Totales, Cupos_Disponibles
        FROM disponibilidad
@@ -699,36 +737,31 @@ async function bloquearDisponibilidad(conn, idTour, fechaTour, excludeReservaId 
       FOR UPDATE`,
     [idTour, fechaTour]
   );
-
-  if (rows?.length) {
-    return {
-      cuposTotales: Number(rows[0].Cupos_Totales || 0),
-      cuposDisponibles: Number(rows[0].Cupos_Disponibles || 0),
-    };
-  }
-
-  const cupoTotal = await obtenerCupoTotalBase(conn, idTour, fechaTour);
   const ocupados = await contarOcupadosGrupales(conn, idTour, fechaTour, excludeReservaId);
-  const cuposDisponibles = Math.max(0, cupoTotal - ocupados);
+  if (ocupados > cupoTotal) {
+    const err = new Error(`La ocupación actual (${ocupados}) supera la capacidad efectiva (${cupoTotal}) para ${fechaTour}.`);
+    err.status = 409;
+    err.errorCode = 'CAPACITY_BELOW_OCCUPANCY';
+    throw err;
+  }
+  const cuposDisponibles = cupoTotal - ocupados;
+  if (Number(rows?.[0]?.Cupos_Totales) !== cupoTotal
+    || Number(rows?.[0]?.Cupos_Disponibles) !== cuposDisponibles) {
+    await conn.query(
+      `UPDATE disponibilidad
+          SET Cupos_Totales = ?, Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
+        WHERE Id_Tour = ? AND Fecha_Tour = ?`,
+      [cupoTotal, cuposDisponibles, idTour, fechaTour]
+    );
+  }
+  return { cuposTotales: cupoTotal, cuposDisponibles };
+}
 
-  await conn.query(
-    `INSERT INTO disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
-     VALUES (?, ?, ?, ?)`,
-    [idTour, fechaTour, cupoTotal, cuposDisponibles]
-  );
-
-  const [rows2] = await conn.query(
-    `SELECT Cupos_Totales, Cupos_Disponibles
-       FROM disponibilidad
-      WHERE Id_Tour = ? AND Fecha_Tour = ?
-      FOR UPDATE`,
-    [idTour, fechaTour]
-  );
-
-  return {
-    cuposTotales: Number(rows2?.[0]?.Cupos_Totales || 0),
-    cuposDisponibles: Number(rows2?.[0]?.Cupos_Disponibles || 0),
-  };
+async function reconciliarDisponibilidadParaTour(conn, idTour) {
+  const [rows] = await conn.query(`SELECT Fecha_Tour FROM disponibilidad
+    WHERE Id_Tour = ? AND Fecha_Tour >= ? ORDER BY Fecha_Tour ASC`, [idTour, hoyBogotaYMD()]);
+  for (const row of rows) await bloquearDisponibilidad(conn, idTour, normalizarFechaYMD(row.Fecha_Tour));
+  return rows.length;
 }
 
 async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cantidadNueva, cantidadAnterior = 0, excludeReservaId = null }) {
@@ -759,18 +792,10 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
 async function liberarCuposReserva({ conn, impacto }) {
   if (!impacto?.ocupaCupos) return null;
 
-  const cupoInfo = await bloquearDisponibilidad(conn, impacto.idTour, impacto.fechaTour);
-  const nuevosDisponibles = Math.min(
-    Number(cupoInfo.cuposTotales || 0),
-    Number(cupoInfo.cuposDisponibles || 0) + Number(impacto.cantidad || 0)
-  );
-
-  await conn.query(
-    `UPDATE disponibilidad
-        SET Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
-      WHERE Id_Tour = ? AND Fecha_Tour = ?`,
-    [nuevosDisponibles, impacto.idTour, impacto.fechaTour]
-  );
+  // La reserva se excluye del conteo mientras el encabezado aún conserva su
+  // estado anterior. Bloqueo + recálculo deja el mismo resultado si se reintenta.
+  const cupoInfo = await bloquearDisponibilidad(conn, impacto.idTour, impacto.fechaTour, impacto.idReserva);
+  const nuevosDisponibles = cupoInfo.cuposDisponibles;
 
   return {
     idTour: impacto.idTour,
@@ -819,6 +844,8 @@ async function filtrarReservas(q, ownerUserId = null) {
 
   const conds = [];
   const values = [];
+
+  conds.push(reservaNoEliminadaPredicate('r'));
 
   const like = (v) => `%${v}%`;
 
@@ -939,11 +966,13 @@ async function filtrarReservas(q, ownerUserId = null) {
       r.Id_Reserva, r.Fecha_Tour, h.Id_Tour, t.Nombre_Tour,
       r.Tipo_Reserva, r.Id_Moneda, m.Codigo AS Moneda_Codigo,
       r.Estado, r.Idioma_Reserva, r.Telefono_Reportante, r.Nombre_Reportante,
+      r.Id_Entidad_Reportante, er.Nombre AS Nombre_Entidad_Reportante,
       COUNT(p.Id_Pasajero) AS Pasajeros
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     ${where}
@@ -984,6 +1013,8 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
       r.Idioma_Reserva,
       r.Telefono_Reportante,
       r.Nombre_Reportante,
+      r.Id_Entidad_Reportante,
+      er.Nombre AS Nombre_Entidad_Reportante,
       COALESCE((
         SELECT SUM(COALESCE(px.Precio_Pasajero, 0))
         FROM pasajeros px
@@ -1011,9 +1042,11 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN puntos pto ON pto.Id_Punto = h.Id_Punto
     WHERE r.Id_Reserva = ?
+      AND ${reservaNoEliminadaPredicate('r')}
       ${ownerCondition}
     LIMIT 1
     `,
@@ -1085,7 +1118,7 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
     NombrePasajero: p.Nombre_Pasajero,
     TipoPasajero:
       p.Tipo_Pasajero === 'ADULTO' ? 'Adulto' :
-      p.Tipo_Pasajero === 'NINO'   ? 'Niño'   :
+      normalizePassengerType(p.Tipo_Pasajero) === 'NIÑO' ? 'Niño' :
       'Infante',
     IdPas: p.DNI || '',
     Nacionalidad: p.Nacionalidad || null,
@@ -1171,7 +1204,8 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
 async function normalizarEstadosReservasExistentes(conexion = db) {
   const [reservasRows] = await conexion.query(
     `SELECT Id_Reserva, Fecha_Tour, Estado, Telefono_Reportante
-       FROM reservas`
+       FROM reservas r
+      WHERE ${reservaNoEliminadaPredicate('r')}`
   );
 
   if (!reservasRows?.length) return { evaluadas: 0, actualizadas: 0 };
@@ -1321,7 +1355,7 @@ async function obtenerPreciosPorFiltro(Id_Tour, Id_Plan, Id_Moneda, fecha) {
 
   const [rows] = await db.query(sql, params);
   const map = {};
-  for (const r of rows) map[r.Tipo_Pasajero] = Number(r.Precio);
+  for (const r of rows) map[normalizePassengerType(r.Tipo_Pasajero)] = Number(r.Precio);
   return map;
 }
 
@@ -1346,66 +1380,49 @@ async function obtenerHorarios(Id_Tour, Id_Punto) {
  * CUPOS
  * =========================== */
 async function verificarCupos(Fecha, Id_Tour, Cantidad, Id_Reserva) {
-  let tourParaCupo = Id_Tour;
   let nombreTour = 'Tour desconocido';
 
-  if (Id_Tour == 1 || Id_Tour == 5) tourParaCupo = 5;
-
-  const sqlCupo = `
-    SELECT COALESCE(
-      (SELECT a.Cupo FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1),
-      (SELECT t.Cupo_Base FROM tours t WHERE t.Id_Tour = ? LIMIT 1)
-    ) AS CupoTotal`;
-  const [cupoRows] = await db.query(sqlCupo, [tourParaCupo, Fecha, tourParaCupo]);
+  const aforoOverride = getSchemaCapabilities().aforoOperation
+    ? `(SELECT CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END
+         FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1)`
+    : `(SELECT a.Cupo FROM aforos a WHERE a.Id_Tour = ? AND a.Fecha_Aforo = ? ORDER BY a.Id_Aforo DESC LIMIT 1)`;
+  const sqlCupo = `SELECT COALESCE(${aforoOverride},
+      (SELECT t.Cupo_Base FROM tours t WHERE t.Id_Tour = ? LIMIT 1)) AS CupoTotal`;
+  const [cupoRows] = await db.query(sqlCupo, [Id_Tour, Fecha, Id_Tour]);
   const cupoTotal = Number(cupoRows?.[0]?.CupoTotal || 0);
 
   let ocupados = 0;
   if (typeof Id_Reserva !== 'undefined' && Id_Reserva !== null) {
     // Excluir los pasajeros de la reserva actual
     const sqlOcupados = `
-      SELECT COALESCE(SUM(CASE WHEN p.Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Ocupados
+      SELECT COALESCE(SUM(${passengerSeatSql('p')}), 0) AS Ocupados
       FROM reservas r
       LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
       LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
       WHERE h.Id_Tour = ?
         AND r.Fecha_Tour = ?
-        AND (r.Estado IS NULL OR r.Estado <> 'Cancelada')
-        AND r.Tipo_Reserva = 'Grupal'
+        AND ${consumingReservationSql('r', { softDelete: getSchemaCapabilities().reservasSoftDelete })}
         AND r.Id_Reserva <> ?`;
     const [ocRows] = await db.query(sqlOcupados, [Id_Tour, Fecha, Id_Reserva]);
     ocupados = Number(ocRows?.[0]?.Ocupados || 0);
   } else {
     const sqlOcupados = `
-      SELECT COALESCE(SUM(CASE WHEN p.Tipo_Pasajero IN ('ADULTO', 'NINO') THEN 1 ELSE 0 END), 0) AS Ocupados
+      SELECT COALESCE(SUM(${passengerSeatSql('p')}), 0) AS Ocupados
       FROM reservas r
       LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
       LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
       WHERE h.Id_Tour = ?
         AND r.Fecha_Tour = ?
-        AND (r.Estado IS NULL OR r.Estado <> 'Cancelada')
-        AND r.Tipo_Reserva = 'Grupal'`;
+        AND ${consumingReservationSql('r', { softDelete: getSchemaCapabilities().reservasSoftDelete })}`;
     const [ocRows] = await db.query(sqlOcupados, [Id_Tour, Fecha]);
     ocupados = Number(ocRows?.[0]?.Ocupados || 0);
   }
 
-  if (Id_Tour != 1 && Id_Tour != 5) {
-    const [nombreResult] = await db.query(
-      `SELECT Nombre_Tour FROM tours WHERE Id_Tour = ? LIMIT 1`,
-      [Id_Tour]
-    );
-    nombreTour = nombreResult[0]?.Nombre_Tour || 'Tour desconocido';
-  } else {
-    const [nombresResult] = await db.query(
-      `SELECT Id_Tour, Nombre_Tour FROM tours WHERE Id_Tour IN (1,5)`
-    );
-    const nombresMap = {};
-    for (const row of nombresResult) nombresMap[row.Id_Tour] = row.Nombre_Tour;
-    nombreTour = `${nombresMap[1] || 'Tour 1'} Y ${nombresMap[5] || 'Tour 5'}`;
-  }
+  const [nombreResult] = await db.query('SELECT Nombre_Tour FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]);
+  nombreTour = nombreResult[0]?.Nombre_Tour || 'Tour desconocido';
 
   const disponiblesRaw = cupoTotal - ocupados;
   const disponibles = Math.max(0, disponiblesRaw);
-  console.log('disponibles', disponiblesRaw, "CupoTotal", cupoTotal, "Ocupados", ocupados, "Cantidad solicitada", Cantidad);
   return {
     disponible: disponiblesRaw >= Number(Cantidad || 0),
     cupoTotal,
@@ -1451,6 +1468,19 @@ async function crearReservaConPasajerosYPagos(
     await conn.beginTransaction();
 
     const r = payload.cabeceraReserva;
+    const [[tourActivo]] = await conn.query(
+      'SELECT Activo FROM tours WHERE Id_Tour = ? FOR UPDATE',
+      [r.Id_Tour]
+    );
+    if (!tourActivo || Number(tourActivo.Activo) !== 1) {
+      const err = new Error('No se pueden crear reservas para un tour inactivo o inexistente.');
+      err.status = 409;
+      err.errorCode = 'TOUR_INACTIVO';
+      throw err;
+    }
+    // Lock the tour before the first consistent read. Capacity checks must not
+    // inherit a snapshot taken while another reservation holds this tour lock.
+    const idEntidadReportante = await validateReservationEntity(conn, r.Id_Canal, r.Id_Entidad_Reportante);
     const idMoneda = await resolverMonedaReserva(conn, r.Id_Moneda, { required: true });
     const tipoReserva = r.Tipo_Reserva || 'Grupal';
     const pasajerosArray = Array.isArray(payload.pasajeros) ? payload.pasajeros : [];
@@ -1486,15 +1516,16 @@ async function crearReservaConPasajerosYPagos(
 
     await conn.query(
       `INSERT INTO reservas
-       (Id_Reserva, Tipo_Reserva, Id_Horario, Fecha_Tour, Id_Canal, Id_Moneda, Idioma_Reserva,
+       (Id_Reserva, Tipo_Reserva, Id_Horario, Fecha_Tour, Id_Canal, Id_Entidad_Reportante, Id_Moneda, Idioma_Reserva,
         Telefono_Reportante, Nombre_Reportante, Estado, Observaciones, Creado_Por, Actualizado_Por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         idReserva,
         r.Tipo_Reserva || 'Grupal',
         r.Id_Horario || null,
         r.Fecha_Tour,
         r.Id_Canal || null,
+        idEntidadReportante,
         idMoneda,
         r.Idioma_Reserva || 'ESPAÑOL',
         r.Telefono_Reportante || null,
@@ -1520,7 +1551,7 @@ async function crearReservaConPasajerosYPagos(
             p.DNI || null,
             normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
-            p.Tipo_Pasajero,
+            passengerTypeForDatabase(p.Tipo_Pasajero),
             p.Id_Plan ?? null,
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
@@ -1638,13 +1669,13 @@ async function obtenerComisiones(Id_Tour, Id_Canal) {
     UNION ALL
     SELECT
       COALESCE(tc.Valor, 0) AS Comision,
-      'NINO' AS Tipo_Pasajero
+      'NIÑO' AS Tipo_Pasajero
     FROM tour_comisiones tc
     WHERE tc.Id_Tour = ? AND tc.Id_Canal = ?
   `;
   const [rows] = await db.query(sql, [Id_Tour, Id_Canal, Id_Tour, Id_Canal]);
-  const result = { ADULTO: 0, NINO: 0 };
-  for (const row of rows) result[row.Tipo_Pasajero] = row.Comision;
+  const result = { ADULTO: 0, NIÑO: 0 };
+  for (const row of rows) result[normalizePassengerType(row.Tipo_Pasajero)] = row.Comision;
   return result;
 }
 
@@ -1665,6 +1696,8 @@ async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
       r.Id_Horario,
       r.Fecha_Tour,
       r.Id_Canal,
+      r.Id_Entidad_Reportante,
+      er.Nombre AS Nombre_Entidad_Reportante,
       r.Id_Moneda,
       r.Idioma_Reserva,
       r.Estado,
@@ -1682,7 +1715,8 @@ async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
       ) AS Id_Moneda_Sugerida
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
-    WHERE r.Id_Reserva = ?
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
+    WHERE r.Id_Reserva = ? AND ${reservaNoEliminadaPredicate('r')}
       ${ownerCondition}
     LIMIT 1
     `,
@@ -1736,6 +1770,8 @@ async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
     Id_Horario: cab.Id_Horario,
     Fecha_Tour: cab.Fecha_Tour.toISOString().slice(0, 10),
     Id_Canal: cab.Id_Canal,
+    Id_Entidad_Reportante: cab.Id_Entidad_Reportante,
+    Nombre_Entidad_Reportante: cab.Nombre_Entidad_Reportante || null,
     Id_Moneda: cab.Id_Moneda || cab.Id_Moneda_Sugerida || null,
     Moneda_Persistida: Boolean(cab.Id_Moneda),
     Idioma_Reserva: cab.Idioma_Reserva,
@@ -1750,7 +1786,7 @@ async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
 
   const Pasajeros = paxRows.map(r => ({
     Id_Pasajero: r.Id_Pasajero,
-    Tipo_Pasajero: r.Tipo_Pasajero,
+    Tipo_Pasajero: normalizePassengerType(r.Tipo_Pasajero),
     Nombre_Pasajero: r.Nombre_Pasajero || '',
     DNI: r.DNI || null,
     Nacionalidad: r.Nacionalidad || null,
@@ -1770,8 +1806,6 @@ async function obtenerReservaDetalle(Id_Reserva, ownerUserId = null) {
     Observaciones: p.Observaciones || null,
     SoporteUrl: p.Ruta_Comprobante || null
   }));
-
-  console.log(Cabecera, Pasajeros, Pagos);
 
   return { Cabecera, Pasajeros, Pagos };
 }
@@ -1809,9 +1843,18 @@ async function actualizarReservaConPasajerosYPagos(
       throw err;
     }
     assertReservationOwner(impactoActual.reserva, ownerUserId);
+    if (impactoActual.reserva.Eliminada_En) {
+      const err = new Error('Una reserva eliminada lógicamente no se puede editar.');
+      err.status = 410;
+      err.errorCode = 'RESERVA_ELIMINADA';
+      throw err;
+    }
 
     const r = payload?.cabeceraReserva || {};
     const currentReserva = impactoActual.reserva;
+    const idCanalFinal = r.Id_Canal !== undefined ? r.Id_Canal : currentReserva.Id_Canal;
+    const idEntidadReportante = await validateReservationEntity(conn, idCanalFinal,
+      r.Id_Entidad_Reportante !== undefined ? r.Id_Entidad_Reportante : currentReserva.Id_Entidad_Reportante);
     const pasajerosArray = Array.isArray(payload?.pasajeros) ? payload.pasajeros : [];
     const pagosArray = Array.isArray(payload?.pagos) ? payload.pagos : [];
     const [puntosPasajerosAnteriores] = await conn.query(
@@ -1880,6 +1923,7 @@ async function actualizarReservaConPasajerosYPagos(
       if (r.Id_Horario !== undefined) setIf('Id_Horario', r.Id_Horario || null);
       if (r.Fecha_Tour !== undefined) setIf('Fecha_Tour', r.Fecha_Tour);
       if (r.Id_Canal !== undefined) setIf('Id_Canal', r.Id_Canal);
+      if (r.Id_Canal !== undefined || r.Id_Entidad_Reportante !== undefined) setIf('Id_Entidad_Reportante', idEntidadReportante);
       if (r.Id_Moneda !== undefined) {
         setIf('Id_Moneda', await resolverMonedaReserva(conn, r.Id_Moneda, { required: true }));
       }
@@ -1914,7 +1958,7 @@ async function actualizarReservaConPasajerosYPagos(
             p.DNI || null,
             normalizarNacionalidad(p.Nacionalidad),
             p.Telefono_Pasajero || null,
-            p.Tipo_Pasajero,
+            passengerTypeForDatabase(p.Tipo_Pasajero),
             p.Id_Plan ?? null,
             p.Precio_Tour || 0,
             p.Precio_Pasajero || 0,
@@ -2016,6 +2060,7 @@ async function actualizarReservaConPasajerosYPagos(
       { columna: 'NumeroPasajeros', anterior: cantidadPasajerosAnterior, nuevo: cantidadPasajerosNueva },
       { columna: 'Puntos_Recogida', anterior: serializePoints(puntosAnteriores), nuevo: serializePoints(puntosNuevos) },
       { columna: 'Nombre_Reportante', anterior: currentReserva.Nombre_Reportante || null, nuevo: r.Nombre_Reportante !== undefined ? (r.Nombre_Reportante || null) : (currentReserva.Nombre_Reportante || null) },
+      { columna: 'Id_Entidad_Reportante', anterior: currentReserva.Id_Entidad_Reportante || null, nuevo: idEntidadReportante || null },
       { columna: 'Idioma_Reserva', anterior: currentReserva.Idioma_Reserva || null, nuevo: r.Idioma_Reserva !== undefined ? (r.Idioma_Reserva || null) : (currentReserva.Idioma_Reserva || null) },
       { columna: 'Observaciones', anterior: currentReserva.Observaciones || null, nuevo: r.Observaciones !== undefined ? (r.Observaciones || null) : (currentReserva.Observaciones || null) },
     ];
@@ -2087,6 +2132,12 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       throw err;
     }
     assertReservationOwner(impactoActual.reserva, ownerUserId);
+    if (impactoActual.reserva.Eliminada_En) {
+      const err = new Error('Una reserva eliminada lógicamente no se puede cancelar.');
+      err.status = 410;
+      err.errorCode = 'RESERVA_ELIMINADA';
+      throw err;
+    }
 
     const estadoAnterior = impactoActual.estado || null;
     const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
@@ -2129,10 +2180,10 @@ async function cancelarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
   }
 }
 
-async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ownerUserId = null) {
+async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ownerUserId = null, motivo = null) {
+  requireSchemaCapability('reservaDeletionAudit', 'Eliminar reservas requiere aplicar la migración de soft-delete.');
   let conn;
   let committed = false;
-  let rutasComprobantes = [];
   try {
     conn = await db.getConnection();
     await conn.beginTransaction();
@@ -2145,36 +2196,40 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       throw err;
     }
     assertReservationOwner(impactoActual.reserva, ownerUserId);
-
     const reserva = impactoActual.reserva;
+    if (reserva.Eliminada_En) {
+      await conn.commit();
+      return { Id_Reserva: String(Id_Reserva), eliminada: true, idempotente: true, cuposLiberados: null };
+    }
 
     const [[resumenDeps]] = await conn.query(
       `SELECT
-          COALESCE((SELECT COUNT(*) FROM pasajeros WHERE Id_Reserva = ?), 0) AS pasajeros,
-          COALESCE((SELECT COUNT(*) FROM pagos_reservas WHERE Id_Reserva = ?), 0) AS pagos,
-          COALESCE((
-            SELECT COUNT(*)
-              FROM pagos_reservas
-             WHERE Id_Reserva = ?
-               AND Ruta_Comprobante IS NOT NULL
-               AND Ruta_Comprobante <> ''
-               AND Ruta_Comprobante <> 'N/A'
-          ), 0) AS comprobantes`,
+          (SELECT COUNT(*) FROM pasajeros WHERE Id_Reserva = ?) AS pasajeros,
+          (SELECT COUNT(*) FROM pagos_reservas WHERE Id_Reserva = ?) AS pagos,
+          (SELECT COUNT(*) FROM pagos_reservas WHERE Id_Reserva = ?
+             AND Ruta_Comprobante IS NOT NULL AND Ruta_Comprobante <> '' AND Ruta_Comprobante <> 'N/A') AS comprobantes`,
       [Id_Reserva, Id_Reserva, Id_Reserva]
     );
 
-    const [comprobantesRows] = await conn.query(
-      `SELECT Ruta_Comprobante
-         FROM pagos_reservas
-        WHERE Id_Reserva = ?
-        FOR UPDATE`,
+    const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
+    const motivoNormalizado = String(motivo || '').trim().slice(0, 500) || null;
+    const [updated] = await conn.query(
+      `UPDATE reservas
+          SET Eliminada_En = CURRENT_TIMESTAMP(3), Eliminada_Por = ?,
+              Motivo_Eliminacion = ?, Actualizado_Por = COALESCE(?, Actualizado_Por)
+        WHERE Id_Reserva = ? AND Eliminada_En IS NULL`,
+      [userId || null, motivoNormalizado, userId || null, Id_Reserva]
+    );
+    if (!updated.affectedRows) {
+      const err = new Error('La reserva ya fue eliminada por otra operación.');
+      err.status = 409;
+      err.errorCode = 'RESERVA_ELIMINADA_CONCURRENTE';
+      throw err;
+    }
+    const [[eliminacionRegistrada]] = await conn.query(
+      "SELECT DATE_FORMAT(Eliminada_En, '%Y-%m-%d %H:%i:%s.%f') AS Eliminada_En FROM reservas WHERE Id_Reserva = ?",
       [Id_Reserva]
     );
-    rutasComprobantes = (comprobantesRows || [])
-      .map((row) => normalizarRutaComprobanteSalida(row.Ruta_Comprobante))
-      .filter(Boolean);
-
-    const cuposLiberados = await liberarCuposReserva({ conn, impacto: impactoActual });
 
     await recordHistorial({
       conexion: conn,
@@ -2183,31 +2238,18 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       accion: 'ELIMINAR_RESERVA',
       id_usuario: userId,
       detalles: [
-        { columna: 'Estado', anterior: reserva.Estado || null, nuevo: 'ELIMINADA' },
-        { columna: 'Tipo_Reserva', anterior: reserva.Tipo_Reserva || null, nuevo: null },
-        { columna: 'Fecha_Tour', anterior: normalizarFechaYMD(reserva.Fecha_Tour) || null, nuevo: null },
-        { columna: 'Id_Tour', anterior: reserva.Id_Tour || null, nuevo: null },
-        { columna: 'Nombre_Reportante', anterior: reserva.Nombre_Reportante || null, nuevo: null },
-        { columna: 'Pasajeros_Eliminados', anterior: resumenDeps.pasajeros || 0, nuevo: 0 },
-        { columna: 'Pagos_Eliminados', anterior: resumenDeps.pagos || 0, nuevo: 0 },
+        { columna: 'Eliminada_En', anterior: null, nuevo: eliminacionRegistrada.Eliminada_En },
+        { columna: 'Eliminada_Por', anterior: null, nuevo: userId || null },
+        { columna: 'Motivo_Eliminacion', anterior: null, nuevo: motivoNormalizado },
+        { columna: 'Pasajeros_Conservados', anterior: 0, nuevo: Number(resumenDeps.pasajeros || 0) },
+        { columna: 'Pagos_Conservados', anterior: 0, nuevo: Number(resumenDeps.pagos || 0) },
+        { columna: 'Comprobantes_Conservados', anterior: 0, nuevo: Number(resumenDeps.comprobantes || 0) },
         ...(cuposLiberados?.cuposLiberados ? [{ columna: 'Cupos_Liberados', anterior: 0, nuevo: cuposLiberados.cuposLiberados }] : []),
       ]
     });
 
-    await conn.query('DELETE FROM pagos_reservas WHERE Id_Reserva = ?', [Id_Reserva]);
-    await conn.query('DELETE FROM pasajeros WHERE Id_Reserva = ?', [Id_Reserva]);
-    await conn.query('DELETE FROM reservas WHERE Id_Reserva = ?', [Id_Reserva]);
-
     await conn.commit();
     committed = true;
-
-    const resultadosEliminacion = await Promise.all(
-      rutasComprobantes.map((ruta) => eliminarArchivoComprobanteFisico(ruta).catch((error) => {
-        console.warn('No se pudo eliminar un comprobante de la reserva eliminada:', error?.message || error);
-        return false;
-      }))
-    );
-
     websocketManager.broadcastReservaEvento({
       type: 'reservaEliminada',
       Fecha_Tour: normalizarFechaYMD(impactoActual.fechaTour),
@@ -2216,16 +2258,15 @@ async function eliminarReservaSvc(Id_Reserva, userId = null, clientIp = null, ow
       ownerUserId: reserva.Creado_Por || null,
     });
     sincronizarNovedadesProgramacion(Id_Reserva, normalizarFechaYMD(impactoActual.fechaTour));
-
     return {
       Id_Reserva: String(Id_Reserva),
-      dependenciasEliminadas: {
+      eliminada: true,
+      dependenciasConservadas: {
         pasajeros: Number(resumenDeps.pasajeros || 0),
         pagos: Number(resumenDeps.pagos || 0),
         comprobantesReferenciados: Number(resumenDeps.comprobantes || 0),
       },
       cuposLiberados,
-      comprobantesFisicosEliminados: resultadosEliminacion.filter(Boolean).length,
     };
   } catch (error) {
     if (conn && !committed) await conn.rollback();
@@ -2505,4 +2546,7 @@ module.exports = {
   resolverMonedaReserva,
   actualizarEstadosReservasVencidas,
   normalizarEstadosReservasExistentes,
+  reconciliarDisponibilidadParaTour,
+  reservaOcupaCupos,
+  construirImpactoCuposReserva,
 };

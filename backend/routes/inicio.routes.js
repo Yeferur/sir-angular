@@ -17,5 +17,11 @@ router.post(
   checkAnyPermission(['AFOROS.ACTUALIZAR']),
   inicioCtrl.guardarAforo,
 );
+router.post(
+  '/retirar-aforo',
+  authMiddleware,
+  checkAnyPermission(['AFOROS.ACTUALIZAR']),
+  inicioCtrl.retirarAforo,
+);
 
 module.exports = router;

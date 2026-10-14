@@ -1,7 +1,13 @@
+const {
+  reservasOperativasSource,
+  getSchemaCapabilities,
+  requireSchemaCapability,
+} = require('./schema-capabilities');
 const db = require('../database/db');
+const { passengerSeatSql, consumingReservationSql, activeReservationSql } = require('./Reservas/cupos-compartidos');
 
-// Estados admitidos (normalizamos con UPPER/TRIM para tolerar mayúsculas, minúsculas y espacios)
-const ESTADOS_VALIDOS = ['ACTIVA', 'ACTIVO', 'PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA'];
+const availabilityPolicy = alias => consumingReservationSql(alias, { softDelete: getSchemaCapabilities().reservasSoftDelete });
+const activePolicy = alias => activeReservationSql(alias, { softDelete: getSchemaCapabilities().reservasSoftDelete });
 
 function normalizarTourInicio(tour) {
   return {
@@ -14,7 +20,6 @@ function normalizarTourInicio(tour) {
 }
 
 function crearConsultaTours({ fecha, incluirCupos = false, incluirPrivados = false, ordenarPorNombre = false } = {}) {
-  const estadosPlaceholders = ESTADOS_VALIDOS.map(() => '?').join(',');
   const campos = ['t.Id_Tour', 't.Nombre_Tour'];
   const params = [];
 
@@ -34,40 +39,38 @@ function crearConsultaTours({ fecha, incluirCupos = false, incluirPrivados = fal
     SELECT SUM(cnt_pasajeros)
     FROM (
       SELECT COUNT(p.Id_Pasajero) AS cnt_pasajeros
-      FROM reservas r
+      FROM ${reservasOperativasSource('r')}
       JOIN horarios h ON h.Id_Horario = r.Id_Horario
       JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-      WHERE h.Id_Tour = t.Id_Tour AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
+      WHERE h.Id_Tour = t.Id_Tour AND ${passengerSeatSql('p')} = 1
         AND r.Fecha_Tour = ?
-        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+        AND ${availabilityPolicy('r')}
       GROUP BY r.Id_Reserva
     ) x
   ), 0) AS NumeroPasajeros`);
-  params.push(fecha, ...ESTADOS_VALIDOS);
+  params.push(fecha);
 
   campos.push(`COALESCE((
     SELECT COUNT(r.Id_Reserva)
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE h.Id_Tour = t.Id_Tour
       AND r.Fecha_Tour = ?
-      AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-      AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+      AND ${availabilityPolicy('r')}
   ), 0) AS totalReservas`);
-  params.push(fecha, ...ESTADOS_VALIDOS);
+  params.push(fecha);
 
   if (incluirPrivados) {
     campos.push(`COALESCE((
       SELECT COUNT(*)
-      FROM reservas r
+      FROM ${reservasOperativasSource('r')}
       JOIN horarios h ON h.Id_Horario = r.Id_Horario
       WHERE h.Id_Tour = t.Id_Tour
         AND r.Fecha_Tour = ?
         AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
-        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})
+        AND ${activePolicy('r')}
     ), 0) AS totalPrivados`);
-    params.push(fecha, ...ESTADOS_VALIDOS);
+    params.push(fecha);
   }
 
   const query = `
@@ -142,13 +145,12 @@ async function obtenerDatosInicio(fecha) {
         h.Id_Tour,
         p.Id_Plan,
         COUNT(p.Id_Pasajero) AS NumeroPasajeros
-      FROM reservas r
+      FROM ${reservasOperativasSource('r')}
       JOIN horarios h ON h.Id_Horario = r.Id_Horario
       JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
       WHERE r.Fecha_Tour = ?
-        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-        AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
-        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+        AND ${availabilityPolicy('r')}
+        AND ${passengerSeatSql('p')} = 1
       GROUP BY h.Id_Tour, p.Id_Plan
     ) pc ON pc.Id_Tour = pt.Id_Tour AND pc.Id_Plan = pt.Id_Plan
     ORDER BY pt.Id_Tour, pt.Id_Plan
@@ -164,16 +166,15 @@ async function obtenerDatosInicio(fecha) {
         FROM pasajeros p
         WHERE p.Id_Reserva = r.Id_Reserva
       ) AS NumeroPasajeros
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE r.Fecha_Tour = ?
       AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'PRIVADA'
-      AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${ESTADOS_VALIDOS.map(() => '?').join(',')})
+      AND ${activePolicy('r')}
     ORDER BY r.Id_Reserva
   `;
 
   try {
-    const estadosParams = ESTADOS_VALIDOS.slice(); // copia
     const [tours] = await db.query(
       toursQuery,
       toursQueryParams
@@ -189,7 +190,7 @@ async function obtenerDatosInicio(fecha) {
       transfer.totalTransfers = Number(transfer.totalTransfers) || 0;
     }
 
-    const [planesRaw] = await db.query(planesQuery, [fecha, ...estadosParams]);
+    const [planesRaw] = await db.query(planesQuery, [fecha]);
 
     // Agrupar planes por tour
     const planesMap = {};
@@ -202,7 +203,7 @@ async function obtenerDatosInicio(fecha) {
       });
     }
 
-    const [privadosRaw] = await db.query(privadosQuery, [fecha, ...estadosParams]);
+    const [privadosRaw] = await db.query(privadosQuery, [fecha]);
 
     // map privados por tour
     const privadosMap = {};
@@ -228,39 +229,69 @@ async function obtenerDatosInicio(fecha) {
 }
 
 async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
+  const cupo = Number(NuevoCupo);
+  if (!Number.isInteger(cupo) || cupo < 0) {
+    return { success: false, error: 'El cupo debe ser un entero no negativo.' };
+  }
   const { recordHistorial, logSistema } = require('./Historial/logger');
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
+    // Mantener el mismo orden de bloqueo que las operaciones de tour y USAR_BASE.
+    const [[tourLock]] = await conn.query(
+      'SELECT Cupo_Base FROM tours WHERE Id_Tour = ? AND Activo = 1 FOR UPDATE',
+      [Id_Tour],
+    );
+    if (!tourLock) {
+      await conn.rollback();
+      return { success: false, error: 'El tour no existe o está desactivado.' };
+    }
+
+    const aforoOperation = getSchemaCapabilities().aforoOperation;
+    const aforoSubquery = aforoOperation
+      ? `(SELECT CASE WHEN Operacion = 'USAR_BASE' THEN NULL ELSE Cupo END FROM aforos
+          WHERE Id_Tour = ? AND Fecha_Aforo = ? ORDER BY Id_Aforo DESC LIMIT 1)`
+      : `(SELECT Cupo FROM aforos WHERE Id_Tour = ? AND Fecha_Aforo = ? ORDER BY Id_Aforo DESC LIMIT 1)`;
+    const [[capacidadActual]] = await conn.query(
+      `SELECT COALESCE(${aforoSubquery}, ?) AS Cupo`, [Id_Tour, Fecha, tourLock.Cupo_Base]);
+    await conn.query(`INSERT INTO disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
+      VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE Id_Disponibilidad = Id_Disponibilidad`,
+    [Id_Tour, Fecha, Number(capacidadActual?.Cupo || 0), Number(capacidadActual?.Cupo || 0)]);
+    await conn.query('SELECT Id_Disponibilidad FROM disponibilidad WHERE Id_Tour = ? AND Fecha_Tour = ? FOR UPDATE', [Id_Tour, Fecha]);
+
     // 1. Obtener número de pasajeros existentes para ese tour y fecha
     const pasajerosQuery = `
       SELECT COUNT(p.Id_Pasajero) AS totalPasajeros
-      FROM reservas r
+      FROM ${reservasOperativasSource('r')}
       JOIN horarios h ON h.Id_Horario = r.Id_Horario
       JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-      WHERE h.Id_Tour = ? AND r.Fecha_Tour = ? AND p.Tipo_Pasajero IN ('ADULTO', 'NINO')
-        AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, ''))) = 'GRUPAL'
-        AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN ('ACTIVA','ACTIVO','PENDIENTE','PENDIENTEDATOS','CONFIRMADA','COMPLETADA')
+      WHERE h.Id_Tour = ? AND r.Fecha_Tour = ? AND ${passengerSeatSql('p')} = 1
+        AND ${availabilityPolicy('r')}
     `;
     const [[{ totalPasajeros }]] = await conn.query(pasajerosQuery, [Id_Tour, Fecha]);
 
-    if (NuevoCupo < totalPasajeros) {
+    if (cupo < totalPasajeros) {
       await conn.rollback();
       return { success: false, error: `El cupo no puede ser menor al número de pasajeros existentes (${totalPasajeros}).` };
     }
 
     // 2. Insertar o actualizar aforo
     // fetch previous aforo (if any) to record previous value
-    const [prevA] = await conn.query('SELECT Cupo FROM aforos WHERE Id_Tour = ? AND Fecha_Aforo = ? ORDER BY Id_Aforo DESC LIMIT 1', [Id_Tour, Fecha]);
+    const [prevA] = await conn.query(`SELECT ${aforoOperation ? 'Operacion, ' : ''}Cupo
+      FROM aforos WHERE Id_Tour = ? AND Fecha_Aforo = ? ORDER BY Id_Aforo DESC LIMIT 1`, [Id_Tour, Fecha]);
     const previoCupo = prevA && prevA[0] ? prevA[0].Cupo : null;
 
-    const insertQuery = `
-      INSERT INTO aforos (Id_Tour, Fecha_Aforo, Cupo)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE Cupo = VALUES(Cupo)
-    `;
-    await conn.query(insertQuery, [Id_Tour, Fecha, NuevoCupo]);
+    const insertQuery = aforoOperation
+      ? `INSERT INTO aforos (Id_Tour, Fecha_Aforo, Cupo, Operacion) VALUES (?, ?, ?, 'FIJAR')`
+      : `INSERT INTO aforos (Id_Tour, Fecha_Aforo, Cupo) VALUES (?, ?, ?)`;
+    await conn.query(insertQuery, [Id_Tour, Fecha, cupo]);
+
+    // Si el saldo ya está materializado, reconciliarlo en la misma transacción.
+    await conn.query(`UPDATE disponibilidad
+      SET Cupos_Totales = ?, Cupos_Disponibles = ?, Updated_At = CURRENT_TIMESTAMP(3)
+      WHERE Id_Tour = ? AND Fecha_Tour = ?`,
+    [cupo, cupo - Number(totalPasajeros), Id_Tour, Fecha]);
 
     // 3. Obtener nombre del tour
     const [[tourRow]] = await conn.query('SELECT Nombre_Tour FROM tours WHERE Id_Tour = ?', [Id_Tour]);
@@ -295,9 +326,60 @@ async function guardarAforo({ Id_Tour, Fecha, NuevoCupo, userId = null }) {
   }
 }
 
+async function retirarAforo({ Id_Tour, Fecha, userId = null }) {
+  requireSchemaCapability('aforoOperation', 'Retirar un aforo requiere la migración que agrega Operacion a aforos.');
+  const { recordHistorial, logSistema } = require('./Historial/logger');
+  const conn = await db.getConnection();
+  let committed = false;
+  try {
+    await conn.beginTransaction();
+    const [[tour]] = await conn.query('SELECT Cupo_Base FROM tours WHERE Id_Tour = ? AND Activo = 1 FOR UPDATE', [Id_Tour]);
+    if (!tour) {
+      await conn.rollback();
+      return { success: false, error: 'El tour no existe o está desactivado.' };
+    }
+    const [[current]] = await conn.query(`SELECT CASE WHEN Operacion='USAR_BASE' THEN NULL ELSE Cupo END AS Cupo
+      FROM aforos WHERE Id_Tour = ? AND Fecha_Aforo = ? AND (Operacion='USAR_BASE' OR Cupo IS NOT NULL)
+      ORDER BY Id_Aforo DESC LIMIT 1`, [Id_Tour, Fecha]);
+    const currentCapacity = current?.Cupo == null ? Number(tour.Cupo_Base || 0) : Number(current.Cupo);
+    await conn.query(`INSERT INTO disponibilidad (Id_Tour, Fecha_Tour, Cupos_Totales, Cupos_Disponibles)
+      VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE Id_Disponibilidad = Id_Disponibilidad`,
+    [Id_Tour, Fecha, currentCapacity, currentCapacity]);
+    await conn.query('SELECT Id_Disponibilidad FROM disponibilidad WHERE Id_Tour = ? AND Fecha_Tour = ? FOR UPDATE', [Id_Tour, Fecha]);
+    const [[{ totalPasajeros }]] = await conn.query(`SELECT COUNT(*) AS totalPasajeros
+      FROM ${reservasOperativasSource('r')} JOIN horarios h ON h.Id_Horario = r.Id_Horario
+      JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+      WHERE h.Id_Tour = ? AND r.Fecha_Tour = ? AND ${passengerSeatSql('p')} = 1
+        AND ${availabilityPolicy('r')}
+        `, [Id_Tour, Fecha]);
+    const baseCapacity = Number(tour.Cupo_Base || 0);
+    if (baseCapacity < Number(totalPasajeros)) {
+      await conn.rollback();
+      return { success: false, error: `Cupo_Base (${baseCapacity}) es menor que los pasajeros activos (${totalPasajeros}); no se retiró el override.` };
+    }
+    await conn.query("INSERT INTO aforos (Id_Tour, Fecha_Aforo, Cupo, Operacion) VALUES (?, ?, NULL, 'USAR_BASE')", [Id_Tour, Fecha]);
+    await conn.query(`UPDATE disponibilidad SET Cupos_Totales=?, Cupos_Disponibles=?, Updated_At=CURRENT_TIMESTAMP(3)
+      WHERE Id_Tour=? AND Fecha_Tour=?`, [baseCapacity, baseCapacity - Number(totalPasajeros), Id_Tour, Fecha]);
+    await recordHistorial({ conexion: conn, tabla: 'aforos', id_registro: Id_Tour,
+      accion: 'RETIRAR_AFORO_TOUR', id_usuario: userId, detalles: [
+        { columna: 'Fecha_Aforo', anterior: Fecha, nuevo: Fecha },
+        { columna: 'Operacion', anterior: 'FIJAR', nuevo: 'USAR_BASE' },
+        { columna: 'Cupo', anterior: current?.Cupo ?? null, nuevo: baseCapacity },
+      ] });
+    await conn.commit();
+    committed = true;
+    return { success: true, message: 'El aforo de esta fecha vuelve a usar Cupo_Base.' };
+  } catch (error) {
+    if (!committed) await conn.rollback();
+    try { await logSistema({ mensaje: `retirarAforo error: ${error.message || error}`, meta: { Id_Tour, Fecha } }); } catch (_) {}
+    throw error;
+  } finally { conn.release(); }
+}
+
 module.exports = {
   obtenerDatosInicio,
   obtenerResumenToursProgramacion,
   guardarAforo,
+  retirarAforo,
   normalizarTourInicio,
 };

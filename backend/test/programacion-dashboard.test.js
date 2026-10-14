@@ -135,20 +135,8 @@ test('el resumen del dashboard solo devuelve datos operativos requeridos por Pro
   assert.match(summaryQuery, /WHERE t\.Activo = 1/);
   assert.match(summaryQuery, /ORDER BY t\.Nombre_Tour ASC/);
   assert.doesNotMatch(summaryQuery, /aforos|Cupo_Base|planes_tours|totalPrivados|PRIVADA|transfers/i);
-  const activeReservationStates = [
-    'ACTIVA', 'ACTIVO', 'PENDIENTE', 'PENDIENTEDATOS', 'CONFIRMADA', 'COMPLETADA',
-  ];
-  const expectedSummaryParams = [
-    fecha, ...activeReservationStates,
-    fecha, ...activeReservationStates,
-  ];
-  assert.deepEqual(summaryRequest.params, expectedSummaryParams);
-  assert.deepEqual(summaryRequest.params, [
-    legacyRequest.params[1],
-    ...legacyRequest.params.slice(2, 8),
-    legacyRequest.params[8],
-    ...legacyRequest.params.slice(9, 15),
-  ]);
+  assert.deepEqual(summaryRequest.params, [fecha, fecha]);
+  assert.deepEqual(summaryRequest.params, legacyRequest.params.slice(1, 3));
 });
 
 test('el resumen de Programación requiere PROGRAMACION.LEER aunque falten Aforos y Tours', async () => {

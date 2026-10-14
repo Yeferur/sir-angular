@@ -1,4 +1,5 @@
 const pool = require('../../database/db');
+const { getSchemaCapabilities } = require('../schema-capabilities');
 const {
   CLIENT_RESERVATION_PERMISSION_CODES,
   isClientRoleName,
@@ -38,6 +39,14 @@ async function esRolClientePorId(executor, roleId) {
   return isClientRoleName(rows?.[0]?.Nombre_Rol);
 }
 
+async function esRolAdministradorPorId(executor, roleId) {
+  const [rows] = await executor.query(
+    'SELECT Nombre_Rol FROM roles WHERE Id_Rol = ? LIMIT 1',
+    [roleId]
+  );
+  return String(rows?.[0]?.Nombre_Rol || '').trim().toLocaleLowerCase('es') === 'administrador';
+}
+
 async function consultarPermisosEfectivos(executor, userId) {
   const role = await obtenerRol(executor, userId);
   if (isClientRoleName(role?.Nombre_Rol)) {
@@ -65,6 +74,7 @@ async function consultarPermisosEfectivos(executor, userId) {
       AND COALESCE(permiso_individual.Tipo, '') <> 'DENY'
       AND (
         rp.Id_Permiso IS NOT NULL
+        OR LOWER(TRIM(r.Nombre_Rol)) = 'administrador'
         OR permiso_individual.Tipo = 'ALLOW'
       )
   `, [userId]);
@@ -96,11 +106,20 @@ async function obtenerPermisosPorUsuario(userId) {
 // Una lectura indexada por autorización. CAST evita pérdida de precisión de
 // BIGINT en mysql2/Number; la comparación usa las revisiones como cadenas.
 async function obtenerRevisionPermisosUsuario(userId) {
+  const catalogSupported = getSchemaCapabilities().permissionCatalogRevision;
+  const catalogRevision = catalogSupported
+    ? 'CAST(COALESCE(catalogo_revision.Revision, 0) AS CHAR)'
+    : "CAST('0' AS CHAR)";
+  const catalogJoin = catalogSupported ? `
+    LEFT JOIN permisos_cache_revision catalogo_revision
+      ON catalogo_revision.Tipo = 'CATALOGO'
+     AND catalogo_revision.Id_Entidad = 1` : '';
   const [rows] = await pool.query(`
     SELECT
       CAST(u.Id_Rol AS CHAR) AS Id_Rol,
       CAST(COALESCE(usuario_revision.Revision, 0) AS CHAR) AS Revision_Usuario,
-      CAST(COALESCE(rol_revision.Revision, 0) AS CHAR) AS Revision_Rol
+      CAST(COALESCE(rol_revision.Revision, 0) AS CHAR) AS Revision_Rol,
+      ${catalogRevision} AS Revision_Catalogo
     FROM usuarios u
     LEFT JOIN permisos_cache_revision usuario_revision
       ON usuario_revision.Tipo = 'USUARIO'
@@ -108,6 +127,7 @@ async function obtenerRevisionPermisosUsuario(userId) {
     LEFT JOIN permisos_cache_revision rol_revision
       ON rol_revision.Tipo = 'ROL'
      AND rol_revision.Id_Entidad = u.Id_Rol
+    ${catalogJoin}
     WHERE u.Id_Usuario = ?
     LIMIT 1
   `, [userId]);
@@ -116,12 +136,13 @@ async function obtenerRevisionPermisosUsuario(userId) {
     idRol: row?.Id_Rol == null ? null : String(row.Id_Rol),
     usuario: String(row?.Revision_Usuario ?? 0),
     rol: String(row?.Revision_Rol ?? 0),
+    catalogo: String(row?.Revision_Catalogo ?? 0),
   };
 }
 
 // Usar siempre el ejecutor de la transacción que modifica los permisos.
 async function incrementarRevisionPermisos(executor, tipo, idEntidad) {
-  if (!['ROL', 'USUARIO'].includes(tipo)) throw new Error('Tipo de revisión de permisos no válido.');
+  if (!['ROL', 'USUARIO', 'CATALOGO'].includes(tipo)) throw new Error('Tipo de revisión de permisos no válido.');
   await executor.query(`
     INSERT INTO permisos_cache_revision (Tipo, Id_Entidad, Revision)
     VALUES (?, ?, 1)
@@ -135,6 +156,16 @@ async function incrementarRevisionRol(executor, idRol) {
 
 async function incrementarRevisionUsuario(executor, idUsuario) {
   return incrementarRevisionPermisos(executor, 'USUARIO', idUsuario);
+}
+
+async function incrementarRevisionCatalogo(executor) {
+  if (!getSchemaCapabilities().permissionCatalogRevision) {
+    const error = new Error('La revisión global del catálogo requiere la migración de permisos_cache_revision.');
+    error.code = 'SCHEMA_CAPABILITY_UNAVAILABLE';
+    error.status = 503;
+    throw error;
+  }
+  return incrementarRevisionPermisos(executor, 'CATALOGO', 1);
 }
 
 async function incrementarRevisionUsuarioCompartida(idUsuario) {
@@ -168,7 +199,7 @@ async function verificarPermiso(userId, codigoPermiso) {
         CASE
           WHEN MAX(up.Tipo = 'DENY') = 1 THEN 0
           WHEN MAX(up.Tipo = 'ALLOW') = 1 THEN 1
-          WHEN MAX(rp.Id_Permiso IS NOT NULL AND r.Activo = 1) = 1 THEN 1
+          WHEN MAX((rp.Id_Permiso IS NOT NULL OR LOWER(TRIM(r.Nombre_Rol)) = 'administrador') AND r.Activo = 1) = 1 THEN 1
           ELSE 0
         END AS tiene_permiso
       FROM usuarios u
@@ -269,6 +300,15 @@ async function obtenerPermisosPorRol(idRol) {
       return permisos.sort((a, b) => String(a.Codigo_Permiso).localeCompare(String(b.Codigo_Permiso)));
     }
 
+    if (await esRolAdministradorPorId(conexion, idRol)) {
+      const [catalogo] = await conexion.query(`
+        SELECT Id_Permiso, Codigo_Permiso, Accion, Descripcion,
+               Modulo_Permiso AS Nombre_Modulo, Modulo_Permiso AS Codigo_Modulo
+          FROM permisos ORDER BY Modulo_Permiso, Descripcion
+      `);
+      return catalogo;
+    }
+
     const [rows] = await conexion.query(`
       SELECT
         p.Id_Permiso,
@@ -304,6 +344,12 @@ async function asignarPermisoARol(idRol, idPermiso) {
       error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
       throw error;
     }
+    if (await esRolAdministradorPorId(conexion, idRol)) {
+      const error = new Error('El baseline del rol Administrador es dinámico y no se edita mediante rol_permisos. Use usuario_permisos para excepciones individuales.');
+      error.status = 409;
+      error.errorCode = 'ADMIN_ROLE_BASELINE_DYNAMIC';
+      throw error;
+    }
 
     const [result] = await conexion.query(`
       INSERT INTO rol_permisos (Id_Rol, Id_Permiso)
@@ -334,6 +380,12 @@ async function revocarPermisoDeRol(idRol, idPermiso) {
       const error = new Error('Los permisos del rol Cliente son fijos y no se pueden modificar.');
       error.status = 409;
       error.errorCode = 'CLIENT_ROLE_IMMUTABLE';
+      throw error;
+    }
+    if (await esRolAdministradorPorId(conexion, idRol)) {
+      const error = new Error('El baseline del rol Administrador es dinámico y no se edita mediante rol_permisos. Use usuario_permisos para excepciones individuales.');
+      error.status = 409;
+      error.errorCode = 'ADMIN_ROLE_BASELINE_DYNAMIC';
       throw error;
     }
 
@@ -439,6 +491,7 @@ module.exports = {
   incrementarRevisionPermisos,
   incrementarRevisionRol,
   incrementarRevisionUsuario,
+  incrementarRevisionCatalogo,
   incrementarRevisionUsuarioCompartida,
   verificarPermiso,
   obtenerMenuPorUsuario,

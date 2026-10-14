@@ -9,6 +9,8 @@ const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { assertLocalTestDatabase, assertRevisionSchema } = require('../scripts/permissions-cache-safety');
+const { parseMigrationSql } = require('../scripts/release-migrate-sir2');
+const { installSignalCleanup, dropGeneratedDatabase } = require('../scripts/temporary-validation-cleanup');
 
 function startBackend(env) {
   const child = fork(path.join(__dirname, '..', 'scripts', 'testing', 'permissions-backend-process.cjs'), [], {
@@ -47,9 +49,11 @@ test('MySQL real: dos server.js propagan revocación/concesión, overrides y rol
   dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
   dotenv.config({ path: path.join(__dirname, '..', 'env', '.env'), quiet: true });
   const source = process.env.DB_NAME || process.env.DB_DATABASE;
-  assertLocalTestDatabase(process.env, source);
-  assert.match(source, /^[a-z0-9_]+$/i);
-  const database = `sir_permissions_cache_test_${randomUUID().replaceAll('-', '')}`;
+  assert.equal(source, 'sir2', 'sir2 debe ser la única fuente persistente y solo de lectura');
+  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(String(process.env.DB_HOST).toLowerCase()));
+  assert.notEqual(String(process.env.NODE_ENV).toLowerCase(), 'production');
+  const database = `sir2_permissions_cache_validation_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  const removeSignalCleanup = installSignalCleanup(database);
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER, password: process.env.DB_PASSWORD || process.env.DB_PASS,
@@ -58,6 +62,7 @@ test('MySQL real: dos server.js propagan revocación/concesión, overrides y rol
   const workers = [];
   let created = false;
   t.after(async () => {
+    removeSignalCleanup();
     await Promise.all(workers.map(async ({ child }) => {
       if (child.exitCode === null && child.signalCode === null) {
         const exited = once(child, 'exit');
@@ -67,9 +72,9 @@ test('MySQL real: dos server.js propagan revocación/concesión, overrides y rol
     }));
     try {
       // Únicamente la base efímera creada por ESTA ejecución, nunca la fuente.
-      assert.match(database, /^sir_permissions_cache_test_[a-f0-9]{32}$/);
+      assert.match(database, /^sir2_permissions_cache_validation_[a-f0-9]{20}$/);
       assert.notEqual(database, source);
-      if (created) await connection.query(`DROP DATABASE \`${database}\``);
+      if (created && process.env.SIR_KEEP_VALIDATION_DB !== '1') await dropGeneratedDatabase(database);
     } finally { await connection.end(); }
   });
 
@@ -90,10 +95,13 @@ test('MySQL real: dos server.js propagan revocación/concesión, overrides y rol
     await connection.query(schema['Create Table']);
   }
   await connection.query('SET FOREIGN_KEY_CHECKS = 1');
-  const migration = await fs.readFile(path.join(__dirname, '..', 'database', 'migrations', '20260920_revision_cache_permisos.sql'), 'utf8');
-  await connection.query(migration);
-  await connection.query(migration); // idempotencia real.
-  await assertRevisionSchema(connection);
+  const migrations = await Promise.all([
+    fs.readFile(path.join(__dirname, '..', 'database', 'migrations', '20260920_revision_cache_permisos.sql'), 'utf8'),
+    fs.readFile(path.join(__dirname, '..', 'database', 'migrations', '20261012_0002_permission_catalog_revision.sql'), 'utf8'),
+  ]);
+  for (const migration of migrations) for (const statement of parseMigrationSql(migration)) await connection.query(statement);
+  for (const migration of migrations) for (const statement of parseMigrationSql(migration)) await connection.query(statement); // idempotencia real.
+  await assertRevisionSchema(connection, { requireCatalog: true });
   await connection.query(`INSERT INTO permisos SELECT * FROM \`${source}\`.permisos`);
   const [permissions] = await connection.query("SELECT Id_Permiso, Codigo_Permiso FROM permisos WHERE Codigo_Permiso LIKE 'USUARIOS.%'");
   const ids = new Map(permissions.map((p) => [p.Codigo_Permiso, p.Id_Permiso]));
@@ -259,5 +267,6 @@ test('MySQL real: dos server.js propagan revocación/concesión, overrides y rol
   t.diagnostic(JSON.stringify({ source, database, server: destination.server,
     processes: [readyA, readyB], propagationMs, cacheHit: { revisionQueries: 1, effectivePermissionReads: 0 },
     explain: plan.map(({ table, type, key, rows }) => ({ table, type, key, rows })),
-    websocketClients: 0, rollback: 'rol y usuario verificados en MySQL', cleanup: 'base efímera eliminada al finalizar' }));
+    websocketClients: 0, rollback: 'rol y usuario verificados en MySQL',
+    cleanup: process.env.SIR_KEEP_VALIDATION_DB === '1' ? 'base de validación conservada' : 'base efímera eliminada al finalizar' }));
 });

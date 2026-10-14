@@ -314,7 +314,7 @@ export class ConfirmacionComponent implements OnInit {
   }
 
   tipoPasajeroLabel(tipo: string): string {
-    if (tipo === 'NINO') return 'Niño';
+    if (tipo === 'NIÑO') return 'Niño';
     if (tipo === 'INFANTE') return 'Infante';
     return 'Adulto';
   }

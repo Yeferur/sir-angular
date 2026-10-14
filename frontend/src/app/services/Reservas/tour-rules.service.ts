@@ -6,7 +6,7 @@ export enum TourId {
   HACIENDA_NAPOLES = 5,
 }
 
-export type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
+export type TipoPasajero = 'ADULTO' | 'NIÑO' | 'INFANTE';
 
 interface TourPolicy {
   allowInfantes: boolean;
@@ -17,7 +17,7 @@ const TOUR_POLICIES: Record<number, TourPolicy> = {
   [TourId.RIO_CLARO]: {
     allowInfantes: false,
     alerts: {
-      NINO: {
+      NIÑO: {
         key: 'rioClaroNino',
         title: 'Recuerda',
         message: 'Para este tour, los niños deben tener 5+ años.',
@@ -28,7 +28,7 @@ const TOUR_POLICIES: Record<number, TourPolicy> = {
   [TourId.HACIENDA_NAPOLES]: {
     allowInfantes: true,
     alerts: {
-      NINO: {
+      NIÑO: {
         key: 'napolesNino',
         title: 'Política de Niños',
         message: 'Niños ≥5 van como ADULTOS.',
@@ -59,8 +59,8 @@ export class TourRulesService {
 
   adaptPassengerType(tourId: number, tipo: TipoPasajero): TipoPasajero {
     if (tourId === TourId.HACIENDA_NAPOLES) {
-      if (tipo === 'NINO') return 'ADULTO';
-      if (tipo === 'INFANTE') return 'NINO';
+      if (tipo === 'NIÑO') return 'ADULTO';
+      if (tipo === 'INFANTE') return 'NIÑO';
     }
     return tipo;
   }

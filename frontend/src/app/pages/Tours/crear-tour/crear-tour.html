@@ -203,7 +203,7 @@
                             <button type="button" class="passenger-enable"
                               [class.active]="plans.at(expandedPlanIndex).get('AllowNino')?.value"
                               [attr.aria-pressed]="plans.at(expandedPlanIndex).get('AllowNino')?.value"
-                              (click)="setPassengerEnabled(expandedPlanIndex, 'NINO', !plans.at(expandedPlanIndex).get('AllowNino')?.value)">
+                              (click)="setPassengerEnabled(expandedPlanIndex, 'NIÑO', !plans.at(expandedPlanIndex).get('AllowNino')?.value)">
                               <span></span>
                             </button>
                             <div><strong>Niño</strong></div>
@@ -211,9 +211,9 @@
                           @for (monCtrl of getPlanCurrencies(expandedPlanIndex).controls; track monCtrl; let mi = $index) {
                             <div class="passenger-rate-value">
                               <input type="number" class="form-input precio-input" min="0" placeholder="0"
-                                [formControl]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO')"
+                                [formControl]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NIÑO')"
                                 (focus)="selectPriceValue($event)"
-                                [class.errorInput]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO').touched && getCurrencyPriceControl(expandedPlanIndex, mi, 'NINO').invalid" />
+                                [class.errorInput]="getCurrencyPriceControl(expandedPlanIndex, mi, 'NIÑO').touched && getCurrencyPriceControl(expandedPlanIndex, mi, 'NIÑO').invalid" />
                             </div>
                           }
                         </div>
@@ -546,7 +546,7 @@
                       <div>
                         <strong>{{ monCtrl.get('Codigo')?.value }}</strong>
                         <span>Adulto {{ monCtrl.get('ADULTO')?.value || 0 }}</span>
-                        @if (planCtrl.get('AllowNino')?.value) { <span>Niño {{ monCtrl.get('NINO')?.value || 0 }}</span> }
+                        @if (planCtrl.get('AllowNino')?.value) { <span>Niño {{ monCtrl.get('NIÑO')?.value || 0 }}</span> }
                         @if (planCtrl.get('AllowInfante')?.value) { <span>Infante {{ monCtrl.get('INFANTE')?.value || 0 }}</span> }
                       </div>
                       }

@@ -7,23 +7,26 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { once } = require('node:events');
-const { assertLocalTestDatabase } = require('../scripts/permissions-cache-safety');
+const { createCopy, connectionOptions } = require('../scripts/create-validation-copy');
+const { installSignalCleanup, dropGeneratedDatabase } = require('../scripts/temporary-validation-cleanup');
 
 test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autoría', {
   skip: process.env.MERCADEO_MYSQL_TEST !== '1', timeout: 60000,
 }, async (t) => {
   dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
   dotenv.config({ path: path.join(__dirname, '..', 'env', '.env'), quiet: true });
-  const databaseName = process.env.DB_NAME || process.env.DB_DATABASE;
-  assertLocalTestDatabase(process.env, databaseName);
-  assert.match(databaseName, /^sir2_.+_test(?:_|$)/i, 'solo ejecuta fixtures en la base de pruebas de sir2');
+  assert.equal(process.env.DB_NAME || process.env.DB_DATABASE, 'sir2');
+  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(String(process.env.DB_HOST).toLowerCase()));
+  assert.notEqual(String(process.env.NODE_ENV).toLowerCase(), 'production');
+  const databaseName = `sir2_mercadeo_validation_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  const removeSignalCleanup = installSignalCleanup(databaseName);
   assert.ok(process.env.JWT_SECRET, 'JWT_SECRET requerido para probar el endpoint autenticado');
-
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER, password: process.env.DB_PASSWORD || process.env.DB_PASS,
-    database: databaseName,
-  });
+  await createCopy(databaseName);
+  const previousName = process.env.DB_NAME;
+  const previousDatabase = process.env.DB_DATABASE;
+  process.env.DB_NAME = databaseName;
+  process.env.DB_DATABASE = databaseName;
+  let connection;
   const tag = randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
   const code = (suffix) => `MK${tag}${suffix}`;
   const codes = [];
@@ -32,19 +35,22 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   let server;
 
   t.after(async () => {
+    removeSignalCleanup();
     if (server?.listening) await new Promise((resolve) => {
       server.close(resolve);
       server.closeAllConnections();
     });
-    try {
-      if (codes.length) await connection.query(`DELETE FROM reservas WHERE Id_Reserva IN (${codes.map(() => '?').join(',')})`, codes);
-      if (users.length) await connection.query(`DELETE FROM usuarios WHERE Id_Usuario IN (${users.map(() => '?').join(',')})`, users);
-      if (roles.length) await connection.query(`DELETE FROM roles WHERE Id_Rol IN (${roles.map(() => '?').join(',')})`, roles);
-    } finally {
-      await connection.end();
+    try { if (connection) await connection.end(); }
+    finally {
       await require('../database/db').end();
+      if (process.env.SIR_KEEP_VALIDATION_DB !== '1') await dropGeneratedDatabase(databaseName);
+      if (previousName === undefined) delete process.env.DB_NAME;
+      else process.env.DB_NAME = previousName;
+      if (previousDatabase === undefined) delete process.env.DB_DATABASE;
+      else process.env.DB_DATABASE = previousDatabase;
     }
   });
+  connection = await mysql.createConnection(connectionOptions(databaseName));
 
   const [categories] = await connection.query('SELECT Id_Canal FROM canales_reservas ORDER BY Id_Canal LIMIT 2');
   assert.ok(categories.length >= 1, 'se requiere al menos una categoría de reserva');

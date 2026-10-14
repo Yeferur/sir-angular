@@ -37,7 +37,7 @@ describe('Navegación superior', () => {
     'PUNTOS.LEER', 'PUNTOS.CREAR', 'USUARIOS.LEER', 'USUARIOS.CREAR',
     'TURNOS.LEER', 'PROGRAMACION.LEER', 'SEGUROS.LEER', 'COMISIONES.LEER',
     'AFOROS.LEER', 'INFORMES.LEER', 'HISTORIAL.LEER', 'PENDIENTES.LEER',
-    'NOTIFICACIONES.LEER',
+    'NOTIFICACIONES.LEER', 'MERCADEO.RESERVAS.LEER', 'ENTIDADES_REPORTANTES.LEER',
   ];
   const element = <T extends HTMLElement = HTMLElement>(selector: string): T =>
     fixture.nativeElement.querySelector(selector) as T;
@@ -121,6 +121,14 @@ describe('Navegación superior', () => {
     expect(element('[data-create-trigger]').querySelector('.bx-plus')).toBeNull();
   });
 
+  it('ofrece Mercadeo y Entidades como destinos independientes de Gestión', () => {
+    const gestion = (Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[])
+      .find(node => node.querySelector('h3')?.textContent?.trim() === 'Gestión')!;
+    const links = Array.from(gestion.querySelectorAll<HTMLAnchorElement>('a.launcher-card'));
+    expect(links.find(link => link.getAttribute('href') === '/Mercadeo/Reservas')?.textContent).toContain('Análisis comercial');
+    expect(links.find(link => link.getAttribute('href') === '/Mercadeo/Entidades')?.textContent).toContain('Hoteles y agencias');
+  });
+
   it('conserva el título anterior mientras inicia una navegación lazy', () => {
     layout.pageTitle.set('Reservas');
 
@@ -141,6 +149,17 @@ describe('Navegación superior', () => {
       expect(element('.topbar-page-title').textContent?.trim()).toBe(title);
       expect(document.documentElement.scrollWidth).withContext(`${title}: scroll horizontal a ${viewport}px`).toBeLessThanOrEqual(viewport);
     }
+  });
+
+  it('mantiene un título largo en una línea y ajusta sólo su letra', async () => {
+    layout.pageTitle.set('Entidades reportantes');
+    await render();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const title = element('.topbar-page-title');
+    const zone = element('.topbar-title-zone');
+    expect(getComputedStyle(title).whiteSpace).toBe('nowrap');
+    expect(title.getBoundingClientRect().height).toBeLessThan(zone.getBoundingClientRect().height);
+    expect(title.scrollWidth).toBeLessThanOrEqual(zone.clientWidth);
   });
 
   it('conserva una geometría móvil válida antes de medir la transición', () => {

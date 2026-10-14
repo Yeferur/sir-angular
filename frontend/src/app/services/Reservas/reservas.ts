@@ -18,10 +18,17 @@ export type Tour = {
   Longitud?: number | null;
 };
 export type Canal = { Id_Canal: number; Nombre_Canal: string; Tiene_Comision?: boolean | number; };
+export type EntidadReportante = {
+  Id_Entidad_Reportante: number;
+  Tipo: 'HOTEL' | 'AGENCIA_NACIONAL' | 'AGENCIA_INTERNACIONAL';
+  Nombre: string;
+  Activo: number | boolean;
+  Estado_Validacion: 'PENDIENTE_VALIDACION' | 'VALIDADA' | 'RECHAZADA';
+};
 export type Moneda = { Id_Moneda: number; Codigo: string; Nombre_Moneda: string; };
 export type Plan = { Id_Plan: number; Id_Tour: number; Nombre_Plan: string; };
 export type Horario = { Id_Horario: number; HoraSalida: string };
-export type PrecioMap = Partial<Record<'ADULTO' | 'NINO' | 'INFANTE', number>>;
+export type PrecioMap = Partial<Record<'ADULTO' | 'NIÑO' | 'INFANTE', number>>;
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -50,6 +57,8 @@ export interface CabeceraReserva {
   Idioma_Reserva: string;
   Id_Moneda: number;
   Id_Canal: number;
+  Id_Entidad_Reportante?: number | null;
+  Nombre_Entidad_Reportante?: string | null;
   Tipo_Reserva: 'Grupal' | 'Privada';
   Id_Punto: number | null;
   Nombre_Reportante: string;
@@ -60,7 +69,7 @@ export interface CabeceraReserva {
 }
 
 export interface Pasajero {
-  Tipo_Pasajero: 'ADULTO' | 'NINO' | 'INFANTE';
+  Tipo_Pasajero: 'ADULTO' | 'NIÑO' | 'INFANTE';
   Nombre_Pasajero: string;
   DNI: string | null;
   Nacionalidad?: string | null;
@@ -136,6 +145,15 @@ export class Reservas {
   }
 
   getCanales()  { return this.http.get<Canal[]>( `${this.apiUrl}/canales` ); }
+  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = '') {
+    return this.http.get<EntidadReportante[]>(`${this.apiUrl}/entidades-reportantes`, {
+      params: new HttpParams().set('tipo', tipo).set('buscar', buscar),
+    });
+  }
+  registrarEntidadReportanteRapida(idCanal: number, nombre: string) {
+    return this.http.post<EntidadReportante>(`${this.apiUrl}/entidades-reportantes/rapida`,
+      { Id_Canal: idCanal, Nombre: nombre });
+  }
   getTours(includeTourId?: number | null) {
     let params = new HttpParams();
     if (includeTourId != null) params = params.set('includeTourId', String(includeTourId));
@@ -234,13 +252,13 @@ export class Reservas {
   }
 
   /** ===== Comisiones =====
-   *  INFANTE = 0 siempre (se maneja en el front). El backend puede devolver solo ADULTO y NINO.
+   *  INFANTE = 0 siempre (se maneja en el front). El backend puede devolver solo ADULTO y NIÑO.
    */
-  getComisiones(idTour: number, idCanal: number): Observable<{ ADULTO: number; NINO: number }> {
+  getComisiones(idTour: number, idCanal: number): Observable<{ ADULTO: number; NIÑO: number }> {
     const params = new HttpParams()
       .set('Id_Tour', String(idTour))
       .set('Id_Canal', String(idCanal));
-    return this.http.get<{ ADULTO: number; NINO: number }>(`${this.apiUrl}/reservas/tours/comisiones`, { params });
+    return this.http.get<{ ADULTO: number; NIÑO: number }>(`${this.apiUrl}/reservas/tours/comisiones`, { params });
   }
 
   /* =============================================================================

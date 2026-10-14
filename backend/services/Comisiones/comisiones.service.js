@@ -1,3 +1,4 @@
+const { reservaNoEliminadaPredicate, reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
 const fs = require('node:fs/promises');
@@ -217,7 +218,7 @@ function buildPassengerQuery(filtros = {}) {
         L.Nombre_Receptor_Snap,
         L.DNI_Receptor_Snap,
         L.Fecha_Pago
-      FROM reservas R
+      FROM ${reservasOperativasSource('R')}
       INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
       INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
       INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
@@ -383,7 +384,7 @@ async function obtenerReservasElegibles(conn, ids, lock = false) {
        R.Id_Canal,
        R.Id_Beneficiario_Comision,
        COALESCE(B.Nombre, R.Nombre_Reportante, '(Sin beneficiario)') AS Nombre_Beneficiario
-     FROM reservas R
+     FROM ${reservasOperativasSource('R')}
      LEFT JOIN beneficiarios_comision B ON B.Id_Beneficiario = R.Id_Beneficiario_Comision
      WHERE R.Id_Reserva IN (${placeholders})
        AND R.Fecha_Tour <= CURDATE()
@@ -682,8 +683,8 @@ async function guardarBeneficiarioDesdeComision(payload, userId = null, files = 
 
     const placeholders = reservas.map(() => '?').join(',');
     const [reservasValidas] = await conn.query(
-      `SELECT Id_Reserva FROM reservas
-       WHERE Id_Reserva IN (${placeholders}) AND Id_Canal = ? FOR UPDATE`,
+      `SELECT r.Id_Reserva FROM reservas r WHERE ${reservaNoEliminadaPredicate('r')}
+        AND r.Id_Reserva IN (${placeholders}) AND r.Id_Canal = ? FOR UPDATE`,
       [...reservas, Id_Canal],
     );
     if (reservasValidas.length !== reservas.length) {

@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const { pool, SQL_TIMEOUT_MS } = require('../../config/db-readonly');
 const {
   buildContextPatch,
@@ -71,7 +72,7 @@ async function lookupByReference(reference, message) {
     const rows = await queryReadonly(
       [
         'SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Nombre_Reportante, c.Nombre_Canal, t.Nombre_Tour',
-        'FROM reservas r',
+        'FROM ' + reservasOperativasSource('r'),
         'LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal',
         'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario',
         'LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour',
@@ -124,7 +125,7 @@ async function lookupByReference(reference, message) {
     const rows = await queryReadonly(
       [
         'SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Nombre_Reportante',
-        'FROM reservas r',
+        'FROM ' + reservasOperativasSource('r'),
         'WHERE r.Id_Reserva = ?',
         'LIMIT 5',
       ].join(' '),

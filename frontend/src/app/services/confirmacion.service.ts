@@ -9,7 +9,7 @@ export interface PasajeroControlViaje {
   Nombre_Pasajero: string;
   DNI: string | null;
   Telefono_Pasajero: string | null;
-  Tipo_Pasajero: 'ADULTO' | 'NINO' | 'INFANTE';
+  Tipo_Pasajero: 'ADULTO' | 'NIÑO' | 'INFANTE';
   Confirmacion: 0 | 1;
   Telefono_Reportante: string | null;
   Nombre_Reportante: string | null;

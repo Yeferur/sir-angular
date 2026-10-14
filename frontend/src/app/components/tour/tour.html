@@ -108,7 +108,7 @@
                   <strong>{{ currency.Codigo }}</strong>
                   <span>Adulto {{ formatPrice(currency.Precios?.ADULTO, currency.Codigo) }}</span>
                   @if (plan.AllowNino) {
-                    <span>Niño {{ formatPrice(currency.Precios?.NINO, currency.Codigo) }}</span>
+                    <span>Niño {{ formatPrice(currency.Precios?.['NIÑO'], currency.Codigo) }}</span>
                   }
                   @if (plan.AllowInfante) {
                     <span>Infante {{ formatPrice(currency.Precios?.INFANTE, currency.Codigo) }}</span>

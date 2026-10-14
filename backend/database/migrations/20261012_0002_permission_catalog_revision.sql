@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS permisos_cache_revision (
+  Tipo ENUM('ROL', 'USUARIO', 'CATALOGO') NOT NULL,
+  Id_Entidad BIGINT UNSIGNED NOT NULL,
+  Revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
+  PRIMARY KEY (Tipo, Id_Entidad)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE permisos_cache_revision
+  MODIFY COLUMN Tipo ENUM('ROL', 'USUARIO', 'CATALOGO') NOT NULL;

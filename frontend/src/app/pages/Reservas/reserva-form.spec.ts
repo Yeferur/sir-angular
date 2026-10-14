@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors, HttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { Validators } from '@angular/forms';
 import { EMPTY, of, throwError } from 'rxjs';
 import { CrearReservaComponent } from './crear-reserva/crear-reserva';
 import { EditarReservaComponent } from './editar-reserva/editar-reserva';
@@ -99,6 +100,25 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       expect(field(`${mode}-reserva-canal`).invalid).toBeTrue();
     });
 
+    it('requiere entidad compatible y sugiere usar un duplicado normalizado sin cambiar contacto ni punto', () => {
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' },
+        { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' }]);
+      c.entidadesReportantes.set([{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL',
+        Nombre: 'Hotel Poblado Boutique', Activo: 1, Estado_Validacion: 'VALIDADA' }]);
+      c.form.get('Id_Entidad_Reportante').setValidators(Validators.required);
+      c.form.get('Id_Entidad_Reportante').updateValueAndValidity();
+      c.currentStep = 1;
+      c.nuevoNombreEntidad = 'HÓTEL   POBLADO - BOUTIQUE';
+      c.mostrarRegistroEntidad = true;
+      render();
+      expect(c.form.get('Id_Entidad_Reportante').invalid).toBeTrue();
+      expect(fixture.nativeElement.textContent).toContain('Usar entidad existente');
+      c.usarCoincidenciaEntidad();
+      expect(c.form.get('Id_Entidad_Reportante').value).toBe(7);
+      expect(c.form.get('Nombre_Reportante').value).toBe('CONTACTO');
+      expect(c.puntosSeleccionados()[0].Id_Punto).toBe(397);
+    });
+
     it('actualiza planes/puntos dinámicos y conserva null disabled y controles de cada pasajero', async () => {
       const field = (id: string) => fixture.debugElement.queryAll(By.directive(SirSelectComponent))
         .map(el => el.componentInstance as SirSelectComponent).find(el => el.inputId === id)!;
@@ -126,7 +146,7 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
     });
 
     it('acepta un solo teléfono del reportante con adultos, niños e infantes sin teléfono', async () => {
-      for (const type of ['ADULTO', 'ADULTO', 'NINO', 'INFANTE']) await add(type);
+      for (const type of ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE']) await add(type);
       expect(c.form.valid).toBeTrue();
       await c.onSubmit();
       expect(save).toHaveBeenCalled();
@@ -167,7 +187,7 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
     });
 
     it('rechaza un teléfono adicional mal formado aunque ya exista contacto válido', async () => {
-      await add('NINO');
+      await add('NIÑO');
       c.pasajeros.at(0).get('Telefono_Pasajero').setValue('123');
       await c.onSubmit();
       expect(save).not.toHaveBeenCalled();

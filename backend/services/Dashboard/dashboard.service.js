@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 /**
  * dashboard.service.js  —  SIR Backend
  *
@@ -69,7 +70,7 @@ function buildFilters(filters = {}) {
 function buildCancelledReservationsSql(andConds = '') {
   return `
     SELECT COUNT(DISTINCT r.Id_Reserva) AS Reservas_Canceladas
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE UPPER(TRIM(COALESCE(r.Estado, ''))) IN ('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO')
     ${andConds}
@@ -81,7 +82,7 @@ function buildReservationStatusesSql(andConds = '') {
     SELECT
       COALESCE(NULLIF(UPPER(TRIM(r.Estado)), ''), 'SIN_ESTADO') AS Estado_Reserva,
       COUNT(DISTINCT r.Id_Reserva) AS Cantidad
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE 1 = 1
     ${andConds}
@@ -96,12 +97,12 @@ function buildPassengerAgeSql(andConds = '') {
       COALESCE(NULLIF(UPPER(TRIM(p.Tipo_Pasajero)), ''), 'SIN_TIPO') AS Tipo_Pasajero,
       COUNT(p.Id_Pasajero) AS Cantidad
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE ${ACTIVE_RESERVATION_SQL}
     ${andConds}
     GROUP BY Tipo_Pasajero
-    ORDER BY FIELD(Tipo_Pasajero, 'ADULTO', 'NINO', 'INFANTE', 'SIN_TIPO'), Tipo_Pasajero
+    ORDER BY FIELD(Tipo_Pasajero, 'ADULTO', 'NIÑO', 'INFANTE', 'SIN_TIPO'), Tipo_Pasajero
   `;
 }
 
@@ -114,7 +115,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
 
   const journeyTotalsSql = `
     SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
-    FROM reservas r2
+    FROM ${reservasOperativasSource('r2')}
     JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
     LEFT JOIN pasajeros p2 ON p2.Id_Reserva = r2.Id_Reserva
     WHERE ${ACTIVE_RESERVATION_SQL.replaceAll('r.', 'r2.')}
@@ -140,7 +141,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
       SUM(CASE WHEN NOT (${CLOSED_JOURNEY_SQL}) THEN 1 ELSE 0 END) AS Pendientes,
       COUNT(DISTINCT CASE WHEN ${CLOSED_JOURNEY_SQL} THEN CONCAT(h.Id_Tour, ':', r.Fecha_Tour) END) AS Jornadas_Cerradas,
       COUNT(DISTINCT CASE WHEN NOT (${CLOSED_JOURNEY_SQL}) THEN CONCAT(h.Id_Tour, ':', r.Fecha_Tour) END) AS Jornadas_Pendientes
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
@@ -180,7 +181,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
            COALESCE(SUM(CASE WHEN LOWER(TRIM(pr.Tipo)) = 'pago completo' THEN pr.Monto ELSE 0 END), 0) AS Pago_Completo,
            COALESCE(SUM(CASE WHEN LOWER(TRIM(pr.Tipo)) = 'abono' THEN pr.Monto ELSE 0 END), 0) AS Abonos
     FROM pagos_reservas pr
-    JOIN reservas r ON r.Id_Reserva = pr.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = pr.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     WHERE ${ACTIVE_RESERVATION_SQL}
@@ -363,11 +364,11 @@ async function getIncomeHistorySvc(year, filters = {}) {
         ELSE p.Precio_Pasajero - COALESCE(p.Comision, 0)
       END), 0) AS neto
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
-      FROM reservas r2
+      FROM ${reservasOperativasSource('r2')}
       JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
       LEFT JOIN pasajeros p2 ON p2.Id_Reserva = r2.Id_Reserva
       WHERE ${ACTIVE_RESERVATION_SQL.replaceAll('r.', 'r2.')}
@@ -428,11 +429,11 @@ async function getDailyIncomeSvc(filters = {}) {
         ELSE p.Precio_Pasajero - COALESCE(p.Comision, 0)
       END), 0) AS neto
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
-      FROM reservas r2
+      FROM ${reservasOperativasSource('r2')}
       JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
       LEFT JOIN pasajeros p2 ON p2.Id_Reserva = r2.Id_Reserva
       WHERE ${ACTIVE_RESERVATION_SQL.replaceAll('r.', 'r2.')}
@@ -492,7 +493,7 @@ async function getDailyPassengersSvc(filters = {}) {
       t.Nombre_Tour            AS tour,
       COUNT(p.Id_Pasajero)     AS pasajeros
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     JOIN horarios h ON r.Id_Horario = h.Id_Horario
     JOIN tours t ON h.Id_Tour = t.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL}
@@ -522,7 +523,7 @@ async function getPassengersByChannelSvc(filters = {}) {
       COALESCE(c.Nombre_Canal, 'Sin canal') AS canal,
       COUNT(p.Id_Pasajero)                  AS cantidad
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN canales_reservas c ON r.Id_Canal = c.Id_Canal
     ${tourJoin}
     WHERE ${ACTIVE_RESERVATION_SQL}
@@ -553,12 +554,12 @@ async function getPassengerDistributionSvc(filters = {}) {
       END AS estado,
       COUNT(*) AS cantidad
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON r.Id_Horario = h.Id_Horario
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
       FROM pasajeros p2
-      JOIN reservas r2 ON p2.Id_Reserva = r2.Id_Reserva
+      JOIN ${reservasOperativasSource('r2')} ON p2.Id_Reserva = r2.Id_Reserva
       JOIN horarios h2 ON r2.Id_Horario = h2.Id_Horario
       WHERE UPPER(TRIM(COALESCE(r2.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')
       GROUP BY h2.Id_Tour, r2.Fecha_Tour
@@ -594,7 +595,7 @@ async function getReservationBreakdownSvc(filters = {}) {
       COUNT(p.Id_Pasajero) AS pasajeros,
       COALESCE(SUM(p.Precio_Pasajero), 0) AS bruto,
       COALESCE(SUM(p.Precio_Pasajero - COALESCE(p.Comision, 0)), 0) AS neto
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     ${tourJoin}
     WHERE ${ACTIVE_RESERVATION_SQL}
@@ -647,10 +648,10 @@ async function getTourOccupancySvc(filters = {}) {
         COUNT(DISTINCT r.Id_Reserva) AS reservas,
         COUNT(p.Id_Pasajero) AS pasajeros,
         SUM(CASE WHEN p.Tipo_Pasajero = 'ADULTO' THEN 1 ELSE 0 END) AS adultos,
-        SUM(CASE WHEN p.Tipo_Pasajero = 'NINO' THEN 1 ELSE 0 END) AS ninos,
+        SUM(CASE WHEN p.Tipo_Pasajero IN ('NIÑO','NINO') THEN 1 ELSE 0 END) AS ninos,
         SUM(CASE WHEN p.Tipo_Pasajero = 'INFANTE' THEN 1 ELSE 0 END) AS infantes
       FROM pasajeros p
-      JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+      JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
       JOIN horarios h ON r.Id_Horario = h.Id_Horario
       JOIN planes_tours assigned_plan
         ON assigned_plan.Id_Plan = p.Id_Plan
@@ -668,11 +669,11 @@ async function getTourOccupancySvc(filters = {}) {
         COUNT(DISTINCT r.Id_Reserva) AS reservas,
         COUNT(p.Id_Pasajero) AS pasajeros,
         SUM(CASE WHEN p.Tipo_Pasajero = 'ADULTO' THEN 1 ELSE 0 END) AS adultos,
-        SUM(CASE WHEN p.Tipo_Pasajero = 'NINO' THEN 1 ELSE 0 END) AS ninos,
+        SUM(CASE WHEN p.Tipo_Pasajero IN ('NIÑO','NINO') THEN 1 ELSE 0 END) AS ninos,
         SUM(CASE WHEN p.Tipo_Pasajero = 'INFANTE' THEN 1 ELSE 0 END) AS infantes,
         1 AS sin_plan
       FROM pasajeros p
-      JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+      JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
       JOIN horarios h ON r.Id_Horario = h.Id_Horario
       LEFT JOIN planes_tours assigned_plan
         ON assigned_plan.Id_Plan = p.Id_Plan
@@ -732,7 +733,7 @@ async function getTourOccupancySvc(filters = {}) {
       t.Nombre_Tour AS nombre,
       COUNT(p.Id_Pasajero) AS pasajeros
     FROM pasajeros p
-    JOIN reservas r ON p.Id_Reserva = r.Id_Reserva
+    JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     JOIN horarios h ON r.Id_Horario = h.Id_Horario
     JOIN tours t ON h.Id_Tour = t.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL}
@@ -759,7 +760,7 @@ async function getDashboardOperationalSvc(filters = {}) {
     SELECT COALESCE(NULLIF(TRIM(r.Idioma_Reserva), ''), 'Sin idioma') AS idioma,
            COUNT(p.Id_Pasajero) AS registrados,
            SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
     GROUP BY idioma ORDER BY registrados DESC
@@ -768,7 +769,7 @@ async function getDashboardOperationalSvc(filters = {}) {
     SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Punto), ''), 'Sin punto') AS punto,
            COUNT(p.Id_Pasajero) AS registrados,
            SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
@@ -780,11 +781,11 @@ async function getDashboardOperationalSvc(filters = {}) {
       SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron,
       SUM(CASE WHEN cj.Id_Confirmacion IS NOT NULL AND cj.Total_Pasajeros = jornada.Total_Pasajeros AND COALESCE(p.Confirmacion, 0) = 0 THEN 1 ELSE 0 END) AS noViajaron,
       SUM(CASE WHEN cj.Id_Confirmacion IS NULL OR cj.Total_Pasajeros <> jornada.Total_Pasajeros THEN 1 ELSE 0 END) AS pendientes
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
-      FROM reservas r2 JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
+      FROM ${reservasOperativasSource('r2')} JOIN horarios h2 ON h2.Id_Horario = r2.Id_Horario
       LEFT JOIN pasajeros p2 ON p2.Id_Reserva = r2.Id_Reserva
       WHERE ${ACTIVE_RESERVATION_SQL.replaceAll('r.', 'r2.')}
       GROUP BY h2.Id_Tour, r2.Fecha_Tour
@@ -799,7 +800,7 @@ async function getDashboardOperationalSvc(filters = {}) {
     SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), CONCAT('Sin plan · ', COALESCE(p.Tipo_Pasajero, 'Sin tipo'))) AS tarifa,
            COUNT(p.Id_Pasajero) AS pasajeros,
            COALESCE(SUM(p.Precio_Pasajero), 0) AS ingresos
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
@@ -808,7 +809,7 @@ async function getDashboardOperationalSvc(filters = {}) {
   const passportSql = `
     SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), 'Sin plan') AS plan,
            COUNT(p.Id_Pasajero) AS pasajeros
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
@@ -820,7 +821,7 @@ async function getDashboardOperationalSvc(filters = {}) {
            SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron,
            COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Precio_Pasajero ELSE 0 END), 0) AS ingresos,
            COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Comision ELSE 0 END), 0) AS comisiones
-    FROM pasajeros p JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+    FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}

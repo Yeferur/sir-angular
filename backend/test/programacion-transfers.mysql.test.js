@@ -8,6 +8,7 @@ const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 const ExcelJS = require('exceljs');
 const { assertTestDestination, migrate } = require('../scripts/migrate-programacion-transfers');
+const { installSignalCleanup, dropGeneratedDatabase } = require('../scripts/temporary-validation-cleanup');
 
 test('MySQL real: listado exportado, audiencia efectiva, deduplicación, cierre y reinicio', {
   skip: process.env.PROGRAMACION_TRANSFERS_MYSQL_TEST !== '1', timeout: 60000,
@@ -15,20 +16,23 @@ test('MySQL real: listado exportado, audiencia efectiva, deduplicación, cierre 
   dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
   dotenv.config({ path: path.join(__dirname, '..', 'env', '.env'), quiet: true });
   const source = process.env.DB_NAME || process.env.DB_DATABASE;
-  assertTestDestination(process.env, source);
-  assert.match(source, /^[a-z0-9_]+$/i);
-  const database = `sir_programacion_transfers_test_${randomUUID().replaceAll('-', '')}`;
+  assert.equal(source, 'sir2', 'sir2 debe ser la única fuente persistente y solo de lectura');
+  assert.ok(['127.0.0.1', 'localhost', '::1'].includes(String(process.env.DB_HOST).toLowerCase()));
+  assert.notEqual(String(process.env.NODE_ENV).toLowerCase(), 'production');
+  const database = `sir2_programacion_transfers_validation_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  const removeSignalCleanup = installSignalCleanup(database);
   const connection = await mysql.createConnection({ host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER, password: process.env.DB_PASSWORD || process.env.DB_PASS, database: source, multipleStatements: true });
   let created = false;
   let pool;
   const originalDatabase = process.env.DB_NAME;
   t.after(async () => {
+    removeSignalCleanup();
     if (pool) await pool.end();
     try {
-      assert.match(database, /^sir_programacion_transfers_test_[a-f0-9]{32}$/);
+      assert.match(database, /^sir2_programacion_transfers_validation_[a-f0-9]{20}$/);
       assert.notEqual(source, database);
-      if (created) await connection.query(`DROP DATABASE \`${database}\``);
+      if (created && process.env.SIR_KEEP_VALIDATION_DB !== '1') await dropGeneratedDatabase(database);
     } finally {
       await connection.end();
       if (originalDatabase === undefined) delete process.env.DB_NAME;

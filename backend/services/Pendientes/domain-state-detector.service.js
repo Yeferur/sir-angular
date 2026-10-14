@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const policy = require('./pendientes-policy.service');
 const pendingService = require('./pendientes.service');
@@ -32,7 +33,7 @@ async function syncReservationPendings() {
   const [rows] = await db.query(
     `SELECT r.Id_Reserva, r.Estado, r.Fecha_Tour,
             CASE WHEN LOWER(TRIM(COALESCE(ro.Nombre_Rol, ''))) <> 'cliente' THEN r.Creado_Por ELSE NULL END AS Destino_Interno
-       FROM reservas r
+       FROM ${reservasOperativasSource('r')}
        LEFT JOIN usuarios u ON u.Id_Usuario = r.Creado_Por
        LEFT JOIN roles ro ON ro.Id_Rol = u.Id_Rol
       WHERE r.Fecha_Tour BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)

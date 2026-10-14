@@ -1,3 +1,5 @@
+const { reservasOperativasSource, getSchemaCapabilities } = require('../schema-capabilities');
+const { passengerSeatSql, consumingReservationSql } = require('../Reservas/cupos-compartidos');
 const Ajv = require('ajv');
 
 const { pool, SQL_TIMEOUT_MS, SQL_MAX_ROWS } = require('../../config/db-readonly');
@@ -128,7 +130,7 @@ async function resolveTourReference(tourName) {
 
 function buildReservationFilters({ date, tour }) {
   const joins = [
-    'FROM reservas r',
+    'FROM ' + reservasOperativasSource('r'),
     'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario',
     'LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour',
   ];
@@ -233,20 +235,24 @@ async function fetchReservaDiagnostics({ date, tour, includePayments, includePoi
 }
 
 async function fetchCuposDiagnostics({ date, tour }) {
+  const aforo = getSchemaCapabilities().aforoOperation
+    ? "CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END" : 'a.Cupo';
+  const aforoProjection = getSchemaCapabilities().aforoOperation
+    ? 'a1.Id_Tour, a1.Cupo, a1.Operacion' : 'a1.Id_Tour, a1.Cupo';
   const rows = await queryReadonly(
     [
       'SELECT t.Id_Tour, t.Nombre_Tour,',
-      'COALESCE(a.Cupo, t.Cupo_Base) AS aforo,',
+      `COALESCE(${aforo}, t.Cupo_Base) AS aforo,`,
       'COALESCE(occ.Reservados, 0) AS ocupados,',
-      'GREATEST(COALESCE(a.Cupo, t.Cupo_Base) - COALESCE(occ.Reservados, 0), 0) AS disponibles,',
+      `GREATEST(COALESCE(${aforo}, t.Cupo_Base) - COALESCE(occ.Reservados, 0), 0) AS disponibles,`,
       'CASE',
-      '  WHEN COALESCE(a.Cupo, t.Cupo_Base) > 0',
-      '    THEN ROUND((COALESCE(occ.Reservados, 0) / COALESCE(a.Cupo, t.Cupo_Base)) * 100, 1)',
+      `  WHEN COALESCE(${aforo}, t.Cupo_Base) > 0`,
+      `    THEN ROUND((COALESCE(occ.Reservados, 0) / COALESCE(${aforo}, t.Cupo_Base)) * 100, 1)`,
       '  ELSE 0',
       'END AS porcentajeOcupacion',
       'FROM tours t',
       'LEFT JOIN (',
-      '  SELECT a1.Id_Tour, a1.Cupo',
+      `  SELECT ${aforoProjection}`,
       '  FROM aforos a1',
       '  INNER JOIN (',
       '    SELECT Id_Tour, MAX(Id_Aforo) AS Max_Aforo',
@@ -256,11 +262,11 @@ async function fetchCuposDiagnostics({ date, tour }) {
       '  ) last_aforo ON last_aforo.Max_Aforo = a1.Id_Aforo',
       ') a ON a.Id_Tour = t.Id_Tour',
       'LEFT JOIN (',
-      '  SELECT h.Id_Tour, COUNT(pa.Id_Pasajero) AS Reservados',
-      '  FROM reservas r',
+      `  SELECT h.Id_Tour, COALESCE(SUM(${passengerSeatSql('pa')}),0) AS Reservados`,
+      '  FROM ' + reservasOperativasSource('r'),
       '  JOIN horarios h ON h.Id_Horario = r.Id_Horario',
       '  LEFT JOIN pasajeros pa ON pa.Id_Reserva = r.Id_Reserva',
-      "  WHERE r.Fecha_Tour = ? AND UPPER(COALESCE(r.Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')",
+      `  WHERE r.Fecha_Tour = ? AND ${consumingReservationSql('r')}`,
       '  GROUP BY h.Id_Tour',
       ') occ ON occ.Id_Tour = t.Id_Tour',
       'WHERE t.Activo = 1',
@@ -346,7 +352,7 @@ async function fetchListadosDiagnostics({ date, tour }) {
       '  SELECT DISTINCT t.Id_Tour, t.Nombre_Tour,',
       '         p.Id_Programacion, p.Confirmado_En,',
       '         CASE WHEN p.Estado = "activa" THEN 1 ELSE 0 END AS TieneListado',
-      '  FROM reservas r',
+      '  FROM ' + reservasOperativasSource('r'),
       '  INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario',
       '  INNER JOIN tours t ON t.Id_Tour = h.Id_Tour',
       '  LEFT JOIN programacion_tours pt ON pt.Id_Tour = t.Id_Tour',
@@ -579,7 +585,7 @@ async function runBuscarEntidad(input) {
     const rows = await queryReadonly(
       [
         'SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Nombre_Reportante',
-        'FROM reservas r',
+        'FROM ' + reservasOperativasSource('r'),
         'WHERE r.Id_Reserva = ?',
         'LIMIT 5',
       ].join(' '),
@@ -676,7 +682,7 @@ async function runConsultarReservas(input) {
     });
   }
 
-  const joins = ['FROM reservas r'];
+  const joins = ['FROM ' + reservasOperativasSource('r')];
   const filters = [];
   const values = [];
 
@@ -752,16 +758,20 @@ async function runConsultarReservas(input) {
 }
 
 async function runConsultarCupos(input) {
+  const aforo = getSchemaCapabilities().aforoOperation
+    ? "CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END" : 'a.Cupo';
+  const aforoProjection = getSchemaCapabilities().aforoOperation
+    ? 'a1.Id_Tour, a1.Cupo, a1.Operacion' : 'a1.Id_Tour, a1.Cupo';
   const rows = await queryReadonly(
     [
       'SELECT t.Id_Tour, t.Nombre_Tour,',
-      'COALESCE(a.Cupo, t.Cupo_Base) AS Cupo_Total,',
+      `COALESCE(${aforo}, t.Cupo_Base) AS Cupo_Total,`,
       'COALESCE(occ.Reservados, 0) AS Reservados,',
-      'GREATEST(COALESCE(a.Cupo, t.Cupo_Base) - COALESCE(occ.Reservados, 0), 0) AS Cupos_Disponibles,',
+      `GREATEST(COALESCE(${aforo}, t.Cupo_Base) - COALESCE(occ.Reservados, 0), 0) AS Cupos_Disponibles,`,
       '? AS Fecha_Operacion',
       'FROM tours t',
       'LEFT JOIN (',
-      '  SELECT a1.Id_Tour, a1.Cupo',
+      `  SELECT ${aforoProjection}`,
       '  FROM aforos a1',
       '  INNER JOIN (',
       '    SELECT Id_Tour, MAX(Id_Aforo) AS Max_Aforo',
@@ -771,11 +781,11 @@ async function runConsultarCupos(input) {
       '  ) last_aforo ON last_aforo.Max_Aforo = a1.Id_Aforo',
       ') a ON a.Id_Tour = t.Id_Tour',
       'LEFT JOIN (',
-      '  SELECT h.Id_Tour, COUNT(pa.Id_Pasajero) AS Reservados',
-      '  FROM reservas r',
+      `  SELECT h.Id_Tour, COALESCE(SUM(${passengerSeatSql('pa')}),0) AS Reservados`,
+      '  FROM ' + reservasOperativasSource('r'),
       '  JOIN horarios h ON h.Id_Horario = r.Id_Horario',
       '  LEFT JOIN pasajeros pa ON pa.Id_Reserva = r.Id_Reserva',
-      "  WHERE r.Fecha_Tour = ? AND UPPER(COALESCE(r.Estado, '')) NOT IN ('CANCELADA', 'CANCELADO')",
+      `  WHERE r.Fecha_Tour = ? AND ${consumingReservationSql('r')}`,
       '  GROUP BY h.Id_Tour',
       ') occ ON occ.Id_Tour = t.Id_Tour',
       'WHERE t.Activo = 1',
@@ -889,7 +899,7 @@ async function runConsultarPagos(input) {
     const rows = await queryReadonly(
       [
         'SELECT COUNT(*) AS total',
-        'FROM reservas r',
+        'FROM ' + reservasOperativasSource('r'),
         'JOIN horarios h ON h.Id_Horario = r.Id_Horario',
         'JOIN tours t ON t.Id_Tour = h.Id_Tour',
         'LEFT JOIN (SELECT Id_Reserva, SUM(COALESCE(Precio_Pasajero, 0)) AS Total_Reserva FROM pasajeros GROUP BY Id_Reserva) ps ON ps.Id_Reserva = r.Id_Reserva',
@@ -922,7 +932,7 @@ async function runConsultarPagos(input) {
       'COALESCE(ps.Total_Reserva, 0) AS Valor_Total,',
       'COALESCE(pg.Total_Pagado, 0) AS Valor_Pagado,',
       'GREATEST(COALESCE(ps.Total_Reserva, 0) - COALESCE(pg.Total_Pagado, 0), 0) AS Valor_Pendiente',
-      'FROM reservas r',
+      'FROM ' + reservasOperativasSource('r'),
       'JOIN horarios h ON h.Id_Horario = r.Id_Horario',
       'JOIN tours t ON t.Id_Tour = h.Id_Tour',
       'LEFT JOIN (SELECT Id_Reserva, SUM(COALESCE(Precio_Pasajero, 0)) AS Total_Reserva FROM pasajeros GROUP BY Id_Reserva) ps ON ps.Id_Reserva = r.Id_Reserva',

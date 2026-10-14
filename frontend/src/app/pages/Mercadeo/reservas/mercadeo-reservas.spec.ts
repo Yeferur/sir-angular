@@ -50,22 +50,23 @@ describe('MercadeoReservasComponent', () => {
     fixture.detectChanges();
   });
 
-  it('carga categorías y consulta con page size 25 mostrando los indicadores y creadores', () => {
+  it('carga categorías y consulta con page size 25 mostrando resultados y creadores', () => {
     expect(api.getCategorias).toHaveBeenCalled();
     expect(component.categoryOptions().map((option) => option.label)).toEqual(['Todas las categorías', 'AGENCIA']);
     component.search();
     fixture.detectChanges();
     expect(api.buscar).toHaveBeenCalledWith(jasmine.objectContaining({ codigoReserva: '' }), 1, 25);
     const html = fixture.nativeElement as HTMLElement;
-    expect(html.textContent).toContain('Reservas encontradas');
-    expect(html.textContent).toContain('Pasajeros encontrados');
+    expect(html.textContent).toContain('80 reservas · 88 pasajeros');
     expect(html.textContent).toContain('Usuario Uno');
     expect(html.textContent).toContain('No disponible');
     expect(html.textContent).toContain('Quién reporta');
     expect(html.querySelector('h1')).toBeNull();
-    expect(html.querySelector('.page-description')?.textContent?.trim()).toBe('Consulta y análisis de información comercial');
-    expect(html.querySelector('.filter-heading h2')?.textContent?.trim()).toBe('Filtros de consulta');
-    expect(Array.from(html.querySelectorAll('.filter-actions button')).map(button => button.textContent?.trim())).toEqual(['Limpiar', 'Buscar']);
+    expect(html.querySelector('.marketing-tabs')).toBeNull();
+    expect(html.querySelector('.marketing-summary')).toBeNull();
+    expect(html.querySelector('app-date-range-picker')).not.toBeNull();
+    expect(html.querySelector('app-search-input')).not.toBeNull();
+    expect(html.querySelector('app-filter-bar')).not.toBeNull();
   });
 
   it('envía filtros activos, avanza de página y reinicia a página 1 al buscar filtros cambiados', () => {
@@ -95,7 +96,7 @@ describe('MercadeoReservasComponent', () => {
     expect(component.result()).toBeNull();
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Prepara tu consulta');
-    expect((fixture.nativeElement as HTMLElement).querySelector('.marketing-initial-state')).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-query-empty-state')).not.toBeNull();
 
     api.buscar.and.returnValue(of({ ...result, items: [], totalReservas: 0, totalPasajeros: 0 }));
     component.search();

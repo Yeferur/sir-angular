@@ -20,14 +20,14 @@ exports.login = async (req, res) => {
     const { username, correo, password } = req.body || {};
     const userKey = username || correo;
     if (!userKey || !password) {
-      return sendError(res, { status: 400, message: 'Usuario/correo y contrasena son requeridos', errorCode: 'MISSING_PARAMS' });
+      return sendError(res, { status: 400, message: 'Usuario/correo y contraseña son requeridos', errorCode: 'MISSING_PARAMS' });
     }
 
     const user = await loginService.findUserByUsername(userKey);
     if (!user) return sendError(res, { status: 401, message: 'Usuario no encontrado', errorCode: 'AUTH_USER_NOT_FOUND' });
 
     const ok = await loginService.comparePasswords(password, user.Contrasena);
-    if (!ok) return sendError(res, { status: 401, message: 'Contrasena incorrecta', errorCode: 'AUTH_INVALID_CREDENTIALS' });
+    if (!ok) return sendError(res, { status: 401, message: 'Contraseña incorrecta', errorCode: 'AUTH_INVALID_CREDENTIALS' });
 
     const token = loginService.generateToken(user);
     await loginService.saveSession(user.Id_Usuario, token);

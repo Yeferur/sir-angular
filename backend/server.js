@@ -63,6 +63,7 @@ app.get('/uploads/fotos_perfil/:filename', (req, res, next) => {
 const loginRoutes = require('./routes/Login/login.routes');
 const inicioRoutes = require('./routes/inicio.routes');
 const reservasRoutes = require('./routes/Reservas/reserva.routes');
+const entidadesReportantesRoutes = require('./routes/EntidadesReportantes/entidades-reportantes.routes');
 const puntosRoutes = require('./routes/Puntos/puntos.routes');
 const programacionRoutes = require('./routes/Programacion/programacion.routes');
 const sesionesRoutes = require('./routes/Usuarios/usuarios.routes');
@@ -81,6 +82,7 @@ const { iniciarVencimientosJob, detenerVencimientosJob } = require('./jobs/venci
 const { iniciarEmailOutboxJob, detenerEmailOutboxJob } = require('./jobs/email-outbox.job');
 const { iniciarPendientesJob, detenerPendientesJob } = require('./jobs/pendientes.job');
 const { publishAppUpdateOnStartup } = require('./jobs/app-updates.job');
+const { initializeSchemaCapabilities } = require('./services/schema-capabilities');
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.JSON_LIMIT || '10mb' }));
@@ -89,6 +91,7 @@ app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_LIMIT
 app.use('/api', loginRoutes);
 app.use('/api', inicioRoutes);
 app.use('/api', reservasRoutes);
+app.use('/api', entidadesReportantesRoutes);
 app.use('/api', puntosRoutes);
 app.use('/api', programacionRoutes);
 app.use('/api', sesionesRoutes);
@@ -169,12 +172,32 @@ server.on('error', (err) => {
   process.exit(1);
 });
 
-// ✅ Levantar server
-iniciarVencimientosJob();
-iniciarEmailOutboxJob();
-iniciarPendientesJob();
-void publishAppUpdateOnStartup();
-startServer(DEFAULT_PORT);
+// Detectar el contrato una sola vez antes de aceptar tráfico o iniciar jobs.
+// Esta lectura a information_schema no modifica la base.
+async function bootServer() {
+  const capabilities = await initializeSchemaCapabilities();
+  console.log('[Schema] Capacidades activas:', {
+    database: capabilities.database,
+    reservasSoftDelete: capabilities.reservasSoftDelete,
+    aforoOperation: capabilities.aforoOperation,
+    permissionCatalogRevision: capabilities.permissionCatalogRevision,
+  });
+
+  if (process.env.SIR_DISABLE_BACKGROUND_JOBS === '1') {
+    console.warn('[Jobs] Desactivados por SIR_DISABLE_BACKGROUND_JOBS=1.');
+  } else {
+    iniciarVencimientosJob();
+    iniciarEmailOutboxJob();
+    iniciarPendientesJob();
+    void publishAppUpdateOnStartup();
+  }
+  startServer(DEFAULT_PORT);
+}
+
+void bootServer().catch((error) => {
+  console.error('[Schema] No se pudo detectar el contrato de la base; el servidor no se iniciará:', error?.message || error);
+  process.exit(1);
+});
 
 let shuttingDown = false;
 async function shutdown(signal) {

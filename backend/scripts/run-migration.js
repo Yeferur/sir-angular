@@ -11,7 +11,11 @@ async function main() {
   if (!/^\d{8}_[a-z0-9_]+\.sql$/i.test(migrationName)) {
     throw new Error('Indica el nombre de una migración SQL válida.');
   }
-  const sql = await fs.readFile(path.join(__dirname, '..', 'database', 'migrations', migrationName), 'utf8');
+  const migrationNames = migrationName === '20260920_revision_cache_permisos.sql'
+    ? [migrationName, '20261012_0002_permission_catalog_revision.sql']
+    : [migrationName];
+  const sqlFiles = await Promise.all(migrationNames.map((name) =>
+    fs.readFile(path.join(__dirname, '..', 'database', 'migrations', name), 'utf8')));
   const { assertLocalTestDatabase, assertRevisionSchema } = require('./permissions-cache-safety');
   const permissionsCacheMigration = migrationName === '20260920_revision_cache_permisos.sql';
   assertLocalTestDatabase(process.env, process.env.DB_NAME || process.env.DB_DATABASE);
@@ -30,8 +34,8 @@ async function main() {
       await assertRevisionSchema(connection);
       console.log(`Destino local de pruebas confirmado: ${rows[0].db}`);
     }
-    await connection.query(sql);
-    if (permissionsCacheMigration) await assertRevisionSchema(connection);
+    for (const sql of sqlFiles) await connection.query(sql);
+    if (permissionsCacheMigration) await assertRevisionSchema(connection, { requireCatalog: true });
     console.log(`Migración aplicada: ${migrationName}`);
   } finally {
     await connection.end();

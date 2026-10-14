@@ -1,21 +1,23 @@
-.marketing-reservations { display: grid; width: 100%; gap: 1rem; container-type: inline-size; }
+.marketing-reservations { display: grid; width: 100%; max-width: 1350px; gap: 14px; container-type: inline-size; }
+.marketing-primary-filters { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(220px, 1fr); gap: 12px; width: 100%; }
+.filter-hint { margin: .6rem 0 0; color: var(--text-secondary); font-size: .8rem; }
 .eyebrow { margin: 0 0 .3rem; color: var(--text-muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .page-description { margin: 0; color: var(--text-secondary); }
-.marketing-filters { width: min(100%, 1120px); padding: 1.2rem; border: 1px solid var(--border-color); border-radius: var(--radius-lg, .9rem); background: var(--bg-secondary); box-sizing: border-box; }
+.marketing-filters { width: 100%; padding: 10px; border: 1px solid var(--separator-color); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg-secondary) 88%, transparent); box-sizing: border-box; }
 .filter-heading { margin-bottom: 1rem; }
 .filter-heading h2 { margin: 0; color: var(--text-primary); font-size: 1rem; }
 .filter-heading p { margin: .25rem 0 0; color: var(--text-secondary); font-size: .82rem; }
-.filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; }
+.filter-grid { display: contents; }
 .form-group { display: grid; gap: .4rem; min-width: 0; }
 .form-label { color: var(--text-secondary); font-size: .8rem; font-weight: 600; }
-.form-input { width: 100%; min-height: 2.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md, .65rem); background: var(--bg-tertiary); color: var(--text-primary); padding: .65rem .75rem; font: inherit; }
+.form-input { width: 100%; min-height: 42px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); padding: 9px 12px; font: inherit; box-sizing: border-box; }
 .form-input:focus { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
 .filter-actions { display: flex; justify-content: flex-end; gap: .65rem; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border-color); }
 .marketing-initial-state { min-height: 0; padding: 1.2rem; }
 .marketing-initial-state .empty-icon { margin-bottom: .35rem; }
 .inline-error { margin: .6rem 0 0; color: var(--danger-color, #b42318); font-size: .85rem; }
 .marketing-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
-.summary-card, .results-card { border: 1px solid var(--border-color); border-radius: var(--radius-lg, .9rem); background: var(--bg-secondary); }
+.summary-card, .results-card { border: 1px solid var(--separator-color); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 .summary-card { display: grid; gap: .25rem; padding: .9rem 1rem; }
 .summary-card span, .results-heading span, .pagination > span { color: var(--text-secondary); font-size: .82rem; }
 .summary-card strong { color: var(--text-primary); font-size: 1.5rem; }
@@ -27,6 +29,7 @@
 .marketing-table th { position: sticky; top: 0; z-index: 1; background: var(--bg-tertiary); color: var(--text-secondary); text-align: left; font-size: .73rem; font-weight: 700; white-space: nowrap; }
 .marketing-table th, .marketing-table td { padding: .72rem .8rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
 .marketing-table td { font-size: .84rem; }
+.marketing-mobile-list { display: none; }
 .booking-code { font-weight: 700; white-space: nowrap; }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .8rem 1rem; }
 .pagination-buttons { display: flex; gap: .3rem; }
@@ -35,12 +38,24 @@
 .pagination-button.is-current { border-color: var(--accent-blue); background: var(--accent-blue); color: var(--text-on-accent); }
 .button-spinner { display: inline-block; width: .9rem; height: .9rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: mercadeo-spin .7s linear infinite; vertical-align: -.1rem; }
 @keyframes mercadeo-spin { to { transform: rotate(360deg); } }
-@container (max-width: 900px) { .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 900px) { .marketing-primary-filters { grid-template-columns: 1fr; } }
 @container (max-width: 600px) {
-  .filter-grid, .marketing-summary { grid-template-columns: 1fr; }
+  .marketing-primary-filters, .marketing-summary { grid-template-columns: 1fr; }
   .filter-actions { flex-direction: column-reverse; }
   .filter-actions button { width: 100%; justify-content: center; }
   .results-heading, .pagination { align-items: flex-start; flex-direction: column; }
   .pagination { gap: .6rem; }
   .marketing-table th, .marketing-table td { padding: .62rem; }
+  .table-scroll { display: none; }
+  .marketing-mobile-list { display: grid; gap: 8px; padding: 10px; }
+  .marketing-mobile-card { padding: 13px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
+  .marketing-mobile-card-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px; font-size: .8rem; }
+  .marketing-mobile-card-head strong { color: var(--accent-blue); }
+  .marketing-mobile-card-head span, .marketing-mobile-card p { color: var(--text-secondary); }
+  .marketing-mobile-card h3 { margin: 10px 0 2px; font-size: .95rem; }
+  .marketing-mobile-card p { margin: 0 0 10px; font-size: .76rem; }
+  .marketing-mobile-card dl { display: grid; gap: 5px; margin: 0; }
+  .marketing-mobile-card dl div { display: flex; justify-content: space-between; gap: 10px; font-size: .75rem; }
+  .marketing-mobile-card dt { color: var(--text-secondary); }
+  .marketing-mobile-card dd { margin: 0; text-align: right; }
 }

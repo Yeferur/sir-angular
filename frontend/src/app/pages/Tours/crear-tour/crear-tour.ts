@@ -10,7 +10,7 @@ import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { tourAvailabilityValidator, tourPlanValidityValidator } from '../tour-form.validators';
 
-type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
+type TipoPasajero = 'ADULTO' | 'NIÑO' | 'INFANTE';
 
 type MonedaVM = {
   Id_Moneda: number;
@@ -34,7 +34,7 @@ type PlanPayload = {
   Monedas: Array<{
     Id_Moneda: number;
     Codigo: string;
-    Precios: { ADULTO: number; NINO: number; INFANTE: number };
+    Precios: { ADULTO: number; NIÑO: number; INFANTE: number };
   }>;
 };
 
@@ -307,7 +307,7 @@ export class CrearTourComponent implements OnInit {
     this.plans.push(this.createPlanGroup('Plan básico', false));
 
     // Aplica reglas de validación desde el inicio
-    this.applyPassengerRules(0, 'NINO');
+    this.applyPassengerRules(0, 'NIÑO');
     this.applyPassengerRules(0, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
   }
@@ -429,7 +429,7 @@ export class CrearTourComponent implements OnInit {
       Codigo: [moneda.Codigo],
       Nombre_Moneda: [moneda.Nombre_Moneda],
       ADULTO: [0, [Validators.min(0)]],
-      NINO: [0, [Validators.min(0)]],
+      NIÑO: [0, [Validators.min(0)]],
       INFANTE: [0, [Validators.min(0)]],
     });
   }
@@ -443,7 +443,7 @@ export class CrearTourComponent implements OnInit {
     this.expandedPlanIndex = idx;
     this.form.markAsDirty();
 
-    this.applyPassengerRules(idx, 'NINO');
+    this.applyPassengerRules(idx, 'NIÑO');
     this.applyPassengerRules(idx, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
   }
@@ -485,14 +485,14 @@ export class CrearTourComponent implements OnInit {
       );
       target?.patchValue({
         ADULTO: Number(sourceCurrency.ADULTO || 0),
-        NINO: Number(sourceCurrency.NINO || 0),
+        NIÑO: Number(sourceCurrency.NIÑO || 0),
         INFANTE: Number(sourceCurrency.INFANTE || 0),
       }, { emitEvent: false });
     }
 
     this.plans.push(copy);
     const newIndex = this.plans.length - 1;
-    this.applyPassengerRules(newIndex, 'NINO');
+    this.applyPassengerRules(newIndex, 'NIÑO');
     this.applyPassengerRules(newIndex, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
     this.expandedPlanIndex = newIndex;
@@ -539,7 +539,7 @@ export class CrearTourComponent implements OnInit {
   shouldShowCurrencyInReview(planIndex: number, currencyIndex: number): boolean {
     if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return true;
     const currency = this.getPlanCurrencies(planIndex).at(currencyIndex) as FormGroup;
-    return ['ADULTO', 'NINO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
+    return ['ADULTO', 'NIÑO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
   }
 
   getPrimaryCurrencyIndex(planIndex: number): number {
@@ -582,7 +582,7 @@ export class CrearTourComponent implements OnInit {
     enabled: boolean
   ): void {
     const plan = this.plans.at(planIndex) as FormGroup;
-    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    const allowKey = tipo === 'NIÑO' ? 'AllowNino' : 'AllowInfante';
     plan.get(allowKey)?.setValue(enabled);
     this.togglePassengerType(planIndex, tipo);
   }
@@ -595,7 +595,7 @@ export class CrearTourComponent implements OnInit {
    */
   private applyPassengerRules(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
     const plan = this.plans.at(planIndex) as FormGroup;
-    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    const allowKey = tipo === 'NIÑO' ? 'AllowNino' : 'AllowInfante';
     const allowed = !!plan.get(allowKey)?.value;
 
     const currencies = this.getPlanCurrencies(planIndex);
@@ -691,7 +691,7 @@ export class CrearTourComponent implements OnInit {
       const primaryCurrency = (this.getPlanCurrencies(p).at(this.getPrimaryCurrencyIndex(p)) as FormGroup) || null;
       if (!primaryCurrency || Number(primaryCurrency.get('ADULTO')?.value || 0) <= 0) return false;
 
-      if (allowNino && Number(primaryCurrency.get('NINO')?.value || 0) <= 0) return false;
+      if (allowNino && Number(primaryCurrency.get('NIÑO')?.value || 0) <= 0) return false;
       if (allowInf && Number(primaryCurrency.get('INFANTE')?.value || 0) <= 0) return false;
     }
 
@@ -706,7 +706,7 @@ export class CrearTourComponent implements OnInit {
       const currencies = plan.get('monedas') as FormArray;
       currencies.controls.forEach((c) => {
         c.get('ADULTO')?.markAsTouched();
-        c.get('NINO')?.markAsTouched();
+        c.get('NIÑO')?.markAsTouched();
         c.get('INFANTE')?.markAsTouched();
       });
     });
@@ -1002,7 +1002,7 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
         Codigo: String(m.Codigo || ''),
         Precios: {
           ADULTO: Number(m.ADULTO || 0),
-          NINO: allowNino ? Number(m.NINO || 0) : 0,
+          NIÑO: allowNino ? Number(m.NIÑO || 0) : 0,
           INFANTE: allowInf ? Number(m.INFANTE || 0) : 0,
         },
       }));
@@ -1062,7 +1062,7 @@ private buildDisponibilidadPayload(): DisponibilidadPayload {
           const currencies = plan.get('monedas') as FormArray;
           for (let i = 0; i < currencies.length; i++) {
             const cg = currencies.at(i) as FormGroup;
-            if (cg.get('ADULTO')?.invalid || cg.get('NINO')?.invalid || cg.get('INFANTE')?.invalid) { pricingInvalid = true; break; }
+            if (cg.get('ADULTO')?.invalid || cg.get('NIÑO')?.invalid || cg.get('INFANTE')?.invalid) { pricingInvalid = true; break; }
           }
           if (pricingInvalid) break;
         }

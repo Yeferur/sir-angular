@@ -16,7 +16,12 @@ test('Mercadeo construye filtros parametrizados, incluida la combinación comple
   ];
 
   for (const [key, value, expectedSql, expectedParam] of fields) {
-    const built = buildFilters({ [key]: value });
+    const query = key === 'fechaRegistroDesde'
+      ? { fechaRegistroDesde: value, fechaRegistroHasta: '2026-08-31' }
+      : key === 'fechaRegistroHasta'
+        ? { fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: value }
+        : { [key]: value };
+    const built = buildFilters(query);
     assert.ok(built.where.includes(expectedSql), key);
     assert.ok([...built.values, ...built.passengerValues].includes(expectedParam), key);
   }
@@ -32,6 +37,9 @@ test('Mercadeo construye filtros parametrizados, incluida la combinación comple
   assert.ok(!combined.where.includes(malicious));
   assert.ok(combined.where.includes('EXISTS (SELECT 1 FROM pasajeros'));
   assert.equal(buildFilters({}).where, '');
+  assert.throws(() => buildFilters({ fechaRegistroDesde: '2026-08-01' }), e => e.errorCode === 'DATE_RANGE_INVALID');
+  assert.throws(() => buildFilters({ fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-09-01' }),
+    e => e.errorCode === 'DATE_RANGE_TOO_LONG');
 });
 
 test('Mercadeo devuelve conteos de reservas/pasajeros y agrupa varios pasajeros sin duplicar reservas', async (t) => {

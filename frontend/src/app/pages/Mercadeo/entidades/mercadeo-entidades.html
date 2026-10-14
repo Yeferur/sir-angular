@@ -1,0 +1,176 @@
+<main class="page-container entity-page" [attr.aria-busy]="loading()">
+  <header class="entity-heading">
+    <p>Hoteles y agencias que reportan reservas.</p>
+    <div class="entity-heading-actions">
+      <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !result()?.items?.length || !!dateError()" (click)="export()">Exportar Excel</button>
+      @if (canCreate) { <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">+ Nueva entidad</button> }
+    </div>
+  </header>
+
+  <section class="entity-filters" aria-label="Filtros de entidades">
+    <app-filter-bar panelId="entity-filter-panel" [expanded]="filterOpen()" [filterCount]="filterCount()"
+      [busy]="loading()" [canSearch]="!dateError()"
+      (toggleFilters)="filterOpen.set(!filterOpen())" (search)="search()">
+      <div sirPrimaryFilters class="entity-primary-filters">
+        <div class="form-group"><label for="entity-name">Entidad</label>
+          <app-search-input inputId="entity-name" placeholder="Buscar por nombre" [value]="filters().buscar"
+            (valueChange)="setFilter('buscar', $event)" (search)="search()" />
+        </div>
+        <div class="form-group"><label for="entity-period">Período de actividad</label>
+          <app-date-range-picker inputId="entity-period" [value]="dateRange()" (rangeChange)="setRange($event)" />
+        </div>
+      </div>
+    </app-filter-bar>
+    <app-filter-panel panelId="entity-filter-panel" [open]="filterOpen()">
+      <div class="form-group"><label for="entity-type">Tipo</label>
+        <app-select inputId="entity-type" [options]="typeOptions" [ngModel]="filters().tipo"
+          (ngModelChange)="setFilter('tipo', $event)" /></div>
+      <div class="form-group"><label for="entity-validation">Validación</label>
+        <app-select inputId="entity-validation" [options]="validationOptions" [ngModel]="filters().validacion"
+          (ngModelChange)="setFilter('validacion', $event)" /></div>
+      <div class="form-group"><label for="entity-status">Estado</label>
+        <app-select inputId="entity-status" [options]="statusOptions" [ngModel]="filters().estado"
+          (ngModelChange)="setFilter('estado', $event)" /></div>
+      <div class="form-group"><label for="entity-activity">Actividad</label>
+        <app-select inputId="entity-activity" [options]="activityOptions" [ngModel]="filters().actividad"
+          (ngModelChange)="setFilter('actividad', $event)" /></div>
+      @if (hasChangedFilters()) { <button type="button" class="sir-action sir-action--ghost" (click)="clear()">Restablecer filtros</button> }
+    </app-filter-panel>
+    @if (dateError()) { <p class="inline-error" role="alert">{{ dateError() }}</p> }
+  </section>
+
+  @if (error() && !result()) { <app-loading-state mode="error" label="No se pudieron consultar las entidades" [detail]="error()" actionLabel="Reintentar" (action)="search()" /> }
+  @else if (loading() && !result()) { <app-loading-state label="Consultando entidades…" /> }
+  @if (result(); as data) {
+    @if (error()) { <p class="inline-error" role="alert">{{ error() }} Los resultados anteriores siguen disponibles.</p> }
+    @if (!data.items.length) {
+      <app-query-empty-state title="Sin entidades para esta consulta"
+        description="Los hoteles y agencias aparecerán aquí al registrarse. Puedes ajustar los filtros o crear una entidad." />
+    } @else {
+      <section class="entity-results" aria-label="Actividad por entidad">
+        <div class="results-heading"><strong>{{ data.total }} {{ data.total === 1 ? 'entidad' : 'entidades' }}</strong>
+          @if (data.summary.Con_Reservas) { <span>{{ data.summary.Con_Reservas }} con actividad</span> }
+          @if (data.summary.Total_Reservas) { <span>{{ data.summary.Total_Reservas }} {{ one(data.summary.Total_Reservas) ? 'reserva' : 'reservas' }}</span> }
+          @if (data.summary.Total_Pasajeros) { <span>{{ data.summary.Total_Pasajeros }} {{ one(data.summary.Total_Pasajeros) ? 'pasajero' : 'pasajeros' }}</span> }
+        </div>
+        <div class="entity-table-wrap">
+          <table><thead><tr><th>Entidad</th><th>Tipo</th><th>Estado</th><th>Validación</th><th>Actividad del período</th><th>Última actividad</th></tr></thead>
+            <tbody>@for (item of data.items; track item.Id_Entidad_Reportante) {
+              <tr><td><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button></td>
+                <td>{{ typeLabel(item.Tipo) }}</td><td>{{ item.Activo ? 'Activa' : 'Inactiva' }}</td>
+                <td>{{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</td>
+                <td>{{ item.Reservas ? item.Reservas + (one(item.Reservas) ? ' reserva · ' : ' reservas · ') + item.Pasajeros + (one(item.Pasajeros) ? ' pasajero' : ' pasajeros') : 'Sin reservas' }}</td>
+                <td>{{ item.Ultima_Actividad ? (item.Ultima_Actividad | date:'d MMM y':'':'es-CO') : '—' }}</td>
+              </tr>
+            }</tbody></table>
+        </div>
+        <div class="entity-cards">@for (item of data.items; track item.Id_Entidad_Reportante) {
+          <article class="entity-card"><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button>
+            <p>{{ typeLabel(item.Tipo) }} · {{ item.Activo ? 'Activa' : 'Inactiva' }} · {{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</p>
+            @if (item.Reservas) { <small>{{ item.Reservas }} {{ one(item.Reservas) ? 'reserva' : 'reservas' }} · {{ item.Pasajeros }} {{ one(item.Pasajeros) ? 'pasajero' : 'pasajeros' }}</small> }
+          </article>
+        }</div>
+        @if (data.totalPages > 1) { <footer class="entity-pagination"><span>Página {{ data.page }} de {{ data.totalPages }}</span>
+          <button type="button" class="sir-action sir-action--secondary" (click)="search(data.page - 1)" [disabled]="data.page <= 1 || loading()">Anterior</button>
+          <button type="button" class="sir-action sir-action--secondary" (click)="search(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
+        </footer> }
+      </section>
+    }
+  }
+
+  @if (selected(); as detail) {
+    <div class="entity-backdrop" (click)="close()"></div>
+    <aside class="entity-drawer" role="dialog" aria-modal="true" aria-labelledby="entity-detail-title"
+      cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+      <button type="button" class="drawer-close" aria-label="Cerrar detalle" (click)="close()">×</button>
+      <h2 id="entity-detail-title">{{ detail.entity.Nombre }}</h2>
+      <p>{{ typeLabel(detail.entity.Tipo) }} · {{ detail.entity.Activo ? 'Activa' : 'Inactiva' }} · {{ validationLabel(detail.entity.Estado_Validacion) }}</p>
+      <div class="drawer-actions">
+        @if (canEdit) {
+          <button type="button" class="sir-action sir-action--secondary" (click)="startEdit()">Editar</button>
+          <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="setActive(!detail.entity.Activo)">
+            {{ detail.entity.Activo ? 'Desactivar' : 'Activar' }}</button>
+        }
+        @if (canValidate) {
+          <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Validar</button>
+          <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="validate('RECHAZADA')">Rechazar</button>
+        }
+      </div>
+      @if (editing()) {
+        <div class="entity-edit"><label for="edit-entity-name">Nombre comercial</label>
+          <input id="edit-entity-name" class="entity-input" [(ngModel)]="name" maxlength="255" />
+          <label for="edit-entity-type">Tipo</label>
+          <app-select inputId="edit-entity-type" [options]="typeOptions" [(ngModel)]="type" />
+          <button type="button" class="sir-action sir-action--primary" [disabled]="saving() || !name.trim()" (click)="save()">Guardar cambios</button>
+          <button type="button" class="sir-action sir-action--ghost" (click)="editing.set(false)">Cancelar</button>
+        </div>
+      }
+      @if (detail.historic.Reservas) {
+      <h3>Actividad</h3>
+      <p>Histórico: {{ detail.historic.Reservas }} {{ one(detail.historic.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.historic.Pasajeros }} {{ one(detail.historic.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p>
+      @if (detail.period.Reservas) { <p>Período: {{ detail.period.Reservas }} {{ one(detail.period.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.period.Pasajeros }} {{ one(detail.period.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p> }
+      @if (detail.historic.Ultima_Actividad) { <p>Última reserva: {{ detail.historic.Ultima_Actividad | date:'d MMM y':'':'es-CO' }}</p> }
+      }
+      @if (detail.contacts.length) { <h3>Contactos que han reportado</h3>
+      @for (contact of detail.contacts; track contact.Nombre + ':' + contact.Telefono) { <p>{{ contact.Nombre }} @if (contact.Telefono) { · {{ contact.Telefono }} } · {{ contact.Reservas }} {{ one(contact.Reservas) ? 'reserva' : 'reservas' }}</p> }
+      }
+      @if (detail.observed.length) { <h3>Puntos observados en reservas</h3>
+      @for (point of detail.observed; track point.Id_Punto) {
+        <p>{{ point.Nombre_Punto }} · {{ point.Reservas }} {{ one(point.Reservas) ? 'reserva' : 'reservas' }}
+          @if (canValidate) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">Asociar</button> }</p>
+      } }
+      @if (detail.associated.length) { <h3>Puntos asociados oficialmente</h3>
+      @for (point of detail.associated; track point.Id_Punto) {
+        <p>{{ point.Nombre_Punto }} · {{ point.Estado_Validacion }}
+          @if (canValidate) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, false)">Quitar</button> }</p>
+      } }
+      @if (canValidate) {
+        <button type="button" class="sir-action sir-action--ghost entity-point-toggle" [attr.aria-expanded]="pointPickerOpen()" (click)="pointPickerOpen.set(!pointPickerOpen())">{{ pointPickerOpen() ? 'Cerrar búsqueda de puntos' : 'Asociar punto de encuentro' }}</button>
+        @if (pointPickerOpen()) {
+          <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" [value]="pointSearch" (valueChange)="pointSearch = $event; searchPoints()" />
+          @for (point of pointMatches(); track point.Id_Punto) {
+            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">{{ point.NombrePunto }}</button>
+          }
+        }
+      }
+      @if (detailError()) { <p class="inline-error" role="alert">{{ detailError() }}</p> }
+    </aside>
+  }
+  @if (creating()) {
+    <div class="entity-backdrop" (click)="close()"></div>
+    <section class="entity-dialog" role="dialog" aria-modal="true" aria-labelledby="create-entity-title"
+      cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+      <button type="button" class="drawer-close" aria-label="Cerrar" (click)="close()">×</button>
+      <h2 id="create-entity-title">Nueva entidad</h2>
+      <p>Registra el hotel o agencia que reporta reservas.</p>
+      <div class="form-group"><label for="create-entity-type">Tipo</label>
+        <app-select inputId="create-entity-type" [options]="typeOptions" [ngModel]="type" (ngModelChange)="onCreateTypeChange($event)" /></div>
+      <div class="form-group"><label for="create-entity-name">Nombre comercial</label>
+        <input id="create-entity-name" class="entity-input" [ngModel]="name" (ngModelChange)="onCreateNameChange($event)" maxlength="255" autocomplete="off" placeholder="Escribe o busca un nombre" /></div>
+      @if (suggesting()) { <small role="status">Buscando coincidencias…</small> }
+      @if (entitySuggestions().length || createPointSuggestions().length) {
+        <div class="entity-suggestions" aria-label="Sugerencias de nombre">
+          @if (entitySuggestions().length) { <h3>Entidades existentes</h3>
+            @for (entity of entitySuggestions(); track entity.Id_Entidad_Reportante) {
+              <button type="button" (click)="close(); open(entity)">{{ entity.Nombre }} · {{ typeLabel(entity.Tipo) }}</button>
+            }
+          }
+          @if (type === 'HOTEL' && createPointSuggestions().length) { <h3>Puntos de encuentro</h3>
+            @for (point of createPointSuggestions(); track point.Id_Punto) {
+              <button type="button" (click)="usePoint(point)">{{ point.NombrePunto }}</button>
+            }
+          }
+        </div>
+      }
+      @if (exactDuplicate) { <p class="inline-error" role="alert">Ya existe {{ exactDuplicate.Nombre }}. Abre su detalle para administrarla.</p> }
+      @if (selectedCreatePoint(); as point) {
+        <label class="entity-associate-option"><input type="checkbox" [checked]="associateCreatePoint()" (change)="associateCreatePoint.set($any($event.target).checked)" />
+          <span>Asociar también el punto de encuentro <strong>{{ point.NombrePunto }}</strong></span></label>
+      }
+      <p class="entity-form-note">Puedes crear un nombre nuevo. Quedará pendiente de validación.</p>
+      @if (detailError()) { <p class="inline-error" role="alert">{{ detailError() }}</p> }
+      <div class="entity-form-actions"><button type="button" class="sir-action sir-action--ghost" (click)="close()">Cancelar</button>
+        <button type="button" class="sir-action sir-action--primary" [disabled]="saving() || !name.trim() || !type || !!exactDuplicate" (click)="save()">{{ saving() ? 'Creando…' : 'Crear entidad' }}</button></div>
+    </section>
+  }
+</main>

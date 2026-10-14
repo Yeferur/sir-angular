@@ -73,7 +73,7 @@ test('construye la composición de pasajeros por edad sin incluir canceladas', (
   assert.match(sql, /UPPER\(TRIM\(p\.Tipo_Pasajero\)\)/);
   assert.match(sql, /NOT IN \('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO'\)/);
   assert.match(sql, /GROUP BY Tipo_Pasajero/);
-  assert.match(sql, /ADULTO.*NINO.*INFANTE/s);
+  assert.match(sql, /ADULTO.*NIÑO.*INFANTE/s);
 });
 
 test('agrupa la confirmación por la expresión calculada y no por Estado de la reserva', async (t) => {

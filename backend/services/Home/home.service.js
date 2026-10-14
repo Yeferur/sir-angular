@@ -1,9 +1,11 @@
+const { reservasOperativasSource, getSchemaCapabilities } = require('../schema-capabilities');
+const { passengerSeatSql, consumingReservationSql, activeReservationSql } = require('../Reservas/cupos-compartidos');
 const db = require('../../database/db');
 const crypto = require('crypto');
 const { isClientRoleName } = require('../../utils/clientAccess');
 const { syncHomeProcesses } = require('../Pendientes/home-process-detector.service');
 
-const ACTIVE_RESERVATION_SQL = "UPPER(TRIM(COALESCE(r.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ELIMINADA','ELIMINADO')";
+const ACTIVE_RESERVATION_SQL = activeReservationSql('r');
 const ACTIVE_TRANSFER_SQL = "UPPER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ANULADA','ANULADO','ELIMINADA','ELIMINADO')";
 
 function bogotaDate(offsetDays = 0) {
@@ -116,7 +118,7 @@ async function getOverview(userId, dates, personalScope, includeTransfers = true
         COUNT(CASE
           WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'GRUPAL'))) = 'PRIVADA' THEN p.Id_Pasajero
         END) AS Pasajeros_Privados
-     FROM reservas r
+     FROM ${reservasOperativasSource('r')}
      LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
      WHERE r.Fecha_Tour IN (?, ?)
        AND ${ACTIVE_RESERVATION_SQL}
@@ -164,7 +166,7 @@ async function getPersonalWork(userId, dates, permissions, clientMode = false) {
          r.Tipo_Reserva,
          t.Nombre_Tour,
          COUNT(p.Id_Pasajero) AS Pasajeros
-       FROM reservas r
+       FROM ${reservasOperativasSource('r')}
        LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
        LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
        LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -203,7 +205,7 @@ async function getPersonalWork(userId, dates, permissions, clientMode = false) {
   const pendingPromise = canReadReservations
     ? db.query(
       `SELECT COUNT(*) AS Total
-       FROM reservas r
+       FROM ${reservasOperativasSource('r')}
        WHERE r.Creado_Por = ?
          AND r.Fecha_Tour >= ?
          AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN ('PENDIENTE','PENDIENTE DE DATOS','PENDIENTE DE PAGO')`,
@@ -236,14 +238,17 @@ async function getPersonalWork(userId, dates, permissions, clientMode = false) {
 }
 
 async function getCapacityAlerts(dates) {
+  const aforoCapacitySql = getSchemaCapabilities().aforoOperation
+    ? "CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END"
+    : 'a.Cupo';
   const [rows] = await db.query(
     `SELECT
        t.Id_Tour,
        t.Nombre_Tour,
        DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha,
-       COALESCE(a.Cupo, t.Cupo_Base, 0) AS Capacidad,
-       SUM(CASE WHEN p.Tipo_Pasajero IN ('ADULTO','NINO') THEN 1 ELSE 0 END) AS Ocupados
-     FROM reservas r
+       COALESCE(${aforoCapacitySql}, t.Cupo_Base, 0) AS Capacidad,
+       SUM(${passengerSeatSql('p')}) AS Ocupados
+     FROM ${reservasOperativasSource('r')}
      INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
      INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
      LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -255,9 +260,9 @@ async function getCapacityAlerts(dates) {
        LIMIT 1
      )
      WHERE r.Fecha_Tour BETWEEN ? AND ?
-       AND UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'GRUPAL'))) = 'GRUPAL'
-       AND ${ACTIVE_RESERVATION_SQL}
-     GROUP BY t.Id_Tour, t.Nombre_Tour, r.Fecha_Tour, a.Cupo, t.Cupo_Base
+       AND ${consumingReservationSql('r')}
+     GROUP BY t.Id_Tour, t.Nombre_Tour, r.Fecha_Tour, a.Cupo,
+       ${getSchemaCapabilities().aforoOperation ? 'a.Operacion,' : ''} t.Cupo_Base
      HAVING Capacidad <= 0 OR (Ocupados / NULLIF(Capacidad, 0)) >= 0.8
      ORDER BY
        CASE WHEN Capacidad <= 0 THEN 2 ELSE Ocupados / NULLIF(Capacidad, 0) END DESC,
@@ -289,7 +294,7 @@ async function getOperationalProcesses(dates, permissions) {
       `SELECT COUNT(*) AS Total
        FROM (
          SELECT h.Id_Tour, r.Fecha_Tour
-         FROM reservas r
+         FROM ${reservasOperativasSource('r')}
          INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
          LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
          LEFT JOIN confirmaciones_jornada cj
@@ -317,7 +322,7 @@ async function getOperationalProcesses(dates, permissions) {
       `SELECT COUNT(*) AS Total
        FROM (
          SELECT h.Id_Tour, r.Fecha_Tour
-         FROM reservas r
+         FROM ${reservasOperativasSource('r')}
          INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
          LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
          WHERE r.Fecha_Tour BETWEEN ? AND ?
@@ -374,7 +379,7 @@ async function getOperationalProcesses(dates, permissions) {
     const [rows] = await db.query(
       `SELECT DISTINCT r.Id_Reserva, DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha_Tour,
               t.Id_Tour, t.Nombre_Tour
-       FROM reservas r
+       FROM ${reservasOperativasSource('r')}
        LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
        LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
        INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva

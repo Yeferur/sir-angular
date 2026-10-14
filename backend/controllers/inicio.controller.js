@@ -1,4 +1,4 @@
-const { obtenerDatosInicio, guardarAforo } = require('../services/inicio.service');
+const { obtenerDatosInicio, guardarAforo, retirarAforo } = require('../services/inicio.service');
 const { sendSuccess, sendError } = require('../utils/responseEnvelope');
 
 exports.getInicioData = async (req, res) => {
@@ -33,6 +33,23 @@ exports.guardarAforo = async (req, res) => {
     return sendSuccess(res, { data: null, message: result.message || 'Aforo guardado correctamente' });
   } catch (error) {
     console.error('Error al guardar aforo:', error);
+    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.retirarAforo = async (req, res) => {
+  const { Id_Tour, Fecha } = req.body || {};
+  if (!Id_Tour || !Fecha) {
+    return sendError(res, { status: 400, message: 'Id_Tour y Fecha son obligatorios', errorCode: 'MISSING_PARAMS' });
+  }
+  try {
+    const result = await retirarAforo({ Id_Tour, Fecha, userId: req.user?.id });
+    if (!result.success) {
+      return sendError(res, { status: 409, message: result.error || 'No se pudo retirar el aforo', errorCode: 'CAPACITY_CONFLICT' });
+    }
+    return sendSuccess(res, { data: null, message: result.message });
+  } catch (error) {
+    console.error('Error al retirar aforo:', error);
     return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
   }
 };

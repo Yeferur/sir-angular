@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {
   MIGRATIONS, assertTargetConfiguration, assertConnectedDatabase,
-  assertConfirmation, assertMigrationSafe, readMigrations,
+  assertConfirmation, selectMigrationsThrough, assertMigrationSafe, readMigrations,
 } = require('../scripts/release-migrate-sir2');
 
 test('el guard rechaza sir, destino vacío y un nombre confirmado distinto', () => {
@@ -21,6 +21,16 @@ test('sir2 exige confirmación exacta antes del DDL', () => {
   assert.throws(() => assertConfirmation([]), /--confirm-sir2/);
   assert.throws(() => assertConfirmation(['--confirm-sir2', '--database=sir']), /--confirm-sir2/);
   assert.doesNotThrow(() => assertConfirmation(['--confirm-sir2']));
+  assert.doesNotThrow(() => assertConfirmation(['--confirm-sir2', '--through', MIGRATIONS[5]]));
+  assert.throws(() => assertConfirmation(['--confirm-sir2', '--only', MIGRATIONS[5]]), /--confirm-sir2/);
+});
+
+test('el runner permite checkpoints acumulativos para separar ventanas de migración', () => {
+  const migrations = MIGRATIONS.map((name) => ({ name }));
+  assert.deepEqual(selectMigrationsThrough(migrations, MIGRATIONS[14]), migrations.slice(0, 15));
+  assert.deepEqual(selectMigrationsThrough(migrations, MIGRATIONS[15]), migrations.slice(0, 16));
+  assert.deepEqual(selectMigrationsThrough(migrations, null), migrations);
+  assert.throws(() => selectMigrationsThrough(migrations, 'inventada.sql'), /Checkpoint desconocido/);
 });
 
 test('rechaza cambio de base y referencias explícitas a sir', () => {
@@ -43,7 +53,7 @@ test('SQL de reservas y runtime usan disponibilidad en minúscula', async () => 
 
 test('las migraciones se leen, incluida la rutina histórica', async () => {
   const migrations = await readMigrations();
-  assert.equal(migrations.length, 10);
+  assert.equal(migrations.length, MIGRATIONS.length);
   assert.deepEqual(migrations.map(x => x.name), [...MIGRATIONS]);
   const historical = migrations.find(x => x.name === '20260911_pendientes_recordatorios_mvp.sql');
   assert.equal(historical.statements.filter(x => x.startsWith('CREATE PROCEDURE')).length, 1);

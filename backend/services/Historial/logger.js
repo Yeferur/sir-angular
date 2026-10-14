@@ -139,26 +139,25 @@ async function recordHistorialCambioReserva({
   const useExternalConn = !!conexion;
   const conn = conexion || await db.getConnection();
   try {
-    const payload = {
-      estadoAnterior: estado_anterior,
-      estadoNuevo: estado_nuevo,
-      metadata: metadata || {}
-    };
-
-    const [result] = await conn.query(
-      `INSERT INTO historial_cambios
-      (Tabla, Id_Registro, Id_Usuario, Cambio_JSON, IP_Cliente, Fecha_Registro)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
-      [
-        'reservas',
-        id_reserva ? String(id_reserva) : null,
-        normalizeOptionalUserId(id_usuario),
-        JSON.stringify(payload),
-        ip_cliente || null,
-      ]
-    );
-
-    return result.insertId;
+    const detalles = [
+      { columna: 'Estado', anterior: estado_anterior, nuevo: estado_nuevo },
+      ...Object.entries(metadata || {}).map(([columna, valor]) => ({
+        columna: `Metadata.${columna}`,
+        anterior: null,
+        nuevo: typeof valor === 'string' ? valor : JSON.stringify(valor),
+      })),
+    ];
+    // IP queda fuera hasta que exista una política y columna aprobada; jamás
+    // se usa como sustituto de actor. El evento funcional vive en historial.
+    void ip_cliente;
+    return await registrarHistorial({
+      conexion: conn,
+      tabla: 'reservas',
+      id_registro: id_reserva,
+      accion: 'CAMBIO_ESTADO_RESERVA',
+      id_usuario: id_usuario,
+      detalles,
+    });
   } finally {
     if (!useExternalConn && conn) conn.release();
   }

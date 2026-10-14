@@ -25,7 +25,7 @@ import { tourAvailabilityValidator, tourPlanValidityValidator } from '../tour-fo
 /* =========================================================
  * TYPES
  * ========================================================= */
-type TipoPasajero = 'ADULTO' | 'NINO' | 'INFANTE';
+type TipoPasajero = 'ADULTO' | 'NIÑO' | 'INFANTE';
 
 type DiaSemana =
   | 'lunes'
@@ -59,7 +59,7 @@ type PlanPayload = {
   Monedas: Array<{
     Id_Moneda: number;
     Codigo: string;
-    Precios: { ADULTO: number; NINO: number; INFANTE: number };
+    Precios: { ADULTO: number; NIÑO: number; INFANTE: number };
   }>;
 };
 
@@ -176,7 +176,7 @@ export class EditarTourComponent implements OnInit {
       Id_Moneda: [null],
       Tiene_Plan: [false],
       Nombre_Plan: [''],
-      precios: this.fb.group({ ADULTO: [0], NINO: [0], INFANTE: [0] }),
+      precios: this.fb.group({ ADULTO: [0], NIÑO: [0], INFANTE: [0] }),
 
       // planes / disponibilidad
       planes: this.fb.array([]),
@@ -347,7 +347,7 @@ export class EditarTourComponent implements OnInit {
       Codigo: [moneda.Codigo],
       Nombre_Moneda: [moneda.Nombre_Moneda],
       ADULTO: [0, [Validators.min(0)]],
-      NINO: [0, [Validators.min(0)]],
+      NIÑO: [0, [Validators.min(0)]],
       INFANTE: [0, [Validators.min(0)]],
     });
   }
@@ -467,7 +467,7 @@ export class EditarTourComponent implements OnInit {
 
     this.plans.push(this.createPlanGroup('Plan básico', false, null));
 
-    this.applyPassengerRules(0, 'NINO');
+    this.applyPassengerRules(0, 'NIÑO');
     this.applyPassengerRules(0, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
   }
@@ -481,7 +481,7 @@ export class EditarTourComponent implements OnInit {
     this.expandedPlanIndex = idx;
     this.form.markAsDirty();
 
-    this.applyPassengerRules(idx, 'NINO');
+    this.applyPassengerRules(idx, 'NIÑO');
     this.applyPassengerRules(idx, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
   }
@@ -539,14 +539,14 @@ export class EditarTourComponent implements OnInit {
       );
       target?.patchValue({
         ADULTO: Number(sourceCurrency.ADULTO || 0),
-        NINO: Number(sourceCurrency.NINO || 0),
+        NIÑO: Number(sourceCurrency.NIÑO || 0),
         INFANTE: Number(sourceCurrency.INFANTE || 0),
       }, { emitEvent: false });
     }
 
     this.plans.push(copy);
     const newIndex = this.plans.length - 1;
-    this.applyPassengerRules(newIndex, 'NINO');
+    this.applyPassengerRules(newIndex, 'NIÑO');
     this.applyPassengerRules(newIndex, 'INFANTE');
     this.applyAdultRulesAcrossPlans();
     this.expandedPlanIndex = newIndex;
@@ -606,7 +606,7 @@ export class EditarTourComponent implements OnInit {
   shouldShowCurrencyInReview(planIndex: number, currencyIndex: number): boolean {
     if (currencyIndex === this.getPrimaryCurrencyIndex(planIndex)) return true;
     const currency = this.getPlanCurrencies(planIndex).at(currencyIndex) as FormGroup;
-    return ['ADULTO', 'NINO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
+    return ['ADULTO', 'NIÑO', 'INFANTE'].some((type) => Number(currency.get(type)?.value || 0) > 0);
   }
 
   togglePassengerType(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
@@ -620,14 +620,14 @@ export class EditarTourComponent implements OnInit {
     enabled: boolean
   ): void {
     const plan = this.plans.at(planIndex) as FormGroup;
-    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    const allowKey = tipo === 'NIÑO' ? 'AllowNino' : 'AllowInfante';
     plan.get(allowKey)?.setValue(enabled);
     this.togglePassengerType(planIndex, tipo);
   }
 
   private applyPassengerRules(planIndex: number, tipo: Exclude<TipoPasajero, 'ADULTO'>): void {
     const plan = this.plans.at(planIndex) as FormGroup;
-    const allowKey = tipo === 'NINO' ? 'AllowNino' : 'AllowInfante';
+    const allowKey = tipo === 'NIÑO' ? 'AllowNino' : 'AllowInfante';
     const allowed = !!plan.get(allowKey)?.value;
 
     const currencies = this.getPlanCurrencies(planIndex);
@@ -680,7 +680,7 @@ export class EditarTourComponent implements OnInit {
           const mg = monedasFA.at(i) as FormGroup;
 
           const adulto = mg.get('ADULTO');
-          const nino = mg.get('NINO');
+          const nino = mg.get('NIÑO');
           const inf = mg.get('INFANTE');
 
           adulto?.enable({ emitEvent: false });
@@ -749,7 +749,7 @@ export class EditarTourComponent implements OnInit {
       const plan = this.plans.at(p) as FormGroup;
       const primary = this.getPlanCurrencies(p).at(this.getPrimaryCurrencyIndex(p)) as FormGroup;
       if (!primary || Number(primary.get('ADULTO')?.value || 0) <= 0) return false;
-      if (plan.get('AllowNino')?.value && Number(primary.get('NINO')?.value || 0) <= 0) return false;
+      if (plan.get('AllowNino')?.value && Number(primary.get('NIÑO')?.value || 0) <= 0) return false;
       if (plan.get('AllowInfante')?.value && Number(primary.get('INFANTE')?.value || 0) <= 0) return false;
     }
     return true;
@@ -761,7 +761,7 @@ export class EditarTourComponent implements OnInit {
       const currencies = plan.get('monedas') as FormArray;
       currencies.controls.forEach((currency) => {
         currency.get('ADULTO')?.markAsTouched();
-        currency.get('NINO')?.markAsTouched();
+        currency.get('NIÑO')?.markAsTouched();
         currency.get('INFANTE')?.markAsTouched();
       });
     });
@@ -778,10 +778,10 @@ export class EditarTourComponent implements OnInit {
         if (!g) return;
 
         g.get('ADULTO')?.setValue(Number(map?.ADULTO ?? 0), { emitEvent: false });
-        g.get('NINO')?.setValue(Number(map?.NINO ?? 0), { emitEvent: false });
+        g.get('NIÑO')?.setValue(Number(map?.NIÑO ?? 0), { emitEvent: false });
         g.get('INFANTE')?.setValue(Number(map?.INFANTE ?? 0), { emitEvent: false });
 
-        const anyPrice = !!(map && (map.ADULTO || map.NINO || map.INFANTE));
+        const anyPrice = !!(map && (map.ADULTO || map.NIÑO || map.INFANTE));
         this.form.get('Tiene_Plan')?.setValue(Boolean(anyPrice), { emitEvent: false });
 
         try { this.cd.detectChanges(); } catch {}
@@ -1165,7 +1165,7 @@ export class EditarTourComponent implements OnInit {
                   if (idx >= 0) {
                     const mg = monedasFA.at(idx) as FormGroup;
                     mg.get('ADULTO')?.setValue(Number(m.Precios?.ADULTO || 0), { emitEvent: false });
-                    mg.get('NINO')?.setValue(Number(m.Precios?.NINO || 0), { emitEvent: false });
+                    mg.get('NIÑO')?.setValue(Number(m.Precios?.NIÑO || 0), { emitEvent: false });
                     mg.get('INFANTE')?.setValue(Number(m.Precios?.INFANTE || 0), { emitEvent: false });
                   }
                 }
@@ -1173,7 +1173,7 @@ export class EditarTourComponent implements OnInit {
 
               this.plans.push(pg);
 
-              this.applyPassengerRules(i, 'NINO');
+              this.applyPassengerRules(i, 'NIÑO');
               this.applyPassengerRules(i, 'INFANTE');
             }
 
@@ -1225,7 +1225,7 @@ export class EditarTourComponent implements OnInit {
         Codigo: String(m.Codigo || ''),
         Precios: {
           ADULTO: Number(m.ADULTO || 0),
-          NINO: allowNino ? Number(m.NINO || 0) : 0,
+          NIÑO: allowNino ? Number(m.NIÑO || 0) : 0,
           INFANTE: allowInf ? Number(m.INFANTE || 0) : 0,
         },
       }));
@@ -1288,7 +1288,7 @@ export class EditarTourComponent implements OnInit {
           const currencies = plan.get('monedas') as FormArray;
           for (let i = 0; i < currencies.length; i++) {
             const cg = currencies.at(i) as FormGroup;
-            if (cg.get('ADULTO')?.invalid || cg.get('NINO')?.invalid || cg.get('INFANTE')?.invalid) { pricingInvalid = true; break; }
+            if (cg.get('ADULTO')?.invalid || cg.get('NIÑO')?.invalid || cg.get('INFANTE')?.invalid) { pricingInvalid = true; break; }
           }
           if (pricingInvalid) break;
         }

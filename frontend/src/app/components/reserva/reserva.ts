@@ -305,7 +305,7 @@ export class ReservasDynamicComponent implements OnChanges, OnDestroy {
   private normalizarTipoPasajero(tipo: any): TipoPasajero {
     const value = String(tipo ?? '').trim().toUpperCase();
     if (value === 'ADULTO' || value === 'ADULTOS') return 'Adulto';
-    if (value === 'NINO' || value === 'NIÑO' || value === 'CHILD') return 'Niño';
+    if (value === 'NIÑO' || value === 'NINO' || value === 'CHILD') return 'Niño';
     return 'Infante';
   }
 

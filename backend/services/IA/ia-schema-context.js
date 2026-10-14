@@ -192,7 +192,7 @@ const IA_ALLOWED_TABLES = {
       'Confirmacion',
     ],
     operationalNotes: [
-      'Para reservas grupales, el conteo operativo suele usar Tipo_Pasajero IN (ADULTO, NINO).',
+      'Los cupos compartidos se calculan con la política central del servicio de reservas: Grupal activa ADULTO y NIÑO ocupan un asiento; INFANTE y Privada ocupan cero.',
       'Id_Punto puede ser NULL: eso permite detectar reservas o pasajeros sin punto asignado.',
     ],
   },

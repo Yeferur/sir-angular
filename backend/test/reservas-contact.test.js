@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { validarContactoReserva, hasReservaContact } = require('../services/Reservas/reserva-contact');
 
 test('un único teléfono de reportante permite pasajeros adicionales sin teléfono', () => {
-  const pasajeros = ['ADULTO', 'ADULTO', 'NINO', 'INFANTE'].map(Tipo_Pasajero => ({ Tipo_Pasajero, Telefono_Pasajero: null }));
+  const pasajeros = ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map(Tipo_Pasajero => ({ Tipo_Pasajero, Telefono_Pasajero: null }));
   assert.doesNotThrow(() => validarContactoReserva('+573001234567', pasajeros));
   assert.equal(hasReservaContact('+573001234567', pasajeros), true);
 });
@@ -25,21 +25,37 @@ test('falta de contacto y teléfono adicional inválido tienen errores específi
 
 // Opt-in: exercises real transactions ONLY in the explicitly authorized local copy.
 test('creación y edición reales preservan contacto, pasajeros y datos tras errores', { skip: process.env.RUN_RESERVAS_INTEGRATION !== '1' }, async () => {
+  const { randomUUID } = require('node:crypto');
+  const { createCopy } = require('../scripts/create-validation-copy');
+  const { installSignalCleanup, dropGeneratedDatabase } = require('../scripts/temporary-validation-cleanup');
+  const previousName = process.env.DB_NAME;
+  const previousDatabase = process.env.DB_DATABASE;
+  const databaseName = `sir2_contact_validation_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  const removeSignalCleanup = installSignalCleanup(databaseName);
+  await createCopy(databaseName);
+  process.env.DB_NAME = databaseName;
+  process.env.DB_DATABASE = databaseName;
   const db = require('../database/db');
+  try {
   const [[identity]] = await db.query('SELECT DATABASE() db, @@hostname host');
-  assert.equal(identity.db, 'sir2_programacion_alertas_test_20260921');
+  assert.equal(identity.db, databaseName);
   assert.ok(['127.0.0.1', 'localhost'].includes(process.env.DB_HOST));
+  await require('../services/schema-capabilities').initializeSchemaCapabilities(db);
   const svc = require('../services/Reservas/reservas.service');
+  const [[configuration]] = await db.query(`SELECT h.Id_Horario,h.Id_Tour,h.Id_Punto,m.Id_Moneda,c.Id_Canal
+    FROM horarios h JOIN tours t ON t.Id_Tour=h.Id_Tour AND t.Activo=1
+    JOIN puntos p ON p.Id_Punto=h.Id_Punto AND p.Activo=1
+    CROSS JOIN monedas m CROSS JOIN canales_reservas c
+    WHERE c.Nombre_Canal='WEB' AND t.Cupo_Base>=4 LIMIT 1`);
+  assert.ok(configuration);
   const date = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);
   const suffix = Date.now().toString();
   const payload = {
-    cabeceraReserva: { Tipo_Reserva: 'Grupal', Id_Tour: 2, Id_Horario: 2, Id_Punto: 397, Fecha_Tour: date, Id_Moneda: 1, Id_Canal: 1, Idioma_Reserva: 'ESPAÑOL', Nombre_Reportante: 'PRUEBA AUTOMATIZADA CONTACTO', Telefono_Reportante: '+573001234567', Observaciones: 'SINTETICA - prueba automatizada formulario' },
-    pasajeros: ['ADULTO', 'ADULTO', 'NINO', 'INFANTE'].map((Tipo_Pasajero, index) => ({ Tipo_Pasajero, Nombre_Pasajero: `SINTETICO ${index}`, DNI: `TEST-${suffix}-${index}`, Telefono_Pasajero: null, Id_Punto: 397, Precio_Pasajero: 100, Precio_Tour: 100 })),
+    cabeceraReserva: { Tipo_Reserva: 'Grupal', Id_Tour: configuration.Id_Tour, Id_Horario: configuration.Id_Horario, Id_Punto: configuration.Id_Punto, Fecha_Tour: date, Id_Moneda: configuration.Id_Moneda, Id_Canal: configuration.Id_Canal, Idioma_Reserva: 'ESPAÑOL', Nombre_Reportante: 'PRUEBA AUTOMATIZADA CONTACTO', Telefono_Reportante: '+573001234567', Observaciones: 'SINTETICA - prueba automatizada formulario' },
+    pasajeros: ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map((Tipo_Pasajero, index) => ({ Tipo_Pasajero, Nombre_Pasajero: `SINTETICO ${index}`, DNI: `TEST-${suffix}-${index}`, Telefono_Pasajero: null, Id_Punto: configuration.Id_Punto, Precio_Pasajero: 100, Precio_Tour: 100 })),
     pagos: [{ Tipo: 'Pago Directo', Monto: 400 }], replacePagos: true,
   };
-  let id;
-  try {
-    id = (await svc.crearReservaConPasajerosYPagos(payload)).Id_Reserva;
+    const id = (await svc.crearReservaConPasajerosYPagos(payload)).Id_Reserva;
     assert.ok(id);
     const read = async () => {
       const [[cabecera]] = await db.query('SELECT Nombre_Reportante, Telefono_Reportante, Estado, Observaciones FROM reservas WHERE Id_Reserva=?', [id]);
@@ -68,9 +84,12 @@ test('creación y edición reales preservan contacto, pasajeros y datos tras err
       await assert.rejects(svc.crearReservaConPasajerosYPagos(invalid), e => e.status === 400 && e.errorCode === code);
     }
   } finally {
-    // Only this test's synthetic reservation; no existing records or saved programs are changed.
-    if (id) await svc.eliminarReservaSvc(id);
-    await new Promise(resolve => setTimeout(resolve, 200));
+    removeSignalCleanup();
     await db.end();
+    if (process.env.SIR_KEEP_VALIDATION_DB !== '1') await dropGeneratedDatabase(databaseName);
+    if (previousName === undefined) delete process.env.DB_NAME;
+    else process.env.DB_NAME = previousName;
+    if (previousDatabase === undefined) delete process.env.DB_DATABASE;
+    else process.env.DB_DATABASE = previousDatabase;
   }
 });

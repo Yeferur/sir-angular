@@ -10,7 +10,7 @@ test('cache hit, TTL exacto y limpieza conservan la caché solo cinco minutos', 
   let revisionReads = 0;
   t.mock.method(Date, 'now', () => now);
   const cache = createPermissionCache({
-    async obtenerRevisionPermisosUsuario() { revisionReads++; return { idRol: '1', usuario: '0', rol: '0' }; },
+    async obtenerRevisionPermisosUsuario() { revisionReads++; return { idRol: '1', usuario: '0', rol: '0', catalogo: '0' }; },
     async obtenerPermisosPorUsuario() { reads++; return [{ Codigo_Permiso: 'A.LEER' }]; },
   });
   await cache.obtenerPermisosUsuario(1);

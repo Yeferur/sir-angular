@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const { recordHistorial } = require('../Historial/logger');
 
@@ -53,7 +54,7 @@ async function obtenerPasajerosPorTour(idTourValue, fechaValue) {
        C.Nombre_Canal,
        COALESCE(PP.Nombre_Punto, PH.Nombre_Punto) AS PuntoEncuentro
      FROM pasajeros P
-     INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
+     INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
      INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
      LEFT JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
      LEFT JOIN puntos PP ON PP.Id_Punto = P.Id_Punto
@@ -127,7 +128,7 @@ async function obtenerEstadoConfirmacion(fechaValue, idTourValue = null) {
        CJ.Confirmada_En,
        CJ.Confirmada_Por
      FROM pasajeros P
-     INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
+     INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
      INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
      INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
      LEFT JOIN confirmaciones_jornada CJ
@@ -156,7 +157,7 @@ async function actualizarConfirmacion(payload, userId = null) {
     const [actuales] = await conn.query(
       `SELECT P.Id_Pasajero, P.Confirmacion, P.Id_Reserva
        FROM pasajeros P
-       INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
+       INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
        INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
        WHERE P.Id_Pasajero IN (${placeholders})
          AND H.Id_Tour = ?
@@ -200,7 +201,7 @@ async function actualizarConfirmacion(payload, userId = null) {
          SUM(CASE WHEN P.Confirmacion = 1 THEN 1 ELSE 0 END) AS Total_Viajaron,
          GROUP_CONCAT(DISTINCT P.Id_Reserva ORDER BY P.Id_Reserva SEPARATOR ',') AS Reservas
        FROM pasajeros P
-       INNER JOIN reservas R ON R.Id_Reserva = P.Id_Reserva
+       INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
        INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
        WHERE H.Id_Tour = ?
          AND R.Fecha_Tour = ?

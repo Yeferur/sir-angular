@@ -81,7 +81,7 @@
       } @else {
       <!-- Título de la página activa — SIEMPRE visible, sin condición -->
       <div class="topbar-title-zone" animate.enter="search-rest-enter">
-        <span class="topbar-page-title"
+        <span class="topbar-page-title" [sirFitTopbarTitle]="pageTitle()"
               [class.is-leaving]="titleLeaving()"
               [class.is-entering]="titleEntering()">{{ pageTitle() }}</span>
       </div>

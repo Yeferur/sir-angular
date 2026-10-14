@@ -1,30 +1,28 @@
 <main class="page-container marketing-reservations" [attr.aria-busy]="loading()">
   <section class="marketing-filters" aria-label="Filtros de consulta">
-    <div class="filter-heading">
-      <h2>Filtros de consulta</h2>
-      <p>Combina los criterios para explorar la información comercial.</p>
-    </div>
+    <app-filter-bar panelId="marketing-more-filters" [expanded]="filtersOpen()" [filterCount]="filterCount()"
+      [busy]="loading()" [canSearch]="!rangeError"
+      (toggleFilters)="filtersOpen.set(!filtersOpen())" (search)="search()">
+      <div sirPrimaryFilters class="marketing-primary-filters">
+      <div class="form-group">
+        <label class="form-label" for="marketing-registration-range">Período de registro</label>
+        <app-date-range-picker inputId="marketing-registration-range" [value]="registrationRange()"
+          (rangeChange)="setRegistrationRange($event)" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="marketing-code">Código de reserva</label>
+        <app-search-input inputId="marketing-code" placeholder="Código exacto"
+          [value]="filters().codigoReserva" (valueChange)="setFilter('codigoReserva', $event)"
+          (search)="search()" />
+      </div>
+      </div>
+    </app-filter-bar>
+    <app-filter-panel panelId="marketing-more-filters" [open]="filtersOpen()">
     <div class="filter-grid">
-      <div class="form-group">
-        <label class="form-label" for="marketing-date-from">Registro desde</label>
-        <app-datepicker inputId="marketing-date-from" placeholder="Fecha inicial"
-          [ngModel]="filters().fechaRegistroDesde" (dateChange)="setFilter('fechaRegistroDesde', $event)" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-date-to">Registro hasta</label>
-        <app-datepicker inputId="marketing-date-to" placeholder="Fecha final"
-          [ngModel]="filters().fechaRegistroHasta" (dateChange)="setFilter('fechaRegistroHasta', $event)" />
-      </div>
       <div class="form-group">
         <label class="form-label" for="marketing-tour-date">Fecha del tour</label>
         <app-datepicker inputId="marketing-tour-date" placeholder="Cualquier fecha"
           [ngModel]="filters().fechaTour" (dateChange)="setFilter('fechaTour', $event)" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-code">Código de reserva</label>
-        <input id="marketing-code" class="form-input" type="text" maxlength="20" autocomplete="off"
-          [ngModel]="filters().codigoReserva" (ngModelChange)="setFilter('codigoReserva', $event)"
-          (keyup.enter)="search()" placeholder="Código exacto" />
       </div>
       <div class="form-group">
         <label class="form-label" for="marketing-category">Categoría</label>
@@ -45,27 +43,13 @@
           (keyup.enter)="search()" placeholder="Número exacto" />
       </div>
     </div>
+    @if (hasChangedFilters()) { <button type="button" class="sir-action sir-action--ghost marketing-reset" (click)="clearFilters()">Restablecer filtros</button> }
+    </app-filter-panel>
     @if (categoryError()) { <p class="inline-error" role="status">{{ categoryError() }}</p> }
-    @if (filters().fechaRegistroDesde && filters().fechaRegistroHasta && filters().fechaRegistroDesde > filters().fechaRegistroHasta) {
-      <p class="inline-error" role="alert">La fecha inicial debe ser anterior a la fecha final.</p>
+    @if (rangeError) {
+      <p class="inline-error" role="alert">{{ rangeError }}</p>
     }
-    <div class="filter-actions">
-      <button type="button" class="sir-action sir-action--secondary" (click)="clearFilters()" [disabled]="loading()">Limpiar</button>
-      <button type="button" class="sir-action sir-action--primary" (click)="search()"
-        [disabled]="loading() || (!!filters().fechaRegistroDesde && !!filters().fechaRegistroHasta && filters().fechaRegistroDesde > filters().fechaRegistroHasta)"
-        [attr.aria-busy]="loading()">
-        @if (loading()) { <span class="button-spinner" aria-hidden="true"></span> }
-        {{ loading() ? 'Consultando…' : 'Buscar' }}
-      </button>
-    </div>
   </section>
-
-  @if (result(); as data) {
-    <section class="marketing-summary" aria-label="Resumen de resultados">
-      <article class="summary-card"><span>Reservas encontradas</span><strong>{{ data.totalReservas | number }}</strong></article>
-      <article class="summary-card"><span>Pasajeros encontrados</span><strong>{{ data.totalPasajeros | number }}</strong></article>
-    </section>
-  }
 
   @if (error()) {
     <app-loading-state mode="error" label="No se pudieron consultar las reservas" [detail]="error()"
@@ -74,13 +58,11 @@
     <app-loading-state mode="loading" label="Consultando reservas de Mercadeo…" />
   } @else if (result(); as data) {
     @if (!data.items.length) {
-      <section class="empty-state">
-        <span class="empty-icon"><i class="bx bx-search-alt" aria-hidden="true"></i></span>
-        <h2>Sin resultados</h2><p>No encontramos reservas con los filtros seleccionados.</p>
-      </section>
+      <app-query-empty-state title="Sin resultados"
+        description="No encontramos reservas con los filtros seleccionados." />
     } @else {
       <section class="results-card" aria-label="Resultados de reservas">
-        <div class="results-heading"><h2>Resultados</h2><span>{{ data.totalReservas | number }} reservas · {{ data.totalPasajeros | number }} pasajeros</span></div>
+        <div class="results-heading"><h2>Resultados</h2><span>{{ data.totalReservas | number }} {{ data.totalReservas === 1 ? 'reserva' : 'reservas' }} · {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span></div>
         <div class="table-scroll">
           <table class="marketing-table">
             <thead><tr>
@@ -113,7 +95,25 @@
             </tbody>
           </table>
         </div>
-        <footer class="pagination" aria-label="Paginación de resultados">
+        <div class="marketing-mobile-list">
+          @for (reserva of data.items; track reserva.Id_Reserva) {
+            @for (pasajero of reserva.pasajeros; track pasajero.id) {
+              <article class="marketing-mobile-card">
+                <div class="marketing-mobile-card-head"><strong>{{ reserva.Id_Reserva }}</strong><span>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</span></div>
+                <h3>{{ pasajero.nombre || 'Pasajero sin nombre' }}</h3>
+                <p>{{ reserva.Categoria || 'Sin categoría' }} · Reportó {{ reserva.NombreReporta || 'No disponible' }}</p>
+                <dl><div><dt>Registro</dt><dd>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</dd></div>
+                  @if (pasajero.documento) { <div><dt>Documento</dt><dd>{{ pasajero.documento }}</dd></div> }
+                  @if (reserva.Telefono) { <div><dt>Teléfono</dt><dd>{{ reserva.Telefono }}</dd></div> }
+                  <div><dt>Creó</dt><dd>{{ reserva.UsuarioCreador || 'No disponible' }}</dd></div></dl>
+              </article>
+            } @empty {
+              <article class="marketing-mobile-card"><div class="marketing-mobile-card-head"><strong>{{ reserva.Id_Reserva }}</strong><span>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</span></div>
+                <p>Sin pasajeros registrados · {{ reserva.Categoria || 'Sin categoría' }}</p></article>
+            }
+          }
+        </div>
+        @if (data.totalPages > 1) { <footer class="pagination" aria-label="Paginación de resultados">
           <span>Página {{ data.page }} de {{ data.totalPages }} · {{ data.pageSize }} reservas por página</span>
           <div class="pagination-buttons">
             <button type="button" class="pagination-button" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()" aria-label="Página anterior">‹</button>
@@ -123,13 +123,11 @@
             }
             <button type="button" class="pagination-button" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()" aria-label="Página siguiente">›</button>
           </div>
-        </footer>
+        </footer> }
       </section>
     }
   } @else {
-    <section class="empty-state marketing-initial-state">
-      <span class="empty-icon"><i class="bx bx-filter-alt" aria-hidden="true"></i></span>
-      <h2>Prepara tu consulta</h2><p>Selecciona uno o varios filtros y busca las reservas que necesitas.</p>
-    </section>
+    <app-query-empty-state title="Prepara tu consulta"
+      description="Selecciona uno o varios filtros y busca las reservas que necesitas." />
   }
 </main>

@@ -5,7 +5,7 @@
     "packageManager": "npm",
     "analytics": false,
     "cache": {
-      "enabled": true
+      "enabled": false
     }
   },
   "newProjectRoot": "projects",
@@ -37,6 +37,7 @@
           },
           "configurations": {
             "production": {
+              "optimization": { "scripts": true, "styles": true, "fonts": { "inline": false } },
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",

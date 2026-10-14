@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
 
@@ -165,7 +166,7 @@ async function listarSeguros(filtros) {
             COALESCE(pb.Tipo_Bus, 'grupal') <> 'privado'
             OR EXISTS (
                 SELECT 1
-                FROM reservas rp
+                FROM ${reservasOperativasSource('rp')}
                 INNER JOIN horarios hp ON hp.Id_Horario = rp.Id_Horario
                 WHERE rp.Id_Reserva = pb.Id_Reserva_Privada
                   AND hp.Id_Tour = ?
@@ -221,7 +222,7 @@ async function listarSeguros(filtros) {
                 p.DNI,
                 p.Tipo_Pasajero
             FROM pasajeros p
-            INNER JOIN reservas r ON r.Id_Reserva = p.Id_Reserva
+            INNER JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
             WHERE p.Id_Reserva IN (?)
               AND p.Confirmacion = 1
             ORDER BY p.Id_Reserva ASC, p.Id_Pasajero ASC

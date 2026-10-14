@@ -749,7 +749,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private buildPassengerAgeRows(raw: any): Array<{ tipo: string; cantidad: number; label: string }> {
     const labels: Record<string, string> = {
-      ADULTO: 'Adultos', NINO: 'Niños', INFANTE: 'Infantes', SIN_TIPO: 'Sin tipo'
+      ADULTO: 'Adultos', NIÑO: 'Niños', INFANTE: 'Infantes', SIN_TIPO: 'Sin tipo'
     };
     return (Array.isArray(raw) ? raw : [])
       .map((item: any) => {

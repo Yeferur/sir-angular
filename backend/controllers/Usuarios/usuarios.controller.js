@@ -660,7 +660,8 @@ exports.actualizarUsuario = async (req, res) => {
     }
 
     shouldForceLogout = !!hash
-      || Number(Activo) === 0;
+      || Number(Activo) === 0
+      || Number(current.Id_Rol || 0) !== Number(Id_Rol || 0);
     if (shouldForceLogout) {
       await conn.query('DELETE FROM sesiones WHERE Id_Usuario = ?', [id]);
     }

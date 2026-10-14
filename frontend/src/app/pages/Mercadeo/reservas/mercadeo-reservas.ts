@@ -1,8 +1,13 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
+import { SirDateRange, SirDateRangePickerComponent } from '../../../shared/date-range-picker/date-range-picker';
+import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
+import { SirFilterBarComponent } from '../../../shared/filter-bar/filter-bar';
+import { SirFilterPanelComponent } from '../../../shared/filter-panel/filter-panel';
+import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
 import { MercadeoFilters, MercadeoPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
@@ -15,7 +20,9 @@ const EMPTY_FILTERS: MercadeoFilters = {
 @Component({
   selector: 'app-mercadeo-reservas',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, SirSelectComponent, LoadingStateComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, SirDateRangePickerComponent,
+    SirSearchInputComponent, SirFilterBarComponent, SirFilterPanelComponent, QueryEmptyStateComponent,
+    SirSelectComponent, LoadingStateComponent],
   templateUrl: './mercadeo-reservas.html',
   styleUrl: './mercadeo-reservas.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,6 +39,28 @@ export class MercadeoReservasComponent implements OnInit {
   readonly error = signal('');
   readonly categoryError = signal('');
   readonly pageSize = 25;
+  readonly filtersOpen = signal(false);
+  readonly filterCount = computed(() => ['fechaTour', 'categoria', 'nombrePasajero', 'documento']
+    .filter(key => !!this.filters()[key as keyof MercadeoFilters]).length);
+  readonly hasChangedFilters = computed(() => Object.keys(EMPTY_FILTERS)
+    .some(key => !!this.filters()[key as keyof MercadeoFilters]));
+
+  readonly registrationRange = computed<SirDateRange>(() => ({
+    start: this.filters().fechaRegistroDesde || null, end: this.filters().fechaRegistroHasta || null,
+  }));
+  setRegistrationRange(range: SirDateRange): void {
+    this.filters.update(filters => ({ ...filters, fechaRegistroDesde: range.start || '',
+      fechaRegistroHasta: range.end || '' }));
+  }
+  get rangeError(): string {
+    const f = this.filters();
+    if (!f.fechaRegistroDesde && !f.fechaRegistroHasta) return '';
+    if (!f.fechaRegistroDesde || !f.fechaRegistroHasta) return 'Selecciona un rango completo.';
+    if (f.fechaRegistroDesde > f.fechaRegistroHasta) return 'La fecha inicial debe ser anterior a la final.';
+    if ((Date.parse(f.fechaRegistroHasta) - Date.parse(f.fechaRegistroDesde)) / 86400000 > 30)
+      return 'El rango máximo es de 31 días calendario.';
+    return '';
+  }
 
   ngOnInit(): void {
     this.api.getCategorias().subscribe({
@@ -56,7 +85,7 @@ export class MercadeoReservasComponent implements OnInit {
   }
 
   search(page = 1): void {
-    if (this.loading()) return;
+    if (this.loading() || this.rangeError) return;
     this.loading.set(true);
     this.error.set('');
     this.api.buscar(this.filters(), page, this.pageSize).pipe(finalize(() => this.loading.set(false))).subscribe({

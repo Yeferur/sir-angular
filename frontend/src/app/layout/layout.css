@@ -282,7 +282,7 @@
 
 /* ─── Título central — SIEMPRE visible ─── */
 .topbar-title-zone {
-  flex: 0 0 clamp(180px, 20vw, 280px);
+  flex: 1 1 clamp(180px, 20vw, 280px);
   width: clamp(180px, 20vw, 280px);
   min-width: 0;
   max-width: none;
@@ -296,13 +296,13 @@
 
 .topbar-page-title {
   display: block;
+  flex: 0 0 auto;
   font-size: clamp(1.18rem, 0.95rem + 0.6vw, 1.5rem);
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--text-primary);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
   text-align: center;
   transition: opacity 150ms ease, transform 180ms var(--ease-panel), filter 180ms ease;
 }
@@ -1032,7 +1032,7 @@
     width: 100vw;
   }
 
-  /* El título conserva su texto completo y puede ocupar dos líneas. */
+  /* El título usa el ancho central real; la directiva ajusta sólo su letra. */
   .topbar-title-zone {
     flex: 1 1 0;
     max-width: none;

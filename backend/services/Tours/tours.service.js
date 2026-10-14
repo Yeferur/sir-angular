@@ -1,6 +1,8 @@
 // backend/services/Tours/tours.service.js
 const db = require('../../database/db');
 const { recordHistorial, logSistema } = require('../Historial/logger');
+const { passengerTypeForDatabase } = require('../schema-capabilities');
+const { normalizePassengerType } = require('../Reservas/cupos-compartidos');
 
 const DIAS_VALIDOS = new Set([
   'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'
@@ -88,15 +90,15 @@ async function guardarPreciosPlan(conn, Id_Tour, Id_Plan, monedas) {
     if (!Id_Moneda) throw new Error('Cada tarifa debe tener una moneda válida');
 
     const precios = moneda?.Precios || {};
-    for (const tipo of ['ADULTO', 'NINO', 'INFANTE']) {
-      const precio = Number(precios[tipo] || 0);
+    for (const tipo of ['ADULTO', 'NIÑO', 'INFANTE']) {
+      const precio = Number(precios[tipo] ?? (tipo === 'NIÑO' ? precios.NINO : undefined) ?? 0);
       if (!Number.isFinite(precio) || precio < 0) {
         throw new Error(`El precio de ${tipo.toLowerCase()} no puede ser negativo`);
       }
       await conn.query(
         `INSERT INTO tour_precios (Id_Tour, Id_Plan, Id_Moneda, Tipo_Pasajero, Precio)
          VALUES (?, ?, ?, ?, ?)`,
-        [Id_Tour, Id_Plan, Id_Moneda, tipo, precio]
+        [Id_Tour, Id_Plan, Id_Moneda, passengerTypeForDatabase(tipo, 'tour_precios'), precio]
       );
     }
   }
@@ -347,13 +349,13 @@ async function crearTour(data, userId = null) {
       for (const m of monedas) {
         const Id_Moneda = m?.Id_Moneda ? Number(m.Id_Moneda) : null;
         const precios = m?.Precios || {};
-        const tipos = ['ADULTO', 'NINO', 'INFANTE'];
+        const tipos = ['ADULTO', 'NIÑO', 'INFANTE'];
         for (const tipo of tipos) {
-          const precio = Number(precios[tipo] || 0);
+          const precio = Number(precios[tipo] ?? (tipo === 'NIÑO' ? precios.NINO : undefined) ?? 0);
           await conn.query(
             `INSERT INTO tour_precios (Id_Tour, Id_Plan, Id_Moneda, Tipo_Pasajero, Precio)
              VALUES (?, ?, ?, ?, ?)`,
-            [nuevoIdTour, Id_Plan, Id_Moneda, tipo, precio]
+            [nuevoIdTour, Id_Plan, Id_Moneda, passengerTypeForDatabase(tipo, 'tour_precios'), precio]
           );
         }
       }
@@ -395,7 +397,7 @@ async function obtenerPreciosTour(Id_Tour, Id_Plan, Id_Moneda) {
     Id_Plan ?? null, Id_Plan ?? null,
     Id_Moneda ?? null, Id_Moneda ?? null
   ]);
-  return rows;
+  return rows.map(row => ({ ...row, Tipo_Pasajero: normalizePassengerType(row.Tipo_Pasajero) }));
 }
 
 async function upsertPreciosTour(Id_Tour, Id_Plan, Id_Moneda, preciosMap, userId = null) {
@@ -407,6 +409,7 @@ async function upsertPreciosTour(Id_Tour, Id_Plan, Id_Moneda, preciosMap, userId
     for (const tipo of tipos) {
       const precio = preciosMap[tipo];
       if (precio == null) continue;
+      const tipoDb = passengerTypeForDatabase(tipo, 'tour_precios');
 
       const [exists] = await conn.query(
         `SELECT Id_PrecioTour FROM tour_precios
@@ -415,7 +418,7 @@ async function upsertPreciosTour(Id_Tour, Id_Plan, Id_Moneda, preciosMap, userId
            AND (Id_Moneda = ? OR (? IS NULL AND Id_Moneda IS NULL))
            AND Tipo_Pasajero = ?
          LIMIT 1`,
-        [Id_Tour, Id_Plan ?? null, Id_Plan ?? null, Id_Moneda ?? null, Id_Moneda ?? null, tipo]
+        [Id_Tour, Id_Plan ?? null, Id_Plan ?? null, Id_Moneda ?? null, Id_Moneda ?? null, tipoDb]
       );
 
       if (exists.length) {
@@ -427,7 +430,7 @@ async function upsertPreciosTour(Id_Tour, Id_Plan, Id_Moneda, preciosMap, userId
         await conn.query(
           `INSERT INTO tour_precios (Id_Tour, Id_Plan, Id_Moneda, Tipo_Pasajero, Precio)
            VALUES (?, ?, ?, ?, ?)`,
-          [Id_Tour, Id_Plan ?? null, Id_Moneda ?? null, tipo, precio]
+          [Id_Tour, Id_Plan ?? null, Id_Moneda ?? null, tipoDb, precio]
         );
       }
     }
@@ -555,7 +558,7 @@ async function obtenerTourPorId(Id_Tour) {
     }
   }
 
-  const preciosIdx = new Map(); // planKey -> Map(monId -> {ADULTO,NINO,INFANTE})
+  const preciosIdx = new Map(); // planKey -> Map(monId -> {ADULTO,NIÑO,INFANTE})
   const monedaMeta = new Map();
 
   for (const r of (preciosRows || [])) {
@@ -565,14 +568,14 @@ async function obtenerTourPorId(Id_Tour) {
     if (!preciosIdx.has(planKey)) preciosIdx.set(planKey, new Map());
     const byMon = preciosIdx.get(planKey);
 
-    if (!byMon.has(monId)) byMon.set(monId, { ADULTO: 0, NINO: 0, INFANTE: 0 });
+    if (!byMon.has(monId)) byMon.set(monId, { ADULTO: 0, NIÑO: 0, INFANTE: 0 });
 
     if (!monedaMeta.has(monId)) {
       monedaMeta.set(monId, { Codigo: String(r.Codigo || ''), Nombre_Moneda: String(r.Nombre_Moneda || '') });
     }
 
-    const tipo = String(r.Tipo_Pasajero || '').toUpperCase();
-    if (tipo === 'ADULTO' || tipo === 'NINO' || tipo === 'INFANTE') {
+    const tipo = normalizePassengerType(r.Tipo_Pasajero);
+    if (tipo === 'ADULTO' || tipo === 'NIÑO' || tipo === 'INFANTE') {
       byMon.get(monId)[tipo] = Number(r.Precio || 0);
     }
   }
@@ -582,7 +585,7 @@ async function obtenerTourPorId(Id_Tour) {
     return monedasCatalogo.map((mc) => {
       const monId = Number(mc.Id_Moneda);
       const metaJoin = monedaMeta.get(monId) || {};
-      const Precios = byMon.get(monId) || { ADULTO: 0, NINO: 0, INFANTE: 0 };
+      const Precios = byMon.get(monId) || { ADULTO: 0, NIÑO: 0, INFANTE: 0 };
 
       return {
         Id_Moneda: monId,
@@ -590,7 +593,7 @@ async function obtenerTourPorId(Id_Tour) {
         Nombre_Moneda: mc.Nombre_Moneda || metaJoin.Nombre_Moneda || '',
         Precios: {
           ADULTO: Number(Precios.ADULTO || 0),
-          NINO: Number(Precios.NINO || 0),
+          NIÑO: Number(Precios.NIÑO || 0),
           INFANTE: Number(Precios.INFANTE || 0),
         },
       };
@@ -605,7 +608,7 @@ async function obtenerTourPorId(Id_Tour) {
       const planKey = `P:${planId}`;
       const Monedas = buildMonedasForPlanKey(planKey);
 
-      const AllowNino = Monedas.some(m => Number(m.Precios?.NINO || 0) > 0);
+      const AllowNino = Monedas.some(m => Number(m.Precios?.NIÑO || 0) > 0);
       const AllowInfante = Monedas.some(m => Number(m.Precios?.INFANTE || 0) > 0);
 
       return {
@@ -620,7 +623,7 @@ async function obtenerTourPorId(Id_Tour) {
     });
   } else {
     const Monedas = buildMonedasForPlanKey('NULL');
-    const AllowNino = Monedas.some(m => Number(m.Precios?.NINO || 0) > 0);
+    const AllowNino = Monedas.some(m => Number(m.Precios?.NIÑO || 0) > 0);
     const AllowInfante = Monedas.some(m => Number(m.Precios?.INFANTE || 0) > 0);
 
     Planes = [{
@@ -663,7 +666,7 @@ async function actualizarTour(Id_Tour, data, userId = null) {
 
     // fetch previous tour snapshot
     const [prevRows] = await conn.query(
-      'SELECT Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Id_Tour = ? LIMIT 1',
+      'SELECT Nombre_Tour, Abreviacion, Cupo_Base FROM tours WHERE Id_Tour = ? LIMIT 1 FOR UPDATE',
       [Id_Tour]
     );
     const prev = prevRows && prevRows[0] ? prevRows[0] : null;
@@ -687,6 +690,11 @@ async function actualizarTour(Id_Tour, data, userId = null) {
         Id_Tour
       ]
     );
+
+    if (Number(prev?.Cupo_Base || 0) !== Number(Cupo_Base || 0)) {
+      const reservasService = require('../Reservas/reservas.service');
+      await reservasService.reconciliarDisponibilidadParaTour(conn, Id_Tour);
+    }
 
     const actualizaComisiones =
       Object.prototype.hasOwnProperty.call(data || {}, 'Comisiones')

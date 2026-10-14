@@ -11,8 +11,13 @@ const SCHEMAS = {
 };
 
 function assertTestDestination(env, database) {
+  if (env.SIR_PREPROD_VALIDATION === '1') {
+    require('./validation-database-guard').assertValidationDatabaseName(database);
+  }
   if (!['localhost', '127.0.0.1', '::1'].includes(String(env.DB_HOST).toLowerCase())
-    || env.NODE_ENV === 'production' || !/(^|_)test(_|$)/i.test(database || '')
+    || env.NODE_ENV === 'production' || (env.SIR_PREPROD_VALIDATION !== '1'
+      && !/(^|_)test(_|$)/i.test(database || '')
+      && !/^sir2_programacion_transfers_validation_[a-f0-9]{20}$/i.test(database || ''))
     || /(^|_)(prod|production|operativa)(_|$)/i.test(database || '')) {
     throw new Error('La migración de Transfers requiere una base MySQL local identificada como test, fuera de producción.');
   }

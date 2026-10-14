@@ -1,18 +1,4 @@
 -- Esquemas que antes eran creados desde servicios. Aplicar antes del backend nuevo.
-CREATE TABLE IF NOT EXISTS historial_cambios (
-  Id_Cambio BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  Tabla VARCHAR(100) NOT NULL,
-  Id_Registro VARCHAR(50) DEFAULT NULL,
-  Id_Usuario BIGINT UNSIGNED DEFAULT NULL,
-  Cambio_JSON JSON NOT NULL,
-  IP_Cliente VARCHAR(64) DEFAULT NULL,
-  Fecha_Registro DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (Id_Cambio),
-  KEY idx_historial_cambios_tabla (Tabla),
-  KEY idx_historial_cambios_registro (Id_Registro),
-  KEY idx_historial_cambios_usuario (Id_Usuario)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS confirmaciones_jornada (
   Id_Confirmacion BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   Id_Tour BIGINT UNSIGNED NOT NULL,

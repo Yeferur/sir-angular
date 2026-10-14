@@ -46,6 +46,7 @@ import { PendientesService } from '../services/Pendientes/pendientes.service';
 import { MiActividadFacade } from '../services/MiActividad/mi-actividad.facade';
 import { WebSocketService } from '../services/WebSocket/web-socket';
 import { UnsavedChangesService } from '../guards/unsaved-changes.guard';
+import { FitTopbarTitleDirective } from '../shared/directives/fit-topbar-title.directive';
 
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -75,6 +76,7 @@ interface SidebarItem {
         FormsModule,
         GlobalSearchComponent,
         LoginContentComponent,
+        FitTopbarTitleDirective,
     ],
     templateUrl: './layout.html',
     styleUrls: ['./layout.css'],
@@ -1284,7 +1286,16 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             group: 'gestion',
             route: '/Mercadeo/Reservas',
             permission: 'MERCADEO.RESERVAS.LEER',
-            exact: false,
+            exact: true,
+        },
+        {
+            key: 'entidades-reportantes',
+            label: 'Entidades reportantes',
+            icon: 'bx bx-building-house',
+            group: 'gestion',
+            route: '/Mercadeo/Entidades',
+            permission: 'ENTIDADES_REPORTANTES.LEER',
+            exact: true,
         },
         {
             key: 'control-viaje',
@@ -1393,6 +1404,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             historial: 'Actividad del sistema',
             programacion: 'Programación operativa',
             mercadeo: 'Análisis comercial',
+            'entidades-reportantes': 'Hoteles y agencias',
             seguros: 'Vehículos, guías y conductores',
             comisiones: 'Pendientes por liquidar',
         };

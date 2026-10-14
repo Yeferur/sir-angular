@@ -279,6 +279,12 @@ exports.deleteReserva = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user?.id || null;
   const clientIp = req.ip || req.headers['x-forwarded-for'] || null;
-  const data = await eliminarReservaSvc(id, userId, clientIp, clientOwnerIdFromRequest(req));
+  const data = await eliminarReservaSvc(
+    id,
+    userId,
+    clientIp,
+    clientOwnerIdFromRequest(req),
+    req.body?.motivo || req.body?.Motivo_Eliminacion || null
+  );
   return sendSuccess(res, { data, message: 'Reserva eliminada correctamente' });
 });

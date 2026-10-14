@@ -7,7 +7,8 @@ const permisosService = require('../services/Permisos/permisos.service');
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 function sameRevision(a, b) {
-  return a?.idRol === b?.idRol && a?.usuario === b?.usuario && a?.rol === b?.rol;
+  return a?.idRol === b?.idRol && a?.usuario === b?.usuario
+    && a?.rol === b?.rol && a?.catalogo === b?.catalogo;
 }
 
 function createPermissionCache(service = permisosService) {

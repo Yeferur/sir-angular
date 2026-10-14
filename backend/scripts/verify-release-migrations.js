@@ -24,7 +24,7 @@ async function prepareObservedSir2State(conn, temporary) {
   for (const table of [
     'pendientes_eventos', 'pendientes_operativos', 'reglas_pendientes',
     'permisos_cache_revision', 'programacion_transfers_snapshot',
-    'programacion_transfers_listados', 'historial_cambios',
+    'programacion_transfers_listados',
   ]) await conn.query(`DROP TABLE IF EXISTS ${quote(temporary)}.${quote(table)}`);
   await conn.query('SET FOREIGN_KEY_CHECKS=1');
 
@@ -83,7 +83,6 @@ async function assertSchema(conn) {
   }
   const required = {
     historial: ['Id_Registro'],
-    historial_cambios: ['Id_Cambio', 'Tabla', 'Id_Registro', 'Id_Usuario', 'Cambio_JSON', 'IP_Cliente', 'Fecha_Registro'],
     confirmaciones_jornada: ['Id_Confirmacion', 'Id_Tour', 'Fecha_Tour', 'Total_Pasajeros', 'Total_Viajaron', 'Total_No_Viajaron', 'Confirmada_En', 'Confirmada_Por'],
     disponibilidad: ['Id_Disponibilidad', 'Id_Tour', 'Fecha_Tour', 'Cupos_Totales', 'Cupos_Disponibles', 'Updated_At'],
     email_outbox: ['Id_Email', 'Tipo', 'Prioridad', 'Destinatario', 'Payload', 'Dedupe_Key', 'Estado', 'Intentos', 'Max_Intentos', 'Disponible_En', 'Expira_En', 'Bloqueado_En', 'Bloqueado_Por', 'Enviado_En', 'Fallido_En', 'Smtp_Message_Id', 'Ultimo_Error', 'Fecha_Creacion', 'Fecha_Actualizacion'],
@@ -117,9 +116,6 @@ async function assertSchema(conn) {
   const [indexes] = await conn.query(`SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()`);
   const indexSet = new Set(indexes.map(row => `${row.TABLE_NAME.toLowerCase()}.${row.INDEX_NAME}`));
   for (const index of [
-    'historial_cambios.idx_historial_cambios_registro',
-    'historial_cambios.idx_historial_cambios_tabla',
-    'historial_cambios.idx_historial_cambios_usuario',
     'confirmaciones_jornada.ux_confirmaciones_jornada_tour_fecha',
     'confirmaciones_jornada.idx_confirmaciones_jornada_fecha',
     'confirmaciones_jornada.idx_confirmaciones_jornada_usuario',
@@ -215,10 +211,10 @@ async function main() {
   const source = String(env.DB_NAME || env.DB_DATABASE || '');
   const host = String(env.DB_HOST || '').toLowerCase();
   if (!['localhost', '127.0.0.1', '::1'].includes(host)
-    || !/(^|_)test(_|$)/i.test(source)
+    || source !== 'sir2'
     || /(^|_)(prod|production|operativa)(_|$)/i.test(source)
     || String(env.NODE_ENV || '').toLowerCase() === 'production') {
-    throw new Error('Solo se permite una base MySQL local identificada como test.');
+    throw new Error('La fuente de solo lectura debe ser la sir2 local canónica.');
   }
   const temporary = `sir_release_test_${crypto.randomBytes(4).toString('hex')}`;
   const conn = await mysql.createConnection({
@@ -249,7 +245,7 @@ async function main() {
     for (const table of tables) {
       if (['pendientes_eventos', 'pendientes_operativos', 'reglas_pendientes',
         'permisos_cache_revision', 'programacion_transfers_snapshot',
-        'programacion_transfers_listados', 'historial_cambios',
+        'programacion_transfers_listados',
         'permisos', 'rol_permisos', 'usuario_permisos', 'notificaciones',
       ].includes(table)) continue;
       const [[row]] = await conn.query(`SELECT COUNT(*) AS n FROM ${quote(table)}`);

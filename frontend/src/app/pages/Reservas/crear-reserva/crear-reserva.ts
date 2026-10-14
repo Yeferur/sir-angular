@@ -1,11 +1,12 @@
 import { CONTACT_REQUIRED_MESSAGE, RESERVA_PHONE_PATTERN, hasReservaContact, reservaContactValidator } from '../reserva-contact.utils';
 import {
-  Component, OnInit, OnDestroy, ChangeDetectorRef, inject, signal,
+  Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener, inject, signal,
   computed, NgZone, DestroyRef
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { A11yModule } from '@angular/cdk/a11y';
 import { Router } from '@angular/router';
 import {
   ReactiveFormsModule, FormBuilder, FormGroup, Validators,
@@ -19,8 +20,9 @@ import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { isTourDateAvailable, toDateOnly } from '../../../shared/utils/calendar-date';
 import {
-  Reservas, Tour, Canal, Moneda, Plan, Horario, PrecioMap, Punto,
+  Reservas, Tour, Canal, EntidadReportante, Moneda, Plan, Horario, PrecioMap, Punto,
 } from '../../../services/Reservas/reservas';
+import { tipoEntidadPorCanal, claveNombreEntidad } from '../entidad-reportante.utils';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
@@ -53,7 +55,7 @@ interface SubmitValidationIssue {
   selector: 'app-crear-reserva',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule, DecimalPipe,
+    CommonModule, ReactiveFormsModule, DecimalPipe, A11yModule,
     SirSelectComponent, SirSelectOptionsPipe, DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
   ],
   templateUrl: './crear-reserva.html',
@@ -156,13 +158,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private aplicarPreciosGlobales(): void {
     this.actualizarPrecioGlobalPorTipo('ADULTO');
-    this.actualizarPrecioGlobalPorTipo('NINO');
+    this.actualizarPrecioGlobalPorTipo('NIÑO');
     this.actualizarPrecioGlobalPorTipo('INFANTE');
   }
 
   private aplicarComisionesGlobales(): void {
     this.actualizarComisionGlobalPorTipo('ADULTO');
-    this.actualizarComisionGlobalPorTipo('NINO');
+    this.actualizarComisionGlobalPorTipo('NIÑO');
     this.actualizarComisionGlobalPorTipo('INFANTE');
   }
 
@@ -253,7 +255,9 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       case 1: // Responsable
         return !!(
           this.form?.get('Nombre_Reportante')?.valid &&
-          this.form?.get('Telefono_Reportante')?.valid
+          this.form?.get('Telefono_Reportante')?.valid &&
+          this.form?.get('Id_Canal')?.valid &&
+          this.form?.get('Id_Entidad_Reportante')?.valid
         );
       case 2: // Configuración — requiere al menos un punto
         return (
@@ -282,6 +286,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       case 1:
         this.form.get('Nombre_Reportante')?.markAsTouched();
         this.form.get('Telefono_Reportante')?.markAsTouched();
+        this.form.get('Id_Entidad_Reportante')?.markAsTouched();
         break;
       case 2:
         this.form.get('Id_Plan')?.markAsTouched();
@@ -677,7 +682,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     });
   }
 
-  private tipoOcupaAsiento(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): boolean {
+  private tipoOcupaAsiento(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): boolean {
     return tipo !== 'INFANTE';
   }
 
@@ -764,6 +769,91 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   tours = signal<Tour[]>([]);
   readonly compareSelectValues = compareSelectValuesAsStrings;
   canales = signal<Canal[]>([]);
+  entidadesReportantes = signal<EntidadReportante[]>([]);
+  readonly entidadSelectOptions = computed<SirSelectOption[]>(() => this.entidadesReportantes()
+    .map(entidad => ({ value: String(entidad.Id_Entidad_Reportante), label: entidad.Nombre })));
+  mostrarRegistroEntidad = false;
+  busquedaEntidad = '';
+  private busquedaEntidadVersion = 0;
+  nuevoNombreEntidad = '';
+  registrandoEntidad = signal(false);
+  entidadError = signal('');
+  private entidadBusquedaTimer: ReturnType<typeof setTimeout> | null = null;
+  @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void { this.mostrarRegistroEntidad = false; }
+  buscarEntidadesConEspera(): void {
+    if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
+    this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(), 250);
+  }
+  coincidenciaEntidad(): EntidadReportante | undefined {
+    const key = claveNombreEntidad(this.nuevoNombreEntidad);
+    return key ? this.entidadesReportantes().find(item => claveNombreEntidad(item.Nombre) === key) : undefined;
+  }
+  buscarCoincidenciaEntidad(): void {
+    this.busquedaEntidad = this.nuevoNombreEntidad;
+    this.buscarEntidadesConEspera();
+  }
+  usarCoincidenciaEntidad(): void {
+    const match = this.coincidenciaEntidad();
+    if (!match) return;
+    this.form.get('Id_Entidad_Reportante')?.setValue(match.Id_Entidad_Reportante);
+    this.mostrarRegistroEntidad = false;
+    this.nuevoNombreEntidad = '';
+  }
+
+  tipoEntidadSeleccionada(): EntidadReportante['Tipo'] | null {
+    return tipoEntidadPorCanal(this.canales(), this.form?.get('Id_Canal')?.value);
+  }
+
+  async onCanalEntidadChange(preserve = false): Promise<void> {
+    const control = this.form.get('Id_Entidad_Reportante');
+    const tipo = this.tipoEntidadSeleccionada();
+    control?.setValidators(tipo ? [Validators.required] : []);
+    if (!preserve || !tipo) control?.setValue(null);
+    control?.updateValueAndValidity();
+    this.entidadError.set('');
+    this.mostrarRegistroEntidad = false;
+    this.busquedaEntidad = '';
+    this.entidadesReportantes.set([]);
+    const version = ++this.busquedaEntidadVersion;
+    if (!tipo) return;
+    try {
+      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo));
+      if (version === this.busquedaEntidadVersion) this.entidadesReportantes.set(items || []);
+    } catch {
+      this.entidadError.set('No pudimos cargar las entidades. Intenta nuevamente.');
+    }
+  }
+
+  async buscarEntidades(): Promise<void> {
+    const tipo = this.tipoEntidadSeleccionada();
+    if (!tipo) return;
+    const version = ++this.busquedaEntidadVersion;
+    try {
+      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo, this.busquedaEntidad));
+      if (version === this.busquedaEntidadVersion) this.entidadesReportantes.set(items || []);
+    } catch {
+      if (version === this.busquedaEntidadVersion) this.entidadError.set('No pudimos buscar entidades.');
+    }
+  }
+
+  async registrarEntidadRapida(): Promise<void> {
+    if (!this.tipoEntidadSeleccionada() || this.registrandoEntidad()) return;
+    if (this.coincidenciaEntidad()) { this.usarCoincidenciaEntidad(); return; }
+    this.registrandoEntidad.set(true);
+    this.entidadError.set('');
+    try {
+      const entidad = await firstValueFrom(this.reservasSvc.registrarEntidadReportanteRapida(
+        Number(this.form.get('Id_Canal')?.value), this.nuevoNombreEntidad));
+      this.entidadesReportantes.update(items => [...items.filter(item =>
+        String(item.Id_Entidad_Reportante) !== String(entidad.Id_Entidad_Reportante)), entidad]
+        .sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es')));
+      this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
+      this.mostrarRegistroEntidad = false;
+      this.nuevoNombreEntidad = '';
+    } catch (error: any) {
+      this.entidadError.set(error?.error?.message || 'No pudimos registrar la entidad. Revisa el nombre e intenta nuevamente.');
+    } finally { this.registrandoEntidad.set(false); this.cdr.markForCheck(); }
+  }
   monedas = signal<Moneda[]>([]);
   planes = signal<Plan[]>([]);
   horarioSeleccionado = signal<Horario | null>(null);
@@ -807,9 +897,9 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     return Boolean(Number(canal?.Tiene_Comision || 0));
   }
 
-  private aplicarComisionesCanalSeleccionado(comisiones?: Partial<Record<'ADULTO' | 'NINO' | 'INFANTE', number>>): void {
+  private aplicarComisionesCanalSeleccionado(comisiones?: Partial<Record<'ADULTO' | 'NIÑO' | 'INFANTE', number>>): void {
     const adulto = Math.floor(Number(comisiones?.ADULTO || 0));
-    const nino = Math.floor(Number(comisiones?.NINO || 0));
+    const nino = Math.floor(Number(comisiones?.NIÑO || 0));
 
     this.form.patchValue({
       ComisionAdulto: adulto,
@@ -818,8 +908,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     }, { emitEvent: false });
 
     for (const ctrl of this.pasajeros.controls) {
-      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
-      const comision = tipo === 'ADULTO' ? adulto : tipo === 'NINO' ? nino : 0;
+      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NIÑO' | 'INFANTE';
+      const comision = tipo === 'ADULTO' ? adulto : tipo === 'NIÑO' ? nino : 0;
       ctrl.get('Comision')?.setValue(comision, { emitEvent: false });
     }
   }
@@ -958,6 +1048,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Idioma_Reserva:      ['ESPAÑOL'],
       Id_Moneda:           [{ value: 1, disabled: false }, Validators.required],
       Id_Canal:            [null, Validators.required],
+      Id_Entidad_Reportante: [null],
       Nombre_Reportante:   ['', Validators.required],
       Telefono_Reportante: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones:       [''],
@@ -1024,6 +1115,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.tours.set(tours || []);
       this.canales.set(canales || []);
       this.ensureDefaultCanal();
+      await this.onCanalEntidadChange();
       this.monedas.set(monedas || []);
     } catch {
       this.initialLoadError.set('No pudimos cargar la información necesaria. Intenta nuevamente.');
@@ -1198,7 +1290,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     }
 
     if (idTour === 5) {
-      const ninos = this.countByTipo('NINO');
+      const ninos = this.countByTipo('NIÑO');
       const infantes = this.countByTipo('INFANTE');
       if (ninos > 0 && infantes > 0) {
         this.alertService.showModal({ type: 'info', title: 'Política de Niños e Infantes', message: 'En Hacienda Nápoles, los niños mayores de 5 años van como ADULTOS y los infantes mayores de 1 año como NIÑOS.' });
@@ -1292,7 +1384,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   // ── Pasajeros ──────────────────────────────────────────────────────
   displayTipo(t: string | null | undefined): string {
     switch ((t || '').toUpperCase()) {
-      case 'NINO': return 'NIÑO';
+      case 'NIÑO': return 'NIÑO';
       case 'ADULTO': return 'ADULTO';
       case 'INFANTE': return 'INFANTE';
       default: return (t || '').toString().toUpperCase();
@@ -1315,29 +1407,29 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     ).length;
   }
 
-  private precioControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
-    return tipo === 'ADULTO' ? 'PrecioAdulto' : tipo === 'NINO' ? 'PrecioNino' : 'PrecioInfante';
+  private precioControlPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): string {
+    return tipo === 'ADULTO' ? 'PrecioAdulto' : tipo === 'NIÑO' ? 'PrecioNino' : 'PrecioInfante';
   }
 
-  private comisionControlPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): string {
-    return tipo === 'ADULTO' ? 'ComisionAdulto' : tipo === 'NINO' ? 'ComisionNino' : 'ComisionInfante';
+  private comisionControlPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): string {
+    return tipo === 'ADULTO' ? 'ComisionAdulto' : tipo === 'NIÑO' ? 'ComisionNino' : 'ComisionInfante';
   }
 
-  private precioGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+  private precioGlobalPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): number {
     return Number(this.form.get(this.precioControlPorTipo(tipo))?.value || 0);
   }
 
-  private comisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): number {
+  private comisionGlobalPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): number {
     return Number(this.form.get(this.comisionControlPorTipo(tipo))?.value || 0);
   }
 
-  private getCantidadInputSignal(tipo: 'ADULTO' | 'NINO' | 'INFANTE') {
-    return tipo === 'ADULTO' ? this.adultosCantidadInput : tipo === 'NINO' ? this.ninosCantidadInput : this.infantesCantidadInput;
+  private getCantidadInputSignal(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE') {
+    return tipo === 'ADULTO' ? this.adultosCantidadInput : tipo === 'NIÑO' ? this.ninosCantidadInput : this.infantesCantidadInput;
   }
 
   private syncCantidadInputsFromFormArray(): void {
     this.adultosCantidadInput.set(this.countByTipo('ADULTO'));
-    this.ninosCantidadInput.set(this.countByTipo('NINO'));
+    this.ninosCantidadInput.set(this.countByTipo('NIÑO'));
     this.infantesCantidadInput.set(this.countByTipo('INFANTE'));
   }
 
@@ -1521,7 +1613,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   ninosInputValue(): number { return this.ninosCantidadInput(); }
   infantesInputValue(): number { return this.infantesCantidadInput(); }
 
-  onCantidadInputChange(tipo: 'ADULTO' | 'NINO' | 'INFANTE', value: any): void {
+  onCantidadInputChange(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE', value: any): void {
     const parsed = Number(value);
     const safe = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
     this.getCantidadInputSignal(tipo).set(safe);
@@ -1590,12 +1682,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const ref = this.preciosRef();
     this.form.patchValue({
       PrecioAdulto: Number(ref.ADULTO || 0),
-      PrecioNino: Number(ref.NINO || 0),
+      PrecioNino: Number(ref.NIÑO || 0),
       PrecioInfante: Number(ref.INFANTE || 0),
     }, { emitEvent: false });
 
     for (const ctrl of this.pasajeros.controls) {
-      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NINO' | 'INFANTE';
+      const tipo = ctrl.get('Tipo_Pasajero')?.value as 'ADULTO' | 'NIÑO' | 'INFANTE';
       if (!ctrl.get('Id_Plan')?.dirty) ctrl.get('Id_Plan')?.setValue(this.form.get('Id_Plan')?.value ?? null, { emitEvent: false });
       ctrl.get('PrecioRef')?.setValue(ref[tipo] ?? 0, { emitEvent: false });
       ctrl.get('Precio_Pasajero')?.setValue(this.precioGlobalPorTipo(tipo), { emitEvent: false });
@@ -1650,7 +1742,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   pasajerosConAsiento(): number {
     return this.pasajeros.controls.filter(c => {
       const t = normalizeReservaPassengerType(c.get('Tipo_Pasajero')?.value);
-      return t === 'ADULTO' || t === 'NINO';
+      return t === 'ADULTO' || t === 'NIÑO';
     }).length;
   }
 
@@ -1671,12 +1763,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  actualizarPreciosComisionesPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): void {
+  actualizarPreciosComisionesPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): void {
     this.actualizarPrecioGlobalPorTipo(tipo);
     this.actualizarComisionGlobalPorTipo(tipo);
   }
 
-  actualizarPrecioGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): void {
+  actualizarPrecioGlobalPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): void {
     const precio = this.precioGlobalPorTipo(tipo);
 
     for (const ctrl of this.pasajeros.controls) {
@@ -1690,7 +1782,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  actualizarComisionGlobalPorTipo(tipo: 'ADULTO' | 'NINO' | 'INFANTE'): void {
+  actualizarComisionGlobalPorTipo(tipo: 'ADULTO' | 'NIÑO' | 'INFANTE'): void {
     const comision = this.comisionGlobalPorTipo(tipo);
 
     for (const ctrl of this.pasajeros.controls) {
@@ -1716,7 +1808,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   resumenTiposPasajero(): string {
-    return (['ADULTO', 'NINO', 'INFANTE'] as ReservaPassengerType[])
+    return (['ADULTO', 'NIÑO', 'INFANTE'] as ReservaPassengerType[])
       .map((tipo) => ({ tipo, cantidad: this.countByTipo(tipo) }))
       .filter(({ cantidad }) => cantidad > 0)
       .map(({ tipo, cantidad }) => `${cantidad} ${reservaPassengerTypeLabel(tipo).toLocaleLowerCase('es-CO')}${cantidad === 1 ? '' : 's'}`)
@@ -1827,7 +1919,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
     const counters: Record<ReservaPassengerType, number> = {
       ADULTO: 0,
-      NINO: 0,
+      NIÑO: 0,
       INFANTE: 0,
     };
 
@@ -1907,6 +1999,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       Id_Plan: 'Plan',
       Id_Moneda: 'Moneda',
       Id_Canal: 'Canal',
+      Id_Entidad_Reportante: 'Entidad reportante',
       Nombre_Reportante: 'Nombre del reportante',
       Telefono_Reportante: 'Teléfono del reportante',
       Tipo_Reserva: 'Tipo de reserva',
@@ -1962,7 +2055,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const tourNombre = this.tours().find(t => t.Id_Tour === Number(this.form.get('SelectTour')?.value))?.Nombre_Tour ?? '—';
     const fecha = this.form.get('Fecha_Tour')?.value ?? '—';
     const ad = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'ADULTO').length;
-    const ni = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'NINO').length;
+    const ni = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'NIÑO').length;
     const infa = this.pasajeros.controls.filter(c => c.get('Tipo_Pasajero')?.value === 'INFANTE').length;
     const totalNeto = this.totalNeto();
 
@@ -2037,6 +2130,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         Id_Horario: this.form.get('Id_Horario')?.value || null,
         Fecha_Tour: this.form.get('Fecha_Tour')?.value,
         Id_Canal: this.form.get('Id_Canal')?.value,
+        Id_Entidad_Reportante: this.form.get('Id_Entidad_Reportante')?.value || null,
         Id_Moneda: this.form.get('Id_Moneda')?.value,
         Idioma_Reserva: this.toUpperText(this.form.get('Idioma_Reserva')?.value),
         Telefono_Reportante: this.form.get('Telefono_Reportante')?.value,

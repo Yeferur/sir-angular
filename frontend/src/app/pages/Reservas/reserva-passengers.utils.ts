@@ -1,23 +1,23 @@
 import { AbstractControl } from '@angular/forms';
 
-export type ReservaPassengerType = 'ADULTO' | 'NINO' | 'INFANTE';
+export type ReservaPassengerType = 'ADULTO' | 'NIÑO' | 'INFANTE';
 
 const PASSENGER_ORDER: Record<ReservaPassengerType, number> = {
   ADULTO: 0,
-  NINO: 1,
+  NIÑO: 1,
   INFANTE: 2,
 };
 
 export function normalizeReservaPassengerType(raw: unknown): ReservaPassengerType {
   const normalized = String(raw ?? '').trim().toUpperCase();
-  if (normalized === 'NINO') return 'NINO';
+  if (normalized === 'NIÑO' || normalized === 'NINO') return 'NIÑO';
   if (normalized === 'INFANTE') return 'INFANTE';
   return 'ADULTO';
 }
 
 export function reservaPassengerTypeLabel(raw: unknown): string {
   const tipo = normalizeReservaPassengerType(raw);
-  if (tipo === 'NINO') return 'Niño';
+  if (tipo === 'NIÑO') return 'Niño';
   if (tipo === 'INFANTE') return 'Infante';
   return 'Adulto';
 }

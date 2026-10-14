@@ -1,3 +1,4 @@
+const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -5,7 +6,9 @@ const MAX_PAGE_SIZE = 100;
 
 function validDate(value) {
   const text = String(value || '').trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const parsed = new Date(`${text}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text ? text : null;
 }
 
 function buildFilters(query = {}) {
@@ -15,6 +18,12 @@ function buildFilters(query = {}) {
   const passengerValues = [];
   const dateFrom = validDate(query.fechaRegistroDesde);
   const dateTo = validDate(query.fechaRegistroHasta);
+  if ((query.fechaRegistroDesde || query.fechaRegistroHasta) && (!dateFrom || !dateTo || dateFrom > dateTo)) {
+    throw Object.assign(new Error('Selecciona un rango de registro completo y válido.'), { status: 400, errorCode: 'DATE_RANGE_INVALID' });
+  }
+  if (dateFrom && (Date.parse(dateTo) - Date.parse(dateFrom)) / 86400000 > 30) {
+    throw Object.assign(new Error('El rango máximo es de 31 días calendario.'), { status: 400, errorCode: 'DATE_RANGE_TOO_LONG' });
+  }
   const fechaTour = validDate(query.fechaTour);
   const bookingCode = String(query.codigoReserva || '').trim().slice(0, 20);
   const passengerName = String(query.nombrePasajero || '').trim().slice(0, 255);
@@ -55,7 +64,7 @@ async function buscarReservasMercadeo(query = {}) {
   const [summaryRows] = await db.query(`
     SELECT COUNT(DISTINCT r.Id_Reserva) AS totalReservas,
            COUNT(DISTINCT p.Id_Pasajero) AS totalPasajeros
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva${passengerConditions.length ? ` AND ${passengerConditions.join(' AND ')}` : ''}
     ${where}
   `, [...passengerValues, ...values, ...passengerValues]);
@@ -73,7 +82,7 @@ async function buscarReservasMercadeo(query = {}) {
            c.Nombre_Canal AS Categoria,
            r.Creado_Por AS CreadorId,
            u.Nombres_Apellidos AS UsuarioCreador
-    FROM reservas r
+    FROM ${reservasOperativasSource('r')}
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN usuarios u ON u.Id_Usuario = r.Creado_Por
     ${where}
