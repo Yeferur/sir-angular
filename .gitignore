@@ -10,6 +10,10 @@ backend/database/backups/
 backend/database/baseline/
 backend/database/seeds/
 backend/database/migrations/pending/
+backend/database/migrations/20260825_comisiones_receptor_documentos.sql
+backend/database/migrations/20260825_programacion_capacidad_manual.sql
+backend/database/migrations/20260825_tours_primera_parada.sql
+backend/database/migrations/20260825_tours_primera_parada_coordenadas.sql
 backend/database/migrations/20261012_0003_soft_delete_and_roles.sql
 backend/database/migrations/20261012_0004_chat_schema.sql
 backend/database/migrations/20261013_0010_financial_restrict_fks.sql
