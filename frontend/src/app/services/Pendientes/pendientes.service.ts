@@ -1,7 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SILENT_APP_ACTIVITY } from '../../interceptors/app-activity.interceptor';
 
 export type PendingPriority = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
 
@@ -67,9 +68,10 @@ export class PendientesService {
   readonly activeCount = signal(0);
 
   listPending(includeSuppressed = true): Observable<{ pendientes: OperationalPending[]; total: number }> {
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
     return this.http.get<{ pendientes: OperationalPending[]; total: number }>(
       this.pendingUrl,
-      { params: { incluirSuprimidos: String(includeSuppressed) } },
+      { params: { incluirSuprimidos: String(includeSuppressed) }, context },
     ).pipe(tap(response => this.activeCount.set(response.total || 0)));
   }
 
@@ -88,9 +90,10 @@ export class PendientesService {
   }
 
   listReminders(includeCompleted = false): Observable<{ recordatorios: PersonalReminder[]; total: number; correoRecordatorios?: string }> {
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
     return this.http.get<{ recordatorios: PersonalReminder[]; total: number; correoRecordatorios?: string }>(
       this.reminderUrl,
-      { params: { incluirCompletados: String(includeCompleted) } },
+      { params: { incluirCompletados: String(includeCompleted) }, context },
     );
   }
 

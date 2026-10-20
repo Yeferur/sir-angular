@@ -322,16 +322,13 @@ function buildPuntoActions(row, permisos) {
     });
   }
 
-  if (hasPermission(permisos, 'RESERVAS.LEER')) {
+  if (hasPermission(permisos, 'PUNTOS.RESERVAS.LEER')) {
     actions.push({
       label: 'Ver reservas asociadas',
-      kind: 'filter',
-      route: '/Reservas/VerReservas',
+      kind: 'open-punto-reservas',
       entityId: id,
-      permission: 'RESERVAS.LEER',
-      params: {
-        queryParams: { punto: nombre, buscar: 1 },
-      },
+      entityName: nombre,
+      permission: 'PUNTOS.RESERVAS.LEER',
     });
   }
 
@@ -513,7 +510,7 @@ async function searchTours(query, permisos) {
 }
 
 async function searchPuntos(query, permisos) {
-  if (!hasPermission(permisos, 'PUNTOS.LEER', 'PUNTOS.ACTUALIZAR', 'RESERVAS.LEER')) return [];
+  if (!hasPermission(permisos, 'PUNTOS.LEER', 'PUNTOS.ACTUALIZAR', 'PUNTOS.RESERVAS.LEER')) return [];
 
   const exact = sanitizeQuery(query);
   const like = `%${exact}%`;

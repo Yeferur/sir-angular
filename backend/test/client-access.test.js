@@ -6,10 +6,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   CLIENT_RESERVATION_PERMISSION_CODES,
+  clientOwnerIdFromRequest,
   assertReservationOwner,
   isClientRoleName,
 } = require('../utils/clientAccess');
 const { filtrarReservas } = require('../services/Reservas/reservas.service');
+const reservasController = require('../controllers/Reservas/reservas.controller');
 const { searchGlobal, buildDateResult } = require('../services/Search/search.service');
 const permissionsService = require('../services/Permisos/permisos.service');
 const { checkAnyPermission } = require('../middlewares/permissionsMiddleware');
@@ -31,6 +33,51 @@ test('una reserva ajena se trata como inexistente', () => {
     () => assertReservationOwner({ Creado_Por: 99 }, 25),
     (error) => error.status === 404 && error.errorCode === 'RESERVA_NOT_FOUND'
   );
+});
+
+test('la identidad Cliente inválida falla cerrada y nunca se interpreta como acceso sin propietario', () => {
+  assert.equal(clientOwnerIdFromRequest({ user: { isClient: false, id: null } }), null);
+  assert.equal(clientOwnerIdFromRequest({ user: { isClient: true, id: 77 } }), 77);
+
+  for (const id of [undefined, null, 0, -1, 'no-es-un-id', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => clientOwnerIdFromRequest({ user: { isClient: true, id } }),
+      (error) => error.status === 401 && error.errorCode === 'CLIENT_IDENTITY_INVALID'
+    );
+  }
+});
+
+test('el endpoint inicial de reservas rechaza Cliente inválido antes de consultar datos', async (t) => {
+  const originalQuery = db.query;
+  const originalConsoleError = console.error;
+  const queries = [];
+  t.after(() => {
+    db.query = originalQuery;
+    console.error = originalConsoleError;
+  });
+
+  db.query = async (sql) => {
+    queries.push(sql);
+    return [[]];
+  };
+  console.error = () => {};
+
+  const response = {
+    statusCode: 200,
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+
+  await reservasController.getReservas({
+    user: { isClient: true, id: null },
+    query: {},
+    path: '/reservas',
+  }, response, () => {});
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.errorCode, 'CLIENT_IDENTITY_INVALID');
+  assert.deepEqual(queries, []);
 });
 
 test('el listado de Cliente siempre agrega Creado_Por al conteo y a los datos', async (t) => {

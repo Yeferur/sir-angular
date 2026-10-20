@@ -1,4 +1,4 @@
-<main class="trip-control-page" [class.trip-control-page--with-footer]="pasajeros.length && canUpdateAsistencia">
+<main class="trip-control-page sir-query-form" [class.trip-control-page--with-footer]="pasajeros.length && canUpdateAsistencia">
   @if (catalogLoading) {
     <app-loading-state mode="loading" label="Preparando Control de viaje" detail="Cargando los tours disponibles…" />
   } @else if (catalogError) {
@@ -8,8 +8,8 @@
     <section class="filters-card" aria-label="Seleccionar jornada">
       <div class="filters-grid">
         <div class="field-group">
-          <label class="form-label">Fecha del tour</label>
-          <app-datepicker [ngModel]="filters.Fecha" (dateChange)="updateSearchFilter('Fecha', $event)"
+          <label class="form-label" for="trip-date">Fecha del tour</label>
+          <app-datepicker inputId="trip-date" [ngModel]="filters.Fecha" (dateChange)="updateSearchFilter('Fecha', $event)"
             [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
         </div>
         <div class="field-group field-group--tour">
@@ -22,7 +22,7 @@
         <button type="button" class="action-button action-button--primary" (click)="search()"
           [disabled]="isLoading || isSubmitting || !filters.Fecha || !filters.Id_Tour">
           @if (isLoading) { <span class="button-spinner button-spinner--light"></span> }
-          {{ isLoading ? 'Actualizando…' : 'Consultar pasajeros' }}
+          {{ isLoading ? 'Buscando…' : 'Buscar' }}
         </button>
       </div>
     </section>
@@ -31,29 +31,13 @@
       <app-loading-state mode="error" label="No pudimos cargar la jornada" [detail]="loadError"
         actionLabel="Reintentar" (action)="search()" />
     } @else if (!hasSearched) {
-      <section class="search-state" aria-labelledby="search-ready-title">
-        <div class="search-state-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m20 20-4-4"></path>
-          </svg>
-        </div>
-        <strong id="search-ready-title">Listo para buscar</strong>
-        <span>Selecciona una fecha y un tour, y presiona “Consultar pasajeros” para cargar la jornada.</span>
-      </section>
+      <app-query-empty-state class="trip-query-state" title="Listo para buscar" [headingLevel]="3"
+        description="Selecciona una fecha y un tour, y presiona ‘Buscar’ para cargar la jornada." />
     } @else if (!pasajeros.length && isLoading) {
       <app-loading-state mode="loading" label="Cargando pasajeros" detail="Consultando reservas activas…" />
     } @else if (!pasajeros.length) {
-      <section class="search-state" aria-labelledby="search-empty-title">
-        <div class="search-state-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m20 20-4-4"></path>
-          </svg>
-        </div>
-        <strong id="search-empty-title">Sin resultados</strong>
-        <span>No encontramos pasajeros activos para el tour y la fecha seleccionados. Revisa los filtros e intenta nuevamente.</span>
-      </section>
+      <app-query-empty-state class="trip-query-state" title="Sin resultados" [headingLevel]="3"
+        description="No encontramos pasajeros activos para el tour y la fecha seleccionados. Revisa los filtros e intenta nuevamente." />
     } @else {
       <section class="control-card" aria-live="polite">
         <div class="list-tools">
@@ -88,16 +72,8 @@
         </div>
 
         @if (!pasajerosFiltrados.length) {
-          <div class="search-state search-state--compact">
-            <div class="search-state-icon" aria-hidden="true">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                <circle cx="11" cy="11" r="7"></circle>
-                <path d="m20 20-4-4"></path>
-              </svg>
-            </div>
-            <strong>Sin coincidencias</strong>
-            <span>Cambia la búsqueda o el filtro de asistencia.</span>
-          </div>
+          <app-query-empty-state title="Sin coincidencias" description="Cambia la búsqueda o el filtro de asistencia."
+            [headingLevel]="3" [compact]="true" class="trip-query-compact" />
         } @else {
           <div class="reservation-list">
             @for (reserva of reservasAgrupadas; track trackByReserva($index, reserva)) {

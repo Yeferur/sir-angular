@@ -8,11 +8,12 @@ import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { UiStateService } from '../../services/ui-state.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 
 @Component({
   selector: 'app-tour-detail',
   standalone: true,
-  imports: [CommonModule, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, DrawerCloseButtonComponent],
   templateUrl: './tour.html',
   styleUrls: ['./tour.css'],
 })

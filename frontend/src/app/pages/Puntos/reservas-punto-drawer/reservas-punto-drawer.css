@@ -1,0 +1,167 @@
+:host {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  color: var(--text-primary);
+}
+
+.point-reservations {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.point-reservations__header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.point-reservations__header h2 {
+  margin: 0;
+  font-size: clamp(1.08rem, 1.7vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+}
+
+.point-reservations__header > div {
+  min-width: 0;
+  padding-right: 48px;
+}
+
+.point-reservations__header p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: .78rem;
+}
+
+.point-reservations__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 26px 30px;
+}
+
+.point-reservations__filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 210px) 108px;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.point-reservations__filter {
+  min-width: 0;
+}
+
+.point-reservations__filter label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.point-reservations__filter app-select,
+.point-reservations__filter app-date-range-picker { display: block; }
+
+.point-reservations__filters .reservation-search-button {
+  width: 108px;
+  height: 40px;
+  min-height: 40px;
+  justify-content: center;
+}
+
+.point-reservations__error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-red) 32%, var(--separator-color));
+  border-radius: 10px;
+  color: var(--accent-red);
+  font-size: .78rem;
+}
+
+.point-reservations__results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  font-size: .86rem;
+}
+
+.point-reservations__results-heading .updating-pill { margin-right: auto; }
+
+.point-reservations__export {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--separator-color);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font: 700 .76rem var(--font-family);
+  cursor: pointer;
+}
+
+.point-reservations__export:hover:not(:disabled) {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.point-reservations__export:disabled { opacity: .5; cursor: not-allowed; }
+
+.point-reservations__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+}
+
+.point-reservations__table-wrap[aria-busy="true"] { opacity: .6; }
+
+.point-reservations__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .8rem;
+}
+
+.point-reservations__table th,
+.point-reservations__table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--separator-color);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.point-reservations__table th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: .68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.point-reservations__table tbody tr:last-child td { border-bottom: 0; }
+.point-reservations__table tbody tr:hover { background: var(--bg-tertiary); }
+.point-reservations__code { color: var(--accent-blue); font-weight: 800; }
+
+@media (max-width: 800px) {
+  .point-reservations__filters { grid-template-columns: minmax(0, 1fr) 108px; }
+  .point-reservations__filter:first-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  .point-reservations__header { padding: 18px 18px 14px; }
+  .point-reservations__scroll { padding: 16px 18px 24px; }
+  .point-reservations__filters { grid-template-columns: minmax(0, 1fr); }
+  .point-reservations__filter:first-child { grid-column: auto; }
+  .point-reservations__filters .reservation-search-button { width: 100%; }
+}

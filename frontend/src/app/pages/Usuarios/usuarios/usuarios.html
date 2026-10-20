@@ -167,21 +167,13 @@
           }
         </div>
       } @else {
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="m17 11 2 2 4-4"/>
-            </svg>
-          </div>
-          <h3>{{ searchQuery() ? 'Sin resultados' : 'No hay usuarios en este estado' }}</h3>
-          <p>{{ searchQuery() ? 'Prueba con otro nombre, documento, correo, usuario o rol.' : 'Cambia el filtro para consultar otras cuentas.' }}</p>
+        <app-query-empty-state [title]="searchQuery() ? 'Sin resultados' : 'No hay usuarios en este estado'"
+          [headingLevel]="3"
+          [description]="searchQuery() ? 'Prueba con otro nombre, documento, correo, usuario o rol.' : 'Cambia el filtro para consultar otras cuentas.'">
           @if (searchQuery()) {
-            <button type="button" class="btn-secondary" (click)="clearSearch()">Limpiar búsqueda</button>
+            <button type="button" class="sir-action sir-action--secondary" (click)="clearSearch()">Limpiar búsqueda</button>
           }
-        </div>
+        </app-query-empty-state>
       }
     </div>
   </div>

@@ -149,6 +149,11 @@
 
 .topbar-bar.is-transitioning .topbar-island-content { width: max-content; }
 
+/* La marca de handoff indica que el contenido real ya entró en la isla.
+   Mantener desactivada la animación de entrada al quitar is-transitioning
+   evita que el chrome vuelva a aparecer desde cero al terminar el login. */
+.topbar-bar.show-chrome-handoff .topbar-island-content { animation: none; }
+
 .topbar-bar.is-transitioning {
   background: var(--bg-secondary, #1c1c1e);
   backdrop-filter: none;

@@ -641,47 +641,33 @@
 .drawer.open { transform: translateX(0); }
 
 .drawer-header {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   padding: 20px 24px 14px;
   border-bottom: 1px solid var(--separator-color);
+}
+
+.drawer-header-content {
+  min-width: 0;
+  padding-right: 48px;
 }
 
 .drawer-title {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -.02em;
+  font-size: clamp(1.08rem, 1.7vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.025em;
 }
 
 .drawer-sub {
-  margin: 3px 0 0;
+  margin: 5px 0 0;
   color: var(--text-secondary);
   font-size: .78rem;
-}
-
-.drawer-close-btn {
-  display: flex;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border: 1px solid var(--separator-color);
-  border-radius: 12px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background .15s, color .15s;
-}
-
-.drawer-close-btn:hover {
-  background: rgba(255, 69, 58, .12);
-  color: var(--accent-red);
 }
 
 .drawer-body {

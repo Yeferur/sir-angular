@@ -57,7 +57,7 @@ export class WebSocketService {
     'selfLogoutAllSessions',
     'adminForceLogout'
   ]);
-  public readonly permissionEvents$ = this.streamForTypes(['permissions:updated', 'success']);
+  public readonly permissionEvents$ = this.streamForTypes(['permissions:updated']);
   public readonly presenceEvents$ = this.streamForTypes(['usuarios_conectados_actualizados']);
   public readonly aforoEvents$ = this.streamForTypes(['aforoActualizado']);
   public readonly reservationEvents$ = this.streamForTypes(['reservaCreada', 'reservaActualizada', 'reservaEliminada']);

@@ -13,12 +13,12 @@
   <div class="wizard-stepper">
     @for (step of wizardSteps; let i = $index; track step.id) {
     @if (i > 0) {
-    <div class="step-connector" [class.filled]="currentStep > i"></div>
+    <div class="step-connector" [class.filled]="maxReachedStep >= i"></div>
     }
-    <div class="step-item" [class.is-active]="currentStep === i" [class.is-done]="currentStep > i"
+    <div class="step-item" [class.is-active]="currentStep === i" [class.is-done]="i !== currentStep && i <= maxReachedStep && canAdvanceFromStep(i) && !stepHasError(i)"
       [class.has-error]="stepHasError(i)" [class.is-locked]="!canNavigateToStep(i)" (click)="goToStep(i)">
       <div class="step-bubble">
-        @if (currentStep > i && !stepHasError(i)) {
+        @if (i !== currentStep && i <= maxReachedStep && canAdvanceFromStep(i) && !stepHasError(i)) {
         <svg viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
           <polyline points="2,7 6,11 12,3" />
         </svg>
@@ -186,13 +186,53 @@
       <div class="card-header">
         <div>
           <h2>Responsable</h2>
-          <p class="card-header-hint">Registra quién reporta y el teléfono principal del transfer.</p>
+          <p class="card-header-hint">Registra el canal, la entidad reportante cuando corresponda y la persona de contacto.</p>
         </div>
       </div>
 
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">¿Quién reporta? <span class="required-star">*</span></label>
+          <label class="form-label" for="editar-transfer-canal">Canal <span class="required-star">*</span></label>
+          <app-select inputId="editar-transfer-canal" formControlName="Id_Canal"
+            (valueChange)="onCanalEntidadChange()" [options]="canalSelectOptions"
+            [compareWith]="compareSelectValues" ariaLabel="Canal" placeholder="Selecciona un canal"
+            [invalid]="!!(form.get('Id_Canal')?.touched && form.get('Id_Canal')?.invalid)" [required]="true" />
+          @if (form.get('Id_Canal')?.touched && form.get('Id_Canal')?.invalid) {
+            <div class="errorMessage">Selecciona el canal del transfer.</div>
+          }
+        </div>
+        @if (tipoEntidadSeleccionada()) {
+        <div class="form-group">
+          <label class="form-label" for="editar-transfer-entidad">Entidad reportante <span class="required-star">*</span></label>
+          <div class="transfer-entity-autocomplete">
+            <input type="text" id="editar-transfer-entidad" class="form-input" role="combobox"
+              aria-autocomplete="list" aria-controls="editar-transfer-entidad-opciones"
+              [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
+              [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
+              placeholder="Buscar hotel o agencia por nombre" [value]="busquedaEntidad" autocomplete="off"
+              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()"
+              (blur)="cerrarSugerenciasEntidad()" />
+            @if (entidadAutocompleteOpen) {
+              <ul id="editar-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
+                @if (entidadCargando) { <li role="status">Buscando entidades…</li> }
+                @else if (resultsEntidadesReportantes.length) {
+                  @for (entidad of resultsEntidadesReportantes; track entidad.Id_Entidad_Reportante) {
+                    <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
+                      {{ entidad.Nombre }}
+                    </li>
+                  }
+                } @else { <li role="status">No encontramos entidades con ese nombre.</li> }
+              </ul>
+            }
+          </div>
+          @if (entidadError) { <div class="errorMessage" role="status">{{ entidadError }}</div> }
+          @if (form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid) {
+            <div class="errorMessage">Selecciona la entidad reportante.</div>
+          }
+        </div>
+        }
+        <div class="form-group">
+          <label class="form-label">Nombre de quien reporta <span class="required-star">*</span></label>
           <input type="text" formControlName="Reporta" class="form-input"
             [ngClass]="form.get('Reporta')?.touched && form.get('Reporta')?.invalid ? 'errorInput' : ''" />
           @if (form.get('Reporta')?.touched && form.get('Reporta')?.invalid) {
@@ -464,6 +504,8 @@
               <div class="resumen-info-row"><span class="resumen-info-label">Documento</span><span class="resumen-info-value">{{ form.get('DNI')?.value || '—' }}</span></div>
               <div class="resumen-info-row"><span class="resumen-info-label">Teléfono</span><span class="resumen-info-value">{{ form.get('TelefonoTitular')?.value || '—' }}</span></div>
               <div class="resumen-info-row"><span class="resumen-info-label">Reporta</span><span class="resumen-info-value">{{ form.get('Reporta')?.value || '—' }}</span></div>
+              <div class="resumen-info-row"><span class="resumen-info-label">Canal</span><span class="resumen-info-value">{{ nombreCanalSeleccionado() }}</span></div>
+              @if (tipoEntidadSeleccionada()) { <div class="resumen-info-row"><span class="resumen-info-label">Entidad</span><span class="resumen-info-value">{{ nombreEntidadSeleccionada() }}</span></div> }
               <div class="resumen-info-row"><span class="resumen-info-label">Teléfono de contacto</span><span class="resumen-info-value">{{ form.get('TelefonoReserva')?.value || '—' }}</span></div>
             </div>
           </div>

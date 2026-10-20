@@ -52,10 +52,15 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   });
   connection = await mysql.createConnection(connectionOptions(databaseName));
 
-  const [categories] = await connection.query('SELECT Id_Canal FROM canales_reservas ORDER BY Id_Canal LIMIT 2');
+  const [categories] = await connection.query('SELECT Id_Canal,Nombre_Canal FROM canales_reservas ORDER BY Id_Canal');
   assert.ok(categories.length >= 1, 'se requiere al menos una categoría de reserva');
   const channelOne = categories[0].Id_Canal;
   const channelTwo = categories[1]?.Id_Canal ?? channelOne;
+  const channel = (name) => {
+    const result = categories.find(item => item.Nombre_Canal === name);
+    assert.ok(result, `se requiere el canal ${name}`);
+    return result.Id_Canal;
+  };
   const [[baseline]] = await connection.query(`
     SELECT (SELECT COUNT(*) FROM reservas) AS reservas,
            (SELECT COUNT(*) FROM pasajeros) AS pasajeros
@@ -86,6 +91,19 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   await insertUser(inactiveCreatorId, 'Creador inactivo', null, 0);
   await insertUser(deniedUserId, 'Usuario sin permiso', deniedRoleId, 1);
 
+  const entityService = require('../services/EntidadesReportantes/entidades-reportantes.service');
+  const database = require('../database/db');
+  await require('../services/schema-capabilities').initializeSchemaCapabilities(database);
+  const hotelName = `Hotel Dann ${tag}`;
+  const nationalName = `Agencia Nacional ${tag}`;
+  const internationalName = `Agencia Internacional ${tag}`;
+  const hotel = (await entityService.quickCreate({ channelId: channel('HOTEL'),
+    name: hotelName, actorId: allowedUserId })).entity;
+  const national = (await entityService.quickCreate({ channelId: channel('AGENCIA NACIONAL'),
+    name: nationalName, actorId: allowedUserId })).entity;
+  const international = (await entityService.quickCreate({ channelId: channel('AGENCIA INTERNACIONAL'),
+    name: internationalName, actorId: allowedUserId })).entity;
+
   const activeToken = jwt.sign({ id: allowedUserId }, process.env.JWT_SECRET, { expiresIn: '10m' });
   const deniedToken = jwt.sign({ id: deniedUserId }, process.env.JWT_SECRET, { expiresIn: '10m' });
   for (const [id, token] of [[allowedUserId, activeToken], [deniedUserId, deniedToken]]) {
@@ -93,10 +111,12 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   }
 
   const fixtures = [];
-  const pushBooking = (suffix, channel, creatorId, passengerRows) => {
+  const pushBooking = (suffix, channelId, creatorId, passengerRows, details = {}) => {
     const id = code(suffix);
     codes.push(id);
-    fixtures.push({ id, channel, creatorId, passengerRows });
+    fixtures.push({ id, channel: channelId, creatorId, passengerRows,
+      entityId: details.entityId ?? null, reporterName: details.reporterName || `Reporta ${tag}`,
+      reporterPhone: details.reporterPhone || '+573001112233' });
   };
   pushBooking('A', channelOne, allowedUserId, [
     [`MK${tag} Alpha One`, `DOC-${tag}-001`],
@@ -109,15 +129,28 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
     pushBooking(String(index).padStart(2, '0'), index < 15 ? channelOne : channelTwo,
       index % 2 ? allowedUserId : null, [[`MK${tag} Passenger ${index}`, `DOC-${tag}-${String(index).padStart(3, '0')}`]]);
   }
+  const freelanceChannel = channel('FREELANCE');
+  const sameReporter = `Juan Pérez ${tag}`;
+  pushBooking('H1', channel('HOTEL'), allowedUserId, [[`MK${tag} Hotel Passenger 1`, `DOC-${tag}-H1`]],
+    { entityId: hotel.Id_Entidad_Reportante, reporterName: sameReporter });
+  pushBooking('H2', channel('HOTEL'), allowedUserId, [[`MK${tag} Hotel Passenger 2`, `DOC-${tag}-H2`]],
+    { entityId: hotel.Id_Entidad_Reportante, reporterName: `María Gómez ${tag}` });
+  pushBooking('N1', channel('AGENCIA NACIONAL'), allowedUserId, [[`MK${tag} National Passenger`, `DOC-${tag}-N1`]],
+    { entityId: national.Id_Entidad_Reportante, reporterName: sameReporter });
+  pushBooking('I1', channel('AGENCIA INTERNACIONAL'), allowedUserId, [[`MK${tag} International Passenger`, `DOC-${tag}-I1`]],
+    { entityId: international.Id_Entidad_Reportante, reporterName: `Contacto Internacional ${tag}` });
+  pushBooking('F1', freelanceChannel, allowedUserId, [[`MK${tag} Freelance Passenger`, `DOC-${tag}-F1`]],
+    { reporterName: `Freelance libre ${tag}`, reporterPhone: '+573009998877' });
 
   for (let index = 0; index < fixtures.length; index += 1) {
     const fixture = fixtures[index];
     const day = String((index % 28) + 1).padStart(2, '0');
     await connection.query(`INSERT INTO reservas
-      (Id_Reserva, Tipo_Reserva, Fecha_Tour, Fecha_Registro, Id_Canal, Nombre_Reportante,
-       Telefono_Reportante, Estado, Creado_Por, Actualizado_Por)
-      VALUES (?, 'Grupal', '2100-01-15', ?, ?, ?, '+573001112233', 'Pendiente', ?, ?)` ,
-    [fixture.id, `2099-08-${day} 09:30:00`, fixture.channel, `Reporta ${tag}`, fixture.creatorId,
+      (Id_Reserva, Tipo_Reserva, Fecha_Tour, Fecha_Registro, Id_Canal, Id_Entidad_Reportante,
+       Nombre_Reportante, Telefono_Reportante, Estado, Creado_Por, Actualizado_Por)
+      VALUES (?, 'Grupal', '2100-01-15', ?, ?, ?, ?, ?, 'Pendiente', ?, ?)` ,
+    [fixture.id, `2099-08-${day} 09:30:00`, fixture.channel, fixture.entityId,
+      fixture.reporterName, fixture.reporterPhone, fixture.creatorId,
       fixture.creatorId && fixture.creatorId === allowedUserId ? fixture.creatorId : null]);
     for (const [name, document] of fixture.passengerRows) {
       await connection.query('INSERT INTO pasajeros (Id_Reserva, Nombre_Pasajero, DNI) VALUES (?, ?, ?)', [fixture.id, name, document]);
@@ -154,12 +187,45 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   assert.equal(dateRange.totalPasajeros, fixtures.reduce((sum, item) => sum + item.passengerRows.length, 0));
   const tourDate = reservations((await get('/reservas?fechaTour=2100-01-15')).body);
   assert.equal(tourDate.totalReservas, fixtures.length);
+  const tourDateRange = reservations((await get('/reservas?fechaTourDesde=2100-01-14&fechaTourHasta=2100-01-16')).body);
+  assert.equal(tourDateRange.totalReservas, fixtures.length);
   const exact = reservations((await get(`/reservas?codigoReserva=${exactCode}`)).body);
   assert.equal(exact.items.length, 1);
   assert.equal(exact.totalReservas, 1);
   assert.equal(exact.totalPasajeros, 3);
   assert.equal(exact.items[0].pasajeros.length, 3, 'tres pasajeros pertenecen a una sola reserva en la respuesta');
   assert.equal(exact.items[0].UsuarioCreador, `Creador activo ${tag}`);
+
+  const hotelReservations = reservations((await get(`/reservas?nombreEntidad=${encodeURIComponent(hotelName)}`)).body);
+  assert.equal(hotelReservations.totalReservas, 2);
+  assert.deepEqual(new Set(hotelReservations.items.map(item => String(item.Id_Entidad_Reportante))),
+    new Set([String(hotel.Id_Entidad_Reportante)]));
+  assert.deepEqual(new Set(hotelReservations.items.map(item => item.NombreReporta)),
+    new Set([sameReporter, `María Gómez ${tag}`]));
+  assert.ok(hotelReservations.items.every(item => item.Nombre_Entidad_Reportante === hotelName && item.Tipo_Entidad_Reportante === 'HOTEL'));
+
+  const contactMatches = reservations((await get(`/reservas?nombreReportante=${encodeURIComponent(sameReporter)}`)).body);
+  assert.equal(contactMatches.totalReservas, 2);
+  assert.deepEqual(new Set(contactMatches.items.map(item => String(item.Id_Entidad_Reportante))),
+    new Set([String(hotel.Id_Entidad_Reportante), String(national.Id_Entidad_Reportante)]),
+    'personas homónimas en entidades distintas conservan IDs diferentes');
+
+  const byEntityId = reservations((await get(`/reservas?idEntidadReportante=${hotel.Id_Entidad_Reportante}`)).body);
+  assert.equal(byEntityId.totalReservas, 2);
+  assert.ok(byEntityId.items.every(item => String(item.Id_Entidad_Reportante) === String(hotel.Id_Entidad_Reportante)));
+
+  for (const [suffix, entity, type] of [['N1', national, 'AGENCIA_NACIONAL'], ['I1', international, 'AGENCIA_INTERNACIONAL']]) {
+    const row = reservations((await get(`/reservas?codigoReserva=${encodeURIComponent(code(suffix))}`)).body).items[0];
+    assert.equal(String(row.Id_Entidad_Reportante), String(entity.Id_Entidad_Reportante));
+    assert.equal(row.Nombre_Entidad_Reportante, entity.Nombre);
+    assert.equal(row.Tipo_Entidad_Reportante, type);
+  }
+  const freelance = reservations((await get(`/reservas?codigoReserva=${encodeURIComponent(code('F1'))}`)).body).items[0];
+  assert.equal(freelance.Id_Entidad_Reportante, null);
+  assert.equal(freelance.Nombre_Entidad_Reportante, null);
+  assert.equal(freelance.Tipo_Entidad_Reportante, null);
+  assert.equal(freelance.NombreReporta, `Freelance libre ${tag}`);
+  assert.equal(freelance.Telefono, '+573009998877');
 
   const byCategory = reservations((await get(`/reservas?fechaRegistroDesde=2099-08-01&fechaRegistroHasta=2099-08-28&categoria=${channelOne}`)).body);
   assert.equal(byCategory.totalReservas, fixtures.filter((item) => item.channel === channelOne).length);

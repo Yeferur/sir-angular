@@ -330,29 +330,6 @@
 
 .payment-mode-dot { color: var(--accent-blue); }
 
-.btn-close {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
-  border: 1px solid var(--separator-color);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
-}
-
-.detail-header .btn-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
-}
-
 .btn-secondary,
 .btn-primary,
 .btn-danger {
@@ -419,7 +396,6 @@
   box-shadow: 0 4px 12px rgba(255, 59, 48, 0.24);
 }
 
-.btn-close:hover,
 .btn-secondary:hover,
 .btn-danger:hover,
 .btn-primary:hover {
@@ -427,8 +403,7 @@
 }
 
 .btn-secondary:hover,
-.btn-danger:hover,
-.btn-close:hover {
+.btn-danger:hover {
   background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
   border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
   color: var(--accent-red);
@@ -708,13 +683,6 @@
     padding: 12px 18px 16px;
   }
 
-  .detail-header .btn-close {
-    top: 14px;
-    right: 14px;
-    width: 32px;
-    height: 32px;
-  }
-
   .detail-header-main,
   .detail-header-text,
   .header-main {
@@ -754,7 +722,6 @@
 
   .progress-fill,
   .passenger-card,
-  .btn-close,
   .btn-secondary,
   .btn-primary,
   .btn-danger {

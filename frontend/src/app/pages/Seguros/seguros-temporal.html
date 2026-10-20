@@ -1,0 +1,100 @@
+<main class="insurance-page insurance-temporal-page sir-query-form" [class.insurance-temporal-page--with-results]="!!result">
+  @if (catalogLoading) {
+    <app-loading-state mode="loading" label="Preparando seguros" detail="Cargando los tours disponibles…" />
+  } @else if (catalogError) {
+    <app-loading-state mode="error" label="No pudimos preparar el módulo" [detail]="catalogError"
+      actionLabel="Reintentar" (action)="loadTours()" />
+  } @else {
+    <section class="search-card" aria-label="Buscar pasajeros confirmados para seguros">
+      <div class="search-primary">
+        <div class="field-group field-group--date">
+          <label class="form-label" for="insurance-temporal-date">Fecha del tour</label>
+          <app-datepicker inputId="insurance-temporal-date" [ngModel]="fecha" (dateChange)="actualizarFecha($event)"
+            [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
+        </div>
+
+        <div class="field-group field-group--tour">
+          <label class="form-label" for="insurance-temporal-tour">Tour</label>
+          <app-select inputId="insurance-temporal-tour" [ngModel]="idTour"
+            (ngModelChange)="actualizarTour($event)" [options]="tourSelectOptions"
+            [compareWith]="compareSelectValues" ariaLabel="Tour" placeholder="Seleccionar tour" />
+        </div>
+
+        <button type="button" class="button button--primary search-button" (click)="buscar()"
+          [disabled]="!fecha || !idTour || isSearching">
+          @if (isSearching) { <span class="spinner spinner--light"></span> }
+          {{ isSearching ? 'Buscando…' : 'Buscar' }}
+        </button>
+      </div>
+    </section>
+
+    @if (searchError) {
+      <app-loading-state mode="error" label="No pudimos cargar los pasajeros" [detail]="searchError"
+        actionLabel="Reintentar" (action)="buscar()" />
+    } @else if (isSearching && !result) {
+      <app-loading-state mode="loading" label="Consultando pasajeros" detail="Reuniendo a quienes tienen asistencia confirmada…" />
+    } @else if (!hasSearched) {
+      <app-query-empty-state class="insurance-query-state" title="Listo para buscar"
+        description="Selecciona la fecha y el tour para consultar los pasajeros confirmados en Control de Viaje." />
+    } @else if (result; as data) {
+      @if (data.requiereConfirmacion) {
+        <section class="workflow-card" role="status" aria-live="polite">
+          <span class="workflow-icon workflow-icon--warning" aria-hidden="true">!</span>
+          <div class="workflow-copy">
+            <strong>La jornada aún requiere confirmación</strong>
+            <span>El archivo solo incluirá pasajeros marcados como que viajaron.</span>
+          </div>
+          @if (canOpenConfirmation) {
+            <button type="button" class="button button--primary" (click)="irAConfirmacion()">Abrir Control de Viaje</button>
+          } @else {
+            <span class="workflow-permission">Requiere acceso a Control de Viaje</span>
+          }
+        </section>
+      }
+
+      @if (data.pasajerosSinDocumento) {
+        <div class="insurance-temporal-warning" role="alert">
+          {{ data.pasajerosSinDocumento }} pasajero(s) confirmado(s) no tienen DNI o pasaporte. Completa esos datos en la reserva para habilitar la descarga.
+        </div>
+      }
+
+      <section class="insurance-temporal-results" aria-live="polite" [attr.aria-busy]="isSearching">
+        <div class="insurance-temporal-heading">
+          <div>
+            <h2>{{ nombreTour }}</h2>
+            <p>{{ fecha | date:'EEEE d MMMM y':'UTC':'es-CO' }} · {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero confirmado' : 'pasajeros confirmados' }} · {{ totalReservas | number }} {{ totalReservas === 1 ? 'reserva' : 'reservas' }}</p>
+          </div>
+          <button type="button" class="button button--primary" (click)="descargarExcel()"
+            [disabled]="isExporting || !data.totalPasajeros || !!data.pasajerosSinDocumento">
+            @if (isExporting) { <span class="spinner spinner--light"></span> }
+            {{ isExporting ? 'Generando…' : 'Descargar seguros' }}
+          </button>
+        </div>
+
+        @if (!data.pasajeros.length) {
+          <app-query-empty-state class="insurance-query-compact" title="Sin pasajeros confirmados"
+            description="No hay pasajeros marcados como viajeros para esta fecha y tour." [compact]="true" />
+        } @else {
+          <div class="table-scroll insurance-temporal-table-wrap">
+            <table class="insurance-temporal-table">
+              <thead><tr>
+                <th scope="col">N°</th><th scope="col">Tipo</th><th scope="col">Nombre</th>
+                <th scope="col">DNI / Pasaporte</th><th scope="col">Reserva</th>
+              </tr></thead>
+              <tbody>
+                @for (pasajero of data.pasajeros; track pasajero.Id_Pasajero; let index = $index) {
+                  <tr>
+                    <td>{{ index + 1 }}</td><td>{{ pasajero.Tipo_Pasajero || 'Pasajero' }}</td>
+                    <td>{{ pasajero.Nombre_Pasajero }}</td><td>{{ pasajero.DNI || 'Pendiente' }}</td>
+                    <td>{{ pasajero.Id_Reserva }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="insurance-temporal-note">El Excel contiene una hoja con todos los pasajeros confirmados, sin separación por bus.</p>
+        }
+      </section>
+    }
+  }
+</main>

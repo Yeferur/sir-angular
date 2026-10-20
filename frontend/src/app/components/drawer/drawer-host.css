@@ -97,6 +97,17 @@
   flex-direction: column;
 }
 
+.sir-drawer-panel app-reservas-punto-drawer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sir-drawer-panel:has(app-reservas-punto-drawer) {
+  width: min(860px, 72vw);
+}
+
 .sir-drawer-panel app-turnos-vacaciones-panel {
   flex: 1;
   min-height: 0;
@@ -135,6 +146,7 @@
   .sir-drawer-panel:has(app-turnos-intercambio-panel),
   .sir-drawer-panel:has(app-turnos-vacaciones-panel),
   .sir-drawer-panel:has(app-usuario-detail),
+  .sir-drawer-panel:has(app-reservas-punto-drawer),
   .sir-drawer-panel:has(app-mapa) {
     top: 0;
     right: 0;

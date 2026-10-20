@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const transfersController = require('../../controllers/Transfers/transfers.controller');
 const { authMiddleware } = require('../../middlewares/authMiddleware');
-const { checkPermission } = require('../../middlewares/permissionsMiddleware');
+const { checkPermission, checkAnyPermission } = require('../../middlewares/permissionsMiddleware');
 
 router.get('/Transfer/ServicioTransfer', authMiddleware, checkPermission('TRANSFERS.LEER'), transfersController.getServicios);
+router.get('/Transfer/Canales', authMiddleware, checkAnyPermission(['TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TRANSFERS.ACTUALIZAR']), transfersController.getCanales);
 router.post('/Transfer/NuevoTransfer', authMiddleware, checkPermission('TRANSFERS.CREAR'), transfersController.createTransfer);
 router.put('/Transfer/:Id_Transfer', authMiddleware, checkPermission('TRANSFERS.ACTUALIZAR'), transfersController.updateTransfer);
 router.patch('/Transfer/:Id_Transfer/Cancelar', authMiddleware, checkPermission('TRANSFERS.CANCELAR'), transfersController.cancelTransfer);

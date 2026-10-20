@@ -2,7 +2,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { MercadeoReservasComponent } from './mercadeo-reservas';
 import { MercadeoPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
 import { routes } from '../../../app.routes';
@@ -16,8 +16,14 @@ registerLocaleData(localeEsCO);
 const result: MercadeoPage = {
   page: 1, pageSize: 25, totalPages: 4, totalReservas: 80, totalPasajeros: 88,
   items: [
-    { Id_Reserva: 'MK-A', Fecha_Registro: '2026-08-10T09:30:00', Fecha_Tour: '2026-09-04', NombreReporta: 'Agencia', Telefono: '3001234567', Categoria: 'AGENCIA', CreadorId: 1, UsuarioCreador: 'Usuario Uno', pasajeros: [{ id: 1, nombre: 'Ana', documento: 'CC-1' }] },
-    { Id_Reserva: 'MK-B', Fecha_Registro: '2026-08-11T10:00:00', Fecha_Tour: '2026-09-05', NombreReporta: 'Contacto', Telefono: null, Categoria: 'WEB', CreadorId: null, UsuarioCreador: null, pasajeros: [{ id: 2, nombre: 'Luis', documento: null }] },
+    { Id_Reserva: 'MK-A', Fecha_Registro: '2026-08-10T09:30:00', Fecha_Tour: '2026-09-04', Id_Canal: 1,
+      Id_Entidad_Reportante: 7, Nombre_Entidad_Reportante: 'Hotel Dann', Tipo_Entidad_Reportante: 'HOTEL',
+      NombreReporta: 'Juan Pérez', Telefono: '3001234567', Categoria: 'HOTEL', CreadorId: 1,
+      UsuarioCreador: 'Usuario Uno', pasajeros: [{ id: 1, nombre: 'Ana', documento: 'CC-1' }] },
+    { Id_Reserva: 'MK-B', Fecha_Registro: '2026-08-11T10:00:00', Fecha_Tour: '2026-09-05', Id_Canal: 4,
+      Id_Entidad_Reportante: null, Nombre_Entidad_Reportante: null, Tipo_Entidad_Reportante: null,
+      NombreReporta: 'Freelance libre', Telefono: null, Categoria: 'FREELANCE', CreadorId: null,
+      UsuarioCreador: null, pasajeros: [{ id: 2, nombre: 'Luis', documento: null }] },
   ],
 };
 
@@ -29,9 +35,10 @@ describe('MercadeoReservasComponent', () => {
   let alerts: { errorToast: jasmine.Spy };
 
   beforeEach(async () => {
-    api = jasmine.createSpyObj<MercadeoService>('MercadeoService', ['getCategorias', 'buscar']);
+    api = jasmine.createSpyObj<MercadeoService>('MercadeoService', ['getCategorias', 'buscar', 'buscarEntidadesReportantes']);
     api.getCategorias.and.returnValue(of([{ Id_Canal: 1, Nombre_Canal: 'AGENCIA' }]));
     api.buscar.and.returnValue(of(result));
+    api.buscarEntidadesReportantes.and.returnValue(of([]));
     permissions = {
       asegurarPermisosCargados: jasmine.createSpy().and.resolveTo(true),
       tieneAlgunPermiso: jasmine.createSpy().and.returnValue(true),
@@ -52,7 +59,7 @@ describe('MercadeoReservasComponent', () => {
 
   it('carga categorías y consulta con page size 25 mostrando resultados y creadores', () => {
     expect(api.getCategorias).toHaveBeenCalled();
-    expect(component.categoryOptions().map((option) => option.label)).toEqual(['Todas las categorías', 'AGENCIA']);
+    expect(component.categoryOptions().map((option) => option.label)).toEqual(['Todos los canales', 'AGENCIA']);
     component.search();
     fixture.detectChanges();
     expect(api.buscar).toHaveBeenCalledWith(jasmine.objectContaining({ codigoReserva: '' }), 1, 25);
@@ -60,33 +67,113 @@ describe('MercadeoReservasComponent', () => {
     expect(html.textContent).toContain('80 reservas · 88 pasajeros');
     expect(html.textContent).toContain('Usuario Uno');
     expect(html.textContent).toContain('No disponible');
-    expect(html.textContent).toContain('Quién reporta');
+    expect(html.textContent).toContain('Quién reportó');
+    expect(component.result()?.items[0].Nombre_Entidad_Reportante).toBe('Hotel Dann');
+    expect(component.result()?.items[0].NombreReporta).toBe('Juan Pérez');
+    expect(html.textContent).toContain('Juan Pérez');
+    const rows = Array.from(html.querySelectorAll('.marketing-table tbody tr'));
+    expect(rows[0].children[6].textContent?.trim()).toBe('Hotel Dann');
+    expect(rows[0].children[7].textContent).toContain('Juan Pérez');
+    const freelanceRow = rows.find((row) => row.textContent?.includes('MK-B'));
+    expect(freelanceRow?.children[6].textContent?.trim()).toBe('');
+    const freelanceCard = Array.from(html.querySelectorAll('.marketing-mobile-card'))
+      .find((card) => card.textContent?.includes('MK-B'));
+    expect(freelanceCard?.textContent).toContain('Reportó: Freelance libre');
+    expect(freelanceCard?.textContent).not.toContain('Entidad:');
     expect(html.querySelector('h1')).toBeNull();
     expect(html.querySelector('.marketing-tabs')).toBeNull();
     expect(html.querySelector('.marketing-summary')).toBeNull();
     expect(html.querySelector('app-date-range-picker')).not.toBeNull();
-    expect(html.querySelector('app-search-input')).not.toBeNull();
+    expect(html.querySelector('#marketing-code.search-input')).not.toBeNull();
     expect(html.querySelector('app-filter-bar')).not.toBeNull();
   });
 
   it('envía filtros activos, avanza de página y reinicia a página 1 al buscar filtros cambiados', () => {
     component.setFilter('fechaRegistroDesde', '2026-08-01');
     component.setFilter('fechaRegistroHasta', '2026-08-31');
+    component.setFilter('fechaTourDesde', '2026-09-01');
+    component.setFilter('fechaTourHasta', '2026-09-30');
     component.setFilter('fechaTour', '2026-09-04');
     component.setFilter('codigoReserva', 'MK-A');
     component.setFilter('categoria', '1');
+    component.setFilter('nombreReportante', 'Juan Pérez');
+    component.setFilter('nombreEntidad', 'Hotel Dann');
     component.setFilter('nombrePasajero', 'Ana');
     component.setFilter('documento', 'CC-1');
     component.search();
     expect(api.buscar.calls.mostRecent().args[0]).toEqual({
-      fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31', fechaTour: '2026-09-04',
-      codigoReserva: 'MK-A', categoria: '1', nombrePasajero: 'Ana', documento: 'CC-1',
+      fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31',
+      fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-09-30', fechaTour: '2026-09-04',
+      codigoReserva: 'MK-A', categoria: '1', nombreReportante: 'Juan Pérez', nombreEntidad: 'Hotel Dann',
+      nombrePasajero: 'Ana', documento: 'CC-1',
     });
+    expect(component.filterCount()).toBe(6);
     component.changePage(2);
     expect(api.buscar.calls.mostRecent().args[1]).toBe(2);
+    expect(api.buscar.calls.mostRecent().args[0].nombreEntidad).toBe('Hotel Dann');
     component.setFilter('codigoReserva', 'MK-B');
     component.search();
     expect(api.buscar.calls.mostRecent().args[1]).toBe(1);
+  });
+
+  it('mantiene filtros separados para persona y entidad reportante', () => {
+    component.setFilter('nombreReportante', 'Juan Pérez');
+    component.setFilter('nombreEntidad', 'Hotel Dann');
+    component.search();
+    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      nombreReportante: 'Juan Pérez', nombreEntidad: 'Hotel Dann',
+    }));
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.querySelector('#marketing-reporter')).not.toBeNull();
+    expect(html.querySelector('#marketing-entity')).not.toBeNull();
+  });
+
+  it('usa el Id de una entidad seleccionada y conserva sus datos como pill aplicada', () => {
+    const entity = { Id_Entidad_Reportante: 19, Tipo: 'AGENCIA_NACIONAL' as const, Nombre: 'Agencia Norte',
+      Activo: 1, Estado_Validacion: 'VALIDADA' as const };
+    component.selectEntity(entity);
+    component.setFilter('nombreReportante', 'Juan Pérez');
+    component.search();
+    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      idEntidadReportante: '19', nombreEntidad: '', nombreReportante: 'Juan Pérez',
+    }));
+    expect(component.appliedEntity()?.Nombre).toBe('Agencia Norte');
+    expect(component.filterCount()).toBe(2);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Entidad: Agencia Norte');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Reportó: Juan Pérez');
+  });
+
+  it('aplica el período del tour, conserva el período de registro avanzado y valida rangos completos', () => {
+    component.setTourRange({ start: '2026-09-01', end: '2026-09-30' });
+    component.setRegistrationRange({ start: '2026-08-01', end: '2026-08-31' });
+    component.search();
+    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-09-30',
+      fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31',
+    }));
+    component.setTourRange({ start: '2026-09-01', end: null });
+    expect(component.rangeError).toContain('rango completo');
+    const previousCalls = api.buscar.calls.count();
+    component.search();
+    expect(api.buscar.calls.count()).toBe(previousCalls);
+  });
+
+  it('mantiene los resultados anteriores y muestra actualización/error en una consulta posterior', () => {
+    component.search();
+    fixture.detectChanges();
+    const response = new Subject<MercadeoPage>();
+    api.buscar.and.returnValue(response);
+    component.setFilter('nombreReportante', 'María');
+    component.search();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Actualizando');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('MK-A');
+    response.error({ error: { message: 'Fallo de consulta' } });
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fallo de consulta');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Los resultados anteriores siguen disponibles.');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('MK-A');
   });
 
   it('limpia filtros/resultados y muestra estado vacío y error del backend', () => {

@@ -2,6 +2,7 @@ const multer = require('multer');
 
 const {
   getServiciosTransferSvc,
+  getCanalesTransferSvc,
   crearTransferSvc,
   actualizarTransferSvc,
   cancelarTransferSvc,
@@ -62,6 +63,16 @@ exports.getServicios = async (_req, res) => {
   } catch (e) {
     console.error(e);
     return sendError(res, { status: 500, message: 'Error al obtener servicios de transfer', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.getCanales = async (_req, res) => {
+  try {
+    const rows = await getCanalesTransferSvc();
+    return sendSuccess(res, { data: rows, message: 'Canales obtenidos correctamente' });
+  } catch (e) {
+    console.error(e);
+    return sendError(res, { status: 500, message: 'Error al obtener canales de transfer', errorCode: 'INTERNAL_ERROR' });
   }
 };
 

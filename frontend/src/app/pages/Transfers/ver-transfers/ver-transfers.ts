@@ -10,12 +10,13 @@ import { UiStateService } from '../../../services/ui-state.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { finalize, Subscription } from 'rxjs';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-transfers',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './ver-transfers.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })
@@ -29,7 +30,6 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   private drawer = inject(SirDrawerService);
   private hostElement = inject(ElementRef<HTMLElement>);
   private searchRequest?: Subscription;
-  private restoreSearchFromUrl = false;
 
   readonly estadoOptions = ['Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completado', 'Cancelado'];
 
@@ -63,19 +63,18 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     Estado: [] as string[],
     Empty: false
   });
+  appliedFilters = signal(this.filters());
 
   private readonly refreshEffect = effect(() => {
     const entity = this.uiState.needsRefresh();
     if (entity === 'transfers') {
-      if (this.hasSearched()) {
-        this.buscarTransfers(false);
-      }
+      if (this.hasSearched()) this.buscarTransfers(false);
       this.uiState.needsRefresh.set('');
     }
   });
 
   ngOnInit(): void {
-    this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
+    this.restoreFiltersFromQuery();
     this.loadInitialData();
   }
 
@@ -108,7 +107,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     this.transferService.getServicios().pipe(
       finalize(() => {
         this.isLoading.set(false);
-        this.runRestoredSearch();
+        if (!this.loadError()) this.runRestoredSearch();
       })
     ).subscribe({
       next: (s) => this.resultsServicios.set(s || []),
@@ -223,8 +222,61 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update(p => ({ ...p, [key]: value }));
+  }
+
+  removeAppliedFilter(key: keyof ReturnType<typeof this.filters>, value: any): void {
+    if (this.isSearching()) return;
+    this.filters.set({ ...this.appliedFilters(), [key]: value });
+    this.buscarTransfers();
+  }
+
+  removeAppliedMainSearch(): void {
+    if (this.isSearching()) return;
+    this.filters.set({ ...this.appliedFilters(), Nombre_Titular: '' });
+    this.buscarTransfers();
+  }
+
+  hasVisibleAppliedFilters(): boolean {
+    const f = this.appliedFilters();
+    return Boolean(
+      f.Nombre_Titular?.trim() || f.Id_Transfer?.trim() || f.Telefono_Titular?.trim() ||
+      f.DNI?.trim() || f.Punto_Salida?.trim() || f.Punto_Destino?.trim() ||
+      f.Fecha_Transfer || f.Fecha_Registro || f.Estado?.length || f.Id_Servicio?.length
+    );
+  }
+
+  visibleAppliedFilterCount(): number {
+    const f = this.appliedFilters();
+    return Number(!!f.Nombre_Titular?.trim())
+      + Number(!!f.Id_Transfer?.trim())
+      + Number(!!f.Telefono_Titular?.trim())
+      + Number(!!f.DNI?.trim())
+      + Number(!!f.Punto_Salida?.trim())
+      + Number(!!f.Punto_Destino?.trim())
+      + Number(!!f.Fecha_Transfer)
+      + Number(!!f.Fecha_Registro)
+      + Number(!!f.Estado?.length)
+      + Number(!!f.Id_Servicio?.length);
+  }
+
+  clearAppliedFilters(): void {
+    if (this.isSearching()) return;
+    this.filters.set({
+      Fecha_Transfer: '',
+      Fecha_Registro: '',
+      Id_Servicio: [],
+      Id_Rango: '',
+      Id_Transfer: '',
+      Nombre_Titular: '',
+      Telefono_Titular: '',
+      DNI: '',
+      Punto_Salida: '',
+      Punto_Destino: '',
+      Estado: [],
+      Empty: false,
+    });
     this.page.set(1);
-    this.syncFiltersToUrl();
+    this.buscarTransfers();
   }
 
   onMainSearchInput(val: string) {
@@ -236,7 +288,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     this.updateFilter('Nombre_Titular', '');
   }
 
-  private restoreFiltersFromQuery(): boolean {
+  private restoreFiltersFromQuery(): void {
     const params = this.route.snapshot.queryParamMap;
     const requestedPage = Number(params.get('pagina') || 1);
     const toValues = (value: string | null): string[] => String(value || '')
@@ -260,11 +312,11 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     });
 
     this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
-    return params.get('buscar') === '1';
+    this.appliedFilters.set(this.filters());
   }
 
   private buildFilterQueryParams(searchApplied: boolean): Record<string, string | number | null> {
-    const filter = this.filters();
+    const filter = this.appliedFilters();
     return {
       fechaTransfer: filter.Fecha_Transfer || null,
       fechaRegistro: filter.Fecha_Registro || null,
@@ -293,8 +345,6 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   }
 
   private runRestoredSearch(): void {
-    if (!this.restoreSearchFromUrl) return;
-    this.restoreSearchFromUrl = false;
     this.buscarTransfers(false);
   }
 
@@ -353,7 +403,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
 
   getMultiFilterLabel(filterKey: 'Estado' | 'Id_Servicio'): string {
     const selectedCount = (this.filters()[filterKey] as any[])?.length || 0;
-    if (selectedCount === 0) return 'Todos';
+    if (selectedCount === 0) return filterKey === 'Estado' ? 'Todos los estados' : 'Todos los servicios';
     if (selectedCount === 1) return '1 seleccionado';
     return `${selectedCount} seleccionados`;
   }
@@ -376,7 +426,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   }
 
   activeFilterCount(): number {
-    const f = this.filters();
+    const f = this.appliedFilters();
     let count = 0;
     if (f.Fecha_Transfer) count++;
     if (f.Fecha_Registro) count++;
@@ -385,8 +435,12 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     return count;
   }
 
+  hasAppliedCriteria(): boolean {
+    return Object.keys(this.buildApiFilters()).length > 0;
+  }
+
   getSelectedServiciosText(): string {
-    const ids = this.filters().Id_Servicio;
+    const ids = this.appliedFilters().Id_Servicio;
     if (!ids?.length) return '';
     return ids
       .map(id => {
@@ -405,7 +459,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   }
 
   private buildApiFilters() {
-    const f = this.filters();
+    const f = this.appliedFilters();
     const api: any = {};
     if (f.Fecha_Transfer) api.Fecha_Transfer = f.Fecha_Transfer;
     if (f.Fecha_Registro) api.Fecha_Registro = f.Fecha_Registro;
@@ -422,11 +476,9 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
   }
 
   buscarTransfers(resetPage = true) {
+    if (this.isSearching()) return;
+    if (resetPage || !this.hasSearched()) this.appliedFilters.set({ ...this.filters() });
     const filtros = this.buildApiFilters();
-    if (Object.keys(filtros).length === 0) {
-      this.alerts.showAlert({ type: 'info', title: 'Sin filtros', message: 'Aplica al menos un filtro para buscar.', autoClose: true, autoCloseTime: 2500 });
-      return;
-    }
     if (resetPage) this.page.set(1);
     const paginatedFilters = {
       ...filtros,

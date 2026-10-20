@@ -1,133 +1,305 @@
-<main class="page-container marketing-reservations" [attr.aria-busy]="loading()">
-  <section class="marketing-filters" aria-label="Filtros de consulta">
-    <app-filter-bar panelId="marketing-more-filters" [expanded]="filtersOpen()" [filterCount]="filterCount()"
-      [busy]="loading()" [canSearch]="!rangeError"
-      (toggleFilters)="filtersOpen.set(!filtersOpen())" (search)="search()">
-      <div sirPrimaryFilters class="marketing-primary-filters">
-      <div class="form-group">
-        <label class="form-label" for="marketing-registration-range">Período de registro</label>
+<main class="page-container reservation-browser marketing-reservations" [attr.aria-busy]="loading()">
+  <div class="marketing-report-selector" role="group" aria-label="Tipo de información de Mercadeo">
+    <button type="button" [class.is-active]="mode() === 'reservas'" [attr.aria-pressed]="mode() === 'reservas'"
+      [disabled]="loading()" (click)="setMode('reservas')">Reservas</button>
+    <button type="button" [class.is-active]="mode() === 'transfers'" [attr.aria-pressed]="mode() === 'transfers'"
+      [disabled]="loading()" (click)="setMode('transfers')">Transfers</button>
+  </div>
+  <section class="page-header reservation-search-panel" [attr.aria-label]="'Consulta de ' + (mode() === 'reservas' ? 'reservas' : 'transfers') + ' de Mercadeo'">
+    <app-filter-bar [showFilters]="false" [showSearch]="false">
+      <div sirPrimaryFilters class="search-container marketing-search-field">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <label class="visually-hidden" for="marketing-entity">Entidad reportante</label>
+        <div class="marketing-entity-autocomplete marketing-entity-search">
+          <input id="marketing-entity" type="text" class="search-input" placeholder="Buscar entidad reportante"
+            maxlength="100" autocomplete="off" role="combobox" aria-autocomplete="list"
+            aria-controls="marketing-entity-options" [attr.aria-expanded]="entityAutocompleteOpen()"
+            [value]="entityInputValue()" [disabled]="loading()"
+            (input)="onEntityInput($any($event.target).value)" (focus)="openEntitySuggestions()"
+            (blur)="closeEntitySuggestions()" (keyup.enter)="search()" />
+          @if (entityInputValue()) {
+            <button type="button" class="search-clear" aria-label="Limpiar entidad reportante" [disabled]="loading()"
+              (click)="clearEntity()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          }
+          @if (entityAutocompleteOpen() && entityInputValue().trim().length >= 2) {
+            <div id="marketing-entity-options" class="autocomplete-dropdown" role="listbox" aria-label="Entidades reportantes">
+              @if (entityLoading()) {
+                <div class="autocomplete-item" role="status">Buscando entidades…</div>
+              } @else if (entityOptions().length) {
+                @for (entity of entityOptions(); track entity.Id_Entidad_Reportante) {
+                  <button type="button" class="autocomplete-item" role="option" [attr.aria-selected]="false"
+                    (mousedown)="$event.preventDefault()" (click)="selectEntity(entity)">
+                    <span>{{ entity.Nombre }}</span><small>{{ entity.Tipo }}</small>
+                  </button>
+                }
+              } @else {
+                <div class="autocomplete-item" role="status">No encontramos entidades activas con ese nombre.</div>
+              }
+            </div>
+          }
+          @if (entityError()) { <small class="inline-error" role="status">{{ entityError() }}</small> }
+        </div>
+      </div>
+
+      <div sirPrimaryFilters class="marketing-period-field">
+        <label class="visually-hidden" for="marketing-registration-range">Período de creación</label>
         <app-date-range-picker inputId="marketing-registration-range" [value]="registrationRange()"
-          (rangeChange)="setRegistrationRange($event)" />
+          [invalid]="!!registrationRangeError" [disabled]="loading()"
+          placeholder="Período de creación" (rangeChange)="setRegistrationRange($event)" />
       </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-code">Código de reserva</label>
-        <app-search-input inputId="marketing-code" placeholder="Código exacto"
-          [value]="filters().codigoReserva" (valueChange)="setFilter('codigoReserva', $event)"
-          (search)="search()" />
-      </div>
+      <div sirFilterActions class="marketing-search-actions">
+        <button type="button" class="btn-filter" (click)="filtersOpen.set(!filtersOpen())"
+          [class.btn-filter--active]="filtersOpen()" aria-controls="marketing-more-filters"
+          [attr.aria-label]="filterCount() ? 'Filtros, ' + filterCount() + ' activos' : 'Filtros'"
+          [attr.aria-expanded]="filtersOpen()" [disabled]="loading()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+          </svg>
+          Filtros
+          <span class="filter-count" [class.filter-count--empty]="filterCount() === 0" aria-hidden="true">{{ filterCount() }}</span>
+        </button>
+        <button type="button" class="btn-primary reservation-search-button" (click)="search()"
+          [disabled]="loading() || !!rangeError" [attr.aria-busy]="loading()"
+          [attr.aria-label]="loading() ? 'Buscando en Mercadeo' : 'Buscar en Mercadeo'">
+          Buscar
+        </button>
       </div>
     </app-filter-bar>
-    <app-filter-panel panelId="marketing-more-filters" [open]="filtersOpen()">
-    <div class="filter-grid">
-      <div class="form-group">
-        <label class="form-label" for="marketing-tour-date">Fecha del tour</label>
-        <app-datepicker inputId="marketing-tour-date" placeholder="Cualquier fecha"
-          [ngModel]="filters().fechaTour" (dateChange)="setFilter('fechaTour', $event)" />
+
+    @if (hasAppliedFilters()) {
+      <div class="active-filters" aria-label="Filtros aplicados">
+        @if (appliedFilters().fechaRegistroDesde || appliedFilters().fechaRegistroHasta) {
+          <div class="filter-token">
+          Creación: {{ registrationRangeLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()"
+              aria-label="Quitar filtro de fecha de creación" (click)="removeAppliedFilter('registro')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (appliedFilters().fechaTour) {
+          <div class="filter-token">
+            {{ mode() === 'reservas' ? 'Fecha del tour' : 'Fecha del transfer' }}: {{ tourDateLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()"
+              [attr.aria-label]="'Quitar filtro de fecha del ' + (mode() === 'reservas' ? 'tour' : 'transfer')"
+              (click)="removeAppliedFilter('fechaTour')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (appliedFilters().categoria) {
+          <div class="filter-token">
+            Canal: {{ categoryLabel(appliedFilters().categoria) }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar filtro de canal"
+              (click)="removeAppliedFilter('canal')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (appliedFilters().idEntidadReportante) {
+          <div class="filter-token">
+            Entidad reportante: {{ appliedEntityLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar filtro de entidad reportante"
+              (click)="removeAppliedFilter('entidad')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (appliedFilters().creadorIds.length) {
+          <div class="filter-token">
+            Creado por: {{ creatorLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar filtro de usuario creador"
+              (click)="removeAppliedFilter('creadores')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
+        @if (filterCount() > 1) {
+          <button type="button" class="clear-filters-link" [disabled]="loading()" (click)="clearSecondaryFilters()">Limpiar filtros</button>
+        }
       </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-category">Categoría</label>
-        <app-select inputId="marketing-category" [ngModel]="filters().categoria"
-          (ngModelChange)="setFilter('categoria', $event)" [options]="categoryOptions()"
-          [disabled]="loadingCategories()" placeholder="Todas las categorías" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-passenger">Nombre del pasajero</label>
-        <input id="marketing-passenger" class="form-input" type="text" maxlength="255" autocomplete="off"
-          [ngModel]="filters().nombrePasajero" (ngModelChange)="setFilter('nombrePasajero', $event)"
-          (keyup.enter)="search()" placeholder="Empieza a escribir el nombre" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="marketing-document">Documento</label>
-        <input id="marketing-document" class="form-input" type="text" maxlength="50" autocomplete="off"
-          [ngModel]="filters().documento" (ngModelChange)="setFilter('documento', $event)"
-          (keyup.enter)="search()" placeholder="Número exacto" />
-      </div>
-    </div>
-    @if (hasChangedFilters()) { <button type="button" class="sir-action sir-action--ghost marketing-reset" (click)="clearFilters()">Restablecer filtros</button> }
-    </app-filter-panel>
-    @if (categoryError()) { <p class="inline-error" role="status">{{ categoryError() }}</p> }
-    @if (rangeError) {
-      <p class="inline-error" role="alert">{{ rangeError }}</p>
     }
+
+    @if (categoryError()) { <p class="inline-error" role="status">{{ categoryError() }}</p> }
+    @if (rangeError) { <p class="inline-error" role="alert">{{ rangeError }}</p> }
   </section>
 
-  @if (error()) {
-    <app-loading-state mode="error" label="No se pudieron consultar las reservas" [detail]="error()"
-      actionLabel="Reintentar" (action)="search(result()?.page || 1)" />
-  } @else if (loading() && !result()) {
-    <app-loading-state mode="loading" label="Consultando reservas de Mercadeo…" />
-  } @else if (result(); as data) {
-    @if (!data.items.length) {
-      <app-query-empty-state title="Sin resultados"
-        description="No encontramos reservas con los filtros seleccionados." />
-    } @else {
-      <section class="results-card" aria-label="Resultados de reservas">
-        <div class="results-heading"><h2>Resultados</h2><span>{{ data.totalReservas | number }} {{ data.totalReservas === 1 ? 'reserva' : 'reservas' }} · {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span></div>
+  <app-filter-panel panelId="marketing-more-filters" [open]="filtersOpen()" [label]="'Filtros avanzados de ' + (mode() === 'reservas' ? 'reservas' : 'transfers')">
+    <div class="form-group">
+      <label class="form-label" for="marketing-tour-date">Fecha del {{ mode() === 'reservas' ? 'tour' : 'transfer' }}</label>
+      <app-datepicker inputId="marketing-tour-date" [ngModel]="filters().fechaTour"
+        (dateChange)="setFilter('fechaTour', $event)" [disabled]="loading()"
+        [placeholder]="mode() === 'reservas' ? 'Fecha del tour' : 'Fecha del transfer'" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="marketing-channel">Canal</label>
+      <app-select inputId="marketing-channel" [ngModel]="filters().categoria"
+        (ngModelChange)="setFilter('categoria', $event)" [options]="categoryOptions()"
+        [disabled]="loadingCategories() || loading()" placeholder="Todos los canales" />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="marketing-creators">Creado por</label>
+      <app-multi-select inputId="marketing-creators" [ngModel]="filters().creadorIds"
+        (ngModelChange)="setCreatorFilter($event)" [options]="creatorOptions()"
+        placeholder="Todos los usuarios" [disabled]="loading() || !usuarios().length"
+        ariaLabel="Usuarios que crearon el registro" />
+      @if (userError()) { <small class="inline-error" role="status">{{ userError() }}</small> }
+    </div>
+  </app-filter-panel>
+
+  @if (error() && (mode() === 'reservas' ? !result() : !transfersResult())) {
+    <app-loading-state mode="error" [label]="'No se pudieron consultar ' + (mode() === 'reservas' ? 'las reservas' : 'los transfers')" [detail]="error()"
+      actionLabel="Reintentar" (action)="retrySearch()" />
+  } @else if (loading() && (mode() === 'reservas' ? !result() : !transfersResult())) {
+    <app-loading-state mode="loading" [label]="mode() === 'reservas' ? 'Consultando reservas de Mercadeo…' : 'Consultando transfers de Mercadeo…'" />
+  } @else if (mode() === 'reservas' && result(); as data) {
+    @if (error()) {
+      <div class="results-notice" role="alert">
+        <span>{{ error() }} Los resultados anteriores siguen disponibles.</span>
+        <button type="button" (click)="retrySearch()">Reintentar</button>
+      </div>
+    }
+    @if (loading()) {
+      <div class="results-toolbar"><span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span></div>
+    }
+    <section class="results-list marketing-results"
+      [attr.aria-busy]="loading()" aria-label="Resultados de reservas">
+      <div class="results-heading">
+        <h2>Resultados</h2>
+        <span>{{ data.totalReservas | number }} {{ data.totalReservas === 1 ? 'reserva' : 'reservas' }} ·
+          {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span>
+      </div>
+      @if (!data.items.length) {
+        <app-query-empty-state title="Sin resultados" [headingLevel]="3"
+          description="No encontramos reservas con los criterios aplicados." />
+      } @else {
         <div class="table-scroll">
           <table class="marketing-table">
             <thead><tr>
-              <th scope="col">Código</th><th scope="col">Registro</th><th scope="col">Tour</th>
-              <th scope="col">Pasajero</th><th scope="col">Documento</th><th scope="col">Quién reporta</th>
-              <th scope="col">Teléfono</th><th scope="col">Categoría</th><th scope="col">Usuario creador</th>
+              <th scope="col">Código</th><th scope="col">Creación</th><th scope="col">Fecha del tour</th>
+              <th scope="col">Pasajeros</th><th scope="col">Canal</th>
+              <th scope="col">Entidad reportante</th><th scope="col">Quién reportó</th>
+              <th scope="col">Teléfono</th><th scope="col">Usuario creador</th>
             </tr></thead>
             <tbody>
               @for (reserva of data.items; track reserva.Id_Reserva) {
-                @for (pasajero of reserva.pasajeros; track pasajero.id) {
-                  <tr>
-                    <td class="booking-code">{{ reserva.Id_Reserva }}</td>
-                    <td>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
-                    <td>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</td>
-                    <td>{{ pasajero.nombre || '—' }}</td><td>{{ pasajero.documento || '—' }}</td>
-                    <td>{{ reserva.NombreReporta || '—' }}</td><td>{{ reserva.Telefono || '—' }}</td>
-                    <td>{{ reserva.Categoria || '—' }}</td><td>{{ reserva.UsuarioCreador || 'No disponible' }}</td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td class="booking-code">{{ reserva.Id_Reserva }}</td>
-                    <td>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
-                    <td>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</td>
-                    <td>—</td><td>—</td><td>{{ reserva.NombreReporta || '—' }}</td>
-                    <td>{{ reserva.Telefono || '—' }}</td><td>{{ reserva.Categoria || '—' }}</td>
-                    <td>{{ reserva.UsuarioCreador || 'No disponible' }}</td>
-                  </tr>
-                }
+                <tr>
+                  <td class="booking-code">{{ reserva.Id_Reserva }}</td>
+                  <td>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
+                  <td>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</td>
+                  <td>{{ reserva.Cantidad_Pasajeros | number }}</td>
+                  <td>{{ reserva.Categoria || '—' }}</td><td>{{ reserva.Nombre_Entidad_Reportante || '—' }}</td>
+                  <td>{{ reserva.NombreReporta || '—' }}</td><td>{{ reserva.Telefono || '—' }}</td>
+                  <td>{{ reserva.UsuarioCreador || 'No disponible' }}</td>
+                </tr>
               }
             </tbody>
           </table>
         </div>
         <div class="marketing-mobile-list">
           @for (reserva of data.items; track reserva.Id_Reserva) {
-            @for (pasajero of reserva.pasajeros; track pasajero.id) {
-              <article class="marketing-mobile-card">
-                <div class="marketing-mobile-card-head"><strong>{{ reserva.Id_Reserva }}</strong><span>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</span></div>
-                <h3>{{ pasajero.nombre || 'Pasajero sin nombre' }}</h3>
-                <p>{{ reserva.Categoria || 'Sin categoría' }} · Reportó {{ reserva.NombreReporta || 'No disponible' }}</p>
-                <dl><div><dt>Registro</dt><dd>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</dd></div>
-                  @if (pasajero.documento) { <div><dt>Documento</dt><dd>{{ pasajero.documento }}</dd></div> }
-                  @if (reserva.Telefono) { <div><dt>Teléfono</dt><dd>{{ reserva.Telefono }}</dd></div> }
-                  <div><dt>Creó</dt><dd>{{ reserva.UsuarioCreador || 'No disponible' }}</dd></div></dl>
-              </article>
-            } @empty {
-              <article class="marketing-mobile-card"><div class="marketing-mobile-card-head"><strong>{{ reserva.Id_Reserva }}</strong><span>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</span></div>
-                <p>Sin pasajeros registrados · {{ reserva.Categoria || 'Sin categoría' }}</p></article>
-            }
+            <article class="marketing-mobile-card">
+              <div class="marketing-mobile-card-head"><strong>{{ reserva.Id_Reserva }}</strong><span>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</span></div>
+              <h3>{{ reserva.Cantidad_Pasajeros | number }} {{ reserva.Cantidad_Pasajeros === 1 ? 'pasajero' : 'pasajeros' }}</h3>
+              <p>Canal: {{ reserva.Categoria || 'No disponible' }}</p>
+              @if (reserva.Nombre_Entidad_Reportante) { <p>Entidad: {{ reserva.Nombre_Entidad_Reportante }}</p> }
+              <p>Reportó: {{ reserva.NombreReporta || 'No disponible' }}</p>
+              <dl><div><dt>Creación</dt><dd>{{ reserva.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</dd></div>
+                @if (reserva.Telefono) { <div><dt>Teléfono</dt><dd>{{ reserva.Telefono }}</dd></div> }
+                <div><dt>Creó</dt><dd>{{ reserva.UsuarioCreador || 'No disponible' }}</dd></div></dl>
+            </article>
           }
         </div>
-        @if (data.totalPages > 1) { <footer class="pagination" aria-label="Paginación de resultados">
-          <span>Página {{ data.page }} de {{ data.totalPages }} · {{ data.pageSize }} reservas por página</span>
-          <div class="pagination-buttons">
-            <button type="button" class="pagination-button" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()" aria-label="Página anterior">‹</button>
-            @for (page of pageNumbers(); track page) {
-              <button type="button" class="pagination-button" [class.is-current]="page === data.page"
-                [attr.aria-current]="page === data.page ? 'page' : null" (click)="changePage(page)" [disabled]="loading()">{{ page }}</button>
-            }
-            <button type="button" class="pagination-button" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()" aria-label="Página siguiente">›</button>
-          </div>
-        </footer> }
-      </section>
+      }
+      @if (data.totalPages > 1) {
+        <nav class="results-pagination" aria-label="Paginación de reservas de Mercadeo">
+          <button type="button" class="pagination-button" (click)="changePage(data.page - 1)"
+            [disabled]="data.page <= 1 || loading()">Anterior</button>
+          <span class="pagination-indicator" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
+          <button type="button" class="pagination-button" (click)="changePage(data.page + 1)"
+            [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
+        </nav>
+      }
+    </section>
+  } @else if (mode() === 'transfers' && transfersResult(); as data) {
+    @if (error()) {
+      <div class="results-notice" role="alert">
+        <span>{{ error() }} Los resultados anteriores siguen disponibles.</span>
+        <button type="button" (click)="retrySearch()">Reintentar</button>
+      </div>
     }
+    @if (loading()) {
+      <div class="results-toolbar"><span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span></div>
+    }
+    <section class="results-list marketing-results" [attr.aria-busy]="loading()" aria-label="Resultados de transfers">
+      <div class="results-heading">
+        <h2>Resultados</h2>
+        <span>{{ data.totalTransfers | number }} {{ data.totalTransfers === 1 ? 'transfer' : 'transfers' }} ·
+          {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'persona' : 'personas' }}</span>
+      </div>
+      @if (!data.items.length) {
+        <app-query-empty-state title="Sin resultados" [headingLevel]="3"
+          description="No encontramos transfers con los criterios aplicados." />
+      } @else {
+        <div class="table-scroll">
+          <table class="marketing-table">
+            <thead><tr>
+              <th scope="col">Código</th><th scope="col">Creación</th><th scope="col">Fecha del transfer</th>
+              <th scope="col">Servicio</th><th scope="col">Titular</th><th scope="col">Documento</th>
+              <th scope="col">Personas</th><th scope="col">Canal</th><th scope="col">Entidad reportante</th>
+              <th scope="col">Quién reportó</th><th scope="col">Teléfono</th><th scope="col">Usuario creador</th>
+            </tr></thead>
+            <tbody>
+              @for (transfer of data.items; track transfer.Id_Transfer) {
+                <tr>
+                  <td class="booking-code">{{ transfer.Codigo_Transfer }}</td>
+                  <td>{{ transfer.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
+                  <td>{{ transfer.Fecha_Transfer | date:'d MMM y':'':'es-CO' }}</td>
+                  <td>{{ transfer.Nombre_Servicio || '—' }}</td><td>{{ transfer.Nombre_Titular || '—' }}</td>
+                  <td>{{ transfer.DNI || '—' }}</td><td>{{ transfer.Cantidad_Pasajeros | number }}</td>
+                  <td>{{ transfer.Categoria || '—' }}</td><td>{{ transfer.Nombre_Entidad_Reportante || '—' }}</td>
+                  <td>{{ transfer.NombreReporta || '—' }}</td><td>{{ transfer.Telefono || transfer.Telefono_Titular || '—' }}</td>
+                  <td>{{ transfer.UsuarioCreador || 'No disponible' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="marketing-mobile-list">
+          @for (transfer of data.items; track transfer.Id_Transfer) {
+            <article class="marketing-mobile-card">
+              <div class="marketing-mobile-card-head"><strong>{{ transfer.Codigo_Transfer }}</strong><span>{{ transfer.Fecha_Transfer | date:'d MMM y':'':'es-CO' }}</span></div>
+              <h3>{{ transfer.Nombre_Titular || 'Titular sin nombre' }}</h3>
+              <p>{{ transfer.Nombre_Servicio || 'Servicio sin especificar' }} · {{ transfer.Cantidad_Pasajeros | number }} personas</p>
+              <p>Canal: {{ transfer.Categoria || 'No disponible' }}</p>
+              @if (transfer.Nombre_Entidad_Reportante) { <p>Entidad: {{ transfer.Nombre_Entidad_Reportante }}</p> }
+              <p>Reportó: {{ transfer.NombreReporta || 'No disponible' }}</p>
+              <dl><div><dt>Creación</dt><dd>{{ transfer.Fecha_Registro | date:'d MMM y, HH:mm':'':'es-CO' }}</dd></div>
+                @if (transfer.DNI) { <div><dt>Documento</dt><dd>{{ transfer.DNI }}</dd></div> }
+                @if (transfer.Telefono || transfer.Telefono_Titular) { <div><dt>Teléfono</dt><dd>{{ transfer.Telefono || transfer.Telefono_Titular }}</dd></div> }
+                <div><dt>Creó</dt><dd>{{ transfer.UsuarioCreador || 'No disponible' }}</dd></div></dl>
+            </article>
+          }
+        </div>
+      }
+      @if (data.totalPages > 1) {
+        <nav class="results-pagination" aria-label="Paginación de transfers de Mercadeo">
+          <button type="button" class="pagination-button" (click)="changePage(data.page - 1)"
+            [disabled]="data.page <= 1 || loading()">Anterior</button>
+          <span class="pagination-indicator" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
+          <button type="button" class="pagination-button" (click)="changePage(data.page + 1)"
+            [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
+        </nav>
+      }
+    </section>
   } @else {
-    <app-query-empty-state title="Prepara tu consulta"
-      description="Selecciona uno o varios filtros y busca las reservas que necesitas." />
+    <app-query-empty-state title="Prepara tu consulta" [headingLevel]="3"
+      description="Busca por entidad reportante, período de creación o filtros avanzados." />
   }
 </main>

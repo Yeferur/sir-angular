@@ -1,4 +1,4 @@
-<main class="commissions-page" [class.commissions-page--with-footer]="canales.length">
+<main class="commissions-page sir-query-form" [class.commissions-page--with-footer]="canales.length">
   @if (catalogLoading) {
     <app-loading-state mode="loading" label="Preparando comisiones" detail="Cargando tours y canales…" />
   } @else if (catalogError) {
@@ -6,59 +6,89 @@
       actionLabel="Reintentar" (action)="cargarCatalogos()" />
   } @else {
     <section class="search-card" aria-label="Buscar comisiones">
-      <div class="search-primary">
-        <div class="field-group field-group--date">
-          <label class="form-label">Fecha del tour</label>
+      <app-filter-bar [showFilters]="false" [showSearch]="false">
+        <div sirPrimaryFilters class="field-group field-group--date">
+          <label class="form-label" for="commission-date">Fecha del tour</label>
           <app-datepicker [ngModel]="fecha" (dateChange)="actualizarFiltro('fecha', $event)"
-            [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
+            inputId="commission-date" [maxDate]="fechaMaxima" placeholder="Seleccionar fecha" />
         </div>
 
-        <div class="field-group field-group--tour">
+        <div sirPrimaryFilters class="field-group field-group--tour">
           <label class="form-label" for="commission-tour">Tour</label>
           <app-select inputId="commission-tour" [ngModel]="idTour"
             (ngModelChange)="actualizarFiltro('idTour', $event)"
             [options]="tourSelectOptions" [compareWith]="compareSelectValues"
             ariaLabel="Tour" placeholder="" />
         </div>
-
-        <button type="button" class="button button--filter" [class.button--filter-active]="showAdvancedFilters"
-          [attr.aria-expanded]="showAdvancedFilters" aria-controls="commission-extra-filters"
-          (click)="toggleAdvancedFilters()">
-          <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 6h16M7 12h10m-7 6h4" />
+        <button sirFilterActions type="button" class="btn-filter" (click)="toggleAdvancedFilters()"
+          [class.btn-filter--active]="showAdvancedFilters" aria-controls="commission-extra-filters"
+          [attr.aria-label]="activeAdvancedFilters ? 'Filtros, ' + activeAdvancedFilters + ' activos' : 'Filtros'"
+          [attr.aria-expanded]="showAdvancedFilters">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
           </svg>
           Filtros
-          @if (activeAdvancedFilters) { <span class="filter-count">{{ activeAdvancedFilters }}</span> }
+          <span class="filter-count" [class.filter-count--empty]="activeAdvancedFilters === 0" aria-hidden="true">{{ activeAdvancedFilters || 0 }}</span>
         </button>
+        <button sirFilterActions type="button" class="btn-primary reservation-search-button" (click)="buscar()"
+          [disabled]="isSearching || !fecha" [attr.aria-busy]="isSearching"
+          [attr.aria-label]="isSearching ? 'Buscando comisiones' : 'Buscar comisiones'">
+          <span class="search-button-label" [class.search-button-label--hidden]="isSearching">Buscar</span>
+          <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching" aria-hidden="true"></span>
+        </button>
+      </app-filter-bar>
 
-        <button type="button" class="button button--primary search-button" (click)="buscar()"
-          [disabled]="!fecha || isSearching">
-          @if (isSearching) { <span class="spinner spinner--light"></span> }
-          {{ isSearching ? 'Buscando…' : 'Buscar' }}
-        </button>
-      </div>
+      @if (appliedFilters?.idCanal || appliedFilters?.filtroEstado) {
+        <div class="active-filters" aria-label="Filtros aplicados">
+          @if (appliedFilters?.idCanal) {
+            <div class="filter-token">
+              Canal: {{ appliedCanalLabel }}
+              <button type="button" class="remove-token-btn" [disabled]="isSearching"
+                [attr.aria-label]="'Quitar filtro Canal: ' + appliedCanalLabel" (click)="quitarFiltroAplicado('idCanal')">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          }
+          @if (appliedFilters?.filtroEstado) {
+            <div class="filter-token">
+              Estado: {{ appliedEstadoLabel }}
+              <button type="button" class="remove-token-btn" [disabled]="isSearching"
+                [attr.aria-label]="'Quitar filtro Estado: ' + appliedEstadoLabel" (click)="quitarFiltroAplicado('filtroEstado')">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          }
+          @if (activeAdvancedFilters > 1) {
+            <button type="button" class="clear-filters-link" [disabled]="isSearching" (click)="limpiarFiltros()">Limpiar filtros</button>
+          }
+        </div>
+      }
     </section>
 
     @if (showAdvancedFilters) {
-      <section id="commission-extra-filters" class="extra-filter-card">
-        <div class="field-group">
-          <label class="form-label" for="commission-channel">Canal</label>
-          <app-select inputId="commission-channel" [ngModel]="idCanal"
-            (ngModelChange)="actualizarFiltro('idCanal', $event)"
-            [options]="canalSelectOptions" [compareWith]="compareSelectValues"
-            ariaLabel="Canal" placeholder="" />
-        </div>
+      <div id="commission-extra-filters" class="advanced-filters-panel" aria-label="Filtros de comisiones">
+        <div class="commission-filter-grid">
+          <div class="field-group">
+            <label class="form-label" for="commission-channel">Canal</label>
+            <app-select inputId="commission-channel" [ngModel]="idCanal"
+              (ngModelChange)="actualizarFiltro('idCanal', $event)"
+              [options]="canalSelectOptions" [compareWith]="compareSelectValues"
+              ariaLabel="Canal" placeholder="" />
+          </div>
 
-        <div class="field-group">
-          <label class="form-label" for="commission-status">Estado</label>
-          <app-select inputId="commission-status" [ngModel]="filtroEstado"
-            (ngModelChange)="actualizarFiltro('filtroEstado', $event)"
-            [options]="estadoSelectOptions" [compareWith]="compareSelectValues"
-            ariaLabel="Estado" placeholder="" />
+          <div class="field-group">
+            <label class="form-label" for="commission-status">Estado</label>
+            <app-select inputId="commission-status" [ngModel]="filtroEstado"
+              (ngModelChange)="actualizarFiltro('filtroEstado', $event)"
+              [options]="estadoSelectOptions" [compareWith]="compareSelectValues"
+              ariaLabel="Estado" placeholder="" />
+          </div>
         </div>
-
-        <button type="button" class="reset-button" (click)="limpiarFiltros()">Restablecer filtros</button>
-      </section>
+      </div>
     }
 
     @if (hasSearched && !isSearching && jornadasPorConfirmar.length) {
@@ -82,55 +112,42 @@
       </section>
     }
 
-    @if (searchError) {
-      <app-loading-state mode="error" label="No pudimos cargar las comisiones" [detail]="searchError"
-        actionLabel="Reintentar" (action)="buscar()" />
-    } @else if (isSearching && !canales.length) {
-      <app-loading-state mode="loading" label="Consultando comisiones" detail="Calculando la jornada seleccionada…" />
-    } @else if (!hasSearched) {
-      <section class="empty-state" aria-labelledby="commissions-ready-title">
-        <span class="empty-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-        </span>
-        <h2 id="commissions-ready-title">Listo para buscar</h2>
-        <p>Selecciona la fecha del tour y presiona “Buscar” para cargar las comisiones.</p>
-      </section>
-    } @else if (!canales.length && !isSearching) {
-      <section class="empty-state" aria-labelledby="commissions-empty-title">
-        <span class="empty-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/>
-          </svg>
-        </span>
-        <h2 id="commissions-empty-title">Sin resultados</h2>
-        <p>No encontramos comisiones disponibles con los filtros seleccionados.</p>
-      </section>
-    } @else if (canales.length) {
+    <div class="results-area">
+      @if (searchError && canales.length) {
+        <div class="results-notice results-notice--error" role="alert">
+          <span>{{ searchError }} Los resultados anteriores siguen disponibles.</span>
+          <button type="button" (click)="buscar()">Reintentar</button>
+        </div>
+      }
+
+      @if (canales.length) {
       <section class="results" aria-live="polite">
+        @if (isSearching) {
+          <div class="results-toolbar">
+            <span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span>
+          </div>
+        }
         <div class="list-search">
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
           </svg>
           <input type="search" [ngModel]="filtroLista" (ngModelChange)="actualizarBusquedaLocal($event)"
-            placeholder="Buscar en los resultados por reportante, reserva o tour" aria-label="Buscar en los resultados" />
+            placeholder="Buscar entidad, reportante, reserva o tour" aria-label="Buscar en los resultados" />
           <span>{{ textoCantidad(canalesVisibles.length, 'canal', 'canales') }}</span>
         </div>
 
         @if (!canalesVisibles.length) {
-          <section class="empty-state empty-state--compact">
-            <h2>Sin coincidencias</h2>
-            <p>No hay reportantes ni reservas que coincidan con “{{ filtroLista }}”.</p>
-          </section>
+          <app-query-empty-state class="commission-list-query-empty" title="Sin coincidencias"
+            description="No hay grupos ni reservas que coincidan con “{{ filtroLista }}”."
+            [headingLevel]="3" [compact]="true" />
         } @else {
-          <div class="channel-list">
+          <div class="channel-list" [class.results-list--updating]="isSearching" [attr.aria-busy]="isSearching">
             @for (canal of canalesVisibles; track canal.Id_Canal) {
               <article class="channel-card">
                 <header class="channel-header">
                   <div>
                     <strong>{{ canal.Nombre_Canal }}</strong>
-                    <span>{{ textoCantidad(canal.reportantes.length, 'reportante', 'reportantes') }}</span>
+                    <span>{{ textoCantidad(canal.grupos.length, 'grupo', 'grupos') }}</span>
                   </div>
                   <div class="channel-totals">
                     <span><small>Pendiente</small><strong>{{ formatCOP(canal.Pendiente_Canal) }}</strong></span>
@@ -139,34 +156,35 @@
                 </header>
 
                 <div class="reporter-list">
-                  @for (reportante of canal.reportantes; track trackBeneficiario($index, reportante)) {
+                  @for (grupo of canal.grupos; track trackGrupo($index, grupo)) {
                     <section class="reporter-group">
                       <header class="reporter-header">
                         <div class="reporter-identity">
-                          <strong>{{ reportante.Nombre_Reportante }}</strong>
+                          <strong>{{ nombreGrupo(grupo) }}</strong>
                           <span>
-                            {{ textoCantidad(reportante.reservas.length, 'reserva', 'reservas') }}
-                            @if (reportante.Forma_Pago) { · {{ etiquetaPago(reportante.Forma_Pago) }} }
-                            @if (reportante.Cuenta_Bancaria) { · {{ cuentaOculta(reportante.Cuenta_Bancaria, reportante.Forma_Pago) }} }
+                            {{ etiquetaTipoGrupo(grupo) }} · {{ textoCantidad(grupo.reservas.length, 'reserva', 'reservas') }}
+                            @if (grupo.Forma_Pago) { · {{ etiquetaPago(grupo.Forma_Pago) }} }
+                            @if (grupo.Cuenta_Bancaria) { · {{ cuentaOculta(grupo.Cuenta_Bancaria, grupo.Forma_Pago) }} }
                           </span>
                         </div>
                         <div class="reporter-amounts">
-                          <span><small>Pendiente</small><strong>{{ formatCOP(reportante.Pendiente_Reportante) }}</strong></span>
-                          <span><small>Total</small><strong>{{ formatCOP(reportante.Total_Reportante) }}</strong></span>
+                          <span><small>Pendiente</small><strong>{{ formatCOP(grupo.Pendiente_Reportante) }}</strong></span>
+                          <span><small>Pagado</small><strong>{{ formatCOP(grupo.Pagado_Reportante) }}</strong></span>
+                          <span><small>Total comisión</small><strong>{{ formatCOP(grupo.Total_Reportante) }}</strong></span>
                         </div>
-                        @if (pendientesDe(reportante)) {
-                          <button type="button" class="button button--primary button--small" (click)="abrirPagoBeneficiario(reportante)">
+                        @if (pendientesDe(grupo)) {
+                          <button type="button" class="button button--primary button--small" (click)="abrirPagoGrupo(grupo)">
                             Registrar pago
                           </button>
                         } @else {
-                          <button type="button" class="button button--secondary button--small" (click)="reabrirBeneficiario(reportante)">
+                          <button type="button" class="button button--secondary button--small" (click)="reabrirGrupo(grupo)">
                             Volver a pendiente
                           </button>
                         }
                       </header>
 
                       <div class="reservation-list">
-                        @for (reserva of reportante.reservas; track reserva.Id_Reserva) {
+                        @for (reserva of grupo.reservas; track reserva.Id_Reserva) {
                           <button type="button" class="reservation-row" (click)="verReserva(reserva.Id_Reserva)"
                             [attr.aria-label]="'Abrir reserva ' + reserva.Id_Reserva">
                             <span class="reservation-id">#{{ reserva.Id_Reserva }}</span>
@@ -177,11 +195,12 @@
                                   <span class="private-pill">Privada</span>
                                 }
                               </span>
-                              <small>{{ textoCantidad(reserva.Num_Pasajeros, 'pasajero confirmado', 'pasajeros confirmados') }}</small>
+                              <small>{{ reserva.Fecha_Tour | date:'dd/MM/yyyy' }} · {{ textoCantidad(reserva.Num_Pasajeros, 'pasajero confirmado', 'pasajeros confirmados') }}</small>
+                              @if (reserva.Nombre_Reportante) { <small>Reportó {{ reserva.Nombre_Reportante }}</small> }
                             </span>
-                            <strong class="reservation-value">{{ formatCOP(reserva.Total_Comision) }}</strong>
+                            <strong class="reservation-value">{{ formatCOP(montoVisibleReserva(reserva)) }}</strong>
                             <span class="status-pill" [class.status-pill--paid]="reserva.Estado_Liquidacion === 'PAGADO'">
-                              {{ reserva.Estado_Liquidacion === 'PAGADO' ? 'Pagada' : 'Pendiente' }}
+                              {{ reserva.Estado_Liquidacion === 'PAGADO' ? 'Pagada · monto histórico' : 'Pendiente' }}
                             </span>
                             <svg class="row-chevron" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                               <path d="m9 6 6 6-6 6"/>
@@ -197,7 +216,24 @@
           </div>
         }
       </section>
-    }
+      } @else if (isSearching) {
+        <app-loading-state label="Buscando comisiones…" />
+      } @else if (searchError) {
+        <app-loading-state mode="error" label="No pudimos cargar las comisiones" [detail]="searchError"
+          actionLabel="Reintentar" (action)="buscar()" />
+      } @else if (hasSearched) {
+        @if (appliedFilters?.idCanal || appliedFilters?.filtroEstado) {
+          <app-query-empty-state title="Sin resultados" [headingLevel]="3"
+            description="No encontramos comisiones con los filtros aplicados." />
+        } @else {
+          <app-query-empty-state title="No hay comisiones registradas" [headingLevel]="3"
+            description="No se encontraron comisiones para el tour y la fecha seleccionados." />
+        }
+      } @else {
+      <app-query-empty-state title="Listo para buscar" [headingLevel]="3"
+        description="Selecciona la fecha del tour y presiona ‘Buscar’ para cargar las comisiones." />
+      }
+    </div>
   }
 </main>
 
@@ -235,19 +271,19 @@
   </div>
 }
 
-@if (panel.visible && panel.reportante) {
+@if (panel.visible && panel.grupo) {
   <div class="sheet-backdrop" (mousedown)="cerrarPanel()">
     <aside class="payment-sheet" role="dialog" aria-modal="true" aria-labelledby="payment-title"
       (mousedown)="$event.stopPropagation()">
       <header class="sheet-header">
         <div>
           @if (panel.modoCola) { <span class="sheet-step">Pago {{ pasoCola }}</span> }
-          <h1 id="payment-title">{{ panel.reportante.Nombre_Reportante }}</h1>
+          <span class="sheet-step">{{ esFreelance(panel.grupo) ? 'Reportante' : 'Beneficiario' }}</span>
+          <h1 id="payment-title">{{ nombreGrupo(panel.grupo) }}</h1>
+          <p>{{ etiquetaTipoGrupo(panel.grupo) }}@if (esFreelance(panel.grupo)) { · Reserva {{ panel.reservas[0]?.Id_Reserva }} }</p>
           <p>{{ textoCantidad(panel.reservas.length, 'reserva', 'reservas') }} · {{ formatCOP(panelTotal) }}</p>
         </div>
-        <button type="button" class="sheet-close" (click)="cerrarPanel()" [disabled]="panel.saving" aria-label="Cerrar">
-          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg>
-        </button>
+        <app-drawer-close-button label="Cerrar" [disabled]="panel.saving" (dismiss)="cerrarPanel()" />
       </header>
 
       @if (panel.modoCola) {
@@ -258,19 +294,34 @@
 
       <div class="sheet-body">
         <section class="payment-summary">
+          <div class="payment-recipient-context">
+            <span>{{ esFreelance(panel.grupo) ? 'Reportante' : 'Beneficiario' }}</span>
+            <strong>{{ nombreGrupo(panel.grupo) }}</strong>
+            @if (esFreelance(panel.grupo)) {
+              <span>Reserva {{ panel.reservas[0]?.Id_Reserva }}</span>
+            }
+          </div>
           <div><span>Total a registrar</span><strong>{{ formatCOP(panelTotal) }}</strong></div>
           <p>El pago quedará registrado para informes. La transferencia se realiza por fuera de la aplicación.</p>
           <div class="payment-reservations" aria-label="Reservas incluidas en el pago">
             @for (reserva of panel.reservas; track reserva.Id_Reserva) {
-              <span>#{{ reserva.Id_Reserva }} · {{ reserva.Nombre_Tour }} · {{ formatCOP(reserva.Total_Comision) }}</span>
+              <span>#{{ reserva.Id_Reserva }} · {{ reserva.Fecha_Tour | date:'dd/MM/yyyy' }} · {{ reserva.Nombre_Tour }} · {{ formatCOP(montoVisibleReserva(reserva)) }}</span>
             }
           </div>
         </section>
 
+        @if (panel.perfilCargando) {
+          <p class="profile-message" role="status">Cargando los datos de pago de la entidad…</p>
+        } @else if (panel.perfilError) {
+          <p class="profile-message profile-message--error" role="alert">
+            {{ panel.perfilError }} Puedes registrar el pago manualmente; no se podrá guardar el perfil en este momento.
+          </p>
+        }
+
         <button type="button" class="optional-toggle" (click)="toggleDatosPago()" [attr.aria-expanded]="panel.mostrarDatosPago">
           <span>
             <strong>Datos del pago</strong>
-            <small>Opcional · medio y cuenta de destino</small>
+            <small>{{ esFreelance(panel.grupo) ? 'Datos manuales de pago' : 'Medio y cuenta de destino' }}</small>
           </span>
           <svg [class.optional-toggle__chevron--open]="panel.mostrarDatosPago" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m9 6 6 6-6 6"/>
@@ -311,50 +362,19 @@
               </div>
             }
 
-            <label class="central-switch" [class.central-switch--disabled]="!panel.formaPago">
-              <input type="checkbox" [(ngModel)]="panel.guardarCentral" [disabled]="!panel.formaPago" />
-              <span class="switch-control" aria-hidden="true"></span>
-              <span>
-                <strong>{{ panel.reportante.Centralizado ? 'Actualizar para próximas comisiones' : 'Guardar para próximas comisiones' }}</strong>
-                <small>Se aplicará automáticamente cuando vuelva a aparecer este reportante.</small>
-              </span>
-            </label>
-
-            <section class="beneficiary-documents">
-              <div class="beneficiary-documents__heading">
+            @if (esEntidadComisionable(panel.grupo) && !panel.perfilError) {
+              <label class="central-switch" [class.central-switch--disabled]="!panel.formaPago || panel.perfilCargando">
+                <input type="checkbox" [(ngModel)]="panel.guardarPerfil" [disabled]="!panel.formaPago || panel.perfilCargando" />
+                <span class="switch-control" aria-hidden="true"></span>
                 <span>
-                  <strong>Documentos bancarios</strong>
-                  <small>Opcional · hasta 5 archivos JPG, PNG o PDF de máximo 5 MB cada uno</small>
+                  <strong>{{ panel.perfilExiste ? 'Actualizar para próximas comisiones' : 'Guardar para próximas comisiones' }}</strong>
+                  <small>Se guardará para {{ nombreGrupo(panel.grupo) }}.</small>
                 </span>
-                <label class="button button--secondary button--small">
-                  Adjuntar
-                  <input type="file" accept="image/jpeg,image/png,application/pdf" multiple
-                    (change)="seleccionarDocumentos($event)" hidden />
-                </label>
-              </div>
+              </label>
+            }
 
-              @if (panel.reportante.documentos?.length || panel.documentosNuevos.length) {
-                <div class="beneficiary-document-list">
-                  @for (documento of panel.reportante.documentos || []; track documento.Id_Documento) {
-                    <div class="beneficiary-document-row">
-                      <button type="button" (click)="descargarDocumento(documento.Id_Documento, documento.Nombre_Original)">
-                        {{ documento.Nombre_Original }}
-                      </button>
-                      <button type="button" class="document-remove" (click)="eliminarDocumento(documento.Id_Documento)" aria-label="Eliminar documento">Eliminar</button>
-                    </div>
-                  }
-                  @for (documento of panel.documentosNuevos; track documento.name; let index = $index) {
-                    <div class="beneficiary-document-row beneficiary-document-row--new">
-                      <span>{{ documento.name }}</span>
-                      <button type="button" class="document-remove" (click)="quitarDocumentoNuevo(index)">Quitar</button>
-                    </div>
-                  }
-                </div>
-              }
-            </section>
-
-            @if (panel.touched && (panelError || centralizacionError)) {
-              <p class="field-error">{{ panelError || centralizacionError }}</p>
+            @if (panel.touched && (panelError || perfilGuardadoError)) {
+              <p class="field-error">{{ panelError || perfilGuardadoError }}</p>
             }
           </section>
         }
@@ -364,7 +384,7 @@
         <button type="button" class="button button--secondary" (click)="omitirPagoActual()" [disabled]="panel.saving">
           {{ panel.modoCola ? 'Omitir' : 'Cancelar' }}
         </button>
-        <button type="button" class="button button--primary" (click)="registrarPagoActual()" [disabled]="panel.saving">
+        <button type="button" class="button button--primary" (click)="registrarPagoActual()" [disabled]="panel.saving || panel.perfilCargando">
           @if (panel.saving) { <span class="spinner spinner--light"></span> }
           {{ panel.saving ? 'Registrando…' : (panel.modoCola ? 'Registrar y continuar' : 'Registrar pago') }}
         </button>

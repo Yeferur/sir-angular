@@ -61,46 +61,87 @@
         (click)="buscarTransfers()"
         [disabled]="isSearching()"
         [attr.aria-busy]="isSearching()"
-        [attr.aria-label]="isSearching() ? 'Buscando transfers' : 'Buscar transfers'">
-        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Buscar</span>
+        [attr.aria-label]="isSearching() ? 'Aplicando criterios de transfers' : 'Aplicar criterios de transfers'">
+        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Aplicar</span>
         <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
       </button>
     </div>
 
     <!-- ACTIVE FILTER TOKENS -->
-    @if (filters().Fecha_Transfer || filters().Fecha_Registro || filters().Estado?.length > 0 || filters().Id_Servicio?.length > 0) {
-      <div class="active-filters">
-        @if (filters().Fecha_Transfer) {
+    @if (hasVisibleAppliedFilters()) {
+      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
+        <div class="active-filter-tokens">
+        @if (appliedFilters().Nombre_Titular?.trim()) {
           <div class="filter-token">
-            Fecha transfer: {{ filters().Fecha_Transfer | date:'d MMM yyyy':'':'es-CO' }}
-            <button type="button" class="remove-token-btn" (click)="clearFechaTransfer()" aria-label="Quitar fecha del transfer">
+            Búsqueda: {{ appliedFilters().Nombre_Titular }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedMainSearch()" aria-label="Quitar búsqueda">×</button>
+          </div>
+        }
+        @if (appliedFilters().Id_Transfer?.trim()) {
+          <div class="filter-token">
+            Código de transfer: {{ appliedFilters().Id_Transfer }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Id_Transfer', '')" aria-label="Quitar código de transfer">×</button>
+          </div>
+        }
+        @if (appliedFilters().Telefono_Titular?.trim()) {
+          <div class="filter-token">
+            Teléfono: {{ appliedFilters().Telefono_Titular }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Telefono_Titular', '')" aria-label="Quitar teléfono">×</button>
+          </div>
+        }
+        @if (appliedFilters().DNI?.trim()) {
+          <div class="filter-token">
+            Documento: {{ appliedFilters().DNI }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('DNI', '')" aria-label="Quitar documento">×</button>
+          </div>
+        }
+        @if (appliedFilters().Punto_Salida?.trim()) {
+          <div class="filter-token">
+            Punto de salida: {{ appliedFilters().Punto_Salida }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Punto_Salida', '')" aria-label="Quitar punto de salida">×</button>
+          </div>
+        }
+        @if (appliedFilters().Punto_Destino?.trim()) {
+          <div class="filter-token">
+            Punto de destino: {{ appliedFilters().Punto_Destino }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Punto_Destino', '')" aria-label="Quitar punto de destino">×</button>
+          </div>
+        }
+        @if (appliedFilters().Fecha_Transfer) {
+          <div class="filter-token">
+            Fecha del transfer: {{ appliedFilters().Fecha_Transfer | date:'d MMM yyyy':'':'es-CO' }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Fecha_Transfer', '')" aria-label="Quitar fecha del transfer">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().Fecha_Registro) {
+        @if (appliedFilters().Fecha_Registro) {
           <div class="filter-token">
-            Registro: {{ filters().Fecha_Registro | date:'d MMM yyyy':'':'es-CO' }}
-            <button type="button" class="remove-token-btn" (click)="clearFechaRegistro()" aria-label="Quitar fecha de registro">
+            Fecha de creación: {{ appliedFilters().Fecha_Registro | date:'d MMM yyyy':'':'es-CO' }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Fecha_Registro', '')" aria-label="Quitar fecha de registro">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().Estado?.length > 0) {
+        @if (appliedFilters().Estado?.length > 0) {
           <div class="filter-token">
-            Estado: {{ filters().Estado.join(', ') }}
-            <button type="button" class="remove-token-btn" (click)="clearMultiFilter('Estado')" aria-label="Quitar filtro de estado">
+            Estado: {{ appliedFilters().Estado.join(', ') }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Estado', [])" aria-label="Quitar filtro de estado">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().Id_Servicio?.length > 0) {
+        @if (appliedFilters().Id_Servicio?.length > 0) {
           <div class="filter-token">
             Servicio: {{ getSelectedServiciosText() }}
-            <button type="button" class="remove-token-btn" (click)="clearMultiFilter('Id_Servicio')" aria-label="Quitar filtro de servicio">
+            <button type="button" class="remove-token-btn" (click)="removeAppliedFilter('Id_Servicio', [])" aria-label="Quitar filtro de servicio">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
+        }
+        </div>
+        @if (visibleAppliedFilterCount() > 1) {
+          <button type="button" class="clear-active-filters" [disabled]="isSearching()" (click)="clearAppliedFilters()">Limpiar filtros</button>
         }
       </div>
     }
@@ -337,25 +378,11 @@
         (action)="buscarTransfers()">
       </app-loading-state>
     } @else if (hasSearched()) {
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
-          </svg>
-        </div>
-        <h3>Sin resultados</h3>
-        <p>No se encontraron transfers con los filtros aplicados.</p>
-      </div>
+      <app-query-empty-state [title]="hasAppliedCriteria() ? 'Sin resultados' : 'No hay transfers registrados'"
+        [headingLevel]="3"
+        [description]="hasAppliedCriteria() ? 'No se encontraron transfers con los criterios aplicados.' : 'Aún no hay transfers en la aplicación.'" />
     } @else {
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h3>Listo para buscar</h3>
-        <p>Aplica los filtros y presiona "Buscar" para cargar los transfers.</p>
-      </div>
+      <app-loading-state label="Cargando transfers…"></app-loading-state>
     }
   </div>
 

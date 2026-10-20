@@ -8,6 +8,74 @@
   animation: pageEnter .45s cubic-bezier(.22, 1, .36, 1) both;
 }
 
+.order-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.order-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 .85rem var(--font-family);
+  cursor: pointer;
+  transition: color .2s ease;
+}
+
+.order-back-button:hover,
+.order-back-button:focus-visible {
+  color: var(--text-primary);
+}
+
+.order-back-button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.order-back-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 270px;
+  min-width: 220px;
+}
+
+.route-selector-label {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.route-selector app-select {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .card,
 .empty-state-card {
   background: var(--bg-secondary);
@@ -58,58 +126,31 @@
   white-space: nowrap;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.field label,
 .summary-label {
   color: var(--text-secondary);
   font-size: .72rem;
   font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
 }
 
 .route-summary {
   display: flex;
   align-items: center;
-  gap: 0;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1.5px solid var(--separator-color);
-}
-
-.route-summary .summary-item {
-  flex: 0 1 auto;
-  min-width: 150px;
-  padding: 0 24px;
-  border-left: 1px solid var(--separator-color);
-}
-
-.route-summary .summary-item:first-child {
-  min-width: 110px;
-  padding-left: 0;
-  border-left: 0;
-}
-
-.route-summary .summary-item:last-child {
-  padding-right: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-left: auto;
 }
 
 .summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .summary-value {
   color: var(--text-primary);
-  font-size: .92rem;
+  font-size: .86rem;
   font-weight: 800;
 }
 
@@ -445,27 +486,34 @@
   to { transform: rotate(360deg); }
 }
 
+@media (max-width: 880px) {
+  .order-controls {
+    flex-wrap: wrap;
+  }
+
+  .route-summary {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-left: 38px;
+  }
+}
+
 @media (max-width: 640px) {
   .ordenar-page {
     padding: 0 16px;
   }
 
-  .card {
-    padding: 16px;
+  .route-selector {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .route-summary {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
+    margin-left: 0;
   }
 
-  .route-summary .summary-item,
-  .route-summary .summary-item:first-child {
-    width: 100%;
-    min-width: 0;
-    padding: 0;
-    border-left: 0;
+  .card {
+    padding: 16px;
   }
 
   .route-debt-card {

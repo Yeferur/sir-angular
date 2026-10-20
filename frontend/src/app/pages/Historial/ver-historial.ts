@@ -1,15 +1,15 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, Subscription } from 'rxjs';
 import { Historial, HistorialFilterOptions, HistorialFilters, HistorialService } from '../../services/Historial/historial.service';
-import { SirDateRange, SirDateRangePickerComponent } from '../../shared/date-range-picker/date-range-picker';
+import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
-import { SirAlertService } from '../../services/Alertas/alert.service';
+import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
 
 interface HistorialFilterState {
-  period: SirDateRange | null;
-  periodExplicit: boolean;
+  fecha: string;
   referencia: string;
   usuarios: number[];
   actividad: string[];
@@ -26,8 +26,20 @@ function isCalendarDate(value: string | null): value is string {
 }
 
 function cloneFilters(filters: HistorialFilterState): HistorialFilterState {
-  return { period: filters.period ? { ...filters.period } : null, periodExplicit: filters.periodExplicit, referencia: filters.referencia,
+  return { fecha: filters.fecha, referencia: filters.referencia,
     usuarios: [...filters.usuarios], actividad: [...filters.actividad], modulos: [...filters.modulos] };
+}
+
+function todayBogota(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function initialFilters(): HistorialFilterState {
+  return { fecha: todayBogota(), referencia: '', usuarios: [], actividad: [], modulos: [] };
 }
 
 function normalizeReference(value: string): string { return String(value || '').trim().toUpperCase(); }
@@ -36,24 +48,24 @@ function isValidReference(value: string): boolean { return /^(?:[A-Z]{2,4}|TRS)\
 @Component({
   selector: 'app-ver-historial',
   standalone: true,
-  imports: [CommonModule, SirDateRangePickerComponent, LoadingStateComponent],
+  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './ver-historial.html',
   styleUrls: ['../listado-reservas-transfers.css', './ver-historial.css'],
 })
 export class VerHistorialComponent implements OnInit, OnDestroy {
   private readonly historialService = inject(HistorialService);
-  private readonly alerts = inject(SirAlertService);
   private readonly hostElement = inject(ElementRef<HTMLElement>);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
   private requestId = 0;
+  private searchRequest?: Subscription;
   private pendingOwnNavigation = false;
   private optionsLoaded = false;
   private pendingQueryParams: import('@angular/router').ParamMap | null = null;
 
-  readonly draftFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
-  readonly appliedFilters = signal<HistorialFilterState>({ period: null, periodExplicit: false, referencia: '', usuarios: [], actividad: [], modulos: [] });
+  readonly draftFilters = signal<HistorialFilterState>(initialFilters());
+  readonly appliedFilters = signal<HistorialFilterState>(initialFilters());
   readonly filterOptions = signal<HistorialFilterOptions>(emptyOptions);
   readonly historialList = signal<Historial[]>([]);
   readonly totalRecords = signal(0);
@@ -61,6 +73,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   readonly totalPages = signal(1);
   readonly isInitialLoading = signal(false);
   readonly isTableRefreshing = signal(false);
+  readonly isSearching = computed(() => this.isInitialLoading() || this.isTableRefreshing());
   readonly isOptionsLoading = signal(false);
   readonly errorMessage = signal('');
   readonly referenceInputError = signal('');
@@ -72,7 +85,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   readonly appliedGroupCount = computed(() => {
     const applied = this.appliedFilters();
-    return Number(applied.periodExplicit) + Number(applied.usuarios.length > 0) + Number(applied.actividad.length > 0) + Number(applied.modulos.length > 0);
+    return Number(applied.usuarios.length > 0) + Number(applied.actividad.length > 0) + Number(applied.modulos.length > 0);
   });
   readonly hasMultipleAppliedGroups = computed(() => this.appliedGroupCount() >= 2);
   readonly summaryText = computed(() => {
@@ -102,7 +115,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void { this.subscriptions.unsubscribe(); }
+  ngOnDestroy(): void { this.searchRequest?.unsubscribe(); this.subscriptions.unsubscribe(); }
 
   toggleAdvancedFilters(): void {
     const shouldOpen = !this.advancedFiltersVisible();
@@ -129,7 +142,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   multiFilterLabel(group: 'usuarios' | 'actividad' | 'modulos'): string {
     const values = this.draftFilters()[group];
-    if (!values.length) return 'Todos';
+    if (!values.length) return group === 'usuarios' ? 'Todos los usuarios' : group === 'actividad' ? 'Todos los tipos' : 'Todos los módulos';
     return values.length === 1 ? '1 seleccionado' : `${values.length} seleccionados`;
   }
 
@@ -147,11 +160,8 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.draftFilters.update((current) => ({ ...current, modulos: Array.isArray(values) ? [...values] : [] }));
   }
 
-  onPeriodChange(period: SirDateRange): void {
-    const start = isCalendarDate(period?.start) ? period.start : null;
-    const end = isCalendarDate(period?.end) ? period.end : null;
-    const nextPeriod = start && end && start <= end ? { start, end } : null;
-    this.draftFilters.update((current) => ({ ...current, period: nextPeriod, periodExplicit: !!nextPeriod }));
+  onDateChange(value: string | null): void {
+    this.draftFilters.update((current) => ({ ...current, fecha: isCalendarDate(value) ? value : current.fecha }));
   }
 
   toggleUser(id: number, checked: boolean): void {
@@ -169,6 +179,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   }
 
   buscar(): void {
+    if (this.pendingOwnNavigation || this.isSearching()) return;
     const applied = cloneFilters(this.draftFilters());
     applied.referencia = normalizeReference(applied.referencia);
     if (applied.referencia && !isValidReference(applied.referencia)) {
@@ -176,31 +187,15 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
       return;
     }
     this.referenceInputError.set('');
-    const periodStart = applied.period?.start || null;
-    const periodEnd = applied.period?.end || null;
-    const hasValidPeriod = applied.periodExplicit && isCalendarDate(periodStart) && isCalendarDate(periodEnd) && periodStart <= periodEnd;
-    if (!applied.referencia && !hasValidPeriod) {
-      this.alerts.showModal({ type: 'info', title: 'Sin filtros',
-        message: 'Debes ingresar un código o seleccionar un período para buscar.' });
-      return;
-    }
-    if (applied.period && applied.period.start && applied.period.end && applied.period.start > applied.period.end) {
-      [applied.period.start, applied.period.end] = [applied.period.end, applied.period.start];
-    }
     this.appliedFilters.set(applied);
     this.currentPage.set(1);
     this.syncUrlAndLoad();
   }
 
-  removeAppliedFilter(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): void {
+  removeAppliedFilter(group: 'usuarios' | 'actividad' | 'modulos'): void {
     const applied = cloneFilters(this.appliedFilters());
     const draft = cloneFilters(this.draftFilters());
-    if (group === 'period') {
-      applied.period = null; applied.periodExplicit = false;
-      draft.period = null; draft.periodExplicit = false;
-    } else {
-      applied[group] = []; draft[group] = [];
-    }
+    applied[group] = []; draft[group] = [];
     this.appliedFilters.set(applied);
     this.draftFilters.set(draft);
     this.currentPage.set(1);
@@ -208,8 +203,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   }
 
   limpiarFiltros(): void {
-    const applied: HistorialFilterState = { ...cloneFilters(this.appliedFilters()), period: null, periodExplicit: false,
-      usuarios: [], actividad: [], modulos: [] };
+    const applied: HistorialFilterState = { ...cloneFilters(this.appliedFilters()), usuarios: [], actividad: [], modulos: [] };
     this.appliedFilters.set(applied);
     this.draftFilters.set(cloneFilters(applied));
     this.currentPage.set(1);
@@ -217,7 +211,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   }
 
   goToPage(page: number): void {
-    if (page < 1 || page > this.totalPages() || page === this.currentPage()) return;
+    if (this.pendingOwnNavigation || this.isSearching() || page < 1 || page > this.totalPages() || page === this.currentPage()) return;
     this.currentPage.set(page);
     this.syncUrlAndLoad();
   }
@@ -247,7 +241,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   }
 
   exportarHistorial(): void {
-    if (this.totalRecords() === 0 || this.isTableRefreshing()) return;
+    if (this.totalRecords() === 0 || this.isSearching() || this.errorMessage()) return;
     const filters = this.toServiceFilters(this.appliedFilters(), 1);
     this.historialService.exportarHistorial(filters).subscribe({
       next: (blob) => this.historialService.descargarExcel(blob),
@@ -269,12 +263,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     return labels.length === 1 ? labels[0] : `${labels.length} seleccionados`;
   }
 
-  pillLabel(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): string {
-    if (group === 'period') {
-      const { start, end } = this.appliedFilters().period || { start: '', end: '' };
-      const format = (value: string) => new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
-      return `Período: ${format(start)}${start === end ? '' : ` – ${format(end)}`}`;
-    }
+  pillLabel(group: 'usuarios' | 'actividad' | 'modulos'): string {
     const applied = this.appliedFilters()[group];
     const labels = group === 'usuarios'
       ? (applied as number[]).map((id) => this.selectedUserLabel(id))
@@ -283,9 +272,12 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     return `${groupLabel}: ${labels.join(', ')}`;
   }
 
-  hasApplied(group: 'period' | 'usuarios' | 'actividad' | 'modulos'): boolean {
-    const applied = this.appliedFilters();
-    return group === 'period' ? applied.periodExplicit : applied[group].length > 0;
+  hasApplied(group: 'usuarios' | 'actividad' | 'modulos'): boolean {
+    return this.appliedFilters()[group].length > 0;
+  }
+  hasAppliedCriteria(): boolean {
+    const filters = this.appliedFilters();
+    return !!filters.referencia || !!filters.usuarios.length || !!filters.actividad.length || !!filters.modulos.length;
   }
   isDraftSelected(group: 'usuarios' | 'actividad' | 'modulos', value: number | string): boolean {
     return (this.draftFilters()[group] as Array<number | string>).includes(value);
@@ -314,11 +306,6 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     return labels[column] || column.replace(/_/g, ' ');
   }
 
-  isSingleDay(): boolean {
-    const { start, end } = this.appliedFilters().period || { start: null, end: null };
-    return !!start && start === end;
-  }
-
   formatTimestamp(value: string): string {
     const local = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(value || ''));
     if (local) {
@@ -337,12 +324,11 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   private toServiceFilters(filters: HistorialFilterState, page: number): HistorialFilters {
     const referencia = normalizeReference(filters.referencia);
-    const period = filters.periodExplicit ? filters.period : null;
     return {
       usuarios: [...filters.usuarios], actividad: [...filters.actividad], modulos: [...filters.modulos],
       referencia: referencia || undefined,
-      fechaInicio: period?.start || undefined,
-      fechaFin: period?.end || undefined,
+      fechaInicio: filters.fecha,
+      fechaFin: filters.fecha,
       page, limit: this.pageSize,
     };
   }
@@ -350,8 +336,9 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   private syncUrlAndLoad(): void {
     const filters = this.appliedFilters();
     const queryParams: Record<string, unknown> = {
-      desde: filters.periodExplicit ? filters.period?.start : null,
-      hasta: filters.periodExplicit ? filters.period?.end : null,
+      fecha: filters.fecha,
+      desde: null,
+      hasta: null,
       referencia: filters.referencia || null,
       usuarios: filters.usuarios.length ? filters.usuarios : null,
       actividad: filters.actividad.length ? filters.actividad : null,
@@ -369,13 +356,11 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge' }).then(() => {
       if (this.pendingOwnNavigation) {
         this.pendingOwnNavigation = false;
-        if (this.canQuery(this.appliedFilters())) this.loadHistorial();
-        else this.prepareForQuery();
+        this.loadHistorial();
       }
     }).catch(() => {
       this.pendingOwnNavigation = false;
-      if (this.canQuery(this.appliedFilters())) this.loadHistorial();
-      else this.prepareForQuery();
+      this.loadHistorial();
     });
   }
 
@@ -393,11 +378,10 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   private restoreFromQuery(params: import('@angular/router').ParamMap): void {
     if (this.pendingOwnNavigation) this.pendingOwnNavigation = false;
-    const from = params.get('desde');
-    const to = params.get('hasta');
-    const periodExplicit = isCalendarDate(from) && isCalendarDate(to);
+    const requestedDate = params.get('fecha') || params.get('hasta') || params.get('fechaFin') || params.get('desde') || params.get('fechaInicio');
+    const fecha = isCalendarDate(requestedDate) ? requestedDate : todayBogota();
     const restored: HistorialFilterState = {
-      period: periodExplicit ? { start: from!, end: to! } : null, periodExplicit, referencia: normalizeReference(params.get('referencia') || ''),
+      fecha, referencia: normalizeReference(params.get('referencia') || ''),
       usuarios: params.getAll('usuarios').flatMap((value) => value.split(',')).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0),
       actividad: this.restoreActivity(params),
       modulos: params.getAll('modulos').flatMap((value) => value.split(',')).filter(Boolean),
@@ -406,33 +390,19 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.appliedFilters.set(cloneFilters(restored));
     this.draftFilters.set(cloneFilters(restored));
     this.currentPage.set(page);
-    if (this.canQuery(restored)) this.loadHistorial();
-    else this.prepareForQuery();
-  }
-
-  private canQuery(filters: HistorialFilterState): boolean {
-    return !!normalizeReference(filters.referencia) || !!(filters.periodExplicit && filters.period?.start && filters.period?.end);
-  }
-
-  private prepareForQuery(): void {
-    this.hasQueried.set(false);
-    this.isInitialLoading.set(false);
-    this.isTableRefreshing.set(false);
-    this.historialList.set([]);
-    this.totalRecords.set(0);
-    this.totalPages.set(1);
-    this.errorMessage.set('');
+    this.loadHistorial();
   }
 
   private loadHistorial(): void {
     const thisRequest = ++this.requestId;
-    const initial = !this.hasQueried();
+    this.searchRequest?.unsubscribe();
+    const initial = this.historialList().length === 0;
     this.hasQueried.set(true);
     this.isInitialLoading.set(initial);
     this.isTableRefreshing.set(!initial);
     this.errorMessage.set('');
     const filters = this.toServiceFilters(this.appliedFilters(), this.currentPage());
-    this.subscriptions.add(this.historialService.getHistorial(filters).pipe(finalize(() => {
+    this.searchRequest = this.historialService.getHistorial(filters).pipe(finalize(() => {
       if (thisRequest === this.requestId) {
         this.isInitialLoading.set(false);
         this.isTableRefreshing.set(false);
@@ -453,9 +423,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
       error: () => {
         if (thisRequest !== this.requestId) return;
         this.errorMessage.set('No se pudo cargar el historial. Intenta nuevamente.');
-        this.historialList.set([]);
-        this.totalRecords.set(0);
       },
-    }));
+    });
   }
 }

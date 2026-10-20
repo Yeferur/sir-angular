@@ -10,11 +10,12 @@ import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 
 @Component({
   selector: 'app-ver-tours',
   standalone: true,
-  imports: [CommonModule, FormsModule, LoadingStateComponent],
+  imports: [CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './ver-tours.html',
   styleUrls: ['../../listado-reservas-transfers.css', './ver-tours.css'],
 })

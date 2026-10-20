@@ -1,7 +1,8 @@
 import { Injectable, signal } from "@angular/core";
 import { WebSocketService } from "../WebSocket/web-socket";
-import { HttpClient } from "@angular/common/http";
+import { HttpClient, HttpContext } from "@angular/common/http";
 import { environment } from "../../../environments/environment";
+import { SILENT_APP_ACTIVITY } from "../../interceptors/app-activity.interceptor";
 import { Observable, Subject, of } from "rxjs";
 import { catchError, finalize, switchMap, takeUntil } from "rxjs/operators";
 
@@ -64,8 +65,10 @@ export class UsuariosService {
   }
 
   private obtenerUsuariosYSesiones(): Observable<{ usuarios: Usuario[]; sesiones: { id_user: string }[] }> {
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
     return this.http.get<{ usuarios: Usuario[]; sesiones: { id_user: string }[] }>(
-      `${environment.apiUrl}/usuarios-sesiones`
+      `${environment.apiUrl}/usuarios-sesiones`,
+      { context }
     );
   }
 
@@ -127,8 +130,9 @@ export class UsuariosService {
   }
 
   // Obtener perfil del usuario autenticado
-  getMiPerfil(): Observable<any> {
-    return this.http.get(`${environment.apiUrl}/perfil`);
+  getMiPerfil(silent = false): Observable<any> {
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, silent);
+    return this.http.get(`${environment.apiUrl}/perfil`, { context });
   }
 
   // Actualizar perfil del usuario autenticado (campos seguros)

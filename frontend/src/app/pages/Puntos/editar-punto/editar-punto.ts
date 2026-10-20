@@ -387,6 +387,7 @@ export class EditarPuntoComponent implements OnInit, OnDestroy {
 
   private markInitialLoadDone(): void {
     if (this.toursLoaded && this.rutasLoaded && this.puntoLoaded) {
+      if (!this.loadError()) this.maxReachedStep = this.wizardSteps.length - 1;
       this.isLoading.set(false);
     }
   }

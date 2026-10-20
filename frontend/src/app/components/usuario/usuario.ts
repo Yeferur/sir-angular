@@ -17,6 +17,7 @@ import { PermisosService } from '../../services/Permisos/permisos.service';
 import { AuthService } from '../../services/Login/login-service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 import { AsesorSemana, TurnoDia, TurnosService } from '../../services/Turnos/turnos.service';
 
 interface UsuarioDetalle {
@@ -48,7 +49,7 @@ interface PermissionGroup {
 @Component({
   selector: 'app-usuario-detail',
   standalone: true,
-  imports: [CommonModule, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, DrawerCloseButtonComponent],
   templateUrl: './usuario.html',
   styleUrl: './usuario.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

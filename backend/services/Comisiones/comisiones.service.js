@@ -9,7 +9,14 @@ const { recordHistorial } = require('../Historial/logger');
 
 const FORMAS_PAGO = new Set(['TRANSFERENCIA_BANCOLOMBIA', 'NEQUI', 'EFECTIVO']);
 const ESTADOS_LIQUIDACION = new Set(['PENDIENTE', 'PAGADO']);
-const TIPOS_BENEFICIARIO = new Set(['HOTEL', 'AGENCIA', 'FREELANCE']);
+const TIPOS_ENTIDAD_COMISIONABLE = new Set(['HOTEL', 'AGENCIA_NACIONAL']);
+const LEGACY_TIPOS_BENEFICIARIO = new Set(['HOTEL', 'AGENCIA', 'FREELANCE']);
+const NOMBRES_CANALES_COMISION = Object.freeze({
+  HOTEL: 'HOTEL',
+  'AGENCIA NACIONAL': 'AGENCIA_NACIONAL',
+  'AGENCIA INTERNACIONAL': 'AGENCIA_INTERNACIONAL',
+  FREELANCE: 'FREELANCE',
+});
 const MAX_RESERVAS_LOTE = 1000;
 const MAX_DOCUMENTOS = 5;
 const PRIVATE_DOCUMENT_ROOT = path.resolve(__dirname, '../../private_uploads/comisiones');
@@ -148,15 +155,39 @@ function fechaBogota() {
   }).format(new Date());
 }
 
-function buildPassengerQuery(filtros = {}) {
-  const { Id_Tour, Fecha, Id_Canal, Nombre_Reportante, Estado } = filtros;
-  const conditions = [
-    'P.Confirmacion = 1',
-    'P.Comision > 0',
-    'R.Fecha_Tour <= CURDATE()',
-    "UPPER(TRIM(COALESCE(R.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')",
+function tipoEntidadCanal(nombreCanal) {
+  return NOMBRES_CANALES_COMISION[String(nombreCanal || '').trim().toLocaleUpperCase('es-CO')] || null;
+}
+
+function condicionesElegibilidadComision({ r = 'R', c = 'C', e = 'E', p = 'P' } = {}) {
+  return [
+    `${p}.Confirmacion = 1`,
+    `${p}.Comision > 0`,
+    `UPPER(TRIM(COALESCE(${p}.Tipo_Pasajero, ''))) <> 'INFANTE'`,
+    `${r}.Fecha_Tour <= CURDATE()`,
+    `UPPER(TRIM(COALESCE(${r}.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')`,
+    `COALESCE(${c}.Tiene_Comision, 0) = 1`,
+    `UPPER(TRIM(COALESCE(${c}.Nombre_Canal, ''))) <> 'AGENCIA INTERNACIONAL'`,
+    `(
+      (UPPER(TRIM(${c}.Nombre_Canal)) = 'HOTEL' AND ${r}.Id_Entidad_Reportante IS NOT NULL
+        AND ${e}.Tipo = 'HOTEL' AND ${e}.Activo = 1 AND ${e}.Estado_Validacion <> 'RECHAZADA')
+      OR (UPPER(TRIM(${c}.Nombre_Canal)) = 'AGENCIA NACIONAL' AND ${r}.Id_Entidad_Reportante IS NOT NULL
+        AND ${e}.Tipo = 'AGENCIA_NACIONAL' AND ${e}.Activo = 1 AND ${e}.Estado_Validacion <> 'RECHAZADA')
+      OR (UPPER(TRIM(${c}.Nombre_Canal)) = 'FREELANCE' AND ${r}.Id_Entidad_Reportante IS NULL)
+    )`,
   ];
+}
+
+function buildPassengerQuery(filtros = {}) {
+  const { Id_Tour, Id_Reserva, Fecha, Id_Canal, Nombre_Reportante, Estado } = filtros;
+  const conditions = condicionesElegibilidadComision();
   const params = [];
+
+  if (Id_Reserva) {
+    const ids = normalizarIdsReservas(Array.isArray(Id_Reserva) ? Id_Reserva : [Id_Reserva]);
+    conditions.push(`R.Id_Reserva IN (${ids.map(() => '?').join(',')})`);
+    params.push(...ids);
+  }
 
   if (Fecha) {
     conditions.push('R.Fecha_Tour = ?');
@@ -179,7 +210,7 @@ function buildPassengerQuery(filtros = {}) {
     }
   }
   if (Nombre_Reportante) {
-    conditions.push("COALESCE(B.Nombre, R.Nombre_Reportante, '') LIKE ?");
+    conditions.push("CONCAT_WS(' ', COALESCE(E.Nombre, ''), COALESCE(R.Nombre_Reportante, '')) LIKE ?");
     params.push(`%${String(Nombre_Reportante).trim()}%`);
   }
   if (Estado && ESTADOS_LIQUIDACION.has(String(Estado).toUpperCase())) {
@@ -197,6 +228,17 @@ function buildPassengerQuery(filtros = {}) {
         R.Tipo_Reserva,
         C.Id_Canal,
         C.Nombre_Canal,
+        C.Tiene_Comision,
+        E.Id_Entidad_Reportante,
+        E.Tipo AS Tipo_Entidad,
+        E.Nombre AS Nombre_Entidad,
+        E.Activo AS Entidad_Activa,
+        E.Estado_Validacion AS Estado_Validacion_Entidad,
+        PC.Id_Perfil_Comision,
+        PC.Forma_Pago AS Forma_Pago_Perfil,
+        PC.Numero_Cuenta AS Cuenta_Perfil,
+        PC.Nombre_Receptor AS Nombre_Receptor_Perfil,
+        PC.DNI_Receptor AS DNI_Receptor_Perfil,
         T.Id_Tour,
         T.Nombre_Tour,
         P.Id_Pasajero,
@@ -204,44 +246,75 @@ function buildPassengerQuery(filtros = {}) {
         P.DNI,
         P.Tipo_Pasajero,
         P.Comision AS Comision_Pasajero,
-        B.Id_Beneficiario,
-        B.Tipo_Beneficiario,
-        B.Nombre AS Nombre_Beneficiario,
-        B.Telefono AS Telefono_Beneficiario,
-        B.Forma_Pago AS Forma_Pago_Beneficiario,
-        B.Numero_Cuenta AS Cuenta_Beneficiario,
-        B.Nombre_Receptor AS Nombre_Receptor_Beneficiario,
-        B.DNI_Receptor AS DNI_Receptor_Beneficiario,
         COALESCE(L.Estado, 'PENDIENTE') AS Estado_Liquidacion,
         L.Forma_Pago AS Forma_Pago_Liquidacion,
         L.Cuenta_Bancaria AS Cuenta_Liquidacion,
         L.Nombre_Receptor_Snap,
         L.DNI_Receptor_Snap,
-        L.Fecha_Pago
+        L.Fecha_Pago,
+        L.Monto_Comision_Pagada
       FROM ${reservasOperativasSource('R')}
       INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
       INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
       INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+      LEFT JOIN entidades_reportantes E ON E.Id_Entidad_Reportante = R.Id_Entidad_Reportante
+      LEFT JOIN perfiles_comision_entidad PC
+        ON PC.Id_Entidad_Reportante = E.Id_Entidad_Reportante AND PC.Activo = 1
       INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
-      LEFT JOIN beneficiarios_comision B
-        ON B.Id_Beneficiario = R.Id_Beneficiario_Comision
-       AND B.Activo = 1
       LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva
       WHERE ${conditions.join(' AND ')}
-      ORDER BY C.Nombre_Canal, COALESCE(B.Nombre, R.Nombre_Reportante), R.Id_Reserva, P.Id_Pasajero
+      ORDER BY C.Nombre_Canal, COALESCE(E.Nombre, R.Nombre_Reportante), R.Id_Reserva, P.Id_Pasajero
     `,
     params,
   };
 }
 
-function legacyBeneficiaryKey(row) {
-  return `${row.Id_Canal}:${String(row.Nombre_Reportante || '(Sin beneficiario)').trim().toLocaleUpperCase('es-CO')}`;
+function esFilaComisionable(row) {
+  const tipoCanal = tipoEntidadCanal(row.Nombre_Canal);
+  if (!Number(row.Tiene_Comision) || !tipoCanal || tipoCanal === 'AGENCIA_INTERNACIONAL') return false;
+  if (String(row.Tipo_Pasajero || '').toUpperCase() === 'INFANTE') return false;
+  if (tipoCanal === 'FREELANCE') return !row.Id_Entidad_Reportante;
+  return Boolean(row.Id_Entidad_Reportante)
+    && row.Tipo_Entidad === tipoCanal
+    && Number(row.Entidad_Activa) === 1
+    && row.Estado_Validacion_Entidad !== 'RECHAZADA';
+}
+
+function resumirReservasElegibles(rows) {
+  const reservas = new Map();
+  for (const row of rows) {
+    if (!esFilaComisionable(row)) continue;
+    if (!reservas.has(row.Id_Reserva)) {
+      reservas.set(row.Id_Reserva, {
+        ...row,
+        Monto_Comision: 0,
+        Num_Pasajeros: 0,
+        Comision_Minima: null,
+        Comision_Maxima: null,
+        pasajeros: [],
+      });
+    }
+    const reserva = reservas.get(row.Id_Reserva);
+    const comision = Number(row.Comision_Pasajero) || 0;
+    reserva.Monto_Comision += comision;
+    reserva.Num_Pasajeros += 1;
+    reserva.Comision_Minima = reserva.Comision_Minima === null ? comision : Math.min(reserva.Comision_Minima, comision);
+    reserva.Comision_Maxima = reserva.Comision_Maxima === null ? comision : Math.max(reserva.Comision_Maxima, comision);
+    reserva.pasajeros.push({
+      Id_Pasajero: Number(row.Id_Pasajero),
+      Nombre_Pasajero: row.Nombre_Pasajero,
+      DNI: row.DNI || null,
+      Tipo_Pasajero: row.Tipo_Pasajero || null,
+      Comision: comision,
+    });
+  }
+  return [...reservas.values()];
 }
 
 function agruparComisiones(rows) {
   const canales = new Map();
-
-  for (const row of rows) {
+  for (const row of resumirReservasElegibles(rows)) {
+    const tipoCanal = tipoEntidadCanal(row.Nombre_Canal);
     if (!canales.has(row.Id_Canal)) {
       canales.set(row.Id_Canal, {
         Id_Canal: Number(row.Id_Canal),
@@ -254,28 +327,31 @@ function agruparComisiones(rows) {
     }
 
     const canal = canales.get(row.Id_Canal);
-    const reportanteKey = row.Id_Beneficiario
-      ? `beneficiario:${row.Id_Beneficiario}`
-      : `legacy:${legacyBeneficiaryKey(row)}`;
-    const nombre = row.Nombre_Beneficiario || row.Nombre_Reportante || '(Sin beneficiario)';
+    const reportanteKey = tipoCanal === 'FREELANCE'
+      ? `reserva:${row.Id_Reserva}`
+      : `entidad:${row.Id_Entidad_Reportante}`;
+    const nombre = tipoCanal === 'FREELANCE'
+      ? (row.Nombre_Reportante || '(Sin reportante)')
+      : (row.Nombre_Entidad || '(Sin entidad)');
 
     if (!canal.reportantesMap.has(reportanteKey)) {
-      const forma = row.Forma_Pago_Beneficiario || row.Forma_Pago_Liquidacion || null;
-      const cuenta = row.Cuenta_Beneficiario || row.Cuenta_Liquidacion || null;
       canal.reportantesMap.set(reportanteKey, {
         Key_Beneficiario: reportanteKey,
-        Id_Beneficiario: row.Id_Beneficiario ? Number(row.Id_Beneficiario) : null,
+        Id_Entidad_Reportante: row.Id_Entidad_Reportante ? Number(row.Id_Entidad_Reportante) : null,
+        Id_Perfil_Comision: row.Id_Perfil_Comision ? Number(row.Id_Perfil_Comision) : null,
+        Tipo_Entidad: row.Tipo_Entidad || null,
+        Nombre_Entidad: row.Nombre_Entidad || null,
+        Nombre_Beneficiario: nombre,
         Id_Canal: Number(row.Id_Canal),
-        Tipo_Beneficiario: row.Tipo_Beneficiario || null,
-        Nombre_Reportante: nombre,
-        Telefono: row.Telefono_Beneficiario || row.Telefono_Reportante || null,
-        Centralizado: Boolean(row.Id_Beneficiario),
-        Forma_Pago: forma,
-        Cuenta_Bancaria: cuenta,
-        Nombre_Receptor: row.Nombre_Receptor_Beneficiario || row.Nombre_Receptor_Snap || null,
-        DNI_Receptor: row.DNI_Receptor_Beneficiario || row.DNI_Receptor_Snap || null,
+        Nombre_Reportante: tipoCanal === 'FREELANCE' ? (row.Nombre_Reportante || null) : null,
+        Telefono: tipoCanal === 'FREELANCE' ? (row.Telefono_Reportante || null) : null,
+        Centralizado: Boolean(row.Id_Perfil_Comision),
+        Forma_Pago: row.Forma_Pago_Perfil || row.Forma_Pago_Liquidacion || null,
+        Cuenta_Bancaria: row.Cuenta_Perfil || row.Cuenta_Liquidacion || null,
+        Nombre_Receptor: row.Nombre_Receptor_Perfil || row.Nombre_Receptor_Snap || null,
+        DNI_Receptor: row.DNI_Receptor_Perfil || row.DNI_Receptor_Snap || null,
         documentos: [],
-        Origen_Datos_Pago: row.Forma_Pago_Beneficiario ? 'CENTRALIZADO' : (row.Forma_Pago_Liquidacion ? 'HISTORICO' : 'SIN_DATOS'),
+        Origen_Datos_Pago: row.Forma_Pago_Perfil ? 'CENTRALIZADO' : (row.Forma_Pago_Liquidacion ? 'HISTORICO' : 'SIN_DATOS'),
         reservasMap: new Map(),
         Total_Reportante: 0,
         Pendiente_Reportante: 0,
@@ -284,40 +360,34 @@ function agruparComisiones(rows) {
     }
 
     const reportante = canal.reportantesMap.get(reportanteKey);
-    if (!reportante.reservasMap.has(row.Id_Reserva)) {
-      reportante.reservasMap.set(row.Id_Reserva, {
-        Id_Reserva: row.Id_Reserva,
-        Fecha_Tour: row.Fecha_Tour,
-        Id_Tour: Number(row.Id_Tour),
-        Nombre_Tour: row.Nombre_Tour,
-        Tipo_Reserva: row.Tipo_Reserva || null,
-        Num_Pasajeros: 0,
-        Total_Comision: 0,
-        Comision_Minima: null,
-        Comision_Maxima: null,
-        Estado_Liquidacion: row.Estado_Liquidacion,
-        Forma_Pago: row.Forma_Pago_Liquidacion || null,
-        Cuenta_Bancaria: row.Cuenta_Liquidacion || null,
-        Nombre_Receptor: row.Nombre_Receptor_Snap || null,
-        DNI_Receptor: row.DNI_Receptor_Snap || null,
-        Fecha_Pago: row.Fecha_Pago || null,
-        pasajeros: [],
-      });
-    }
-
-    const reserva = reportante.reservasMap.get(row.Id_Reserva);
-    const comision = Number(row.Comision_Pasajero) || 0;
-    reserva.Num_Pasajeros += 1;
-    reserva.Total_Comision += comision;
-    reserva.Comision_Minima = reserva.Comision_Minima === null ? comision : Math.min(reserva.Comision_Minima, comision);
-    reserva.Comision_Maxima = reserva.Comision_Maxima === null ? comision : Math.max(reserva.Comision_Maxima, comision);
-    reserva.pasajeros.push({
-      Id_Pasajero: Number(row.Id_Pasajero),
-      Nombre_Pasajero: row.Nombre_Pasajero,
-      DNI: row.DNI || null,
-      Tipo_Pasajero: row.Tipo_Pasajero || null,
-      Comision: comision,
-    });
+    const reserva = {
+      Id_Reserva: row.Id_Reserva,
+      Fecha_Tour: row.Fecha_Tour,
+      Id_Tour: Number(row.Id_Tour),
+      Nombre_Tour: row.Nombre_Tour,
+      Nombre_Reportante: row.Nombre_Reportante || null,
+      Telefono_Reportante: row.Telefono_Reportante || null,
+      Tipo_Reserva: row.Tipo_Reserva || null,
+      Num_Pasajeros: row.Num_Pasajeros,
+      Total_Comision: row.Monto_Comision,
+      Comision_Minima: row.Comision_Minima,
+      Comision_Maxima: row.Comision_Maxima,
+      Estado_Liquidacion: row.Estado_Liquidacion,
+      Forma_Pago: row.Forma_Pago_Liquidacion || null,
+      Cuenta_Bancaria: row.Cuenta_Liquidacion || null,
+      Nombre_Receptor: row.Nombre_Receptor_Snap || null,
+      DNI_Receptor: row.DNI_Receptor_Snap || null,
+      Fecha_Pago: row.Fecha_Pago || null,
+      Monto_Comision_Pagada: row.Monto_Comision_Pagada == null ? null : Number(row.Monto_Comision_Pagada),
+      pasajeros: row.pasajeros,
+    };
+    reportante.reservasMap.set(row.Id_Reserva, reserva);
+    const pagado = reserva.Estado_Liquidacion === 'PAGADO';
+    reportante.Total_Reportante += reserva.Total_Comision;
+    reportante.Pendiente_Reportante += pagado ? 0 : reserva.Total_Comision;
+    reportante.Pagado_Reportante += pagado
+      ? (reserva.Monto_Comision_Pagada == null ? reserva.Total_Comision : reserva.Monto_Comision_Pagada)
+      : 0;
   }
 
   const result = [];
@@ -325,12 +395,6 @@ function agruparComisiones(rows) {
     const reportantes = [];
     for (const reportante of canal.reportantesMap.values()) {
       const reservas = Array.from(reportante.reservasMap.values());
-      for (const reserva of reservas) {
-        const pagado = reserva.Estado_Liquidacion === 'PAGADO';
-        reportante.Total_Reportante += reserva.Total_Comision;
-        reportante.Pendiente_Reportante += pagado ? 0 : reserva.Total_Comision;
-        reportante.Pagado_Reportante += pagado ? reserva.Total_Comision : 0;
-      }
       canal.Total_Canal += reportante.Total_Reportante;
       canal.Pendiente_Canal += reportante.Pendiente_Reportante;
       canal.Pagado_Canal += reportante.Pagado_Reportante;
@@ -347,59 +411,71 @@ async function listarComisiones(filtros = {}) {
   if (!filtros.Fecha) return [];
   const { sql, params } = buildPassengerQuery(filtros);
   const [rows] = await db.query(sql, params);
-  const grouped = agruparComisiones(rows);
-  const beneficiaryIds = [...new Set(rows.map(row => Number(row.Id_Beneficiario)).filter(id => Number.isInteger(id) && id > 0))];
-  if (!beneficiaryIds.length) return grouped;
-  const [documents] = await db.query(
-    `SELECT Id_Documento, Id_Beneficiario, Nombre_Original, Mime_Type, Tamano_Bytes, Fecha_Creacion
-     FROM beneficiarios_comision_documentos
-     WHERE Id_Beneficiario IN (?)
-     ORDER BY Fecha_Creacion DESC, Id_Documento DESC`,
-    [beneficiaryIds],
-  );
-  const byBeneficiary = new Map();
-  for (const document of documents || []) {
-    const id = Number(document.Id_Beneficiario);
-    if (!byBeneficiary.has(id)) byBeneficiary.set(id, []);
-    byBeneficiary.get(id).push({
-      ...document,
-      Id_Documento: Number(document.Id_Documento),
-      Id_Beneficiario: id,
-      Tamano_Bytes: Number(document.Tamano_Bytes || 0),
-    });
-  }
-  for (const channel of grouped) {
-    for (const beneficiary of channel.reportantes) {
-      beneficiary.documentos = byBeneficiary.get(Number(beneficiary.Id_Beneficiario)) || [];
-    }
-  }
-  return grouped;
+  return agruparComisiones(rows);
 }
 
-async function obtenerReservasElegibles(conn, ids, lock = false) {
+async function bloquearReservas(conn, ids) {
   const placeholders = ids.map(() => '?').join(',');
   const [rows] = await conn.query(
-    `SELECT
-       R.Id_Reserva,
-       R.Id_Canal,
-       R.Id_Beneficiario_Comision,
-       COALESCE(B.Nombre, R.Nombre_Reportante, '(Sin beneficiario)') AS Nombre_Beneficiario
-     FROM ${reservasOperativasSource('R')}
-     LEFT JOIN beneficiarios_comision B ON B.Id_Beneficiario = R.Id_Beneficiario_Comision
-     WHERE R.Id_Reserva IN (${placeholders})
-       AND R.Fecha_Tour <= CURDATE()
-       AND UPPER(TRIM(COALESCE(R.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')
-       AND EXISTS (
-         SELECT 1
-         FROM pasajeros P
-         WHERE P.Id_Reserva = R.Id_Reserva
-           AND P.Confirmacion = 1
-           AND P.Comision > 0
-       )
-     ${lock ? 'FOR UPDATE' : ''}`,
+    `SELECT R.Id_Reserva FROM reservas R
+     WHERE R.Id_Reserva IN (${placeholders}) AND ${reservaNoEliminadaPredicate('R')}
+     FOR UPDATE`,
     ids,
   );
   return rows;
+}
+
+async function obtenerReservasElegibles(conn, ids) {
+  const { sql, params } = buildPassengerQuery({ Id_Reserva: ids });
+  const [rows] = await conn.query(sql, params);
+  return resumirReservasElegibles(rows);
+}
+
+function claveGrupoReserva(row) {
+  const tipoCanal = tipoEntidadCanal(row.Nombre_Canal);
+  if (!Number(row.Tiene_Comision) || tipoCanal === 'AGENCIA_INTERNACIONAL') {
+    throw createServiceError('El canal de una o más reservas no genera comisiones.', 409, 'CHANNEL_NOT_COMMISSIONABLE');
+  }
+  if (tipoCanal === 'HOTEL' || tipoCanal === 'AGENCIA_NACIONAL') {
+    if (!row.Id_Entidad_Reportante || row.Tipo_Entidad !== tipoCanal) {
+      throw createServiceError('La reserva no tiene una entidad reportante válida para su canal.', 409, 'ENTITY_COMMISSION_MISMATCH');
+    }
+    return `entidad:${row.Id_Entidad_Reportante}`;
+  }
+  if (tipoCanal === 'FREELANCE' && !row.Id_Entidad_Reportante) return `reserva:${row.Id_Reserva}`;
+  throw createServiceError('El canal de una o más reservas no está configurado para comisiones.', 409, 'CHANNEL_NOT_COMMISSIONABLE');
+}
+
+function datosPagoEfectivos(grupo, reservas, estado) {
+  const tipoCanal = tipoEntidadCanal(reservas[0]?.Nombre_Canal);
+  if (tipoCanal === 'FREELANCE' && reservas.length !== 1) {
+    throw createServiceError('Cada reserva Freelance se debe liquidar de forma independiente.', 400, 'FREELANCE_GROUP_NOT_ALLOWED');
+  }
+  const claves = new Set(reservas.map(claveGrupoReserva));
+  if (claves.size !== 1) {
+    throw createServiceError('Cada grupo de pago debe corresponder a una entidad o a una sola reserva Freelance.', 400, 'MIXED_COMMISSION_GROUP');
+  }
+  const perfil = TIPOS_ENTIDAD_COMISIONABLE.has(tipoCanal) && reservas[0].Id_Perfil_Comision
+    && reservas[0].Forma_Pago_Perfil
+    ? reservas[0]
+    : null;
+  const forma = perfil?.Forma_Pago_Perfil ?? grupo.Forma_Pago;
+  const cuenta = perfil?.Cuenta_Perfil ?? grupo.Cuenta_Bancaria;
+  const receptorNombre = perfil?.Nombre_Receptor_Perfil ?? grupo.Nombre_Receptor;
+  const receptorDni = perfil?.DNI_Receptor_Perfil ?? grupo.DNI_Receptor;
+  const paymentRequired = estado === 'PAGADO';
+  const pago = validarDatosPago(forma, cuenta, {
+    permitirVacio: !paymentRequired,
+    permitirCuentaVacia: !paymentRequired,
+  });
+  const receptor = validarReceptor(receptorNombre, receptorDni, estado === 'PAGADO' ? pago.Forma_Pago : null);
+  return {
+    ...pago,
+    ...receptor,
+    Nombre_Beneficiario: tipoCanal === 'FREELANCE'
+      ? (receptor.Nombre_Receptor || reservas[0].Nombre_Reportante || null)
+      : reservas[0].Nombre_Entidad,
+  };
 }
 
 async function actualizarLiquidacionesLote(payload, userId = null) {
@@ -413,12 +489,7 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
 
   const grupos = payload.pagos.map((grupo) => {
     const reservas = normalizarIdsReservas(grupo.reservas);
-    const pago = validarDatosPago(grupo.Forma_Pago, grupo.Cuenta_Bancaria, {
-      permitirVacio: true,
-      permitirCuentaVacia: true,
-    });
-    const receptor = validarReceptor(grupo.Nombre_Receptor, grupo.DNI_Receptor, estado === 'PAGADO' ? pago.Forma_Pago : null);
-    return { ...pago, ...receptor, reservas };
+    return { ...grupo, reservas };
   });
   const allIds = grupos.flatMap((grupo) => grupo.reservas);
   const uniqueIds = [...new Set(allIds)];
@@ -429,7 +500,13 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const elegibles = await obtenerReservasElegibles(conn, uniqueIds, true);
+    const locked = await bloquearReservas(conn, uniqueIds);
+    if (locked.length !== uniqueIds.length) {
+      const found = new Set(locked.map((row) => String(row.Id_Reserva)));
+      throw createServiceError('Algunas reservas ya no están disponibles para liquidar.', 409, 'COMMISSION_CHANGED',
+        uniqueIds.filter((id) => !found.has(String(id))));
+    }
+    const elegibles = await obtenerReservasElegibles(conn, uniqueIds);
     if (elegibles.length !== uniqueIds.length) {
       const found = new Set(elegibles.map((row) => String(row.Id_Reserva)));
       const invalidas = uniqueIds.filter((id) => !found.has(String(id)));
@@ -442,21 +519,25 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
     }
 
     const byId = new Map(elegibles.map((row) => [String(row.Id_Reserva), row]));
+    const montoPorReserva = Object.fromEntries(elegibles.map((row) => [String(row.Id_Reserva), Number(row.Monto_Comision || 0)]));
+    const montoTotalLote = Object.values(montoPorReserva).reduce((sum, value) => sum + value, 0);
     const fechaPago = estado === 'PAGADO' ? fechaBogota() : null;
     const values = [];
     for (const grupo of grupos) {
+      const groupRows = grupo.reservas.map((idReserva) => byId.get(String(idReserva)));
+      const payment = datosPagoEfectivos(grupo, groupRows, estado);
       for (const idReserva of grupo.reservas) {
         const reserva = byId.get(String(idReserva));
         values.push([
           idReserva,
-          reserva.Id_Beneficiario_Comision || null,
-          reserva.Nombre_Beneficiario || null,
-          grupo.Forma_Pago,
-          grupo.Numero_Cuenta,
-          grupo.Nombre_Receptor,
-          grupo.DNI_Receptor,
+          payment.Nombre_Beneficiario,
+          payment.Forma_Pago,
+          payment.Numero_Cuenta,
+          payment.Nombre_Receptor,
+          payment.DNI_Receptor,
           estado,
           fechaPago,
+          estado === 'PAGADO' ? Number(reserva.Monto_Comision) : null,
           userId || null,
           userId || null,
         ]);
@@ -465,12 +546,11 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
 
     await conn.query(
       `INSERT INTO liquidaciones
-       (Id_Reserva, Id_Beneficiario_Comision, Nombre_Beneficiario_Snap,
-        Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap, Estado, Fecha_Pago,
+       (Id_Reserva, Nombre_Beneficiario_Snap,
+        Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap, Estado, Fecha_Pago, Monto_Comision_Pagada,
         Creado_Por, Actualizado_Por)
        VALUES ?
        ON DUPLICATE KEY UPDATE
-         Id_Beneficiario_Comision = VALUES(Id_Beneficiario_Comision),
          Nombre_Beneficiario_Snap = VALUES(Nombre_Beneficiario_Snap),
          Forma_Pago = VALUES(Forma_Pago),
          Cuenta_Bancaria = VALUES(Cuenta_Bancaria),
@@ -478,6 +558,7 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
          DNI_Receptor_Snap = VALUES(DNI_Receptor_Snap),
          Estado = VALUES(Estado),
          Fecha_Pago = VALUES(Fecha_Pago),
+         Monto_Comision_Pagada = VALUES(Monto_Comision_Pagada),
          Actualizado_Por = VALUES(Actualizado_Por)`,
       [values],
     );
@@ -491,11 +572,18 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
       detalles: [
         { columna: 'Reservas', anterior: null, nuevo: uniqueIds.length },
         { columna: 'Estado', anterior: null, nuevo: estado },
+        ...(estado === 'PAGADO' ? [
+          { columna: 'Monto_Comision_Pagada_Total', anterior: null, nuevo: montoTotalLote },
+          { columna: 'Montos_Por_Reserva', anterior: null, nuevo: JSON.stringify(montoPorReserva) },
+        ] : []),
       ],
     });
 
     await conn.commit();
-    return { updated: uniqueIds.length };
+    return {
+      updated: uniqueIds.length,
+      ...(estado === 'PAGADO' ? { montos: montoPorReserva } : {}),
+    };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -524,17 +612,24 @@ async function actualizarDatosPago(payload, userId = null) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const elegibles = await obtenerReservasElegibles(conn, reservas, true);
+    const locked = await bloquearReservas(conn, reservas);
+    if (locked.length !== reservas.length) {
+      throw createServiceError('La selección cambió. Actualiza la consulta e inténtalo nuevamente.', 409, 'COMMISSION_CHANGED');
+    }
+    const elegibles = await obtenerReservasElegibles(conn, reservas);
     if (elegibles.length !== reservas.length) {
       throw createServiceError('La selección cambió. Actualiza la consulta e inténtalo nuevamente.', 409, 'COMMISSION_CHANGED');
+    }
+    const groupKeys = new Set(elegibles.map(claveGrupoReserva));
+    if (groupKeys.size !== 1 || (tipoEntidadCanal(elegibles[0].Nombre_Canal) === 'FREELANCE' && elegibles.length !== 1)) {
+      throw createServiceError('Actualiza los datos de pago por entidad o por una sola reserva Freelance.', 400, 'MIXED_COMMISSION_GROUP');
     }
     const byId = new Map(elegibles.map((row) => [String(row.Id_Reserva), row]));
     const values = reservas.map((idReserva) => {
       const reserva = byId.get(String(idReserva));
       return [
         idReserva,
-        reserva.Id_Beneficiario_Comision || null,
-        reserva.Nombre_Beneficiario || null,
+        reserva.Nombre_Entidad || receptor.Nombre_Receptor || reserva.Nombre_Reportante || null,
         'PENDIENTE',
         pago.Forma_Pago,
         pago.Numero_Cuenta,
@@ -547,12 +642,11 @@ async function actualizarDatosPago(payload, userId = null) {
 
     await conn.query(
       `INSERT INTO liquidaciones
-       (Id_Reserva, Id_Beneficiario_Comision, Nombre_Beneficiario_Snap,
+       (Id_Reserva, Nombre_Beneficiario_Snap,
         Estado, Forma_Pago, Cuenta_Bancaria, Nombre_Receptor_Snap, DNI_Receptor_Snap,
         Creado_Por, Actualizado_Por)
        VALUES ?
        ON DUPLICATE KEY UPDATE
-         Id_Beneficiario_Comision = VALUES(Id_Beneficiario_Comision),
          Nombre_Beneficiario_Snap = VALUES(Nombre_Beneficiario_Snap),
          Forma_Pago = VALUES(Forma_Pago),
          Cuenta_Bancaria = VALUES(Cuenta_Bancaria),
@@ -583,6 +677,134 @@ async function actualizarDatosPago(payload, userId = null) {
   }
 }
 
+function validarIdEntidadComision(value) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw createServiceError('Selecciona una entidad reportante válida.', 400, 'ENTITY_INVALID');
+  }
+  return id;
+}
+
+function validarTipoEntidadConPerfil(entity) {
+  if (!entity || !TIPOS_ENTIDAD_COMISIONABLE.has(entity.Tipo)) {
+    throw createServiceError(
+      'Solo HOTEL y AGENCIA NACIONAL pueden tener un perfil de comisión reutilizable.',
+      400,
+      'ENTITY_COMMISSION_PROFILE_FORBIDDEN',
+    );
+  }
+}
+
+async function obtenerPerfilComisionEntidad(idEntidad) {
+  const entityId = validarIdEntidadComision(idEntidad);
+  const [[entity]] = await db.query(
+    'SELECT Id_Entidad_Reportante, Tipo, Nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante = ? LIMIT 1',
+    [entityId],
+  );
+  if (!entity) throw createServiceError('La entidad reportante no existe.', 404, 'ENTITY_NOT_FOUND');
+  validarTipoEntidadConPerfil(entity);
+  const [[profile]] = await db.query(
+    `SELECT Id_Perfil_Comision, Id_Entidad_Reportante, Forma_Pago, Numero_Cuenta,
+            Nombre_Receptor, DNI_Receptor, Activo, Creado_Por, Actualizado_Por,
+            Fecha_Registro, Fecha_Actualizacion
+       FROM perfiles_comision_entidad
+      WHERE Id_Entidad_Reportante = ? LIMIT 1`,
+    [entityId],
+  );
+  return profile ? { ...profile, Tipo_Entidad: entity.Tipo, Nombre_Entidad: entity.Nombre } : null;
+}
+
+async function guardarPerfilComisionEntidad(payload, userId = null) {
+  const entityId = validarIdEntidadComision(payload?.Id_Entidad_Reportante);
+  const pago = validarDatosPago(payload?.Forma_Pago, payload?.Numero_Cuenta);
+  const receptor = validarReceptor(payload?.Nombre_Receptor, payload?.DNI_Receptor, pago.Forma_Pago);
+  const requestedProfileId = payload?.Id_Perfil_Comision == null ? null : Number(payload.Id_Perfil_Comision);
+  if (requestedProfileId !== null && (!Number.isSafeInteger(requestedProfileId) || requestedProfileId <= 0)) {
+    throw createServiceError('El perfil de comisión no es válido.', 400, 'PROFILE_INVALID');
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[entity]] = await conn.query(
+      `SELECT Id_Entidad_Reportante, Tipo, Nombre FROM entidades_reportantes
+        WHERE Id_Entidad_Reportante = ? FOR UPDATE`,
+      [entityId],
+    );
+    if (!entity) throw createServiceError('La entidad reportante no existe.', 404, 'ENTITY_NOT_FOUND');
+    validarTipoEntidadConPerfil(entity);
+
+    const [[existing]] = await conn.query(
+      `SELECT Id_Perfil_Comision, Forma_Pago, Numero_Cuenta, Nombre_Receptor, DNI_Receptor
+         FROM perfiles_comision_entidad WHERE Id_Entidad_Reportante = ? LIMIT 1 FOR UPDATE`,
+      [entityId],
+    );
+    if (requestedProfileId && existing && Number(existing.Id_Perfil_Comision) !== requestedProfileId) {
+      throw createServiceError('El perfil no pertenece a la entidad indicada.', 409, 'PROFILE_ENTITY_MISMATCH');
+    }
+
+    let profileId;
+    let created = false;
+    if (existing) {
+      profileId = Number(existing.Id_Perfil_Comision);
+      await conn.query(
+        `UPDATE perfiles_comision_entidad
+            SET Forma_Pago = ?, Numero_Cuenta = ?, Nombre_Receptor = ?, DNI_Receptor = ?,
+                Activo = 1, Actualizado_Por = ?
+          WHERE Id_Perfil_Comision = ?`,
+        [pago.Forma_Pago, pago.Numero_Cuenta, receptor.Nombre_Receptor, receptor.DNI_Receptor,
+          userId || null, profileId],
+      );
+    } else {
+      if (requestedProfileId) throw createServiceError('El perfil de comisión ya no existe.', 404, 'PROFILE_NOT_FOUND');
+      const [result] = await conn.query(
+        `INSERT INTO perfiles_comision_entidad
+          (Id_Entidad_Reportante, Forma_Pago, Numero_Cuenta, Nombre_Receptor, DNI_Receptor,
+           Creado_Por, Actualizado_Por)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [entityId, pago.Forma_Pago, pago.Numero_Cuenta, receptor.Nombre_Receptor, receptor.DNI_Receptor,
+          userId || null, userId || null],
+      );
+      profileId = Number(result.insertId);
+      created = true;
+    }
+
+    await recordHistorial({
+      conexion: conn,
+      tabla: 'perfiles_comision_entidad',
+      id_registro: profileId,
+      accion: created ? 'CREAR_PERFIL_COMISION_ENTIDAD' : 'ACTUALIZAR_PERFIL_COMISION_ENTIDAD',
+      id_usuario: userId,
+      detalles: [
+        { columna: 'Id_Entidad_Reportante', anterior: null, nuevo: entityId },
+        { columna: 'Forma_Pago', anterior: existing?.Forma_Pago || null, nuevo: pago.Forma_Pago },
+        { columna: 'Numero_Cuenta', anterior: existing?.Numero_Cuenta ? `***${String(existing.Numero_Cuenta).slice(-4)}` : null,
+          nuevo: pago.Numero_Cuenta ? `***${pago.Numero_Cuenta.slice(-4)}` : 'EFECTIVO' },
+        { columna: 'Nombre_Receptor', anterior: existing?.Nombre_Receptor || null, nuevo: receptor.Nombre_Receptor },
+        { columna: 'DNI_Receptor', anterior: enmascararDocumento(existing?.DNI_Receptor), nuevo: enmascararDocumento(receptor.DNI_Receptor) },
+      ],
+    });
+    await conn.commit();
+    return {
+      Id_Perfil_Comision: profileId,
+      Id_Entidad_Reportante: entityId,
+      Tipo_Entidad: entity.Tipo,
+      Nombre_Entidad: entity.Nombre,
+      Forma_Pago: pago.Forma_Pago,
+      Numero_Cuenta: pago.Numero_Cuenta,
+      Nombre_Receptor: receptor.Nombre_Receptor,
+      DNI_Receptor: receptor.DNI_Receptor,
+      Activo: 1,
+      created,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 async function guardarBeneficiarioDesdeComision(payload, userId = null, files = []) {
   const Id_Canal = Number(payload?.Id_Canal);
   const tipo = String(payload?.Tipo_Beneficiario || '').trim().toUpperCase();
@@ -597,7 +819,7 @@ async function guardarBeneficiarioDesdeComision(payload, userId = null, files = 
   }
   const preparedDocuments = await Promise.all(uploadedFiles.map(prepararDocumento));
 
-  if (!Number.isInteger(Id_Canal) || Id_Canal <= 0 || !TIPOS_BENEFICIARIO.has(tipo) || nombre.length < 2) {
+  if (!Number.isInteger(Id_Canal) || Id_Canal <= 0 || !LEGACY_TIPOS_BENEFICIARIO.has(tipo) || nombre.length < 2) {
     throw createServiceError('Completa correctamente el beneficiario.', 400, 'INVALID_BENEFICIARY');
   }
 
@@ -859,7 +1081,7 @@ async function generarExcelComisiones(filtros, res) {
     for (const rep of canal.reportantes) {
       summary.addRow({
         canal: canal.Nombre_Canal,
-        beneficiario: rep.Nombre_Reportante,
+        beneficiario: rep.Nombre_Beneficiario || rep.Nombre_Entidad || rep.Nombre_Reportante || '',
         medio: paymentLabel(rep.Forma_Pago),
         cuenta: rep.Cuenta_Bancaria || (rep.Forma_Pago === 'EFECTIVO' ? 'EFECTIVO' : ''),
         receptor: rep.Nombre_Receptor || '',
@@ -905,7 +1127,7 @@ async function generarExcelComisiones(filtros, res) {
         for (const pasajero of reserva.pasajeros) {
           ws.addRow({
             reserva: reserva.Id_Reserva,
-            beneficiario: rep.Nombre_Reportante,
+            beneficiario: rep.Nombre_Beneficiario || rep.Nombre_Entidad || rep.Nombre_Reportante || '',
             pasajero: pasajero.Nombre_Pasajero,
             dni: pasajero.DNI || '',
             tipo: pasajero.Tipo_Pasajero || '',
@@ -949,6 +1171,8 @@ module.exports = {
   actualizarLiquidacion,
   actualizarLiquidacionesLote,
   actualizarDatosPago,
+  obtenerPerfilComisionEntidad,
+  guardarPerfilComisionEntidad,
   guardarBeneficiarioDesdeComision,
   obtenerDocumentoBeneficiario,
   eliminarDocumentoBeneficiario,
@@ -956,6 +1180,10 @@ module.exports = {
   // Exportados para pruebas unitarias.
   agruparComisiones,
   buildPassengerQuery,
+  condicionesElegibilidadComision,
+  tipoEntidadCanal,
+  claveGrupoReserva,
+  datosPagoEfectivos,
   validarDatosPago,
   normalizarFormaPago,
   validarReceptor,

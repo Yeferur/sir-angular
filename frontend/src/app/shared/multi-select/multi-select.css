@@ -1,0 +1,52 @@
+.multi-filter { position: relative; width: 100%; }
+.multi-filter-trigger {
+  width: 100%; min-height: 41px; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; background-color: var(--bg-tertiary); border: 1.5px solid var(--separator-color);
+  border-radius: 11px; padding: 9px 12px; font-size: .92rem; font-family: var(--font-family);
+  color: var(--text-primary); cursor: pointer; text-align: left;
+  transition: border-color .18s, background .18s, box-shadow .18s, color .18s;
+}
+.multi-filter-trigger:hover { border-color: color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color)); }
+.multi-filter-trigger.active, .multi-filter-trigger:focus-visible {
+  border-color: var(--accent-blue); background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1); outline: none;
+}
+.multi-filter-trigger.multi-filter-trigger-active { color: var(--accent-blue); }
+.multi-filter-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.multi-filter-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; width: max-content; min-width: 100%; max-width: min(500px, 90vw);
+  background: var(--bg-secondary); border: 1.5px solid var(--separator-color); border-radius: 12px;
+  padding: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto;
+  z-index: 500; box-shadow: 0 12px 30px rgba(0,0,0,.26); animation: sirMultiFilterFadeDown .16s ease;
+}
+.multi-filter-option {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; background: transparent;
+  border: 1px solid transparent; border-radius: 9px; color: var(--text-primary); font-size: .87rem;
+  font-family: var(--font-family); padding: 8px 10px; cursor: pointer; text-align: left;
+  word-wrap: break-word; overflow-wrap: break-word; transition: background .15s, border-color .15s;
+}
+.multi-filter-option span:last-child { white-space: normal; word-break: break-word; flex: 1; }
+.multi-filter-option:hover { background: var(--bg-tertiary); border-color: var(--separator-color); }
+.multi-filter-option:disabled { opacity: .55; cursor: not-allowed; }
+.multi-filter-checkbox {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--separator-color);
+  background: var(--bg-tertiary); color: #fff; display: inline-flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: border-color .15s, background .15s;
+}
+.multi-filter-checkbox.checked { background: var(--accent-blue); border-color: var(--accent-blue); }
+.multi-filter-clear {
+  margin-top: 2px; width: 100%; background: rgba(10, 132, 255, .08); border: 1px dashed rgba(10, 132, 255, .28);
+  border-radius: 9px; color: var(--accent-blue); font-size: .82rem; font-weight: 700;
+  font-family: var(--font-family); padding: 8px 10px; cursor: pointer; transition: filter .15s, border-color .15s;
+}
+.multi-filter-clear:hover { filter: brightness(1.06); border-color: rgba(10, 132, 255, .46); }
+.multi-filter-clear:disabled { opacity: .5; cursor: not-allowed; }
+
+@keyframes sirMultiFilterFadeDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 560px) {
+  .multi-filter-menu { min-width: 0; }
+}

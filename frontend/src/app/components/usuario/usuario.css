@@ -90,31 +90,6 @@
   color: var(--accent-red);
 }
 
-.btn-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--separator-color);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
-}
-
-.btn-close:hover {
-  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
-  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
-  color: var(--accent-red);
-  transform: translateY(-1px);
-}
-
 .detail-scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -558,7 +533,6 @@
     animation: none;
   }
 
-  .btn-close,
   .btn-primary,
   .btn-secondary,
   .btn-danger {

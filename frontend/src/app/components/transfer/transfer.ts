@@ -17,6 +17,7 @@ import { SirAlertService } from '../../services/Alertas/alert.service';
 import { UiStateService } from '../../services/ui-state.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 import { toUserErrorMessage } from '../../shared/errors/user-error-message';
 
 import jsPDF from 'jspdf';
@@ -89,7 +90,7 @@ interface TransferDetalle {
 @Component({
   selector: 'app-transfer-dynamic',
   standalone: true,
-  imports: [CommonModule, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, DrawerCloseButtonComponent],
   templateUrl: './transfer.html',
   styleUrls: ['./transfer.css']
 })

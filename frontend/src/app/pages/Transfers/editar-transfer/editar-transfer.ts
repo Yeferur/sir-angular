@@ -8,6 +8,8 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
+import type { Canal, EntidadReportante } from '../../../services/Reservas/reservas';
+import { tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
@@ -229,7 +231,9 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   private isResponsableStepValid(): boolean {
     return !!(
       this.form?.get('Reporta')?.valid &&
-      this.form?.get('TelefonoReserva')?.valid
+      this.form?.get('TelefonoReserva')?.valid &&
+      this.form?.get('Id_Canal')?.valid &&
+      (!this.tipoEntidadSeleccionada() || this.form?.get('Id_Entidad_Reportante')?.valid)
     );
   }
 
@@ -262,6 +266,8 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       case 1:
         this.form.get('Reporta')?.markAsTouched();
         this.form.get('TelefonoReserva')?.markAsTouched();
+        this.form.get('Id_Canal')?.markAsTouched();
+        this.form.get('Id_Entidad_Reportante')?.markAsTouched();
         this.navbar.showAlert({
           type: 'warning',
           title: 'Paso incompleto',
@@ -304,8 +310,9 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         return requiredTouchedInvalid || !!flightInvalid || (cantidad !== null && !this.selectedRango);
       }
       case 1:
-        return ['Reporta', 'TelefonoReserva'].some((name) => {
+        return ['Reporta', 'TelefonoReserva', 'Id_Canal', 'Id_Entidad_Reportante'].some((name) => {
           const control = this.form?.get(name);
+          if (name === 'Id_Entidad_Reportante' && !this.tipoEntidadSeleccionada()) return false;
           return !!(control?.touched && control.invalid);
         });
       case 2:
@@ -324,12 +331,121 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   resultsServicioTransfer: any[] = [];
   resultsRangos: any[] = [];
   resultsMonedas: any[] = [];
+  resultsCanales: Canal[] = [];
+  resultsEntidadesReportantes: EntidadReportante[] = [];
+  busquedaEntidad = '';
+  entidadAutocompleteOpen = false;
+  entidadCargando = false;
+  entidadError = '';
+  private entidadSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private entidadSearchVersion = 0;
   selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
   valorEsEditable = false;
   private rangoLookupSeq = 0;
   showFlightFields = false;
+
+  get canalSelectOptions(): SirSelectOption[] {
+    return this.resultsCanales.map((canal) => ({ value: String(canal.Id_Canal), label: canal.Nombre_Canal }));
+  }
+
+  tipoEntidadSeleccionada(): EntidadReportante['Tipo'] | null {
+    return tipoEntidadPorCanal(this.resultsCanales, this.form?.get('Id_Canal')?.value);
+  }
+
+  onCanalEntidadChange(preserve = false): void {
+    const control = this.form?.get('Id_Entidad_Reportante');
+    const tipo = this.tipoEntidadSeleccionada();
+    control?.setValidators(tipo ? [Validators.required] : []);
+    if (!tipo || !preserve) control?.setValue(null, { emitEvent: false });
+    control?.updateValueAndValidity({ emitEvent: false });
+    if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
+    this.entidadSearchVersion++;
+    if (!preserve) this.busquedaEntidad = '';
+    this.entidadAutocompleteOpen = false;
+    this.entidadCargando = false;
+    this.entidadError = '';
+    this.resultsEntidadesReportantes = [];
+    if (!tipo) { this.cdr.markForCheck(); return; }
+    if (preserve && control?.value && this.busquedaEntidad.trim().length >= 2) this.buscarEntidadesReportantes();
+    this.cdr.markForCheck();
+  }
+
+  onEntidadInput(value: string): void {
+    const currentId = this.form?.get('Id_Entidad_Reportante')?.value;
+    const previousValue = this.busquedaEntidad;
+    if (currentId && value !== previousValue) this.form.get('Id_Entidad_Reportante')?.setValue(null);
+    this.busquedaEntidad = value;
+    if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
+    this.entidadSearchVersion++;
+    this.entidadCargando = false;
+    const term = value.trim();
+    this.entidadError = '';
+    this.entidadAutocompleteOpen = term.length >= 2;
+    if (term.length < 2) {
+      this.entidadCargando = false;
+      this.resultsEntidadesReportantes = [];
+      this.cdr.markForCheck();
+      return;
+    }
+    this.entidadSearchTimer = setTimeout(() => this.buscarEntidadesReportantes(), 220);
+  }
+
+  abrirSugerenciasEntidad(): void {
+    const selectedId = this.form?.get('Id_Entidad_Reportante')?.value;
+    if (selectedId && this.busquedaEntidad) return;
+    if (this.busquedaEntidad.trim().length >= 2) {
+      this.entidadAutocompleteOpen = true;
+      this.onEntidadInput(this.busquedaEntidad);
+    }
+  }
+
+  cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
+
+  seleccionarEntidadReportante(entidad: EntidadReportante): void {
+    this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = entidad.Nombre;
+    this.resultsEntidadesReportantes = [entidad];
+    this.entidadAutocompleteOpen = false;
+    this.entidadError = '';
+    this.cdr.markForCheck();
+  }
+
+  private buscarEntidadesReportantes(): void {
+    const type = this.tipoEntidadSeleccionada();
+    const term = this.busquedaEntidad.trim();
+    if (!type || term.length < 2) return;
+    const version = ++this.entidadSearchVersion;
+    this.entidadCargando = true;
+    this.entidadError = '';
+    this.transferSvc.getEntidadesReportantes(type, term).subscribe({
+      next: (entities) => {
+        if (version !== this.entidadSearchVersion) return;
+        this.resultsEntidadesReportantes = Array.isArray(entities) ? entities : [];
+        this.entidadCargando = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        if (version !== this.entidadSearchVersion) return;
+        this.entidadError = 'No pudimos buscar las entidades reportantes.';
+        this.entidadCargando = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  nombreCanalSeleccionado(): string {
+    const id = this.form?.get('Id_Canal')?.value;
+    return this.resultsCanales.find((canal) => String(canal.Id_Canal) === String(id))?.Nombre_Canal || '—';
+  }
+
+  nombreEntidadSeleccionada(): string {
+    const id = this.form?.get('Id_Entidad_Reportante')?.value;
+    return this.resultsEntidadesReportantes.find((entidad) => String(entidad.Id_Entidad_Reportante) === String(id))?.Nombre
+      || this.busquedaEntidad || '—';
+  }
 
   // Archivos de comprobantes
   pagoPagadoFile: File | null = null;
@@ -714,6 +830,8 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
   ngOnInit(): void {
     this.form = this.fb.group({
+      Id_Canal: [null, Validators.required],
+      Id_Entidad_Reportante: [null],
       Titular: ['', Validators.required],
       DNI: [''],
       TelefonoTitular: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
@@ -816,6 +934,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
       servicios: this.transferSvc.getServicios(),
       rangos: this.transferSvc.getRangos(),
       monedas: this.transferSvc.getMonedas(),
+      canales: this.transferSvc.getCanales(),
       transfer: this.transferSvc.getTransfer(transferId)
     }).pipe(
       finalize(() => {
@@ -823,10 +942,11 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         this.cdr.markForCheck();
       })
     ).subscribe({
-      next: ({ servicios, rangos, monedas, transfer }) => {
+      next: ({ servicios, rangos, monedas, canales, transfer }) => {
         this.resultsServicioTransfer = this.unwrapListResponse(servicios);
         this.resultsRangos = this.unwrapListResponse(rangos);
         this.resultsMonedas = this.unwrapListResponse(monedas);
+        this.resultsCanales = this.unwrapListResponse(canales);
 
         const detalle = this.unwrapTransferDetalle(transfer);
         if (!detalle) {
@@ -835,6 +955,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         }
 
         this.fillFormWithTransferData(detalle);
+        this.maxReachedStep = this.wizardSteps.length - 1;
       },
       error: (error) => {
         this.loadError.set(toUserErrorMessage(error, 'No pudimos cargar el transfer y sus datos.'));
@@ -866,6 +987,8 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         Llegada: transfer.Punto_Destino || '',
         Fecha: this.normalizeIncomingDate(transfer.Fecha_Transfer),
         Hora: transfer.Hora_Recogida || '',
+        Id_Canal: transfer.Id_Canal ?? null,
+        Id_Entidad_Reportante: transfer.Id_Entidad_Reportante ?? null,
         TipoVuelo: transfer.TipoVuelo || '',
         Reporta: transfer.Nombre_Reportante || '',
         Vuelo: transfer.Vuelo || '',
@@ -873,6 +996,9 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         TelefonoReserva: transfer.Telefono_Reportante || '',
         Observaciones: transfer.Observaciones || ''
       }, { emitEvent: false });
+
+      this.busquedaEntidad = transfer.Nombre_Entidad_Reportante || '';
+      this.onCanalEntidadChange(true);
 
       // Determinar tipo de pago
       if (pagos.length === 0 || (pagos.length === 1 && pagos[0].Metodo === 'Paga en punto')) {
@@ -938,7 +1064,9 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
         Fecha: 'Fecha del servicio (no puede ser anterior a hoy)',
         TipoVuelo: 'Tipo de vuelo',
         Vuelo: 'Número de vuelo',
-        Reporta: 'Nombre del reportante',
+        Reporta: 'Nombre de quien reporta',
+        Id_Canal: 'Canal',
+        Id_Entidad_Reportante: 'Entidad reportante',
         TelefonoReserva: 'Teléfono de contacto (ej: +573001234567)'
       };
 
@@ -1165,6 +1293,8 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
       Salida: this.toUpperText(this.form.value.Salida),
       Llegada: this.toUpperText(this.form.value.Llegada),
       FechaTransfer: this.form.value.Fecha,
+      Id_Canal: Number(this.form.value.Id_Canal) || null,
+      Id_Entidad_Reportante: Number(this.form.value.Id_Entidad_Reportante) || null,
       NombreReporta: this.toUpperText(this.form.value.Reporta),
       HoraRecogida: this.form.value.Hora,
       Vuelo: this.toUpperText(this.form.value.Vuelo),
@@ -1280,6 +1410,7 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
   }
 
   ngOnDestroy(): void {
+    if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     this.navbar?.clearOverlay?.();
   }

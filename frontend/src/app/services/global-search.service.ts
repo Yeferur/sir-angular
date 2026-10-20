@@ -10,9 +10,10 @@ import { Subscription } from 'rxjs';
 
 export interface GlobalSearchAction {
   label: string;
-  kind: 'navigate' | 'open-reserva' | 'open-transfer' | 'open-tour' | 'open-usuario' | 'filter' | 'dashboard' | 'aforo';
+  kind: 'navigate' | 'open-reserva' | 'open-transfer' | 'open-tour' | 'open-usuario' | 'open-punto-reservas' | 'filter' | 'dashboard' | 'aforo';
   route?: string;
   entityId?: string | number;
+  entityName?: string;
   permission?: string;
   params?: {
     queryParams?: Record<string, any>;
@@ -285,6 +286,14 @@ export class GlobalSearchService {
       if (action.entityId != null) {
         this.closeSearch();
         this.drawer.openUsuario(String(action.entityId));
+      }
+      return;
+    }
+
+    if (action.kind === 'open-punto-reservas') {
+      if (action.entityId != null) {
+        this.closeSearch();
+        this.drawer.openReservasPunto(Number(action.entityId), String(action.entityName || ''));
       }
       return;
     }

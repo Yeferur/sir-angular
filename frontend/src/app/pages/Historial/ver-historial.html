@@ -17,6 +17,12 @@
         }
         @if (referenceInputError()) { <span class="visually-hidden" role="alert">{{ referenceInputError() }}</span> }
       </div>
+      <div class="historial-date">
+        <label class="visually-hidden" for="historial-date">Fecha del historial</label>
+        <app-datepicker inputId="historial-date" [ngModel]="draftFilters().fecha"
+          placeholder="Selecciona una fecha" [allowClear]="false"
+          (dateChange)="onDateChange($event)"></app-datepicker>
+      </div>
       <button type="button" class="btn-filter" (click)="toggleAdvancedFilters()"
           [class.btn-filter--active]="advancedFiltersVisible()"
           aria-controls="historial-advanced-filters"
@@ -29,15 +35,15 @@
           <span class="filter-count" [class.filter-count--empty]="appliedGroupCount() === 0" aria-hidden="true">{{ appliedGroupCount() || 0 }}</span>
       </button>
       <button type="button" class="btn-primary reservation-search-button" (click)="buscar()"
-          [disabled]="isInitialLoading() || isTableRefreshing()" [attr.aria-busy]="isInitialLoading() || isTableRefreshing()"
-          [attr.aria-label]="isTableRefreshing() ? 'Buscando historial' : 'Buscar historial'">
-          <span class="search-button-label" [class.search-button-label--hidden]="isTableRefreshing()">Buscar</span>
-          <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isTableRefreshing()" aria-hidden="true"></span>
+          [disabled]="isSearching()" [attr.aria-busy]="isSearching()"
+          [attr.aria-label]="isSearching() ? 'Aplicando criterios del historial' : 'Aplicar criterios del historial'">
+          <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Aplicar</span>
+          <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
       </button>
     </div>
-    @if (hasApplied('period') || hasApplied('usuarios') || hasApplied('actividad') || hasApplied('modulos')) {
+    @if (hasApplied('usuarios') || hasApplied('actividad') || hasApplied('modulos')) {
       <div class="active-filters" aria-label="Filtros aplicados">
-        @for (group of ['period', 'usuarios', 'modulos', 'actividad']; track group) {
+        @for (group of ['usuarios', 'modulos', 'actividad']; track group) {
           @if (hasApplied($any(group))) {
             <div class="filter-token">
               {{ pillLabel($any(group)) }}
@@ -58,15 +64,6 @@
   @if (advancedFiltersVisible()) {
     <div id="historial-advanced-filters" class="advanced-filters-panel">
       <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label" for="historial-period">Período</label>
-          <app-date-range-picker
-            inputId="historial-period"
-            [value]="draftFilters().period"
-            placeholder="Seleccionar período"
-            [allowClear]="false"
-            (rangeChange)="onPeriodChange($event)" />
-        </div>
         <div class="form-group">
           <label class="form-label">Usuario</label>
           <div class="multi-filter">
@@ -132,7 +129,7 @@
           </div>
         </div>
         <div class="form-group hist-filter-action">
-          <label class="form-label">Tipo de actividad</label>
+          <label class="form-label">Actividad</label>
           <div class="multi-filter">
             <button type="button" class="multi-filter-trigger"
               [class.active]="openFilterDropdown() === 'actividad'"
@@ -169,43 +166,43 @@
 
 
   <div class="results-area">
-    @if (isInitialLoading()) {
-      <app-loading-state label="Cargando historial…"></app-loading-state>
-    } @else if (!hasQueried()) {
-      <div class="empty-state" role="status">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h3>Listo para consultar</h3>
-        <p>Busca una reserva o transfer por código, o utiliza los filtros para consultar actividad del sistema.</p>
-      </div>
+    @if (!hasQueried()) {
+      <app-loading-state label="Preparando historial…"></app-loading-state>
+    } @else if (historialList().length === 0 && isSearching()) {
+      <app-loading-state label="Buscando historial…"></app-loading-state>
+    } @else if (historialList().length === 0 && errorMessage()) {
+      <app-loading-state mode="error" label="No pudimos consultar el historial"
+        [detail]="errorMessage()" (action)="buscar()"></app-loading-state>
     } @else {
       <section class="results-section" aria-label="Resultados del historial">
-      <div class="results-heading">
-        <p class="results-summary" aria-live="polite">{{ summaryText() }}</p>
-        <button type="button" class="sir-action sir-action--secondary export-button" (click)="exportarHistorial()"
-          [disabled]="totalRecords() === 0 || isTableRefreshing()" aria-label="Exportar todos los resultados a Excel">
-          <i class="bx bx-download" aria-hidden="true"></i> Exportar Excel
-        </button>
-      </div>
-
       @if (errorMessage()) {
-        <div class="result-state result-error" role="alert">
-          <h2>No se pudo cargar el historial</h2>
-          <p>{{ errorMessage() }}</p>
-          <button type="button" class="secondary-button" (click)="buscar()">Reintentar</button>
+        <div class="results-notice results-notice--error" role="alert">
+          <span>{{ errorMessage() }} Los resultados anteriores siguen disponibles.</span>
+          <button type="button" (click)="buscar()">Reintentar</button>
         </div>
-      } @else if (historialList().length === 0) {
-        <div class="result-state" role="status">
-          <i class="bx bx-time-five" aria-hidden="true"></i>
-          <h2>{{ appliedFilters().referencia && !appliedFilters().periodExplicit ? 'No hay actividad para este código' : isSingleDay() ? 'No hay actividad para este día' : 'No hay actividad para este período' }}</h2>
-          <p>{{ appliedFilters().referencia && !appliedFilters().periodExplicit ? 'Prueba otro código o ajusta los filtros adicionales.' : 'Prueba otro período o ajusta los filtros adicionales.' }}</p>
+      }
+      @if (totalRecords() > 0 || isTableRefreshing()) {
+        <div class="results-heading">
+          @if (totalRecords() > 0) {
+            <p class="results-summary" aria-live="polite">{{ summaryText() }}</p>
+          }
+          @if (isTableRefreshing()) {
+            <span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span>
+          }
+          @if (totalRecords() > 0) {
+            <button type="button" class="sir-action sir-action--secondary export-button" (click)="exportarHistorial()"
+              [disabled]="isSearching() || !!errorMessage()" aria-label="Exportar todos los resultados a Excel">
+              <i class="bx bx-download" aria-hidden="true"></i> Exportar Excel
+            </button>
+          }
         </div>
+      }
+
+      @if (historialList().length === 0) {
+        <app-query-empty-state [title]="hasAppliedCriteria() ? 'Sin resultados' : 'No hay actividad registrada'"
+          [description]="hasAppliedCriteria() ? 'No se encontraron eventos con los criterios aplicados.' : 'No hay eventos de historial para esta fecha.'" />
       } @else {
-        <div class="table-card" [class.is-refreshing]="isTableRefreshing()">
-          @if (isTableRefreshing()) { <div class="refresh-status" role="status">Actualizando…</div> }
+        <div class="table-card" [class.results-list--updating]="isTableRefreshing()" [attr.aria-busy]="isTableRefreshing()">
           <div class="table-scroll">
             <table class="historial-table">
               <thead>
@@ -267,10 +264,10 @@
       }
 
       @if (totalPages() > 1) {
-        <nav class="pagination" aria-label="Paginación del historial">
-          <button type="button" class="secondary-button" (click)="previousPage()" [disabled]="currentPage() === 1 || isTableRefreshing()">Anterior</button>
-          <span>Página <strong>{{ currentPage() }}</strong> de <strong>{{ totalPages() }}</strong></span>
-          <button type="button" class="secondary-button" (click)="nextPage()" [disabled]="currentPage() === totalPages() || isTableRefreshing()">Siguiente</button>
+        <nav class="results-pagination" aria-label="Paginación del historial">
+          <button type="button" class="pagination-button" (click)="previousPage()" [disabled]="currentPage() <= 1 || isSearching()">Anterior</button>
+          <span class="pagination-indicator" aria-live="polite">Página {{ currentPage() }} de {{ totalPages() }}</span>
+          <button type="button" class="pagination-button" (click)="nextPage()" [disabled]="currentPage() >= totalPages() || isSearching()">Siguiente</button>
         </nav>
       }
       </section>

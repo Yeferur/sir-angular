@@ -1,12 +1,62 @@
 const { obtenerPuntos, obtenerPuntosQuery, obtenerRutasPuntos, obtenerPuntosPorRuta, obtenerHorario, obtenerHorariosPorPunto, obtenerPuntosPorDireccion, validarCoordenadasOSRM, validarOperatividadRuta, crearPunto, obtenerPuntoPorId, actualizarPunto, eliminarPunto, actualizarOrdenPuntosRuta } = require('../../services/Puntos/puntos.service');
+const { consultarReservasPunto, obtenerEstadosReservaPunto } = require('../../services/Puntos/puntos-reservas.service');
 const ExcelJS = require('exceljs');
 const { sendSuccess, sendError } = require('../../utils/responseEnvelope');
+
+exports.getEstadosReservasPuntos = async (_req, res) => {
+  try {
+    return sendSuccess(res, { data: await obtenerEstadosReservaPunto(), message: 'Estados de reservas obtenidos correctamente' });
+  } catch (error) {
+    console.error('Error al consultar estados de reservas de puntos:', error);
+    return sendError(res, { status: 500, message: 'No fue posible consultar los estados.', errorCode: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.getReservasPunto = async (req, res) => {
+  try {
+    const data = await consultarReservasPunto(req.params.id, req.query);
+    return sendSuccess(res, { data, message: 'Reservas asociadas obtenidas correctamente' });
+  } catch (error) {
+    console.error('Error al consultar reservas de punto:', error);
+    return sendError(res, { status: error.statusCode || 500,
+      message: error.statusCode ? error.message : 'No fue posible consultar las reservas.',
+      errorCode: error.errorCode || 'INTERNAL_ERROR' });
+  }
+};
+
+exports.exportarReservasPunto = async (req, res) => {
+  try {
+    const rows = await consultarReservasPunto(req.params.id, req.query, { exportAll: true });
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Reservas asociadas');
+    worksheet.columns = [
+      { header: 'Código', key: 'codigo', width: 20 },
+      { header: 'Fecha del tour', key: 'fecha', width: 18 },
+      { header: 'Tour', key: 'tour', width: 38 },
+      { header: 'Pasajeros', key: 'pasajeros', width: 14 },
+      { header: 'Estado', key: 'estado', width: 22 },
+    ];
+    rows.forEach(row => worksheet.addRow({ codigo: row.Id_Reserva, fecha: row.Fecha_Tour,
+      tour: row.Nombre_Tour || '', pasajeros: row.Pasajeros, estado: row.Estado }));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Reservas_Punto_${Number(req.params.id)}.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Error al exportar reservas de punto:', error);
+    if (res.headersSent) return res.end();
+    return sendError(res, { status: error.statusCode || 500,
+      message: error.statusCode ? error.message : 'No fue posible exportar las reservas.',
+      errorCode: error.errorCode || 'EXPORT_FAILED' });
+  }
+};
 
 exports.exportarPuntosExcel = async (req, res) => {
   const q = req.query.q || '';
   const ruta = req.query.ruta || '';
+  const pendientes = req.query.pendientes || '';
   try {
-    const result = await obtenerPuntos({ page: 1, limit: 10000, q, ruta, allowLargeLimit: true });
+    const result = await obtenerPuntos({ page: 1, limit: 10000, q, ruta, pendientes, allowLargeLimit: true });
     const puntos = result.rows || [];
 
     const workbook = new ExcelJS.Workbook();
@@ -35,7 +85,7 @@ exports.exportarPuntosExcel = async (req, res) => {
     res.end();
   } catch (error) {
     console.error('Error al exportar puntos a Excel:', error);
-    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'EXPORT_FAILED' });
+    return sendError(res, { status: error.statusCode || 500, message: error.statusCode ? error.message : 'Error interno del servidor', errorCode: error.statusCode ? 'INVALID_FILTERS' : 'EXPORT_FAILED' });
   }
 };
 
@@ -44,9 +94,10 @@ exports.getPuntos = async (req, res) => {
   const limit = req.query.limit || 10;
   const q = req.query.q || '';
   const ruta = req.query.ruta || '';
+  const pendientes = req.query.pendientes || '';
 
   try {
-    const result = await obtenerPuntos({ page, limit, q, ruta });
+    const result = await obtenerPuntos({ page, limit, q, ruta, pendientes });
     return sendSuccess(res, {
       data: {
         data: result.rows,
@@ -58,7 +109,7 @@ exports.getPuntos = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al obtener puntos:', error);
-    return sendError(res, { status: 500, message: 'Error interno del servidor', errorCode: 'INTERNAL_ERROR' });
+    return sendError(res, { status: error.statusCode || 500, message: error.statusCode ? error.message : 'Error interno del servidor', errorCode: error.statusCode ? 'INVALID_FILTERS' : 'INTERNAL_ERROR' });
   }
 };
 

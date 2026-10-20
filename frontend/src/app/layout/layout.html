@@ -254,8 +254,8 @@
             @for (item of getVisibleMenuItemsByGroup('principal'); track item.key) {
               @if (item.route) {
               <a class="launcher-card"
-                 [class.active]="isRouteActive(item.route, item.exact ?? false)"
-                 [attr.aria-current]="isRouteActive(item.route, item.exact ?? false) ? 'page' : null"
+                 [class.active]="isMenuRouteActive(item)"
+                 [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null"
                  [routerLink]="item.route"
                  (click)="navigateFromTopbar()">
                 <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
@@ -306,8 +306,8 @@
             @for (item of getVisibleMenuItemsByGroup('gestion'); track item.key) {
               @if (item.route) {
               <a class="launcher-card"
-                 [class.active]="isRouteActive(item.route, item.exact ?? false)"
-                 [attr.aria-current]="isRouteActive(item.route, item.exact ?? false) ? 'page' : null"
+                 [class.active]="isMenuRouteActive(item)"
+                 [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null"
                  [routerLink]="item.route"
                  (click)="navigateFromTopbar()">
                 <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>

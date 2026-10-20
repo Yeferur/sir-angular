@@ -72,6 +72,28 @@ async function guardarBeneficiario(req, res) {
     }
 }
 
+async function obtenerPerfilComisionEntidad(req, res) {
+    try {
+        const result = await comisionesService.obtenerPerfilComisionEntidad(req.params.idEntidad);
+        return sendSuccess(res, { data: result, message: 'Perfil de comisión obtenido correctamente' });
+    } catch (error) {
+        return handleError(res, error, 'Error al consultar el perfil de comisión', 'PROFILE_READ_FAILED');
+    }
+}
+
+async function guardarPerfilComisionEntidad(req, res) {
+    try {
+        const result = await comisionesService.guardarPerfilComisionEntidad(req.body, req.user?.id || null);
+        return sendSuccess(res, {
+            data: result,
+            message: result.created ? 'Perfil de comisión creado correctamente' : 'Perfil de comisión actualizado correctamente',
+            status: result.created ? 201 : 200,
+        });
+    } catch (error) {
+        return handleError(res, error, 'Error al guardar el perfil de comisión', 'PROFILE_SAVE_FAILED');
+    }
+}
+
 async function descargarDocumento(req, res) {
     try {
         const document = await comisionesService.obtenerDocumentoBeneficiario(Number(req.params.idDocumento));
@@ -111,6 +133,8 @@ module.exports = {
     actualizarLiquidacion,
     actualizarLiquidacionesLote,
     actualizarDatosPago,
+    obtenerPerfilComisionEntidad,
+    guardarPerfilComisionEntidad,
     guardarBeneficiario,
     descargarDocumento,
     eliminarDocumento,

@@ -15,41 +15,53 @@ import { Subscription, catchError, finalize, firstValueFrom, forkJoin, of } from
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import {
-  ComisionBeneficiario,
   ComisionCanal,
+  ComisionGrupo,
   ComisionReserva,
   ComisionesService,
   EstadoLiquidacion,
   FiltrosComisiones,
   FormaPagoComision,
   GrupoPagoComision,
-  TipoBeneficiario,
+  PerfilComisionEntidad,
 } from '../../services/Comisiones/comisiones.service';
 import { Tours } from '../../services/Tours/tours';
 import { Reservas } from '../../services/Reservas/reservas';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
+import { SirFilterBarComponent } from '../../shared/filter-bar/filter-bar';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
 import { ConfirmacionService, EstadoConfirmacion, JornadaConfirmacion } from '../../services/confirmacion.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 
 type FormaPagoPanel = FormaPagoComision | '';
+
+interface CommissionFilterState {
+  fecha: string;
+  idTour: string;
+  idCanal: string;
+  filtroEstado: EstadoLiquidacion | '';
+}
 
 interface PanelPagoState {
   visible: boolean;
   modoCola: boolean;
-  cola: ComisionBeneficiario[];
+  cola: ComisionGrupo[];
   indiceCola: number;
-  reportante: ComisionBeneficiario | null;
+  grupo: ComisionGrupo | null;
   reservas: ComisionReserva[];
   mostrarDatosPago: boolean;
   formaPago: FormaPagoPanel;
   cuenta: string;
   nombreReceptor: string;
   dniReceptor: string;
-  documentosNuevos: File[];
-  guardarCentral: boolean;
+  guardarPerfil: boolean;
+  perfilExiste: boolean;
+  perfilCargando: boolean;
+  perfilError: string;
   saving: boolean;
   touched: boolean;
 }
@@ -57,7 +69,8 @@ interface PanelPagoState {
 @Component({
   selector: 'app-comisiones',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirFilterBarComponent, CommonModule, FormsModule, DatepickerComponent,
+    LoadingStateComponent, QueryEmptyStateComponent, DrawerCloseButtonComponent],
   templateUrl: './comisiones.html',
   styleUrl: './comisiones.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -111,6 +124,7 @@ export class ComisionesComponent implements OnInit {
   idTour = '';
   idCanal = '';
   filtroEstado: EstadoLiquidacion | '' = '';
+  appliedFilters: CommissionFilterState | null = null;
   filtroLista = '';
 
   tours: any[] = [];
@@ -130,21 +144,24 @@ export class ComisionesComponent implements OnInit {
     modoCola: false,
     cola: [],
     indiceCola: 0,
-    reportante: null,
+    grupo: null,
     reservas: [],
     mostrarDatosPago: false,
     formaPago: '',
     cuenta: '',
     nombreReceptor: '',
     dniReceptor: '',
-    documentosNuevos: [],
-    guardarCentral: false,
+    guardarPerfil: false,
+    perfilExiste: false,
+    perfilCargando: false,
+    perfilError: '',
     saving: false,
     touched: false,
   };
 
   private searchSubscription?: Subscription;
   private restoreSearchFromUrl = false;
+  private perfilRequestVersion = 0;
 
   ngOnInit(): void {
     this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
@@ -179,18 +196,22 @@ export class ComisionesComponent implements OnInit {
   }
 
   buscar(preserveResults = true): void {
-    if (!this.fecha || this.isSearching) return;
+    this.runSearch(this.draftFilterSnapshot(), preserveResults);
+  }
+
+  private runSearch(filters: CommissionFilterState, preserveResults = true): void {
+    if (!filters.fecha || this.isSearching) return;
     this.searchSubscription?.unsubscribe();
     this.hasSearched = true;
     this.isSearching = true;
     this.searchError = '';
     if (!preserveResults) this.canales = [];
     this.cerrarPanel();
-    this.syncFiltersToUrl(true);
+    this.showAdvancedFilters = false;
 
     this.searchSubscription = forkJoin({
-      canales: this.comisionesService.listarComisiones(this.filtros()),
-      estado: this.confirmacionService.getEstado(this.fecha, this.idTour || null).pipe(catchError(() => of(null))),
+      canales: this.comisionesService.listarComisiones(this.filtros(filters)),
+      estado: this.confirmacionService.getEstado(filters.fecha, filters.idTour || null).pipe(catchError(() => of(null))),
     }).pipe(
       finalize(() => {
         this.isSearching = false;
@@ -199,8 +220,10 @@ export class ComisionesComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: ({ canales, estado }) => {
+        this.appliedFilters = { ...filters };
         this.canales = canales || [];
         this.estadoConfirmacion = estado;
+        this.syncFiltersToUrl(true);
         this.cdr.markForCheck();
       },
       error: (error) => {
@@ -214,8 +237,16 @@ export class ComisionesComponent implements OnInit {
     this.idCanal = '';
     this.filtroEstado = '';
     this.showAdvancedFilters = false;
-    this.syncFiltersToUrl(this.hasSearched);
+    if (this.appliedFilters && this.activeAdvancedFilters) {
+      this.runSearch({ ...this.appliedFilters, idCanal: '', filtroEstado: '' });
+    }
     this.cdr.markForCheck();
+  }
+
+  quitarFiltroAplicado(campo: 'idCanal' | 'filtroEstado'): void {
+    if (!this.appliedFilters || this.isSearching) return;
+    this[campo] = '';
+    this.runSearch({ ...this.appliedFilters, [campo]: '' });
   }
 
   actualizarFiltro(campo: 'fecha' | 'idTour' | 'idCanal' | 'filtroEstado', valor: string | number | null): void {
@@ -225,7 +256,7 @@ export class ComisionesComponent implements OnInit {
     } else {
       this[campo] = normalized;
     }
-    this.syncFiltersToUrl(this.hasSearched);
+    this.cdr.markForCheck();
   }
 
   actualizarBusquedaLocal(value: string): void {
@@ -240,11 +271,20 @@ export class ComisionesComponent implements OnInit {
   }
 
   get activeAdvancedFilters(): number {
-    return Number(Boolean(this.idCanal)) + Number(Boolean(this.filtroEstado));
+    return Number(Boolean(this.appliedFilters?.idCanal)) + Number(Boolean(this.appliedFilters?.filtroEstado));
+  }
+
+  get appliedCanalLabel(): string {
+    const id = this.appliedFilters?.idCanal;
+    return this.canalesDisponibles.find((canal) => String(canal.Id_Canal) === id)?.Nombre_Canal || `Canal #${id}`;
+  }
+
+  get appliedEstadoLabel(): string {
+    return this.appliedFilters?.filtroEstado === 'PAGADO' ? 'Pagada' : 'Pendiente';
   }
 
   get jornadasPorConfirmar(): JornadaConfirmacion[] {
-    if (this.filtroEstado === 'PAGADO') return [];
+    if (this.appliedFilters?.filtroEstado === 'PAGADO') return [];
     return this.estadoConfirmacion?.jornadas?.filter(
       (jornada) => jornada.Requiere_Confirmacion && jornada.Total_Comisionables > 0,
     ) || [];
@@ -259,24 +299,25 @@ export class ComisionesComponent implements OnInit {
   }
 
   irAConfirmacion(): void {
-    if (!this.canOpenConfirmation || !this.fecha || !this.jornadasPorConfirmar.length) return;
-    const targetTour = this.idTour || (this.jornadasPorConfirmar.length === 1
+    const filters = this.appliedFilters;
+    if (!this.canOpenConfirmation || !filters?.fecha || !this.jornadasPorConfirmar.length) return;
+    const targetTour = filters.idTour || (this.jornadasPorConfirmar.length === 1
       ? String(this.jornadasPorConfirmar[0].Id_Tour)
       : '');
     void this.router.navigate(['/Reservas/Confirmacion'], {
       queryParams: {
-        fechaTour: this.fecha,
+        fechaTour: filters.fecha,
         tour: targetTour || null,
         buscar: targetTour ? 1 : null,
         origen: 'comisiones',
-        origenCanal: this.idCanal || null,
-        origenEstado: this.filtroEstado || null,
+        origenCanal: filters.idCanal || null,
+        origenEstado: filters.filtroEstado || null,
       },
     });
   }
 
   async exportar(): Promise<void> {
-    if (!this.fecha || this.isExporting) return;
+    if (!this.appliedFilters?.fecha || this.isExporting) return;
     this.isExporting = true;
     this.cdr.markForCheck();
     try {
@@ -284,7 +325,7 @@ export class ComisionesComponent implements OnInit {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Comisiones_${this.fecha}.xlsx`;
+      link.download = `Comisiones_${this.appliedFilters.fecha}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
       this.alerts.successToast('Reporte exportado', 'El archivo conserva el detalle y no cambia el estado de pago.');
@@ -296,59 +337,102 @@ export class ComisionesComponent implements OnInit {
     }
   }
 
-  abrirPagoBeneficiario(reportante: ComisionBeneficiario): void {
-    const pendientes = this.reservasPendientesDe(reportante);
+  abrirPagoGrupo(grupo: ComisionGrupo): void {
+    const pendientes = this.reservasPendientesDeGrupo(grupo);
     if (!pendientes.length) return;
     this.panel.modoCola = false;
     this.panel.cola = [];
     this.panel.indiceCola = 0;
-    this.cargarReportanteEnPanel(reportante, pendientes);
+    this.cargarGrupoEnPanel(grupo, pendientes);
   }
 
   iniciarColaPagos(): void {
     const cola = this.canales
-      .flatMap((canal) => canal.reportantes)
-      .filter((reportante) => this.pendientesDe(reportante) > 0);
+      .flatMap((canal) => canal.grupos)
+      .filter((grupo) => this.pendientesDe(grupo) > 0);
     if (!cola.length) return;
     this.panel.modoCola = true;
     this.panel.cola = cola;
     this.panel.indiceCola = 0;
-    this.cargarReportanteEnPanel(cola[0], this.reservasPendientesDe(cola[0]));
+    this.cargarGrupoEnPanel(cola[0], this.reservasPendientesDeGrupo(cola[0]));
   }
 
-  private cargarReportanteEnPanel(reportante: ComisionBeneficiario, reservas: ComisionReserva[]): void {
-    const forma = reportante.Forma_Pago || reservas[0]?.Forma_Pago || '';
-    const cuenta = reportante.Cuenta_Bancaria || reservas[0]?.Cuenta_Bancaria || '';
+  private cargarGrupoEnPanel(grupo: ComisionGrupo, reservas: ComisionReserva[]): void {
+    const forma = grupo.Forma_Pago || reservas[0]?.Forma_Pago || '';
+    const cuenta = grupo.Cuenta_Bancaria || reservas[0]?.Cuenta_Bancaria || '';
     this.panel.visible = true;
-    this.panel.reportante = reportante;
+    this.panel.grupo = grupo;
     this.panel.reservas = reservas;
     this.panel.formaPago = forma;
     this.panel.cuenta = cuenta;
-    this.panel.nombreReceptor = reportante.Nombre_Receptor || reservas[0]?.Nombre_Receptor || '';
-    this.panel.dniReceptor = reportante.DNI_Receptor || reservas[0]?.DNI_Receptor || '';
-    this.panel.documentosNuevos = [];
-    this.panel.mostrarDatosPago = Boolean(forma || cuenta || reportante.Nombre_Receptor || reportante.documentos?.length || reportante.Centralizado);
-    this.panel.guardarCentral = reportante.Centralizado;
+    this.panel.nombreReceptor = grupo.Nombre_Receptor || reservas[0]?.Nombre_Receptor || '';
+    this.panel.dniReceptor = grupo.DNI_Receptor || reservas[0]?.DNI_Receptor || '';
+    this.panel.mostrarDatosPago = this.esFreelance(grupo) || Boolean(forma || cuenta || grupo.Nombre_Receptor);
+    this.panel.guardarPerfil = false;
+    this.panel.perfilExiste = false;
+    this.panel.perfilError = '';
+    this.panel.perfilCargando = this.esEntidadComisionable(grupo);
     this.panel.saving = false;
     this.panel.touched = false;
+    const requestVersion = ++this.perfilRequestVersion;
+    if (this.panel.perfilCargando && grupo.Id_Entidad_Reportante) {
+      void this.precargarPerfilEntidad(grupo, requestVersion);
+    }
+    this.cdr.markForCheck();
+  }
+
+  private async precargarPerfilEntidad(grupo: ComisionGrupo, requestVersion: number): Promise<void> {
+    try {
+      const perfil = await firstValueFrom(this.comisionesService.obtenerPerfilEntidad(Number(grupo.Id_Entidad_Reportante)));
+      if (requestVersion !== this.perfilRequestVersion || this.panel.grupo !== grupo) return;
+      this.aplicarPerfilEntidad(perfil);
+    } catch (error) {
+      if (requestVersion !== this.perfilRequestVersion || this.panel.grupo !== grupo) return;
+      this.panel.perfilError = this.errorMessage(error, 'No se pudo cargar el perfil de esta entidad.');
+      this.panel.guardarPerfil = false;
+      this.panel.mostrarDatosPago = true;
+    } finally {
+      if (requestVersion === this.perfilRequestVersion && this.panel.grupo === grupo) {
+        this.panel.perfilCargando = false;
+        this.cdr.markForCheck();
+      }
+    }
+  }
+
+  private aplicarPerfilEntidad(perfil: PerfilComisionEntidad | null): void {
+    this.panel.perfilExiste = Boolean(perfil);
+    this.panel.guardarPerfil = Boolean(perfil);
+    if (perfil) {
+      this.panel.formaPago = perfil.Forma_Pago || this.panel.formaPago;
+      this.panel.cuenta = perfil.Numero_Cuenta || this.panel.cuenta;
+      this.panel.nombreReceptor = perfil.Nombre_Receptor || this.panel.nombreReceptor;
+      this.panel.dniReceptor = perfil.DNI_Receptor || this.panel.dniReceptor;
+      this.panel.grupo!.Id_Perfil_Comision = perfil.Id_Perfil_Comision;
+      this.panel.mostrarDatosPago = true;
+    } else if (this.esEntidadComisionable(this.panel.grupo)) {
+      this.panel.mostrarDatosPago = true;
+    }
     this.cdr.markForCheck();
   }
 
   cerrarPanel(): void {
     if (this.panel.saving) return;
+    this.perfilRequestVersion += 1;
     this.panel.visible = false;
     this.panel.modoCola = false;
     this.panel.cola = [];
     this.panel.indiceCola = 0;
-    this.panel.reportante = null;
+    this.panel.grupo = null;
     this.panel.reservas = [];
     this.panel.mostrarDatosPago = false;
     this.panel.formaPago = '';
     this.panel.cuenta = '';
     this.panel.nombreReceptor = '';
     this.panel.dniReceptor = '';
-    this.panel.documentosNuevos = [];
-    this.panel.guardarCentral = false;
+    this.panel.guardarPerfil = false;
+    this.panel.perfilExiste = false;
+    this.panel.perfilCargando = false;
+    this.panel.perfilError = '';
     this.panel.touched = false;
     this.cdr.markForCheck();
   }
@@ -361,33 +445,6 @@ export class ComisionesComponent implements OnInit {
   onFormaPagoChange(): void {
     this.panel.touched = true;
     if (!this.panelRequiereCuenta) this.panel.cuenta = '';
-  }
-
-  seleccionarDocumentos(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const files = Array.from(input.files || []);
-    input.value = '';
-    const allowed = new Set(['image/jpeg', 'image/png', 'application/pdf']);
-    const invalid = files.find(file => !allowed.has(file.type) || file.size > 5 * 1024 * 1024);
-    if (invalid) {
-      this.alerts.warningToast('Documento no permitido', 'Solo se admiten JPG, PNG o PDF de máximo 5 MB por archivo.');
-      return;
-    }
-    const combined = [...this.panel.documentosNuevos, ...files];
-    const existingCount = this.panel.reportante?.documentos?.length || 0;
-    if (existingCount + combined.length > 5) {
-      this.alerts.warningToast('Demasiados documentos', 'Puedes adjuntar máximo 5 documentos por beneficiario.');
-      return;
-    }
-    this.panel.documentosNuevos = combined;
-    if (files.length) this.panel.guardarCentral = true;
-    this.panel.touched = true;
-    this.cdr.markForCheck();
-  }
-
-  quitarDocumentoNuevo(index: number): void {
-    this.panel.documentosNuevos = this.panel.documentosNuevos.filter((_, current) => current !== index);
-    this.cdr.markForCheck();
   }
 
   omitirPagoActual(): void {
@@ -405,8 +462,8 @@ export class ComisionesComponent implements OnInit {
   }
 
   private async persistirPanel(): Promise<void> {
-    const reportante = this.panel.reportante;
-    if (!reportante || this.panel.saving) return;
+    const grupo = this.panel.grupo;
+    if (!grupo || this.panel.saving || this.panel.perfilCargando) return;
     this.panel.saving = true;
     this.cdr.markForCheck();
     const ids = this.panel.reservas.map((reserva) => reserva.Id_Reserva);
@@ -416,27 +473,26 @@ export class ComisionesComponent implements OnInit {
       : null;
 
     try {
-      if (this.panel.guardarCentral && forma) {
-        const beneficiario = await firstValueFrom(this.comisionesService.guardarBeneficiario({
-          Id_Beneficiario: reportante.Id_Beneficiario,
-          Id_Canal: reportante.Id_Canal,
-          Tipo_Beneficiario: reportante.Tipo_Beneficiario || this.inferirTipoBeneficiario(reportante.Id_Canal),
-          Nombre: reportante.Nombre_Reportante,
-          Telefono: reportante.Telefono,
+      if (this.panel.guardarPerfil && forma && this.esEntidadComisionable(grupo) && grupo.Id_Entidad_Reportante) {
+        const profilePayload = {
+          ...(this.panel.perfilExiste && grupo.Id_Perfil_Comision
+            ? { Id_Perfil_Comision: grupo.Id_Perfil_Comision }
+            : {}),
+          Id_Entidad_Reportante: grupo.Id_Entidad_Reportante,
           Forma_Pago: forma,
           Numero_Cuenta: cuenta,
           Nombre_Receptor: this.panel.nombreReceptor.trim(),
           DNI_Receptor: this.panel.dniReceptor.trim(),
-          reservas: ids,
-          documentos: this.panel.documentosNuevos,
-        }));
-        reportante.Id_Beneficiario = Number(beneficiario.Id_Beneficiario);
-        reportante.Centralizado = true;
-        reportante.Tipo_Beneficiario = beneficiario.Tipo_Beneficiario;
-        reportante.Origen_Datos_Pago = 'CENTRALIZADO';
-        reportante.Nombre_Receptor = beneficiario.Nombre_Receptor;
-        reportante.DNI_Receptor = beneficiario.DNI_Receptor;
-        reportante.documentos = beneficiario.documentos || reportante.documentos || [];
+        };
+        const perfil = this.panel.perfilExiste
+          ? await firstValueFrom(this.comisionesService.actualizarPerfilEntidad(profilePayload))
+          : await firstValueFrom(this.comisionesService.crearPerfilEntidad(profilePayload));
+        grupo.Id_Perfil_Comision = Number(perfil.Id_Perfil_Comision);
+        grupo.Forma_Pago = perfil.Forma_Pago;
+        grupo.Cuenta_Bancaria = perfil.Numero_Cuenta;
+        grupo.Nombre_Receptor = perfil.Nombre_Receptor;
+        grupo.DNI_Receptor = perfil.DNI_Receptor;
+        this.panel.perfilExiste = true;
       }
 
       const payload: GrupoPagoComision = {
@@ -446,13 +502,12 @@ export class ComisionesComponent implements OnInit {
         Nombre_Receptor: forma ? this.panel.nombreReceptor.trim() : null,
         DNI_Receptor: forma ? this.panel.dniReceptor.trim() : null,
       };
-      await firstValueFrom(this.comisionesService.actualizarLiquidacion({ ...payload, Estado: 'PAGADO' }));
+      const paymentResult = await firstValueFrom(this.comisionesService.actualizarLiquidacion({ ...payload, Estado: 'PAGADO' }));
 
-      reportante.Forma_Pago = forma;
-      reportante.Cuenta_Bancaria = cuenta;
-      reportante.Nombre_Receptor = payload.Nombre_Receptor;
-      reportante.DNI_Receptor = payload.DNI_Receptor;
-      if (!reportante.Centralizado) reportante.Origen_Datos_Pago = forma ? 'HISTORICO' : 'SIN_DATOS';
+      grupo.Forma_Pago = forma;
+      grupo.Cuenta_Bancaria = cuenta;
+      grupo.Nombre_Receptor = payload.Nombre_Receptor;
+      grupo.DNI_Receptor = payload.DNI_Receptor;
       for (const reserva of this.panel.reservas) {
         reserva.Forma_Pago = forma;
         reserva.Cuenta_Bancaria = cuenta;
@@ -460,6 +515,7 @@ export class ComisionesComponent implements OnInit {
         reserva.DNI_Receptor = payload.DNI_Receptor;
         reserva.Estado_Liquidacion = 'PAGADO';
         reserva.Fecha_Pago = this.fechaMaxima;
+        reserva.Monto_Comision_Pagada = Number(paymentResult.montos?.[reserva.Id_Reserva] ?? reserva.Total_Comision);
       }
       this.recalcularTotales();
       this.panel.saving = false;
@@ -467,7 +523,7 @@ export class ComisionesComponent implements OnInit {
       if (this.panel.modoCola) {
         this.avanzarCola(true);
       } else {
-        this.alerts.successToast('Pago registrado', `Se registró el pago de ${reportante.Nombre_Reportante}.`);
+        this.alerts.successToast('Pago registrado', `Se registró el pago de ${this.nombreGrupo(grupo)}.`);
         this.cerrarPanel();
       }
     } catch (error) {
@@ -481,22 +537,22 @@ export class ComisionesComponent implements OnInit {
     const siguiente = this.panel.indiceCola + 1;
     if (siguiente >= this.panel.cola.length) {
       this.panel.saving = false;
-      const mensaje = registroExitoso ? 'Terminaste de revisar los pagos pendientes.' : 'No quedan reportantes por revisar.';
+      const mensaje = registroExitoso ? 'Terminaste de revisar los pagos pendientes.' : 'No quedan grupos por revisar.';
       this.cerrarPanel();
       this.alerts.successToast('Revisión completada', mensaje);
       return;
     }
     this.panel.indiceCola = siguiente;
-    const reportante = this.panel.cola[siguiente];
-    this.cargarReportanteEnPanel(reportante, this.reservasPendientesDe(reportante));
+    const grupo = this.panel.cola[siguiente];
+    this.cargarGrupoEnPanel(grupo, this.reservasPendientesDeGrupo(grupo));
   }
 
-  async reabrirBeneficiario(reportante: ComisionBeneficiario): Promise<void> {
-    const pagadas = reportante.reservas.filter((reserva) => reserva.Estado_Liquidacion === 'PAGADO');
+  async reabrirGrupo(grupo: ComisionGrupo): Promise<void> {
+    const pagadas = grupo.reservas.filter((reserva) => reserva.Estado_Liquidacion === 'PAGADO');
     if (!pagadas.length) return;
     const accepted = await this.alerts.confirmDecision(
       'Volver a pendiente',
-      `Las comisiones pagadas de ${reportante.Nombre_Reportante} volverán a quedar pendientes.`,
+      `Las comisiones pagadas de ${this.nombreGrupo(grupo)} volverán a quedar pendientes.`,
       { confirmText: 'Volver a pendiente', cancelText: 'Cancelar' },
     );
     if (!accepted) return;
@@ -504,17 +560,18 @@ export class ComisionesComponent implements OnInit {
       await firstValueFrom(this.comisionesService.actualizarLiquidacion({
         reservas: pagadas.map((reserva) => reserva.Id_Reserva),
         Estado: 'PENDIENTE',
-        Forma_Pago: reportante.Forma_Pago,
-        Cuenta_Bancaria: reportante.Cuenta_Bancaria,
-        Nombre_Receptor: reportante.Nombre_Receptor,
-        DNI_Receptor: reportante.DNI_Receptor,
+        Forma_Pago: grupo.Forma_Pago,
+        Cuenta_Bancaria: grupo.Cuenta_Bancaria,
+        Nombre_Receptor: grupo.Nombre_Receptor,
+        DNI_Receptor: grupo.DNI_Receptor,
       }));
       for (const reserva of pagadas) {
         reserva.Estado_Liquidacion = 'PENDIENTE';
         reserva.Fecha_Pago = null;
+        reserva.Monto_Comision_Pagada = null;
       }
       this.recalcularTotales();
-      this.alerts.successToast('Comisiones pendientes', 'El reportante puede incluirse nuevamente en un pago.');
+      this.alerts.successToast('Comisiones pendientes', 'El grupo puede incluirse nuevamente en un pago.');
     } catch (error) {
       this.alerts.errorToast('No se pudo actualizar', this.errorMessage(error, 'Intenta nuevamente.'));
     }
@@ -534,29 +591,29 @@ export class ComisionesComponent implements OnInit {
     if (!query) return this.canales;
     return this.canales.map((canal) => {
       if (this.normalizarTexto(canal.Nombre_Canal).includes(query)) return canal;
-      const reportantes = canal.reportantes.map((reportante) => {
-        if (this.normalizarTexto(reportante.Nombre_Reportante).includes(query)) return reportante;
-        const reservas = reportante.reservas.filter((reserva) =>
-          this.normalizarTexto(`${reserva.Id_Reserva} ${reserva.Nombre_Tour}`).includes(query),
+      const grupos = canal.grupos.map((grupo) => {
+        if (this.normalizarTexto(`${this.nombreGrupo(grupo)} ${grupo.Nombre_Reportante || ''}`).includes(query)) return grupo;
+        const reservas = grupo.reservas.filter((reserva) =>
+          this.normalizarTexto(`${reserva.Id_Reserva} ${reserva.Nombre_Tour} ${reserva.Nombre_Reportante || ''}`).includes(query),
         );
-        return reservas.length ? { ...reportante, reservas } : null;
-      }).filter((reportante): reportante is ComisionBeneficiario => Boolean(reportante));
-      return reportantes.length ? { ...canal, reportantes } : null;
+        return reservas.length ? { ...grupo, reservas } : null;
+      }).filter((grupo): grupo is ComisionGrupo => Boolean(grupo));
+      return grupos.length ? { ...canal, grupos } : null;
     }).filter((canal): canal is ComisionCanal => Boolean(canal));
   }
 
   get totalReservas(): number {
-    return this.canales.reduce((sum, canal) => sum + canal.reportantes.reduce((subtotal, rep) => subtotal + rep.reservas.length, 0), 0);
+    return this.canales.reduce((sum, canal) => sum + canal.grupos.reduce((subtotal, grupo) => subtotal + grupo.reservas.length, 0), 0);
   }
 
   get totalPasajeros(): number {
-    return this.canales.reduce((sum, canal) => sum + canal.reportantes.reduce(
+    return this.canales.reduce((sum, canal) => sum + canal.grupos.reduce(
       (subtotal, rep) => subtotal + rep.reservas.reduce((count, reserva) => count + reserva.Num_Pasajeros, 0), 0,
     ), 0);
   }
 
-  get totalBeneficiarios(): number {
-    return this.canales.reduce((sum, canal) => sum + canal.reportantes.length, 0);
+  get totalGrupos(): number {
+    return this.canales.reduce((sum, canal) => sum + canal.grupos.length, 0);
   }
 
   get totalGlobal(): number {
@@ -572,8 +629,8 @@ export class ComisionesComponent implements OnInit {
   }
 
   get reservasPendientes(): number {
-    return this.canales.reduce((sum, canal) => sum + canal.reportantes.reduce(
-      (subtotal, rep) => subtotal + this.pendientesDe(rep), 0,
+    return this.canales.reduce((sum, canal) => sum + canal.grupos.reduce(
+      (subtotal, grupo) => subtotal + this.pendientesDe(grupo), 0,
     ), 0);
   }
 
@@ -589,10 +646,11 @@ export class ComisionesComponent implements OnInit {
     const forma = this.panel.formaPago || null;
     const cuenta = this.panel.cuenta.trim();
     if (!forma && cuenta) return 'Selecciona el medio de pago asociado a este número.';
+    if (!forma) return 'Selecciona un medio de pago para registrar la comisión.';
     if (forma && !this.panel.nombreReceptor.trim()) return 'Ingresa el nombre de la persona o empresa que recibe el pago.';
     if (forma && !this.panel.dniReceptor.trim()) return 'Ingresa el DNI, NIT o documento de quien recibe el pago.';
     if (forma && !/^[a-zA-Z0-9.\-\s]{4,50}$/.test(this.panel.dniReceptor.trim())) return 'El DNI, NIT o documento del receptor no es válido.';
-    if (!forma || !cuenta) return '';
+    if (this.panelRequiereCuenta && !cuenta) return 'Ingresa el dato de pago asociado a este medio.';
     if (forma === 'TRANSFERENCIA_BANCOLOMBIA' && !/^\d{11}$/.test(cuenta)) {
       return 'La cuenta Bancolombia debe tener exactamente 11 dígitos.';
     }
@@ -602,8 +660,8 @@ export class ComisionesComponent implements OnInit {
     return '';
   }
 
-  get centralizacionError(): string {
-    if (!this.panel.guardarCentral) return '';
+  get perfilGuardadoError(): string {
+    if (!this.panel.guardarPerfil) return '';
     if (!this.panel.formaPago) return 'Selecciona un medio de pago para guardar estos datos.';
     if (this.panelRequiereCuenta && !this.panel.cuenta.trim()) return 'Ingresa la cuenta antes de guardarla para próximas comisiones.';
     return this.panelError;
@@ -614,15 +672,15 @@ export class ComisionesComponent implements OnInit {
   }
 
   get panelCuentaPlaceholder(): string {
-    return this.panel.formaPago === 'NEQUI' ? 'Ej. 3001234567 (opcional)' : '11 dígitos (opcional)';
+    return this.panel.formaPago === 'NEQUI' ? 'Ej. 3001234567' : '11 dígitos';
   }
 
   get pasoCola(): string {
     return `${this.panel.indiceCola + 1} de ${this.panel.cola.length}`;
   }
 
-  pendientesDe(reportante: ComisionBeneficiario): number {
-    return this.reservasPendientesDe(reportante).length;
+  pendientesDe(grupo: ComisionGrupo): number {
+    return this.reservasPendientesDeGrupo(grupo).length;
   }
 
   etiquetaPago(forma: FormaPagoComision | null): string {
@@ -650,64 +708,69 @@ export class ComisionesComponent implements OnInit {
     return `${cantidad} ${cantidad === 1 ? singular : (plural || `${singular}s`)}`;
   }
 
-  trackBeneficiario(_: number, reportante: ComisionBeneficiario): string {
-    return reportante.Key_Beneficiario;
+  trackGrupo(_: number, grupo: ComisionGrupo): string {
+    if (grupo.Id_Entidad_Reportante) return `entidad:${grupo.Id_Entidad_Reportante}`;
+    return `reserva:${grupo.reservas[0]?.Id_Reserva || 'sin-reserva'}`;
   }
 
   private validarPanel(): boolean {
     this.panel.touched = true;
-    const error = this.panelError || this.centralizacionError;
+    const error = this.panel.perfilCargando
+      ? 'Espera a que termine la carga del perfil de la entidad.'
+      : this.panelError || this.perfilGuardadoError;
     if (error) {
       this.alerts.warningToast('Revisa los datos del pago', error);
+      this.panel.mostrarDatosPago = true;
       this.cdr.markForCheck();
       return false;
     }
-    return Boolean(this.panel.reportante && this.panel.reservas.length);
+    return Boolean(this.panel.grupo && this.panel.reservas.length);
   }
 
-  descargarDocumento(idDocumento: number, nombre: string): void {
-    this.comisionesService.descargarDocumento(idDocumento).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = nombre || 'documento';
-        link.click();
-        URL.revokeObjectURL(url);
-      },
-      error: error => this.alerts.errorToast('No se pudo descargar', this.errorMessage(error, 'Intenta nuevamente.')),
-    });
+  private reservasPendientesDeGrupo(grupo: ComisionGrupo): ComisionReserva[] {
+    return grupo.reservas.filter((reserva) => reserva.Estado_Liquidacion !== 'PAGADO');
   }
 
-  async eliminarDocumento(idDocumento: number): Promise<void> {
-    const beneficiary = this.panel.reportante;
-    if (!beneficiary?.Id_Beneficiario || this.panel.saving) return;
-    const accepted = await this.alerts.confirmDecision(
-      'Eliminar documento',
-      'El archivo se eliminará definitivamente del beneficiario.',
-      { confirmText: 'Eliminar', cancelText: 'Cancelar' },
-    );
-    if (!accepted) return;
-    try {
-      await firstValueFrom(this.comisionesService.eliminarDocumento(beneficiary.Id_Beneficiario, idDocumento));
-      beneficiary.documentos = (beneficiary.documentos || []).filter(document => document.Id_Documento !== idDocumento);
-      this.alerts.successToast('Documento eliminado', 'El archivo se eliminó correctamente.');
-      this.cdr.markForCheck();
-    } catch (error) {
-      this.alerts.errorToast('No se pudo eliminar', this.errorMessage(error, 'Intenta nuevamente.'));
+  esFreelance(grupo: ComisionGrupo | null): boolean {
+    return Boolean(grupo && !grupo.Id_Entidad_Reportante);
+  }
+
+  esEntidadComisionable(grupo: ComisionGrupo | null): boolean {
+    return Boolean(grupo?.Id_Entidad_Reportante
+      && (grupo.Tipo_Entidad === 'HOTEL' || grupo.Tipo_Entidad === 'AGENCIA_NACIONAL'));
+  }
+
+  nombreGrupo(grupo: ComisionGrupo | null): string {
+    if (!grupo) return '';
+    if (this.esEntidadComisionable(grupo)) return grupo.Nombre_Entidad || 'Entidad reportante';
+    return grupo.Nombre_Reportante || 'Freelance';
+  }
+
+  etiquetaTipoGrupo(grupo: ComisionGrupo | null): string {
+    if (!grupo) return '';
+    if (this.esFreelance(grupo)) return 'Freelance';
+    if (grupo.Tipo_Entidad === 'AGENCIA_NACIONAL') return 'Agencia nacional';
+    if (grupo.Tipo_Entidad === 'HOTEL') return 'Hotel';
+    return 'Entidad reportante';
+  }
+
+  montoVisibleReserva(reserva: ComisionReserva): number {
+    if (reserva.Estado_Liquidacion === 'PAGADO' && reserva.Monto_Comision_Pagada != null) {
+      return Number(reserva.Monto_Comision_Pagada);
     }
+    return Number(reserva.Total_Comision || 0);
   }
 
-  private reservasPendientesDe(reportante: ComisionBeneficiario): ComisionReserva[] {
-    return reportante.reservas.filter((reserva) => reserva.Estado_Liquidacion !== 'PAGADO');
+  private draftFilterSnapshot(): CommissionFilterState {
+    return { fecha: this.fecha, idTour: this.idTour, idCanal: this.idCanal, filtroEstado: this.filtroEstado };
   }
 
-  private filtros(): FiltrosComisiones {
+  private filtros(filters: CommissionFilterState = this.appliedFilters || this.draftFilterSnapshot()): FiltrosComisiones {
     return {
-      Fecha: this.fecha,
-      Id_Tour: this.idTour || undefined,
-      Id_Canal: this.idCanal || undefined,
-      Estado: this.filtroEstado,
+      Fecha: filters.fecha,
+      Id_Tour: filters.idTour || undefined,
+      Id_Canal: filters.idCanal || undefined,
+      Estado: filters.filtroEstado,
     };
   }
 
@@ -723,19 +786,20 @@ export class ComisionesComponent implements OnInit {
     if (Number.isInteger(canal) && canal > 0) this.idCanal = String(canal);
     if (estado === 'PENDIENTE' || estado === 'PAGADO') this.filtroEstado = estado;
     this.filtroLista = String(params.get('q') || params.get('reportante') || '').trim();
-    this.showAdvancedFilters = Boolean(this.idCanal || this.filtroEstado);
+    this.showAdvancedFilters = false;
     return params.get('buscar') === '1' && hasValidFecha;
   }
 
   private syncFiltersToUrl(searchApplied: boolean): void {
+    const filters = this.appliedFilters || this.draftFilterSnapshot();
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
-        fechaTour: this.fecha || null,
-        tour: this.idTour || null,
+        fechaTour: filters.fecha || null,
+        tour: filters.idTour || null,
         tours: null,
-        canal: this.idCanal || null,
-        estado: this.filtroEstado || null,
+        canal: filters.idCanal || null,
+        estado: filters.filtroEstado || null,
         q: this.filtroLista.trim() || null,
         reportante: null,
         buscar: searchApplied ? 1 : null,
@@ -749,27 +813,22 @@ export class ComisionesComponent implements OnInit {
     return forma === 'TRANSFERENCIA_BANCOLOMBIA' || forma === 'NEQUI';
   }
 
-  private inferirTipoBeneficiario(idCanal: number): TipoBeneficiario {
-    const nombre = String(this.canalesDisponibles.find((canal) => Number(canal.Id_Canal) === idCanal)?.Nombre_Canal || '').toUpperCase();
-    if (nombre.includes('HOTEL')) return 'HOTEL';
-    if (nombre.includes('AGENCIA')) return 'AGENCIA';
-    return 'FREELANCE';
-  }
-
   private recalcularTotales(): void {
     for (const canal of this.canales) {
       canal.Total_Canal = 0;
       canal.Pendiente_Canal = 0;
       canal.Pagado_Canal = 0;
-      for (const reportante of canal.reportantes) {
-        reportante.Total_Reportante = reportante.reservas.reduce((sum, reserva) => sum + Number(reserva.Total_Comision || 0), 0);
-        reportante.Pendiente_Reportante = reportante.reservas
+      for (const grupo of canal.grupos) {
+        grupo.Total_Reportante = grupo.reservas.reduce((sum, reserva) => sum + Number(reserva.Total_Comision || 0), 0);
+        grupo.Pendiente_Reportante = grupo.reservas
           .filter((reserva) => reserva.Estado_Liquidacion !== 'PAGADO')
           .reduce((sum, reserva) => sum + Number(reserva.Total_Comision || 0), 0);
-        reportante.Pagado_Reportante = reportante.Total_Reportante - reportante.Pendiente_Reportante;
-        canal.Total_Canal += reportante.Total_Reportante;
-        canal.Pendiente_Canal += reportante.Pendiente_Reportante;
-        canal.Pagado_Canal += reportante.Pagado_Reportante;
+        grupo.Pagado_Reportante = grupo.reservas
+          .filter((reserva) => reserva.Estado_Liquidacion === 'PAGADO')
+          .reduce((sum, reserva) => sum + this.montoVisibleReserva(reserva), 0);
+        canal.Total_Canal += grupo.Total_Reportante;
+        canal.Pendiente_Canal += grupo.Pendiente_Reportante;
+        canal.Pagado_Canal += grupo.Pagado_Reportante;
       }
     }
     this.cdr.markForCheck();

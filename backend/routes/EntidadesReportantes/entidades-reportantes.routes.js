@@ -5,9 +5,10 @@ const controller = require('../../controllers/EntidadesReportantes/entidades-rep
 
 router.get('/entidades-reportantes', authMiddleware,
   checkAnyPermission(['RESERVAS.LEER', 'RESERVAS.CREAR', 'RESERVAS.ACTUALIZAR',
+    'TRANSFERS.LEER', 'TRANSFERS.CREAR', 'TRANSFERS.ACTUALIZAR',
     'MERCADEO.RESERVAS.LEER', 'ENTIDADES_REPORTANTES.LEER']), controller.list);
 router.post('/entidades-reportantes/rapida', authMiddleware,
-  checkAnyPermission(['RESERVAS.CREAR', 'RESERVAS.ACTUALIZAR']), controller.quickCreate);
+  checkAnyPermission(['RESERVAS.CREAR', 'RESERVAS.ACTUALIZAR', 'TRANSFERS.CREAR', 'TRANSFERS.ACTUALIZAR']), controller.quickCreate);
 router.patch('/entidades-reportantes/:id/validacion', authMiddleware,
   checkPermission('ENTIDADES_REPORTANTES.VALIDAR'), controller.validate);
 router.get('/entidades-reportantes/actividad', authMiddleware,

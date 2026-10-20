@@ -6,21 +6,24 @@
   max-width: 1350px;
 }
 
-.points-overview {
+.points-result-actions .btn-secondary,
+.points-result-actions .btn-primary {
+  min-height: 40px;
+}
+
+.points-results-toolbar > .points-results-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.points-results-toolbar > .points-result-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
-.header-actions {
   flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.header-actions .btn-secondary,
-.header-actions .btn-primary {
-  min-height: 40px;
+  gap: 8px;
 }
 
 .btn-secondary {
@@ -57,29 +60,23 @@
   transform: none;
 }
 
-.route-filter-inline {
-  display: flex;
-  align-items: center;
-  flex: 0 0 190px;
-  gap: 8px;
-  min-width: 0;
-}
-
-.route-filter-inline > svg {
-  flex-shrink: 0;
+.points-search-row { align-items: flex-end; }
+.points-search-row .search-container { min-width: 210px; margin-bottom: 0; }
+.point-filter { flex: 0 1 185px; min-width: 160px; }
+.point-filter-label {
+  display: block;
+  margin-bottom: 4px;
   color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 700;
 }
-
+.point-filter app-select { display: block; }
 .points-list {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
   transition: opacity .18s ease;
-}
-
-.points-list--updating {
-  opacity: .72;
 }
 
 .point-card {
@@ -195,6 +192,27 @@
   transform: none;
 }
 
+.btn-row-reservas {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  padding: 6px 11px;
+  border: 1px solid var(--separator-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 700 .72rem var(--font-family);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-row-reservas:hover,
+.btn-row-reservas:focus-visible {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
 .action-spinner {
   width: 13px;
   height: 13px;
@@ -306,41 +324,26 @@
   font-weight: 600;
 }
 
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.pagination .btn-secondary {
-  min-width: 98px;
-  justify-content: center;
-}
-
-.page-indicator {
-  min-width: 120px;
-  color: var(--text-secondary);
-  font-size: .82rem;
-  font-weight: 700;
-  text-align: center;
-}
-
 @keyframes pointSpin {
   to {
     transform: rotate(360deg);
   }
 }
 
+@media (max-width: 980px) {
+  .points-search-row { flex-wrap: wrap; }
+  .points-search-row .search-container { flex: 1 1 100%; }
+  .point-filter { flex: 1 1 190px; }
+}
+
 @media (max-width: 760px) {
-  .points-overview {
-    align-items: stretch;
+  .points-results-toolbar {
+    flex-wrap: wrap;
   }
 
-  .header-actions {
+  .points-results-toolbar > .points-result-actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .point-card__header {
@@ -363,20 +366,19 @@
     padding: 0 16px;
   }
 
-  .route-filter-inline {
-    flex: 1 1 calc(55% - 4px);
-  }
-
-  .header-actions {
+  .points-search-row { display: grid; grid-template-columns: 1fr; }
+  .points-search-row .search-container,
+  .points-search-row .point-filter { width: 100%; min-width: 0; }
+  .points-results-toolbar > .points-result-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .header-actions .btn-primary {
+  .points-result-actions .btn-primary {
     grid-column: 1 / -1;
   }
 
-  .header-actions button {
+  .points-result-actions button {
     justify-content: center;
   }
 
@@ -401,6 +403,8 @@
     justify-content: center;
     width: 100%;
   }
+
+  .point-actions .btn-row-reservas { grid-column: 1 / -1; }
 
   .schedule-heading {
     align-items: flex-start;
@@ -429,19 +433,6 @@
     white-space: normal;
   }
 
-  .pagination {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .pagination .btn-secondary {
-    width: 100%;
-  }
-
-  .page-indicator {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

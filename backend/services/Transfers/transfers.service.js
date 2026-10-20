@@ -4,6 +4,7 @@ const fs = require('fs');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
+const { validateReservationEntity } = require('../EntidadesReportantes/entidades-reportantes.service');
 const transferNovedades = require('../Programacion/programacion-transfers-novedades.service');
 
 function sincronizarListadoPreparado(idTransfer) {
@@ -336,6 +337,11 @@ async function getServiciosTransferSvc() {
   return rows.map(r => ({ id: r.Id_Servicio, Servicio: r.Nombre_Servicio }));
 }
 
+async function getCanalesTransferSvc() {
+  const [rows] = await db.query('SELECT Id_Canal, Nombre_Canal, Tiene_Comision FROM canales_reservas ORDER BY Nombre_Canal');
+  return rows;
+}
+
 function normalizarCantidadPersonasInput(value) {
   if (value === null || value === undefined || value === '') return null;
   const cantidad = Number(value);
@@ -474,6 +480,14 @@ async function crearTransferSvc(payload, files = {}) {
     }
 
     const pricing = await resolverRangoYValorTransfer(conn, payload, { idMoneda });
+    const idCanal = payload.Id_Canal;
+    const idEntidadReportante = await validateReservationEntity(conn, idCanal, payload.Id_Entidad_Reportante);
+    const [[canalReportante]] = await conn.query(
+      'SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal = ? LIMIT 1', [idCanal]
+    );
+    const [entidadReportanteRows] = idEntidadReportante
+      ? await conn.query('SELECT Nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante = ? LIMIT 1', [idEntidadReportante])
+      : [[]];
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
       Id_Moneda: idMoneda,
@@ -486,6 +500,8 @@ async function crearTransferSvc(payload, files = {}) {
 
     const sql = `INSERT INTO transfers (
       Id_Transfer,
+      Id_Canal,
+      Id_Entidad_Reportante,
       Nombre_Titular,
       DNI,
       Telefono_Titular,
@@ -506,10 +522,12 @@ async function crearTransferSvc(payload, files = {}) {
       Observaciones,
       Creado_Por,
       Actualizado_Por
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
     const params = [
       idTransfer,
+      idCanal,
+      idEntidadReportante,
       payload.Titular || null,
       payload.DNI || null,
       payload.Tel_Contacto || null,
@@ -618,6 +636,8 @@ async function crearTransferSvc(payload, files = {}) {
       accion: 'CREAR_TRANSFER',
       id_usuario: historialUserId,
       detalles: [
+        { columna: 'Canal', anterior: null, nuevo: canalReportante?.Nombre_Canal || null },
+        { columna: 'Entidad reportante', anterior: null, nuevo: entidadReportanteRows?.[0]?.Nombre || null },
         { columna: 'Nombre_Titular', anterior: null, nuevo: payload.Titular || null },
         { columna: 'Fecha_Transfer', anterior: null, nuevo: payload.FechaTransfer || null },
         { columna: 'Estado', anterior: null, nuevo: estadoCalculado }
@@ -736,6 +756,11 @@ async function filtrarTransfersSvc(q) {
     SELECT
       tr.Id_Transfer,
       CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
+      tr.Id_Canal,
+      c.Nombre_Canal AS Categoria,
+      tr.Id_Entidad_Reportante,
+      er.Nombre AS Nombre_Entidad_Reportante,
+      er.Tipo AS Tipo_Entidad_Reportante,
       tr.Fecha_Transfer,
       tr.Hora_Recogida,
       tr.Estado,
@@ -755,6 +780,8 @@ async function filtrarTransfersSvc(q) {
       s.Nombre_Servicio AS Nombre_Servicio,
       tr.Fecha_Registro
     FROM transfers tr
+    LEFT JOIN canales_reservas c ON c.Id_Canal = tr.Id_Canal
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
     LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
     LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
     LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
@@ -826,6 +853,7 @@ async function getDetalleTransferSvc(Id_Transfer) {
     SELECT
       tr.*,
       CONCAT('TRS', LPAD(tr.Id_Transfer, 5, '0')) AS Codigo_Transfer,
+      er.Nombre AS Nombre_Entidad_Reportante,
       s.Nombre_Servicio,
       rg.Descripcion AS RangoDescripcion,
       rg.Minimo,
@@ -833,6 +861,7 @@ async function getDetalleTransferSvc(Id_Transfer) {
       m.Codigo AS MonedaCodigo,
       m.Nombre_Moneda
     FROM transfers tr
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
     LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
     LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
     LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
@@ -1059,9 +1088,12 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
     await conn.beginTransaction();
 
     const [transferActualRows] = await conn.query(
-      `SELECT Estado
-         FROM transfers
-        WHERE Id_Transfer = ?
+      `SELECT t.Estado, t.Id_Canal, t.Id_Entidad_Reportante, t.Nombre_Titular, t.Fecha_Transfer,
+              c.Nombre_Canal, er.Nombre AS Nombre_Entidad_Reportante
+         FROM transfers t
+         LEFT JOIN canales_reservas c ON c.Id_Canal = t.Id_Canal
+         LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = t.Id_Entidad_Reportante
+        WHERE t.Id_Transfer = ?
         LIMIT 1
         FOR UPDATE`,
       [Id_Transfer]
@@ -1102,6 +1134,15 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       cantidadActual: transferActual.Cantidad_Personas ?? null
     });
 
+    const idCanal = payload.Id_Canal;
+    const idEntidadReportante = await validateReservationEntity(conn, idCanal, payload.Id_Entidad_Reportante);
+    const [[canalReportante]] = await conn.query(
+      'SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal = ? LIMIT 1', [idCanal]
+    );
+    const [entidadReportanteRows] = idEntidadReportante
+      ? await conn.query('SELECT Nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante = ? LIMIT 1', [idEntidadReportante])
+      : [[]];
+
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
       Id_Moneda: idMoneda,
@@ -1112,6 +1153,8 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
     }, transferActualRows[0].Estado || null);
 
     const sql = `UPDATE transfers SET
+      Id_Canal = ?,
+      Id_Entidad_Reportante = ?,
       Nombre_Titular = ?,
       DNI = ?,
       Telefono_Titular = ?,
@@ -1134,6 +1177,8 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
     WHERE Id_Transfer = ?`;
 
     const params = [
+      idCanal,
+      idEntidadReportante,
       payload.Titular || null,
       payload.DNI || null,
       payload.Tel_Contacto || null,
@@ -1248,6 +1293,10 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       accion: 'ACTUALIZAR_TRANSFER',
       id_usuario: historialUserId,
       detalles: [
+        { columna: 'Canal', anterior: transferActualRows[0].Nombre_Canal ?? null,
+          nuevo: canalReportante?.Nombre_Canal || null },
+        { columna: 'Entidad reportante', anterior: transferActualRows[0].Nombre_Entidad_Reportante ?? null,
+          nuevo: entidadReportanteRows?.[0]?.Nombre || null },
         { columna: 'Nombre_Titular', anterior: transferActualRows?.[0]?.Nombre_Titular ?? null, nuevo: payload?.Titular || null },
         { columna: 'Fecha_Transfer', anterior: transferActualRows?.[0]?.Fecha_Transfer ?? null, nuevo: payload?.FechaTransfer || null },
         { columna: 'Estado', anterior: transferActualRows?.[0]?.Estado ?? null, nuevo: estadoCalculado }
@@ -1446,4 +1495,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos, normalizarEstadosTransfersExistentes };
+module.exports = { getServiciosTransferSvc, getCanalesTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos, normalizarEstadosTransfersExistentes };

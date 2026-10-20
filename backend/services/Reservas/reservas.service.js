@@ -1,6 +1,6 @@
 // services/Reservas/reservas.service.js
 const db = require('../../database/db');
-const { hasReservaContact, validarContactoReserva } = require('./reserva-contact');
+const { isValidReporterPhone, hasValidPassengerPhone, validarContactoReserva } = require('./reserva-contact');
 const { validateReservationEntity } = require('../EntidadesReportantes/entidades-reportantes.service');
 const fs = require('fs');
 const path = require('path');
@@ -334,6 +334,11 @@ function esAbonoReserva(tipo) {
   return String(tipo || '').trim().toLowerCase() === 'abono';
 }
 
+const ESTADOS_RESERVA_CANONICOS = Object.freeze([
+  'Pendiente', 'Pendiente de datos', 'Pendiente de pago',
+  'Confirmada', 'Completada', 'Cancelada',
+]);
+
 function normalizarEstadoReservaLegacy(estado) {
   const value = String(estado || '').trim().toLowerCase();
   if (!value) return '';
@@ -345,6 +350,7 @@ function normalizarEstadoReservaLegacy(estado) {
   if (value === 'cancelada') return 'Cancelada';
   if (value === 'pendiente') return 'Pendiente';
   if (value === 'pendiente de datos') return 'Pendiente de datos';
+  if (value === 'pendientedatos') return 'Pendiente de datos';
   if (value === 'pendiente de pago') return 'Pendiente de pago';
   return String(estado || '').trim();
 }
@@ -355,6 +361,7 @@ function expandirEstadoReservaFiltro(estado) {
   if (lower === 'confirmada') return ['Confirmada', 'Confirmado', 'Activo', 'Activa'];
   if (lower === 'completada') return ['Completada', 'Completado'];
   if (lower === 'cancelada') return ['Cancelada', 'Cancelado'];
+  if (lower === 'pendiente de datos') return ['Pendiente de datos', 'PendienteDatos'];
   return normalized ? [normalized] : [];
 }
 
@@ -406,7 +413,8 @@ function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoAc
 
   const datosOk = pasajerosArray.length > 0
     && pasajerosArray.every((p) => tieneTexto(p?.Nombre_Pasajero) && tieneTexto(p?.DNI))
-    && hasReservaContact(telefonoReportante, pasajerosArray);
+    && isValidReporterPhone(telefonoReportante)
+    && hasValidPassengerPhone(pasajerosArray);
 
   const totalVenta = pasajerosArray.reduce((sum, p) => sum + Number(p?.Precio_Pasajero || 0), 0);
   const totalAbonado = pagosArray.reduce((sum, pago) => (
@@ -2605,6 +2613,9 @@ async function obtenerHistorialCambiosReserva(Id_Reserva, limit = 25, ownerUserI
 module.exports = {
   // list/read
   filtrarReservas,
+  ESTADOS_RESERVA_CANONICOS,
+  normalizarEstadoReservaLegacy,
+  expandirEstadoReservaFiltro,
   obtenerReserva,
   verificarCupos,
   // catalogs

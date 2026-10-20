@@ -12,19 +12,19 @@
     <div class="wizard-stepper" aria-label="Pasos para editar el punto de encuentro">
       @for (step of wizardSteps; track step.id; let i = $index) {
         @if (i > 0) {
-          <div class="step-connector" [class.filled]="currentStep >= i"></div>
+          <div class="step-connector" [class.filled]="maxReachedStep >= i"></div>
         }
         <button
           type="button"
           class="step-item"
           [class.is-active]="currentStep === i"
-          [class.is-done]="currentStep > i"
+          [class.is-done]="i !== currentStep && i <= maxReachedStep && canAdvanceFromStep(i) && !stepHasError(i)"
           [class.has-error]="stepHasError(i)"
           [class.is-locked]="i > maxReachedStep"
           [disabled]="i > maxReachedStep"
           (click)="goToStep(i)">
           <span class="step-bubble">
-            @if (currentStep > i && !stepHasError(i)) {
+            @if (i !== currentStep && i <= maxReachedStep && canAdvanceFromStep(i) && !stepHasError(i)) {
               <svg viewBox="0 0 14 14" aria-hidden="true"><polyline points="2,7 6,11 12,3"/></svg>
             } @else if (stepHasError(i)) {
               <svg class="icon-error" viewBox="0 0 14 14" aria-hidden="true">

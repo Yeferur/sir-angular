@@ -1,5 +1,6 @@
 import { SirSelectComponent } from '../../../shared/select/select';
-import { ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
+import { SirMultiSelectComponent, SirMultiSelectOption } from '../../../shared/multi-select/multi-select';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -13,17 +14,18 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirMultiSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './ver-reservas.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })
 export class VerReservasComponent implements OnInit, OnDestroy {
-  readonly reservationTypeOptions = [{ value: '', label: 'Grupales y privadas' }, { value: 'Grupal', label: 'Solo grupales' }, { value: 'Privada', label: 'Solo privadas' }];
+  readonly reservationTypeOptions = [{ value: '', label: 'Todos los tipos' }, { value: 'Grupal', label: 'Solo grupales' }, { value: 'Privada', label: 'Solo privadas' }];
   readonly estadoOptions = ['Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Completada', 'Cancelada'];
   mainInputFocused = signal(false);
 private settingFromAutocomplete = false;
@@ -114,7 +116,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
 
   getSelectedToursText(): string {
-    const ids = this.filters().tour;
+    const ids = this.appliedFilters().tour;
     if (!ids?.length) return '';
     return ids
       .map(id => {
@@ -125,7 +127,7 @@ seleccionarPuntoAutocomplete(p: any) {
   }
 
   getSelectedCategoriasText(): string {
-    const ids = this.filters().CategoriaReserva;
+    const ids = this.appliedFilters().CategoriaReserva;
     if (!ids?.length) return '';
     return ids
       .map(id => {
@@ -143,12 +145,17 @@ seleccionarPuntoAutocomplete(p: any) {
   private permisosService = inject(PermisosService);
   private drawer = inject(SirDrawerService);
   private alertService = inject(SirAlertService);
-  private hostElement = inject(ElementRef<HTMLElement>);
   private searchRequest?: Subscription;
-  private restoreSearchFromUrl = false;
 
   resultsTours = signal<any[]>([]);
   resultsCategoria = signal<any[]>([]);
+  readonly estadoMultiOptions: SirMultiSelectOption<string>[] = this.estadoOptions.map(value => ({ value, label: value }));
+  readonly tourMultiOptions = computed<SirMultiSelectOption<number>[]>(() => this.resultsTours().map(tour => ({
+    value: Number(tour.Id_Tour), label: String(tour.Nombre_Tour || ''),
+  })));
+  readonly channelMultiOptions = computed<SirMultiSelectOption<number>[]>(() => this.resultsCategoria().map(channel => ({
+    value: Number(channel.Id_Canal), label: String(channel.Nombre_Canal || ''),
+  })));
   reservas = signal<any[]>([]);
   readonly pageSize = 25;
   readonly page = signal(1);
@@ -159,14 +166,8 @@ seleccionarPuntoAutocomplete(p: any) {
   loadError = signal('');
   searchError = signal('');
   hasSearched = signal(false);
-  filtersApplied = signal(false);
 
   advancedFiltersVisible = signal(false);
-
-  dropdownOpenCategoria = signal(false);
-  dropdownOpenTour = signal(false);
-  dropdownOpenEstado = signal(false);
-
 
   filters = signal({
     FechaReserva: '',
@@ -181,6 +182,7 @@ seleccionarPuntoAutocomplete(p: any) {
     TipoReserva: '' as '' | 'Grupal' | 'Privada',
     Empty: false,
   });
+  appliedFilters = signal(this.filters());
 
   private readonly refreshEffect = effect(() => {
     const entity = this.uiState.needsRefresh();
@@ -211,7 +213,7 @@ seleccionarPuntoAutocomplete(p: any) {
 
 
   ngOnInit(): void {
-    this.restoreSearchFromUrl = this.restoreFiltersFromQuery();
+    this.restoreFiltersFromQuery();
     this.loadInitialData();
   }
 
@@ -220,7 +222,7 @@ seleccionarPuntoAutocomplete(p: any) {
   }
 
   listar() {
-    if (this.filtersApplied()) {
+    if (this.hasSearched()) {
       this.buscarReservas(false);
     }
   }
@@ -348,8 +350,6 @@ seleccionarPuntoAutocomplete(p: any) {
       Id_Reserva: '',
       Punto: '',
     }));
-    this.page.set(1);
-    this.syncFiltersToUrl();
   }
 
   loadInitialData() {
@@ -362,7 +362,7 @@ seleccionarPuntoAutocomplete(p: any) {
       finalize(() => {
         this.isLoading.set(false);
         this.cdr.markForCheck();
-        this.runRestoredSearch();
+        if (!this.loadError()) this.runRestoredSearch();
       })
     ).subscribe({
       next: ({ tours, categorias }) => {
@@ -382,11 +382,73 @@ seleccionarPuntoAutocomplete(p: any) {
 
   updateFilter(key: keyof ReturnType<typeof this.filters>, value: any) {
     this.filters.update((prev) => ({ ...prev, [key]: value }));
-    this.page.set(1);
-    this.syncFiltersToUrl();
   }
 
-  private restoreFiltersFromQuery(): boolean {
+  removeAppliedFilter(key: keyof ReturnType<typeof this.filters>, value: any): void {
+    if (this.isSearching()) return;
+    this.filters.set({ ...this.appliedFilters(), [key]: value });
+    this.buscarReservas();
+  }
+
+  removeAppliedMainSearch(): void {
+    if (this.isSearching()) return;
+    this.filters.set({
+      ...this.appliedFilters(),
+      NombreApellido: '',
+      IdPas: '',
+      Id_Reserva: '',
+      Punto: '',
+    });
+    this.puntoSeleccionado = null;
+    this.puntoSugerencias.set([]);
+    this.puntoAutocompleteVisible.set(false);
+    this.buscarReservas();
+  }
+
+  hasVisibleAppliedFilters(): boolean {
+    const f = this.appliedFilters();
+    return Boolean(
+      f.FechaReserva || f.FechaRegistro || f.Estado?.length || f.tour?.length ||
+      f.CategoriaReserva?.length || f.TipoReserva || f.NombreApellido?.trim() ||
+      f.Id_Reserva?.trim() || f.IdPas?.trim() || f.Punto?.trim()
+    );
+  }
+
+  visibleAppliedFilterCount(): number {
+    const f = this.appliedFilters();
+    const hasMainSearch = Boolean(f.Punto?.trim() || f.Id_Reserva?.trim() || f.IdPas?.trim() || f.NombreApellido?.trim());
+    return Number(hasMainSearch)
+      + Number(!!f.FechaReserva)
+      + Number(!!f.FechaRegistro)
+      + Number(!!f.Estado?.length)
+      + Number(!!f.tour?.length)
+      + Number(!!f.CategoriaReserva?.length)
+      + Number(!!f.TipoReserva);
+  }
+
+  clearAppliedFilters(): void {
+    if (this.isSearching()) return;
+    this.filters.set({
+      FechaReserva: '',
+      FechaRegistro: '',
+      CategoriaReserva: [],
+      tour: [],
+      Id_Reserva: '',
+      NombreApellido: '',
+      IdPas: '',
+      Punto: '',
+      Estado: [],
+      TipoReserva: '',
+      Empty: false,
+    });
+    this.puntoSeleccionado = null;
+    this.puntoSugerencias.set([]);
+    this.puntoAutocompleteVisible.set(false);
+    this.page.set(1);
+    this.buscarReservas();
+  }
+
+  private restoreFiltersFromQuery(): void {
     const params = this.route.snapshot.queryParamMap;
     const toNumbers = (value: string | null): number[] => String(value || '')
       .split(',')
@@ -417,11 +479,11 @@ seleccionarPuntoAutocomplete(p: any) {
 
     this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
     this.puntoSeleccionado = point ? { NombrePunto: point } : null;
-    return params.get('buscar') === '1';
+    this.appliedFilters.set(this.filters());
   }
 
   private buildFilterQueryParams(searchApplied: boolean): Record<string, string | number | null> {
-    const filter = this.filters();
+    const filter = this.appliedFilters();
     return {
       fechaTour: filter.FechaReserva || null,
       fechaRegistro: filter.FechaRegistro || null,
@@ -449,98 +511,19 @@ seleccionarPuntoAutocomplete(p: any) {
   }
 
   private runRestoredSearch(): void {
-    if (!this.restoreSearchFromUrl) return;
-    this.restoreSearchFromUrl = false;
     this.buscarReservas(false);
   }
 
-  toggleDropdown(name: 'tour' | 'categoria' | 'estado') {
-    this.dropdownOpenTour.set(name === 'tour' ? !this.dropdownOpenTour() : false);
-    this.dropdownOpenCategoria.set(name === 'categoria' ? !this.dropdownOpenCategoria() : false);
-    this.dropdownOpenEstado.set(name === 'estado' ? !this.dropdownOpenEstado() : false);
-  }
-
   toggleAdvancedFilters(): void {
-    const shouldOpen = !this.advancedFiltersVisible();
-    this.closeFilterDropdowns();
-    this.advancedFiltersVisible.set(shouldOpen);
-  }
-
-  @HostListener('document:pointerdown', ['$event'])
-  onDocumentPointerDown(event: PointerEvent): void {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const clickedOwnMultiFilter =
-      this.hostElement.nativeElement.contains(target) && !!target.closest('.multi-filter');
-    if (!clickedOwnMultiFilter) this.closeFilterDropdowns();
-  }
-
-  @HostListener('document:keydown.escape')
-  onFilterEscape(): void {
-    this.closeFilterDropdowns();
-  }
-
-  private closeFilterDropdowns(): void {
-    this.dropdownOpenTour.set(false);
-    this.dropdownOpenCategoria.set(false);
-    this.dropdownOpenEstado.set(false);
+    this.advancedFiltersVisible.update(open => !open);
   }
 
   private closeAdvancedFilters(): void {
     this.advancedFiltersVisible.set(false);
-    this.closeFilterDropdowns();
-  }
-
-  isSelected(filterKey: 'CategoriaReserva' | 'tour' | 'Estado', value: any): boolean {
-    const selectedValues = this.filters()[filterKey] as any[];
-    if (!selectedValues?.length) return false;
-
-    if (filterKey === 'CategoriaReserva' || filterKey === 'tour') {
-      return selectedValues.includes(typeof value === 'string' ? Number(value) : value);
-    }
-
-    return selectedValues.includes(String(value));
-  }
-
-  clearMultiFilter(filterKey: 'CategoriaReserva' | 'tour' | 'Estado'): void {
-    this.updateFilter(filterKey, []);
-  }
-
-  getMultiFilterLabel(filterKey: 'CategoriaReserva' | 'tour' | 'Estado'): string {
-    const selectedCount = (this.filters()[filterKey] as any[])?.length || 0;
-    if (selectedCount === 0) return 'Todos';
-    if (selectedCount === 1) return '1 seleccionado';
-    return `${selectedCount} seleccionados`;
-  }
-
-  toggleSelection(value: any, filterKey: 'CategoriaReserva' | 'tour' | 'Estado') {
-    // Si value es "", limpiar completamente el filtro (equivalente a seleccionar "Todos")
-    if (value === '') {
-      this.updateFilter(filterKey, []);
-      return;
-    }
-
-    // Validar que value no sea null o undefined
-    if (value === null || value === undefined) {
-      return;
-    }
-
-    // Convertir a number para CategoriaReserva y tour, mantener string para Estado
-    let normalizedValue = value;
-    if ((filterKey === 'CategoriaReserva' || filterKey === 'tour') && typeof value === 'string') {
-      normalizedValue = Number(value);
-    }
-
-    const current = this.filters()[filterKey] as any[];
-    const updated = current.includes(normalizedValue)
-      ? current.filter((v) => v !== normalizedValue)
-      : [...current, normalizedValue];
-    this.updateFilter(filterKey, updated);
   }
 
   activeFilterCount(): number {
-    const f = this.filters();
+    const f = this.appliedFilters();
     let count = 0;
 
     if (f.FechaReserva) count++;
@@ -553,8 +536,12 @@ seleccionarPuntoAutocomplete(p: any) {
     return count;
   }
 
+  hasAppliedCriteria(): boolean {
+    return Object.keys(this.buildApiFilters()).length > 0;
+  }
+
   private buildApiFilters() {
-    const f = this.filters();
+    const f = this.appliedFilters();
     const api: any = {};
 
     if (f.FechaReserva) api.Fecha_Tour = f.FechaReserva;     // o FechaReserva según tu backend
@@ -597,6 +584,10 @@ seleccionarPuntoAutocomplete(p: any) {
   }
 
   buscarReservas(resetPage = true) {
+    if (this.isSearching()) return;
+    if (resetPage || !this.hasSearched()) {
+      this.appliedFilters.set({ ...this.filters() });
+    }
     const filtros = this.buildApiFilters();
     // Si el filtro es por punto, solo buscar si el punto fue seleccionado del autocompletar
     if (filtros.Punto && !this.puntoSeleccionado) {
@@ -604,18 +595,6 @@ seleccionarPuntoAutocomplete(p: any) {
         type: 'info',
         title: 'Selecciona un punto',
         message: 'Debes seleccionar un punto de encuentro del autocompletar.',
-        autoClose: true,
-        autoCloseTime: 3000
-      });
-      return;
-    }
-    // Si no hay ningún filtro relevante, no buscar
-    if (Object.keys(filtros).length === 0 ||
-      (!filtros.Punto && !filtros.q && !filtros.Id_Reserva && !filtros.DNI && !filtros.Fecha_Tour && !filtros.Estado && !filtros.Id_Tour && !filtros.Id_Canal && !filtros.Tipo_Reserva)) {
-      this.alertService.showAlert({
-        type: 'info',
-        title: 'Sin filtros',
-        message: 'Debes aplicar al menos un filtro para buscar.',
         autoClose: true,
         autoCloseTime: 3000
       });
@@ -631,7 +610,6 @@ seleccionarPuntoAutocomplete(p: any) {
     this.hasSearched.set(true);
     this.isSearching.set(true);
     this.searchError.set('');
-    this.filtersApplied.set(true);
     this.syncFiltersToUrl(true);
     this.closeAdvancedFilters();
     this.cdr.markForCheck();

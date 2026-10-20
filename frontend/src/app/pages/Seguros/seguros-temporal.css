@@ -1,0 +1,67 @@
+.insurance-temporal-page { padding-bottom: 32px; }
+.insurance-temporal-page--with-results { padding-bottom: 40px; }
+
+.insurance-temporal-results {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--bg-secondary) 91%, transparent);
+}
+
+.insurance-temporal-heading {
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.insurance-temporal-heading h2 { font-size: .94rem; }
+.insurance-temporal-heading p,
+.insurance-temporal-note {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: .74rem;
+}
+
+.insurance-temporal-warning {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, #e9a23b 38%, var(--separator-color));
+  border-radius: var(--radius-md, 12px);
+  color: var(--text-primary);
+  background: color-mix(in srgb, #e9a23b 8%, var(--bg-secondary));
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+.insurance-temporal-table-wrap { overflow-x: auto; }
+.insurance-temporal-table { width: 100%; border-collapse: collapse; font-size: .77rem; }
+.insurance-temporal-table th,
+.insurance-temporal-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--separator-color);
+  text-align: left;
+  white-space: nowrap;
+}
+.insurance-temporal-table th {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-tertiary) 74%, transparent);
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.insurance-temporal-table td:nth-child(1),
+.insurance-temporal-table td:nth-child(2) { text-align: center; }
+.insurance-temporal-table td:nth-child(3) { min-width: 220px; }
+.insurance-temporal-table tbody tr:last-child td { border-bottom: 0; }
+.insurance-temporal-note { margin: 0; padding: 11px 14px; border-top: 1px solid var(--separator-color); }
+
+@media (max-width: 700px) {
+  .insurance-temporal-heading { align-items: stretch; flex-direction: column; }
+  .insurance-temporal-heading .button { width: 100%; }
+  .insurance-temporal-table { min-width: 680px; }
+}

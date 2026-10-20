@@ -95,7 +95,7 @@
 
         <div class="sir-dp-footer">
           <button type="button" class="sir-dp-btn-today" (click)="goToday()">Hoy</button>
-          @if (selected) {
+          @if (selected && allowClear) {
             <button type="button" class="sir-dp-btn-clear" (click)="clearDate()">Limpiar</button>
           }
         </div>

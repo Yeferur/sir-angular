@@ -1,23 +1,27 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validarContactoReserva, hasReservaContact } = require('../services/Reservas/reserva-contact');
+const { validarContactoReserva, isValidReporterPhone } = require('../services/Reservas/reserva-contact');
 
-test('un único teléfono de reportante permite pasajeros adicionales sin teléfono', () => {
-  const pasajeros = ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map(Tipo_Pasajero => ({ Tipo_Pasajero, Telefono_Pasajero: null }));
+test('requiere teléfono del reportante y de al menos un pasajero', () => {
+  const pasajeros = ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map((Tipo_Pasajero, index) => ({
+    Tipo_Pasajero, Telefono_Pasajero: index === 0 ? '+573009876543' : null,
+  }));
   assert.doesNotThrow(() => validarContactoReserva('+573001234567', pasajeros));
-  assert.equal(hasReservaContact('+573001234567', pasajeros), true);
+  assert.equal(isValidReporterPhone('+573001234567'), true);
 });
 
-test('un teléfono de pasajero basta; validar no duplica ni borra teléfonos existentes', () => {
+test('un teléfono de pasajero no sustituye al teléfono obligatorio del reportante', () => {
   const pasajeros = [{ Telefono_Pasajero: '+573001234567' }, { Telefono_Pasajero: '+573009876543' }, { Telefono_Pasajero: '' }];
   const before = structuredClone(pasajeros);
-  validarContactoReserva('', pasajeros);
-  validarContactoReserva(null, pasajeros);
+  assert.throws(() => validarContactoReserva('', pasajeros), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED');
+  assert.throws(() => validarContactoReserva(null, pasajeros), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED');
+  assert.doesNotThrow(() => validarContactoReserva('+573001234567', pasajeros));
   assert.deepEqual(pasajeros, before);
 });
 
-test('falta de contacto y teléfono adicional inválido tienen errores específicos', () => {
-  assert.throws(() => validarContactoReserva('', [{ Telefono_Pasajero: null }]), e => e.status === 400 && e.errorCode === 'RESERVA_CONTACT_REQUIRED' && e.message.includes('al menos un teléfono'));
+test('el teléfono de pasajero es obligatorio para al menos uno y los formatos inválidos se rechazan', () => {
+  assert.throws(() => validarContactoReserva('', [{ Telefono_Pasajero: null }]), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED' && e.message.includes('reportante'));
+  assert.throws(() => validarContactoReserva('+573001234567', [{ Telefono_Pasajero: null }]), e => e.status === 400 && e.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED' && e.message.includes('pasajero'));
   for (const phone of ['123', ' ', '+01234567890', '+573001234567xxxx']) {
     assert.throws(() => validarContactoReserva('+573001234567', [{ Telefono_Pasajero: phone }]), e => e.status === 400 && e.errorCode === 'RESERVA_PHONE_INVALID');
   }
@@ -52,7 +56,7 @@ test('creación y edición reales preservan contacto, pasajeros y datos tras err
   const suffix = Date.now().toString();
   const payload = {
     cabeceraReserva: { Tipo_Reserva: 'Grupal', Id_Tour: configuration.Id_Tour, Id_Horario: configuration.Id_Horario, Id_Punto: configuration.Id_Punto, Fecha_Tour: date, Id_Moneda: configuration.Id_Moneda, Id_Canal: configuration.Id_Canal, Idioma_Reserva: 'ESPAÑOL', Nombre_Reportante: 'PRUEBA AUTOMATIZADA CONTACTO', Telefono_Reportante: '+573001234567', Observaciones: 'SINTETICA - prueba automatizada formulario' },
-    pasajeros: ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map((Tipo_Pasajero, index) => ({ Tipo_Pasajero, Nombre_Pasajero: `SINTETICO ${index}`, DNI: `TEST-${suffix}-${index}`, Telefono_Pasajero: null, Id_Punto: configuration.Id_Punto, Precio_Pasajero: 100, Precio_Tour: 100 })),
+    pasajeros: ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE'].map((Tipo_Pasajero, index) => ({ Tipo_Pasajero, Nombre_Pasajero: `SINTETICO ${index}`, DNI: `TEST-${suffix}-${index}`, Telefono_Pasajero: index === 0 ? '+573009876543' : null, Id_Punto: configuration.Id_Punto, Precio_Pasajero: 100, Precio_Tour: 100 })),
     pagos: [{ Tipo: 'Pago Directo', Monto: 400 }], replacePagos: true,
   };
     const id = (await svc.crearReservaConPasajerosYPagos(payload)).Id_Reserva;
@@ -65,16 +69,21 @@ test('creación y edición reales preservan contacto, pasajeros y datos tras err
     assert.equal((await read()).cabecera.Estado, 'Confirmada');
     payload.cabeceraReserva.Observaciones = 'EDICION SINTETICA';
     await svc.actualizarReservaConPasajerosYPagos(id, payload);
-    assert.deepEqual((await read()).pasajeros.map(p => p.Telefono_Pasajero), [null, null, null, null]);
-    payload.cabeceraReserva.Telefono_Reportante = '';
-    payload.pasajeros[0].Telefono_Pasajero = '+573009876543';
-    await svc.actualizarReservaConPasajerosYPagos(id, payload);
-    await svc.actualizarReservaConPasajerosYPagos(id, payload);
+    assert.deepEqual((await read()).pasajeros.map(p => p.Telefono_Pasajero), ['+573009876543', null, null, null]);
     const before = await read();
     assert.equal(before.cabecera.Estado, 'Confirmada');
-    assert.deepEqual(before.pasajeros.map(p => p.Telefono_Pasajero), ['+573009876543', null, null, null]);
+    const missingReporter = structuredClone(payload);
+    missingReporter.cabeceraReserva.Telefono_Reportante = '';
+    missingReporter.pasajeros[0].Telefono_Pasajero = '+573009876543';
+    await assert.rejects(svc.actualizarReservaConPasajerosYPagos(id, missingReporter), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED');
+    assert.deepEqual(await read(), before);
+    await assert.rejects(svc.crearReservaConPasajerosYPagos(missingReporter), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED');
+    const missingPassenger = structuredClone(payload);
+    missingPassenger.pasajeros.forEach(passenger => { passenger.Telefono_Pasajero = null; });
+    await assert.rejects(svc.actualizarReservaConPasajerosYPagos(id, missingPassenger), e => e.status === 400 && e.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED');
+    assert.deepEqual(await read(), before);
+    await assert.rejects(svc.crearReservaConPasajerosYPagos(missingPassenger), e => e.status === 400 && e.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED');
     for (const [mutation, code] of [
-      [p => { p.pasajeros[0].Telefono_Pasajero = ''; }, 'RESERVA_CONTACT_REQUIRED'],
       [p => { p.pasajeros[1].Telefono_Pasajero = '123'; }, 'RESERVA_PHONE_INVALID'],
       [p => { p.cabeceraReserva.Fecha_Tour = '2026-06-30'; }, 'RESERVA_TOUR_DATE_PAST'],
     ]) {

@@ -1,5 +1,5 @@
 const express = require('express');
-const { exportarPuntosExcel, getPuntos, getPuntosQuery, getRutasPuntos, getPuntosByRuta, getOperatividadPuntosByRuta, updateOrdenPuntosByRuta, getPuntosByDireccion, getHorario, getHorariosPorPunto, validarCoordenadasPunto, createPunto, getPuntoById, updatePunto, deletePunto } = require('../../controllers/Puntos/puntos.controller');
+const { exportarPuntosExcel, getPuntos, getPuntosQuery, getRutasPuntos, getPuntosByRuta, getOperatividadPuntosByRuta, updateOrdenPuntosByRuta, getPuntosByDireccion, getHorario, getHorariosPorPunto, validarCoordenadasPunto, createPunto, getPuntoById, updatePunto, deletePunto, getEstadosReservasPuntos, getReservasPunto, exportarReservasPunto } = require('../../controllers/Puntos/puntos.controller');
 const router = express.Router();
 const { authMiddleware } = require('../../middlewares/authMiddleware');
 const { checkPermission, checkAnyPermission } = require('../../middlewares/permissionsMiddleware');
@@ -14,6 +14,9 @@ router.get('/puntos/rutas/:ruta', authMiddleware, checkPermission('PUNTOS.LEER')
 router.get('/puntos/direccion', authMiddleware, checkPermission('PUNTOS.LEER'), getPuntosByDireccion);
 router.get('/puntos/horario', authMiddleware, checkPermission('PUNTOS.LEER'), getHorario);
 router.get('/puntos/horarios', authMiddleware, checkPermission('PUNTOS.LEER'), getHorariosPorPunto);
+router.get('/puntos/reservas/estados', authMiddleware, checkPermission('PUNTOS.RESERVAS.LEER'), getEstadosReservasPuntos);
+router.get('/puntos/:id/reservas/exportar', authMiddleware, checkPermission('PUNTOS.RESERVAS.EXPORTAR'), exportarReservasPunto);
+router.get('/puntos/:id/reservas', authMiddleware, checkPermission('PUNTOS.RESERVAS.LEER'), getReservasPunto);
 router.post(
   '/puntos/validar-coordenadas',
   authMiddleware,

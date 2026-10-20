@@ -1,0 +1,81 @@
+<section class="point-reservations" aria-labelledby="point-reservations-title">
+  <header class="point-reservations__header">
+    <div>
+      <h2 id="point-reservations-title">Reservas asociadas</h2>
+      <p>{{ puntoNombre }}</p>
+    </div>
+    <app-drawer-close-button label="Cerrar reservas asociadas" (dismiss)="closed.emit()" />
+  </header>
+
+  <div class="point-reservations__scroll">
+    <div class="point-reservations__filters">
+      <div class="point-reservations__filter">
+        <label for="point-reservations-range">Período</label>
+        <app-date-range-picker inputId="point-reservations-range" [value]="draftRange()"
+          (rangeChange)="setRange($event)" />
+      </div>
+      <div class="point-reservations__filter point-reservations__filter--state">
+        <label for="point-reservations-state">Estado</label>
+        <app-select inputId="point-reservations-state" [ngModel]="draftEstado()"
+          (ngModelChange)="draftEstado.set($event)" [options]="estadoOptions()"
+          ariaLabel="Estado de reserva" />
+      </div>
+      <button type="button" class="btn-primary reservation-search-button" (click)="buscar()"
+        [disabled]="loading() || !!rangeError" [attr.aria-busy]="loading()">
+        Buscar
+      </button>
+    </div>
+    @if (rangeError) { <p class="point-reservations__error" role="alert">{{ rangeError }}</p> }
+
+    @if (error() && result()?.total) {
+      <p class="point-reservations__error" role="alert">{{ error() }} Los resultados anteriores siguen disponibles.</p>
+    }
+
+    @if (loading() && !result()?.total) {
+      <app-loading-state label="Consultando reservas asociadas…" />
+    } @else if (!result()?.total && error()) {
+      <app-loading-state mode="error" label="No pudimos consultar las reservas" [detail]="error()"
+        (action)="buscar()" />
+    } @else if (result(); as page) {
+      @if (page.total > 0) {
+        <div class="point-reservations__results-heading">
+          <strong aria-live="polite">{{ page.total }} {{ page.total === 1 ? 'reserva' : 'reservas' }}</strong>
+          @if (loading()) { <span class="updating-pill" role="status">Actualizando</span> }
+          @if (canExport) {
+            <button type="button" class="point-reservations__export" (click)="exportar()"
+              [disabled]="loading() || exporting()">{{ exporting() ? 'Exportando…' : 'Exportar Excel' }}</button>
+          }
+        </div>
+        <div class="point-reservations__table-wrap" [attr.aria-busy]="loading()">
+          <table class="point-reservations__table">
+            <thead><tr><th scope="col">Código</th><th scope="col">Fecha del tour</th>
+              <th scope="col">Tour</th><th scope="col">Pasajeros</th><th scope="col">Estado</th></tr></thead>
+            <tbody>
+              @for (reserva of page.data; track reserva.Id_Reserva) {
+                <tr><td class="point-reservations__code">{{ reserva.Id_Reserva }}</td>
+                  <td>{{ reserva.Fecha_Tour | date:'d MMM y':'':'es-CO' }}</td>
+                  <td>{{ reserva.Nombre_Tour || 'Sin tour' }}</td>
+                  <td>{{ reserva.Pasajeros }}</td><td>{{ reserva.Estado }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <app-query-empty-state title="Sin reservas asociadas"
+          description="No hay reservas para este punto en el período y estado seleccionados." [compact]="true" />
+      }
+      @if (page.total > 0 && page.totalPages > 1) {
+        <nav class="results-pagination" aria-label="Paginación de reservas asociadas">
+          <button type="button" class="pagination-button" (click)="buscar(page.page - 1)"
+            [disabled]="page.page <= 1 || loading()">Anterior</button>
+          <span class="pagination-indicator" aria-live="polite">Página {{ page.page }} de {{ page.totalPages }}</span>
+          <button type="button" class="pagination-button" (click)="buscar(page.page + 1)"
+            [disabled]="page.page >= page.totalPages || loading()">Siguiente</button>
+        </nav>
+      }
+    } @else {
+      <app-query-empty-state title="Listo para consultar"
+        description="Selecciona un período y pulsa Buscar para consultar las reservas del punto." [compact]="true" />
+    }
+  </div>
+</section>

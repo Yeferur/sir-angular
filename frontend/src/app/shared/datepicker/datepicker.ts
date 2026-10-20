@@ -113,6 +113,7 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
 
   // ── Inputs ──────────────────────────────────────────────────
   @Input() placeholder = 'Seleccionar fecha';
+  @Input() allowClear = true;
   @Input() minDate: string | Date | null = null;
   @Input() maxDate: string | Date | null = null;
   @Input() invalid = false;
@@ -196,7 +197,6 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
   toggle(): void {
     if (this.effectivelyDisabled) return;
     this.isOpen ? this.close() : this.open();
-    this.onTouched();
   }
 
   open(): void {
@@ -274,6 +274,7 @@ export class DatepickerComponent implements OnInit, OnChanges, OnDestroy, Contro
     if (!this.isOpen) return;
     this.destroyOverlay();
     this.isOpen = false;
+    this.onTouched();
     this.cdr.markForCheck();
   }
 

@@ -3,6 +3,11 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../../middlewares/authMiddleware'); // Asumo que tienes un middleware de autenticación
 const { checkPermission } = require('../../middlewares/permissionsMiddleware');
+const {
+    obtenerOpcionesListadoGeneralController,
+    consultarListadoGeneralController,
+    exportarListadoGeneralController,
+} = require('../../controllers/Programacion/listado-general.controller');
 
 const programacionExportAuthorization = () => [
     authMiddleware,
@@ -32,6 +37,27 @@ const {
     posponerNovedadProgramacionController,
     revisarNovedadProgramacionController
 } = require('../../controllers/Programacion/programacion.controller');
+
+// Listado general legacy, aislado de la programación y exportación por buses.
+router.get(
+    '/programacion/listado-general/opciones',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    obtenerOpcionesListadoGeneralController
+);
+
+router.post(
+    '/programacion/listado-general/consultar',
+    authMiddleware,
+    checkPermission('PROGRAMACION.LEER'),
+    consultarListadoGeneralController
+);
+
+router.post(
+    '/programacion/listado-general/exportar',
+    ...programacionExportAuthorization(),
+    exportarListadoGeneralController
+);
 
 /**
  * ===================================================================================

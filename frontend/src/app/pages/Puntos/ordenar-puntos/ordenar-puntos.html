@@ -1,4 +1,43 @@
 <div class="ordenar-page">
+  <header class="order-controls">
+    <button type="button" class="order-back-button" (click)="volverAPuntos()"
+      aria-label="Volver a Puntos de encuentro" title="Volver a Puntos de encuentro">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    @if (!isLoadingRutas() && !loadError()) {
+      <div class="route-selector">
+        <label class="route-selector-label" for="ruta">Ruta</label>
+        <app-select inputId="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="onRutaChangeRequest($event)"
+          [disabled]="isLoadingPuntos() || isSaving() || !rutas().length"
+          [options]="rutaSelectOptions()" [compareWith]="compareSelectValues"
+          ariaLabel="Ruta" placeholder="Seleccionar ruta..." />
+      </div>
+
+      <div class="route-summary" aria-live="polite">
+        <div class="summary-item">
+          <strong class="summary-value">{{ puntos().length || 0 }} {{ puntos().length === 1 ? 'punto' : 'puntos' }}</strong>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Orden:</span>
+          @if (hasPendingOrderChanges()) {
+            <span class="status-chip status-chip--dirty">Cambios sin guardar</span>
+          } @else {
+            <span class="status-chip">Actualizado</span>
+          }
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Ubicaciones:</span>
+          @if (isValidatingLocations()) {
+            <span class="status-chip">Validando…</span>
+          } @else if (totalConAlertas() > 0) {
+            <span class="status-chip status-chip--warning">{{ totalConAlertas() }} por revisar</span>
+          } @else {
+            <span class="status-chip status-chip--ready">{{ totalOperativos() }} operativas</span>
+          }
+        </div>
+      </div>
+    }
+  </header>
   @if (isLoadingRutas()) {
     <app-loading-state label="Cargando rutas y puntos…"></app-loading-state>
   } @else if (loadError()) {
@@ -9,48 +48,6 @@
       (action)="loadRutas()">
     </app-loading-state>
   } @else {
-    <section class="card route-card">
-      <div class="section-header">
-        <div>
-          <h2>Selecciona una ruta</h2>
-          <p>Consulta sus puntos y define el orden en el que serán recogidos.</p>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="ruta">Ruta</label>
-        <app-select inputId="ruta" [ngModel]="rutaSeleccionada" (ngModelChange)="onRutaChangeRequest($event)"
-          [disabled]="isLoadingPuntos() || isSaving() || !rutas().length"
-          [options]="rutaSelectOptions()" [compareWith]="compareSelectValues"
-          ariaLabel="Ruta" placeholder="Seleccionar ruta..." />
-      </div>
-
-      <div class="route-summary" aria-live="polite">
-        <div class="summary-item">
-          <span class="summary-label">Puntos</span>
-          <span class="summary-value">{{ puntos().length || 0 }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Orden</span>
-          @if (hasPendingOrderChanges()) {
-            <span class="status-chip status-chip--dirty">Cambios sin guardar</span>
-          } @else {
-            <span class="status-chip">Actualizado</span>
-          }
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Ubicaciones</span>
-          @if (isValidatingLocations()) {
-            <span class="status-chip">Validando…</span>
-          } @else if (totalConAlertas() > 0) {
-            <span class="status-chip status-chip--warning">{{ totalConAlertas() }} por revisar</span>
-          } @else {
-            <span class="status-chip status-chip--ready">{{ totalOperativos() }} operativas</span>
-          }
-        </div>
-      </div>
-    </section>
-
     @if (pendingAssignmentCount() > 0) {
       <section class="route-debt-card" role="status">
         <div class="route-debt-icon" aria-hidden="true">!</div>

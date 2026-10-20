@@ -23,6 +23,7 @@ import { SirAlertService } from '../../services/Alertas/alert.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { UiStateService } from '../../services/ui-state.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 import { toUserErrorMessage } from '../../shared/errors/user-error-message';
 
 // PDF.js
@@ -96,7 +97,7 @@ interface Reserva {
 @Component({
   selector: 'app-reserva',
   standalone: true,
-  imports: [CommonModule, LoadingStateComponent],
+  imports: [CommonModule, LoadingStateComponent, DrawerCloseButtonComponent],
   templateUrl: './reserva.html',
   styleUrls: ['./reserva.css'],
 })

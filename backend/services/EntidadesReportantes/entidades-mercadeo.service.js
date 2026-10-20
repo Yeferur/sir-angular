@@ -51,8 +51,8 @@ function activitySql(f) {
 }
 function filteredSql(f) {
   const a = activitySql(f);
-  const where = [];
-  const params = [...a.params];
+  const where = ['e.Tipo IN (?, ?, ?)'];
+  const params = [...a.params, ...TYPES];
   if (f.type) { where.push('e.Tipo=?'); params.push(f.type); }
   if (f.validation) { where.push('e.Estado_Validacion=?'); params.push(f.validation); }
   if (f.availability) { where.push('e.Activo=?'); params.push(f.availability === 'ACTIVA' ? 1 : 0); }
@@ -100,7 +100,7 @@ async function detail(rawId, query = {}) {
   const f = filters(query);
   const [[entity]] = await db.query(`SELECT e.*,u.Nombres_Apellidos AS Creador
     FROM entidades_reportantes e LEFT JOIN usuarios u ON u.Id_Usuario=e.Creado_Por
-    WHERE e.Id_Entidad_Reportante=?`, [id]);
+    WHERE e.Id_Entidad_Reportante=? AND e.Tipo IN (?, ?, ?)`, [id, ...TYPES]);
   if (!entity) fail(404, 'ENTITY_NOT_FOUND', 'Entidad reportante no encontrada.');
   const period = f.start ? 'AND r.Fecha_Registro>=? AND r.Fecha_Registro<DATE_ADD(?,INTERVAL 1 DAY)' : '';
   const p = f.start ? [`${f.start} 00:00:00`, f.end] : [];

@@ -2,6 +2,7 @@ const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
 const { recordHistorial } = require('../Historial/logger');
+const { obtenerPasajerosPorTour, obtenerEstadoConfirmacion } = require('../Confirmacion/confirmacion.service');
 
 function createServiceError(message, statusCode = 400, errorCode = 'SEGUROS_ERROR', details = []) {
     const error = new Error(message);
@@ -261,6 +262,123 @@ async function listarSeguros(filtros) {
         DNI_Conductor: bus.DNI_Conductor || null,
         pasajeros: pasajerosPorBus.get(bus.Id_Bus_Prog) || []
     }));
+}
+
+async function listarSegurosTemporales(filtros = {}) {
+    const Fecha = String(filtros.Fecha || '').trim();
+    const Id_Tour = Number(filtros.Id_Tour);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(Fecha) || !Number.isInteger(Id_Tour) || Id_Tour <= 0) {
+        throw createServiceError('Selecciona una fecha y un tour válidos.', 400, 'INVALID_FILTERS');
+    }
+
+    const [todosLosPasajeros, estado, tourRows] = await Promise.all([
+        obtenerPasajerosPorTour(Id_Tour, Fecha),
+        obtenerEstadoConfirmacion(Fecha, Id_Tour),
+        db.query('SELECT Nombre_Tour FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]),
+    ]);
+    const pasajeros = (todosLosPasajeros || []).filter(pasajero => Number(pasajero.Confirmacion) === 1);
+    const jornada = estado?.jornadas?.find(item => Number(item.Id_Tour) === Id_Tour) || null;
+    const pasajerosSinDocumento = pasajeros.filter(pasajero => !String(pasajero.DNI || '').trim()).length;
+
+    return {
+        Fecha,
+        Id_Tour,
+        Nombre_Tour: tourRows?.[0]?.[0]?.Nombre_Tour || 'Tour',
+        totalPasajeros: pasajeros.length,
+        pasajerosSinDocumento,
+        jornadaConfirmada: Boolean(jornada?.Confirmada),
+        requiereConfirmacion: Boolean(jornada?.Requiere_Confirmacion),
+        pasajeros,
+    };
+}
+
+async function generarExcelSegurosTemporales(filtros = {}) {
+    const data = await listarSegurosTemporales(filtros);
+    if (!data.totalPasajeros) {
+        throw createServiceError('No hay pasajeros confirmados como viajeros para esta fecha y tour.', 404, 'NO_CONFIRMED_PASSENGERS');
+    }
+    const pasajerosSinDocumento = data.pasajeros.filter(pasajero => !String(pasajero.DNI || '').trim());
+    if (pasajerosSinDocumento.length) {
+        throw createServiceError(
+            'Completa el DNI o pasaporte de los pasajeros que viajaron antes de descargar el archivo.',
+            409,
+            'MISSING_PASSENGER_DOCUMENTS',
+            pasajerosSinDocumento.map(pasajero => ({
+                Id_Pasajero: pasajero.Id_Pasajero,
+                Id_Reserva: pasajero.Id_Reserva,
+                Nombre_Pasajero: pasajero.Nombre_Pasajero,
+            })),
+        );
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Maxitours';
+    workbook.created = new Date();
+    const worksheet = workbook.addWorksheet('Seguros');
+    const columns = [
+        { header: 'N°', key: 'num', width: 7 },
+        { header: 'TIPO', key: 'tipo', width: 16 },
+        { header: 'NOMBRE', key: 'nombre', width: 38 },
+        { header: 'DNI / PASAPORTE', key: 'dni', width: 24 },
+        { header: 'ID RESERVA', key: 'reserva', width: 18 },
+    ];
+    worksheet.columns = columns;
+    worksheet.views = [{ state: 'frozen', ySplit: 2 }];
+    worksheet.autoFilter = { from: 'A2', to: 'E2' };
+    worksheet.mergeCells('A1:E1');
+    const title = worksheet.getCell('A1');
+    title.value = `${data.Nombre_Tour} · ${data.Fecha} · Pasajeros confirmados para seguros`;
+    title.font = { bold: true, size: 13, color: { argb: 'FF111827' } };
+    title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+    title.alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).height = 26;
+
+    const border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    };
+    const header = worksheet.getRow(2);
+    header.values = columns.map(column => column.header);
+    header.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FF111827' }, size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = border;
+    });
+
+    data.pasajeros.forEach((pasajero, index) => {
+        const row = worksheet.addRow({
+            num: index + 1,
+            tipo: pasajero.Tipo_Pasajero || 'PASAJERO',
+            nombre: pasajero.Nombre_Pasajero || '',
+            dni: pasajero.DNI || '',
+            reserva: pasajero.Id_Reserva || '',
+        });
+        row.eachCell({ includeEmpty: true }, cell => {
+            cell.border = border;
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            if (index % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        });
+        row.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+        row.height = 19;
+    });
+
+    const totalRow = worksheet.addRow(['Total asegurados', '', '', '', data.totalPasajeros]);
+    worksheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
+    totalRow.font = { bold: true };
+    totalRow.eachCell({ includeEmpty: true }, cell => { cell.border = border; });
+    totalRow.getCell(1).alignment = { horizontal: 'left' };
+    totalRow.getCell(5).alignment = { horizontal: 'center' };
+
+    const safeTour = String(data.Nombre_Tour || 'Tour').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'Tour';
+    return {
+        buffer: await workbook.xlsx.writeBuffer(),
+        fileName: `Seguros_${data.Fecha}_${safeTour}.xlsx`,
+        totalPasajeros: data.totalPasajeros,
+    };
 }
 
 async function actualizarPersonalBus(idBusProg, campos, userId = null) {
@@ -524,6 +642,8 @@ async function generarExcelSeguros(filtros, res) {
 
 module.exports = {
     listarSeguros,
+    listarSegurosTemporales,
+    generarExcelSegurosTemporales,
     actualizarPersonalBus,
     generarExcelSeguros,
     buildBusStatus,

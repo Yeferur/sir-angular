@@ -10,7 +10,7 @@ let emptyStateId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class QueryEmptyStateComponent {
-  @Input() icon = 'bx-search-alt';
+  @Input() icon = 'bx-search';
   @Input() title = 'Listo para buscar';
   @Input() description = '';
   @Input() compact = false;

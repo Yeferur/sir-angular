@@ -1,14 +1,13 @@
-import { AbstractControl, ValidationErrors } from '@angular/forms';
-
 export const RESERVA_PHONE_PATTERN = /^\+[1-9]\d{10,12}$/;
-export const CONTACT_REQUIRED_MESSAGE = 'La reserva necesita al menos un teléfono de contacto válido. Completa el teléfono del reportante o el de un pasajero (ej: +573001234567).';
 
-export function hasReservaContact(reportante: unknown, pasajeros: any[]): boolean {
-  return [reportante, ...pasajeros.map(p => p.Telefono_Pasajero)]
-    .some(phone => RESERVA_PHONE_PATTERN.test(String(phone ?? '')));
+export function isValidReporterPhone(value: unknown): boolean {
+  return RESERVA_PHONE_PATTERN.test(String(value ?? '').trim());
 }
 
-export function reservaContactValidator(form: AbstractControl): ValidationErrors | null {
-  return hasReservaContact(form.get('Telefono_Reportante')?.value, form.get('Pasajeros')?.value ?? [])
-    ? null : { contactRequired: true };
+export function isValidPassengerPhone(value: unknown): boolean {
+  return RESERVA_PHONE_PATTERN.test(String(value ?? '').trim());
+}
+
+export function hasValidPassengerPhone(passengers: Array<{ Telefono_Pasajero?: unknown }> | null | undefined): boolean {
+  return Array.isArray(passengers) && passengers.some(passenger => isValidPassengerPhone(passenger?.Telefono_Pasajero));
 }

@@ -325,6 +325,7 @@ async function obtenerPuntos({
   limit = 10,
   q = '',
   ruta = '',
+  pendientes = [],
   allowLargeLimit = false
 }) {
   page = Math.max(1, Math.trunc(Number(page)) || 1);
@@ -332,7 +333,18 @@ async function obtenerPuntos({
   limit = Math.min(maxLimit, Math.max(1, Math.trunc(Number(limit)) || 10));
 
   const search = String(q ?? '').trim();
-  const routeFilter = String(ruta ?? '').trim();
+  const requestedRoute = String(ruta ?? '').trim();
+  const routeFilter = requestedRoute.toUpperCase() === 'PENDIENTE' ? '' : requestedRoute;
+  const pendingFilters = Array.isArray(pendientes) ? [...pendientes] : String(pendientes || '').split(',').filter(Boolean);
+  if (requestedRoute.toUpperCase() === 'PENDIENTE' && !pendingFilters.includes('sin-ruta')) {
+    pendingFilters.push('sin-ruta');
+  }
+  const allowedPending = new Set(['sin-ruta', 'sin-horario', 'sin-coordenadas']);
+  if (pendingFilters.some((value) => !allowedPending.has(value))) {
+    const error = new Error('Filtro Pendientes no reconocido.');
+    error.statusCode = 400;
+    throw error;
+  }
   const conditions = ['p.Activo = 1'];
   const args = [];
 
@@ -350,6 +362,22 @@ async function obtenerPuntos({
     conditions.push('p.ruta = ?');
     args.push(routeFilter);
   }
+
+  const pendingConditions = [];
+  if (pendingFilters.includes('sin-ruta')) {
+    pendingConditions.push("(p.ruta IS NULL OR TRIM(p.ruta) = '' OR UPPER(TRIM(p.ruta)) = 'PENDIENTE')");
+  }
+  if (pendingFilters.includes('sin-horario')) {
+    pendingConditions.push(`(NOT EXISTS (SELECT 1 FROM horarios h WHERE h.Id_Punto = p.Id_Punto)
+      OR EXISTS (SELECT 1 FROM horarios h WHERE h.Id_Punto = p.Id_Punto
+        AND (h.Hora_Salida IS NULL OR TRIM(h.Hora_Salida) = '' OR UPPER(TRIM(h.Hora_Salida)) = 'PENDIENTE')))`);
+  }
+  if (pendingFilters.includes('sin-coordenadas')) {
+    pendingConditions.push(`(p.Latitud IS NULL OR p.Longitud IS NULL
+      OR ABS(p.Latitud) < 0.0001 OR ABS(p.Longitud) < 0.0001
+      OR p.Latitud NOT BETWEEN -90 AND 90 OR p.Longitud NOT BETWEEN -180 AND 180)`);
+  }
+  if (pendingConditions.length) conditions.push(`(${pendingConditions.join(' OR ')})`);
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 

@@ -72,62 +72,88 @@
         (click)="buscarReservas()"
         [disabled]="isSearching()"
         [attr.aria-busy]="isSearching()"
-        [attr.aria-label]="isSearching() ? 'Buscando reservas' : 'Buscar reservas'">
-        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Buscar</span>
+        [attr.aria-label]="isSearching() ? 'Aplicando criterios de reservas' : 'Aplicar criterios de reservas'">
+        <span class="search-button-label" [class.search-button-label--hidden]="isSearching()">Aplicar</span>
         <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="isSearching()" aria-hidden="true"></span>
       </button>
     </div>
 
     <!-- ACTIVE FILTER TOKENS -->
-    @if (filters().FechaReserva || filters().FechaRegistro || filters().Estado?.length > 0 || filters().tour?.length > 0 || filters().CategoriaReserva?.length > 0 || filters().TipoReserva) {
-      <div class="active-filters">
-        @if (filters().FechaReserva) {
+    @if (hasVisibleAppliedFilters()) {
+      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
+        <div class="active-filter-tokens">
+        @if (appliedFilters().Punto) {
           <div class="filter-token">
-            Fecha tour: {{ filters().FechaReserva | date:'d MMM yyyy':'':'es-CO' }}
-            <button class="remove-token-btn" (click)="clearFechaReserva()">
+            Punto de encuentro: {{ appliedFilters().Punto }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedMainSearch()" aria-label="Quitar búsqueda por punto de encuentro">×</button>
+          </div>
+        } @else if (appliedFilters().Id_Reserva) {
+          <div class="filter-token">
+            Código de reserva: {{ appliedFilters().Id_Reserva }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedMainSearch()" aria-label="Quitar búsqueda por código de reserva">×</button>
+          </div>
+        } @else if (appliedFilters().IdPas) {
+          <div class="filter-token">
+            Documento: {{ appliedFilters().IdPas }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedMainSearch()" aria-label="Quitar búsqueda por documento">×</button>
+          </div>
+        } @else if (appliedFilters().NombreApellido?.trim()) {
+          <div class="filter-token">
+            Búsqueda: {{ appliedFilters().NombreApellido }}
+            <button type="button" class="remove-token-btn" (click)="removeAppliedMainSearch()" aria-label="Quitar búsqueda">×</button>
+          </div>
+        }
+        @if (appliedFilters().FechaReserva) {
+          <div class="filter-token">
+            Fecha tour: {{ appliedFilters().FechaReserva | date:'d MMM yyyy':'':'es-CO' }}
+            <button class="remove-token-btn" (click)="removeAppliedFilter('FechaReserva', '')">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().FechaRegistro) {
+        @if (appliedFilters().FechaRegistro) {
           <div class="filter-token">
-            Registro: {{ filters().FechaRegistro | date:'d MMM yyyy':'':'es-CO' }}
-            <button class="remove-token-btn" (click)="clearFechaRegistro()">
+            Fecha de creación: {{ appliedFilters().FechaRegistro | date:'d MMM yyyy':'':'es-CO' }}
+            <button class="remove-token-btn" (click)="removeAppliedFilter('FechaRegistro', '')">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().Estado?.length > 0) {
+        @if (appliedFilters().Estado?.length > 0) {
           <div class="filter-token">
-            Estado: {{ filters().Estado.join(', ') }}
-            <button class="remove-token-btn" (click)="updateFilter('Estado', [])">
+            Estado: {{ appliedFilters().Estado.join(', ') }}
+            <button class="remove-token-btn" (click)="removeAppliedFilter('Estado', [])">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().TipoReserva) {
+        @if (appliedFilters().TipoReserva) {
           <div class="filter-token">
-            Tipo: {{ filters().TipoReserva }}
-            <button class="remove-token-btn" (click)="updateFilter('TipoReserva', '')" aria-label="Quitar filtro de tipo">
+            Tipo: {{ appliedFilters().TipoReserva }}
+            <button class="remove-token-btn" (click)="removeAppliedFilter('TipoReserva', '')" aria-label="Quitar filtro de tipo">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().tour?.length > 0) {
+        @if (appliedFilters().tour?.length > 0) {
           <div class="filter-token">
             Tour: {{ getSelectedToursText() }}
-            <button class="remove-token-btn" (click)="updateFilter('tour', [])">
+            <button class="remove-token-btn" (click)="removeAppliedFilter('tour', [])">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         }
-        @if (filters().CategoriaReserva?.length > 0) {
+        @if (appliedFilters().CategoriaReserva?.length > 0) {
           <div class="filter-token">
-            Categoría: {{ getSelectedCategoriasText() }}
-            <button class="remove-token-btn" (click)="updateFilter('CategoriaReserva', [])">
+            Canal: {{ getSelectedCategoriasText() }}
+            <button class="remove-token-btn" (click)="removeAppliedFilter('CategoriaReserva', [])">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
+        }
+        </div>
+        @if (visibleAppliedFilterCount() > 1) {
+          <button type="button" class="clear-active-filters" [disabled]="isSearching()" (click)="clearAppliedFilters()">Limpiar filtros</button>
         }
       </div>
     }
@@ -155,114 +181,21 @@
         </div>
         <div class="form-group">
           <label class="form-label">Estado</label>
-          <div class="multi-filter">
-            <button
-              type="button"
-              class="multi-filter-trigger"
-              [class.active]="dropdownOpenEstado()"
-              [class.multi-filter-trigger-active]="filters().Estado.length > 0"
-              (click)="toggleDropdown('estado')"
-              [attr.aria-expanded]="dropdownOpenEstado()"
-            >
-              <span>{{ getMultiFilterLabel('Estado') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (dropdownOpenEstado()) {
-              <div class="multi-filter-menu">
-                @for (e of estadoOptions; track e) {
-                  <button type="button" class="multi-filter-option" (click)="toggleSelection(e, 'Estado')">
-                    <span class="multi-filter-checkbox" [class.checked]="isSelected('Estado', e)">
-                      @if (isSelected('Estado', e)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ e }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('Estado')">
-                  Limpiar selección
-                </button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="reservation-state-filter" [options]="estadoMultiOptions"
+            [ngModel]="filters().Estado" (ngModelChange)="updateFilter('Estado', $event)"
+            placeholder="Todos los estados" />
         </div>
         <div class="form-group">
           <label class="form-label">Tour</label>
-          <div class="multi-filter">
-            <button
-              type="button"
-              class="multi-filter-trigger"
-              [class.active]="dropdownOpenTour()"
-              [class.multi-filter-trigger-active]="filters().tour.length > 0"
-              (click)="toggleDropdown('tour')"
-              [attr.aria-expanded]="dropdownOpenTour()"
-            >
-              <span>{{ getMultiFilterLabel('tour') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (dropdownOpenTour()) {
-              <div class="multi-filter-menu">
-                @for (t of resultsTours(); track t.Id_Tour) {
-                  <button type="button" class="multi-filter-option" (click)="toggleSelection(t.Id_Tour, 'tour')">
-                    <span class="multi-filter-checkbox" [class.checked]="isSelected('tour', t.Id_Tour)">
-                      @if (isSelected('tour', t.Id_Tour)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ t.Nombre_Tour }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('tour')">
-                  Limpiar selección
-                </button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="reservation-tour-filter" [options]="tourMultiOptions()"
+            [ngModel]="filters().tour" (ngModelChange)="updateFilter('tour', $event)"
+            placeholder="Todos los tours" />
         </div>
         <div class="form-group">
           <label class="form-label">Canal</label>
-          <div class="multi-filter">
-            <button
-              type="button"
-              class="multi-filter-trigger"
-              [class.active]="dropdownOpenCategoria()"
-              [class.multi-filter-trigger-active]="filters().CategoriaReserva.length > 0"
-              (click)="toggleDropdown('categoria')"
-              [attr.aria-expanded]="dropdownOpenCategoria()"
-            >
-              <span>{{ getMultiFilterLabel('CategoriaReserva') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (dropdownOpenCategoria()) {
-              <div class="multi-filter-menu">
-                @for (c of resultsCategoria(); track c.Id_Canal) {
-                  <button type="button" class="multi-filter-option" (click)="toggleSelection(c.Id_Canal, 'CategoriaReserva')">
-                    <span class="multi-filter-checkbox" [class.checked]="isSelected('CategoriaReserva', c.Id_Canal)">
-                      @if (isSelected('CategoriaReserva', c.Id_Canal)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ c.Nombre_Canal }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="clearMultiFilter('CategoriaReserva')">
-                  Limpiar selección
-                </button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="reservation-channel-filter" [options]="channelMultiOptions()"
+            [ngModel]="filters().CategoriaReserva" (ngModelChange)="updateFilter('CategoriaReserva', $event)"
+            placeholder="Todos los canales" />
         </div>
         <div class="form-group">
           <label class="form-label" for="reservation-type-filter">Tipo de reserva</label>
@@ -402,25 +335,11 @@
         (action)="buscarReservas()">
       </app-loading-state>
     } @else if (hasSearched()) {
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/>
-          </svg>
-        </div>
-        <h3>Sin resultados</h3>
-        <p>No se encontraron reservas con los filtros aplicados.</p>
-      </div>
+      <app-query-empty-state [title]="hasAppliedCriteria() ? 'Sin resultados' : 'No hay reservas registradas'"
+        [headingLevel]="3"
+        [description]="hasAppliedCriteria() ? 'No se encontraron reservas con los criterios aplicados.' : 'Aún no hay reservas en la aplicación.'" />
     } @else {
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <h3>Listo para buscar</h3>
-        <p>Aplica los filtros y presiona "Buscar" para cargar las reservas.</p>
-      </div>
+      <app-loading-state label="Cargando reservas…"></app-loading-state>
     }
   </div>
 

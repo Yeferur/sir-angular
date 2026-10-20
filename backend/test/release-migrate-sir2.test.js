@@ -73,12 +73,13 @@ test('migración Mercadeo idempotente por inspección de índice y sin cambios d
   assert.ok(mercadeo > MIGRATIONS.indexOf('20260930_runtime_schema.sql'));
 });
 
-test('migración final de autoría/auditoría está en release y protege columnas y FKs', async () => {
-  const name = '20261013_0014_final_authoring_audit_schema.sql';
+test('migración de perfiles de comisión está en release y protege columnas y FKs', async () => {
+  const name = '20261016_0015_perfiles_comision_entidad.sql';
   assert.equal(MIGRATIONS.at(-1), name);
   assert.deepEqual(REQUIRED_COLUMNS.tours, ['Creado_Por', 'Actualizado_Por']);
   assert.deepEqual(REQUIRED_COLUMNS.puntos, ['Creado_Por', 'Actualizado_Por']);
-  assert.deepEqual(REQUIRED_COLUMNS.liquidaciones, ['Creado_Por', 'Actualizado_Por']);
+  assert.deepEqual(REQUIRED_COLUMNS.liquidaciones, ['Creado_Por', 'Actualizado_Por', 'Monto_Comision_Pagada']);
+  assert.ok(REQUIRED_COLUMNS.perfiles_comision_entidad.includes('Id_Entidad_Reportante'));
   assert.deepEqual(REQUIRED_COLUMNS.programaciones, ['Creado_Por']);
   assert.deepEqual(REQUIRED_COLUMNS.historial, ['Actor_Nombre', 'Actor_Rol']);
   for (const [table, constraint] of [
@@ -86,10 +87,20 @@ test('migración final de autoría/auditoría está en release y protege columna
     ['puntos', 'fk_puntos_creado_por'], ['puntos', 'fk_puntos_actualizado_por'],
     ['liquidaciones', 'fk_liquidaciones_creado_por'], ['liquidaciones', 'fk_liquidaciones_actualizado_por'],
     ['programaciones', 'fk_programaciones_creado_por'],
+    ['perfiles_comision_entidad', 'fk_perfiles_comision_creado_por'],
+    ['perfiles_comision_entidad', 'fk_perfiles_comision_actualizado_por'],
   ]) assert.ok(REQUIRED_FKS.some(([fkTable, fkName, onDelete]) =>
     fkTable === table && fkName === constraint && onDelete === 'SET NULL'));
+  assert.ok(REQUIRED_FKS.some(([table, fk, action]) =>
+    table === 'perfiles_comision_entidad' && fk === 'fk_perfiles_comision_entidad' && action === 'RESTRICT'));
   const migration = (await readMigrations()).at(-1);
   assert.equal(migration.name, name);
-  assert.ok(migration.statements.some(statement => statement.startsWith('UPDATE historial h')));
+  const profileTable = migration.statements.find(statement => statement.startsWith('CREATE TABLE IF NOT EXISTS perfiles_comision_entidad'));
+  assert.ok(profileTable);
+  assert.match(profileTable, /UNIQUE KEY ux_perfiles_comision_entidad \(Id_Entidad_Reportante\)/);
+  assert.match(profileTable, /REFERENCES entidades_reportantes \(Id_Entidad_Reportante\)/);
+  assert.doesNotMatch(profileTable, /Tipo_Beneficiario|Id_Canal|Nombre VARCHAR/);
+  assert.ok(migration.statements.some(statement => statement.includes('Monto_Comision_Pagada')));
+  assert.ok(migration.statements.some(statement => statement.includes('DECIMAL(10,0)')));
   assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
 });

@@ -1,0 +1,197 @@
+<main class="page-container reservation-browser general-list-page" [attr.aria-busy]="loading() || exporting()">
+  <section class="page-header general-list-search" aria-label="Filtros del listado general">
+    <app-filter-bar
+      panelId="general-list-filters"
+      [expanded]="filtersOpen()"
+      [filterCount]="filterCount()"
+      [busy]="loading() || loadingOptions() || exporting()"
+      [canSearch]="canSearch()"
+      [showClear]="filterCount() > 0 || selectedReportType() !== 'reservas_grupales' || selectedFormat() !== 'nuevo'"
+      searchLabel="Buscar"
+      (toggleFilters)="toggleFilters()"
+      (search)="search()"
+      (clear)="clearFilters()">
+      <div sirPrimaryFilters class="general-primary-field general-format-field">
+        <label class="visually-hidden" for="general-report-type">Tipo de listado</label>
+        <app-select inputId="general-report-type" [ngModel]="selectedReportType()"
+          (ngModelChange)="onReportTypeChange($event)" [options]="reportTypeOptions"
+          [disabled]="loading() || loadingOptions()" placeholder="Tipo de listado" />
+      </div>
+
+      @if (!isTransfers()) {
+        <div sirPrimaryFilters class="general-primary-field general-format-field">
+          <label class="visually-hidden" for="general-export-format">Formato del listado</label>
+          <app-select inputId="general-export-format" [ngModel]="selectedFormat()"
+            (ngModelChange)="onFormatChange($event)" [options]="formatOptions"
+            [disabled]="loading() || loadingOptions()" placeholder="Formato del listado" />
+        </div>
+      }
+
+      @if (!isMasivo() || isTransfers()) {
+        <div sirPrimaryFilters class="general-primary-field general-exact-date">
+          <label class="visually-hidden" for="general-list-tour-date">{{ isTransfers() ? 'Fecha del transfer' : 'Fecha del tour' }}</label>
+          <app-datepicker inputId="general-list-tour-date" [ngModel]="filters().fechaTour"
+            [placeholder]="isTransfers() ? 'Fecha del transfer' : 'Fecha del tour'" [disabled]="loading() || loadingOptions()"
+            (dateChange)="onExactTourDate($event)" />
+        </div>
+      } @else {
+        <div sirPrimaryFilters class="general-primary-field general-tour-range">
+          <label class="visually-hidden" for="general-list-tour-range">Rango de fecha del tour para el formato Masivo</label>
+          <app-date-range-picker inputId="general-list-tour-range" [value]="tourRange()"
+            placeholder="Rango de fecha del tour" [disabled]="loading() || loadingOptions()"
+            [invalid]="searchAttempted() && !!tourRangeError" (rangeChange)="onTourRangeChange($event)" />
+        </div>
+      }
+
+      @if (!isTransfers()) {
+        <div sirPrimaryFilters class="general-primary-field general-tour-select">
+          <label class="visually-hidden" for="general-list-tours">Tours</label>
+          <app-multi-select inputId="general-list-tours" [ngModel]="filters().tours"
+            (ngModelChange)="setMultiFilter('tours', $event)" [options]="tourOptions()"
+            placeholder="Todos los tours" [disabled]="loading() || loadingOptions()" />
+        </div>
+      }
+    </app-filter-bar>
+
+    @if (optionsError()) {
+      <div class="general-inline-error" role="alert">
+        <span>{{ optionsError() }}</span>
+        <button type="button" class="clear-filters-link" [disabled]="loadingOptions()" (click)="retryOptions()">Reintentar</button>
+      </div>
+    }
+    @if (visibleValidationError) {
+      <p class="general-inline-error" role="alert">{{ visibleValidationError }}</p>
+    }
+  </section>
+
+  @if (!isTransfers()) {
+    <app-filter-panel panelId="general-list-filters" [open]="filtersOpen()" label="Filtros adicionales del listado general">
+      <div class="form-group">
+        <label class="form-label" for="general-route">Ruta</label>
+        <app-multi-select inputId="general-route" [ngModel]="filters().rutas"
+          (ngModelChange)="setMultiFilter('rutas', $event)" [options]="routeOptions()"
+          placeholder="Todas las rutas" [disabled]="loading() || loadingOptions()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="general-status">Estado de la reserva</label>
+        <app-multi-select inputId="general-status" [ngModel]="filters().estados"
+          (ngModelChange)="setMultiFilter('estados', $event)" [options]="statusOptions()"
+          placeholder="Todos los estados" [disabled]="loading() || loadingOptions()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="general-channel">Canal de reserva</label>
+        <app-multi-select inputId="general-channel" [ngModel]="filters().canales"
+          (ngModelChange)="setMultiFilter('canales', $event)" [options]="channelOptions()"
+          placeholder="Todos los canales" [disabled]="loading() || loadingOptions()" />
+      </div>
+    </app-filter-panel>
+  }
+
+  @if (loading() && !result() && !transfersResult()) {
+    <app-loading-state mode="loading" label="Consultando listado…" />
+  } @else if (error() && !result() && !transfersResult()) {
+    <app-loading-state mode="error" label="No se pudo consultar el listado" [detail]="error()"
+      actionLabel="Reintentar" (action)="search()" />
+  } @else if (appliedReportType() === 'transfers' && transfersResult(); as data) {
+    @if (error()) { <div class="general-results-error" role="alert">{{ error() }}</div> }
+    @if (loading()) { <div class="general-updating" role="status">Actualizando consulta…</div> }
+    @if (resultsStale()) {
+      <div class="general-stale-note" role="status">Cambiaste la fecha o el tipo de listado. Busca de nuevo para actualizar los resultados y habilitar la descarga.</div>
+    }
+    <section class="results-list general-results" aria-label="Resultado de transfers" [attr.aria-busy]="loading()">
+      <div class="results-heading general-results-heading">
+        <div>
+          <h2>Transfers</h2>
+          <span>{{ data.totalTransfers | number }} {{ data.totalTransfers === 1 ? 'transfer' : 'transfers' }} ·
+            {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span>
+        </div>
+        @if (canExport()) {
+          <button type="button" class="btn-primary" [disabled]="exporting() || !data.totalTransfers || resultsStale()"
+            [attr.aria-busy]="exporting()" (click)="exportar()">
+            {{ exporting() ? 'Generando…' : 'Descargar Excel' }}
+          </button>
+        }
+      </div>
+      @if (!data.transfers.length) {
+        <app-query-empty-state title="Sin resultados" [compact]="true"
+          description="No encontramos transfers para la fecha seleccionada." />
+      } @else {
+        <div class="table-scroll">
+          <table class="general-list-table">
+            <thead><tr>
+              <th scope="col">Código</th><th scope="col">Servicio</th><th scope="col">Hora</th>
+              <th scope="col">Pasajeros</th><th scope="col">Punto de salida</th><th scope="col">Destino</th>
+              <th scope="col">Titular</th><th scope="col">Estado</th>
+            </tr></thead>
+            <tbody>
+              @for (item of data.transfers; track item.Id_Transfer) {
+                <tr>
+                  <td>{{ item.Codigo_Transfer || '—' }}</td><td>{{ item.Nombre_Servicio || '—' }}</td>
+                  <td>{{ item.Hora_Recogida || '—' }}</td><td>{{ item.Cantidad_Personas | number }}</td>
+                  <td>{{ item.Punto_Salida || '—' }}</td><td>{{ item.Punto_Destino || '—' }}</td>
+                  <td>{{ item.Nombre_Titular || '—' }}</td><td>{{ item.Estado || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  } @else if (result(); as data) {
+    @if (error()) { <div class="general-results-error" role="alert">{{ error() }}</div> }
+    @if (loading()) { <div class="general-updating" role="status">Actualizando consulta…</div> }
+    @if (resultsStale()) {
+      <div class="general-stale-note" role="status">Cambiaste los filtros o el formato. Busca de nuevo para actualizar los resultados y habilitar la descarga.</div>
+    }
+    <section class="results-list general-results" aria-label="Resultado del listado general" [attr.aria-busy]="loading()">
+      <div class="results-heading general-results-heading">
+        <div>
+          <h2>{{ reportTypeLabel() }}</h2>
+          <span>{{ data.totalReservas | number }} {{ data.totalReservas === 1 ? 'reserva' : 'reservas' }} ·
+            {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span>
+          @if (data.totalReservas > data.limite) {
+            <small>La vista resume las primeras {{ data.limite }} reservas; Excel incluye el resultado completo.</small>
+          }
+        </div>
+        @if (canExport()) {
+          <button type="button" class="btn-primary" [disabled]="exporting() || !data.totalReservas || resultsStale()"
+            [attr.aria-busy]="exporting()" (click)="exportar()">
+            {{ exporting() ? 'Generando…' : 'Descargar Excel' }}
+          </button>
+        }
+      </div>
+
+      @if (!data.items.length) {
+        <app-query-empty-state title="Sin resultados" [compact]="true"
+          description="No encontramos reservas con los filtros seleccionados." />
+      } @else {
+        <div class="table-scroll">
+          <table class="general-list-table">
+            <thead><tr>
+              <th scope="col">Fecha del tour</th>
+              <th scope="col">Tour</th><th scope="col">Pasajeros</th><th scope="col">Ruta</th>
+              <th scope="col">Canal</th><th scope="col">Quién reportó</th><th scope="col">Estado</th>
+            </tr></thead>
+            <tbody>
+              @for (item of data.items; track item.Id_Reserva) {
+                <tr>
+                  <td>{{ item.Fecha_Tour ? (item.Fecha_Tour | date:'d MMM y':'UTC':'es-CO') : '—' }}</td>
+                  <td>{{ item.Nombre_Tour || '—' }}</td>
+                  <td>{{ item.NumeroPasajeros | number }}</td>
+                  <td>{{ item.Rutas || 'Pendiente' }}</td>
+                  <td>{{ item.Nombre_Canal || '—' }}</td>
+                  <td>{{ item.Nombre_Reportante || '—' }}</td>
+                  <td>{{ item.Estado || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="general-preview-note">La tabla resume una fila por reserva. Excel incluye el detalle de cada pasajero.</div>
+      }
+    </section>
+  } @else {
+    <app-query-empty-state title="Prepara tu consulta" [compact]="false"
+      description="Elige un criterio y usa Buscar para consultar las reservas." />
+  }
+</main>

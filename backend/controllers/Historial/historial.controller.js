@@ -31,7 +31,7 @@ exports.getHistorial = async (req, res) => {
     const result = await historialService.getHistorial(filtersFromQuery(req.query));
     return sendSuccess(res, { data: result, message: 'Historial obtenido correctamente' });
   } catch (error) {
-    const clientError = /fecha|período|periodo|módulo|actividad|identificadores|referencia/i.test(error.message || '');
+    const clientError = /fecha|período|periodo|módulo|actividad|identificadores|referencia|filtro/i.test(error.message || '');
     return sendError(res, { status: clientError ? 400 : 500, message: clientError ? error.message : 'Error obteniendo historial', errorCode: clientError ? 'INVALID_FILTERS' : 'INTERNAL_ERROR' });
   }
 };
@@ -69,7 +69,7 @@ exports.exportHistorial = async (req, res) => {
     return res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('Error exportando historial:', error);
-    const clientError = /fecha|período|periodo|módulo|actividad|identificadores|referencia/i.test(error.message || '');
+    const clientError = /fecha|período|periodo|módulo|actividad|identificadores|referencia|filtro/i.test(error.message || '');
     return sendError(res, { status: clientError ? 400 : 500, message: clientError ? error.message : 'Error exportando el historial', errorCode: clientError ? 'INVALID_FILTERS' : 'EXPORT_FAILED' });
   }
 };

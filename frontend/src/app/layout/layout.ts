@@ -1098,7 +1098,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     private refreshAvatar(): void {
-        this.usuariosService.getMiPerfil().subscribe({
+        this.usuariosService.getMiPerfil(true).subscribe({
             next: (perfil: any) => this.avatarUrl.set(perfil?.Avatar || null),
             error: () => this.avatarUrl.set(null),
         });
@@ -1271,6 +1271,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             ],
         },
         {
+            key: 'programacion-general',
+            label: 'Listado general',
+            icon: 'bx bx-spreadsheet',
+            group: 'gestion',
+            route: '/Programacion/General',
+            permission: 'PROGRAMACION.LEER',
+            exact: true,
+        },
+        {
             key: 'programacion',
             label: 'Listados de buses',
             icon: 'bx bx-list-check',
@@ -1402,6 +1411,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             aforos: 'Disponibilidad y cupos',
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',
+            'programacion-general': 'Reservas para operación y exportación',
             programacion: 'Programación operativa',
             mercadeo: 'Análisis comercial',
             'entidades-reportantes': 'Hoteles y agencias',
@@ -1437,6 +1447,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         const target = this.normalizeUrl(route);
         if (exact || target === '/') return current === target;
         return current === target || current.startsWith(`${target}/`);
+    }
+
+    isMenuRouteActive(item: SidebarItem): boolean {
+        if (item.key === 'programacion') {
+            const current = this.normalizeUrl(this.currentUrl()).toLowerCase();
+            return ['/programacion/listado', '/programacion/transfers', '/programacion/privados', '/programacion/editor']
+                .some(route => current === route || current.startsWith(`${route}/`));
+        }
+        return !!item.route && this.isRouteActive(item.route, item.exact ?? false);
     }
 
     isSubmenuActive(item: SidebarItem): boolean {

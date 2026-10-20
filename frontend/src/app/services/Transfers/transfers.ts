@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import type { EntidadReportante } from '../Reservas/reservas';
 
 export interface PaginatedTransfersResult {
   data: any[];
@@ -19,6 +20,20 @@ export class TransferService {
 
   getServicios(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/ServicioTransfer`);
+  }
+
+  getCanales(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/Transfer/Canales`);
+  }
+
+  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = ''): Observable<EntidadReportante[]> {
+    return this.http.get<EntidadReportante[]>(`${this.apiUrl}/entidades-reportantes`, {
+      params: { tipo, buscar, limite: '200' },
+    });
+  }
+
+  registrarEntidadReportanteRapida(Id_Canal: number | string, Nombre: string): Observable<EntidadReportante> {
+    return this.http.post<EntidadReportante>(`${this.apiUrl}/entidades-reportantes/rapida`, { Id_Canal, Nombre });
   }
 
   crearTransfer(payload: any): Observable<any> {

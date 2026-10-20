@@ -62,9 +62,11 @@ function buildWhere(filters = {}) {
   const to = filters.fechaFin ? parseDate(filters.fechaFin) : null;
   if (filters.fechaInicio && !from) throw new Error('fechaInicio debe ser una fecha calendario válida (YYYY-MM-DD)');
   if (filters.fechaFin && !to) throw new Error('fechaFin debe ser una fecha calendario válida (YYYY-MM-DD)');
-  if ((!from || !to) && !referencia) throw new Error('El período debe incluir fecha de inicio y fin');
   if (Boolean(from) !== Boolean(to)) throw new Error('El período debe incluir fecha de inicio y fin');
   if (from && to && from > to) throw new Error('fechaInicio no puede ser posterior a fechaFin');
+  if (!userIds.length && !actions.length && !activities.length && !modules.length && !referencia && !from) {
+    throw new Error('Debes aplicar al menos un filtro para buscar.');
+  }
 
   if (userIds.length) {
     const ids = userIds.map((value) => Number(value));
@@ -104,7 +106,7 @@ function buildWhere(filters = {}) {
       ? `h.Tabla NOT IN (${TABLES_MAPPED.map(() => '?').join(',')})`
       : '';
     const tableCondition = tables.length ? `h.Tabla IN (${tables.map(() => '?').join(',')})` : '';
-    conditions.push([tableCondition, otherCondition].filter(Boolean).map((value) => `(${value})`).join(' OR '));
+    conditions.push(`(${[tableCondition, otherCondition].filter(Boolean).map((value) => `(${value})`).join(' OR ')})`);
     params.push(...tables, ...(wantsOther ? TABLES_MAPPED : []));
   }
   if (referencia) {

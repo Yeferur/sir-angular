@@ -10,6 +10,8 @@ const PERM = checkPermission('SEGUROS.LEER');
 // Rutas existentes — sin cambios de path ni permisos
 router.get('/',         AUTH, PERM, segurosController.listar);
 router.get('/exportar', AUTH, PERM, segurosController.exportarExcel);
+router.get('/temporal', AUTH, PERM, segurosController.listarTemporal);
+router.get('/temporal/exportar', AUTH, PERM, segurosController.exportarTemporal);
 
 // Nueva ruta — actualizar conductor/DNI de un bus
 router.patch('/buses/:id', AUTH, PERM, segurosController.actualizarPersonalBus);

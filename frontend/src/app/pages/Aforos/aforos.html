@@ -290,17 +290,11 @@
   aria-labelledby="drawer-edit-title">
   @if (drawerTour) {
     <div class="drawer-header">
-      <div>
+      <div class="drawer-header-content">
         <h2 class="drawer-title" id="drawer-edit-title">{{ getDrawerTitle() }}</h2>
         <p class="drawer-sub">{{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}</p>
       </div>
-
-      <button type="button" class="drawer-close-btn" (click)="cerrarDrawer()" aria-label="Cerrar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+      <app-drawer-close-button label="Cerrar edición de aforo" (dismiss)="cerrarDrawer()" />
     </div>
 
     <div class="drawer-body">
@@ -383,7 +377,7 @@
   aria-labelledby="drawer-priv-title">
   @if (drawerTour) {
     <div class="drawer-header">
-      <div>
+      <div class="drawer-header-content">
         <h2 class="drawer-title" id="drawer-priv-title">{{ drawerTour.Nombre_Tour }} — privadas</h2>
         <p class="drawer-sub">
           {{ fecha | date:"EEEE d 'de' MMMM" : '' : 'es-CO' | titlecase }}
@@ -391,12 +385,7 @@
         </p>
       </div>
 
-      <button type="button" class="drawer-close-btn" (click)="cerrarDrawer()" aria-label="Cerrar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+      <app-drawer-close-button label="Cerrar reservas privadas" (dismiss)="cerrarDrawer()" />
     </div>
 
     <div class="drawer-body">

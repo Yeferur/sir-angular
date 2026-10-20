@@ -1,10 +1,11 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import releaseMetadata from '../../../../../release-metadata.json';
 import { environment } from '../../../environments/environment';
 import { SirAlertService } from '../Alertas/alert.service';
 import { SirDrawerService } from '../Drawer/drawer.service';
+import { SILENT_APP_ACTIVITY } from '../../interceptors/app-activity.interceptor';
 
 export const LOADED_SIR_VERSION = new InjectionToken<string>('Loaded SIR version', {
   providedIn: 'root',
@@ -125,9 +126,10 @@ export class AppVersionService implements OnDestroy {
     const userId = this.userId;
     const generation = this.generation;
     this.lastCheckedAt = Date.now();
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
     const request = firstValueFrom(this.http.get<{ version: string }>(
       `${environment.apiUrl}/app-updates/current`,
-      { params: { _: String(Date.now()) } },
+      { params: { _: String(Date.now()) }, context },
     )).then(async response => {
       if (generation !== this.generation || userId !== this.userId) return;
       const version = String(response?.version || '').trim();

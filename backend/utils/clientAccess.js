@@ -16,7 +16,13 @@ function isClientRoleName(value) {
 function clientOwnerIdFromRequest(req) {
   if (!req?.user?.isClient) return null;
   const userId = Number(req.user.id);
-  return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    const error = new Error('La sesión del Cliente no tiene una identidad válida.');
+    error.status = 401;
+    error.errorCode = 'CLIENT_IDENTITY_INVALID';
+    throw error;
+  }
+  return userId;
 }
 
 function createReservationNotFoundError() {

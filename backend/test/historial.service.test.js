@@ -97,12 +97,51 @@ test('Historial acepta un solo día e incluye otros registros sin revelar tablas
 test('Historial rechaza periodos inválidos e identificadores de usuario manipulados', () => {
   assert.throws(() => service.buildWhere({ fechaInicio: '2026-02-30' }), /fechaInicio/);
   assert.throws(() => service.buildWhere({ fechaInicio: '2026-10-14', fechaFin: '2026-10-13' }), /posterior/);
-  assert.throws(() => service.buildWhere({}), /período/);
+  assert.throws(() => service.buildWhere({}), /al menos un filtro/);
   assert.throws(() => service.buildWhere({ fechaInicio: '2026-10-13', fechaFin: '2026-10-13', usuarios: ['1 OR 1=1'] }), /identificadores válidos/);
   assert.throws(() => service.buildWhere({ fechaInicio: '2026-10-13', fechaFin: '2026-10-13', modulos: ['tabla_inventada'] }), /módulo no reconocido/);
   assert.equal(service.sanitizeValue('{"Estado":"Activo","contrasena":"secreta","nested":{"access_token":"privado"}}'),
     '{"Estado":"Activo","contrasena":"[Oculto]","nested":{"access_token":"[Oculto]"}}');
   assert.equal(service.sanitizeValue('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature-value-123456'), '[Oculto]');
+});
+
+test('cada criterio funciona sin período y las combinaciones se unen mediante AND', () => {
+  const cases = [
+    [{ usuarios: [3] }, /h\.Id_Usuario IN \(\?\)/],
+    [{ actividad: ['modificaciones'] }, /h\.Accion IN \(/],
+    [{ modulos: ['reservas'] }, /h\.Tabla IN \(/],
+    [{ fechaInicio: '2026-10-01', fechaFin: '2026-10-13' }, /h\.Fecha_Hora_Registro >= \?/],
+    [{ referencia: 'TG82673' }, /h\.Id_Registro = \?/],
+  ];
+  for (const [filters, condition] of cases) {
+    const where = service.buildWhere(filters);
+    assert.match(where.sql, condition);
+  }
+  const combined = service.buildWhere({ usuarios: [3], modulos: ['reservas'] });
+  assert.match(combined.sql, /h\.Id_Usuario IN \(\?\)[\s\S]* AND [\s\S]*h\.Tabla IN/);
+  const mixedModules = service.buildWhere({ usuarios: [3], modulos: ['reservas', 'otros'] });
+  assert.match(mixedModules.sql, /h\.Id_Usuario IN \(\?\) AND \(\(h\.Tabla IN \([\s\S]*\) OR \(h\.Tabla NOT IN \(/);
+  const activityPeriod = service.buildWhere({ actividad: ['modificaciones'], fechaInicio: '2026-10-01', fechaFin: '2026-10-13' });
+  assert.match(activityPeriod.sql, /h\.Accion IN \([\s\S]* AND h\.Fecha_Hora_Registro >= \?/);
+  const codePeriod = service.buildWhere({ referencia: 'TG82673', fechaInicio: '2026-10-01', fechaFin: '2026-10-13' });
+  assert.match(codePeriod.sql, /h\.Id_Registro = \?[\s\S]* AND h\.Fecha_Hora_Registro >= \?/);
+});
+
+test('página dos usa COUNT y LIMIT/OFFSET sin traer todo el historial', async () => {
+  const calls = [];
+  db.query = async (sql, params) => {
+    calls.push({ sql: String(sql), params });
+    if (String(sql).includes('COUNT(*)')) return [[{ total: 24 }]];
+    if (String(sql).includes('SELECT h.Id_Historial')) return [[]];
+    throw new Error(`Consulta inesperada: ${sql}`);
+  };
+  const result = await service.getHistorial({ usuarios: [3], page: 2, limit: 10 });
+  assert.equal(result.total, 24);
+  assert.equal(result.totalPages, 3);
+  assert.equal(result.page, 2);
+  assert.deepEqual(calls[0].params, [3]);
+  assert.match(calls[1].sql, /LIMIT \? OFFSET \?/);
+  assert.deepEqual(calls[1].params, [3, 10, 10]);
 });
 
 test('búsqueda por reserva usa el código exacto, admite eventos directos y relaciones técnicas seguras sin fecha', () => {

@@ -118,20 +118,15 @@
           }
         </div>
       } @else {
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-          </div>
-          <h3>{{ busqueda() ? 'Sin resultados' : 'No hay tours activos' }}</h3>
-          <p>{{ busqueda() ? 'Prueba con otro nombre o abreviación.' : 'Crea el primer tour para configurar su operación.' }}</p>
+        <app-query-empty-state [title]="busqueda() ? 'Sin resultados' : 'No hay tours activos'"
+          [headingLevel]="3"
+          [description]="busqueda() ? 'Prueba con otro nombre o abreviación.' : 'Crea el primer tour para configurar su operación.'">
           @if (busqueda()) {
-            <button type="button" class="btn-secondary" (click)="clearSearch()">Limpiar búsqueda</button>
+            <button type="button" class="sir-action sir-action--secondary" (click)="clearSearch()">Limpiar búsqueda</button>
           } @else if (canCreateTour) {
-            <button type="button" class="btn-primary" (click)="crearTour()">Nuevo tour</button>
+            <button type="button" class="sir-action sir-action--primary" (click)="crearTour()">Nuevo tour</button>
           }
-        </div>
+        </app-query-empty-state>
       }
     </div>
   </div>

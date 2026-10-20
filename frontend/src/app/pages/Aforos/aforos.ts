@@ -17,6 +17,7 @@ import { finalize, Subscription } from 'rxjs';
 import { PermisoDirective } from '../../shared/directives/permiso.directive';
 import { CountUpDirective } from './count-up.directive';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
+import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
 import { InicioService, Tour, Transfer, TransfersSummary } from '../../services/inicio';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
@@ -29,7 +30,7 @@ const FLASH_DURATION_MS = 1100;
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, FormsModule, PermisoDirective, CountUpDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [CommonModule, FormsModule, PermisoDirective, CountUpDirective, DatepickerComponent, LoadingStateComponent, DrawerCloseButtonComponent],
   templateUrl: './aforos.html',
   styleUrls: ['./aforos.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

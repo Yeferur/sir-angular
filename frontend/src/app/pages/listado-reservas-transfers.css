@@ -297,6 +297,18 @@
   gap: 7px;
 }
 
+.active-filters--managed {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.active-filter-tokens {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
 .filter-token {
   display: inline-flex;
   align-items: center;
@@ -324,6 +336,25 @@
 
 .remove-token-btn:hover { opacity: 1; }
 
+.clear-active-filters {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px 6px;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.clear-active-filters:hover { color: var(--accent-blue); }
+.clear-active-filters:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.clear-active-filters:disabled { cursor: wait; opacity: .5; }
+
 /* =========================================================
    ADVANCED FILTERS PANEL
    ========================================================= */
@@ -334,44 +365,6 @@
   padding: 18px 20px;
   animation: fadeDown .22s ease;
   overflow: visible;
-}
-
-.multi-filter {
-  position: relative;
-}
-
-.multi-filter-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background-color: var(--bg-tertiary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 11px;
-  padding: 9px 12px;
-  font-size: .92rem;
-  font-family: var(--font-family);
-  color: var(--text-primary);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color .18s, background .18s, box-shadow .18s, color .18s;
-}
-
-.multi-filter-trigger:hover {
-  border-color: color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color));
-}
-
-.multi-filter-trigger.active,
-.multi-filter-trigger:focus-visible {
-  border-color: var(--accent-blue);
-  background-color: var(--bg-secondary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
-  outline: none;
-}
-
-.multi-filter-trigger.multi-filter-trigger-active {
-  color: var(--accent-blue);
 }
 
 .type-filter-select {
@@ -392,96 +385,6 @@
 .type-filter-select:focus {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent);
-}
-
-.multi-filter-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: max-content;
-  min-width: 100%;
-  max-width: 500px;
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 240px;
-  overflow-y: auto;
-  z-index: 500;
-  box-shadow: 0 12px 30px rgba(0,0,0,.26);
-  animation: fadeDown .16s ease;
-}
-
-.multi-filter-option {
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  color: var(--text-primary);
-  font-size: .87rem;
-  font-family: var(--font-family);
-  padding: 8px 10px;
-  cursor: pointer;
-  transition: background .15s, border-color .15s;
-  text-align: left;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.multi-filter-option span:last-child {
-  white-space: normal;
-  word-break: break-word;
-  flex: 1;
-}
-
-.multi-filter-option:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--separator-color);
-}
-
-.multi-filter-checkbox {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1.5px solid var(--separator-color);
-  background: var(--bg-tertiary);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: border-color .15s, background .15s;
-}
-
-.multi-filter-checkbox.checked {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-}
-
-.multi-filter-clear {
-  margin-top: 2px;
-  width: 100%;
-  background: rgba(10, 132, 255, .08);
-  border: 1px dashed rgba(10, 132, 255, .28);
-  border-radius: 9px;
-  color: var(--accent-blue);
-  font-size: .82rem;
-  font-weight: 700;
-  font-family: var(--font-family);
-  padding: 8px 10px;
-  cursor: pointer;
-  transition: filter .15s, border-color .15s;
-}
-
-.multi-filter-clear:hover {
-  filter: brightness(1.06);
-  border-color: rgba(10, 132, 255, .46);
 }
 
 /* =========================================================
@@ -790,6 +693,9 @@
   padding: 0 2px 1px;
 }
 
+.reservation-browser .active-filters--managed { flex-wrap: nowrap; }
+.reservation-browser .active-filter-tokens { flex: 1 1 auto; }
+
 .reservation-browser .advanced-filters-panel {
   margin-top: 10px;
 }
@@ -828,6 +734,8 @@
    RESPONSIVE
    ========================================================= */
 @media (max-width: 700px) {
+  .reservation-browser .active-filters--managed { flex-wrap: wrap; }
+  .reservation-browser .clear-active-filters { margin-left: 0; }
   .module-intro { align-items: flex-start; }
   .header-top { flex-direction: column; align-items: flex-start; }
   .header-actions { width: 100%; }
@@ -840,7 +748,6 @@
 @media (max-width: 560px) {
   .page-container { padding: 0 16px; }
   .form-grid { grid-template-columns: 1fr; }
-  .multi-filter-menu { min-width: 0; }
   .module-intro { flex-direction: column; gap: 10px; }
   .result-summary { align-self: flex-start; }
   .results-toolbar { align-items: flex-start; }

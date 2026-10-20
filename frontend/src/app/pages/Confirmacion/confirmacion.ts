@@ -20,6 +20,7 @@ import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
 
 type FiltroEstado = 'TODOS' | 'VIAJARON' | 'NO_VIAJARON' | 'CAMBIOS';
 type ModuloOrigen = 'comisiones' | 'seguros';
@@ -35,7 +36,7 @@ interface ReservaControlViaje {
 @Component({
   selector: 'app-confirmacion',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './confirmacion.html',
   styleUrl: './confirmacion.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

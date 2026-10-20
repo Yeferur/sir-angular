@@ -52,6 +52,12 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   const check = async (name, fn) => { await fn(); checks.push(name); };
   const from = '2027-07-01', to = '2027-07-31';
   const f = { desde: from, hasta: to };
+  const tag = randomBytes(5).toString('hex');
+  const hotelName = `Hotel Poblado Boutique ${tag}`;
+  const agencyName = `Viajes Bogotá ${tag}`;
+  const agencyUpdatedName = `Viajes Bogotá SAS ${tag}`;
+  const internationalName = `São Paulo Travel rápida ${tag}`;
+  const adminInternationalName = `São Paulo Travel ${tag}`;
   const [tour] = await connection.query(`INSERT INTO tours (Nombre_Tour,Abreviacion,Cupo_Base,Activo)
     VALUES ('Validación actividad de entidades','ENT',30,1)`);
   const [schedule] = await connection.query(`INSERT INTO horarios (Id_Punto,Id_Tour,Hora_Salida)
@@ -67,20 +73,27 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   });
 
   const hotel = (await entities.quickCreate({ channelId: channel('HOTEL'),
-    name: 'Hotel Poblado Boutique', actorId: actor.Id_Usuario })).entity;
+    name: hotelName, actorId: actor.Id_Usuario })).entity;
   await check('duplicado normalizado', async () => {
     const duplicate = await entities.quickCreate({ channelId: channel('HOTEL'),
-      name: '  HÓTEL  POBLADO - BOUTIQUE  ', actorId: actor.Id_Usuario });
+      name: `  HÓTEL  POBLADO - BOUTIQUE  ${tag}  `, actorId: actor.Id_Usuario });
     assert.equal(duplicate.created, false);
     assert.equal(duplicate.entity.Id_Entidad_Reportante, hotel.Id_Entidad_Reportante);
-    assert.equal(duplicate.entity.Nombre, 'Hotel Poblado Boutique');
+    assert.equal(duplicate.entity.Nombre, hotelName);
   });
   await check('búsqueda normalizada', async () => {
     const found = await entities.listEntities({ type: 'HOTEL', search: 'hótel poblado' });
     assert.ok(found.some(x => x.Id_Entidad_Reportante === hotel.Id_Entidad_Reportante));
   });
   const agency = (await entities.quickCreate({ channelId: channel('AGENCIA NACIONAL'),
-    name: 'Viajes Bogotá', actorId: actor.Id_Usuario })).entity;
+    name: agencyName, actorId: actor.Id_Usuario })).entity;
+  const international = (await entities.quickCreate({ channelId: channel('AGENCIA INTERNACIONAL'),
+    name: internationalName, actorId: actor.Id_Usuario })).entity;
+  await check('creación rápida deriva el tipo de cada canal', async () => {
+    assert.equal(hotel.Tipo, 'HOTEL');
+    assert.equal(agency.Tipo, 'AGENCIA_NACIONAL');
+    assert.equal(international.Tipo, 'AGENCIA_INTERNACIONAL');
+  });
   await check('tipo por categoría', async () => {
     await assert.rejects(entities.validateReservationEntity(db, channel('HOTEL'), agency.Id_Entidad_Reportante),
       e => e.errorCode === 'ENTITY_CHANNEL_MISMATCH');
@@ -88,13 +101,13 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
       e => e.errorCode === 'ENTITY_REQUIRED');
   });
   await check('creación administrativa', async () => {
-    const created = await marketing.createEntity({ Tipo: 'AGENCIA_INTERNACIONAL', Nombre: 'São Paulo Travel' }, actor.Id_Usuario);
+    const created = await marketing.createEntity({ Tipo: 'AGENCIA_INTERNACIONAL', Nombre: adminInternationalName }, actor.Id_Usuario);
     assert.equal(created.entity.Estado_Validacion, 'PENDIENTE_VALIDACION');
-    assert.equal(created.entity.Nombre, 'São Paulo Travel');
+    assert.equal(created.entity.Nombre, adminInternationalName);
   });
   await check('edición y estado independientes', async () => {
     const updated = await marketing.updateEntity(agency.Id_Entidad_Reportante,
-      { Nombre: 'Viajes Bogotá SAS', Activo: 0 }, actor.Id_Usuario);
+      { Nombre: agencyUpdatedName, Activo: 0 }, actor.Id_Usuario);
     assert.equal(updated.Activo, 0);
     assert.equal((await marketing.detail(agency.Id_Entidad_Reportante)).entity.Estado_Validacion, 'PENDIENTE_VALIDACION');
     await marketing.updateEntity(agency.Id_Entidad_Reportante, { Activo: 1 }, actor.Id_Usuario);
@@ -112,17 +125,41 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   const reservation = await reservations.crearReservaConPasajerosYPagos(
     payload(channel('HOTEL'), hotel.Id_Entidad_Reportante, 'Andrea', points[1].Id_Punto), {}, actor.Id_Usuario);
   await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?', ['2027-07-10 10:00:00', reservation.Id_Reserva]);
+  const sameHotelContact = await reservations.crearReservaConPasajerosYPagos(
+    payload(channel('HOTEL'), hotel.Id_Entidad_Reportante, 'Juan Pérez', points[1].Id_Punto), {}, actor.Id_Usuario);
+  const nationalHomonym = await reservations.crearReservaConPasajerosYPagos(
+    payload(channel('AGENCIA NACIONAL'), agency.Id_Entidad_Reportante, 'Juan Pérez', points[1].Id_Punto), {}, actor.Id_Usuario);
+  const internationalHomonym = await reservations.crearReservaConPasajerosYPagos(
+    payload(channel('AGENCIA INTERNACIONAL'), international.Id_Entidad_Reportante, 'Juan Pérez', points[1].Id_Punto), {}, actor.Id_Usuario);
+  for (const [id, day] of [[sameHotelContact.Id_Reserva, '11'],
+    [nationalHomonym.Id_Reserva, '12'], [internationalHomonym.Id_Reserva, '13']]) {
+    await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
+      [`2027-07-${day} 10:00:00`, id]);
+  }
   await check('actividad y pasajero por FK', async () => {
-    const page = await marketing.listActivity(f);
+    const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', actividad: 'CON_RESERVAS', buscar: hotelName });
     const row = page.items.find(x => x.Id_Entidad_Reportante === hotel.Id_Entidad_Reportante);
-    assert.equal(Number(row.Reservas), 1);
-    assert.equal(Number(row.Pasajeros), 1);
-    assert.equal(row.Contacto_Reciente, 'Andrea');
+    assert.equal(Number(row.Reservas), 2);
+    assert.equal(Number(row.Pasajeros), 2);
+    assert.equal(row.Contacto_Reciente, 'Juan Pérez');
+    assert.equal(page.items.length, 1);
+    const nationalPage = await marketing.listActivity({ ...f, tipo: 'AGENCIA_NACIONAL', actividad: 'CON_RESERVAS', buscar: agencyUpdatedName });
+    const internationalPage = await marketing.listActivity({ ...f, tipo: 'AGENCIA_INTERNACIONAL', actividad: 'CON_RESERVAS', buscar: internationalName });
+    const nationalRow = nationalPage.items.find(x => x.Id_Entidad_Reportante === agency.Id_Entidad_Reportante);
+    const internationalRow = internationalPage.items.find(x => x.Id_Entidad_Reportante === international.Id_Entidad_Reportante);
+    assert.equal(Number(nationalRow.Reservas), 1);
+    assert.equal(Number(internationalRow.Reservas), 1);
+    assert.equal(nationalPage.items.length, 1);
+    assert.equal(internationalPage.items.length, 1);
+    assert.equal(Number(page.summary.Total_Reservas), 2);
   });
   await check('contacto y puntos separados', async () => {
     const detail = await marketing.detail(hotel.Id_Entidad_Reportante, f);
-    assert.equal(detail.contacts[0].Nombre, 'Andrea');
+    assert.ok(detail.contacts.some(contact => contact.Nombre === 'Andrea'));
+    assert.ok(detail.contacts.some(contact => contact.Nombre === 'Juan Pérez'));
+    assert.equal(detail.contacts.reduce((sum, contact) => sum + Number(contact.Reservas), 0), 2);
     assert.equal(String(detail.observed[0].Id_Punto), String(points[1].Id_Punto));
+    assert.equal(Number(detail.observed[0].Reservas), 2);
     assert.equal(String(detail.associated[0].Id_Punto), String(points[0].Id_Punto));
   });
   const categoryReservation = await reservations.crearReservaConPasajerosYPagos(
@@ -150,11 +187,25 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
       AND h.Id_Registro=? AND d.Columna='Id_Entidad_Reportante'`, [categoryReservation.Id_Reserva]);
     assert.ok(history.some(h => String(h.Valor_Anterior) === String(agency.Id_Entidad_Reportante) && h.Valor_Nuevo === ''));
   });
+  await check('Freelance crea y edita reservas con FK de entidad nula', async () => {
+    const freelance = await reservations.crearReservaConPasajerosYPagos(
+      payload(channel('FREELANCE'), null, 'Andrea', points[1].Id_Punto), {}, actor.Id_Usuario);
+    let [[row]] = await connection.query('SELECT Id_Entidad_Reportante FROM reservas WHERE Id_Reserva=?', [freelance.Id_Reserva]);
+    assert.equal(row.Id_Entidad_Reportante, null);
+
+    await reservations.actualizarReservaConPasajerosYPagos(freelance.Id_Reserva,
+      payload(channel('FREELANCE'), hotel.Id_Entidad_Reportante, 'Andrea', points[1].Id_Punto), {}, actor.Id_Usuario);
+    [[row]] = await connection.query('SELECT Id_Entidad_Reportante FROM reservas WHERE Id_Reserva=?', [freelance.Id_Reserva]);
+    assert.equal(row.Id_Entidad_Reportante, null);
+    const activity = await marketing.listActivity({ ...f, tipo: 'HOTEL' });
+    assert.equal(activity.items.length, 1);
+    assert.equal(String(activity.items[0].Id_Entidad_Reportante), String(hotel.Id_Entidad_Reportante));
+  });
   await check('filtros y métricas', async () => {
-    const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', actividad: 'CON_RESERVAS' });
+    const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', actividad: 'CON_RESERVAS', buscar: hotelName });
     assert.equal(page.total, 1);
-    assert.equal(Number(page.summary.Total_Reservas), 1);
-    const inactive = await marketing.listActivity({ ...f, estado: 'INACTIVA' });
+    assert.equal(Number(page.summary.Total_Reservas), 2);
+    const inactive = await marketing.listActivity({ ...f, tipo: 'HOTEL', buscar: hotelName, estado: 'INACTIVA' });
     assert.equal(inactive.total, 0);
   });
   await check('paginación', async () => {
@@ -164,10 +215,11 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   });
   await check('Excel completo filtrado', async () => {
     const workbook = require('exceljs');
-    const buffer = await marketing.exportExcel({ ...f, tipo: 'HOTEL' });
+    const buffer = await marketing.exportExcel({ ...f, tipo: 'HOTEL', buscar: hotelName });
     const parsed = await new workbook.Workbook().xlsx.load(buffer);
     assert.equal(parsed.worksheets[0].rowCount, 2);
-    assert.equal(parsed.worksheets[0].getRow(2).getCell(2).value, 'Hotel Poblado Boutique');
+    assert.equal(parsed.worksheets[0].getRow(2).getCell(2).value, hotelName);
+    assert.equal(Number(parsed.worksheets[0].getRow(2).getCell(5).value), 2);
     assert.ok(parsed.worksheets[0].getRow(2).getCell(11).value);
     assert.ok(parsed.worksheets[0].getRow(2).getCell(12).value);
   });

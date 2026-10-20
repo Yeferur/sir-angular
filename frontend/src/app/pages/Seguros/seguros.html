@@ -1,4 +1,4 @@
-<main class="insurance-page" [class.insurance-page--with-footer]="buses.length">
+<main class="insurance-page sir-query-form" [class.insurance-page--with-footer]="buses.length">
   @if (catalogLoading) {
     <app-loading-state mode="loading" label="Preparando seguros" detail="Cargando los tours disponibles…" />
   } @else if (catalogError) {
@@ -54,25 +54,11 @@
     } @else if (isSearching && !buses.length) {
       <app-loading-state mode="loading" label="Consultando seguros" detail="Reuniendo pasajeros y personal por bus…" />
     } @else if (!hasSearched) {
-      <section class="empty-state" aria-labelledby="insurance-ready-title">
-        <span class="empty-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-        </span>
-        <h2 id="insurance-ready-title">Listo para buscar</h2>
-        <p>Selecciona la fecha y el tour para cargar sus buses y preparar el listado de seguros.</p>
-      </section>
+      <app-query-empty-state class="insurance-query-state" title="Listo para buscar"
+        description="Selecciona la fecha y el tour para cargar sus buses y preparar el listado de seguros." />
     } @else if (!buses.length && !isSearching) {
-      <section class="empty-state" aria-labelledby="insurance-empty-title">
-        <span class="empty-icon" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/>
-          </svg>
-        </span>
-        <h2 id="insurance-empty-title">Sin programación</h2>
-        <p>No encontramos buses guardados para la fecha y el tour seleccionados.</p>
-      </section>
+      <app-query-empty-state class="insurance-query-state" title="Sin programación"
+        description="No encontramos buses guardados para la fecha y el tour seleccionados." />
     } @else if (buses.length) {
       <section class="results" aria-live="polite">
         <div class="list-toolbar">
@@ -91,10 +77,8 @@
         </div>
 
         @if (!busesVisibles.length) {
-          <section class="empty-state empty-state--compact">
-            <h2>Sin buses en este estado</h2>
-            <p>Selecciona otro estado para continuar.</p>
-          </section>
+          <app-query-empty-state class="insurance-query-compact" title="Sin buses en este estado"
+            description="Selecciona otro estado para continuar." [compact]="true" />
         } @else {
           <div class="bus-list">
             @for (bus of busesVisibles; track bus.Id_Bus_Prog) {

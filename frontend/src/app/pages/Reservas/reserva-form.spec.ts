@@ -20,6 +20,7 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
     let fixture: ComponentFixture<any>;
     let c: any;
     let save: jasmine.Spy;
+    let reservasApi: any;
     let alerts: any;
     const dateError = { status: 400, error: { errorCode: 'RESERVA_TOUR_DATE_PAST', message: 'La fecha reservada (2026-06-30) no puede ser pasada respecto a la fecha actual en America/Bogota.' } };
     const render = () => { fixture.changeDetectorRef.markForCheck(); fixture.detectChanges(); };
@@ -28,14 +29,28 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
 
     beforeEach(async () => {
       save = jasmine.createSpy('guardar').and.returnValue(throwError(() => dateError));
+      reservasApi = {
+        getTours: () => of([{ Id_Tour: 2, Nombre_Tour: 'GUATAPÉ' }, { Id_Tour: 3, Nombre_Tour: 'SANTA FE' }]),
+        getCanales: () => of([]),
+        getMonedas: () => of([]),
+        verificarDniDuplicado: () => of({ exists: false }),
+        crearReserva: save,
+        actualizarReserva: save,
+        getEntidadesReportantes: jasmine.createSpy('getEntidadesReportantes').and.returnValue(of([])),
+        registrarEntidadReportanteRapida: jasmine.createSpy('registrarEntidadReportanteRapida')
+          .and.callFake((idCanal: number, nombre: string) => of({
+            Id_Entidad_Reportante: 99,
+            Tipo: idCanal === 2 ? 'AGENCIA_NACIONAL' : idCanal === 3 ? 'AGENCIA_INTERNACIONAL' : 'HOTEL',
+            Nombre: nombre,
+            Activo: 1,
+            Estado_Validacion: 'PENDIENTE_VALIDACION',
+          })),
+      };
       alerts = { showModal: jasmine.createSpy('modal'), showAlert: jasmine.createSpy('alert'), closeModal() {}, warningToast() {} };
       await TestBed.configureTestingModule({
         imports: [component],
         providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([apiEnvelopeInterceptor])), provideHttpClientTesting(),
-          { provide: Reservas, useValue: {
-            getTours: () => of([{ Id_Tour: 2, Nombre_Tour: 'GUATAPÉ' }, { Id_Tour: 3, Nombre_Tour: 'SANTA FE' }]), getCanales: () => of([]), getMonedas: () => of([]),
-            verificarDniDuplicado: () => of({ exists: false }), crearReserva: save, actualizarReserva: save,
-          } },
+          { provide: Reservas, useValue: reservasApi },
           { provide: WebSocketService, useValue: { reservationEvents$: EMPTY, aforoEvents$: EMPTY } },
           { provide: PermisosService, useValue: { tienePermiso: () => true, esCliente: () => false } },
           { provide: SirAlertService, useValue: alerts },
@@ -116,7 +131,112 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       c.usarCoincidenciaEntidad();
       expect(c.form.get('Id_Entidad_Reportante').value).toBe(7);
       expect(c.form.get('Nombre_Reportante').value).toBe('CONTACTO');
+      expect(c.form.get('Telefono_Reportante').value).toBe('+573001234567');
       expect(c.puntosSeleccionados()[0].Id_Punto).toBe(397);
+    });
+
+    it('ordena Canal, Entidad, Nombre y Teléfono en Crear y Editar', async () => {
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }]);
+      c.form.patchValue({ Id_Canal: 1, Id_Entidad_Reportante: 7 }, { emitEvent: false });
+      await c.onCanalEntidadChange(true);
+      c.currentStep = 1;
+      render();
+
+      const grid = fixture.nativeElement.querySelector('.wizard-step-panel .form-grid') as HTMLElement;
+      const labels = Array.from(grid.querySelectorAll(':scope > .form-group > .form-label'))
+        .map(label => label.textContent?.replace('*', '').trim());
+      expect(labels.slice(0, 4)).toEqual([
+        'Canal', 'Entidad reportante', 'Nombre de quien reporta', 'Teléfono del reportante',
+      ]);
+    });
+
+    it('consulta solo el tipo del canal y oculta Entidad para Freelance y otros canales', async () => {
+      c.canales.set([
+        { Id_Canal: 1, Nombre_Canal: 'HOTEL' },
+        { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' },
+        { Id_Canal: 3, Nombre_Canal: 'AGENCIA INTERNACIONAL' },
+        { Id_Canal: 4, Nombre_Canal: 'FREELANCE' },
+        { Id_Canal: 5, Nombre_Canal: 'DIRECTO' },
+      ]);
+      for (const [id, type] of [[1, 'HOTEL'], [2, 'AGENCIA_NACIONAL'], [3, 'AGENCIA_INTERNACIONAL']] as const) {
+        c.form.get('Id_Canal').setValue(id);
+        await c.onCanalEntidadChange();
+        expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith(type);
+        expect(c.tipoEntidadSeleccionada()).toBe(type);
+      }
+      const entityQueries = reservasApi.getEntidadesReportantes.calls.count();
+
+      c.form.get('Id_Canal').setValue(4);
+      await c.onCanalEntidadChange();
+      expect(c.tipoEntidadSeleccionada()).toBeNull();
+      expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledTimes(entityQueries);
+      c.currentStep = 1;
+      render();
+      expect(fixture.nativeElement.textContent).not.toContain('Entidad reportante');
+
+      c.form.get('Id_Canal').setValue(5);
+      await c.onCanalEntidadChange();
+      expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledTimes(entityQueries);
+    });
+
+    it('limpia Hotel al cambiar a Agencia Nacional y a Freelance', async () => {
+      c.canales.set([
+        { Id_Canal: 1, Nombre_Canal: 'HOTEL' },
+        { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' },
+        { Id_Canal: 3, Nombre_Canal: 'FREELANCE' },
+      ]);
+      c.form.get('Id_Canal').setValue(1);
+      await c.onCanalEntidadChange();
+      c.form.get('Id_Entidad_Reportante').setValue(7);
+
+      c.form.get('Id_Canal').setValue(2);
+      await c.onCanalEntidadChange();
+      expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith('AGENCIA_NACIONAL');
+
+      c.form.get('Id_Entidad_Reportante').setValue(8);
+      c.form.get('Id_Canal').setValue(3);
+      await c.onCanalEntidadChange();
+      expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
+      expect(reservasApi.getEntidadesReportantes.calls.count()).toBe(2);
+    });
+
+    it('Editar conserva la entidad al cargar la reserva sin cambiar su canal', async () => {
+      if (mode !== 'editar') {
+        expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
+        return;
+      }
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }]);
+      c.entidadesReportantes.set([{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL', Nombre: 'Hotel Centro',
+        Activo: 1, Estado_Validacion: 'VALIDADA' }]);
+      c.form.patchValue({ Id_Canal: 1, Id_Entidad_Reportante: 7 }, { emitEvent: false });
+      await c.onCanalEntidadChange(true);
+
+      expect(c.form.get('Id_Entidad_Reportante').value).toBe(7);
+      expect(c.form.get('Id_Entidad_Reportante').valid).toBeTrue();
+    });
+
+    it('crea rápidamente con el canal actual y bloquea el registro rápido en Freelance', async () => {
+      c.canales.set([
+        { Id_Canal: 1, Nombre_Canal: 'HOTEL' },
+        { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' },
+        { Id_Canal: 3, Nombre_Canal: 'FREELANCE' },
+      ]);
+      c.form.get('Id_Canal').setValue(2);
+      await c.onCanalEntidadChange();
+      c.nuevoNombreEntidad = 'Viajes Andinos';
+      await c.registrarEntidadRapida();
+      expect(reservasApi.registrarEntidadReportanteRapida).toHaveBeenCalledOnceWith(2, 'Viajes Andinos');
+      expect(c.form.get('Id_Entidad_Reportante').value).toBe(99);
+
+      c.form.get('Id_Canal').setValue(3);
+      await c.onCanalEntidadChange();
+      c.nuevoNombreEntidad = 'Freelance libre';
+      await c.registrarEntidadRapida();
+      expect(reservasApi.registrarEntidadReportanteRapida).toHaveBeenCalledTimes(1);
+      expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
     });
 
     it('actualiza planes/puntos dinámicos y conserva null disabled y controles de cada pasajero', async () => {
@@ -145,44 +265,37 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       }
     });
 
-    it('acepta un solo teléfono del reportante con adultos, niños e infantes sin teléfono', async () => {
+    it('requiere teléfono del reportante y de al menos un pasajero', async () => {
       for (const type of ['ADULTO', 'ADULTO', 'NIÑO', 'INFANTE']) await add(type);
+      c.pasajeros.at(0).get('Telefono_Pasajero').setValue('+573009876543');
       expect(c.form.valid).toBeTrue();
       await c.onSubmit();
       expect(save).toHaveBeenCalled();
       const payload = save.calls.mostRecent().args[mode === 'crear' ? 0 : 1];
       expect(payload.pasajeros.length).toBe(4);
-      expect(payload.pasajeros.every((p: any) => p.Telefono_Pasajero === null)).toBeTrue();
+      expect(payload.pasajeros[0].Telefono_Pasajero).toBe('+573009876543');
+      expect(payload.pasajeros.slice(1).every((p: any) => p.Telefono_Pasajero == null)).toBeTrue();
     });
 
-    it('acepta contacto de un pasajero, conserva teléfonos y no los copia al agregar otro', async () => {
+    it('exige el teléfono del reportante aunque un pasajero tenga teléfono', async () => {
       c.form.get('Telefono_Reportante').setValue('');
       await add('ADULTO');
-      c.pasajeros.at(0).patchValue({ Nombre_Pasajero: 'ANA', Telefono_Pasajero: '+573001234567' });
-      await add('ADULTO');
-      await add('INFANTE');
-      expect(c.form.valid).toBeTrue();
-      const before = c.form.getRawValue();
+      c.pasajeros.at(0).patchValue({ Nombre_Pasajero: 'ANA', DNI: 'DOC-1', Nacionalidad: 'COLOMBIA', Telefono_Pasajero: '+573001234567', Precio_Pasajero: 100 });
+      expect(c.form.get('Telefono_Reportante').hasError('required')).toBeTrue();
       await c.onSubmit();
-      expect(save).toHaveBeenCalled();
-      expect(c.form.getRawValue()).toEqual(before);
-      const payload = save.calls.mostRecent().args[mode === 'crear' ? 0 : 1];
-      expect(payload.pasajeros.map((p: any) => p.Telefono_Pasajero)).toEqual(['+573001234567', null, null]);
-      expect(c.isSubmitting()).toBeFalse();
-      const shown = mode === 'crear' ? alerts.showModal : alerts.showAlert;
-      expect(shown.calls.mostRecent().args[0].message).toContain('fecha del tour ya pasó');
-    });
-
-    it('señala el contacto faltante y conserva los campos ante la validación', async () => {
-      await add('ADULTO');
-      c.pasajeros.at(0).get('Nombre_Pasajero').setValue('DATOS SIN GUARDAR');
-      c.form.get('Telefono_Reportante').setValue('');
-      await c.onSubmit(); render();
       expect(save).not.toHaveBeenCalled();
       expect(c.currentStep).toBe(1);
-      const field = fixture.nativeElement.querySelector(`#${mode}-telefono-contacto`);
-      expect(field.classList.contains('errorInput')).toBeTrue();
-      expect(fixture.nativeElement.textContent).toContain('al menos un teléfono de contacto válido');
+      expect(c.pasajeros.at(0).get('Telefono_Pasajero').value).toBe('+573001234567');
+    });
+
+    it('exige teléfono de al menos un pasajero y conserva los campos ante la validación', async () => {
+      await add('ADULTO');
+      c.pasajeros.at(0).patchValue({ Nombre_Pasajero: 'DATOS SIN GUARDAR', DNI: 'DOC-1', Nacionalidad: 'COLOMBIA' });
+      await c.onSubmit(); render();
+      expect(save).not.toHaveBeenCalled();
+      expect(c.currentStep).toBe(3);
+      expect(c.showPassengerPhoneRequiredError).toBeTrue();
+      expect(fixture.nativeElement.textContent).toContain('Ingresa el teléfono de al menos un pasajero.');
       expect(c.pasajeros.at(0).get('Nombre_Pasajero').value).toBe('DATOS SIN GUARDAR');
     });
 

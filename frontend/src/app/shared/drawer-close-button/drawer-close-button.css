@@ -1,0 +1,59 @@
+:host {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: block;
+  width: 34px;
+  height: 34px;
+  line-height: 0;
+}
+
+.sir-drawer-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--separator-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, background-color .18s ease, color .18s ease;
+}
+
+.sir-drawer-close:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent-red) 36%, var(--separator-color));
+  background: color-mix(in srgb, var(--accent-red) 10%, var(--bg-tertiary));
+  color: var(--accent-red);
+}
+
+.sir-drawer-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.sir-drawer-close:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+@media (max-width: 600px) {
+  :host {
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .sir-drawer-close {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sir-drawer-close { transition: none; }
+}

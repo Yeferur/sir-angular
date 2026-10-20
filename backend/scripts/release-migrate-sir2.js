@@ -31,6 +31,7 @@ const MIGRATIONS = Object.freeze([
   '20261013_0012_entidades_reportantes.sql',
   '20261013_0013_entidades_mercadeo.sql',
   '20261013_0014_final_authoring_audit_schema.sql',
+  '20261016_0015_perfiles_comision_entidad.sql',
 ]);
 
 function assertTargetConfiguration(env) {
@@ -160,7 +161,8 @@ const REQUIRED_COLUMNS = Object.freeze({
   entidad_reportante_puntos: ['Id_Entidad_Reportante', 'Id_Punto', 'Estado_Validacion', 'Validado_Por', 'Validado_En'],
   tours: ['Creado_Por', 'Actualizado_Por'],
   puntos: ['Creado_Por', 'Actualizado_Por'],
-  liquidaciones: ['Creado_Por', 'Actualizado_Por'],
+  liquidaciones: ['Creado_Por', 'Actualizado_Por', 'Monto_Comision_Pagada'],
+  perfiles_comision_entidad: ['Id_Perfil_Comision', 'Id_Entidad_Reportante', 'Forma_Pago', 'Activo', 'Fecha_Registro'],
   programaciones: ['Creado_Por'],
   historial: ['Actor_Nombre', 'Actor_Rol'],
 });
@@ -183,6 +185,9 @@ const REQUIRED_FKS = Object.freeze([
   ['puntos', 'fk_puntos_actualizado_por', 'SET NULL'],
   ['liquidaciones', 'fk_liquidaciones_creado_por', 'SET NULL'],
   ['liquidaciones', 'fk_liquidaciones_actualizado_por', 'SET NULL'],
+  ['perfiles_comision_entidad', 'fk_perfiles_comision_entidad', 'RESTRICT'],
+  ['perfiles_comision_entidad', 'fk_perfiles_comision_creado_por', 'SET NULL'],
+  ['perfiles_comision_entidad', 'fk_perfiles_comision_actualizado_por', 'SET NULL'],
   ['programaciones', 'fk_programaciones_creado_por', 'SET NULL'],
 ]);
 

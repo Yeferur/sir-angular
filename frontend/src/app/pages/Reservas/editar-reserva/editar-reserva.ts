@@ -1,5 +1,5 @@
 import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
-import { CONTACT_REQUIRED_MESSAGE, RESERVA_PHONE_PATTERN, hasReservaContact, reservaContactValidator } from '../reserva-contact.utils';
+import { hasValidPassengerPhone, isValidReporterPhone, RESERVA_PHONE_PATTERN } from '../reserva-contact.utils';
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
@@ -109,6 +109,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   ];
   currentStep = 0;
   goingBack = false;
+  private passengerPhoneRequirementSubmitted = false;
   maxReachedStep = 0;
   panelAnimating = false;
 
@@ -138,7 +139,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   private getFriendlyReservaErrorMessage(error: any): string {
-    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') return CONTACT_REQUIRED_MESSAGE;
+    if (['RESERVA_REPORTER_PHONE_REQUIRED', 'RESERVA_CONTACT_REQUIRED'].includes(error?.error?.errorCode)) {
+      return 'El teléfono del reportante es obligatorio.';
+    }
+    if (error?.error?.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED') {
+      return 'Ingresa el teléfono de al menos un pasajero.';
+    }
     const raw = String(this.getApiErrorMessage(error));
     const normalized = raw
       .normalize('NFD')
@@ -666,9 +672,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   private showApiError(error: any, title = 'No se pudo completar la operación'): void {
     const message = this.getFriendlyReservaErrorMessage(error);
-    if (error?.error?.errorCode === 'RESERVA_CONTACT_REQUIRED') {
+    if (['RESERVA_REPORTER_PHONE_REQUIRED', 'RESERVA_CONTACT_REQUIRED'].includes(error?.error?.errorCode)) {
       this.form.get('Telefono_Reportante')?.markAsTouched();
       this.focusValidationTarget(1, 'editar-telefono-contacto');
+    }
+    if (error?.error?.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED') {
+      this.passengerPhoneRequirementSubmitted = true;
+      this.focusValidationTarget(3, this.getPassengerPhoneFocusId());
     }
     this.closeSummaryIfOpen();
 
@@ -859,18 +869,52 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   readonly compareSelectValues = compareSelectValuesAsStrings;
   canales = signal<Canal[]>([]);
   entidadesReportantes = signal<EntidadReportante[]>([]);
-  readonly entidadSelectOptions = computed<SirSelectOption[]>(() => this.entidadesReportantes()
-    .map(entidad => ({ value: String(entidad.Id_Entidad_Reportante), label: entidad.Nombre })));
   mostrarRegistroEntidad = false;
   busquedaEntidad = '';
+  entidadAutocompleteOpen = false;
+  entidadCargando = false;
   private busquedaEntidadVersion = 0;
   nuevoNombreEntidad = '';
   registrandoEntidad = signal(false);
   entidadError = signal('');
   private entidadBusquedaTimer: ReturnType<typeof setTimeout> | null = null;
   @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void { this.mostrarRegistroEntidad = false; }
-  buscarEntidadesConEspera(): void {
+  onEntidadInput(value: string): void {
+    const previousValue = this.busquedaEntidad;
+    const selectedId = this.form?.get('Id_Entidad_Reportante')?.value;
+    if (selectedId && value !== previousValue) this.form.get('Id_Entidad_Reportante')?.setValue(null);
+    this.busquedaEntidad = value;
+    this.entidadError.set('');
+    this.buscarEntidadesConEspera();
+  }
+  abrirSugerenciasEntidad(): void {
+    if (this.form?.get('Id_Entidad_Reportante')?.value && this.busquedaEntidad) return;
+    if (this.busquedaEntidad.trim().length >= 2) {
+      this.entidadAutocompleteOpen = true;
+      this.buscarEntidadesConEspera();
+    }
+  }
+  cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
+  seleccionarEntidadReportante(entidad: EntidadReportante): void {
+    this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = entidad.Nombre;
+    this.entidadesReportantes.set([entidad]);
+    this.entidadAutocompleteOpen = false;
+    this.entidadError.set('');
+    this.cdr.markForCheck();
+  }
+  buscarEntidadesConEspera(showSuggestions = true): void {
     if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
+    this.busquedaEntidadVersion++;
+    this.entidadCargando = false;
+    const term = this.busquedaEntidad.trim();
+    if (showSuggestions) this.entidadAutocompleteOpen = term.length >= 2;
+    if (term.length < 2) {
+      this.entidadesReportantes.set([]);
+      this.cdr.markForCheck();
+      return;
+    }
     this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(), 250);
   }
   coincidenciaEntidad(): EntidadReportante | undefined {
@@ -879,12 +923,15 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
   buscarCoincidenciaEntidad(): void {
     this.busquedaEntidad = this.nuevoNombreEntidad;
-    this.buscarEntidadesConEspera();
+    this.form.get('Id_Entidad_Reportante')?.setValue(null);
+    this.buscarEntidadesConEspera(false);
   }
   usarCoincidenciaEntidad(): void {
     const match = this.coincidenciaEntidad();
     if (!match) return;
     this.form.get('Id_Entidad_Reportante')?.setValue(match.Id_Entidad_Reportante);
+    this.busquedaEntidad = match.Nombre;
+    this.entidadAutocompleteOpen = false;
     this.mostrarRegistroEntidad = false;
     this.nuevoNombreEntidad = '';
   }
@@ -897,32 +944,34 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const control = this.form.get('Id_Entidad_Reportante');
     const tipo = this.tipoEntidadSeleccionada();
     control?.setValidators(tipo ? [Validators.required] : []);
-    if (!preserve || !tipo) control?.setValue(null);
+    if (!tipo || !preserve) control?.setValue(null, { emitEvent: false });
     control?.updateValueAndValidity();
     this.entidadError.set('');
     this.mostrarRegistroEntidad = false;
-    this.busquedaEntidad = '';
+    if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
+    this.entidadAutocompleteOpen = false;
+    this.entidadCargando = false;
+    if (!preserve) this.busquedaEntidad = '';
+    this.nuevoNombreEntidad = '';
     this.entidadesReportantes.set([]);
-    const version = ++this.busquedaEntidadVersion;
+    this.busquedaEntidadVersion++;
     if (!tipo) return;
-    try {
-      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo));
-      if (version === this.busquedaEntidadVersion) this.entidadesReportantes.set(items || []);
-    } catch {
-      this.entidadError.set('No pudimos cargar las entidades. Intenta nuevamente.');
-    }
+    if (preserve && control?.value && this.busquedaEntidad.trim().length >= 2) this.buscarEntidadesConEspera(true);
   }
 
   async buscarEntidades(): Promise<void> {
     const tipo = this.tipoEntidadSeleccionada();
-    if (!tipo) return;
+    const term = this.busquedaEntidad.trim();
+    if (!tipo || term.length < 2) return;
     const version = ++this.busquedaEntidadVersion;
+    this.entidadCargando = true;
+    this.entidadError.set('');
     try {
-      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo, this.busquedaEntidad));
+      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo, term));
       if (version === this.busquedaEntidadVersion) this.entidadesReportantes.set(items || []);
     } catch {
       if (version === this.busquedaEntidadVersion) this.entidadError.set('No pudimos buscar entidades.');
-    }
+    } finally { if (version === this.busquedaEntidadVersion) this.entidadCargando = false; this.cdr.markForCheck(); }
   }
 
   async registrarEntidadRapida(): Promise<void> {
@@ -937,6 +986,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         String(item.Id_Entidad_Reportante) !== String(entidad.Id_Entidad_Reportante)), entidad]
         .sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es')));
       this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
+      this.busquedaEntidad = entidad.Nombre;
+      this.entidadAutocompleteOpen = false;
       this.mostrarRegistroEntidad = false;
       this.nuevoNombreEntidad = '';
     } catch (error: any) {
@@ -1179,7 +1230,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Id_Canal: [null, Validators.required],
       Id_Entidad_Reportante: [null],
       Nombre_Reportante: ['', Validators.required],
-      Telefono_Reportante: ['', [Validators.pattern(this.e164WithTenDigitsPattern)]],
+      Telefono_Reportante: ['', [Validators.required, Validators.pattern(this.e164WithTenDigitsPattern)]],
       Observaciones: [''],
 
       // Tipo
@@ -1207,7 +1258,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       // Comprobante (pago completo)
       ComprobantePago: [null],
       PagoObservaciones: [''],
-    }, { validators: reservaContactValidator });
+    });
     this.wsService.reservationEvents$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((msg: any) => {
@@ -1329,6 +1380,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
       this.originalReserva = structuredClone(data);
       const idCanalReserva = data?.Cabecera?.Id_Canal ?? data?.Id_Canal ?? null;
+      this.busquedaEntidad = data?.Cabecera?.Nombre_Entidad_Reportante ?? data?.Nombre_Entidad_Reportante ?? '';
       // Cabecera
       this.form.patchValue({
         SelectTour: data?.Cabecera?.Id_Tour ?? data?.Id_Tour ?? '',
@@ -3067,13 +3119,19 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       };
     }
 
-    if (this.form.hasError('contactRequired')) {
-      this.form.get('Telefono_Reportante')?.markAsTouched();
-      return { message: CONTACT_REQUIRED_MESSAGE, step: 1, focusId: 'editar-telefono-contacto' };
+    const reporterPhone = this.form.get('Telefono_Reportante');
+    if (reporterPhone?.invalid) {
+      reporterPhone.markAsTouched();
+      return { message: 'El teléfono del reportante es obligatorio y debe tener un formato válido.', step: 1, focusId: 'editar-telefono-contacto' };
     }
 
     const passengerIssue = this.getPassengerValidationIssue();
     if (passengerIssue) return passengerIssue;
+
+    if (this.pasajeros.length > 0 && !this.hasPassengerContactPhone()) {
+      this.passengerPhoneRequirementSubmitted = true;
+      return { message: 'Ingresa el teléfono de al menos un pasajero.', step: 3, focusId: this.getPassengerPhoneFocusId() };
+    }
 
     if (!this.form.invalid) return null;
 
@@ -3088,7 +3146,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       Id_Moneda: 'Moneda',
       Id_Canal: 'Canal',
       Nombre_Reportante: 'Nombre del reportante',
-      Telefono_Reportante: 'Teléfono del reportante (indicativo + 10 dígitos, ej: +573001234567)',
+      Telefono_Reportante: 'Teléfono del reportante (ej: +573001234567)',
       Tipo_Reserva: 'Tipo de reserva',
       Id_Punto: 'Selecciona un punto principal de encuentro',
     };
@@ -3424,28 +3482,41 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
 
   // ===================== Estado sugerido (opcional) =====================
   private validarDatosPasajeros(pax: Array<any>) {
-    let faltanNombre = 0, faltanDni = 0, hayTelefonoPasajero = false;
+    let faltanNombre = 0, faltanDni = 0;
     for (const p of pax) {
       const nombre = (p.Nombre_Pasajero ?? '').toString().trim();
       const dni = (p.DNI ?? '').toString().trim();
       if (!nombre) faltanNombre++;
       if (!dni) faltanDni++;
     }
-    hayTelefonoPasajero = hasReservaContact(this.form.get('Telefono_Reportante')?.value, pax);
     const okNombres = faltanNombre === 0;
     const okDni = faltanDni === 0;
-    return { ok: okNombres && okDni && hayTelefonoPasajero, okNombres, okDni, hayTelefonoPasajero, faltanNombre, faltanDni };
+    return { ok: okNombres && okDni, okNombres, okDni, faltanNombre, faltanDni };
   }
 
   getPhoneError(controlName: string): string {
     const ctrl = this.form?.get(controlName);
-    if (this.form?.hasError('contactRequired')) return CONTACT_REQUIRED_MESSAGE;
     if (!ctrl) return 'Teléfono inválido.';
-    if (ctrl.hasError('required')) return 'El teléfono es obligatorio.';
+    if (ctrl.hasError('required')) return 'El teléfono del reportante es obligatorio.';
     if (ctrl.hasError('pattern')) {
       return "Debe iniciar con '+' y tener indicativo + exactamente 10 dígitos del número (ej: +573001234567).";
     }
     return 'Teléfono inválido.';
+  }
+
+  get showPassengerPhoneRequiredError(): boolean {
+    return this.passengerPhoneRequirementSubmitted
+      && this.pasajeros.length > 0
+      && !hasValidPassengerPhone(this.pasajeros.getRawValue());
+  }
+
+  private hasPassengerContactPhone(): boolean {
+    return hasValidPassengerPhone(this.pasajeros.getRawValue());
+  }
+
+  private getPassengerPhoneFocusId(): string {
+    const adultIndex = this.pasajeros.controls.findIndex(control => normalizeReservaPassengerType(control.get('Tipo_Pasajero')?.value) === 'ADULTO');
+    return `editar-pasajero-${adultIndex >= 0 ? adultIndex : 0}-telefono`;
   }
 
   // ===================== Comprobante preview / actions =====================
@@ -3533,6 +3604,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
+    this.busquedaEntidadVersion++;
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     this.navbar?.clearOverlay?.();
   }
@@ -3543,12 +3616,15 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     tieneComprobanteCompleto: boolean
   ): { estado: 'Confirmada' | 'Pendiente'; subestado: 'de datos' | 'de pago' | null; motivo: string } {
     const val = this.validarDatosPasajeros(pasajeros);
-    if (!val.ok) {
+    const telefonoReportanteValido = isValidReporterPhone(this.form.get('Telefono_Reportante')?.value);
+    const telefonoPasajeroValido = hasValidPassengerPhone(pasajeros);
+    if (!val.ok || !telefonoReportanteValido || !telefonoPasajeroValido) {
       const partes: string[] = [];
       if (!val.okNombres) partes.push(`faltan ${val.faltanNombre} nombre(s)`);
       if (!val.okDni) partes.push(`faltan ${val.faltanDni} DNI/pasaporte(s)`);
-      if (!val.hayTelefonoPasajero) partes.push('no hay teléfono de contacto válido');
-      const razon = `Faltan datos básicos de pasajeros: ${partes.join('; ')}.`;
+      if (!telefonoReportanteValido) partes.push('falta el teléfono de contacto del reportante');
+      if (!telefonoPasajeroValido) partes.push('falta el teléfono de al menos un pasajero');
+      const razon = `Faltan datos básicos de la reserva: ${partes.join('; ')}.`;
       return { estado: 'Pendiente', subestado: 'de datos', motivo: razon };
     }
     if (formaPago === 'Directo') return { estado: 'Confirmada', subestado: null, motivo: 'Pago directo y datos completos.' };

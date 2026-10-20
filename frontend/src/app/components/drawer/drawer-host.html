@@ -22,6 +22,7 @@
                           drawer()!.type === 'duplicar' ? 'Duplicar reserva' :
                           drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
                           drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
+                          drawer()!.type === 'punto-reservas' ? 'Reservas asociadas al punto' :
                           drawer()!.type === 'mi-actividad' ? 'Avisos' :
                           drawer()!.type === 'programacion-listado' ? (drawer()!.props?.['novedades'] ? 'Novedades de Programación' : 'Listado de programación') : 'Novedades de la app'">
 
@@ -30,6 +31,13 @@
         [Id_Reserva]="drawer()!.id!"
         (onClose)="close()"
       />
+    }
+
+    @if (drawer()!.type === 'punto-reservas') {
+      <app-reservas-punto-drawer
+        [puntoId]="drawer()!.id!"
+        [puntoNombre]="drawer()!.props?.['nombre'] || ''"
+        (closed)="close()" />
     }
 
     @if (drawer()!.type === 'transfer') {

@@ -95,6 +95,10 @@ export class OrdenarPuntosComponent implements OnInit {
     });
   }
 
+  volverAPuntos(): void {
+    void this.router.navigate(['/Puntos/VerPuntos'], { queryParamsHandling: 'preserve' });
+  }
+
   async onRutaChangeRequest(nextRuta: string): Promise<void> {
     const nuevaRuta = String(nextRuta || '').trim();
     const rutaActual = String(this.rutaSeleccionada || '').trim();

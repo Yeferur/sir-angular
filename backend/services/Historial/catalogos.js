@@ -46,7 +46,7 @@ const TIPOS_ACTIVIDAD = Object.freeze([
     'VALIDAR', 'ACEPTAR_INTERCAMBIO_TURNO', 'RECHAZAR_INTERCAMBIO_TURNO',
   ] },
   { value: 'otros', label: 'Otros', acciones: [
-    'EXPORTAR_EXCEL_LISTADO', 'EXPORTAR_EXCEL_PRIVADO', 'CREAR_O_ACTUALIZAR',
+    'EXPORTAR_EXCEL_LISTADO', 'EXPORTAR_EXCEL_LISTADO_GENERAL', 'EXPORTAR_EXCEL_PRIVADO', 'CREAR_O_ACTUALIZAR',
   ] },
 ].map((tipo) => Object.freeze({ ...tipo, acciones: Object.freeze(tipo.acciones) })));
 

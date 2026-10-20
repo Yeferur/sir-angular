@@ -36,6 +36,38 @@ async function exportarExcel(req, res) {
     }
 }
 
+async function listarTemporal(req, res) {
+    try {
+        const data = await segurosService.listarSegurosTemporales(req.query);
+        return sendSuccess(res, { data, message: 'Pasajeros confirmados para seguros obtenidos correctamente' });
+    } catch (error) {
+        console.error('Error al listar pasajeros confirmados para seguros:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'Error interno al listar pasajeros para seguros',
+            errorCode: error.errorCode || 'TEMPORARY_INSURANCE_LIST_FAILED',
+            details: error.details || undefined,
+        });
+    }
+}
+
+async function exportarTemporal(req, res) {
+    try {
+        const result = await segurosService.generarExcelSegurosTemporales(req.query);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        return res.send(result.buffer);
+    } catch (error) {
+        console.error('Error al exportar pasajeros confirmados para seguros:', error);
+        return sendError(res, {
+            status: error.statusCode || 500,
+            message: error.message || 'Error al generar el Excel temporal de seguros',
+            errorCode: error.errorCode || 'TEMPORARY_INSURANCE_EXPORT_FAILED',
+            details: error.details || undefined,
+        });
+    }
+}
+
 /* PATCH /seguros/buses/:id — actualiza identificación y personal del bus */
 async function actualizarPersonalBus(req, res) {
     try {
@@ -72,5 +104,7 @@ async function actualizarPersonalBus(req, res) {
 module.exports = {
     listar,
     exportarExcel,
+    listarTemporal,
+    exportarTemporal,
     actualizarPersonalBus
 };

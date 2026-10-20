@@ -7,7 +7,6 @@ import {
   Subject,
   Subscription,
   debounceTime,
-  distinctUntilChanged,
   finalize,
   forkJoin,
   map
@@ -15,11 +14,16 @@ import {
 
 import { puntosService, Punto } from '../../../services/Puntos/puntos';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 type PuntoHorario = NonNullable<Punto['horarios']>[number];
+type PendingFilter = 'sin-ruta' | 'sin-horario' | 'sin-coordenadas';
+type PointFilters = { q: string; ruta: string; pendientes: PendingFilter[] };
+const PENDING_FILTERS: PendingFilter[] = ['sin-ruta', 'sin-horario', 'sin-coordenadas'];
 type PuntoOperationalIssue = {
   key: 'missing-coordinates' | 'missing-route';
   label: 'Sin coordenadas' | 'Sin ruta';
@@ -28,7 +32,7 @@ type PuntoOperationalIssue = {
 @Component({
   selector: 'app-ver-puntos',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './ver-puntos.html',
   styleUrls: ['../../listado-reservas-transfers.css', './ver-puntos.css']
 })
@@ -36,12 +40,20 @@ export class VerPuntos implements OnInit, OnDestroy {
   readonly compareSelectValues = compareSelectValuesAsStrings;
 
   readonly rutaSelectOptions = computed<SirSelectOption[]>(() => [{ value: "", label: "Todas las rutas" },
-      ...(this.rutas() || []).map((ruta: any) => ({ value: String(ruta), label: String(this.routeLabel(ruta)) }))]);
+      ...(this.rutas() || []).filter(ruta => String(ruta).toUpperCase() !== 'PENDIENTE')
+        .map((ruta: any) => ({ value: String(ruta), label: String(this.routeLabel(ruta)) }))]);
+  readonly pendingSelectOptions: SirSelectOption[] = [
+    { value: '', label: 'Todos' },
+    { value: 'sin-ruta', label: 'Sin ruta' },
+    { value: 'sin-horario', label: 'Sin horarios' },
+    { value: 'sin-coordenadas', label: 'Sin coordenadas' },
+  ];
 
   private puntosSvc = inject(puntosService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private permisosService = inject(PermisosService);
+  private drawer = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
 
   readonly limit = 10;
@@ -55,10 +67,12 @@ export class VerPuntos implements OnInit, OnDestroy {
   readonly loadError = signal('');
   readonly searchError = signal('');
   readonly hasLoadedOnce = signal(false);
+  readonly appliedFilters = signal<PointFilters>({ q: '', ruta: '', pendientes: [] });
   readonly deletingIds = signal<Set<number>>(new Set());
 
   searchTerm = '';
   selectedRoute = '';
+  selectedPending: PendingFilter | '' = '';
   descargandoExcel = false;
 
   private readonly searchInput$ = new Subject<string>();
@@ -69,11 +83,9 @@ export class VerPuntos implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.restoreFiltersFromQuery();
     this.inputSubscription = this.searchInput$.pipe(
-      map((value) => String(value || '').trim()),
-      debounceTime(300),
-      distinctUntilChanged()
+      map(value => String(value || '').trim()),
+      debounceTime(350)
     ).subscribe(() => this.buscarPuntos(true));
-
     this.loadInitialData();
   }
 
@@ -103,6 +115,16 @@ export class VerPuntos implements OnInit, OnDestroy {
     return this.permisosService.tienePermiso('PUNTOS.ACTUALIZAR');
   }
 
+  get canViewReservasPunto(): boolean {
+    return this.permisosService.tienePermiso('PUNTOS.RESERVAS.LEER');
+  }
+
+  verReservasPunto(punto: Punto): void {
+    const id = this.getPuntoId(punto);
+    if (!id || !this.canViewReservasPunto) return;
+    this.drawer.openReservasPunto(id, this.getPuntoName(punto));
+  }
+
   loadInitialData(): void {
     this.searchRequest?.unsubscribe();
     this.isLoading.set(true);
@@ -113,8 +135,9 @@ export class VerPuntos implements OnInit, OnDestroy {
       result: this.puntosSvc.getPuntos(
         this.page(),
         this.limit,
-        this.searchTerm,
-        this.selectedRoute
+        this.appliedFilters().q,
+        this.appliedFilters().ruta,
+        this.appliedFilters().pendientes
       )
     }).pipe(
       finalize(() => this.isLoading.set(false))
@@ -131,8 +154,18 @@ export class VerPuntos implements OnInit, OnDestroy {
   }
 
   buscarPuntos(resetPage = true): void {
+    if (resetPage) {
+      const nextFilters: PointFilters = {
+        q: this.searchTerm.trim(), ruta: this.selectedRoute,
+        pendientes: this.selectedPending ? [this.selectedPending] : []
+      };
+      const current = this.appliedFilters();
+      if (current.q === nextFilters.q && current.ruta === nextFilters.ruta &&
+          current.pendientes[0] === nextFilters.pendientes[0]) return;
+      this.appliedFilters.set(nextFilters);
+      this.page.set(1);
+    }
     this.searchRequest?.unsubscribe();
-    if (resetPage) this.page.set(1);
     this.syncFiltersToUrl();
 
     this.isSearching.set(true);
@@ -141,8 +174,9 @@ export class VerPuntos implements OnInit, OnDestroy {
     this.searchRequest = this.puntosSvc.getPuntos(
       this.page(),
       this.limit,
-      this.searchTerm,
-      this.selectedRoute
+      this.appliedFilters().q,
+      this.appliedFilters().ruta,
+      this.appliedFilters().pendientes
     ).pipe(
       finalize(() => this.isSearching.set(false))
     ).subscribe({
@@ -174,7 +208,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   clearSearch(): void {
     if (!this.searchTerm) return;
     this.searchTerm = '';
-    this.searchInput$.next('');
+    this.buscarPuntos(true);
   }
 
   submitSearch(): void {
@@ -183,6 +217,11 @@ export class VerPuntos implements OnInit, OnDestroy {
 
   onRouteChange(route: string): void {
     this.selectedRoute = String(route || '').trim();
+    this.buscarPuntos(true);
+  }
+
+  onPendingChange(value: PendingFilter | ''): void {
+    this.selectedPending = PENDING_FILTERS.includes(value as PendingFilter) ? value : '';
     this.buscarPuntos(true);
   }
 
@@ -224,14 +263,21 @@ export class VerPuntos implements OnInit, OnDestroy {
     const requestedPage = Number(params.get('pagina') || 1);
 
     this.searchTerm = String(params.get('q') || '').trim();
-    this.selectedRoute = String(params.get('ruta') || '').trim();
+    const route = String(params.get('ruta') || '').trim();
+    this.selectedRoute = route.toUpperCase() === 'PENDIENTE' ? '' : route;
+    this.selectedPending = params.getAll('pendientes').flatMap(value => value.split(','))
+      .find((value): value is PendingFilter => PENDING_FILTERS.includes(value as PendingFilter))
+      || (route.toUpperCase() === 'PENDIENTE' ? 'sin-ruta' : '');
+    this.appliedFilters.set({ q: this.searchTerm, ruta: this.selectedRoute,
+      pendientes: this.selectedPending ? [this.selectedPending] : [] });
     this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
   }
 
   private buildFilterQueryParams(): Record<string, string | number | null> {
     return {
-      q: this.searchTerm.trim() || null,
-      ruta: this.selectedRoute || null,
+      q: this.appliedFilters().q || null,
+      ruta: this.appliedFilters().ruta || null,
+      pendientes: this.appliedFilters().pendientes.join(',') || null,
       pagina: this.page() > 1 ? this.page() : null
     };
   }
@@ -323,7 +369,7 @@ export class VerPuntos implements OnInit, OnDestroy {
     if (!this.canExportPuntos || this.descargandoExcel) return;
 
     this.descargandoExcel = true;
-    this.puntosSvc.exportarExcel(this.searchTerm, this.selectedRoute).pipe(
+    this.puntosSvc.exportarExcel(this.appliedFilters().q, this.appliedFilters().ruta, this.appliedFilters().pendientes).pipe(
       finalize(() => this.descargandoExcel = false)
     ).subscribe({
       next: (blob) => {

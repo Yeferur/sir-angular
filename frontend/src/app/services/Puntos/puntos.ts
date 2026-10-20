@@ -1,7 +1,8 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SILENT_APP_ACTIVITY } from '../../interceptors/app-activity.interceptor';
 
 export interface Punto {
   Id_Punto?: number;
@@ -36,6 +37,28 @@ export interface OrdenPuntoItem {
   posicion: number;
 }
 
+export interface ReservaAsociadaPunto {
+  Id_Reserva: string;
+  Fecha_Tour: string;
+  Nombre_Tour: string | null;
+  Pasajeros: number;
+  Estado: string;
+}
+
+export interface ReservasPuntoPage {
+  data: ReservaAsociadaPunto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ReservasPuntoFilters {
+  desde: string;
+  hasta: string;
+  estado: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -44,21 +67,40 @@ export class puntosService {
   private baseUrl = environment.apiUrl; // ej. 'http://localhost:4000/api'
 
   // Fetch paginated points. Returns the normalized page selected by the server.
-  getPuntos(page = 1, limit = 10, q = '', ruta = '') {
+  getPuntos(page = 1, limit = 10, q = '', ruta = '', pendientes: string[] = []) {
     const params: any = { page: String(page), limit: String(limit) };
     if (q.trim()) params.q = q.trim();
     if (ruta.trim()) params.ruta = ruta.trim();
+    if (pendientes.length) params.pendientes = pendientes.join(',');
     return this.http.get<{ data: Punto[]; total: number; page?: number; limit?: number }>(
       `${this.baseUrl}/puntos`,
       { params }
     );
   }
 
-  exportarExcel(q = '', ruta = ''): Observable<Blob> {
+  exportarExcel(q = '', ruta = '', pendientes: string[] = []): Observable<Blob> {
     const params: any = {};
     if (q.trim()) params.q = q.trim();
     if (ruta.trim()) params.ruta = ruta.trim();
+    if (pendientes.length) params.pendientes = pendientes.join(',');
     return this.http.get(`${this.baseUrl}/puntos/exportar`, { params, responseType: 'blob' });
+  }
+
+  getEstadosReservasPuntos(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/puntos/reservas/estados`,
+      { context: new HttpContext().set(SILENT_APP_ACTIVITY, true) });
+  }
+
+  getReservasPunto(idPunto: number, filters: ReservasPuntoFilters, page = 1, limit = 25): Observable<ReservasPuntoPage> {
+    const params = { ...filters, page: String(page), limit: String(limit) };
+    return this.http.get<ReservasPuntoPage>(`${this.baseUrl}/puntos/${idPunto}/reservas`,
+      { params, context: new HttpContext().set(SILENT_APP_ACTIVITY, true) });
+  }
+
+  exportarReservasPunto(idPunto: number, filters: ReservasPuntoFilters): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/puntos/${idPunto}/reservas/exportar`,
+      { params: { ...filters }, responseType: 'blob',
+        context: new HttpContext().set(SILENT_APP_ACTIVITY, true) });
   }
 
 

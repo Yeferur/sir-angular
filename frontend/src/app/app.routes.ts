@@ -162,6 +162,13 @@ export const routes: Routes = [
     redirectTo: 'Programacion/Listado',
   },
   {
+    path: 'Programacion/General',
+    loadComponent: () => import('./pages/Programacion/listado-general/listado-general').then((m) => m.ListadoGeneralComponent),
+    canActivate: [authGuard, permisoGuard],
+    data: { permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
+    title: 'Listado general',
+  },
+  {
     path: 'Programacion/Listado',
     loadComponent: () => import('./pages/Programacion/listado/listado').then((m) => m.Listado),
     canActivate: [authGuard, permisoGuard],
@@ -211,7 +218,7 @@ export const routes: Routes = [
   },
   {
     path: 'Seguros',
-    loadComponent: () => import('./pages/Seguros/seguros').then((m) => m.SegurosComponent),
+    loadComponent: () => import('./pages/Seguros/seguros-temporal').then((m) => m.SegurosTemporalComponent),
     canActivate: [authGuard, permisoGuard],
     data: { permiso: 'SEGUROS.LEER', redirectTo: '/Aforos' },
     title: 'Seguros',

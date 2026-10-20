@@ -44,6 +44,28 @@ export interface SeguroPersonalPayload {
   DNI_Guia?: string | null;
 }
 
+export interface SeguroTemporalPasajero {
+  Id_Pasajero: number;
+  Id_Reserva: string;
+  Nombre_Pasajero: string;
+  DNI: string | null;
+  Tipo_Pasajero: string | null;
+  Nombre_Reportante: string | null;
+  Nombre_Canal: string | null;
+  Confirmacion: number;
+}
+
+export interface SeguroTemporalListado {
+  Fecha: string;
+  Id_Tour: number;
+  Nombre_Tour: string;
+  totalPasajeros: number;
+  pasajerosSinDocumento: number;
+  jornadaConfirmada: boolean;
+  requiereConfirmacion: boolean;
+  pasajeros: SeguroTemporalPasajero[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SegurosService {
   private readonly http = inject(HttpClient);
@@ -68,5 +90,17 @@ export class SegurosService {
       .set('Fecha', filtros.Fecha)
       .set('Id_Tour', filtros.Id_Tour);
     return this.http.get(`${this.apiUrl}/exportar`, { params, responseType: 'blob' });
+  }
+
+  listarSegurosTemporales(filtros: { Fecha: string; Id_Tour: string }): Observable<SeguroTemporalListado> {
+    const params = new HttpParams().set('Fecha', filtros.Fecha).set('Id_Tour', filtros.Id_Tour);
+    return this.http.get<any>(`${this.apiUrl}/temporal`, { params }).pipe(
+      map(response => (response?.data ?? response) as SeguroTemporalListado),
+    );
+  }
+
+  exportarSegurosTemporales(filtros: { Fecha: string; Id_Tour: string }): Observable<Blob> {
+    const params = new HttpParams().set('Fecha', filtros.Fecha).set('Id_Tour', filtros.Id_Tour);
+    return this.http.get(`${this.apiUrl}/temporal/exportar`, { params, responseType: 'blob' });
   }
 }

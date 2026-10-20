@@ -19,6 +19,7 @@ import { SeguroBus, SeguroPasajero, SegurosService } from '../../services/Seguro
 import { Tours } from '../../services/Tours/tours';
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
+import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { ConfirmacionService, EstadoConfirmacion, JornadaConfirmacion } from '../../services/confirmacion.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
@@ -44,7 +45,7 @@ interface PanelSeguroState {
 @Component({
   selector: 'app-seguros',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
   templateUrl: './seguros.html',
   styleUrl: './seguros.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

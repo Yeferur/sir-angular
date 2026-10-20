@@ -1,6 +1,8 @@
 const {
   buscarReservasMercadeo,
+  buscarTransfersMercadeo,
   obtenerCategoriasMercadeo,
+  obtenerUsuariosMercadeo,
 } = require('../../services/Mercadeo/mercadeo.service');
 
 function sendSuccess(res, data, message) {
@@ -26,5 +28,11 @@ function asyncHandler(fn) {
 exports.listarReservas = asyncHandler(async (req, res) =>
   sendSuccess(res, await buscarReservasMercadeo(req.query), 'Consulta de reservas de Mercadeo completada'));
 
+exports.listarTransfers = asyncHandler(async (req, res) =>
+  sendSuccess(res, await buscarTransfersMercadeo(req.query), 'Consulta de transfers de Mercadeo completada'));
+
 exports.listarCategorias = asyncHandler(async (_req, res) =>
   sendSuccess(res, await obtenerCategoriasMercadeo(), 'Categorías obtenidas'));
+
+exports.listarUsuarios = asyncHandler(async (_req, res) =>
+  sendSuccess(res, await obtenerUsuariosMercadeo(), 'Usuarios obtenidos'));

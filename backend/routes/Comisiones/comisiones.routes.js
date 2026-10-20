@@ -64,6 +64,28 @@ router.put(
     comisionesController.actualizarDatosPago
 );
 
+// Perfil reutilizable de pago, ligado uno a uno a Hotel o Agencia Nacional.
+router.get(
+    '/perfiles-entidad/:idEntidad',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.obtenerPerfilComisionEntidad
+);
+
+router.post(
+    '/perfiles-entidad',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.guardarPerfilComisionEntidad
+);
+
+router.put(
+    '/perfiles-entidad',
+    authMiddleware,
+    checkPermission(PERM),
+    comisionesController.guardarPerfilComisionEntidad
+);
+
 // Centralización opcional desde el flujo de comisiones.
 router.post(
     '/beneficiarios',

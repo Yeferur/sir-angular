@@ -1,7 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { Subscription } from 'rxjs';
+import { SILENT_APP_ACTIVITY } from '../../interceptors/app-activity.interceptor';
 
 export interface SirNotification {
   idNotificacion: string; tipo: string; titulo: string; mensaje: string; entidadTipo: string | null;
@@ -35,7 +36,8 @@ export class NotificacionesService {
   load(onLoaded?: (items: SirNotification[]) => void): void {
     this.loadSub?.unsubscribe();
     const generation = ++this.loadGeneration;
-    this.loadSub = this.http.get<{ noLeidas: number; notificaciones: SirNotification[] }>(this.baseUrl).subscribe({
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
+    this.loadSub = this.http.get<{ noLeidas: number; notificaciones: SirNotification[] }>(this.baseUrl, { context }).subscribe({
       next: response => {
         if (generation !== this.loadGeneration) return;
         this.noLeidas.set(response.noLeidas || 0);

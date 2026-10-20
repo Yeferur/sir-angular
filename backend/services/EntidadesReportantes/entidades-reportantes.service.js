@@ -30,7 +30,7 @@ function searchKey(value) {
 
 async function typeForChannel(executor, channelId) {
   const [rows] = await executor.query('SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal=? LIMIT 1', [channelId]);
-  if (!rows.length) throw error(400, 'CHANNEL_INVALID', 'Selecciona un canal de reserva válido.');
+  if (!rows.length) throw error(400, 'CHANNEL_INVALID', 'Selecciona un canal válido para este servicio.');
   return CHANNEL_TYPES[String(rows[0].Nombre_Canal).trim().toLocaleUpperCase('es')] || null;
 }
 
@@ -38,10 +38,11 @@ async function validateReservationEntity(executor, channelId, entityId) {
   const requiredType = await typeForChannel(executor, channelId);
   const supplied = entityId !== undefined && entityId !== null && entityId !== '';
   if (!requiredType) {
-    if (supplied) throw error(400, 'ENTITY_CHANNEL_MISMATCH', 'Este canal no admite entidad reportante.');
+    // A channel without entity-reporting semantics always persists NULL, even
+    // when an older or stale client still sends a previously selected entity.
     return null;
   }
-  if (!supplied) throw error(400, 'ENTITY_REQUIRED', 'Selecciona o registra el hotel o agencia que originó la reserva.');
+  if (!supplied) throw error(400, 'ENTITY_REQUIRED', 'Selecciona o registra el hotel o agencia que reportó el servicio.');
   if (!/^\d+$/.test(String(entityId)) || Number(entityId) <= 0) {
     throw error(400, 'ENTITY_INVALID', 'Selecciona una entidad reportante válida.');
   }

@@ -53,11 +53,18 @@ test('Liquidaciones usan el actor autenticado al crear y al hacer upsert', async
   const connection = {
     async beginTransaction() {}, async commit() {}, async rollback() {}, release() {},
     async query(sql, params) {
-      const statement = String(sql);
+      const statement = String(sql).replace(/\s+/g, ' ').trim();
       calls.push({ sql: statement, params });
-      if (/SELECT\s+R\.Id_Reserva/.test(statement)) return [[{
-        Id_Reserva: 'R-AUDIT-1', Id_Canal: 1, Id_Beneficiario_Comision: null,
-        Nombre_Beneficiario: 'Hotel de prueba',
+      if (statement.startsWith('SELECT R.Id_Reserva FROM reservas R')) {
+        return [[{ Id_Reserva: 'R-AUDIT-1' }]];
+      }
+      if (statement.startsWith('SELECT R.Id_Reserva,') && statement.includes('P.Id_Pasajero')) return [[{
+        Id_Reserva: 'R-AUDIT-1', Id_Canal: 1, Nombre_Canal: 'HOTEL', Tiene_Comision: 1,
+        Id_Entidad_Reportante: 11, Tipo_Entidad: 'HOTEL', Nombre_Entidad: 'Hotel de prueba',
+        Entidad_Activa: 1, Estado_Validacion_Entidad: 'VALIDADA',
+        Nombre_Reportante: 'Contacto de prueba', Telefono_Reportante: '3000000000',
+        Monto_Comision: '10000', Id_Pasajero: 1, Tipo_Pasajero: 'ADULTO',
+        Comision_Pasajero: '10000', Nombre_Pasajero: 'Pasajero de prueba',
       }]];
       if (statement.includes('FROM usuarios u')) return [[{
         Id_Usuario: 42, Actor_Nombre: 'Ana Operaciones', Actor_Rol: 'Administrador',

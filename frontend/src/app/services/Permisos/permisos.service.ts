@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, BehaviorSubject, firstValueFrom } from 'rxjs';
 import { tap, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { SILENT_APP_ACTIVITY } from '../../interceptors/app-activity.interceptor';
 
 export interface Permiso {
   codigo: string;
@@ -97,7 +98,8 @@ export class PermisosService {
   // =====================================================
 
   obtenerMisPermisos(): Observable<{ permisos: Permiso[]; role?: string | null }> {
-    return this.http.get<{ permisos: Permiso[]; role?: string | null }>(`${this.baseUrl}/me/permisos`).pipe(
+    const context = new HttpContext().set(SILENT_APP_ACTIVITY, true);
+    return this.http.get<{ permisos: Permiso[]; role?: string | null }>(`${this.baseUrl}/me/permisos`, { context }).pipe(
       tap(response => {
         const codigosPermisos = (response.permisos || []).map(p => p.codigo);
         const role = String(response.role || '').trim() || null;
