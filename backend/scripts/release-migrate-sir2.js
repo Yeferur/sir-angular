@@ -32,6 +32,9 @@ const MIGRATIONS = Object.freeze([
   '20261013_0013_entidades_mercadeo.sql',
   '20261013_0014_final_authoring_audit_schema.sql',
   '20261016_0015_perfiles_comision_entidad.sql',
+  '20261020_0016_transfers_entidad_fecha_registro.sql',
+  '20261021_0017_mercadeo_exportar.sql',
+  '20261021_0018_entidades_reportantes_validacion.sql',
 ]);
 
 function assertTargetConfiguration(env) {
@@ -143,7 +146,8 @@ const CREATE_LEDGER_SQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
 const REQUIRED_COLUMNS = Object.freeze({
   schema_migrations: ['Migration_Id', 'Checksum_SHA256', 'Estado', 'Paso_Actual'],
   permisos_cache_revision: ['Tipo', 'Id_Entidad', 'Revision'],
-  reservas: ['Eliminada_En', 'Eliminada_Por', 'Motivo_Eliminacion', 'Id_Entidad_Reportante'],
+  reservas: ['Eliminada_En', 'Eliminada_Por', 'Motivo_Eliminacion', 'Id_Entidad_Reportante', 'Pendiente_Por_Entidad_En'],
+  transfers: ['Pendiente_Por_Entidad_En'],
   aforos: ['Operacion'],
   chat_conversaciones: ['Tipo', 'Directa_Usuario_Menor', 'Directa_Usuario_Mayor'],
   chat_participantes: ['Id_Conversacion', 'Id_Usuario', 'Ultimo_Mensaje_Leido_Id'],

@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { MercadeoEntidadReportante, MercadeoFilters, MercadeoPage, MercadeoService } from './mercadeo.service';
+import { MercadeoEntidadReportante, MercadeoFilters, MercadeoOrigenPage, MercadeoService } from './mercadeo.service';
 
 describe('MercadeoService', () => {
   let api: MercadeoService;
@@ -15,37 +15,37 @@ describe('MercadeoService', () => {
 
   afterEach(() => http.verify());
 
-  it('envía los filtros de persona/entidad y conserva el DTO de Entidad reportante', () => {
+  it('envía filtros unificados de tipo, entidad, canal y creador con paginación', () => {
     const filters: MercadeoFilters = {
-      fechaRegistroDesde: '', fechaRegistroHasta: '', fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-09-30',
-      fechaTour: '', codigoReserva: '', categoria: '',
-      nombreReportante: 'Juan Pérez', nombreEntidad: 'Hotel Dann', idEntidadReportante: '7',
-      nombrePasajero: '', documento: '',
+      fechaRegistroDesde: '2026-09-01', fechaRegistroHasta: '2026-09-30', fechaTour: '2026-10-02',
+      codigoReserva: '', categoria: '3', tipo: 'TRANSFER', idEntidadReportante: '7', creadorIds: ['12', '14'],
     };
-    let result: MercadeoPage | undefined;
-    api.buscar(filters, 2).subscribe(page => result = page);
+    let result: MercadeoOrigenPage | undefined;
+    api.buscarOrigen(filters, 2, 10).subscribe(page => result = page);
 
-    const request = http.expectOne(req => req.url.endsWith('/mercadeo/reservas'));
-    expect(request.request.params.get('nombreReportante')).toBe('Juan Pérez');
-    expect(request.request.params.get('nombreEntidad')).toBe('Hotel Dann');
+    const request = http.expectOne(req => req.url.endsWith('/mercadeo/origen'));
+    expect(request.request.params.get('tipo')).toBe('TRANSFER');
+    expect(request.request.params.get('fechaRegistroDesde')).toBe('2026-09-01');
+    expect(request.request.params.get('fechaRegistroHasta')).toBe('2026-09-30');
+    expect(request.request.params.get('fechaTour')).toBe('2026-10-02');
+    expect(request.request.params.get('categoria')).toBe('3');
     expect(request.request.params.get('idEntidadReportante')).toBe('7');
-    expect(request.request.params.get('fechaTourDesde')).toBe('2026-09-01');
-    expect(request.request.params.get('fechaTourHasta')).toBe('2026-09-30');
+    expect(request.request.params.get('creadorIds')).toBe('12,14');
     expect(request.request.params.get('page')).toBe('2');
+    expect(request.request.params.get('pageSize')).toBe('10');
     request.flush({
-      items: [{ Id_Reserva: 'MK-1', Fecha_Registro: null, Fecha_Tour: null, Id_Canal: 1,
-        Id_Entidad_Reportante: 7, Nombre_Entidad_Reportante: 'Hotel Dann', Tipo_Entidad_Reportante: 'HOTEL',
-        NombreReporta: 'Juan Pérez', Telefono: '3001234567', Categoria: 'HOTEL', CreadorId: null,
-        UsuarioCreador: null, pasajeros: [] }],
-      page: 2, pageSize: 25, totalPages: 2, totalReservas: 26, totalPasajeros: 26,
+      items: [{ tipo: 'TRANSFER', id_operacion: '42', id_reserva: null, id_transfer: 42,
+        fecha_registro: '2026-09-20 10:00:00', fecha_servicio: '2026-10-02', id_canal: 3, canal: 'Web',
+        id_entidad_reportante: 7, entidad: 'Hotel Dann', tipo_entidad: 'HOTEL', nombre_reportante: 'Juan Pérez',
+        telefono_reportante: '3001234567', creador_id: 12, creador: 'Usuario Uno', pasajeros: 2, estado: 'Pendiente' }],
+      page: 2, pageSize: 10, totalPages: 2, totalOperaciones: 16, totalPasajeros: 2,
+      totalPasajerosEnPagina: 2, tipo: 'TRANSFER',
     });
-    expect(result?.items[0]).toEqual(jasmine.objectContaining({
-      Id_Entidad_Reportante: 7, Nombre_Entidad_Reportante: 'Hotel Dann',
-      Tipo_Entidad_Reportante: 'HOTEL', NombreReporta: 'Juan Pérez',
-    }));
+    expect(result?.items[0].id_transfer).toBe(42);
+    expect(result?.totalPasajerosEnPagina).toBe(2);
   });
 
-  it('consulta las entidades activas disponibles por los tres tipos admitidos', () => {
+  it('permite buscar entidades históricas de los tres tipos para el filtro de origen', () => {
     let entities: MercadeoEntidadReportante[] | undefined;
     api.buscarEntidadesReportantes('Dann').subscribe((rows) => entities = rows);
     const requests = http.match((request) => request.url.endsWith('/entidades-reportantes'));
@@ -56,6 +56,7 @@ describe('MercadeoService', () => {
     for (const request of requests) {
       expect(request.request.params.get('buscar')).toBe('Dann');
       expect(request.request.params.get('limite')).toBe('20');
+      expect(request.request.params.get('incluirInactivas')).toBe('1');
       request.flush([]);
     }
     expect(entities).toEqual([]);

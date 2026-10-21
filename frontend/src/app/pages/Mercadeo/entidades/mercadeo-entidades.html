@@ -1,73 +1,93 @@
-<main class="page-container entity-page" [attr.aria-busy]="loading()">
+<main class="page-container entity-page sir-query-form" [attr.aria-busy]="loading()">
   <header class="entity-heading">
-    <p>Hoteles y agencias que reportan reservas.</p>
+    <p>Hoteles y agencias que reportan reservas y transfers.</p>
     <div class="entity-heading-actions">
-      <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !result()?.items?.length || !!dateError()" (click)="export()">Exportar Excel</button>
+      @if (canExport) { <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !result()?.items?.length || !!dateError()" (click)="export()">Exportar resumen</button> }
       @if (canCreate) { <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">+ Nueva entidad</button> }
     </div>
   </header>
 
-  <section class="entity-filters" aria-label="Filtros de entidades">
+  <section class="search-card entity-filters" aria-label="Filtros de entidades">
     <app-filter-bar panelId="entity-filter-panel" [expanded]="filterOpen()" [filterCount]="filterCount()"
       [busy]="loading()" [canSearch]="!dateError()"
       (toggleFilters)="filterOpen.set(!filterOpen())" (search)="search()">
-      <div sirPrimaryFilters class="entity-primary-filters">
-        <div class="form-group"><label for="entity-name">Entidad</label>
+      <div sirPrimaryFilters class="sir-filter-primary--search-date">
+        <div class="field-group"><label class="form-label" for="entity-name">Entidad</label>
           <app-search-input inputId="entity-name" placeholder="Buscar por nombre" [value]="filters().buscar"
             (valueChange)="setFilter('buscar', $event)" (search)="search()" />
         </div>
-        <div class="form-group"><label for="entity-period">Período de actividad</label>
+        <div class="field-group"><label class="form-label" for="entity-period">Período de creación de reservas</label>
           <app-date-range-picker inputId="entity-period" [value]="dateRange()" (rangeChange)="setRange($event)" />
         </div>
       </div>
     </app-filter-bar>
-    <app-filter-panel panelId="entity-filter-panel" [open]="filterOpen()">
-      <div class="form-group"><label for="entity-type">Tipo</label>
+  </section>
+  @if (dateError()) { <p class="inline-error" role="alert">{{ dateError() }}</p> }
+  @if (validationNotice()) { <p class="entity-notice" role="status">{{ validationNotice() }}</p> }
+  <app-filter-panel panelId="entity-filter-panel" [open]="filterOpen()" [standalone]="true">
+      <div class="field-group"><label class="form-label" for="entity-type">Tipo</label>
         <app-select inputId="entity-type" [options]="typeOptions" [ngModel]="filters().tipo"
           (ngModelChange)="setFilter('tipo', $event)" /></div>
-      <div class="form-group"><label for="entity-validation">Validación</label>
+      <div class="field-group"><label class="form-label" for="entity-validation">Validación</label>
         <app-select inputId="entity-validation" [options]="validationOptions" [ngModel]="filters().validacion"
           (ngModelChange)="setFilter('validacion', $event)" /></div>
-      <div class="form-group"><label for="entity-status">Estado</label>
+      <div class="field-group"><label class="form-label" for="entity-status">Estado</label>
         <app-select inputId="entity-status" [options]="statusOptions" [ngModel]="filters().estado"
           (ngModelChange)="setFilter('estado', $event)" /></div>
-      <div class="form-group"><label for="entity-activity">Actividad</label>
+      <div class="field-group"><label class="form-label" for="entity-activity">Actividad</label>
         <app-select inputId="entity-activity" [options]="activityOptions" [ngModel]="filters().actividad"
           (ngModelChange)="setFilter('actividad', $event)" /></div>
-      @if (hasChangedFilters()) { <button type="button" class="sir-action sir-action--ghost" (click)="clear()">Restablecer filtros</button> }
-    </app-filter-panel>
-    @if (dateError()) { <p class="inline-error" role="alert">{{ dateError() }}</p> }
-  </section>
+      <div class="field-group"><label class="form-label" for="entity-report-gap">Sin reportar hace más de (días)</label>
+        <input id="entity-report-gap" class="entity-input" type="number" min="0" max="36500" inputmode="numeric"
+          [ngModel]="filters().diasSinReportarMin || ''" (ngModelChange)="setDaysFilter($event)"
+          [placeholder]="inactivityDaysPlaceholder()" /></div>
+  </app-filter-panel>
 
-  @if (error() && !result()) { <app-loading-state mode="error" label="No se pudieron consultar las entidades" [detail]="error()" actionLabel="Reintentar" (action)="search()" /> }
-  @else if (loading() && !result()) { <app-loading-state label="Consultando entidades…" /> }
-  @if (result(); as data) {
+  <div class="entity-query-results">
+    @if (error() && !result()) { <app-loading-state mode="error" label="No se pudieron consultar las entidades" [detail]="error()" actionLabel="Reintentar" (action)="search()" /> }
+    @else if (loading() && !result()) { <app-loading-state label="Consultando entidades…" /> }
+    @if (result(); as data) {
     @if (error()) { <p class="inline-error" role="alert">{{ error() }} Los resultados anteriores siguen disponibles.</p> }
     @if (!data.items.length) {
-      <app-query-empty-state title="Sin entidades para esta consulta"
-        description="Los hoteles y agencias aparecerán aquí al registrarse. Puedes ajustar los filtros o crear una entidad." />
+      @if (appliedHasEntityCriteria()) {
+        <app-query-empty-state title="Sin coincidencias"
+          description="No hay entidades que coincidan con los filtros seleccionados." />
+      } @else {
+        <app-query-empty-state title="Sin entidades registradas"
+          description="Aún no hay hoteles o agencias reportantes registrados para consultar." />
+      }
     } @else {
       <section class="entity-results" aria-label="Actividad por entidad">
         <div class="results-heading"><strong>{{ data.total }} {{ data.total === 1 ? 'entidad' : 'entidades' }}</strong>
-          @if (data.summary.Con_Reservas) { <span>{{ data.summary.Con_Reservas }} con actividad</span> }
+          @if (data.summary.Con_Actividad) { <span>{{ data.summary.Con_Actividad }} con actividad</span> }
           @if (data.summary.Total_Reservas) { <span>{{ data.summary.Total_Reservas }} {{ one(data.summary.Total_Reservas) ? 'reserva' : 'reservas' }}</span> }
+          @if (data.summary.Total_Transfers) { <span>{{ data.summary.Total_Transfers }} {{ one(data.summary.Total_Transfers) ? 'transfer' : 'transfers' }}</span> }
           @if (data.summary.Total_Pasajeros) { <span>{{ data.summary.Total_Pasajeros }} {{ one(data.summary.Total_Pasajeros) ? 'pasajero' : 'pasajeros' }}</span> }
         </div>
         <div class="entity-table-wrap">
-          <table><thead><tr><th>Entidad</th><th>Tipo</th><th>Estado</th><th>Validación</th><th>Actividad del período</th><th>Última actividad</th></tr></thead>
+          <table><thead><tr><th>Entidad</th><th>Tipo</th><th>Estado</th><th>Validación</th><th>Actividad del período</th>
+            <th scope="col" [attr.aria-sort]="filters().ordenarPor === 'ultima_reserva' ? (filters().orden === 'DESC' ? 'descending' : 'ascending') : 'none'">
+              <button type="button" class="entity-sort" [attr.aria-label]="sortLabel('ultima_reserva') + ' por última actividad'" (click)="setSort('ultima_reserva')">Última actividad</button>
+            </th>
+            <th scope="col" [attr.aria-sort]="filters().ordenarPor === 'dias_sin_reportar' ? (filters().orden === 'DESC' ? 'descending' : 'ascending') : 'none'">
+              <button type="button" class="entity-sort" [attr.aria-label]="sortLabel('dias_sin_reportar') + ' por días sin reportar'" (click)="setSort('dias_sin_reportar')">Días sin reportar</button>
+            </th></tr></thead>
             <tbody>@for (item of data.items; track item.Id_Entidad_Reportante) {
               <tr><td><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button></td>
                 <td>{{ typeLabel(item.Tipo) }}</td><td>{{ item.Activo ? 'Activa' : 'Inactiva' }}</td>
                 <td>{{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</td>
-                <td>{{ item.Reservas ? item.Reservas + (one(item.Reservas) ? ' reserva · ' : ' reservas · ') + item.Pasajeros + (one(item.Pasajeros) ? ' pasajero' : ' pasajeros') : 'Sin reservas' }}</td>
+                <td>{{ activitySummary(item) }}</td>
                 <td>{{ item.Ultima_Actividad ? (item.Ultima_Actividad | date:'d MMM y':'':'es-CO') : '—' }}</td>
+                <td><span [class.entity-activity-alert]="item.Dias_Sin_Reportar !== null && item.Dias_Sin_Reportar > data.umbralDiasSinReportar">
+                  {{ item.Dias_Sin_Reportar === null ? '—' : item.Dias_Sin_Reportar }}</span></td>
               </tr>
             }</tbody></table>
         </div>
         <div class="entity-cards">@for (item of data.items; track item.Id_Entidad_Reportante) {
           <article class="entity-card"><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button>
             <p>{{ typeLabel(item.Tipo) }} · {{ item.Activo ? 'Activa' : 'Inactiva' }} · {{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</p>
-            @if (item.Reservas) { <small>{{ item.Reservas }} {{ one(item.Reservas) ? 'reserva' : 'reservas' }} · {{ item.Pasajeros }} {{ one(item.Pasajeros) ? 'pasajero' : 'pasajeros' }}</small> }
+            @if (item.Operaciones) { <small>{{ activitySummary(item) }}</small> } @else { <small>Sin actividad</small> }
+            @if (item.Dias_Sin_Reportar !== null) { <small [class.entity-activity-alert]="item.Dias_Sin_Reportar > data.umbralDiasSinReportar">{{ item.Dias_Sin_Reportar }} días sin reportar</small> }
           </article>
         }</div>
         @if (data.totalPages > 1) { <footer class="entity-pagination"><span>Página {{ data.page }} de {{ data.totalPages }}</span>
@@ -77,6 +97,7 @@
       </section>
     }
   }
+  </div>
 
   @if (selected(); as detail) {
     <div class="entity-backdrop" (click)="close()"></div>
@@ -85,17 +106,40 @@
       <button type="button" class="drawer-close" aria-label="Cerrar detalle" (click)="close()">×</button>
       <h2 id="entity-detail-title">{{ detail.entity.Nombre }}</h2>
       <p>{{ typeLabel(detail.entity.Tipo) }} · {{ detail.entity.Activo ? 'Activa' : 'Inactiva' }} · {{ validationLabel(detail.entity.Estado_Validacion) }}</p>
+      @if (detail.entity.Motivo_Rechazo) { <p class="entity-rejection-reason"><strong>Último motivo de rechazo:</strong> {{ detail.entity.Motivo_Rechazo }}</p> }
+      @if (detailNotice()) { <p class="entity-notice" role="status">{{ detailNotice() }}</p> }
       <div class="drawer-actions">
+        @if (canViewOrigin) { <button type="button" class="sir-action sir-action--primary" (click)="showOrigin()">Ver operaciones</button> }
         @if (canEdit) {
           <button type="button" class="sir-action sir-action--secondary" (click)="startEdit()">Editar</button>
           <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="setActive(!detail.entity.Activo)">
             {{ detail.entity.Activo ? 'Desactivar' : 'Activar' }}</button>
         }
         @if (canValidate) {
-          <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Validar</button>
-          <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="validate('RECHAZADA')">Rechazar</button>
+          @if (detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+            <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Validar</button>
+            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="beginReject()">Rechazar</button>
+          } @else if (detail.entity.Estado_Validacion === 'RECHAZADA') {
+            <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Revalidar</button>
+          } @else {
+            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="beginReject()">Rechazar</button>
+          }
         }
       </div>
+      @if (rejecting()) {
+        <section class="entity-rejection-form" aria-labelledby="entity-rejection-label">
+          <label id="entity-rejection-label" for="entity-rejection-reason">Motivo del rechazo <span>(obligatorio)</span></label>
+          <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="300"
+            [(ngModel)]="rejectionReason" [disabled]="saving()" placeholder="Describe brevemente por qué se rechaza"></textarea>
+          <small>{{ rejectionReason.length }}/300</small>
+          <div class="entity-form-actions">
+            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="cancelReject()">Cancelar</button>
+            <button type="button" class="sir-action sir-action--primary"
+              [disabled]="saving() || !rejectionReason.trim() || rejectionReason.trim().length > 300"
+              (click)="validate('RECHAZADA')">{{ saving() ? 'Rechazando…' : 'Confirmar rechazo' }}</button>
+          </div>
+        </section>
+      }
       @if (editing()) {
         <div class="entity-edit"><label for="edit-entity-name">Nombre comercial</label>
           <input id="edit-entity-name" class="entity-input" [(ngModel)]="name" maxlength="255" />
@@ -105,11 +149,11 @@
           <button type="button" class="sir-action sir-action--ghost" (click)="editing.set(false)">Cancelar</button>
         </div>
       }
-      @if (detail.historic.Reservas) {
+      @if (detail.historic.Operaciones) {
       <h3>Actividad</h3>
-      <p>Histórico: {{ detail.historic.Reservas }} {{ one(detail.historic.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.historic.Pasajeros }} {{ one(detail.historic.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p>
-      @if (detail.period.Reservas) { <p>Período: {{ detail.period.Reservas }} {{ one(detail.period.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.period.Pasajeros }} {{ one(detail.period.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p> }
-      @if (detail.historic.Ultima_Actividad) { <p>Última reserva: {{ detail.historic.Ultima_Actividad | date:'d MMM y':'':'es-CO' }}</p> }
+      <p>Histórico: {{ detail.historic.Reservas }} {{ one(detail.historic.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.historic.Transfers }} {{ one(detail.historic.Transfers) ? 'transfer' : 'transfers' }} · {{ detail.historic.Pasajeros }} {{ one(detail.historic.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p>
+      @if (detail.period.Operaciones) { <p>Período: {{ detail.period.Reservas }} {{ one(detail.period.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.period.Transfers }} {{ one(detail.period.Transfers) ? 'transfer' : 'transfers' }} · {{ detail.period.Pasajeros }} {{ one(detail.period.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p> }
+      @if (detail.historic.Ultima_Actividad) { <p>Último reporte: {{ detail.historic.Ultima_Actividad | date:'d MMM y':'':'es-CO' }}@if (detail.historic.Dias_Sin_Reportar !== null) { · {{ detail.historic.Dias_Sin_Reportar }} días sin reportar }</p> }
       }
       @if (detail.contacts.length) { <h3>Contactos que han reportado</h3>
       @for (contact of detail.contacts; track contact.Nombre + ':' + contact.Telefono) { <p>{{ contact.Nombre }} @if (contact.Telefono) { · {{ contact.Telefono }} } · {{ contact.Reservas }} {{ one(contact.Reservas) ? 'reserva' : 'reservas' }}</p> }
@@ -117,14 +161,14 @@
       @if (detail.observed.length) { <h3>Puntos observados en reservas</h3>
       @for (point of detail.observed; track point.Id_Punto) {
         <p>{{ point.Nombre_Punto }} · {{ point.Reservas }} {{ one(point.Reservas) ? 'reserva' : 'reservas' }}
-          @if (canValidate) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">Asociar</button> }</p>
+          @if (canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">Asociar</button> }</p>
       } }
       @if (detail.associated.length) { <h3>Puntos asociados oficialmente</h3>
       @for (point of detail.associated; track point.Id_Punto) {
         <p>{{ point.Nombre_Punto }} · {{ point.Estado_Validacion }}
-          @if (canValidate) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, false)">Quitar</button> }</p>
+          @if (canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, false)">Quitar</button> }</p>
       } }
-      @if (canValidate) {
+      @if (canManagePointRelations) {
         <button type="button" class="sir-action sir-action--ghost entity-point-toggle" [attr.aria-expanded]="pointPickerOpen()" (click)="pointPickerOpen.set(!pointPickerOpen())">{{ pointPickerOpen() ? 'Cerrar búsqueda de puntos' : 'Asociar punto de encuentro' }}</button>
         @if (pointPickerOpen()) {
           <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" [value]="pointSearch" (valueChange)="pointSearch = $event; searchPoints()" />

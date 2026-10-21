@@ -37,7 +37,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     data: {
       preload: true,
-      permisos: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
+      permisos: ['PENDIENTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR', 'RECORDATORIOS.LEER'],
       redirectTo: '/',
     },
     title: 'Avisos',
@@ -78,18 +78,26 @@ export const routes: Routes = [
     title: 'Ver Reservas',
   },
   {
-    path: 'Mercadeo/Reservas',
-    loadComponent: () => import('./pages/Mercadeo/reservas/mercadeo-reservas').then((m) => m.MercadeoReservasComponent),
+    path: 'Mercadeo',
+    pathMatch: 'full',
+    loadComponent: () => import('./pages/Mercadeo/mercadeo').then((m) => m.MercadeoComponent),
     canActivate: [authGuard, permisoGuard],
-    data: { permiso: 'MERCADEO.RESERVAS.LEER', redirectTo: '/Aforos' },
+    data: { permisos: ['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR', 'MERCADEO.RESERVAS.LEER'], redirectTo: '/Aforos' },
+    title: 'Mercadeo',
+  },
+  {
+    path: 'Mercadeo/Reservas',
+    loadComponent: () => import('./pages/Mercadeo/mercadeo-legacy-redirect').then((m) => m.MercadeoLegacyRedirectComponent),
+    canActivate: [authGuard],
+    data: { mercadeoLegacyTab: 'origen' },
     title: 'Mercadeo',
   },
   {
     path: 'Mercadeo/Entidades',
-    loadComponent: () => import('./pages/Mercadeo/entidades/mercadeo-entidades').then((m) => m.MercadeoEntidadesComponent),
-    canActivate: [authGuard, permisoGuard],
-    data: { permiso: 'ENTIDADES_REPORTANTES.LEER', redirectTo: '/Mercadeo/Reservas' },
-    title: 'Entidades reportantes',
+    loadComponent: () => import('./pages/Mercadeo/mercadeo-legacy-redirect').then((m) => m.MercadeoLegacyRedirectComponent),
+    canActivate: [authGuard],
+    data: { mercadeoLegacyTab: 'entidades' },
+    title: 'Mercadeo',
   },
   {
     path: 'Reservas/EditarReserva/:id',
@@ -174,7 +182,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { preload: true, programacionView: 'dashboard', permiso: 'PROGRAMACION.LEER', redirectTo: '/Aforos' },
-    title: 'Programación',
+    title: 'Listado de buses',
   },
   {
     path: 'Programacion/Editor/:fecha/:servicio',
@@ -182,7 +190,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { programacionView: 'editor', permiso: 'PROGRAMACION.ACTUALIZAR', redirectTo: '/Programacion/Listado' },
-    title: 'Programación',
+    title: 'Listado de buses',
   },
   {
     path: 'Programacion/Transfers/:fecha',
@@ -190,7 +198,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { programacionView: 'transfers', permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
-    title: 'Programación',
+    title: 'Listado de buses',
   },
   {
     path: 'Programacion/Privados/:fecha',
@@ -198,7 +206,7 @@ export const routes: Routes = [
     canActivate: [authGuard, permisoGuard],
     canDeactivate: [unsavedChangesGuard],
     data: { programacionView: 'privados', permiso: 'PROGRAMACION.LEER', redirectTo: '/Programacion/Listado' },
-    title: 'Privados',
+    title: 'Listado de buses',
   },
 
   {

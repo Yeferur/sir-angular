@@ -490,6 +490,14 @@ textarea.form-input:hover {
   opacity: .72;
 }
 
+.programacion-command-surface {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* Consulta compartida: Comisiones, Seguros y Control de viaje. */
 main.sir-query-form:is(.commissions-page, .insurance-page, .trip-control-page) {
   width: min(1350px, calc(100% - 40px));
@@ -508,14 +516,14 @@ main.sir-query-form :is(.search-card, .filters-card) {
   height: 82px;
 }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .field-group {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .field-group {
   display: flex;
   flex-direction: column;
   min-width: 0;
   gap: 7px;
 }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .field-group > .form-label {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .field-group > .form-label {
   display: block;
   min-height: 13px;
   margin: 0;
@@ -531,9 +539,18 @@ main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .f
 
 main.sir-query-form :is(.search-primary, .filters-grid) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 368px minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
+}
+
+main.sir-query-form :is(.search-primary, .filters-grid) > .field-group--date {
+  width: 368px;
+  min-width: 0;
+}
+
+main.sir-query-form :is(.search-primary, .filters-grid) > .field-group--tour {
+  min-width: 0;
 }
 
 main.sir-query-form .sir-filter-bar {
@@ -545,9 +562,28 @@ main.sir-query-form .sir-filter-bar {
 
 main.sir-query-form .sir-filter-primary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 368px minmax(0, 1fr);
   align-items: end;
   gap: 10px;
+  min-width: 0;
+}
+
+main.sir-query-form .sir-filter-primary--search-date {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 368px);
+  align-items: end;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+main.sir-query-form .sir-filter-primary > .field-group--date {
+  width: 368px;
+  min-width: 0;
+}
+
+main.sir-query-form .sir-filter-primary > .field-group--tour {
   min-width: 0;
 }
 
@@ -560,9 +596,26 @@ main.sir-query-form .sir-filter-actions {
   gap: 8px;
 }
 
+main.sir-query-form .sir-filter-actions > .sir-filter-toggle {
+  box-sizing: border-box;
+  width: 112px;
+  height: 40px;
+}
+
+main.sir-query-form .sir-filter-actions > .sir-action--primary {
+  box-sizing: border-box;
+  width: 108px;
+  height: 40px;
+}
+
+main.sir-query-form .sir-filter-panel .sir-filter-panel-action {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
 main.sir-query-form .commission-filter-grid { gap: 10px; }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .sir-select-trigger {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .sir-select-trigger {
   box-sizing: border-box;
   height: 40px;
   min-height: 40px;
@@ -575,14 +628,14 @@ main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .s
   line-height: 1.25;
 }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .sir-select-label {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .sir-select-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow-wrap: normal;
 }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .sir-dp-field {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .sir-dp-field {
   box-sizing: border-box;
   height: 40px;
   min-height: 40px;
@@ -590,7 +643,7 @@ main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .s
   border-radius: var(--radius-sm, 8px);
 }
 
-main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel) .sir-dp-text {
+main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .sir-filter-panel) .sir-dp-text {
   font-size: .875rem;
   font-weight: 500;
   line-height: 1.25;
@@ -661,7 +714,7 @@ main.sir-query-form > app-query-empty-state { margin-top: 14px; }
 
   main.sir-query-form .sir-filter-actions > :only-child { grid-column: 1 / -1; }
 
-  main.sir-query-form .sir-filter-actions > :is(.btn-filter, .reservation-search-button) {
+  main.sir-query-form .sir-filter-actions > :is(.btn-filter, .reservation-search-button, .sir-filter-toggle, .sir-action--primary) {
     width: 100%;
   }
 }
@@ -672,6 +725,10 @@ main.sir-query-form > app-query-empty-state { margin-top: 14px; }
   }
 
   main.sir-query-form :is(.search-primary, .filters-grid, .sir-filter-primary) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  main.sir-query-form .sir-filter-primary--search-date {
     grid-template-columns: minmax(0, 1fr);
   }
 

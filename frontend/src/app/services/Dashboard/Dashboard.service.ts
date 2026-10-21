@@ -52,6 +52,7 @@ export interface PassengerAgeSummary {
 
 export interface FinancialCurrencySummary {
   currency: string;
+  reservations: number;
   scheduledTours: number;
   tourRevenue: number;
   tourCommission: number;
@@ -75,6 +76,14 @@ export interface DashboardComparison {
 }
 
 export interface IncomeHistory {
+  financialByCurrency: Array<{
+    currency: string;
+    bruto: number[];
+    neto: number[];
+    transfers: number[];
+    empresa: number[];
+  }>;
+  currency: string;
   bruto: number[];   // 12 valores, uno por mes
   neto:  number[];   // 12 valores, uno por mes
   transfers: number[];
@@ -83,6 +92,7 @@ export interface IncomeHistory {
 
 export interface DailyIncome {
   fecha: string;   // 'YYYY-MM-DD'
+  currency: string;
   bruto: number;
   neto:  number;
   transfer: number;
@@ -107,6 +117,7 @@ export interface PassengerDistribution {
 
 export interface ReservationBreakdown {
   tipo: 'Grupales' | 'Privadas';
+  currency: string;
   reservas: number;
   pasajeros: number;
   bruto: number;
@@ -137,9 +148,9 @@ export interface DashboardOperational {
 export interface DashboardLanguageRow { idioma: string; registrados: number; viajaron: number; }
 export interface DashboardPointRow { punto: string; registrados: number; viajaron: number; }
 export interface DashboardAbsenceRow { canal?: string; tour?: string; programados: number; viajaron: number; noViajaron: number; pendientes: number; }
-export interface DashboardTariffRow { tarifa: string; pasajeros: number; ingresos: number; }
+export interface DashboardTariffRow { tarifa: string; currency: string; pasajeros: number; ingresos: number; }
 export interface DashboardPassportRow { plan: string; pasajeros: number; }
-export interface DashboardChannelFinancialRow { canal: string; viajaron: number; ingresos: number; comisiones: number; }
+export interface DashboardChannelFinancialRow { canal: string; currency: string; viajaron: number; ingresos: number; comisiones: number; }
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 

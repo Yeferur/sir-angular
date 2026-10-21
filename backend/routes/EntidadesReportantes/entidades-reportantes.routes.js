@@ -12,11 +12,11 @@ router.post('/entidades-reportantes/rapida', authMiddleware,
 router.patch('/entidades-reportantes/:id/validacion', authMiddleware,
   checkPermission('ENTIDADES_REPORTANTES.VALIDAR'), controller.validate);
 router.get('/entidades-reportantes/actividad', authMiddleware,
-  checkPermission('ENTIDADES_REPORTANTES.LEER'), controller.activity);
+  checkAnyPermission(['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR']), controller.activity);
 router.get('/entidades-reportantes/exportar', authMiddleware,
-  checkPermission('ENTIDADES_REPORTANTES.LEER'), controller.exportExcel);
+  checkPermission('ENTIDADES_REPORTANTES.LEER'), checkPermission('MERCADEO.EXPORTAR'), controller.exportExcel);
 router.get('/entidades-reportantes/:id', authMiddleware,
-  checkPermission('ENTIDADES_REPORTANTES.LEER'), controller.detail);
+  checkAnyPermission(['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR']), controller.detail);
 router.post('/entidades-reportantes', authMiddleware,
   checkPermission('ENTIDADES_REPORTANTES.CREAR'), controller.create);
 router.patch('/entidades-reportantes/:id', authMiddleware,

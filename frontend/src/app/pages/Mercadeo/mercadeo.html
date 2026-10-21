@@ -1,0 +1,20 @@
+<div class="marketing-unified">
+  <nav class="page-container marketing-tabs" aria-label="Consultas de Mercadeo">
+    @if (canSeeEntities()) {
+      <button type="button" [class.is-active]="activeTab() === 'entidades'"
+        [attr.aria-current]="activeTab() === 'entidades' ? 'page' : null"
+        (click)="selectTab('entidades')">Entidades</button>
+    }
+    @if (canSeeOrigin()) {
+      <button type="button" [class.is-active]="activeTab() === 'origen'"
+        [attr.aria-current]="activeTab() === 'origen' ? 'page' : null"
+        (click)="selectTab('origen')">Origen de reservas</button>
+    }
+  </nav>
+
+  @if (activeTab() === 'entidades' && canSeeEntities()) {
+    <app-mercadeo-entidades (drillDown)="viewEntityOperations($event)" />
+  } @else if (activeTab() === 'origen' && canSeeOrigin()) {
+    <app-mercadeo-reservas />
+  }
+</div>

@@ -1,213 +1,77 @@
 import { provideZonelessChangeDetection } from '@angular/core';
-import { registerLocaleData } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
-import { of, Subject, throwError } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
+import { BehaviorSubject, of } from 'rxjs';
 import { MercadeoReservasComponent } from './mercadeo-reservas';
-import { MercadeoPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
-import { routes } from '../../../app.routes';
-import { permisoGuard } from '../../../guards/permission.guard';
+import { MercadeoService, MercadeoOrigenPage } from '../../../services/Mercadeo/mercadeo.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
-import { SirAlertService } from '../../../services/Alertas/alert.service';
-import localeEsCO from '@angular/common/locales/es-CO';
 
-registerLocaleData(localeEsCO);
-
-const result: MercadeoPage = {
-  page: 1, pageSize: 25, totalPages: 4, totalReservas: 80, totalPasajeros: 88,
-  items: [
-    { Id_Reserva: 'MK-A', Fecha_Registro: '2026-08-10T09:30:00', Fecha_Tour: '2026-09-04', Id_Canal: 1,
-      Id_Entidad_Reportante: 7, Nombre_Entidad_Reportante: 'Hotel Dann', Tipo_Entidad_Reportante: 'HOTEL',
-      NombreReporta: 'Juan Pérez', Telefono: '3001234567', Categoria: 'HOTEL', CreadorId: 1,
-      UsuarioCreador: 'Usuario Uno', pasajeros: [{ id: 1, nombre: 'Ana', documento: 'CC-1' }] },
-    { Id_Reserva: 'MK-B', Fecha_Registro: '2026-08-11T10:00:00', Fecha_Tour: '2026-09-05', Id_Canal: 4,
-      Id_Entidad_Reportante: null, Nombre_Entidad_Reportante: null, Tipo_Entidad_Reportante: null,
-      NombreReporta: 'Freelance libre', Telefono: null, Categoria: 'FREELANCE', CreadorId: null,
-      UsuarioCreador: null, pasajeros: [{ id: 2, nombre: 'Luis', documento: null }] },
-  ],
+const emptyPage: MercadeoOrigenPage = {
+  items: [], page: 1, pageSize: 25, totalPages: 0, totalOperaciones: 0,
+  totalPasajeros: 0, totalPasajerosEnPagina: 0, tipo: 'TODOS',
 };
 
 describe('MercadeoReservasComponent', () => {
   let fixture: ComponentFixture<MercadeoReservasComponent>;
   let component: MercadeoReservasComponent;
   let api: jasmine.SpyObj<MercadeoService>;
-  let permissions: { asegurarPermisosCargados: jasmine.Spy; tieneAlgunPermiso: jasmine.Spy; tieneTodosPermisos: jasmine.Spy };
-  let alerts: { errorToast: jasmine.Spy };
+  let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let router: Router;
 
   beforeEach(async () => {
-    api = jasmine.createSpyObj<MercadeoService>('MercadeoService', ['getCategorias', 'buscar', 'buscarEntidadesReportantes']);
-    api.getCategorias.and.returnValue(of([{ Id_Canal: 1, Nombre_Canal: 'AGENCIA' }]));
-    api.buscar.and.returnValue(of(result));
+    params = new BehaviorSubject(convertToParamMap({}));
+    api = jasmine.createSpyObj<MercadeoService>('MercadeoService', [
+      'getCategorias', 'getUsuarios', 'buscarEntidadesReportantes', 'buscarOrigen', 'exportarOrigen',
+    ]);
+    api.getCategorias.and.returnValue(of([{ Id_Canal: 1, Nombre_Canal: 'Hotel' }]));
+    api.getUsuarios.and.returnValue(of([{ Id_Usuario: 8, Nombres_Apellidos: 'Usuario Uno', Activo: 1 }]));
     api.buscarEntidadesReportantes.and.returnValue(of([]));
-    permissions = {
-      asegurarPermisosCargados: jasmine.createSpy().and.resolveTo(true),
-      tieneAlgunPermiso: jasmine.createSpy().and.returnValue(true),
-      tieneTodosPermisos: jasmine.createSpy().and.returnValue(true),
-    };
-    alerts = { errorToast: jasmine.createSpy() };
+    api.buscarOrigen.and.returnValue(of(emptyPage));
+    api.exportarOrigen.and.returnValue(of(new Blob()));
+
     await TestBed.configureTestingModule({
       imports: [MercadeoReservasComponent],
-      providers: [provideZonelessChangeDetection(), provideRouter([]),
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { queryParamMap: params.asObservable() } },
         { provide: MercadeoService, useValue: api },
-        { provide: PermisosService, useValue: permissions },
-        { provide: SirAlertService, useValue: alerts }],
+        { provide: PermisosService, useValue: { tienePermiso: (code: string) => code === 'MERCADEO.EXPORTAR' } },
+      ],
     }).compileComponents();
+
     fixture = TestBed.createComponent(MercadeoReservasComponent);
     component = fixture.componentInstance;
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate').and.resolveTo(true);
     fixture.detectChanges();
   });
 
-  it('carga categorías y consulta con page size 25 mostrando resultados y creadores', () => {
-    expect(api.getCategorias).toHaveBeenCalled();
-    expect(component.categoryOptions().map((option) => option.label)).toEqual(['Todos los canales', 'AGENCIA']);
-    component.search();
-    fixture.detectChanges();
-    expect(api.buscar).toHaveBeenCalledWith(jasmine.objectContaining({ codigoReserva: '' }), 1, 25);
+  it('muestra el estado inicial compartido y no agrega una acción de limpiar filtros', () => {
     const html = fixture.nativeElement as HTMLElement;
-    expect(html.textContent).toContain('80 reservas · 88 pasajeros');
-    expect(html.textContent).toContain('Usuario Uno');
-    expect(html.textContent).toContain('No disponible');
-    expect(html.textContent).toContain('Quién reportó');
-    expect(component.result()?.items[0].Nombre_Entidad_Reportante).toBe('Hotel Dann');
-    expect(component.result()?.items[0].NombreReporta).toBe('Juan Pérez');
-    expect(html.textContent).toContain('Juan Pérez');
-    const rows = Array.from(html.querySelectorAll('.marketing-table tbody tr'));
-    expect(rows[0].children[6].textContent?.trim()).toBe('Hotel Dann');
-    expect(rows[0].children[7].textContent).toContain('Juan Pérez');
-    const freelanceRow = rows.find((row) => row.textContent?.includes('MK-B'));
-    expect(freelanceRow?.children[6].textContent?.trim()).toBe('');
-    const freelanceCard = Array.from(html.querySelectorAll('.marketing-mobile-card'))
-      .find((card) => card.textContent?.includes('MK-B'));
-    expect(freelanceCard?.textContent).toContain('Reportó: Freelance libre');
-    expect(freelanceCard?.textContent).not.toContain('Entidad:');
-    expect(html.querySelector('h1')).toBeNull();
-    expect(html.querySelector('.marketing-tabs')).toBeNull();
-    expect(html.querySelector('.marketing-summary')).toBeNull();
-    expect(html.querySelector('app-date-range-picker')).not.toBeNull();
-    expect(html.querySelector('#marketing-code.search-input')).not.toBeNull();
-    expect(html.querySelector('app-filter-bar')).not.toBeNull();
+    expect(html.textContent).toContain('Listo para buscar');
+    expect(html.querySelector('button[aria-label*="limpiar filtros" i]')).toBeNull();
+    expect(html.textContent).not.toContain('Preparando…');
   });
 
-  it('envía filtros activos, avanza de página y reinicia a página 1 al buscar filtros cambiados', () => {
-    component.setFilter('fechaRegistroDesde', '2026-08-01');
-    component.setFilter('fechaRegistroHasta', '2026-08-31');
-    component.setFilter('fechaTourDesde', '2026-09-01');
-    component.setFilter('fechaTourHasta', '2026-09-30');
-    component.setFilter('fechaTour', '2026-09-04');
-    component.setFilter('codigoReserva', 'MK-A');
-    component.setFilter('categoria', '1');
-    component.setFilter('nombreReportante', 'Juan Pérez');
-    component.setFilter('nombreEntidad', 'Hotel Dann');
-    component.setFilter('nombrePasajero', 'Ana');
-    component.setFilter('documento', 'CC-1');
+  it('consulta origen unificado y sincroniza el tipo seleccionado en la URL', async () => {
+    component.setFilter('tipo', 'RESERVA');
     component.search();
-    expect(api.buscar.calls.mostRecent().args[0]).toEqual({
-      fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31',
-      fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-09-30', fechaTour: '2026-09-04',
-      codigoReserva: 'MK-A', categoria: '1', nombreReportante: 'Juan Pérez', nombreEntidad: 'Hotel Dann',
-      nombrePasajero: 'Ana', documento: 'CC-1',
-    });
-    expect(component.filterCount()).toBe(6);
-    component.changePage(2);
-    expect(api.buscar.calls.mostRecent().args[1]).toBe(2);
-    expect(api.buscar.calls.mostRecent().args[0].nombreEntidad).toBe('Hotel Dann');
-    component.setFilter('codigoReserva', 'MK-B');
-    component.search();
-    expect(api.buscar.calls.mostRecent().args[1]).toBe(1);
-  });
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-  it('mantiene filtros separados para persona y entidad reportante', () => {
-    component.setFilter('nombreReportante', 'Juan Pérez');
-    component.setFilter('nombreEntidad', 'Hotel Dann');
-    component.search();
-    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
-      nombreReportante: 'Juan Pérez', nombreEntidad: 'Hotel Dann',
+    expect(api.buscarOrigen).toHaveBeenCalledWith(jasmine.objectContaining({ tipo: 'RESERVA' }), 1, 25);
+    expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+      queryParams: jasmine.objectContaining({ tipo: 'RESERVA', vista: 'origen', consultar: '1' }),
+      queryParamsHandling: 'merge',
     }));
-    const html = fixture.nativeElement as HTMLElement;
-    expect(html.querySelector('#marketing-reporter')).not.toBeNull();
-    expect(html.querySelector('#marketing-entity')).not.toBeNull();
   });
 
-  it('usa el Id de una entidad seleccionada y conserva sus datos como pill aplicada', () => {
-    const entity = { Id_Entidad_Reportante: 19, Tipo: 'AGENCIA_NACIONAL' as const, Nombre: 'Agencia Norte',
-      Activo: 1, Estado_Validacion: 'VALIDADA' as const };
-    component.selectEntity(entity);
-    component.setFilter('nombreReportante', 'Juan Pérez');
-    component.search();
-    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
-      idEntidadReportante: '19', nombreEntidad: '', nombreReportante: 'Juan Pérez',
-    }));
-    expect(component.appliedEntity()?.Nombre).toBe('Agencia Norte');
-    expect(component.filterCount()).toBe(2);
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Entidad: Agencia Norte');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Reportó: Juan Pérez');
-  });
+  it('restaura Transfers desde la ruta anterior y ejecuta la consulta', async () => {
+    params.next(convertToParamMap({ tipo: 'Transfers', consultar: '1', vista: 'origen' }));
+    await fixture.whenStable();
 
-  it('aplica el período del tour, conserva el período de registro avanzado y valida rangos completos', () => {
-    component.setTourRange({ start: '2026-09-01', end: '2026-09-30' });
-    component.setRegistrationRange({ start: '2026-08-01', end: '2026-08-31' });
-    component.search();
-    expect(api.buscar.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
-      fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-09-30',
-      fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31',
-    }));
-    component.setTourRange({ start: '2026-09-01', end: null });
-    expect(component.rangeError).toContain('rango completo');
-    const previousCalls = api.buscar.calls.count();
-    component.search();
-    expect(api.buscar.calls.count()).toBe(previousCalls);
-  });
-
-  it('mantiene los resultados anteriores y muestra actualización/error en una consulta posterior', () => {
-    component.search();
-    fixture.detectChanges();
-    const response = new Subject<MercadeoPage>();
-    api.buscar.and.returnValue(response);
-    component.setFilter('nombreReportante', 'María');
-    component.search();
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Actualizando');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('MK-A');
-    response.error({ error: { message: 'Fallo de consulta' } });
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fallo de consulta');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Los resultados anteriores siguen disponibles.');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('MK-A');
-  });
-
-  it('limpia filtros/resultados y muestra estado vacío y error del backend', () => {
-    component.search();
-    component.clearFilters();
-    expect(component.filters().codigoReserva).toBe('');
-    expect(component.result()).toBeNull();
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Prepara tu consulta');
-    expect((fixture.nativeElement as HTMLElement).querySelector('app-query-empty-state')).not.toBeNull();
-
-    api.buscar.and.returnValue(of({ ...result, items: [], totalReservas: 0, totalPasajeros: 0 }));
-    component.search();
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sin resultados');
-
-    api.buscar.and.returnValue(throwError(() => ({ error: { message: 'Backend no disponible' } })));
-    component.search();
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Backend no disponible');
-  });
-
-  it('protege la ruta con el permiso granular de Mercadeo y rechaza acceso directo sin permiso', async () => {
-    const route = routes.find((item) => item.path === 'Mercadeo/Reservas');
-    expect(route?.data?.['permiso']).toBe('MERCADEO.RESERVAS.LEER');
-    expect(route?.title).toBe('Mercadeo');
-    expect(route?.canActivate).toBeTruthy();
-    const snapshot = route as unknown as ActivatedRouteSnapshot;
-    const state = { url: '/Mercadeo/Reservas' } as RouterStateSnapshot;
-    const allowed = await TestBed.runInInjectionContext(() => permisoGuard(snapshot, state));
-    expect(allowed).toBeTrue();
-    permissions.tieneAlgunPermiso.and.returnValue(false);
-    const denied = await TestBed.runInInjectionContext(() => permisoGuard(snapshot, state));
-    expect(denied instanceof UrlTree).toBeTrue();
-    expect(alerts.errorToast).toHaveBeenCalled();
+    expect(api.buscarOrigen).toHaveBeenCalledWith(jasmine.objectContaining({ tipo: 'TRANSFER' }), 1, 25);
+    expect(component.appliedFilters().tipo).toBe('TRANSFER');
   });
 });

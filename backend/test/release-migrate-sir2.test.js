@@ -75,7 +75,7 @@ test('migración Mercadeo idempotente por inspección de índice y sin cambios d
 
 test('migración de perfiles de comisión está en release y protege columnas y FKs', async () => {
   const name = '20261016_0015_perfiles_comision_entidad.sql';
-  assert.equal(MIGRATIONS.at(-1), name);
+  assert.ok(MIGRATIONS.includes(name));
   assert.deepEqual(REQUIRED_COLUMNS.tours, ['Creado_Por', 'Actualizado_Por']);
   assert.deepEqual(REQUIRED_COLUMNS.puntos, ['Creado_Por', 'Actualizado_Por']);
   assert.deepEqual(REQUIRED_COLUMNS.liquidaciones, ['Creado_Por', 'Actualizado_Por', 'Monto_Comision_Pagada']);
@@ -93,7 +93,7 @@ test('migración de perfiles de comisión está en release y protege columnas y 
     fkTable === table && fkName === constraint && onDelete === 'SET NULL'));
   assert.ok(REQUIRED_FKS.some(([table, fk, action]) =>
     table === 'perfiles_comision_entidad' && fk === 'fk_perfiles_comision_entidad' && action === 'RESTRICT'));
-  const migration = (await readMigrations()).at(-1);
+  const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   const profileTable = migration.statements.find(statement => statement.startsWith('CREATE TABLE IF NOT EXISTS perfiles_comision_entidad'));
   assert.ok(profileTable);
@@ -102,5 +102,39 @@ test('migración de perfiles de comisión está en release y protege columnas y 
   assert.doesNotMatch(profileTable, /Tipo_Beneficiario|Id_Canal|Nombre VARCHAR/);
   assert.ok(migration.statements.some(statement => statement.includes('Monto_Comision_Pagada')));
   assert.ok(migration.statements.some(statement => statement.includes('DECIMAL(10,0)')));
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
+test('migración nueva agrega el índice de actividad de transfers y queda sin aplicar', async () => {
+  const name = '20261020_0016_transfers_entidad_fecha_registro.sql';
+  assert.equal(MIGRATIONS[MIGRATIONS.length - 3], name);
+  const migration = (await readMigrations()).find(item => item.name === name);
+  assert.equal(migration.name, name);
+  assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE transfers ADD INDEX ix_transfers_entidad_registro (Id_Entidad_Reportante, Fecha_Registro)')));
+  assert.ok(migration.statements.some(statement => statement.includes('FROM information_schema.STATISTICS')));
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
+test('migración 0017 registra MERCADEO.EXPORTAR y su asignación por defecto sin aplicarla', async () => {
+  const name = '20261021_0017_mercadeo_exportar.sql';
+  assert.equal(MIGRATIONS.at(-2), name);
+  const migration = (await readMigrations()).find(item => item.name === name);
+  assert.equal(migration.name, name);
+  assert.ok(migration.statements.some(statement => statement.includes("'MERCADEO.EXPORTAR'")));
+  assert.ok(migration.statements.some(statement => /'mercadeo','administrador'/.test(statement)));
+  assert.ok(migration.statements.some(statement => statement.includes("VALUES ('CATALOGO',1,1)")));
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
+test('migración 0018 agrega marcas de rechazo y la regla de validación sin aplicar', async () => {
+  const name = '20261021_0018_entidades_reportantes_validacion.sql';
+  assert.equal(MIGRATIONS.at(-1), name);
+  const migration = (await readMigrations()).at(-1);
+  assert.equal(migration.name, name);
+  assert.ok(REQUIRED_COLUMNS.reservas.includes('Pendiente_Por_Entidad_En'));
+  assert.ok(REQUIRED_COLUMNS.transfers.includes('Pendiente_Por_Entidad_En'));
+  assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE reservas ADD COLUMN Pendiente_Por_Entidad_En')));
+  assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE transfers ADD COLUMN Pendiente_Por_Entidad_En')));
+  assert.ok(migration.statements.some(statement => statement.includes('ENTIDAD_REPORTANTE_PENDIENTE_VALIDACION')));
   assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
 });

@@ -1,6 +1,9 @@
 const {
   buscarReservasMercadeo,
   buscarTransfersMercadeo,
+  buscarOrigenReservas,
+  streamOrigenExcel,
+  buildOrigenFilters,
   obtenerCategoriasMercadeo,
   obtenerUsuariosMercadeo,
 } = require('../../services/Mercadeo/mercadeo.service');
@@ -30,6 +33,21 @@ exports.listarReservas = asyncHandler(async (req, res) =>
 
 exports.listarTransfers = asyncHandler(async (req, res) =>
   sendSuccess(res, await buscarTransfersMercadeo(req.query), 'Consulta de transfers de Mercadeo completada'));
+
+exports.listarOrigen = asyncHandler(async (req, res) =>
+  sendSuccess(res, await buscarOrigenReservas(req.query), 'Consulta de origen de reservas completada'));
+
+exports.exportarOrigen = async (req, res) => {
+  try {
+    buildOrigenFilters(req.query || {});
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="mercadeo-origen-detalle.xlsx"');
+    await streamOrigenExcel(req.query || {}, res);
+  } catch (error) {
+    if (res.headersSent) return res.destroy(error);
+    return sendError(res, error);
+  }
+};
 
 exports.listarCategorias = asyncHandler(async (_req, res) =>
   sendSuccess(res, await obtenerCategoriasMercadeo(), 'Categorías obtenidas'));

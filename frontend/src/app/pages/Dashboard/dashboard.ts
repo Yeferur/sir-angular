@@ -3,7 +3,7 @@ import { CommonModule }         from '@angular/common';
 import { Component, ViewChild, inject, OnInit, AfterViewInit, ChangeDetectorRef, OnDestroy, DestroyRef, ChangeDetectionStrategy, HostListener } from '@angular/core';
 import { FormsModule }          from '@angular/forms';
 import { forkJoin, finalize, catchError, of } from 'rxjs';
-import { DatepickerComponent } from '../../shared/datepicker/datepicker';
+import { SirDateRange, SirDateRangePickerComponent } from '../../shared/date-range-picker/date-range-picker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 
 import { DashboardService, DashboardFilters, TourOccupancy, DashboardOperational } from '../../services/Dashboard/Dashboard.service';
@@ -78,8 +78,28 @@ const APEX_EASING: 'easeout' = 'easeout';
 const COP = (v: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
 
-const COP_COMPACT = (v: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: 'compact', maximumFractionDigits: 1 }).format(v);
+const INCOME_COLORS = [
+  [C_BLUE, C_PURPLE, C_TEAL],
+  ['#62a8ff', '#c2a8ff', '#65ddcf'],
+  ['#1765c0', '#7559bd', '#168f82'],
+  ['#8bbdff', '#d5c5ff', '#8be6dc'],
+];
+
+function formatCurrencyValue(value: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+  } catch {
+    return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value);
+  }
+}
+
+function currencyFromSeriesName(name: string): string {
+  return name.match(/·\s*([A-Z]{3})$/)?.[1] || 'COP';
+}
+
+function compactNumber(value: number): string {
+  return new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
 
 function grid(showX = false, showY = true): any {
   return { borderColor: GRID, strokeDashArray: 3, padding: { left: 6, right: 10 }, xaxis: { lines: { show: showX } }, yaxis: { lines: { show: showY } } };
@@ -91,18 +111,16 @@ function axisStyle(): any {
 
 interface IncomeSeriesSet {
   categories: string[];
-  empresa: number[];
-  tours: number[];
-  transfers: number[];
+  series: Array<{ name: string; data: number[] }>;
 }
 
-const EMPTY_INCOME_SET: IncomeSeriesSet = { categories: [], empresa: [], tours: [], transfers: [] };
+const EMPTY_INCOME_SET: IncomeSeriesSet = { categories: [], series: [] };
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 @Component({
   selector:    'app-dashboard',
   standalone:  true,
-  imports:     [SirSelectComponent, CommonModule, NgApexchartsModule, FormsModule, DatepickerComponent, LoadingStateComponent],
+  imports:     [SirSelectComponent, CommonModule, NgApexchartsModule, FormsModule, SirDateRangePickerComponent, LoadingStateComponent],
   templateUrl: './dashboard.html',
   styleUrls:   ['./dashboard.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -159,6 +177,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Filtros ───────────────────────────────────────────────────────────────
   startDate  = '';
   endDate    = '';
+  reportPeriod: SirDateRange = { start: null, end: null };
   tours:      TourOption[] = [];
   selectedTourId: number | null = null;
   selectedReservationType: '' | 'Grupal' | 'Privada' = '';
@@ -251,6 +270,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.startDate = this.toDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
     this.endDate   = this.toDateStr(today);
     this.restoreFiltersFromUrl();
+    this.syncPickers();
     this.syncFiltersToUrl();
     this.initCharts();
     this.loadTours();
@@ -364,7 +384,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         labels: axisStyle(), axisBorder: { show: false }, axisTicks: { show: false },
         crosshairs: { stroke: { color: C_BLUE, width: 1, dashArray: 3 } }
       },
-      yaxis: { labels: { ...axisStyle(), formatter: COP_COMPACT } },
+      yaxis: { labels: { ...axisStyle(), formatter: compactNumber } },
       fill: {
         type: 'gradient',
         gradient: { shadeIntensity: .6, opacityFrom: .2, opacityTo: .015, stops: [0, 76, 100] }
@@ -375,7 +395,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         position: 'top', horizontalAlign: 'right', labels: { colors: AXIS },
         fontSize: '12px', fontFamily: FONT, markers: { size: 6 }
       },
-      tooltip: { theme: 'dark', style: { fontFamily: FONT }, y: { formatter: COP } },
+      tooltip: {
+        theme: 'dark', style: { fontFamily: FONT },
+        y: { formatter: (value: number, options: any) => formatCurrencyValue(value, currencyFromSeriesName(String(options?.w?.globals?.seriesNames?.[options.seriesIndex] || ''))) },
+      },
       markers: { size: 0, hover: { size: 5 } }
     };
 
@@ -802,16 +825,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.passportChartOptions = { ...this.passportChartOptions, labels: passportLabels, series: passportData };
     this.chartPassport?.updateOptions({ labels: passportLabels }, false, false);
     this.chartPassport?.updateSeries(passportData, true);
-    const tariffLabels = this.tariffRows.map((row) => String(row.tarifa || 'Sin tarifa'));
-    const tariffData = this.tariffRows.map((row) => Number(row.pasajeros || 0));
+    const passengersByTariff = new Map<string, number>();
+    for (const row of this.tariffRows) {
+      const label = String(row.tarifa || 'Sin tarifa');
+      passengersByTariff.set(label, (passengersByTariff.get(label) || 0) + Number(row.pasajeros || 0));
+    }
+    const tariffLabels = [...passengersByTariff.keys()];
+    const tariffData = [...passengersByTariff.values()];
     this.tariffChartOptions = { ...this.tariffChartOptions, xaxis: { ...this.tariffChartOptions.xaxis, categories: tariffLabels }, series: [{ name: 'Pasajeros', data: tariffData }] };
     this.chartTariff?.updateOptions({ xaxis: { ...this.tariffChartOptions.xaxis, categories: tariffLabels } }, false, false);
     this.chartTariff?.updateSeries(this.tariffChartOptions.series, true);
-    const channelLabels = this.channelFinancialRows.map((row) => String(row.canal || 'Sin canal'));
+    const channelLabels = this.channelFinancialRows.map((row) => `${String(row.canal || 'Sin canal')} · ${String(row.currency || 'COP')}`);
+    const financialCurrencyAt = (index: number): string => String(this.channelFinancialRows[index]?.currency || 'COP');
     this.channelFinancialChartOptions = { ...this.channelFinancialChartOptions, xaxis: { ...this.channelFinancialChartOptions.xaxis, categories: channelLabels }, series: [
       { name: 'Ingresos', data: this.channelFinancialRows.map((row) => Number(row.ingresos || 0)) },
       { name: 'Comisiones', data: this.channelFinancialRows.map((row) => Number(row.comisiones || 0)) }
-    ], tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false, y: { formatter: (v: number) => COP(v) } } };
+    ], yaxis: { ...this.channelFinancialChartOptions.yaxis, labels: { ...axisStyle(), formatter: compactNumber } }, tooltip: { theme: 'dark', style: { fontFamily: FONT }, shared: true, intersect: false, y: { formatter: (value: number, options: any) => formatCurrencyValue(value, financialCurrencyAt(Number(options?.dataPointIndex || 0))) } } };
     this.chartChannelFinancial?.updateOptions({ xaxis: { ...this.channelFinancialChartOptions.xaxis, categories: channelLabels } }, false, false);
     this.chartChannelFinancial?.updateSeries(this.channelFinancialChartOptions.series, true);
   }
@@ -821,29 +850,41 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.applyOperational(res.operational);
 
-    // 1. Ingresos — arma los dos sets (mensual/diario) y pinta el activo
-    const brutoArr = Array.isArray(res.income?.bruto) ? res.income.bruto : Array(12).fill(0);
-    const netoArr  = Array.isArray(res.income?.neto)  ? res.income.neto  : Array(12).fill(0);
-    const transferMonthlyArr = Array.isArray(res.income?.transfers) ? res.income.transfers : Array(12).fill(0);
-    const companyMonthlyArr = Array.isArray(res.income?.empresa) ? res.income.empresa : brutoArr.map((v: number, i: number) => v + Number(transferMonthlyArr[i] || 0));
-
+    // 1. Ingresos: conserva cada serie en su moneda, sin agregar divisas distintas.
+    const legacyIncome = res.income || {};
+    const monthlyCurrencies = Array.isArray(legacyIncome.financialByCurrency)
+      ? legacyIncome.financialByCurrency
+      : [{
+          currency: String(legacyIncome.currency || res.stats?.primaryCurrency || 'COP'),
+          bruto: Array.isArray(legacyIncome.bruto) ? legacyIncome.bruto : Array(12).fill(0),
+          neto: Array.isArray(legacyIncome.neto) ? legacyIncome.neto : Array(12).fill(0),
+          transfers: Array.isArray(legacyIncome.transfers) ? legacyIncome.transfers : Array(12).fill(0),
+          empresa: Array.isArray(legacyIncome.empresa) ? legacyIncome.empresa : Array(12).fill(0),
+        }];
     this.incomeMonthly = {
       categories: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
-      empresa: companyMonthlyArr,
-      tours: brutoArr,
-      transfers: transferMonthlyArr,
+      series: this.buildIncomeChartSeries(monthlyCurrencies),
     };
 
     const daily = Array.isArray(res.daily) ? res.daily : [];
-    const dailyBruto  = daily.map((d: any) => Number(d.bruto || 0));
-    const dailyTransfer = daily.map((d: any) => Number(d.transfer || 0));
-    const dailyCompany = daily.map((d: any) => Number(d.empresa || (Number(d.bruto || 0) + Number(d.transfer || 0))));
-
+    const dailyDates = [...new Set(daily.map((row: any) => String(row.fecha)))].sort();
+    const dailyCurrencyCodes: string[] = Array.from(new Set<string>(daily.map((row: any) => String(row.currency || res.stats?.primaryCurrency || 'COP')))).sort();
+    const dailyCurrencies = dailyCurrencyCodes.map((currency: string) => {
+      const rows = new Map(daily.filter((row: any) => String(row.currency || res.stats?.primaryCurrency || 'COP') === currency)
+        .map((row: any) => [String(row.fecha), row]));
+      const values = dailyDates.map((date) => rows.get(date) || {});
+      const bruto = values.map((row: any) => Number(row.bruto || 0));
+      const transfers = values.map((row: any) => Number(row.transfer || 0));
+      return {
+        currency,
+        bruto,
+        transfers,
+        empresa: values.map((row: any, index: number) => Number(row.empresa ?? (bruto[index] + transfers[index]))),
+      };
+    });
     this.incomeDaily = {
-      categories: daily.map((d: any) => this.fmtDate(d.fecha)),
-      empresa: dailyCompany,
-      tours: dailyBruto,
-      transfers: dailyTransfer,
+      categories: dailyDates.map((date) => this.fmtDate(date)),
+      series: this.buildIncomeChartSeries(dailyCurrencies),
     };
 
     this.applyIncomeGranularity(this.incomeGranularity);
@@ -851,7 +892,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // 2. Composición financiera (dos donuts)
     const hasCompanySplit = this.totalIngresos > 0 || this.transferRevenue > 0;
     const hasTourSplit = this.totalIngresosNetos > 0 || this.tourCommission > 0;
-    this.hasCompositionData = hasCompanySplit || hasTourSplit;
+    this.hasCompositionData = this.financialByCurrency.some((item) =>
+      Number(item.companyRevenue || 0) > 0 || Number(item.tourNetRevenue || 0) > 0 || Number(item.tourCommission || 0) > 0,
+    );
 
     const companySplitSeries = hasCompanySplit ? [this.totalIngresos, this.transferRevenue] : [];
     this.companySplitChartOptions = { ...this.companySplitChartOptions, series: companySplitSeries };
@@ -932,9 +975,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // 7. Reservas grupales vs. privadas
     const typeRows = Array.isArray(res.reservationTypes) ? res.reservationTypes : [];
     this.reservationTypeRows = typeRows;
-    const typeMap = new Map<string, any>(
-      typeRows.map((item: any): [string, any] => [String(item.tipo), item])
-    );
+    const typeMap = new Map<string, { reservas: number; pasajeros: number }>();
+    for (const item of typeRows) {
+      const type = String(item.tipo);
+      const current = typeMap.get(type) || { reservas: 0, pasajeros: 0 };
+      current.reservas += Number(item.reservas || 0);
+      current.pasajeros += Number(item.pasajeros || 0);
+      typeMap.set(type, current);
+    }
     const typeCategories = this.selectedReservationType
       ? [this.selectedReservationType === 'Grupal' ? 'Grupales' : 'Privadas']
       : ['Grupales', 'Privadas'];
@@ -984,22 +1032,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private applyIncomeGranularity(mode: IncomeGranularity): void {
     const set = mode === 'mensual' ? this.incomeMonthly : this.incomeDaily;
-    this.hasIncomeData = set.empresa.some((v) => v > 0);
-
-    const series = [
-      { name: 'Empresa', data: set.empresa },
-      { name: 'Tours', data: set.tours },
-      { name: 'Transfers', data: set.transfers },
-    ];
+    const series = set.series;
+    this.hasIncomeData = series.some((item) => item.data.some((value) => value > 0));
+    const colors = series.map((_item, index) => INCOME_COLORS[Math.floor(index / 3) % INCOME_COLORS.length][index % 3]);
+    const stroke = { ...this.incomeChartOptions.stroke, colors, width: series.map((_item, index) => index % 3 === 0 ? 3 : 2) };
 
     this.incomeChartOptions = {
       ...this.incomeChartOptions,
       xaxis: { ...this.incomeChartOptions.xaxis, categories: set.categories },
       series,
+      colors,
+      stroke,
     };
 
-    this.chartIncome?.updateOptions({ xaxis: { ...this.incomeChartOptions.xaxis, categories: set.categories } }, false, false);
+    this.chartIncome?.updateOptions({ xaxis: { ...this.incomeChartOptions.xaxis, categories: set.categories }, colors, stroke }, false, false);
     this.chartIncome?.updateSeries(series, true);
+  }
+
+  private buildIncomeChartSeries(currencyRows: Array<{ currency: string; empresa?: number[]; bruto?: number[]; transfers?: number[] }>): IncomeSeriesSet['series'] {
+    return currencyRows.flatMap((item) => {
+      const currency = String(item.currency || 'COP');
+      return [
+        { name: `Empresa · ${currency}`, data: item.empresa || [] },
+        { name: `Tours · ${currency}`, data: item.bruto || [] },
+        { name: `Transfers · ${currency}`, data: item.transfers || [] },
+      ];
+    });
   }
 
   private fmtDate(raw: any): string {
@@ -1073,16 +1131,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private syncPickers() {
+    const start = this.startDate || null;
+    const end = this.endDate || null;
+    if (this.reportPeriod.start !== start || this.reportPeriod.end !== end) {
+      this.reportPeriod = { start, end };
+    }
     this.cdr.markForCheck();
   }
 
-  onDateRangeChange(field: 'startDate' | 'endDate', value: string): void {
-    if (!value) return;
-    this[field] = value;
-    if (this.startDate && this.endDate && this.startDate > this.endDate) {
-      if (field === 'startDate') this.endDate = this.startDate;
-      else                       this.startDate = this.endDate;
-    }
+  onReportPeriodChange(range: SirDateRange): void {
+    if ((range.start && !range.end) || (!range.start && range.end)) return;
+    this.startDate = range.start || '';
+    this.endDate = range.end || '';
     this.syncPickers();
     this.scheduleRefresh();
   }
@@ -1132,15 +1192,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.totalReservas ? this.totalPasajeros / this.totalReservas : null;
   }
 
-  get avgIncomePerBooking(): number | null {
-    return this.totalReservas ? this.totalIngresos / this.totalReservas : null;
-  }
-
-  get marginPct(): number | null {
-    if (!this.totalIngresos) return null;
-    return ((this.totalIngresosNetos / this.totalIngresos) * 100);
-  }
-
   get travelRate(): number | null {
     const closedPassengers = this.totalViajaron + this.totalNoViajaron;
     return closedPassengers ? (this.totalViajaron / closedPassengers) * 100 : null;
@@ -1156,9 +1207,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return ((this.totalViajaron + this.totalNoViajaron) / this.totalPasajeros) * 100;
   }
 
-  get paymentCoverage(): number | null {
-    const expected = this.scheduledTourRevenue + this.transferRevenue;
-    return expected > 0 ? Math.min(100, (this.collectedRevenue / expected) * 100) : null;
+  currencyPaymentCoverage(item: any): number | null {
+    const expected = Number(item?.scheduledTours || 0) + Number(item?.transferRevenue || 0);
+    return expected > 0 ? Math.min(100, (Number(item?.collectedTotal || 0) / expected) * 100) : null;
   }
 
   get companyRevenueComparison(): number | null {
@@ -1178,19 +1229,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get groupReservations(): number {
-    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Grupales')?.reservas || 0);
+    return this.reservationTypeRows.filter((item) => item.tipo === 'Grupales').reduce((total, item) => total + Number(item.reservas || 0), 0);
   }
 
   get privateReservations(): number {
-    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Privadas')?.reservas || 0);
+    return this.reservationTypeRows.filter((item) => item.tipo === 'Privadas').reduce((total, item) => total + Number(item.reservas || 0), 0);
   }
 
   get groupPassengers(): number {
-    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Grupales')?.pasajeros || 0);
+    return this.reservationTypeRows.filter((item) => item.tipo === 'Grupales').reduce((total, item) => total + Number(item.pasajeros || 0), 0);
   }
 
   get privatePassengers(): number {
-    return Number(this.reservationTypeRows.find((item) => item.tipo === 'Privadas')?.pasajeros || 0);
+    return this.reservationTypeRows.filter((item) => item.tipo === 'Privadas').reduce((total, item) => total + Number(item.pasajeros || 0), 0);
   }
 
   get planPassengerTotal(): number {
@@ -1246,6 +1297,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const stats = response.stats || {};
     const operation = response.operational || {};
     const n = (value: unknown): number => Number(value || 0);
+    const currencySummaryRows: any[][] = (Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency : []).flatMap((row: any) => [
+      ['Ingresos de empresa', n(row.companyRevenue), row.currency, 'Tours y transfers'],
+      ['Neto de tours', n(row.tourNetRevenue), row.currency, 'Después de comisiones'],
+      ['Ingresos de transfers', n(row.transferRevenue), row.currency, 'Transfers del periodo'],
+      ['Comisiones de tours', n(row.tourCommission), row.currency, 'Comisiones registradas'],
+      ['Recaudo registrado', n(row.collectedTotal), row.currency, 'Pagos registrados'],
+      ['Pendiente por recaudar', n(row.pendingCollection), row.currency, 'Saldo pendiente'],
+    ]);
     const workbook = new ExcelJS.Workbook();
     const scope = this.selectedTourId ? this.tourLabel : 'Todos los tours';
     const reservationType = this.selectedReservationType || 'Grupales y privadas';
@@ -1284,23 +1343,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       ['Pasajeros que viajaron', n(stats.totalViajaron), 'pasajeros', 'Confirmación individual'],
       ['Pasajeros que no viajaron', n(stats.totalNoViajaron), 'pasajeros', 'Confirmación individual'],
       ['Pasajeros pendientes', n(stats.totalPendientes), 'pasajeros', 'Sin confirmación final'],
-      ['Ingresos de empresa', n(stats.companyRevenue), this.primaryCurrency, 'Tours y transfers'],
-      ['Neto de tours', n(stats.totalIngresosNetos), this.primaryCurrency, 'Después de comisiones'],
-      ['Ingresos de transfers', n(stats.transferRevenue), this.primaryCurrency, 'Transfers del periodo'],
-      ['Comisiones de tours', n(stats.tourCommission), this.primaryCurrency, 'Comisiones registradas'],
-      ['Recaudo registrado', n(stats.collectedRevenue), this.primaryCurrency, 'Pagos registrados'],
-      ['Pendiente por recaudar', n(stats.pendingCollection), this.primaryCurrency, 'Saldo pendiente'], [], ['ESTADO DE RESERVAS'],
+      ...currencySummaryRows, [], ['ESTADO DE RESERVAS'],
       ['Estado', 'Cantidad'], ...(Array.isArray(stats.reservationStatuses) ? stats.reservationStatuses.map((row: any) => [row.estado, n(row.cantidad)]) : []), [], ['RESERVAS POR TIPO'],
-      ['Tipo', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'], ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
-    ], [34, 20, 18, 42], 6);
+      ['Tipo', 'Moneda', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'], ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, row.currency, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
+    ], [26, 12, 14, 14, 20, 20], 6);
 
     addSheet('Pasajeros', [
       ['PASAJEROS Y ASISTENCIA'], ['Fecha', 'Tour', 'Pasajeros registrados'], ...(Array.isArray(response.dailyPax) ? response.dailyPax.map((row: any) => [row.fecha, row.tour, n(row.pasajeros)]) : []), [], ['CONFIRMACIÓN DE VIAJE'], ['Estado', 'Cantidad'], ...(Array.isArray(response.attendance) ? response.attendance.map((row: any) => [row.estado, n(row.cantidad)]) : []), [], ['COMPOSICIÓN POR EDAD'], ['Tipo', 'Cantidad'], ...(Array.isArray(stats.passengerAge) ? stats.passengerAge.map((row: any) => [row.tipo, n(row.cantidad)]) : []), [], ['IDIOMAS'], ['Idioma', 'Registrados', 'Viajaron'], ...(Array.isArray(operation.idiomas) ? operation.idiomas.map((row: any) => [row.idioma, n(row.registrados), n(row.viajaron)]) : []), [], ['PUNTOS DE ENCUENTRO'], ['Punto', 'Registrados', 'Viajaron'], ...(Array.isArray(operation.puntos) ? operation.puntos.map((row: any) => [row.punto, n(row.registrados), n(row.viajaron)]) : []),
     ], [28, 32, 22], 2);
 
     addSheet('Ingresos', [
-      ['INGRESOS Y RECAUDO'], ['Fecha', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'], ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []), [], ['INGRESOS POR CANAL'], ['Canal', 'Viajaron', 'Ingresos', 'Comisiones'], ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []), [], ['TARIFAS'], ['Tarifa', 'Pasajeros', 'Ingresos'], ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, n(row.pasajeros), n(row.ingresos)]) : []),
-    ], [24, 20, 20, 18, 18], 2);
+      ['INGRESOS Y RECAUDO'], ['Fecha', 'Moneda', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'], ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, row.currency, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []), [], ['INGRESOS POR CANAL'], ['Canal', 'Moneda', 'Viajaron', 'Ingresos', 'Comisiones'], ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, row.currency, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []), [], ['TARIFAS'], ['Tarifa', 'Moneda', 'Pasajeros', 'Ingresos'], ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, row.currency, n(row.pasajeros), n(row.ingresos)]) : []), [], ['INGRESOS POR MONEDA'], ['Moneda', 'Tours brutos', 'Comisiones', 'Neto tours', 'Transfers', 'Empresa', 'Recaudado', 'Pendiente'], ...(Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency.map((row: any) => [row.currency, n(row.tourRevenue), n(row.tourCommission), n(row.tourNetRevenue), n(row.transferRevenue), n(row.companyRevenue), n(row.collectedTotal), n(row.pendingCollection)]) : []),
+    ], [18, 14, 18, 18, 18, 18, 18, 18], 2);
 
     const operationRows: any[][] = [['OPERACIÓN Y SEGUIMIENTO'], ['INASISTENCIA POR CANAL'], ['Canal', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'], ...(Array.isArray(operation.inasistenciaCanal) ? operation.inasistenciaCanal.map((row: any) => [row.canal, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : []), [], ['INASISTENCIA POR TOUR'], ['Tour', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'], ...(Array.isArray(operation.inasistenciaTour) ? operation.inasistenciaTour.map((row: any) => [row.tour, n(row.programados), n(row.viajaron), n(row.noViajaron), n(row.pendientes)]) : [])];
     if (this.isNapolesScope && Array.isArray(operation.pasaportes) && operation.pasaportes.length) operationRows.push([], ['PASAPORTES HACIENDA NÁPOLES'], ['Plan', 'Pasajeros'], ...operation.pasaportes.map((row: any) => [row.plan, n(row.pasajeros)]));
@@ -1360,6 +1414,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const stats = response.stats || {};
     const operation = response.operational || {};
     const n = (value: unknown): number => Number(value || 0);
+    const currencySummaryRows: any[][] = (Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency : []).flatMap((row: any) => [
+      ['Ingresos de empresa', n(row.companyRevenue), row.currency, 'Tours y transfers'],
+      ['Neto de tours', n(row.tourNetRevenue), row.currency, 'Después de comisiones'],
+      ['Ingresos de transfers', n(row.transferRevenue), row.currency, 'Transfers del periodo'],
+      ['Comisiones de tours', n(row.tourCommission), row.currency, 'Comisiones registradas'],
+      ['Recaudo registrado', n(row.collectedTotal), row.currency, 'Pagos registrados'],
+      ['Pendiente por recaudar', n(row.pendingCollection), row.currency, 'Saldo pendiente'],
+    ]);
     const workbook = XLSX.utils.book_new();
     const scope = this.selectedTourId ? this.tourLabel : 'Todos los tours';
     const reservationType = this.selectedReservationType || 'Grupales y privadas';
@@ -1384,21 +1446,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       ['Pasajeros que viajaron', n(stats.totalViajaron), 'pasajeros', 'Confirmación individual'],
       ['Pasajeros que no viajaron', n(stats.totalNoViajaron), 'pasajeros', 'Confirmación individual'],
       ['Pasajeros pendientes', n(stats.totalPendientes), 'pasajeros', 'Sin confirmación final'],
-      ['Ingresos de empresa', n(stats.companyRevenue), this.primaryCurrency, 'Tours y transfers'],
-      ['Neto de tours', n(stats.totalIngresosNetos), this.primaryCurrency, 'Después de comisiones'],
-      ['Ingresos de transfers', n(stats.transferRevenue), this.primaryCurrency, 'Transfers del periodo'],
-      ['Comisiones de tours', n(stats.tourCommission), this.primaryCurrency, 'Comisiones registradas'],
-      ['Recaudo registrado', n(stats.collectedRevenue), this.primaryCurrency, 'Pagos registrados'],
-      ['Pendiente por recaudar', n(stats.pendingCollection), this.primaryCurrency, 'Saldo pendiente'],
+      ...currencySummaryRows,
       [],
       ['ESTADO DE RESERVAS'],
       ['Estado', 'Cantidad'],
       ...(Array.isArray(stats.reservationStatuses) ? stats.reservationStatuses.map((row: any) => [row.estado, n(row.cantidad)]) : []),
       [],
       ['RESERVAS POR TIPO'],
-      ['Tipo', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'],
-      ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
-    ], [34, 20, 18, 42], 6);
+      ['Tipo', 'Moneda', 'Reservas', 'Pasajeros', 'Ingresos brutos', 'Ingresos netos'],
+      ...(Array.isArray(response.reservationTypes) ? response.reservationTypes.map((row: any) => [row.tipo, row.currency, n(row.reservas), n(row.pasajeros), n(row.bruto), n(row.neto)]) : []),
+    ], [34, 20, 18, 42, 20, 20], 6);
 
     addSheet('Pasajeros', [
       ['PASAJEROS Y ASISTENCIA'],
@@ -1415,15 +1472,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ], [28, 32, 22], 2);
 
     addSheet('Ingresos', [
-      ['INGRESOS Y RECAUDO'], ['Fecha', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'],
-      ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []),
-      [], ['INGRESOS POR CANAL'], ['Canal', 'Viajaron', 'Ingresos', 'Comisiones'],
-      ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []),
-      [], ['TARIFAS'], ['Tarifa', 'Pasajeros', 'Ingresos'],
-      ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, n(row.pasajeros), n(row.ingresos)]) : []),
-      [], ['INGRESOS POR MONEDA'], ['Moneda', 'Ingresos tours', 'Comisiones', 'Neto tours', 'Transfers', 'Empresa'],
-      ...(Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency.map((row: any) => [row.currency, n(row.tourRevenue), n(row.tourCommission), n(row.tourNetRevenue), n(row.transferRevenue), n(row.companyRevenue)]) : []),
-    ], [24, 20, 20, 18, 18, 18], 2);
+      ['INGRESOS Y RECAUDO'], ['Fecha', 'Moneda', 'Ingresos brutos', 'Ingresos netos', 'Transfers', 'Empresa'],
+      ...(Array.isArray(response.daily) ? response.daily.map((row: any) => [row.fecha, row.currency, n(row.bruto), n(row.neto), n(row.transfer), n(row.empresa)]) : []),
+      [], ['INGRESOS POR CANAL'], ['Canal', 'Moneda', 'Viajaron', 'Ingresos', 'Comisiones'],
+      ...(Array.isArray(operation.canalFinanciero) ? operation.canalFinanciero.map((row: any) => [row.canal, row.currency, n(row.viajaron), n(row.ingresos), n(row.comisiones)]) : []),
+      [], ['TARIFAS'], ['Tarifa', 'Moneda', 'Pasajeros', 'Ingresos'],
+      ...(Array.isArray(operation.tarifas) ? operation.tarifas.map((row: any) => [row.tarifa, row.currency, n(row.pasajeros), n(row.ingresos)]) : []),
+      [], ['INGRESOS POR MONEDA'], ['Moneda', 'Ingresos tours', 'Comisiones', 'Neto tours', 'Transfers', 'Empresa', 'Recaudado', 'Pendiente'],
+      ...(Array.isArray(stats.financialByCurrency) ? stats.financialByCurrency.map((row: any) => [row.currency, n(row.tourRevenue), n(row.tourCommission), n(row.tourNetRevenue), n(row.transferRevenue), n(row.companyRevenue), n(row.collectedTotal), n(row.pendingCollection)]) : []),
+    ], [18, 14, 18, 18, 18, 18, 18, 18], 2);
 
     const operationRows: any[][] = [
       ['OPERACIÓN Y SEGUIMIENTO'], ['INASISTENCIA POR CANAL'], ['Canal', 'Programados', 'Viajaron', 'No viajaron', 'Pendientes'],

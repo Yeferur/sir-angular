@@ -15,11 +15,14 @@ registerLocaleData(localeEsCO);
 const page: PaginaEntidades = {
   page: 1, pageSize: 25, totalPages: 1, total: 1,
   summary: { Total_Entidades: 1, Con_Reservas: 1, Sin_Reservas: 0,
-    Pendientes: 1, Total_Reservas: 2, Total_Pasajeros: 3 },
+    Con_Actividad: 1, Sin_Actividad: 0, Pendientes: 1, Total_Reservas: 2,
+    Total_Transfers: 0, Total_Operaciones: 2, Total_Pasajeros: 3 },
   items: [{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL', Nombre: 'Hotel Niño', Activo: 1,
     Estado_Validacion: 'PENDIENTE_VALIDACION', Fecha_Creacion: '2026-10-13', Reservas: 2,
-    Pasajeros: 3, Primera_Actividad: '2026-10-01', Ultima_Actividad: '2026-10-13',
+    Transfers: 0, Operaciones: 2, Pasajeros: 3, Primera_Reserva: null, Ultima_Reserva: null,
+    Dias_Sin_Reportar: null, Primera_Actividad: null, Ultima_Actividad: null,
     Contacto_Reciente: 'Andrea' }],
+  umbralDiasSinReportar: 90, ordenarPor: 'nombre', orden: 'ASC',
 };
 
 describe('MercadeoEntidadesComponent', () => {
@@ -34,9 +37,10 @@ describe('MercadeoEntidadesComponent', () => {
     api.activity.and.returnValue(of(page));
     api.detail.and.returnValue(of({
       entity: { ...page.items[0], Creado_Por: 1, Creador: 'Mercadeo' },
-      historic: { Reservas: 2, Pasajeros: 3, Primera_Actividad: '2026-10-01',
-        Ultima_Actividad: '2026-10-13' },
-      period: { Reservas: 2, Pasajeros: 3 }, contacts: [{ Nombre: 'Andrea', Telefono: '300',
+      historic: { Reservas: 2, Transfers: 0, Operaciones: 2, Pasajeros: 3,
+        Primera_Reserva: null, Ultima_Reserva: null, Dias_Sin_Reportar: null,
+        Primera_Actividad: null, Ultima_Actividad: null },
+      period: { Reservas: 2, Transfers: 0, Operaciones: 2, Pasajeros: 3 }, contacts: [{ Nombre: 'Andrea', Telefono: '300',
         Reservas: 2, Ultimo_Reporte: '2026-10-13' }],
       observed: [{ Id_Punto: 4, Nombre_Punto: '47 Street', Reservas: 2 }],
       associated: [{ Id_Punto: 5, Nombre_Punto: 'Hotel Niño', Estado_Validacion: 'VALIDADA' }],
@@ -90,10 +94,11 @@ describe('MercadeoEntidadesComponent', () => {
     expect(html).toContain('Puntos asociados oficialmente');
   });
 
-  it('protege la ruta de entidades con el permiso granular', () => {
-    const route = routes.find(item => item.path === 'Mercadeo/Entidades');
-    expect(route?.data?.['permiso']).toBe('ENTIDADES_REPORTANTES.LEER');
+  it('expone una ruta unificada protegida por cualquiera de los permisos de sus pestañas', () => {
+    const route = routes.find(item => item.path === 'Mercadeo');
+    expect(route?.data?.['permisos']).toEqual(['ENTIDADES_REPORTANTES.LEER', 'MERCADEO.RESERVAS.LEER']);
     expect(route?.canActivate).toBeTruthy();
+    expect(routes.find(item => item.path === 'Mercadeo/Entidades')?.data?.['mercadeoLegacyTab']).toBe('entidades');
   });
 
   it('advierte un nombre normalizado existente y no lo crea de nuevo', async () => {
@@ -113,8 +118,11 @@ describe('MercadeoEntidadesComponent', () => {
     buscarPuntos.and.returnValue(of([point]));
     api.create.and.returnValue(of({
       entity: { ...page.items[0], Creado_Por: 1, Creador: 'Mercadeo' },
-      historic: { Reservas: 0, Pasajeros: 0, Primera_Actividad: null, Ultima_Actividad: null },
-      period: { Reservas: 0, Pasajeros: 0 }, contacts: [], observed: [], associated: [],
+      historic: { Reservas: 0, Transfers: 0, Operaciones: 0, Pasajeros: 0,
+        Primera_Reserva: null, Ultima_Reserva: null, Dias_Sin_Reportar: null,
+        Primera_Actividad: null, Ultima_Actividad: null },
+      period: { Reservas: 0, Transfers: 0, Operaciones: 0, Pasajeros: 0 },
+      contacts: [], observed: [], associated: [],
     }));
     api.point.and.returnValue(of({}));
     component.startCreate();

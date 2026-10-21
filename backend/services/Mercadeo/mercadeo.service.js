@@ -1,6 +1,7 @@
 const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const { searchKey } = require('../EntidadesReportantes/entidades-reportantes.service');
+const ExcelJS = require('exceljs');
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -70,6 +71,174 @@ function buildFilters(query = {}) {
 function paginationValue(value, fallback, max) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? Math.min(n, max) : fallback;
+}
+
+const ORIGEN_COLLATION = 'utf8mb4_unicode_ci';
+
+function collatedText(expression) {
+  return `CONVERT(${expression} USING utf8mb4) COLLATE ${ORIGEN_COLLATION}`;
+}
+
+function normalizeOrigenType(value) {
+  const raw = String(value || '').trim().toLocaleUpperCase('es-CO');
+  if (!raw || ['TODOS', 'TODO', 'ALL'].includes(raw)) return 'TODOS';
+  if (['RESERVA', 'RESERVAS'].includes(raw)) return 'RESERVA';
+  if (['TRANSFER', 'TRANSFERS'].includes(raw)) return 'TRANSFER';
+  throw Object.assign(new Error('Selecciona un tipo válido.'), { status: 400, errorCode: 'OPERATION_TYPE_INVALID' });
+}
+
+const ORIGEN_STATES = Object.freeze([
+  'Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Confirmada', 'Confirmado',
+  'Completada', 'Completado', 'Cancelada', 'Cancelado', 'Activo', 'Activa',
+]);
+
+function normalizeOrigenStatus(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLocaleLowerCase('es-CO');
+  const state = ORIGEN_STATES.find(item => item.toLocaleLowerCase('es-CO') === normalized);
+  if (!state) throw Object.assign(new Error('Selecciona un estado válido.'), { status: 400, errorCode: 'OPERATION_STATE_INVALID' });
+  return state;
+}
+
+function buildOrigenFilters(query = {}) {
+  const conditions = [];
+  const values = [];
+  const dateFrom = validDate(query.fechaRegistroDesde);
+  const dateTo = validDate(query.fechaRegistroHasta);
+  if ((query.fechaRegistroDesde || query.fechaRegistroHasta) && (!dateFrom || !dateTo || dateFrom > dateTo)) {
+    throw Object.assign(new Error('Selecciona un rango de creación completo y válido.'), { status: 400, errorCode: 'DATE_RANGE_INVALID' });
+  }
+  if (dateFrom && (Date.parse(dateTo) - Date.parse(dateFrom)) / 86400000 > 30) {
+    throw Object.assign(new Error('El rango máximo es de 31 días calendario.'), { status: 400, errorCode: 'DATE_RANGE_TOO_LONG' });
+  }
+  const serviceDate = validDate(query.fechaTour);
+  const type = normalizeOrigenType(query.tipo);
+  const rawEntityId = String(query.idEntidadReportante || '').trim();
+  let entityId = null;
+  if (rawEntityId) {
+    if (!/^\d+$/.test(rawEntityId) || !Number.isSafeInteger(Number(rawEntityId)) || Number(rawEntityId) < 1) {
+      throw Object.assign(new Error('Identificador de entidad reportante no válido.'), { status: 400, errorCode: 'ENTITY_ID_INVALID' });
+    }
+    entityId = Number(rawEntityId);
+  }
+  const category = Number(query.categoria);
+  const creatorIds = parseCreatorIds(query.creadorIds);
+  const state = normalizeOrigenStatus(query.estado);
+
+  if (type !== 'TODOS') { conditions.push('ops.tipo = ?'); values.push(type); }
+  if (dateFrom) { conditions.push('ops.fecha_registro >= ?'); values.push(`${dateFrom} 00:00:00`); }
+  if (dateTo) { conditions.push('ops.fecha_registro < DATE_ADD(?, INTERVAL 1 DAY)'); values.push(dateTo); }
+  if (serviceDate) { conditions.push('ops.fecha_servicio = ?'); values.push(serviceDate); }
+  if (Number.isSafeInteger(category) && category > 0) { conditions.push('ops.id_canal = ?'); values.push(category); }
+  if (entityId !== null) { conditions.push('ops.id_entidad_reportante = ?'); values.push(entityId); }
+  if (creatorIds.length) {
+    conditions.push(`ops.creador_id IN (${creatorIds.map(() => '?').join(',')})`);
+    values.push(...creatorIds);
+  }
+  if (state) { conditions.push('ops.estado = ?'); values.push(state); }
+  return { type, state, where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', values, entityId, creatorIds };
+}
+
+function origenUnionSql() {
+  const textNull = collatedText('NULL');
+  return `SELECT ${collatedText("'RESERVA'")} AS tipo,
+      ${collatedText('CAST(r.Id_Reserva AS CHAR)')} AS id_operacion,
+      ${collatedText('r.Id_Reserva')} AS id_reserva,
+      CAST(NULL AS UNSIGNED) AS id_transfer,
+      r.Fecha_Registro AS fecha_registro, r.Fecha_Tour AS fecha_servicio,
+      r.Id_Canal AS id_canal, ${collatedText('c.Nombre_Canal')} AS canal,
+      r.Id_Entidad_Reportante AS id_entidad_reportante,
+      ${collatedText('er.Nombre')} AS entidad, ${collatedText('er.Tipo')} AS tipo_entidad,
+      ${collatedText('r.Nombre_Reportante')} AS nombre_reportante,
+      ${collatedText('r.Telefono_Reportante')} AS telefono_reportante,
+      r.Creado_Por AS creador_id, ${collatedText('u.Nombres_Apellidos')} AS creador,
+      CAST(NULL AS UNSIGNED) AS pasajeros, ${collatedText('r.Estado')} AS estado,
+      r.Pendiente_Por_Entidad_En AS pendiente_por_entidad_en
+    FROM ${reservasOperativasSource('r')}
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
+    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN usuarios u ON u.Id_Usuario = r.Creado_Por
+  UNION ALL
+  SELECT ${collatedText("'TRANSFER'")} AS tipo,
+      ${collatedText('CAST(tr.Id_Transfer AS CHAR)')} AS id_operacion,
+      ${textNull} AS id_reserva, tr.Id_Transfer AS id_transfer,
+      tr.Fecha_Registro AS fecha_registro, tr.Fecha_Transfer AS fecha_servicio,
+      tr.Id_Canal AS id_canal, ${collatedText('c.Nombre_Canal')} AS canal,
+      tr.Id_Entidad_Reportante AS id_entidad_reportante,
+      ${collatedText('er.Nombre')} AS entidad, ${collatedText('er.Tipo')} AS tipo_entidad,
+      ${collatedText('tr.Nombre_Reportante')} AS nombre_reportante,
+      ${collatedText('tr.Telefono_Reportante')} AS telefono_reportante,
+      tr.Creado_Por AS creador_id, ${collatedText('u.Nombres_Apellidos')} AS creador,
+      tr.Cantidad_Personas AS pasajeros, ${collatedText('tr.Estado')} AS estado,
+      tr.Pendiente_Por_Entidad_En AS pendiente_por_entidad_en
+    FROM transfers tr
+    LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
+    LEFT JOIN canales_reservas c ON c.Id_Canal = tr.Id_Canal
+    LEFT JOIN usuarios u ON u.Id_Usuario = tr.Creado_Por`;
+}
+
+function origenFromSql(filters) {
+  return `FROM (${origenUnionSql()}) ops ${filters.where}`;
+}
+
+function sortOrigenSql() {
+  return `ops.fecha_registro DESC, ops.tipo COLLATE ${ORIGEN_COLLATION} ASC,
+    CASE WHEN ops.id_transfer IS NOT NULL THEN ops.id_transfer END DESC,
+    CASE WHEN ops.id_reserva IS NOT NULL THEN ops.id_reserva COLLATE ${ORIGEN_COLLATION} END DESC`;
+}
+
+async function buscarOrigenReservas(query = {}) {
+  const filters = buildOrigenFilters(query);
+  const pageSize = paginationValue(query.pageSize, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const requestedPage = paginationValue(query.page, 1, Number.MAX_SAFE_INTEGER);
+  const from = origenFromSql(filters);
+  const [[summary]] = await db.query(`SELECT COUNT(*) AS totalOperaciones ${from}`, filters.values);
+  const totalOperaciones = Number(summary?.totalOperaciones || 0);
+  const totalPages = Math.max(1, Math.ceil(totalOperaciones / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * pageSize;
+  const [items] = await db.query(`SELECT ops.* ${from}
+    ORDER BY ${sortOrigenSql()} LIMIT ? OFFSET ?`, [...filters.values, pageSize, offset]);
+
+  const reservationIds = items.filter(item => item.tipo === 'RESERVA').map(item => item.id_reserva);
+  if (reservationIds.length) {
+    const [passengerRows] = await db.query(`SELECT Id_Reserva, COUNT(*) AS cantidad
+      FROM pasajeros WHERE Id_Reserva IN (${reservationIds.map(() => '?').join(',')})
+      GROUP BY Id_Reserva`, reservationIds);
+    const counts = new Map(passengerRows.map(row => [String(row.Id_Reserva), Number(row.cantidad || 0)]));
+    for (const item of items) if (item.tipo === 'RESERVA') item.pasajeros = counts.get(String(item.id_reserva)) || 0;
+  }
+  for (const item of items) item.pasajeros = Number(item.pasajeros || 0);
+  const pasajerosPagina = items.reduce((sum, item) => sum + Number(item.pasajeros || 0), 0);
+  return { items, page, pageSize, totalPages, totalOperaciones, totalPasajeros: pasajerosPagina,
+    totalPasajerosEnPagina: pasajerosPagina, tipo: filters.type };
+}
+
+async function streamOrigenExcel(query = {}, output) {
+  let page = 1;
+  const pageSize = MAX_PAGE_SIZE;
+  let result = await buscarOrigenReservas({ ...query, page, pageSize });
+  const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: output, useStyles: true, useSharedStrings: true });
+  const sheet = workbook.addWorksheet('Origen de reservas');
+  sheet.columns = [
+    { header: 'Tipo', key: 'tipo', width: 14 }, { header: 'ID de operación', key: 'id_operacion', width: 22 },
+    { header: 'Fecha de creación', key: 'fecha_registro', width: 22 }, { header: 'Fecha de servicio', key: 'fecha_servicio', width: 19 },
+    { header: 'Canal', key: 'canal', width: 25 }, { header: 'Entidad reportante', key: 'entidad', width: 34 },
+    { header: 'Tipo de entidad', key: 'tipo_entidad', width: 25 }, { header: 'Quién reportó', key: 'nombre_reportante', width: 30 },
+    { header: 'Teléfono', key: 'telefono_reportante', width: 20 }, { header: 'Usuario creador', key: 'creador', width: 30 },
+    { header: 'Pasajeros', key: 'pasajeros', width: 14 }, { header: 'Estado', key: 'estado', width: 22 },
+    { header: 'Pendiente por entidad desde', key: 'pendiente_por_entidad_en', width: 26 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  while (true) {
+    for (const item of result.items) sheet.addRow(item).commit();
+    if (page >= result.totalPages) break;
+    page += 1;
+    result = await buscarOrigenReservas({ ...query, page, pageSize });
+  }
+  sheet.commit();
+  await workbook.commit();
 }
 
 async function buscarReservasMercadeo(query = {}) {
@@ -227,4 +396,5 @@ async function obtenerUsuariosMercadeo() {
 }
 
 module.exports = { buscarReservasMercadeo, buscarTransfersMercadeo, obtenerCategoriasMercadeo,
-  obtenerUsuariosMercadeo, buildFilters, buildTransferFilters };
+  buscarOrigenReservas, streamOrigenExcel, obtenerCategoriasMercadeo, obtenerUsuariosMercadeo, buildFilters,
+  buildTransferFilters, buildOrigenFilters, normalizeOrigenType, normalizeOrigenStatus, origenUnionSql };

@@ -217,6 +217,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
     if (!currencies.has(currency)) {
       currencies.set(currency, {
         currency,
+        reservations: 0,
         scheduledTours: 0,
         tourRevenue: 0,
         tourCommission: 0,
@@ -243,6 +244,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
   let pendingJourneys = 0;
   for (const row of reservationResult[0] || []) {
     const target = ensureCurrency(row.Moneda);
+    target.reservations += Number(row.Reservas || 0);
     target.scheduledTours += Number(row.Programado || 0);
     target.tourRevenue += Number(row.Ingreso_Tours || 0);
     target.tourCommission += Number(row.Comisiones || 0);
@@ -275,6 +277,7 @@ async function getDashboardStatsSnapshot(filters = {}) {
     target.collectedAbonos += Number(row.Abonos || 0);
   }
 
+  if (!currencies.size) ensureCurrency('COP');
   const financialByCurrency = Array.from(currencies.values()).map((item) => {
     item.tourNetRevenue = item.tourRevenue - item.tourCommission;
     item.companyRevenue = item.tourRevenue + item.transferRevenue;
@@ -330,6 +333,9 @@ async function getDashboardStatsSvc(filters = {}) {
   const previousClosed = Number(previousStats?.totalViajaron || 0) + Number(previousStats?.totalNoViajaron || 0);
   const currentTravelRate = currentClosed ? (current.totalViajaron / currentClosed) * 100 : null;
   const previousTravelRate = previousClosed ? (previousStats.totalViajaron / previousClosed) * 100 : null;
+  const comparableRevenueCurrency = current.financialByCurrency.length === 1
+    && previousStats?.financialByCurrency?.length === 1
+    && current.primaryCurrency === previousStats.primaryCurrency;
 
   return {
     ...current,
@@ -337,8 +343,8 @@ async function getDashboardStatsSvc(filters = {}) {
       period: previous,
       reservationsPct: percentageChange(current.totalReservas, previousStats.totalReservas),
       passengersPct: percentageChange(current.totalPasajeros, previousStats.totalPasajeros),
-      companyRevenuePct: percentageChange(current.companyRevenue, previousStats.companyRevenue),
-      transferRevenuePct: percentageChange(current.transferRevenue, previousStats.transferRevenue),
+      companyRevenuePct: comparableRevenueCurrency ? percentageChange(current.companyRevenue, previousStats.companyRevenue) : null,
+      transferRevenuePct: comparableRevenueCurrency ? percentageChange(current.transferRevenue, previousStats.transferRevenue) : null,
       travelRateDelta: currentTravelRate === null || previousTravelRate === null
         ? null
         : currentTravelRate - previousTravelRate,
@@ -354,6 +360,7 @@ async function getIncomeHistorySvc(year, filters = {}) {
 
   const toursSql = `
     SELECT
+      COALESCE(m.Codigo, 'COP') AS moneda,
       MONTH(r.Fecha_Tour) AS mes,
       COALESCE(SUM(CASE
         WHEN ${CLOSED_JOURNEY_SQL} THEN CASE WHEN p.Confirmacion = 1 THEN p.Precio_Pasajero ELSE 0 END
@@ -366,6 +373,7 @@ async function getIncomeHistorySvc(year, filters = {}) {
     FROM pasajeros p
     JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
       FROM ${reservasOperativasSource('r2')}
@@ -378,18 +386,20 @@ async function getIncomeHistorySvc(year, filters = {}) {
     WHERE ${ACTIVE_RESERVATION_SQL}
     AND   YEAR(r.Fecha_Tour) = ?
     ${andConds}
-    GROUP BY MONTH(r.Fecha_Tour)
-    ORDER BY mes
+    GROUP BY COALESCE(m.Codigo, 'COP'), MONTH(r.Fecha_Tour)
+    ORDER BY moneda, mes
   `;
 
   const includeTransfers = !filters.tourId && !normalizeReservationType(filters.reservationType);
   const transfersSql = `
-    SELECT MONTH(tr.Fecha_Transfer) AS mes, COALESCE(SUM(tr.Valor), 0) AS transfer
+    SELECT COALESCE(m.Codigo, 'COP') AS moneda, MONTH(tr.Fecha_Transfer) AS mes,
+           COALESCE(SUM(tr.Valor), 0) AS transfer
     FROM transfers tr
+    LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
     WHERE ${ACTIVE_TRANSFER_SQL}
       AND YEAR(tr.Fecha_Transfer) = ?
-    GROUP BY MONTH(tr.Fecha_Transfer)
-    ORDER BY mes
+    GROUP BY COALESCE(m.Codigo, 'COP'), MONTH(tr.Fecha_Transfer)
+    ORDER BY moneda, mes
   `;
 
   const [tourResult, transferResult] = await Promise.all([
@@ -397,18 +407,42 @@ async function getIncomeHistorySvc(year, filters = {}) {
     includeTransfers ? db.query(transfersSql, [year]) : Promise.resolve([[]]),
   ]);
 
-  const bruto = Array(12).fill(0);
-  const neto  = Array(12).fill(0);
-  const transfers = Array(12).fill(0);
+  const byCurrency = new Map();
+  const ensureSeries = (code) => {
+    const currency = String(code || 'COP');
+    if (!byCurrency.has(currency)) byCurrency.set(currency, {
+      currency,
+      bruto: Array(12).fill(0),
+      neto: Array(12).fill(0),
+      transfers: Array(12).fill(0),
+      empresa: Array(12).fill(0),
+    });
+    return byCurrency.get(currency);
+  };
   tourResult[0].forEach(row => {
-    bruto[row.mes - 1] = Number(row.bruto);
-    neto [row.mes - 1] = Number(row.neto);
+    const target = ensureSeries(row.moneda);
+    target.bruto[row.mes - 1] = Number(row.bruto || 0);
+    target.neto[row.mes - 1] = Number(row.neto || 0);
   });
   transferResult[0].forEach((row) => {
-    transfers[row.mes - 1] = Number(row.transfer || 0);
+    const target = ensureSeries(row.moneda);
+    target.transfers[row.mes - 1] = Number(row.transfer || 0);
   });
+  const financialByCurrency = Array.from(byCurrency.values()).map((item) => {
+    item.empresa = item.bruto.map((amount, index) => amount + item.transfers[index]);
+    return item;
+  }).sort((a, b) => a.currency.localeCompare(b.currency));
+  const primary = financialByCurrency.find((item) => item.currency === 'COP') || financialByCurrency[0];
 
-  return { bruto, neto, transfers, empresa: bruto.map((value, index) => value + transfers[index]) };
+  return {
+    financialByCurrency,
+    // Campos legados conservan una sola moneda y nunca suman importes de monedas distintas.
+    currency: primary?.currency || 'COP',
+    bruto: primary?.bruto || Array(12).fill(0),
+    neto: primary?.neto || Array(12).fill(0),
+    transfers: primary?.transfers || Array(12).fill(0),
+    empresa: primary?.empresa || Array(12).fill(0),
+  };
 }
 
 // ─── 3. Ingresos por día (gráfica de rango) ───────────────────────────────────
@@ -419,6 +453,7 @@ async function getDailyIncomeSvc(filters = {}) {
 
   const toursSql = `
     SELECT
+      COALESCE(m.Codigo, 'COP') AS moneda,
       DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS fecha,
       COALESCE(SUM(CASE
         WHEN ${CLOSED_JOURNEY_SQL} THEN CASE WHEN p.Confirmacion = 1 THEN p.Precio_Pasajero ELSE 0 END
@@ -431,6 +466,7 @@ async function getDailyIncomeSvc(filters = {}) {
     FROM pasajeros p
     JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN (
       SELECT h2.Id_Tour, r2.Fecha_Tour, COUNT(p2.Id_Pasajero) AS Total_Pasajeros
       FROM ${reservasOperativasSource('r2')}
@@ -442,8 +478,8 @@ async function getDailyIncomeSvc(filters = {}) {
     LEFT JOIN confirmaciones_jornada cj ON cj.Id_Tour = h.Id_Tour AND cj.Fecha_Tour = r.Fecha_Tour
     WHERE ${ACTIVE_RESERVATION_SQL}
     ${andConds}
-    GROUP BY DATE(r.Fecha_Tour)
-    ORDER BY fecha
+    GROUP BY COALESCE(m.Codigo, 'COP'), DATE(r.Fecha_Tour)
+    ORDER BY fecha, moneda
   `;
 
   const includeTransfers = !filters.tourId && !normalizeReservationType(filters.reservationType);
@@ -453,13 +489,15 @@ async function getDailyIncomeSvc(filters = {}) {
   if (filters.endDate) { transferConds.push('tr.Fecha_Transfer <= ?'); transferParams.push(filters.endDate); }
   const transferAnd = transferConds.length ? `AND ${transferConds.join(' AND ')}` : '';
   const transfersSql = `
-    SELECT DATE_FORMAT(tr.Fecha_Transfer, '%Y-%m-%d') AS fecha,
+    SELECT COALESCE(m.Codigo, 'COP') AS moneda,
+           DATE_FORMAT(tr.Fecha_Transfer, '%Y-%m-%d') AS fecha,
            COALESCE(SUM(tr.Valor), 0) AS transfer
     FROM transfers tr
+    LEFT JOIN monedas m ON m.Id_Moneda = tr.Id_Moneda
     WHERE ${ACTIVE_TRANSFER_SQL}
     ${transferAnd}
-    GROUP BY DATE(tr.Fecha_Transfer)
-    ORDER BY fecha
+    GROUP BY COALESCE(m.Codigo, 'COP'), DATE(tr.Fecha_Transfer)
+    ORDER BY fecha, moneda
   `;
 
   const [tourResult, transferResult] = await Promise.all([
@@ -469,13 +507,16 @@ async function getDailyIncomeSvc(filters = {}) {
   const byDate = new Map();
   for (const row of tourResult[0]) {
     const fecha = String(row.fecha);
-    byDate.set(fecha, { fecha, bruto: Number(row.bruto || 0), neto: Number(row.neto || 0), transfer: 0 });
+    const currency = String(row.moneda || 'COP');
+    byDate.set(`${fecha}|${currency}`, { fecha, currency, bruto: Number(row.bruto || 0), neto: Number(row.neto || 0), transfer: 0 });
   }
   for (const row of transferResult[0]) {
     const fecha = String(row.fecha);
-    const target = byDate.get(fecha) || { fecha, bruto: 0, neto: 0, transfer: 0 };
+    const currency = String(row.moneda || 'COP');
+    const key = `${fecha}|${currency}`;
+    const target = byDate.get(key) || { fecha, currency, bruto: 0, neto: 0, transfer: 0 };
     target.transfer = Number(row.transfer || 0);
-    byDate.set(fecha, target);
+    byDate.set(key, target);
   }
   return Array.from(byDate.values())
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
@@ -591,22 +632,25 @@ async function getReservationBreakdownSvc(filters = {}) {
         WHEN UPPER(TRIM(COALESCE(r.Tipo_Reserva, 'Grupal'))) = 'PRIVADA' THEN 'Privadas'
         ELSE 'Grupales'
       END AS tipo,
+      COALESCE(m.Codigo, 'COP') AS moneda,
       COUNT(DISTINCT r.Id_Reserva) AS reservas,
       COUNT(p.Id_Pasajero) AS pasajeros,
       COALESCE(SUM(p.Precio_Pasajero), 0) AS bruto,
       COALESCE(SUM(p.Precio_Pasajero - COALESCE(p.Comision, 0)), 0) AS neto
     FROM ${reservasOperativasSource('r')}
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     ${tourJoin}
     WHERE ${ACTIVE_RESERVATION_SQL}
     ${andConds}
-    GROUP BY tipo
-    ORDER BY FIELD(tipo, 'Grupales', 'Privadas')
+    GROUP BY tipo, COALESCE(m.Codigo, 'COP')
+    ORDER BY FIELD(tipo, 'Grupales', 'Privadas'), moneda
   `;
 
   const [rows] = await db.query(sql, params);
   return rows.map((row) => ({
     tipo: row.tipo,
+    currency: String(row.moneda || 'COP'),
     reservas: Number(row.reservas || 0),
     pasajeros: Number(row.pasajeros || 0),
     bruto: Number(row.bruto || 0),
@@ -797,14 +841,16 @@ async function getDashboardOperationalSvc(filters = {}) {
   const channelAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(c.Nombre_Canal, 'Sin canal')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal');
   const tourAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(t.Nombre_Tour, 'Sin tour')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour');
   const tariffSql = `
-    SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), CONCAT('Sin plan · ', COALESCE(p.Tipo_Pasajero, 'Sin tipo'))) AS tarifa,
+    SELECT COALESCE(m.Codigo, 'COP') AS moneda,
+           COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), CONCAT('Sin plan · ', COALESCE(p.Tipo_Pasajero, 'Sin tipo'))) AS tarifa,
            COUNT(p.Id_Pasajero) AS pasajeros,
            COALESCE(SUM(p.Precio_Pasajero), 0) AS ingresos
     FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
-    GROUP BY tarifa ORDER BY pasajeros DESC LIMIT 20
+    GROUP BY tarifa, COALESCE(m.Codigo, 'COP') ORDER BY pasajeros DESC LIMIT 40
   `;
   const passportSql = `
     SELECT COALESCE(NULLIF(TRIM(pt.Nombre_Plan), ''), 'Sin plan') AS plan,
@@ -817,15 +863,17 @@ async function getDashboardOperationalSvc(filters = {}) {
     GROUP BY plan ORDER BY pasajeros DESC
   `.replace('LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour', 'LEFT JOIN planes_tours pt ON pt.Id_Plan = p.Id_Plan AND pt.Id_Tour = h.Id_Tour\n    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour');
   const channelFinancialSql = `
-    SELECT COALESCE(c.Nombre_Canal, 'Sin canal') AS canal,
+    SELECT COALESCE(m.Codigo, 'COP') AS moneda,
+           COALESCE(c.Nombre_Canal, 'Sin canal') AS canal,
            SUM(CASE WHEN p.Confirmacion = 1 THEN 1 ELSE 0 END) AS viajaron,
            COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Precio_Pasajero ELSE 0 END), 0) AS ingresos,
            COALESCE(SUM(CASE WHEN p.Confirmacion = 1 THEN p.Comision ELSE 0 END), 0) AS comisiones
     FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
+    LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
-    GROUP BY canal ORDER BY ingresos DESC
+    GROUP BY canal, COALESCE(m.Codigo, 'COP') ORDER BY moneda, ingresos DESC
   `;
 
   const [languageResult, pointResult, channelAbsenceResult, tourAbsenceResult, tariffResult, passportResult, channelFinancialResult] = await Promise.all([
@@ -843,9 +891,9 @@ async function getDashboardOperationalSvc(filters = {}) {
     puntos: pointResult[0].map((row) => ({ punto: row.punto, registrados: Number(row.registrados || 0), viajaron: Number(row.viajaron || 0) })),
     inasistenciaCanal: normalizeRows(channelAbsenceResult[0], 'canal'),
     inasistenciaTour: normalizeRows(tourAbsenceResult[0], 'tour'),
-    tarifas: tariffResult[0].map((row) => ({ tarifa: row.tarifa, pasajeros: Number(row.pasajeros || 0), ingresos: Number(row.ingresos || 0) })),
+    tarifas: tariffResult[0].map((row) => ({ tarifa: row.tarifa, currency: String(row.moneda || 'COP'), pasajeros: Number(row.pasajeros || 0), ingresos: Number(row.ingresos || 0) })),
     pasaportes: passportResult[0].map((row) => ({ plan: row.plan, pasajeros: Number(row.pasajeros || 0) })),
-    canalFinanciero: channelFinancialResult[0].map((row) => ({ canal: row.canal, viajaron: Number(row.viajaron || 0), ingresos: Number(row.ingresos || 0), comisiones: Number(row.comisiones || 0) })),
+    canalFinanciero: channelFinancialResult[0].map((row) => ({ canal: row.canal, currency: String(row.moneda || 'COP'), viajaron: Number(row.viajaron || 0), ingresos: Number(row.ingresos || 0), comisiones: Number(row.comisiones || 0) })),
   };
 }
 

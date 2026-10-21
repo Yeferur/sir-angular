@@ -476,7 +476,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
 
         this.desktopNotifications.configureUser(this.authService.getUser()?.id);
 
-        if (this.permisosService.tienePermiso('PENDIENTES.LEER')) {
+        if (this.permisosService.tienePermiso('PENDIENTES.LEER')
+            || this.permisosService.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR')) {
             this.pendingCenter.loadCount();
         } else {
             this.pendingCenter.clear();
@@ -487,7 +488,9 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             if (event.type === 'turnoIntercambioActualizado') {
                 this.notifications.load();
             }
-            if (event.type === 'programacionNovedadesActualizadas' && this.permisosService.tienePermiso('PENDIENTES.LEER')) {
+            if (event.type === 'programacionNovedadesActualizadas'
+                && (this.permisosService.tienePermiso('PENDIENTES.LEER')
+                    || this.permisosService.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR'))) {
                 this.pendingCenter.loadCount();
             }
         });
@@ -1137,7 +1140,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             icon: 'bx bx-bell',
             group: 'principal',
             route: '/Pendientes',
-            permission: ['PENDIENTES.LEER', 'RECORDATORIOS.LEER'],
+            permission: ['PENDIENTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR', 'RECORDATORIOS.LEER'],
             exact: true,
         },
         {
@@ -1281,7 +1284,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         {
             key: 'programacion',
-            label: 'Listados de buses',
+            label: 'Listado de buses',
             icon: 'bx bx-list-check',
             group: 'gestion',
             route: '/Programacion',
@@ -1293,17 +1296,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             label: 'Mercadeo',
             icon: 'bx bx-bar-chart-alt-2',
             group: 'gestion',
-            route: '/Mercadeo/Reservas',
-            permission: 'MERCADEO.RESERVAS.LEER',
-            exact: true,
-        },
-        {
-            key: 'entidades-reportantes',
-            label: 'Entidades reportantes',
-            icon: 'bx bx-building-house',
-            group: 'gestion',
-            route: '/Mercadeo/Entidades',
-            permission: 'ENTIDADES_REPORTANTES.LEER',
+            route: '/Mercadeo',
+            permission: ['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR', 'MERCADEO.RESERVAS.LEER'],
             exact: true,
         },
         {
@@ -1412,9 +1406,8 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',
             'programacion-general': 'Reservas para operación y exportación',
-            programacion: 'Programación operativa',
+            programacion: 'Listado diario de buses',
             mercadeo: 'Análisis comercial',
-            'entidades-reportantes': 'Hoteles y agencias',
             seguros: 'Vehículos, guías y conductores',
             comisiones: 'Pendientes por liquidar',
         };

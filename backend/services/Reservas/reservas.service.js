@@ -475,13 +475,15 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     if (!useExternalConn) await conn.beginTransaction();
 
     const [candidatos] = await conn.query(
-      `SELECT Id_Reserva, Estado, Fecha_Tour
-         FROM reservas
-        WHERE ${reservaNoEliminadaPredicate('reservas')} AND (
-             Estado IN ('Activo', 'Activa', 'Confirmado', 'Completado', 'Cancelado')
+      `SELECT r.Id_Reserva, r.Estado, r.Fecha_Tour, e.Estado_Validacion AS Estado_Validacion_Entidad
+         FROM reservas r LEFT JOIN entidades_reportantes e
+           ON e.Id_Entidad_Reportante=r.Id_Entidad_Reportante
+        WHERE ${reservaNoEliminadaPredicate('r')}
+          AND r.Pendiente_Por_Entidad_En IS NULL AND (
+             r.Estado IN ('Activo', 'Activa', 'Confirmado', 'Completado', 'Cancelado')
            OR (
-             Fecha_Tour < ?
-             AND Estado IN ('Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
+             r.Fecha_Tour < ?
+             AND r.Estado IN ('Confirmada', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
            ))`,
       [hoyBogota]
     );
@@ -491,11 +493,28 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     for (const row of candidatos || []) {
       const transicion = resolverTransicionReservaVencida(row.Estado, row.Fecha_Tour);
       if (!transicion || transicion.nuevoEstado === row.Estado) continue;
+      if (row.Estado_Validacion_Entidad === 'RECHAZADA' && transicion.nuevoEstado === 'Confirmada') continue;
 
       // Lock and recalculate through the same availability service used by
       // cancellation. The state is rechecked under lock for idempotency.
       const impacto = await obtenerImpactoCuposReservaActual(conn, row.Id_Reserva);
       if (!impacto || impacto.reserva.Estado !== row.Estado || impacto.reserva.Eliminada_En) continue;
+      if (impacto.reserva.Pendiente_Por_Entidad_En) continue;
+
+      const [updateResult] = await conn.query(
+        `UPDATE reservas
+            SET Estado = ?
+          WHERE Id_Reserva = ?
+            AND Estado = ?
+            AND Pendiente_Por_Entidad_En IS NULL
+            AND (? <> 'Confirmada' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
+              WHERE er.Id_Entidad_Reportante=reservas.Id_Entidad_Reportante
+                AND er.Estado_Validacion='RECHAZADA'))`,
+        [transicion.nuevoEstado, row.Id_Reserva, row.Estado, transicion.nuevoEstado]
+      );
+
+      if (!updateResult?.affectedRows) continue;
+
       const sigueConsumiendo = reservationConsumesSharedSeats({
         tipoReserva: impacto.reserva.Tipo_Reserva,
         estado: transicion.nuevoEstado,
@@ -504,16 +523,6 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
       if (impacto.ocupaCupos && !sigueConsumiendo) {
         await liberarCuposReserva({ conn, impacto });
       }
-
-      const [updateResult] = await conn.query(
-        `UPDATE reservas
-            SET Estado = ?
-          WHERE Id_Reserva = ?
-            AND Estado = ?`,
-        [transicion.nuevoEstado, row.Id_Reserva, row.Estado]
-      );
-
-      if (!updateResult?.affectedRows) continue;
 
       await recordHistorial({
         conexion: conn,
@@ -697,6 +706,7 @@ async function obtenerImpactoCuposReservaActual(conn, idReserva) {
         r.Telefono_Reportante,
         r.Id_Canal,
         r.Id_Entidad_Reportante,
+        r.Pendiente_Por_Entidad_En,
         r.Idioma_Reserva,
         r.Observaciones,
         r.Id_Horario,
@@ -802,8 +812,8 @@ async function validarYAplicarCuposTransaccional({ conn, idTour, fechaTour, cant
 async function liberarCuposReserva({ conn, impacto }) {
   if (!impacto?.ocupaCupos) return null;
 
-  // La reserva se excluye del conteo mientras el encabezado aún conserva su
-  // estado anterior. Bloqueo + recálculo deja el mismo resultado si se reintenta.
+  // Recalcula disponibilidad excluyendo el ID de esta reserva; el impacto
+  // conserva su cantidad y estado previos aunque el encabezado ya se actualizó.
   const cupoInfo = await bloquearDisponibilidad(conn, impacto.idTour, impacto.fechaTour, impacto.idReserva);
   const nuevosDisponibles = cupoInfo.cuposDisponibles;
 
@@ -1213,8 +1223,11 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
 
 async function normalizarEstadosReservasExistentes(conexion = db) {
   const [reservasRows] = await conexion.query(
-    `SELECT Id_Reserva, Fecha_Tour, Estado, Telefono_Reportante
-       FROM reservas r
+    `SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Telefono_Reportante,
+            r.Id_Entidad_Reportante, r.Pendiente_Por_Entidad_En,
+            e.Estado_Validacion AS Estado_Validacion_Entidad
+       FROM reservas r LEFT JOIN entidades_reportantes e
+         ON e.Id_Entidad_Reportante=r.Id_Entidad_Reportante
       WHERE ${reservaNoEliminadaPredicate('r')}`
   );
 
@@ -1253,6 +1266,7 @@ async function normalizarEstadosReservasExistentes(conexion = db) {
 
   let actualizadas = 0;
   for (const reserva of reservasRows) {
+    if (reserva.Pendiente_Por_Entidad_En) continue;
     const idReserva = String(reserva.Id_Reserva);
     const estadoActual = normalizarEstadoReservaLegacy(reserva.Estado);
 
@@ -1268,13 +1282,17 @@ async function normalizarEstadosReservasExistentes(conexion = db) {
     }
 
     if (nuevoEstado !== reserva.Estado) {
-      await conexion.query(
+      const [updateResult] = await conexion.query(
         `UPDATE reservas
             SET Estado = ?
-          WHERE Id_Reserva = ?`,
-        [nuevoEstado, idReserva]
+          WHERE Id_Reserva = ?
+            AND Pendiente_Por_Entidad_En IS NULL
+            AND (? <> 'Confirmada' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
+              WHERE er.Id_Entidad_Reportante=reservas.Id_Entidad_Reportante
+                AND er.Estado_Validacion='RECHAZADA'))`,
+        [nuevoEstado, idReserva, nuevoEstado]
       );
-      actualizadas += 1;
+      actualizadas += Number(updateResult?.affectedRows || 0);
     }
   }
 
@@ -1970,12 +1988,19 @@ async function actualizarReservaConPasajerosYPagos(
       if (r.Observaciones !== undefined) setIf('Observaciones', r.Observaciones);
       // Estado calculado desde el backend
       setIf('Estado', estadoCalculado);
+      setIf('Pendiente_Por_Entidad_En', null);
       if (userId) setIf('Actualizado_Por', userId);
 
       if (fields.length) {
         const sql = `UPDATE reservas SET ${fields.join(', ')} WHERE Id_Reserva = ?`;
         await conn.query(sql, [...vals, Id_Reserva]);
       }
+    } else {
+      // Ediciones de pasajeros o pagos también recalculan el estado. Al
+      // validar la entidad activa arriba, esta operación ya fue revisada.
+      await conn.query(`UPDATE reservas SET Estado=?,Pendiente_Por_Entidad_En=NULL,
+        Actualizado_Por=COALESCE(?,Actualizado_Por) WHERE Id_Reserva=?`,
+      [estadoCalculado, userId, Id_Reserva]);
     }
 
     // 2) Conservar la PK de cada pasajero existente durante la edición.

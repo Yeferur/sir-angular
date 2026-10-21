@@ -15,15 +15,11 @@
 
 .operation-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px 16px;
-  margin-bottom: 20px;
-  padding: 10px;
-  border: 1px solid var(--separator-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
+  margin-bottom: 24px;
 }
 
 .operation-date {
@@ -60,7 +56,7 @@
 }
 
 .date-picker-wrap {
-  width: 210px;
+  width: 250px;
 }
 
 .date-nav-btn,
@@ -118,7 +114,7 @@
   from { opacity: 0; transform: translateY(7px); }
 }
 
-@media (max-width: 880px) {
+@media (max-width: 768px) {
   .operation-header {
     align-items: stretch;
     flex-direction: column;

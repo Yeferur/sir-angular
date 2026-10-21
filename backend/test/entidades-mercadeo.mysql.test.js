@@ -15,6 +15,7 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   require('dotenv').config({ path: path.join(__dirname, '..', 'env', '.env'), quiet: true });
   assert.equal(process.env.DB_NAME || process.env.DB_DATABASE, 'sir2');
   assert.ok(['127.0.0.1', 'localhost', '::1'].includes(String(process.env.DB_HOST).toLowerCase()));
+  assert.notEqual(process.env.SIR_KEEP_VALIDATION_DB, '1', 'La copia temporal se debe eliminar al terminar.');
   const database = `sir2_mercadeo_validation_${randomBytes(10).toString('hex')}`;
   const stopCleanup = installSignalCleanup(database);
   await createCopy(database);
@@ -29,6 +30,8 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     process.env.DB_NAME = oldName; process.env.DB_DATABASE = oldDatabase;
   });
   connection = await mysql.createConnection(connectionOptions(database));
+  const [[directTarget]] = await connection.query('SELECT DATABASE() AS selected_database');
+  assert.equal(directTarget.selected_database, database);
   const [columns] = await connection.query(`SELECT 1 FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='entidades_reportantes' AND COLUMN_NAME='Nombre_Normalizado'`);
   if (!columns.length) {
@@ -37,9 +40,12 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     for (const statement of parseMigrationSql(sql)) await connection.query(statement);
   }
   const db = require('../database/db');
+  const [[poolTarget]] = await db.query('SELECT DATABASE() AS selected_database');
+  assert.equal(poolTarget.selected_database, database);
   const entities = require('../services/EntidadesReportantes/entidades-reportantes.service');
   const marketing = require('../services/EntidadesReportantes/entidades-mercadeo.service');
   const reservations = require('../services/Reservas/reservas.service');
+  const transfers = require('../services/Transfers/transfers.service');
   await require('../services/schema-capabilities').initializeSchemaCapabilities(db);
   const [[actor]] = await connection.query(`SELECT u.Id_Usuario FROM usuarios u JOIN roles r ON r.Id_Rol=u.Id_Rol
     WHERE LOWER(TRIM(r.Nombre_Rol))='administrador' LIMIT 1`);
@@ -58,6 +64,7 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   const agencyUpdatedName = `Viajes Bogotá SAS ${tag}`;
   const internationalName = `São Paulo Travel rápida ${tag}`;
   const adminInternationalName = `São Paulo Travel ${tag}`;
+  const transferOnlyName = `Hotel solo transfers ${tag}`;
   const [tour] = await connection.query(`INSERT INTO tours (Nombre_Tour,Abreviacion,Cupo_Base,Activo)
     VALUES ('Validación actividad de entidades','ENT',30,1)`);
   const [schedule] = await connection.query(`INSERT INTO horarios (Id_Punto,Id_Tour,Hora_Salida)
@@ -100,11 +107,18 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     await assert.rejects(entities.validateReservationEntity(db, channel('AGENCIA NACIONAL'), null),
       e => e.errorCode === 'ENTITY_REQUIRED');
   });
+  let neverReportedEntity;
   await check('creación administrativa', async () => {
     const created = await marketing.createEntity({ Tipo: 'AGENCIA_INTERNACIONAL', Nombre: adminInternationalName }, actor.Id_Usuario);
+    neverReportedEntity = created.entity;
     assert.equal(created.entity.Estado_Validacion, 'PENDIENTE_VALIDACION');
     assert.equal(created.entity.Nombre, adminInternationalName);
   });
+  await entities.validateEntity(neverReportedEntity.Id_Entidad_Reportante, 'VALIDADA', actor.Id_Usuario);
+  const { DIAS_SIN_REPORTAR_ALERTA } = require('../config/entidades-reportantes');
+  await connection.query(`UPDATE entidades_reportantes
+    SET Validado_En=DATE_SUB(CURRENT_DATE, INTERVAL ? DAY) WHERE Id_Entidad_Reportante=?`,
+  [DIAS_SIN_REPORTAR_ALERTA + 30, neverReportedEntity.Id_Entidad_Reportante]);
   await check('edición y estado independientes', async () => {
     const updated = await marketing.updateEntity(agency.Id_Entidad_Reportante,
       { Nombre: agencyUpdatedName, Activo: 0 }, actor.Id_Usuario);
@@ -136,11 +150,56 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
       [`2027-07-${day} 10:00:00`, id]);
   }
+  let [[transferRange]] = await connection.query(`SELECT Id_Rango,Minimo FROM transfers_rangos
+    WHERE Minimo >= 1 ORDER BY Minimo LIMIT 1`);
+  if (!transferRange) {
+    const [[nextRange]] = await connection.query('SELECT COALESCE(MAX(Id_Rango),0)+1 AS Id_Rango FROM transfers_rangos');
+    await connection.query(`INSERT INTO transfers_rangos (Id_Rango,Descripcion,Minimo,Maximo)
+      VALUES (?,'Rango de prueba aislado',1,1)`, [nextRange.Id_Rango]);
+    transferRange = { Id_Rango: nextRange.Id_Rango, Minimo: 1 };
+  }
+  let [[transferService]] = await connection.query('SELECT Id_Servicio FROM servicios_transfer ORDER BY Id_Servicio LIMIT 1');
+  if (!transferService) {
+    const [[nextService]] = await connection.query('SELECT COALESCE(MAX(Id_Servicio),0)+1 AS Id_Servicio FROM servicios_transfer');
+    await connection.query('INSERT INTO servicios_transfer (Id_Servicio,Nombre_Servicio) VALUES (?,?)',
+      [nextService.Id_Servicio, 'Servicio de prueba aislado']);
+    transferService = { Id_Servicio: nextService.Id_Servicio };
+  }
+  const transferPassengers = Number(transferRange.Minimo);
+  const sampleTransfer = await transfers.crearTransferSvc({
+    Id_Canal: channel('HOTEL'), Id_Entidad_Reportante: hotel.Id_Entidad_Reportante,
+    Titular: 'Titular de prueba', DNI: 'TEST-ENTIDAD', Tel_Contacto: '3000000000',
+    Cantidad_Personas: transferPassengers, Servicio: transferService.Id_Servicio, Salida: 'Hotel de prueba',
+    Llegada: 'Aeropuerto de prueba', FechaTransfer: '2027-07-15', HoraRecogida: '08:00',
+    NombreReporta: 'Contacto de transfer', TelefonoTransfer: '3000000001', ValorServicio: 0,
+    Id_Moneda: null, Vuelo: null, TipoVuelo: null, Observaciones: 'Fixture de prueba aislado',
+  }, { userId: actor.Id_Usuario });
+  await connection.query('UPDATE transfers SET Fecha_Registro=? WHERE Id_Transfer=?',
+    ['2027-07-14 10:00:00', sampleTransfer.Id_Transfer]);
+  const transferOnlyEntity = (await entities.quickCreate({ channelId: channel('HOTEL'),
+    name: transferOnlyName, actorId: actor.Id_Usuario })).entity;
+  await entities.validateEntity(transferOnlyEntity.Id_Entidad_Reportante, 'VALIDADA', actor.Id_Usuario);
+  const transferOnly = await transfers.crearTransferSvc({
+    Id_Canal: channel('HOTEL'), Id_Entidad_Reportante: transferOnlyEntity.Id_Entidad_Reportante,
+    Titular: 'Titular solo transfer', DNI: 'TEST-TRANSFER-ONLY', Tel_Contacto: '3000000002',
+    Cantidad_Personas: transferPassengers, Servicio: transferService.Id_Servicio,
+    Salida: 'Hotel de prueba', Llegada: 'Aeropuerto de prueba', FechaTransfer: '2027-07-16',
+    HoraRecogida: '08:00', NombreReporta: 'Contacto solo transfer', TelefonoTransfer: '3000000003',
+    ValorServicio: 0, Id_Moneda: null, Vuelo: null, TipoVuelo: null,
+    Observaciones: 'Fixture de prueba aislado: solo transfers',
+  }, { userId: actor.Id_Usuario });
+  await connection.query('UPDATE transfers SET Fecha_Registro=? WHERE Id_Transfer=?',
+    ['2027-07-16 10:00:00', transferOnly.Id_Transfer]);
   await check('actividad y pasajero por FK', async () => {
     const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', actividad: 'CON_RESERVAS', buscar: hotelName });
     const row = page.items.find(x => x.Id_Entidad_Reportante === hotel.Id_Entidad_Reportante);
     assert.equal(Number(row.Reservas), 2);
-    assert.equal(Number(row.Pasajeros), 2);
+    assert.equal(Number(row.Transfers), 1);
+    assert.equal(Number(row.Operaciones), 3);
+    assert.equal(Number(row.Pasajeros), 2 + transferPassengers);
+    assert.ok(row.Primera_Reserva);
+    assert.ok(row.Ultima_Reserva);
+    assert.ok(Number(row.Dias_Sin_Reportar) >= 0);
     assert.equal(row.Contacto_Reciente, 'Juan Pérez');
     assert.equal(page.items.length, 1);
     const nationalPage = await marketing.listActivity({ ...f, tipo: 'AGENCIA_NACIONAL', actividad: 'CON_RESERVAS', buscar: agencyUpdatedName });
@@ -152,6 +211,26 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     assert.equal(nationalPage.items.length, 1);
     assert.equal(internationalPage.items.length, 1);
     assert.equal(Number(page.summary.Total_Reservas), 2);
+    assert.equal(Number(page.summary.Total_Transfers), 1);
+    assert.equal(Number(page.summary.Total_Operaciones), 3);
+    assert.equal(Number(page.summary.Total_Pasajeros), 2 + transferPassengers);
+    assert.equal(Number(page.summary.Con_Actividad), 1);
+    assert.equal(nationalRow.Primera_Actividad, null);
+    assert.equal(nationalRow.Ultima_Actividad, null);
+    assert.equal(nationalRow.Primera_Reserva, null);
+    assert.equal(nationalRow.Ultima_Reserva, null);
+    assert.equal(nationalRow.Dias_Sin_Reportar, null);
+  });
+  await check('entidad con transfers y sin reservas', async () => {
+    const result = await marketing.listActivity({ ...f, tipo: 'HOTEL', buscar: transferOnlyName });
+    const row = result.items.find(item => item.Id_Entidad_Reportante === transferOnlyEntity.Id_Entidad_Reportante);
+    assert.equal(result.total, 1);
+    assert.equal(Number(row.Reservas), 0);
+    assert.equal(Number(row.Transfers), 1);
+    assert.equal(Number(row.Operaciones), 1);
+    assert.equal(Number(row.Pasajeros), transferPassengers);
+    assert.ok(row.Primera_Reserva);
+    assert.ok(row.Ultima_Reserva);
   });
   await check('contacto y puntos separados', async () => {
     const detail = await marketing.detail(hotel.Id_Entidad_Reportante, f);
@@ -161,6 +240,19 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     assert.equal(String(detail.observed[0].Id_Punto), String(points[1].Id_Punto));
     assert.equal(Number(detail.observed[0].Reservas), 2);
     assert.equal(String(detail.associated[0].Id_Punto), String(points[0].Id_Punto));
+  });
+  const reservationOutsidePeriod = await reservations.crearReservaConPasajerosYPagos(
+    payload(channel('HOTEL'), hotel.Id_Entidad_Reportante, 'Contacto período posterior', points[1].Id_Punto),
+    {}, actor.Id_Usuario);
+  await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
+    ['2027-08-01 10:00:00', reservationOutsidePeriod.Id_Reserva]);
+  await check('el periodo limita totales, pero la última fecha conserva toda la historia', async () => {
+    const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', buscar: hotelName });
+    const row = page.items.find(item => item.Id_Entidad_Reportante === hotel.Id_Entidad_Reportante);
+    assert.equal(Number(row.Reservas), 2);
+    assert.equal(Number(row.Transfers), 1);
+    assert.equal(Number(row.Operaciones), 3);
+    assert.equal(new Date(row.Ultima_Reserva).toISOString().slice(0, 10), '2027-08-01');
   });
   const categoryReservation = await reservations.crearReservaConPasajerosYPagos(
     payload(channel('HOTEL'), hotel.Id_Entidad_Reportante, 'Andrea', points[1].Id_Punto), {}, actor.Id_Usuario);
@@ -198,8 +290,9 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
     [[row]] = await connection.query('SELECT Id_Entidad_Reportante FROM reservas WHERE Id_Reserva=?', [freelance.Id_Reserva]);
     assert.equal(row.Id_Entidad_Reportante, null);
     const activity = await marketing.listActivity({ ...f, tipo: 'HOTEL' });
-    assert.equal(activity.items.length, 1);
-    assert.equal(String(activity.items[0].Id_Entidad_Reportante), String(hotel.Id_Entidad_Reportante));
+    assert.equal(activity.items.length, 2);
+    assert.ok(activity.items.some(item => String(item.Id_Entidad_Reportante) === String(hotel.Id_Entidad_Reportante)));
+    assert.ok(activity.items.some(item => String(item.Id_Entidad_Reportante) === String(transferOnlyEntity.Id_Entidad_Reportante)));
   });
   await check('filtros y métricas', async () => {
     const page = await marketing.listActivity({ ...f, tipo: 'HOTEL', actividad: 'CON_RESERVAS', buscar: hotelName });
@@ -284,6 +377,70 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   await check('límite de período', async () => {
     assert.throws(() => marketing.filters({ desde: '2027-07-01', hasta: '2027-08-01' }),
       e => e.errorCode === 'DATE_RANGE_TOO_LONG');
+    assert.equal(marketing.filters({ diasSinReportarMin: '90', ordenarPor: 'dias_sin_reportar', orden: 'desc' }).daysSinceReportMin, 90);
+    assert.throws(() => marketing.filters({ diasSinReportarMin: '-1' }),
+      e => e.errorCode === 'INACTIVITY_DAYS_INVALID');
+    assert.equal(marketing.filters({ ordenarPor: 'no_es_una_columna', orden: 'desc' }).sortBy, 'nombre');
+  });
+  await check('filtro por días, orden y entidades sin actividad', async () => {
+    await connection.query(`UPDATE reservas SET Fecha_Registro=DATE_SUB(CURRENT_DATE, INTERVAL ? DAY)
+      WHERE Id_Entidad_Reportante=? AND Eliminada_En IS NULL`,
+    [DIAS_SIN_REPORTAR_ALERTA + 30, hotel.Id_Entidad_Reportante]);
+    await connection.query(`UPDATE transfers SET Fecha_Registro=DATE_SUB(CURRENT_DATE, INTERVAL ? DAY)
+      WHERE Id_Entidad_Reportante=?`,
+    [DIAS_SIN_REPORTAR_ALERTA + 10, hotel.Id_Entidad_Reportante]);
+    const oldReports = await marketing.listActivity({ tipo: 'HOTEL', buscar: hotelName,
+      diasSinReportarMin: DIAS_SIN_REPORTAR_ALERTA, ordenarPor: 'dias_sin_reportar', orden: 'DESC' });
+    assert.equal(oldReports.items.length, 1);
+    assert.ok(Number(oldReports.items[0].Dias_Sin_Reportar) > DIAS_SIN_REPORTAR_ALERTA);
+    assert.equal(oldReports.ordenarPor, 'dias_sin_reportar');
+    assert.equal(oldReports.orden, 'DESC');
+    const ranked = await marketing.listActivity({ ordenarPor: 'operaciones', orden: 'DESC', pageSize: 100 });
+    assert.equal(ranked.items[0].Id_Entidad_Reportante, hotel.Id_Entidad_Reportante);
+    const neverReported = await marketing.listActivity({ tipo: 'AGENCIA_INTERNACIONAL',
+      buscar: adminInternationalName, actividad: 'SIN_RESERVAS', ordenarPor: 'ultima_reserva' });
+    assert.equal(neverReported.items.length, 1);
+    assert.equal(Number(neverReported.items[0].Reservas), 0);
+    assert.equal(Number(neverReported.items[0].Transfers), 0);
+    assert.equal(Number(neverReported.items[0].Operaciones), 0);
+    assert.equal(neverReported.items[0].Primera_Reserva, null);
+    assert.equal(neverReported.items[0].Ultima_Reserva, null);
+    assert.equal(neverReported.items[0].Dias_Sin_Reportar, null);
+    const neverReportedTooLong = await marketing.listActivity({ tipo: 'AGENCIA_INTERNACIONAL',
+      buscar: adminInternationalName, diasSinReportarMin: DIAS_SIN_REPORTAR_ALERTA });
+    assert.equal(neverReportedTooLong.items.length, 1);
+    assert.equal(neverReportedTooLong.items[0].Id_Entidad_Reportante,
+      neverReportedEntity.Id_Entidad_Reportante);
+    assert.equal(neverReportedTooLong.items[0].Dias_Sin_Reportar, null);
+  });
+  await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
+    ['2027-07-10 10:00:00', reservation.Id_Reserva]);
+  await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
+    ['2027-07-11 10:00:00', sameHotelContact.Id_Reserva]);
+  await connection.query('UPDATE reservas SET Fecha_Registro=? WHERE Id_Reserva=?',
+    ['2027-08-01 10:00:00', reservationOutsidePeriod.Id_Reserva]);
+  await connection.query('UPDATE transfers SET Fecha_Registro=? WHERE Id_Transfer=?',
+    ['2027-07-14 10:00:00', sampleTransfer.Id_Transfer]);
+  await check('reservas eliminadas fuera de la actividad y fechas de inactividad', async () => {
+    const deleted = await reservations.crearReservaConPasajerosYPagos(
+      payload(channel('HOTEL'), hotel.Id_Entidad_Reportante, 'Contacto eliminado', points[1].Id_Punto),
+      {}, actor.Id_Usuario);
+    await connection.query('UPDATE reservas SET Fecha_Registro=?,Eliminada_En=NOW() WHERE Id_Reserva=?',
+      ['2027-08-20 10:00:00', deleted.Id_Reserva]);
+    const [[deletedState]] = await connection.query('SELECT Eliminada_En FROM reservas WHERE Id_Reserva=?', [deleted.Id_Reserva]);
+    assert.ok(deletedState.Eliminada_En);
+    assert.equal(require('../services/schema-capabilities').getSchemaCapabilities().reservasSoftDelete, true);
+    const beforeDeactivate = await marketing.listActivity({ tipo: 'HOTEL', buscar: hotelName });
+    const activeRow = beforeDeactivate.items[0];
+    assert.equal(Number(activeRow.Reservas), 3);
+    assert.equal(Number(activeRow.Transfers), 1);
+    assert.equal(new Date(activeRow.Ultima_Reserva).toISOString().slice(0, 10), '2027-08-01');
+    assert.notEqual(activeRow.Contacto_Reciente, 'Contacto eliminado');
+    await marketing.updateEntity(hotel.Id_Entidad_Reportante, { Activo: 0 }, actor.Id_Usuario);
+    const inactive = await marketing.listActivity({ tipo: 'HOTEL', buscar: hotelName });
+    assert.equal(inactive.items[0].Primera_Reserva, null);
+    assert.equal(inactive.items[0].Ultima_Reserva, null);
+    assert.equal(inactive.items[0].Dias_Sin_Reportar, null);
   });
   await check('quitar asociación oficial', async () => {
     await marketing.setPoint(hotel.Id_Entidad_Reportante, points[0].Id_Punto, false, actor.Id_Usuario);

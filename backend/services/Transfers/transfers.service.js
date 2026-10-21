@@ -250,13 +250,16 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     if (!useExternalConn) await conn.beginTransaction();
 
     const [candidatos] = await conn.query(
-      `SELECT Id_Transfer, Estado, Fecha_Transfer
-         FROM transfers
-        WHERE Estado IN ('Activo', 'Activa', 'Confirmada', 'Completada', 'Cancelada')
+      `SELECT tr.Id_Transfer, tr.Estado, tr.Fecha_Transfer,
+              e.Estado_Validacion AS Estado_Validacion_Entidad
+         FROM transfers tr LEFT JOIN entidades_reportantes e
+           ON e.Id_Entidad_Reportante=tr.Id_Entidad_Reportante
+        WHERE tr.Pendiente_Por_Entidad_En IS NULL
+          AND (tr.Estado IN ('Activo', 'Activa', 'Confirmada', 'Completada', 'Cancelada')
            OR (
-             Fecha_Transfer < ?
-             AND Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
-           )`,
+             tr.Fecha_Transfer < ?
+             AND tr.Estado IN ('Confirmado', 'Pendiente', 'Pendiente de datos', 'Pendiente de pago')
+           ))`,
       [hoyBogota]
     );
 
@@ -265,13 +268,18 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     for (const row of candidatos || []) {
       const transicion = resolverTransicionTransferVencido(row.Estado, row.Fecha_Transfer);
       if (!transicion || transicion.nuevoEstado === row.Estado) continue;
+      if (row.Estado_Validacion_Entidad === 'RECHAZADA' && transicion.nuevoEstado === 'Confirmado') continue;
 
       const [updateResult] = await conn.query(
         `UPDATE transfers
             SET Estado = ?
           WHERE Id_Transfer = ?
-            AND Estado = ?`,
-        [transicion.nuevoEstado, row.Id_Transfer, row.Estado]
+            AND Estado = ?
+            AND Pendiente_Por_Entidad_En IS NULL
+            AND (? <> 'Confirmado' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
+              WHERE er.Id_Entidad_Reportante=transfers.Id_Entidad_Reportante
+                AND er.Estado_Validacion='RECHAZADA'))`,
+        [transicion.nuevoEstado, row.Id_Transfer, row.Estado, transicion.nuevoEstado]
       );
 
       if (!updateResult?.affectedRows) continue;
@@ -911,25 +919,14 @@ async function getDetalleTransferSvc(Id_Transfer) {
 
 async function normalizarEstadosTransfersExistentes(conexion = db) {
   const [transferRows] = await conexion.query(
-    `SELECT
-        Id_Transfer,
-        Fecha_Transfer,
-        Estado,
-        Nombre_Titular,
-        DNI,
-        Telefono_Titular,
-        Cantidad_Personas,
-        Id_Rango,
-        Id_Servicio,
-        Punto_Salida,
-        Punto_Destino,
-        Hora_Recogida,
-        Nombre_Reportante,
-        Telefono_Reportante,
-        Valor,
-        Vuelo,
-        TipoVuelo
-       FROM transfers`
+    `SELECT tr.Id_Transfer, tr.Fecha_Transfer, tr.Estado, tr.Nombre_Titular,
+        tr.DNI, tr.Telefono_Titular, tr.Cantidad_Personas, tr.Id_Rango,
+        tr.Id_Servicio, tr.Punto_Salida, tr.Punto_Destino, tr.Hora_Recogida,
+        tr.Nombre_Reportante, tr.Telefono_Reportante, tr.Valor, tr.Vuelo, tr.TipoVuelo,
+        tr.Id_Entidad_Reportante, tr.Pendiente_Por_Entidad_En,
+        e.Estado_Validacion AS Estado_Validacion_Entidad
+       FROM transfers tr LEFT JOIN entidades_reportantes e
+         ON e.Id_Entidad_Reportante=tr.Id_Entidad_Reportante`
   );
 
   if (!transferRows?.length) return { evaluados: 0, actualizados: 0 };
@@ -953,6 +950,7 @@ async function normalizarEstadosTransfersExistentes(conexion = db) {
 
   let actualizados = 0;
   for (const transfer of transferRows) {
+    if (transfer.Pendiente_Por_Entidad_En) continue;
     const idTransfer = String(transfer.Id_Transfer);
     const estadoActual = normalizarEstadoTransferLegacy(transfer.Estado);
     const pagos = pagosMap.get(idTransfer) || [];
@@ -992,13 +990,17 @@ async function normalizarEstadosTransfersExistentes(conexion = db) {
     }
 
     if (nuevoEstado !== transfer.Estado) {
-      await conexion.query(
+      const [updateResult] = await conexion.query(
         `UPDATE transfers
             SET Estado = ?
-          WHERE Id_Transfer = ?`,
-        [nuevoEstado, idTransfer]
+          WHERE Id_Transfer = ?
+            AND Pendiente_Por_Entidad_En IS NULL
+            AND (? <> 'Confirmado' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
+              WHERE er.Id_Entidad_Reportante=transfers.Id_Entidad_Reportante
+                AND er.Estado_Validacion='RECHAZADA'))`,
+        [nuevoEstado, idTransfer, nuevoEstado]
       );
-      actualizados += 1;
+      actualizados += Number(updateResult?.affectedRows || 0);
     }
   }
 
@@ -1173,6 +1175,7 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       TipoVuelo = ?,
       Estado = ?,
       Observaciones = ?,
+      Pendiente_Por_Entidad_En = NULL,
       Actualizado_Por = COALESCE(?, Actualizado_Por)
     WHERE Id_Transfer = ?`;
 

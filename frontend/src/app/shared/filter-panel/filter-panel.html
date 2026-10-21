@@ -1,5 +1,4 @@
-<section class="sir-filter-panel" [class.is-closing]="closing" [hidden]="!rendered"
-  [attr.inert]="closing ? '' : null" [attr.aria-hidden]="closing ? 'true' : null"
+<section class="sir-filter-panel" [class.sir-filter-panel--standalone]="standalone" [hidden]="!rendered" [attr.aria-hidden]="!rendered ? 'true' : null"
   [id]="panelId || null" [attr.aria-label]="label">
   <div class="sir-filter-panel-grid"><ng-content /></div>
 </section>

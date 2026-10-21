@@ -50,3 +50,4 @@ Los permisos efectivos, incluidas excepciones `ALLOW`/`DENY`, prevalecen sobre e
 2. Escalamiento contextual más prominente para situaciones críticas.
 3. Nuevas reglas por seguros, comisiones, pasajeros y controles, siempre reutilizando el dominio existente.
 4. Asistencia predictiva e IA sobre la trazabilidad, sin convertir el módulo en un gestor de tickets.
+5. Avisar a quienes tienen `ENTIDADES_REPORTANTES.VALIDAR` cuando una operación marcada con `Pendiente_Por_Entidad_En` llegue a su fecha de servicio (`Fecha_Tour` o `Fecha_Transfer`). La alerta debe reutilizar la marca existente, sin agregar columnas ni alterar el vencimiento automático.

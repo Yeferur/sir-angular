@@ -1,6 +1,6 @@
 <div class="programacion-page" [class.is-editor]="modoVista === 'editor' || modoVista === 'privados'">
   @if (modoVista === 'dashboard') {
-    <header class="operation-header">
+    <header class="operation-header programacion-command-surface">
       <div class="operation-date">
         <span class="operation-label">Operación del día</span>
         <p>{{ fechaSeleccionada | date:"EEEE, d 'de' MMMM" : '' : 'es-CO' }}</p>

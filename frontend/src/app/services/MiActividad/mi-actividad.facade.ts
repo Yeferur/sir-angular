@@ -141,7 +141,10 @@ export class MiActividadFacade {
     this.destroyRef.onDestroy(() => clearTimeout(this.contextualBatchTimer));
   }
 
-  get canReadPending(): boolean { return this.permissions.tienePermiso('PENDIENTES.LEER'); }
+  get canReadPending(): boolean {
+    return this.permissions.tienePermiso('PENDIENTES.LEER')
+      || this.permissions.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR');
+  }
   get canManagePending(): boolean { return this.permissions.tienePermiso('PENDIENTES.GESTIONAR'); }
   get canReadReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.LEER'); }
   get canCreateReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.CREAR'); }

@@ -1,7 +1,8 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { A11yModule } from '@angular/cdk/a11y';
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, EventEmitter, HostListener, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SirDateRange, SirDateRangePickerComponent } from '../../../shared/date-range-picker/date-range-picker';
 import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
@@ -29,8 +30,8 @@ const statusOptions: SirSelectOption[] = [
   { value: 'INACTIVA', label: 'Inactivas' },
 ];
 const activityOptions: SirSelectOption[] = [
-  { value: '', label: 'Toda actividad' }, { value: 'CON_RESERVAS', label: 'Con reservas' },
-  { value: 'SIN_RESERVAS', label: 'Sin reservas' },
+  { value: '', label: 'Toda actividad' }, { value: 'CON_RESERVAS', label: 'Con actividad' },
+  { value: 'SIN_RESERVAS', label: 'Sin actividad' },
 ];
 function bogotaDate(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric',
@@ -38,7 +39,7 @@ function bogotaDate(date: Date): string {
 }
 function initialFilters(): FiltrosEntidades {
   return { desde: bogotaDate(new Date(Date.now() - 30 * 86400000)), hasta: bogotaDate(new Date()),
-    tipo: '', validacion: '', estado: '', actividad: '', buscar: '' };
+    tipo: '', validacion: '', estado: '', actividad: '', buscar: '', diasSinReportarMin: '' };
 }
 
 @Component({
@@ -51,6 +52,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   private readonly api = inject(EntidadesReportantesService);
   private readonly reservas = inject(Reservas);
   private readonly permissions = inject(PermisosService);
+  private readonly route = inject(ActivatedRoute);
+  @Output() readonly drillDown = new EventEmitter<ActividadEntidad>();
   private previousFocus: HTMLElement | null = null;
   private suggestionTimer?: ReturnType<typeof setTimeout>;
   private suggestionRun = 0;
@@ -63,14 +66,19 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly dateRange = computed<SirDateRange>(() => ({ start: this.filters().desde, end: this.filters().hasta }));
   readonly result = signal<PaginaEntidades | null>(null);
   readonly selected = signal<DetalleEntidad | null>(null);
+  readonly selectedActivity = signal<ActividadEntidad | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly exporting = signal(false);
   readonly error = signal('');
+  readonly validationNotice = signal('');
   readonly detailError = signal('');
+  readonly detailNotice = signal('');
   readonly filterOpen = signal(false);
+  readonly appliedHasEntityCriteria = signal(false);
   readonly editing = signal(false);
   readonly creating = signal(false);
+  readonly rejecting = signal(false);
   readonly pointMatches = signal<Punto[]>([]);
   readonly pointPickerOpen = signal(false);
   readonly entitySuggestions = signal<ActividadEntidad[]>([]);
@@ -81,15 +89,24 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly canCreate = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.CREAR');
   readonly canEdit = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.ACTUALIZAR');
   readonly canValidate = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR');
+  readonly canManagePointRelations = this.canValidate && this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER');
+  readonly canExport = this.permissions.tienePermiso('MERCADEO.EXPORTAR');
+  readonly canViewOrigin = this.permissions.tienePermiso('MERCADEO.RESERVAS.LEER');
   name = '';
+  rejectionReason = '';
   type: TipoEntidad = 'HOTEL';
   pointSearch = '';
   get exactDuplicate(): ActividadEntidad | null {
     return this.entitySuggestions().find(entity =>
       entity.Tipo === this.type && this.normalize(entity.Nombre) === this.normalize(this.name)) || null;
   }
-  readonly filterCount = computed(() => ['tipo', 'validacion', 'estado', 'actividad']
+  readonly filterCount = computed(() => ['tipo', 'validacion', 'estado', 'actividad', 'diasSinReportarMin']
     .filter(key => !!this.filters()[key as keyof FiltrosEntidades]).length);
+  readonly hasEntityCriteria = computed(() => {
+    const current = this.filters();
+    return !!(current.buscar.trim() || current.tipo || current.validacion || current.estado
+      || current.actividad || current.diasSinReportarMin);
+  });
   readonly dateError = computed(() => {
     const f = this.filters();
     if (!f.desde || !f.hasta) return 'Selecciona un rango completo.';
@@ -99,33 +116,57 @@ export class MercadeoEntidadesComponent implements OnInit {
     return '';
   });
 
-  ngOnInit(): void { this.search(); }
+  ngOnInit(): void {
+    const requestedValidation = this.route.snapshot.queryParamMap.get('validacion') || '';
+    if (this.validationOptions.some(option => option.value === requestedValidation)) {
+      this.filters.update(current => ({ ...current, validacion: requestedValidation }));
+    }
+    this.search();
+  }
   setFilter(key: keyof FiltrosEntidades, value: string): void {
     this.filters.update(current => ({ ...current, [key]: value || '' }));
+  }
+  setDaysFilter(value: number | string | null): void {
+    this.setFilter('diasSinReportarMin', value === null || value === '' ? '' : String(value));
   }
   setRange(range: SirDateRange): void {
     this.filters.update(current => ({ ...current, desde: range.start || '', hasta: range.end || '' }));
   }
   async search(page = 1): Promise<void> {
     if (this.loading() || this.dateError()) return;
+    this.appliedHasEntityCriteria.set(this.hasEntityCriteria());
     this.loading.set(true); this.error.set('');
     try { this.result.set(await firstValueFrom(this.api.activity(this.filters(), page))); }
     catch (e: any) { this.error.set(e?.error?.message || 'No se pudo consultar la actividad.'); }
     finally { this.loading.set(false); }
   }
-  clear(): void { this.filters.set(initialFilters()); this.search(); }
-  readonly hasChangedFilters = computed(() => {
-    const current = this.filters(); const initial = initialFilters();
-    return Object.keys(initial).some(key => current[key as keyof FiltrosEntidades] !== initial[key as keyof FiltrosEntidades]);
-  });
+  setSort(column: string): void {
+    const current = this.filters();
+    const order = current.ordenarPor === column && current.orden === 'ASC' ? 'DESC' : 'ASC';
+    this.filters.update(value => ({ ...value, ordenarPor: column, orden: order }));
+    void this.search(1);
+  }
+  sortLabel(column: string): string {
+    if (this.filters().ordenarPor !== column) return 'Ordenar';
+    return this.filters().orden === 'DESC' ? 'Orden descendente' : 'Orden ascendente';
+  }
+  showOrigin(): void {
+    const item = this.selectedActivity();
+    if (!item) return;
+    this.close();
+    this.drillDown.emit(item);
+  }
   async open(item: ActividadEntidad): Promise<void> {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.detailError.set(''); this.selected.set(null); this.editing.set(false);
+    this.selectedActivity.set(item);
+    this.detailError.set(''); this.detailNotice.set(''); this.selected.set(null); this.editing.set(false);
+    this.rejecting.set(false); this.rejectionReason = '';
     try { this.selected.set(await firstValueFrom(this.api.detail(item.Id_Entidad_Reportante, this.filters()))); }
     catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo cargar el detalle.'); }
   }
   close(): void {
-    this.selected.set(null); this.creating.set(false); this.editing.set(false); this.pointMatches.set([]);
+    this.selected.set(null); this.selectedActivity.set(null); this.creating.set(false); this.editing.set(false);
+    this.rejecting.set(false); this.rejectionReason = ''; this.detailNotice.set(''); this.pointMatches.set([]);
     this.pointPickerOpen.set(false); this.pointSuggestionDismissed = false;
     this.entitySuggestions.set([]); this.createPointSuggestions.set([]);
     this.selectedCreatePoint.set(null); this.associateCreatePoint.set(false);
@@ -222,12 +263,33 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   async validate(state: ValidacionEntidad): Promise<void> {
     const id = this.selected()?.entity.Id_Entidad_Reportante; if (!id || this.saving()) return;
+    const reason = state === 'RECHAZADA' ? this.rejectionReason.trim() : '';
+    if (state === 'RECHAZADA' && (!reason || reason.length > 300)) {
+      this.detailError.set('Escribe un motivo de rechazo de hasta 300 caracteres.');
+      return;
+    }
     this.saving.set(true);
-    try { await firstValueFrom(this.api.validate(id, state));
-      await this.refreshDetail(id); await this.search(this.result()?.page || 1); }
+    this.detailError.set(''); this.detailNotice.set('');
+    try {
+      const result = await firstValueFrom(this.api.validate(id, state, reason));
+      this.rejecting.set(false); this.rejectionReason = '';
+      this.detailNotice.set(result?.warning || '');
+      if (this.canValidate && !this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER')) {
+        this.selected.set(null);
+        this.validationNotice.set(result?.warning || (state === 'RECHAZADA' ? 'Entidad rechazada.' : 'Entidad validada.'));
+        await this.search(this.result()?.page || 1);
+        return;
+      }
+      await this.refreshDetail(id); await this.search(this.result()?.page || 1);
+    }
     catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo actualizar la validación.'); }
     finally { this.saving.set(false); }
   }
+  beginReject(): void {
+    if (!this.canValidate || this.saving()) return;
+    this.detailError.set(''); this.detailNotice.set(''); this.rejectionReason = ''; this.rejecting.set(true);
+  }
+  cancelReject(): void { this.rejecting.set(false); this.rejectionReason = ''; this.detailError.set(''); }
   async searchPoints(): Promise<void> {
     if (this.pointSearch.trim().length < 2) { this.pointMatches.set([]); return; }
     try { this.pointMatches.set(await firstValueFrom(this.reservas.buscarPuntos(this.pointSearch))); }
@@ -263,4 +325,15 @@ export class MercadeoEntidadesComponent implements OnInit {
     return { PENDIENTE_VALIDACION: 'Pendiente', VALIDADA: 'Validada', RECHAZADA: 'Rechazada' }[state];
   }
   one(value: number): boolean { return Number(value) === 1; }
+  activitySummary(item: ActividadEntidad): string {
+    const parts: string[] = [];
+    if (item.Reservas) parts.push(`${item.Reservas} ${this.one(item.Reservas) ? 'reserva' : 'reservas'}`);
+    if (item.Transfers) parts.push(`${item.Transfers} ${this.one(item.Transfers) ? 'transfer' : 'transfers'}`);
+    if (item.Pasajeros) parts.push(`${item.Pasajeros} ${this.one(item.Pasajeros) ? 'pasajero' : 'pasajeros'}`);
+    return parts.length ? parts.join(' · ') : 'Sin actividad';
+  }
+  inactivityDaysPlaceholder(): string {
+    const days = this.result()?.umbralDiasSinReportar;
+    return days ? String(days) : '';
+  }
 }

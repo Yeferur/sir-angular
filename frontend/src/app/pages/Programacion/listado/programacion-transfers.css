@@ -9,11 +9,6 @@
   grid-template-columns: minmax(220px, auto) minmax(390px, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px;
-  border: 1px solid var(--separator-color);
-  border-radius: 14px;
-  background: var(--bg-secondary);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
 }
 
 button, input { font: inherit; }
