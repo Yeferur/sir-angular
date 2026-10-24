@@ -1,17 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { forkJoin, map } from 'rxjs';
 
 export type MercadeoEntidadTipo = 'HOTEL' | 'AGENCIA_NACIONAL' | 'AGENCIA_INTERNACIONAL';
-
-export interface MercadeoEntidadReportante {
-  Id_Entidad_Reportante: number;
-  Tipo: MercadeoEntidadTipo;
-  Nombre: string;
-  Activo: number | boolean;
-  Estado_Validacion: 'PENDIENTE_VALIDACION' | 'VALIDADA' | 'RECHAZADA';
-}
 
 export interface MercadeoPasajero {
   id: number;
@@ -136,18 +127,6 @@ export class MercadeoService {
 
   getUsuarios() {
     return this.http.get<MercadeoUsuario[]>(`${this.apiUrl}/mercadeo/usuarios`);
-  }
-
-  buscarEntidadesReportantes(search: string) {
-    const types: MercadeoEntidadTipo[] = ['HOTEL', 'AGENCIA_NACIONAL', 'AGENCIA_INTERNACIONAL'];
-    const requests = types.map((type) => this.http.get<MercadeoEntidadReportante[]>(
-      `${this.apiUrl}/entidades-reportantes`, {
-        params: new HttpParams().set('tipo', type).set('buscar', search).set('limite', 20).set('incluirInactivas', '1'),
-      },
-    ));
-    return forkJoin(requests).pipe(
-      map((groups) => groups.flat().sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es'))),
-    );
   }
 
   buscar(filters: MercadeoFilters, page: number, pageSize = 25) {

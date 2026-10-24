@@ -146,9 +146,11 @@ export class Reservas {
   }
 
   getCanales()  { return this.http.get<Canal[]>( `${this.apiUrl}/canales` ); }
-  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = '') {
+  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = '', incluirInactivas = false) {
+    let params = new HttpParams().set('tipo', tipo).set('buscar', buscar);
+    if (incluirInactivas) params = params.set('incluirInactivas', '1');
     return this.http.get<EntidadReportante[]>(`${this.apiUrl}/entidades-reportantes`, {
-      params: new HttpParams().set('tipo', tipo).set('buscar', buscar),
+      params,
     });
   }
   registrarEntidadReportanteRapida(idCanal: number, nombre: string) {

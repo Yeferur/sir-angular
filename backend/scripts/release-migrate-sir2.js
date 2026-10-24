@@ -32,9 +32,11 @@ const MIGRATIONS = Object.freeze([
   '20261013_0013_entidades_mercadeo.sql',
   '20261013_0014_final_authoring_audit_schema.sql',
   '20261016_0015_perfiles_comision_entidad.sql',
+  '20261019_0001_transfers_entidad_schema_guard.sql',
   '20261020_0016_transfers_entidad_fecha_registro.sql',
   '20261021_0017_mercadeo_exportar.sql',
   '20261021_0018_entidades_reportantes_validacion.sql',
+  '20261024_0019_mercadeo_lectura.sql',
 ]);
 
 function assertTargetConfiguration(env) {

@@ -8,7 +8,8 @@ import { MercadeoEntidadesComponent } from './mercadeo-entidades';
 import { EntidadesReportantesService, PaginaEntidades } from '../../../services/Mercadeo/entidades-reportantes.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { Reservas } from '../../../services/Reservas/reservas';
-import { routes } from '../../../app.routes';
+import { MercadeoService, MercadeoOrigenPage } from '../../../services/Mercadeo/mercadeo.service';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 
 registerLocaleData(localeEsCO);
 
@@ -20,7 +21,7 @@ const page: PaginaEntidades = {
   items: [{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL', Nombre: 'Hotel Niño', Activo: 1,
     Estado_Validacion: 'PENDIENTE_VALIDACION', Fecha_Creacion: '2026-10-13', Reservas: 2,
     Transfers: 0, Operaciones: 2, Pasajeros: 3, Primera_Reserva: null, Ultima_Reserva: null,
-    Dias_Sin_Reportar: null, Primera_Actividad: null, Ultima_Actividad: null,
+    Dias_Sin_Reportar: null, Primera_Actividad: null, Ultima_Actividad: null, Ultimo_Reporte: '2026-10-13',
     Contacto_Reciente: 'Andrea' }],
   umbralDiasSinReportar: 90, ordenarPor: 'nombre', orden: 'ASC',
 };
@@ -30,11 +31,23 @@ describe('MercadeoEntidadesComponent', () => {
   let component: MercadeoEntidadesComponent;
   let api: jasmine.SpyObj<EntidadesReportantesService>;
   let buscarPuntos: jasmine.Spy;
+  let origenApi: jasmine.SpyObj<MercadeoService>;
+  let drawer: jasmine.SpyObj<SirDrawerService>;
+  const operationsPage: MercadeoOrigenPage = {
+    items: [{ tipo: 'RESERVA', id_operacion: 'R-1', id_reserva: 'R-1', id_transfer: null,
+      fecha_registro: '2026-10-13', fecha_servicio: '2026-10-20', id_canal: 1, canal: 'Hotel',
+      id_entidad_reportante: 7, entidad: 'Hotel Niño', tipo_entidad: 'HOTEL', nombre_reportante: 'Andrea',
+      telefono_reportante: '300', creador_id: 1, creador: 'Mercadeo', pasajeros: 2, estado: 'Pendiente',
+      pendiente_por_entidad_en: null }],
+    page: 1, pageSize: 10, totalPages: 1, totalOperaciones: 1, totalPasajeros: 2,
+    totalPasajerosEnPagina: 2, tipo: 'TODOS',
+  };
 
   beforeEach(async () => {
-    api = jasmine.createSpyObj('EntidadesReportantesService', ['activity', 'detail', 'create',
+    api = jasmine.createSpyObj('EntidadesReportantesService', ['activity', 'search', 'detail', 'create',
       'update', 'validate', 'point', 'export']);
     api.activity.and.returnValue(of(page));
+    api.search.and.returnValue(of([page.items[0]]));
     api.detail.and.returnValue(of({
       entity: { ...page.items[0], Creado_Por: 1, Creador: 'Mercadeo' },
       historic: { Reservas: 2, Transfers: 0, Operaciones: 2, Pasajeros: 3,
@@ -46,11 +59,16 @@ describe('MercadeoEntidadesComponent', () => {
       associated: [{ Id_Punto: 5, Nombre_Punto: 'Hotel Niño', Estado_Validacion: 'VALIDADA' }],
     }));
     buscarPuntos = jasmine.createSpy('buscarPuntos').and.returnValue(of([]));
+    origenApi = jasmine.createSpyObj<MercadeoService>('MercadeoService', ['buscarOrigen']);
+    origenApi.buscarOrigen.and.returnValue(of(operationsPage));
+    drawer = jasmine.createSpyObj<SirDrawerService>('SirDrawerService', ['openReserva', 'openTransfer']);
     await TestBed.configureTestingModule({
       imports: [MercadeoEntidadesComponent],
       providers: [provideZonelessChangeDetection(), provideRouter([]),
         { provide: EntidadesReportantesService, useValue: api },
         { provide: Reservas, useValue: { buscarPuntos } },
+        { provide: MercadeoService, useValue: origenApi },
+        { provide: SirDrawerService, useValue: drawer },
         { provide: PermisosService, useValue: { tienePermiso: () => true } }],
     }).compileComponents();
     fixture = TestBed.createComponent(MercadeoEntidadesComponent);
@@ -69,6 +87,21 @@ describe('MercadeoEntidadesComponent', () => {
     expect(html.querySelector('h1')).toBeNull();
     expect(html.querySelector('.marketing-tabs')).toBeNull();
     expect(html.querySelector('.entity-summary')).toBeNull();
+    expect(html.textContent).toContain('Último reporte');
+    expect(html.textContent).toContain('13 oct 2026');
+  });
+
+  it('inicia con Activa = Sí y un período de 30 días calendario', () => {
+    expect(component.filters().estado).toBe('ACTIVA');
+    expect((Date.parse(component.filters().hasta) - Date.parse(component.filters().desde)) / 86400000).toBe(29);
+    expect(component.filterCount()).toBe(0);
+  });
+
+  it('no trata el filtro predeterminado Activa = Sí como una búsqueda con cero coincidencias', async () => {
+    api.activity.and.returnValue(of({ ...page, items: [], total: 0 }));
+    await component.search();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sin entidades registradas');
   });
 
   it('rechaza un rango mayor a 31 días y envía filtros completos', () => {
@@ -94,11 +127,26 @@ describe('MercadeoEntidadesComponent', () => {
     expect(html).toContain('Puntos asociados oficialmente');
   });
 
-  it('expone una ruta unificada protegida por cualquiera de los permisos de sus pestañas', () => {
-    const route = routes.find(item => item.path === 'Mercadeo');
-    expect(route?.data?.['permisos']).toEqual(['ENTIDADES_REPORTANTES.LEER', 'MERCADEO.RESERVAS.LEER']);
-    expect(route?.canActivate).toBeTruthy();
-    expect(routes.find(item => item.path === 'Mercadeo/Entidades')?.data?.['mercadeoLegacyTab']).toBe('entidades');
+  it('mantiene Entidades en una ruta separada protegida por lectura o validación', async () => {
+    const routes = await import('../../../app.routes').then(module => module.routes);
+    const origin = routes.find(item => item.path === 'Mercadeo/Reservas');
+    const entities = routes.find(item => item.path === 'Mercadeo/Entidades');
+    expect(origin?.data?.['permiso']).toBe('MERCADEO.RESERVAS.LEER');
+    expect(entities?.data?.['permisos']).toEqual(['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR']);
+    expect(routes.some(item => item.path === 'Mercadeo')).toBeFalse();
+  });
+
+  it('carga operaciones solo al abrir el drawer, filtradas por entidad y período, y abre el detalle existente', async () => {
+    expect(origenApi.buscarOrigen).not.toHaveBeenCalled();
+    await component.open(page.items[0]);
+    expect(api.detail).toHaveBeenCalled();
+    expect(origenApi.buscarOrigen).toHaveBeenCalledWith(jasmine.objectContaining({
+      idEntidadReportante: '7',
+      fechaRegistroDesde: component.appliedFilters().desde,
+      fechaRegistroHasta: component.appliedFilters().hasta,
+    }), 1, 10);
+    component.openOperation(operationsPage.items[0]);
+    expect(drawer.openReserva).toHaveBeenCalledWith('R-1');
   });
 
   it('advierte un nombre normalizado existente y no lo crea de nuevo', async () => {
@@ -112,32 +160,4 @@ describe('MercadeoEntidadesComponent', () => {
     expect(api.create).not.toHaveBeenCalled();
   });
 
-  it('propone un punto para hotel y sólo lo asocia con elección expresa', async () => {
-    const point = { Id_Punto: 42, NombrePunto: 'PROVENZA GARDEN' };
-    api.activity.and.returnValue(of({ ...page, items: [], total: 0 }));
-    buscarPuntos.and.returnValue(of([point]));
-    api.create.and.returnValue(of({
-      entity: { ...page.items[0], Creado_Por: 1, Creador: 'Mercadeo' },
-      historic: { Reservas: 0, Transfers: 0, Operaciones: 0, Pasajeros: 0,
-        Primera_Reserva: null, Ultima_Reserva: null, Dias_Sin_Reportar: null,
-        Primera_Actividad: null, Ultima_Actividad: null },
-      period: { Reservas: 0, Transfers: 0, Operaciones: 0, Pasajeros: 0 },
-      contacts: [], observed: [], associated: [],
-    }));
-    api.point.and.returnValue(of({}));
-    component.startCreate();
-    component.onCreateNameChange('Provenza');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    expect(component.createPointSuggestions()[0].Id_Punto).toBe(42);
-    component.usePoint(point);
-    expect(component.name).toBe('Provenza Garden');
-    await component.save();
-    expect(api.point).not.toHaveBeenCalled();
-
-    component.startCreate();
-    component.usePoint(point);
-    component.associateCreatePoint.set(true);
-    await component.save();
-    expect(api.point).toHaveBeenCalledWith(7, 42, true);
-  });
 });

@@ -77,7 +77,7 @@ async function listEntities({ type, search = '', limit = 100, includeInactive = 
   return rows;
 }
 
-async function quickCreate({ channelId, name, actorId }) {
+async function quickCreate({ channelId, name, actorId, canValidate = false }) {
   const commercialName = normalizeName(name);
   const conn = await db.getConnection();
   try {
@@ -95,17 +95,24 @@ async function quickCreate({ channelId, name, actorId }) {
       await conn.commit();
       return { entity: existing[0], created: false };
     }
+    const initialState = canValidate ? 'VALIDADA' : 'PENDIENTE_VALIDACION';
+    const validAt = canValidate ? new Date() : null;
     const [inserted] = await conn.query(`INSERT INTO entidades_reportantes
-      (Tipo,Nombre,Nombre_Normalizado,Estado_Validacion,Creado_Por,Actualizado_Por)
-      VALUES (?,?,?,'PENDIENTE_VALIDACION',?,?)`, [type, commercialName, key, actorId, actorId]);
+      (Tipo,Nombre,Nombre_Normalizado,Estado_Validacion,Creado_Por,Actualizado_Por,Validado_Por,Validado_En)
+      VALUES (?,?,?,?,?,?,?,?)`, [type, commercialName, key, initialState, actorId, actorId,
+      canValidate ? actorId : null, validAt]);
     await recordHistorial({ conexion: conn, tabla: 'entidades_reportantes', id_registro: inserted.insertId,
       accion: 'CREAR', id_usuario: actorId,
       detalles: [{ columna: 'Tipo', anterior: null, nuevo: type },
-        { columna: 'Nombre', anterior: null, nuevo: commercialName }] });
-    await upsertEntityValidationPending(conn, inserted.insertId, commercialName);
+        { columna: 'Nombre', anterior: null, nuevo: commercialName },
+        { columna: 'Estado_Validacion', anterior: null, nuevo: initialState },
+        ...(canValidate ? [{ columna: 'Validado_Por', anterior: null, nuevo: actorId },
+          { columna: 'Validado_En', anterior: null, nuevo: validAt }] : [])] });
+    if (!canValidate) await upsertEntityValidationPending(conn, inserted.insertId, commercialName);
     await conn.commit();
     return { entity: { Id_Entidad_Reportante: inserted.insertId, Tipo: type, Nombre: commercialName,
-      Activo: 1, Estado_Validacion: 'PENDIENTE_VALIDACION' }, created: true };
+      Activo: 1, Estado_Validacion: initialState, Validado_Por: canValidate ? actorId : null,
+      Validado_En: validAt }, created: true };
   } catch (e) {
     await conn.rollback();
     if (e.code === 'ER_DUP_ENTRY') {
@@ -140,7 +147,7 @@ async function upsertEntityValidationPending(connection, id, name, pending = pen
     operationDate: new Date(),
     data: {
       idEntidadReportante: String(id),
-      ruta: '/Mercadeo?vista=entidades&validacion=PENDIENTE_VALIDACION',
+      ruta: '/Mercadeo/Entidades?validacion=PENDIENTE_VALIDACION',
     },
   }, connection);
 }

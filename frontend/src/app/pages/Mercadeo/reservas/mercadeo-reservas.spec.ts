@@ -21,11 +21,10 @@ describe('MercadeoReservasComponent', () => {
   beforeEach(async () => {
     params = new BehaviorSubject(convertToParamMap({}));
     api = jasmine.createSpyObj<MercadeoService>('MercadeoService', [
-      'getCategorias', 'getUsuarios', 'buscarEntidadesReportantes', 'buscarOrigen', 'exportarOrigen',
+      'getCategorias', 'getUsuarios', 'buscarOrigen', 'exportarOrigen',
     ]);
     api.getCategorias.and.returnValue(of([{ Id_Canal: 1, Nombre_Canal: 'Hotel' }]));
     api.getUsuarios.and.returnValue(of([{ Id_Usuario: 8, Nombres_Apellidos: 'Usuario Uno', Activo: 1 }]));
-    api.buscarEntidadesReportantes.and.returnValue(of([]));
     api.buscarOrigen.and.returnValue(of(emptyPage));
     api.exportarOrigen.and.returnValue(of(new Blob()));
 
@@ -47,11 +46,20 @@ describe('MercadeoReservasComponent', () => {
     fixture.detectChanges();
   });
 
-  it('muestra el estado inicial compartido y no agrega una acción de limpiar filtros', () => {
+  it('muestra el estado vacío, sin búsqueda de entidad ni acción global para limpiar', () => {
     const html = fixture.nativeElement as HTMLElement;
     expect(html.textContent).toContain('Listo para buscar');
     expect(html.querySelector('button[aria-label*="limpiar filtros" i]')).toBeNull();
     expect(html.textContent).not.toContain('Preparando…');
+    expect(html.querySelector('app-search-input')).toBeNull();
+    expect(html.textContent).toContain('Servicio');
+    expect(html.textContent).not.toContain('Entidad reportante');
+  });
+
+  it('inicia con los últimos 30 días según el calendario local de Bogotá', () => {
+    const filters = component.filters();
+    expect(filters.fechaRegistroHasta).toBeTruthy();
+    expect((Date.parse(filters.fechaRegistroHasta) - Date.parse(filters.fechaRegistroDesde)) / 86400000).toBe(29);
   });
 
   it('consulta origen unificado y sincroniza el tipo seleccionado en la URL', async () => {
@@ -62,9 +70,12 @@ describe('MercadeoReservasComponent', () => {
 
     expect(api.buscarOrigen).toHaveBeenCalledWith(jasmine.objectContaining({ tipo: 'RESERVA' }), 1, 25);
     expect(router.navigate).toHaveBeenCalledWith([], jasmine.objectContaining({
-      queryParams: jasmine.objectContaining({ tipo: 'RESERVA', vista: 'origen', consultar: '1' }),
+      queryParams: jasmine.objectContaining({ tipo: 'RESERVA', consultar: '1' }),
       queryParamsHandling: 'merge',
     }));
+    const navigation = (router.navigate as jasmine.Spy).calls.mostRecent().args[1] as any;
+    expect(navigation.queryParams.vista).toBeUndefined();
+    expect(navigation.queryParams.idEntidadReportante).toBeUndefined();
   });
 
   it('restaura Transfers desde la ruta anterior y ejecuta la consulta', async () => {

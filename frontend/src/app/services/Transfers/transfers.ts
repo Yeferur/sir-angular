@@ -26,9 +26,11 @@ export class TransferService {
     return this.http.get<any[]>(`${this.apiUrl}/Transfer/Canales`);
   }
 
-  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = ''): Observable<EntidadReportante[]> {
+  getEntidadesReportantes(tipo: EntidadReportante['Tipo'], buscar = '', incluirInactivas = false): Observable<EntidadReportante[]> {
+    const params: Record<string, string> = { tipo, buscar, limite: '200' };
+    if (incluirInactivas) params['incluirInactivas'] = '1';
     return this.http.get<EntidadReportante[]>(`${this.apiUrl}/entidades-reportantes`, {
-      params: { tipo, buscar, limite: '200' },
+      params,
     });
   }
 

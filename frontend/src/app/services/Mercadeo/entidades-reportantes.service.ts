@@ -14,7 +14,8 @@ export interface ActividadEntidad {
   Estado_Validacion: ValidacionEntidad; Fecha_Creacion: string; Creador?: string;
   Reservas: number; Transfers: number; Operaciones: number; Pasajeros: number;
   Primera_Reserva: string | null; Ultima_Reserva: string | null; Dias_Sin_Reportar: number | null;
-  Primera_Actividad: string | null; Ultima_Actividad: string | null; Contacto_Reciente: string | null;
+  Primera_Actividad: string | null; Ultima_Actividad: string | null; Ultimo_Reporte: string | null;
+  Contacto_Reciente: string | null;
 }
 export interface PaginaEntidades {
   items: ActividadEntidad[];
@@ -61,6 +62,10 @@ export class EntidadesReportantesService {
     return this.http.get<PaginaEntidades>(`${this.url}/actividad`, {
       params: this.params(filters).set('page', page).set('pageSize', 25),
     });
+  }
+  search(tipo: TipoEntidad, nombre: string) {
+    return this.http.get<ActividadEntidad[]>(this.url, { params: new HttpParams()
+      .set('tipo', tipo).set('buscar', nombre).set('limite', 20).set('incluirInactivas', '1') });
   }
   detail(id: number, filters: FiltrosEntidades) {
     return this.http.get<DetalleEntidad>(`${this.url}/${id}`, { params: this.params(filters) });

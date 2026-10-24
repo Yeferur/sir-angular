@@ -1,15 +1,16 @@
 import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
-import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
-import { finalize, forkJoin, of } from 'rxjs';
+import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, HostListener, inject } from '@angular/core';
+import { finalize, firstValueFrom, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { A11yModule } from '@angular/cdk/a11y';
 import { Router } from '@angular/router';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
 import type { Canal, EntidadReportante } from '../../../services/Reservas/reservas';
-import { tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
+import { claveNombreEntidad, tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
@@ -32,7 +33,7 @@ interface WizardStep {
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, A11yModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './crear-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })
@@ -323,6 +324,14 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   entidadError = '';
   private entidadSearchTimer: ReturnType<typeof setTimeout> | null = null;
   private entidadSearchVersion = 0;
+  quickEntityDrawerOpen = false;
+  quickEntityName = '';
+  quickEntityMatches: EntidadReportante[] = [];
+  quickEntityLoading = false;
+  quickEntitySaving = false;
+  quickEntityError = '';
+  private quickEntitySearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private quickEntitySearchVersion = 0;
   selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
@@ -346,6 +355,11 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     control?.updateValueAndValidity({ emitEvent: false });
     if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
     this.entidadSearchVersion++;
+    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
+    this.quickEntitySearchVersion++;
+    this.quickEntityDrawerOpen = false;
+    this.quickEntityMatches = [];
+    this.quickEntityLoading = false;
     if (!preserve) this.busquedaEntidad = '';
     this.entidadAutocompleteOpen = false;
     this.entidadCargando = false;
@@ -418,6 +432,115 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  get quickEntityMatch(): EntidadReportante | null {
+    const type = this.tipoEntidadSeleccionada();
+    const key = claveNombreEntidad(this.quickEntityName);
+    if (!type || !key) return null;
+    return this.quickEntityMatches.find(entity => entity.Tipo === type && claveNombreEntidad(entity.Nombre) === key) || null;
+  }
+
+  get quickEntityMatchUsable(): boolean {
+    const match = this.quickEntityMatch;
+    return !!match && !!Number(match.Activo) && match.Estado_Validacion !== 'RECHAZADA';
+  }
+
+  get quickEntityTypeLabel(): string {
+    switch (this.tipoEntidadSeleccionada()) {
+      case 'HOTEL': return 'Hotel';
+      case 'AGENCIA_NACIONAL': return 'Agencia nacional';
+      case 'AGENCIA_INTERNACIONAL': return 'Agencia internacional';
+      default: return 'Entidad reportante';
+    }
+  }
+
+  openQuickEntityDrawer(): void {
+    if (!this.tipoEntidadSeleccionada()) return;
+    this.quickEntityError = '';
+    this.quickEntityName = this.busquedaEntidad;
+    this.quickEntityDrawerOpen = true;
+    this.onQuickEntityNameInput(this.quickEntityName);
+  }
+
+  @HostListener('window:keydown.escape') closeQuickEntityDrawerOnEscape(): void {
+    this.quickEntityDrawerOpen = false;
+  }
+
+  onQuickEntityNameInput(value: string): void {
+    this.quickEntityName = value;
+    this.quickEntityError = '';
+    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
+    const version = ++this.quickEntitySearchVersion;
+    const type = this.tipoEntidadSeleccionada();
+    const term = value.trim();
+    if (!type || term.length < 2) {
+      this.quickEntityMatches = [];
+      this.quickEntityLoading = false;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.quickEntityLoading = true;
+    this.quickEntitySearchTimer = setTimeout(() => {
+      this.transferSvc.getEntidadesReportantes(type, term, true).subscribe({
+        next: entities => {
+          if (version !== this.quickEntitySearchVersion) return;
+          this.quickEntityMatches = Array.isArray(entities) ? entities : [];
+          this.quickEntityLoading = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          if (version !== this.quickEntitySearchVersion) return;
+          this.quickEntityError = 'No pudimos verificar si ya existe.';
+          this.quickEntityLoading = false;
+          this.cdr.markForCheck();
+        },
+      });
+    }, 220);
+  }
+
+  useQuickEntityMatch(): void {
+    const match = this.quickEntityMatch;
+    if (!match || !this.quickEntityMatchUsable) return;
+    this.form.get('Id_Entidad_Reportante')?.setValue(match.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = match.Nombre;
+    this.resultsEntidadesReportantes = [match];
+    this.entidadError = '';
+    this.quickEntityDrawerOpen = false;
+    this.quickEntityName = '';
+    this.cdr.markForCheck();
+  }
+
+  async createQuickEntity(): Promise<void> {
+    const name = this.quickEntityName.trim();
+    const type = this.tipoEntidadSeleccionada();
+    if (!type || this.quickEntitySaving) return;
+    if (name.length < 2) { this.quickEntityError = 'Escribe al menos 2 caracteres para el nombre.'; return; }
+    if (this.quickEntityMatch) {
+      if (this.quickEntityMatchUsable) this.useQuickEntityMatch();
+      else this.quickEntityError = `${this.quickEntityMatch.Nombre} ya existe, pero está inactiva o rechazada. Solicita su revisión.`;
+      return;
+    }
+    const channelId = this.form.get('Id_Canal')?.value;
+    if (!channelId) { this.quickEntityError = 'Selecciona primero el canal.'; return; }
+    this.quickEntitySaving = true;
+    this.quickEntityError = '';
+    try {
+      const entity = await firstValueFrom(this.transferSvc.registrarEntidadReportanteRapida(channelId, name));
+      this.resultsEntidadesReportantes = [...this.resultsEntidadesReportantes.filter(item =>
+        String(item.Id_Entidad_Reportante) !== String(entity.Id_Entidad_Reportante)), entity];
+      this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
+      this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+      this.busquedaEntidad = entity.Nombre;
+      this.quickEntityDrawerOpen = false;
+      this.quickEntityName = '';
+    } catch (error: any) {
+      this.quickEntityError = error?.error?.message || 'No pudimos registrar la entidad. Revisa el nombre e intenta nuevamente.';
+    } finally {
+      this.quickEntitySaving = false;
+      this.cdr.markForCheck();
+    }
   }
 
   nombreCanalSeleccionado(): string {
@@ -1203,6 +1326,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
+    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     this.navbar?.clearOverlay?.();
   }

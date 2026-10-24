@@ -107,7 +107,7 @@ test('migración de perfiles de comisión está en release y protege columnas y 
 
 test('migración nueva agrega el índice de actividad de transfers y queda sin aplicar', async () => {
   const name = '20261020_0016_transfers_entidad_fecha_registro.sql';
-  assert.equal(MIGRATIONS[MIGRATIONS.length - 3], name);
+  assert.equal(MIGRATIONS[MIGRATIONS.length - 4], name);
   const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE transfers ADD INDEX ix_transfers_entidad_registro (Id_Entidad_Reportante, Fecha_Registro)')));
@@ -115,9 +115,24 @@ test('migración nueva agrega el índice de actividad de transfers y queda sin a
   assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
 });
 
+test('la guarda idempotente del esquema de transfers precede a 0016', async () => {
+  const name = '20261019_0001_transfers_entidad_schema_guard.sql';
+  const guardIndex = MIGRATIONS.indexOf(name);
+  const index0016 = MIGRATIONS.indexOf('20261020_0016_transfers_entidad_fecha_registro.sql');
+  assert.ok(guardIndex >= 0);
+  assert.ok(guardIndex < index0016);
+  const migration = (await readMigrations()).find(item => item.name === name);
+  assert.equal(migration.statements.length, 16);
+  assert.equal((migration.statements.join('\n').match(/FROM information_schema\.COLUMNS/g) || []).length, 2);
+  assert.equal((migration.statements.join('\n').match(/FROM information_schema\.REFERENTIAL_CONSTRAINTS/g) || []).length, 2);
+  assert.match(migration.statements.join('\n'), /FOREIGN KEY \(Id_Canal\).*ON DELETE SET NULL ON UPDATE CASCADE/);
+  assert.match(migration.statements.join('\n'), /FOREIGN KEY \(Id_Entidad_Reportante\).*ON DELETE RESTRICT ON UPDATE CASCADE/);
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
 test('migración 0017 registra MERCADEO.EXPORTAR y su asignación por defecto sin aplicarla', async () => {
   const name = '20261021_0017_mercadeo_exportar.sql';
-  assert.equal(MIGRATIONS.at(-2), name);
+  assert.equal(MIGRATIONS.at(-3), name);
   const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(migration.statements.some(statement => statement.includes("'MERCADEO.EXPORTAR'")));
@@ -128,13 +143,26 @@ test('migración 0017 registra MERCADEO.EXPORTAR y su asignación por defecto si
 
 test('migración 0018 agrega marcas de rechazo y la regla de validación sin aplicar', async () => {
   const name = '20261021_0018_entidades_reportantes_validacion.sql';
-  assert.equal(MIGRATIONS.at(-1), name);
-  const migration = (await readMigrations()).at(-1);
+  assert.equal(MIGRATIONS.at(-2), name);
+  const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(REQUIRED_COLUMNS.reservas.includes('Pendiente_Por_Entidad_En'));
   assert.ok(REQUIRED_COLUMNS.transfers.includes('Pendiente_Por_Entidad_En'));
   assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE reservas ADD COLUMN Pendiente_Por_Entidad_En')));
   assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE transfers ADD COLUMN Pendiente_Por_Entidad_En')));
   assert.ok(migration.statements.some(statement => statement.includes('ENTIDAD_REPORTANTE_PENDIENTE_VALIDACION')));
+  assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
+test('migración 0019 agrega lectura de reservas y transfers a Mercadeo, sin Historial ni escritura', async () => {
+  const name = '20261024_0019_mercadeo_lectura.sql';
+  assert.equal(MIGRATIONS.at(-1), name);
+  const migration = (await readMigrations()).at(-1);
+  assert.equal(migration.name, name);
+  const sql = await fs.readFile(path.join(__dirname, '../database/migrations', name), 'utf8');
+  for (const code of ['TRANSFERS.LEER', 'RESERVAS.LEER']) assert.ok(sql.includes(code));
+  assert.doesNotMatch(sql, /HISTORIAL\.LEER/);
+  assert.match(sql, /Nombre_Rol\)\)='mercadeo'/);
+  assert.doesNotMatch(sql, /(?:CREAR|ACTUALIZAR|ELIMINAR)\.(?:RESERVAS|TRANSFERS)/);
   assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
 });

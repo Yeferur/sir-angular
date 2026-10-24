@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { MercadeoEntidadReportante, MercadeoFilters, MercadeoOrigenPage, MercadeoService } from './mercadeo.service';
+import { MercadeoFilters, MercadeoOrigenPage, MercadeoService } from './mercadeo.service';
 
 describe('MercadeoService', () => {
   let api: MercadeoService;
@@ -45,20 +45,4 @@ describe('MercadeoService', () => {
     expect(result?.totalPasajerosEnPagina).toBe(2);
   });
 
-  it('permite buscar entidades históricas de los tres tipos para el filtro de origen', () => {
-    let entities: MercadeoEntidadReportante[] | undefined;
-    api.buscarEntidadesReportantes('Dann').subscribe((rows) => entities = rows);
-    const requests = http.match((request) => request.url.endsWith('/entidades-reportantes'));
-    expect(requests.length).toBe(3);
-    expect(requests.map((request) => request.request.params.get('tipo')).sort()).toEqual([
-      'AGENCIA_INTERNACIONAL', 'AGENCIA_NACIONAL', 'HOTEL',
-    ]);
-    for (const request of requests) {
-      expect(request.request.params.get('buscar')).toBe('Dann');
-      expect(request.request.params.get('limite')).toBe('20');
-      expect(request.request.params.get('incluirInactivas')).toBe('1');
-      request.flush([]);
-    }
-    expect(entities).toEqual([]);
-  });
 });

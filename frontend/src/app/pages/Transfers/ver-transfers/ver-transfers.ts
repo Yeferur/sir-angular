@@ -60,8 +60,7 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     DNI: '',
     Punto_Salida: '',
     Punto_Destino: '',
-    Estado: [] as string[],
-    Empty: false
+    Estado: [] as string[]
   });
   appliedFilters = signal(this.filters());
 
@@ -273,7 +272,6 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
       Punto_Salida: '',
       Punto_Destino: '',
       Estado: [],
-      Empty: false,
     });
     this.page.set(1);
     this.buscarTransfers();
@@ -308,7 +306,6 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
       Punto_Salida: String(params.get('salida') || ''),
       Punto_Destino: String(params.get('destino') || ''),
       Estado: toValues(params.get('estado')),
-      Empty: params.get('vacios') === '1',
     });
 
     this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
@@ -329,7 +326,6 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
       documento: filter.DNI.trim() || null,
       salida: filter.Punto_Salida.trim() || null,
       destino: filter.Punto_Destino.trim() || null,
-      vacios: filter.Empty ? 1 : null,
       pagina: this.page() > 1 ? this.page() : null,
       buscar: searchApplied ? 1 : null,
     };

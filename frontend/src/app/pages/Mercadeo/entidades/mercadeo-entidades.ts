@@ -1,8 +1,8 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { A11yModule } from '@angular/cdk/a11y';
-import { Component, EventEmitter, HostListener, OnInit, Output, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SirDateRange, SirDateRangePickerComponent } from '../../../shared/date-range-picker/date-range-picker';
 import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
@@ -13,6 +13,8 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { Reservas, Punto } from '../../../services/Reservas/reservas';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { MercadeoOrigenOperacion, MercadeoOrigenPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
 import { ActividadEntidad, DetalleEntidad, EntidadesReportantesService, FiltrosEntidades,
   PaginaEntidades, TipoEntidad, ValidacionEntidad } from '../../../services/Mercadeo/entidades-reportantes.service';
 
@@ -26,20 +28,25 @@ const validationOptions: SirSelectOption[] = [
   { value: 'VALIDADA', label: 'Validada' }, { value: 'RECHAZADA', label: 'Rechazada' },
 ];
 const statusOptions: SirSelectOption[] = [
-  { value: '', label: 'Todos los estados' }, { value: 'ACTIVA', label: 'Activas' },
-  { value: 'INACTIVA', label: 'Inactivas' },
+  { value: 'ACTIVA', label: 'Sí' }, { value: 'INACTIVA', label: 'No' }, { value: '', label: 'Todas' },
 ];
 const activityOptions: SirSelectOption[] = [
-  { value: '', label: 'Toda actividad' }, { value: 'CON_RESERVAS', label: 'Con actividad' },
-  { value: 'SIN_RESERVAS', label: 'Sin actividad' },
+  { value: '', label: 'Todas' }, { value: 'CON_RESERVAS', label: 'Con actividad en el período' },
+  { value: 'SIN_RESERVAS', label: 'Sin actividad en el período' },
+  { value: 'SIN_REPORTAR', label: 'Sin reportar hace más de…' },
 ];
 function bogotaDate(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric',
     month: '2-digit', day: '2-digit' }).format(date);
 }
+function addCalendarDays(value: string, days: number): string {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
 function initialFilters(): FiltrosEntidades {
-  return { desde: bogotaDate(new Date(Date.now() - 30 * 86400000)), hasta: bogotaDate(new Date()),
-    tipo: '', validacion: '', estado: '', actividad: '', buscar: '', diasSinReportarMin: '' };
+  const today = bogotaDate(new Date());
+  return { desde: addCalendarDays(today, -29), hasta: today,
+    tipo: '', validacion: '', estado: 'ACTIVA', actividad: '', buscar: '', diasSinReportarMin: '' };
 }
 
 @Component({
@@ -53,20 +60,26 @@ export class MercadeoEntidadesComponent implements OnInit {
   private readonly reservas = inject(Reservas);
   private readonly permissions = inject(PermisosService);
   private readonly route = inject(ActivatedRoute);
-  @Output() readonly drillDown = new EventEmitter<ActividadEntidad>();
+  private readonly router = inject(Router);
+  private readonly mercadeo = inject(MercadeoService);
+  private readonly drawer = inject(SirDrawerService);
   private previousFocus: HTMLElement | null = null;
   private suggestionTimer?: ReturnType<typeof setTimeout>;
   private suggestionRun = 0;
-  private pointSuggestionDismissed = false;
+  private lastUrlState = '';
   readonly typeOptions = typeOptions;
   readonly validationOptions = validationOptions;
   readonly statusOptions = statusOptions;
   readonly activityOptions = activityOptions;
   readonly filters = signal<FiltrosEntidades>(initialFilters());
+  readonly appliedFilters = signal<FiltrosEntidades>(initialFilters());
   readonly dateRange = computed<SirDateRange>(() => ({ start: this.filters().desde, end: this.filters().hasta }));
   readonly result = signal<PaginaEntidades | null>(null);
   readonly selected = signal<DetalleEntidad | null>(null);
   readonly selectedActivity = signal<ActividadEntidad | null>(null);
+  readonly operations = signal<MercadeoOrigenPage | null>(null);
+  readonly operationsLoading = signal(false);
+  readonly operationsError = signal('');
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly exporting = signal(false);
@@ -82,16 +95,15 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly pointMatches = signal<Punto[]>([]);
   readonly pointPickerOpen = signal(false);
   readonly entitySuggestions = signal<ActividadEntidad[]>([]);
-  readonly createPointSuggestions = signal<Punto[]>([]);
-  readonly selectedCreatePoint = signal<Punto | null>(null);
-  readonly associateCreatePoint = signal(false);
   readonly suggesting = signal(false);
   readonly canCreate = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.CREAR');
   readonly canEdit = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.ACTUALIZAR');
   readonly canValidate = this.permissions.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR');
   readonly canManagePointRelations = this.canValidate && this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER');
-  readonly canExport = this.permissions.tienePermiso('MERCADEO.EXPORTAR');
-  readonly canViewOrigin = this.permissions.tienePermiso('MERCADEO.RESERVAS.LEER');
+  readonly canExport = this.permissions.tienePermiso('MERCADEO.EXPORTAR')
+    && this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER');
+  readonly canReadReservations = this.permissions.tienePermiso('RESERVAS.LEER');
+  readonly canReadTransfers = this.permissions.tienePermiso('TRANSFERS.LEER');
   name = '';
   rejectionReason = '';
   type: TipoEntidad = 'HOTEL';
@@ -100,16 +112,18 @@ export class MercadeoEntidadesComponent implements OnInit {
     return this.entitySuggestions().find(entity =>
       entity.Tipo === this.type && this.normalize(entity.Nombre) === this.normalize(this.name)) || null;
   }
-  readonly filterCount = computed(() => ['tipo', 'validacion', 'estado', 'actividad', 'diasSinReportarMin']
-    .filter(key => !!this.filters()[key as keyof FiltrosEntidades]).length);
+  readonly filterCount = computed(() => Number(!!this.filters().tipo)
+    + Number(!!this.filters().validacion) + Number(this.filters().estado !== 'ACTIVA')
+    + Number(!!this.filters().actividad));
   readonly hasEntityCriteria = computed(() => {
-    const current = this.filters();
-    return !!(current.buscar.trim() || current.tipo || current.validacion || current.estado
-      || current.actividad || current.diasSinReportarMin);
+    const current = this.appliedFilters();
+    return !!(current.buscar.trim() || current.tipo || current.validacion
+      || current.actividad || current.diasSinReportarMin || current.estado !== 'ACTIVA');
   });
   readonly dateError = computed(() => {
     const f = this.filters();
-    if (!f.desde || !f.hasta) return 'Selecciona un rango completo.';
+    if (!f.desde && !f.hasta) return '';
+    if (!f.desde || !f.hasta) return 'Selecciona un período completo.';
     if (f.desde > f.hasta) return 'La fecha inicial debe ser anterior a la final.';
     if ((Date.parse(f.hasta) - Date.parse(f.desde)) / 86400000 > 30)
       return 'El rango máximo es de 31 días calendario.';
@@ -117,14 +131,41 @@ export class MercadeoEntidadesComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    const requestedValidation = this.route.snapshot.queryParamMap.get('validacion') || '';
-    if (this.validationOptions.some(option => option.value === requestedValidation)) {
-      this.filters.update(current => ({ ...current, validacion: requestedValidation }));
-    }
-    this.search();
+    this.route.queryParamMap.subscribe(params => {
+      const defaults = initialFilters();
+      const requestedValidation = params.get('validacion') || '';
+      const filters: FiltrosEntidades = {
+        ...defaults,
+        desde: params.get('periodo') === '0' ? '' : params.get('desde') || defaults.desde,
+        hasta: params.get('periodo') === '0' ? '' : params.get('hasta') || defaults.hasta,
+        tipo: params.get('tipo') || '',
+        validacion: this.validationOptions.some(option => option.value === requestedValidation) ? requestedValidation : '',
+        estado: params.has('estado') ? (params.get('estado') || '')
+          : requestedValidation === 'PENDIENTE_VALIDACION' ? '' : defaults.estado,
+        actividad: params.get('actividad') || '',
+        diasSinReportarMin: params.get('diasSinReportarMin') || '',
+        buscar: params.get('buscar') || '',
+        ordenarPor: params.get('ordenarPor') || undefined,
+        orden: params.get('orden') === 'DESC' ? 'DESC' : 'ASC',
+      };
+      this.filters.set(filters);
+      this.appliedFilters.set(filters);
+      const pageValue = Number(params.get('page') || 1);
+      const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+      const urlState = JSON.stringify({ filters, page });
+      if (urlState === this.lastUrlState) return;
+      this.lastUrlState = urlState;
+      void this.search(page, false);
+    });
   }
   setFilter(key: keyof FiltrosEntidades, value: string): void {
-    this.filters.update(current => ({ ...current, [key]: value || '' }));
+    if (key === 'actividad' && value === 'SIN_REPORTAR') {
+      const days = this.result()?.umbralDiasSinReportar || 90;
+      this.filters.update(current => ({ ...current, actividad: value, diasSinReportarMin: current.diasSinReportarMin || String(days) }));
+      return;
+    }
+    this.filters.update(current => ({ ...current, [key]: value || '',
+      ...(key === 'actividad' ? { diasSinReportarMin: '' } : {}) }));
   }
   setDaysFilter(value: number | string | null): void {
     this.setFilter('diasSinReportarMin', value === null || value === '' ? '' : String(value));
@@ -132,13 +173,42 @@ export class MercadeoEntidadesComponent implements OnInit {
   setRange(range: SirDateRange): void {
     this.filters.update(current => ({ ...current, desde: range.start || '', hasta: range.end || '' }));
   }
-  async search(page = 1): Promise<void> {
+  removeAppliedFilter(key: 'periodo' | 'buscar' | 'tipo' | 'validacion' | 'estado' | 'actividad'): void {
+    const next = { ...this.appliedFilters() };
+    if (key === 'periodo') { next.desde = ''; next.hasta = ''; }
+    if (key === 'buscar') next.buscar = '';
+    if (key === 'tipo') next.tipo = '';
+    if (key === 'validacion') next.validacion = '';
+    if (key === 'estado') next.estado = '';
+    if (key === 'actividad') { next.actividad = ''; next.diasSinReportarMin = ''; }
+    this.filters.set(next);
+    void this.search();
+  }
+  periodLabel(): string {
+    const f = this.appliedFilters();
+    return f.desde && f.hasta ? f.desde + ' – ' + f.hasta : f.desde || f.hasta;
+  }
+  async search(page = 1, syncUrl = true): Promise<void> {
     if (this.loading() || this.dateError()) return;
+    const applied = { ...this.filters() };
+    this.appliedFilters.set(applied);
+    if (syncUrl) this.writeUrl(applied, page);
     this.appliedHasEntityCriteria.set(this.hasEntityCriteria());
     this.loading.set(true); this.error.set('');
-    try { this.result.set(await firstValueFrom(this.api.activity(this.filters(), page))); }
+    try { this.result.set(await firstValueFrom(this.api.activity(applied, page))); }
     catch (e: any) { this.error.set(e?.error?.message || 'No se pudo consultar la actividad.'); }
     finally { this.loading.set(false); }
+  }
+  private writeUrl(filters: FiltrosEntidades, page: number): void {
+    this.lastUrlState = JSON.stringify({ filters, page });
+    void this.router.navigate([], { relativeTo: this.route, queryParams: {
+      tipo: filters.tipo || null, validacion: filters.validacion || null, estado: filters.estado || null,
+      actividad: filters.actividad || null, diasSinReportarMin: filters.actividad === 'SIN_REPORTAR' ? filters.diasSinReportarMin || '90' : null,
+      buscar: filters.buscar || null, desde: filters.desde || null, hasta: filters.hasta || null,
+      periodo: !filters.desde && !filters.hasta ? '0' : null,
+      ordenarPor: filters.ordenarPor || null, orden: filters.ordenarPor ? filters.orden || 'ASC' : null,
+      page: page > 1 ? String(page) : null,
+    }, queryParamsHandling: 'merge' });
   }
   setSort(column: string): void {
     const current = this.filters();
@@ -150,26 +220,49 @@ export class MercadeoEntidadesComponent implements OnInit {
     if (this.filters().ordenarPor !== column) return 'Ordenar';
     return this.filters().orden === 'DESC' ? 'Orden descendente' : 'Orden ascendente';
   }
-  showOrigin(): void {
-    const item = this.selectedActivity();
-    if (!item) return;
-    this.close();
-    this.drillDown.emit(item);
-  }
   async open(item: ActividadEntidad): Promise<void> {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.selectedActivity.set(item);
     this.detailError.set(''); this.detailNotice.set(''); this.selected.set(null); this.editing.set(false);
     this.rejecting.set(false); this.rejectionReason = '';
-    try { this.selected.set(await firstValueFrom(this.api.detail(item.Id_Entidad_Reportante, this.filters()))); }
+    this.operations.set(null); this.operationsError.set('');
+    try {
+      this.selected.set(await firstValueFrom(this.api.detail(item.Id_Entidad_Reportante, this.appliedFilters())));
+      await this.loadOperations(item.Id_Entidad_Reportante, 1);
+    }
     catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo cargar el detalle.'); }
+  }
+  private async loadOperations(entityId: number, page: number): Promise<void> {
+    const period = this.appliedFilters();
+    if (!period.desde || !period.hasta) { this.operations.set(null); this.operationsError.set('Selecciona un período para consultar operaciones.'); return; }
+    this.operationsLoading.set(true); this.operationsError.set('');
+    try {
+      this.operations.set(await firstValueFrom(this.mercadeo.buscarOrigen({
+        fechaRegistroDesde: period.desde, fechaRegistroHasta: period.hasta, fechaTour: '', codigoReserva: '',
+        categoria: '', tipo: 'TODOS', estado: '', idEntidadReportante: String(entityId), creadorIds: [],
+      }, page, 10)));
+    } catch (e: any) { this.operationsError.set(e?.error?.message || 'No se pudieron cargar las operaciones.'); }
+    finally { this.operationsLoading.set(false); }
+  }
+  changeOperationsPage(page: number): void {
+    const entityId = this.selected()?.entity.Id_Entidad_Reportante;
+    const data = this.operations();
+    if (!entityId || !data || page < 1 || page > data.totalPages || this.operationsLoading()) return;
+    void this.loadOperations(entityId, page);
+  }
+  openOperation(item: MercadeoOrigenOperacion): void {
+    if (item.tipo === 'RESERVA' && this.canReadReservations && item.id_reserva) this.drawer.openReserva(item.id_reserva);
+    if (item.tipo === 'TRANSFER' && this.canReadTransfers && item.id_transfer) this.drawer.openTransfer(String(item.id_transfer));
+  }
+  operationLabel(item: MercadeoOrigenOperacion): string {
+    return item.tipo === 'TRANSFER' ? 'TRS' + String(item.id_transfer).padStart(5, '0') : item.id_reserva || item.id_operacion;
   }
   close(): void {
     this.selected.set(null); this.selectedActivity.set(null); this.creating.set(false); this.editing.set(false);
+    this.operations.set(null); this.operationsError.set('');
     this.rejecting.set(false); this.rejectionReason = ''; this.detailNotice.set(''); this.pointMatches.set([]);
-    this.pointPickerOpen.set(false); this.pointSuggestionDismissed = false;
-    this.entitySuggestions.set([]); this.createPointSuggestions.set([]);
-    this.selectedCreatePoint.set(null); this.associateCreatePoint.set(false);
+    this.pointPickerOpen.set(false);
+    this.entitySuggestions.set([]);
     clearTimeout(this.suggestionTimer); this.suggestionRun++;
     if (this.previousFocus?.isConnected) this.previousFocus.focus();
     this.previousFocus = null;
@@ -181,12 +274,10 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   onCreateNameChange(value: string): void {
     this.name = value;
-    this.pointSuggestionDismissed = false;
     this.queueSuggestions();
   }
   onCreateTypeChange(value: TipoEntidad): void {
     this.type = value;
-    if (value !== 'HOTEL') { this.selectedCreatePoint.set(null); this.associateCreatePoint.set(false); }
     this.queueSuggestions();
   }
   private normalize(value: string): string {
@@ -197,32 +288,20 @@ export class MercadeoEntidadesComponent implements OnInit {
     clearTimeout(this.suggestionTimer);
     const term = this.name.trim();
     if (term.length < 2) {
-      this.entitySuggestions.set([]); this.createPointSuggestions.set([]); this.suggesting.set(false);
+      this.entitySuggestions.set([]); this.suggesting.set(false);
       return;
     }
     const run = ++this.suggestionRun;
     this.suggestionTimer = setTimeout(async () => {
       this.suggesting.set(true);
       try {
-        const [entities, points] = await Promise.all([
-          firstValueFrom(this.api.activity({ ...initialFilters(), desde: '', hasta: '', buscar: term }, 1)),
-          this.type === 'HOTEL' && !this.pointSuggestionDismissed
-            ? firstValueFrom(this.reservas.buscarPuntos(term)) : Promise.resolve([]),
-        ]);
+        const entities = await firstValueFrom(this.api.search(this.type, term));
         if (run !== this.suggestionRun) return;
-        this.entitySuggestions.set(entities.items.slice(0, 5));
-        this.createPointSuggestions.set(points.slice(0, 6));
+        this.entitySuggestions.set(entities.slice(0, 5));
       } catch {
         if (run === this.suggestionRun) this.detailError.set('No se pudieron cargar las sugerencias. Puedes escribir el nombre manualmente.');
       } finally { if (run === this.suggestionRun) this.suggesting.set(false); }
     }, 250);
-  }
-  usePoint(point: Punto): void {
-    this.pointSuggestionDismissed = true;
-    this.createPointSuggestions.set([]);
-    this.selectedCreatePoint.set(point); this.associateCreatePoint.set(false);
-    this.name = point.NombrePunto.toLocaleLowerCase('es').replace(/(^|\s)\S/g, letter => letter.toLocaleUpperCase('es'));
-    this.queueSuggestions();
   }
   startEdit(): void {
     const entity = this.selected()?.entity; if (!entity) return;
@@ -235,15 +314,6 @@ export class MercadeoEntidadesComponent implements OnInit {
       if (this.creating()) {
         const detail = await firstValueFrom(this.api.create(this.type, this.name));
         this.creating.set(false); this.selected.set(detail);
-        const point = this.selectedCreatePoint();
-        if (point && this.associateCreatePoint()) {
-          try {
-            await firstValueFrom(this.api.point(detail.entity.Id_Entidad_Reportante, point.Id_Punto, true));
-            await this.refreshDetail(detail.entity.Id_Entidad_Reportante);
-          } catch (e: any) {
-            this.detailError.set(e?.error?.message || 'La entidad se creó, pero no se pudo asociar el punto. Puedes asociarlo desde el detalle.');
-          }
-        }
         await this.search();
       } else if (this.selected()) {
         const id = this.selected()!.entity.Id_Entidad_Reportante;
@@ -304,7 +374,7 @@ export class MercadeoEntidadesComponent implements OnInit {
     finally { this.saving.set(false); }
   }
   private async refreshDetail(id: number): Promise<void> {
-    this.selected.set(await firstValueFrom(this.api.detail(id, this.filters())));
+    this.selected.set(await firstValueFrom(this.api.detail(id, this.appliedFilters())));
   }
   async export(): Promise<void> {
     if (this.dateError() || this.exporting() || !this.result()?.items.length) return;
@@ -324,6 +394,9 @@ export class MercadeoEntidadesComponent implements OnInit {
   validationLabel(state: ValidacionEntidad): string {
     return { PENDIENTE_VALIDACION: 'Pendiente', VALIDADA: 'Validada', RECHAZADA: 'Rechazada' }[state];
   }
+  activityFilterLabel(value: string): string {
+    return this.activityOptions.find(option => option.value === value)?.label || value;
+  }
   one(value: number): boolean { return Number(value) === 1; }
   activitySummary(item: ActividadEntidad): string {
     const parts: string[] = [];
@@ -333,7 +406,6 @@ export class MercadeoEntidadesComponent implements OnInit {
     return parts.length ? parts.join(' · ') : 'Sin actividad';
   }
   inactivityDaysPlaceholder(): string {
-    const days = this.result()?.umbralDiasSinReportar;
-    return days ? String(days) : '';
+    return String(this.result()?.umbralDiasSinReportar || 90);
   }
 }

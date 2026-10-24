@@ -99,34 +99,55 @@ describe('Navegación superior', () => {
     await render();
   });
 
-  it('conserva las cuatro categorías y las cinco rutas de creación autorizadas', () => {
+  it('distribuye el menú en cuatro columnas y conserva las rutas de creación', () => {
     const headings = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column > h3'))
       .map(node => (node as HTMLElement).textContent?.trim());
-    expect(headings).toEqual(['Principal', 'Operación', 'Gestión', 'Sistema']);
+    expect(headings).toEqual(['Principal', 'Operación', 'Programación', 'Mercadeo']);
     expect(layout.getCreateActions().map(item => item.route)).toEqual([
       '/Reservas/NuevaReserva', '/Transfers/NuevoTransfer', '/Tours/NuevoTour',
       '/Puntos/NuevoPunto', '/Usuarios/NuevoUsuario',
     ]);
     expect(element('.launcher-operation-grid').children.length).toBe(4);
-    expect(element('a[href="/Reservas/Confirmacion"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Gestión');
-    const systemColumns = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[];
-    const systemColumn = systemColumns
-      .find(column => column.querySelector('h3')?.textContent?.trim() === 'Sistema');
-    expect(systemColumn?.querySelector('h4')).toBeNull();
-    expect(Array.from(systemColumn?.querySelectorAll('.launcher-card strong') || [])
+    expect(element('a[href="/Aforos"]')?.classList.contains('launcher-card--feature')).toBeTrue();
+    expect(element('a[href="/Reservas/Confirmacion"]')?.closest('.launcher-subsection')?.querySelector('h3')?.textContent?.trim()).toBe('Después del viaje');
+    const systemSection = (Array.from(fixture.nativeElement.querySelectorAll('.launcher-subsection')) as HTMLElement[])
+      .find(section => section.querySelector('h3')?.textContent?.trim() === 'Sistema');
+    expect(Array.from(systemSection?.querySelectorAll('.launcher-card strong') || [])
       .map(node => node.textContent?.trim())).toEqual([
-        'Administrar Usuarios', 'Crear Usuarios', 'Turnos de asesores',
+        'Administrar Usuarios', 'Crear Usuarios', 'Turnos de asesores', 'Historial',
       ]);
+    expect(element('a[href="/Programacion/General"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Programación');
+    expect(element('a[href="/Mercadeo/Reservas"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Mercadeo');
+    expect(element('a[href="/Programacion/General"] .launcher-card-copy small')?.textContent?.trim())
+      .toBe('Reservas para operación y exportación');
+    expect(element('a[href="/Usuarios"] .launcher-card-copy small')).toBeNull();
+    expect(element('a[href="/Reservas/Confirmacion"] .launcher-card-copy small')?.textContent?.trim()).toBe('Quién viajó');
+    expect(element('a[href="/Seguros"] .launcher-card-copy small')).toBeNull();
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
     expect(element('[data-create-trigger]').querySelector('.bx-plus')).toBeNull();
   });
 
-  it('ofrece Mercadeo y Entidades como destinos independientes de Gestión', () => {
-    const gestion = (Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[])
-      .find(node => node.querySelector('h3')?.textContent?.trim() === 'Gestión')!;
-    const links = Array.from(gestion.querySelectorAll<HTMLAnchorElement>('a.launcher-card'));
-    expect(links.find(link => link.getAttribute('href') === '/Mercadeo/Reservas')?.textContent).toContain('Análisis comercial');
-    expect(links.find(link => link.getAttribute('href') === '/Mercadeo/Entidades')?.textContent).toContain('Hoteles y agencias');
+  it('muestra Mercadeo y Entidades como tarjetas independientes con su permiso', () => {
+    const origin = element('a[href="/Mercadeo/Reservas"]');
+    const entities = element('a[href="/Mercadeo/Entidades"]');
+    expect(origin.textContent).toContain('Origen de reservas');
+    expect(entities.textContent).toContain('Entidades reportantes');
+    expect(origin.closest('.launcher-subgroup')).toBeNull();
+    expect(entities.closest('.launcher-subgroup')).toBeNull();
+  });
+
+  it('oculta columnas y subsecciones sin elementos visibles y deja fluir las restantes', async () => {
+    allowed = new Set(['INFORMES.LEER', 'SEGUROS.LEER']);
+    await render();
+
+    const columns = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[];
+    expect(columns.length).toBe(2);
+    expect(columns.map(column => column.querySelector(':scope > h3')?.textContent?.trim()))
+      .toEqual(['Principal', undefined]);
+    expect(element('.launcher-subsection > h3').textContent?.trim()).toBe('Después del viaje');
+    expect(element('.launcher-operation-grid')).toBeNull();
+    expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.launcher-subsection').length).toBe(1);
   });
 
   it('conserva el título anterior mientras inicia una navegación lazy', () => {
@@ -243,30 +264,32 @@ describe('Navegación superior', () => {
     expect(element('a[href="/Reservas/VerReservas"]')).not.toBeNull();
   });
 
-  it('muestra Mercadeo solo cuando el usuario tiene MERCADEO.RESERVAS.LEER', async () => {
+  it('muestra cada destino de Mercadeo solo con su permiso de lectura', async () => {
     allowed = new Set(['RESERVAS.LEER']);
     await render();
     expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+    expect(element('a[href="/Mercadeo/Entidades"]')).toBeNull();
 
     allowed.add('MERCADEO.RESERVAS.LEER');
     await render();
-    const link = element<HTMLAnchorElement>('a[href="/Mercadeo/Reservas"]');
-    expect(link).not.toBeNull();
-    expect(link.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Gestión');
-    expect(link.querySelector('strong')?.textContent?.trim()).toBe('Mercadeo');
-    expect(link.querySelector('small')?.textContent?.trim()).toBe('Análisis comercial');
+    const originLink = element<HTMLAnchorElement>('a[href="/Mercadeo/Reservas"]');
+    expect(originLink).not.toBeNull();
+    expect(originLink.textContent).toContain('Origen de reservas');
+    expect(element('a[href="/Mercadeo/Entidades"]')).toBeNull();
 
     layout.toggleNavigationLauncher();
     await render();
-    link.click();
+    originLink.click();
     await render();
     expect(TestBed.inject(Router).url).toBe('/Mercadeo/Reservas');
-    expect(link.classList.contains('active')).toBeTrue();
-    expect(link.getAttribute('aria-current')).toBe('page');
+    expect(originLink.classList.contains('active')).toBeTrue();
+    expect(originLink.getAttribute('aria-current')).toBe('page');
 
     allowed.delete('MERCADEO.RESERVAS.LEER');
+    allowed.add('ENTIDADES_REPORTANTES.LEER');
     await render();
     expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
+    expect(element('a[href="/Mercadeo/Entidades"]')).not.toBeNull();
   });
 
   it('actualiza el menú y las acciones al emitir nuevos permisos sin recargar', async () => {
@@ -277,6 +300,7 @@ describe('Navegación superior', () => {
     expect(element('[data-create-trigger]')).toBeNull();
 
     allowed.add('MERCADEO.RESERVAS.LEER');
+    allowed.add('ENTIDADES_REPORTANTES.LEER');
     allowed.add('RESERVAS.CREAR');
     permissionChanges.next([...allowed]);
     await fixture.whenStable();
@@ -284,6 +308,7 @@ describe('Navegación superior', () => {
     expect(element('[data-create-trigger]')).not.toBeNull();
 
     allowed.delete('MERCADEO.RESERVAS.LEER');
+    allowed.delete('ENTIDADES_REPORTANTES.LEER');
     allowed.delete('RESERVAS.CREAR');
     permissionChanges.next([...allowed]);
     await fixture.whenStable();

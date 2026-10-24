@@ -820,7 +820,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  buscarEntidadesConEspera(showSuggestions = true): void {
+  buscarEntidadesConEspera(showSuggestions = true, includeInactive = false): void {
     if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
     this.busquedaEntidadVersion++;
     this.entidadCargando = false;
@@ -831,20 +831,31 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
-    this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(), 250);
+    this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(includeInactive), 250);
   }
   coincidenciaEntidad(): EntidadReportante | undefined {
     const key = claveNombreEntidad(this.nuevoNombreEntidad);
     return key ? this.entidadesReportantes().find(item => claveNombreEntidad(item.Nombre) === key) : undefined;
   }
+  coincidenciaEntidadDisponible(): boolean {
+    const match = this.coincidenciaEntidad();
+    return !!match && !!Number(match.Activo) && match.Estado_Validacion !== 'RECHAZADA';
+  }
+  mensajeCoincidenciaEntidad(): string {
+    const match = this.coincidenciaEntidad();
+    if (!match) return '';
+    return this.coincidenciaEntidadDisponible()
+      ? `Ya existe ${match.Nombre}.`
+      : `${match.Nombre} ya existe, pero está inactiva o rechazada. Solicita su revisión.`;
+  }
   buscarCoincidenciaEntidad(): void {
     this.busquedaEntidad = this.nuevoNombreEntidad;
     this.form.get('Id_Entidad_Reportante')?.setValue(null);
-    this.buscarEntidadesConEspera(false);
+    this.buscarEntidadesConEspera(false, true);
   }
   usarCoincidenciaEntidad(): void {
     const match = this.coincidenciaEntidad();
-    if (!match) return;
+    if (!match || !this.coincidenciaEntidadDisponible()) return;
     this.form.get('Id_Entidad_Reportante')?.setValue(match.Id_Entidad_Reportante);
     this.busquedaEntidad = match.Nombre;
     this.entidadAutocompleteOpen = false;
@@ -876,7 +887,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (preserve && control?.value && this.busquedaEntidad.trim().length >= 2) this.buscarEntidadesConEspera(true);
   }
 
-  async buscarEntidades(): Promise<void> {
+  async buscarEntidades(includeInactive = false): Promise<void> {
     const tipo = this.tipoEntidadSeleccionada();
     if (!tipo) return;
     const term = this.busquedaEntidad.trim();
@@ -884,7 +895,10 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const version = ++this.busquedaEntidadVersion;
     this.entidadCargando = true;
     try {
-      const items = await firstValueFrom(this.reservasSvc.getEntidadesReportantes(tipo, term));
+      const request = includeInactive
+        ? this.reservasSvc.getEntidadesReportantes(tipo, term, true)
+        : this.reservasSvc.getEntidadesReportantes(tipo, term);
+      const items = await firstValueFrom(request);
       if (version === this.busquedaEntidadVersion) this.entidadesReportantes.set(items || []);
     } catch {
       if (version === this.busquedaEntidadVersion) this.entidadError.set('No pudimos buscar entidades.');
@@ -893,12 +907,18 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   async registrarEntidadRapida(): Promise<void> {
     if (!this.tipoEntidadSeleccionada() || this.registrandoEntidad()) return;
-    if (this.coincidenciaEntidad()) { this.usarCoincidenciaEntidad(); return; }
+    const name = this.nuevoNombreEntidad.trim();
+    if (name.length < 2) { this.entidadError.set('Escribe al menos 2 caracteres para el nombre.'); return; }
+    if (this.coincidenciaEntidad()) {
+      if (this.coincidenciaEntidadDisponible()) this.usarCoincidenciaEntidad();
+      else this.entidadError.set(this.mensajeCoincidenciaEntidad());
+      return;
+    }
     this.registrandoEntidad.set(true);
     this.entidadError.set('');
     try {
       const entidad = await firstValueFrom(this.reservasSvc.registrarEntidadReportanteRapida(
-        Number(this.form.get('Id_Canal')?.value), this.nuevoNombreEntidad));
+        Number(this.form.get('Id_Canal')?.value), name));
       this.entidadesReportantes.update(items => [...items.filter(item =>
         String(item.Id_Entidad_Reportante) !== String(entidad.Id_Entidad_Reportante)), entidad]
         .sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es')));

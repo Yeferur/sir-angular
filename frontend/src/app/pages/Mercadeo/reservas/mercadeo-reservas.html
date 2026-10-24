@@ -3,60 +3,31 @@
     <app-filter-bar panelId="marketing-more-filters" [expanded]="filtersOpen()" [filterCount]="filterCount()"
       [busy]="loading()" [canSearch]="!registrationRangeError()"
       (toggleFilters)="filtersOpen.set(!filtersOpen())" (search)="search()">
-      <div sirPrimaryFilters class="search-container marketing-search-field">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <label class="visually-hidden" for="marketing-entity">Entidad reportante</label>
-        <div class="marketing-entity-autocomplete marketing-entity-search">
-          <input id="marketing-entity" type="text" class="search-input" placeholder="Buscar entidad reportante"
-            maxlength="100" autocomplete="off" role="combobox" aria-autocomplete="list"
-            aria-controls="marketing-entity-options" [attr.aria-expanded]="entityAutocompleteOpen()"
-            [value]="entityInputValue()" [disabled]="loading()"
-            (input)="onEntityInput($any($event.target).value)" (focus)="openEntitySuggestions()"
-            (blur)="closeEntitySuggestions()" (keyup.enter)="search()" />
-          @if (entityInputValue()) {
-            <button type="button" class="search-clear" aria-label="Limpiar entidad reportante" [disabled]="loading()" (click)="clearEntity()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          }
-          @if (entityAutocompleteOpen() && entityInputValue().trim().length >= 2) {
-            <div id="marketing-entity-options" class="autocomplete-dropdown" role="listbox" aria-label="Entidades reportantes">
-              @if (entityLoading()) { <div class="autocomplete-item" role="status">Buscando entidades…</div> }
-              @else if (entityOptions().length) {
-                @for (entity of entityOptions(); track entity.Id_Entidad_Reportante) {
-                  <button type="button" class="autocomplete-item" role="option" [attr.aria-selected]="false"
-                    (mousedown)="$event.preventDefault()" (click)="selectEntity(entity)">
-                    <span>{{ entity.Nombre }}</span><small>{{ entity.Tipo }}</small>
-                  </button>
-                }
-              } @else { <div class="autocomplete-item" role="status">No encontramos entidades con ese nombre.</div> }
-            </div>
-          }
-          @if (entityError()) { <small class="inline-error" role="status">{{ entityError() }}</small> }
+      <div sirPrimaryFilters class="marketing-primary-row">
+        <div class="marketing-period-field">
+          <label class="form-label" for="marketing-registration-range">Período de creación</label>
+          <app-date-range-picker inputId="marketing-registration-range" [value]="registrationRange()"
+            [invalid]="!!registrationRangeError()" [disabled]="loading()"
+            (rangeChange)="setRegistrationRange($event)" />
         </div>
-      </div>
-
-      <div sirPrimaryFilters class="marketing-period-field">
-        <label class="visually-hidden" for="marketing-registration-range">Período de creación</label>
-        <app-date-range-picker inputId="marketing-registration-range" [value]="registrationRange()"
-          [invalid]="!!registrationRangeError()" [disabled]="loading()"
-          placeholder="Período de creación" (rangeChange)="setRegistrationRange($event)" />
+        <div class="marketing-service-field">
+          <label class="form-label" for="marketing-service">Servicio</label>
+          <app-select inputId="marketing-service" [ngModel]="filters().tipo || 'TODOS'"
+            (ngModelChange)="setFilter('tipo', $event)" [options]="serviceOptions" [disabled]="loading()" />
+        </div>
       </div>
     </app-filter-bar>
 
     @if (hasAppliedFilters()) {
       <div class="active-filters" aria-label="Filtros aplicados">
         @if (appliedFilters().fechaRegistroDesde || appliedFilters().fechaRegistroHasta) {
-          <div class="filter-token">Creación: {{ registrationRangeLabel() }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período de creación" (click)="removeAppliedFilter('registro')">×</button>
+          <div class="filter-token">Período: {{ registrationRangeLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período" (click)="removeAppliedFilter('registro')">×</button>
           </div>
         }
-        @if (appliedFilters().fechaTour) {
-          <div class="filter-token">Fecha del tour o transfer: {{ tourDateLabel() }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar fecha del servicio" (click)="removeAppliedFilter('fechaTour')">×</button>
+        @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS') {
+          <div class="filter-token">Servicio: {{ serviceLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar servicio" (click)="removeAppliedFilter('servicio')">×</button>
           </div>
         }
         @if (appliedFilters().categoria) {
@@ -64,19 +35,9 @@
             <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar canal" (click)="removeAppliedFilter('canal')">×</button>
           </div>
         }
-        @if (appliedFilters().idEntidadReportante) {
-          <div class="filter-token">Entidad: {{ appliedEntityLabel() }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar entidad reportante" (click)="removeAppliedFilter('entidad')">×</button>
-          </div>
-        }
         @if (appliedFilters().creadorIds.length) {
           <div class="filter-token">Creado por: {{ creatorLabel() }}
             <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar usuarios creadores" (click)="removeAppliedFilter('creadores')">×</button>
-          </div>
-        }
-        @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS') {
-          <div class="filter-token">Tipo: {{ typeLabel() }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo de operación" (click)="removeAppliedFilter('tipo')">×</button>
           </div>
         }
         @if (appliedFilters().estado) {
@@ -87,20 +48,16 @@
       </div>
     }
     @if (categoryError()) { <p class="inline-error" role="status">{{ categoryError() }}</p> }
+    @if (userError()) { <p class="inline-error" role="status">{{ userError() }}</p> }
     @if (registrationRangeError()) { <p class="inline-error" role="alert">{{ registrationRangeError() }}</p> }
   </section>
 
-  <app-filter-panel panelId="marketing-more-filters" [open]="filtersOpen()" [standalone]="true" label="Filtros avanzados de origen">
-    <div class="form-group">
-      <label class="form-label" for="marketing-tour-date">Fecha del tour o transfer</label>
-      <app-datepicker inputId="marketing-tour-date" [ngModel]="filters().fechaTour"
-        (dateChange)="setFilter('fechaTour', $event)" [disabled]="loading()" placeholder="Fecha del servicio" />
-    </div>
+  <app-filter-panel panelId="marketing-more-filters" [open]="filtersOpen()" [standalone]="true" label="Filtros de origen">
     <div class="form-group">
       <label class="form-label" for="marketing-channel">Canal</label>
       <app-select inputId="marketing-channel" [ngModel]="filters().categoria"
         (ngModelChange)="setFilter('categoria', $event)" [options]="categoryOptions()"
-        [disabled]="loadingCategories() || loading()" placeholder="Todos los canales" />
+        [disabled]="loadingCategories() || loading()" />
     </div>
     <div class="form-group">
       <label class="form-label" for="marketing-creators">Creado por</label>
@@ -108,12 +65,6 @@
         (ngModelChange)="setCreatorFilter($event)" [options]="creatorOptions()"
         placeholder="Todos los usuarios" [disabled]="loading() || !usuarios().length"
         ariaLabel="Usuarios que crearon la operación" />
-      @if (userError()) { <small class="inline-error" role="status">{{ userError() }}</small> }
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="marketing-operation-type">Tipo</label>
-      <app-select inputId="marketing-operation-type" [ngModel]="filters().tipo || 'TODOS'"
-        (ngModelChange)="setFilter('tipo', $event)" [options]="typeOptions" [disabled]="loading()" />
     </div>
     <div class="form-group">
       <label class="form-label" for="marketing-operation-state">Estado</label>
@@ -132,7 +83,7 @@
 
   @if (!hasSearched() && !result()) {
     <app-query-empty-state title="Listo para buscar" [headingLevel]="2"
-      description="Consulta quién reportó cada reserva o transfer y por qué canal llegó." />
+      description="Consulta las reservas y transfers por período, canal, estado o creador." />
   } @else if (result(); as data) {
     @if (loading()) { <div class="results-toolbar"><span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span></div> }
     <section class="results-list marketing-results" [attr.aria-busy]="loading()" aria-label="Origen de reservas y transfers">

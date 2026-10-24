@@ -173,27 +173,30 @@
           <button type="button" class="sir-action sir-action--secondary" (click)="mostrarRegistroEntidad = true">+ Registrar nueva entidad</button>
           @if (mostrarRegistroEntidad) {
           <div class="entity-quick-backdrop" (click)="mostrarRegistroEntidad = false"></div>
-          <div class="entity-quick-dialog" role="dialog" aria-modal="true" aria-labelledby="crear-entidad-titulo"
+          <aside class="entity-quick-drawer" role="dialog" aria-modal="true" aria-labelledby="crear-entidad-titulo"
             cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
             <button type="button" class="entity-quick-close" aria-label="Cerrar registro" (click)="mostrarRegistroEntidad = false">×</button>
             <h3 id="crear-entidad-titulo">Registrar nueva entidad</h3>
-            <p>Tipo: {{ tipoEntidadSeleccionada() === 'HOTEL' ? 'Hotel' : tipoEntidadSeleccionada() === 'AGENCIA_NACIONAL' ? 'Agencia nacional' : 'Agencia internacional' }} · Quedará pendiente de validación.</p>
+            <p>Tipo: {{ tipoEntidadSeleccionada() === 'HOTEL' ? 'Hotel' : tipoEntidadSeleccionada() === 'AGENCIA_NACIONAL' ? 'Agencia nacional' : 'Agencia internacional' }}. El sistema asigna el estado según tu permiso de validación.</p>
             <div class="form-group">
               <label class="form-label" for="crear-nueva-entidad">Nombre comercial</label>
               <input id="crear-nueva-entidad" type="text" class="form-input" [value]="nuevoNombreEntidad"
-                (input)="nuevoNombreEntidad = $any($event.target).value; buscarCoincidenciaEntidad()" placeholder="Hotel Poblado Boutique" />
+                (input)="nuevoNombreEntidad = $any($event.target).value; buscarCoincidenciaEntidad()" minlength="2" maxlength="255" placeholder="Hotel Poblado Boutique" />
             </div>
+            @if (nuevoNombreEntidad.trim().length > 0 && nuevoNombreEntidad.trim().length < 2) { <small class="errorMessage">Escribe al menos 2 caracteres.</small> }
             @if (coincidenciaEntidad(); as match) {
-              <p role="status">Ya existe <strong>{{ match.Nombre }}</strong>.</p>
-              <button type="button" class="sir-action sir-action--secondary" (click)="usarCoincidenciaEntidad()">Usar entidad existente</button>
+              <p role="status">{{ mensajeCoincidenciaEntidad() }}</p>
+              @if (coincidenciaEntidadDisponible()) {
+                <button type="button" class="sir-action sir-action--secondary" (click)="usarCoincidenciaEntidad()">Usar entidad existente</button>
+              }
             }
             <div class="entity-quick-actions">
               <button type="button" class="sir-action sir-action--secondary" (click)="mostrarRegistroEntidad = false">Cancelar</button>
-              <button type="button" class="sir-action sir-action--primary" [disabled]="registrandoEntidad() || !nuevoNombreEntidad.trim() || !!coincidenciaEntidad()"
-                (click)="registrarEntidadRapida()">Guardar entidad pendiente de validación</button>
+              <button type="button" class="sir-action sir-action--primary" [disabled]="registrandoEntidad() || nuevoNombreEntidad.trim().length < 2 || !!coincidenciaEntidad()"
+                (click)="registrarEntidadRapida()">{{ registrandoEntidad() ? 'Registrando…' : 'Registrar entidad' }}</button>
             </div>
             @if (entidadError()) { <div class="errorMessage" role="alert">{{ entidadError() }}</div> }
-          </div>
+          </aside>
           }
           @if (entidadError()) { <div class="errorMessage">{{ entidadError() }}</div> }
         </div>

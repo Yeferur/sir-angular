@@ -180,7 +180,6 @@ seleccionarPuntoAutocomplete(p: any) {
     Punto: '',
     Estado: [] as string[],
     TipoReserva: '' as '' | 'Grupal' | 'Privada',
-    Empty: false,
   });
   appliedFilters = signal(this.filters());
 
@@ -439,7 +438,6 @@ seleccionarPuntoAutocomplete(p: any) {
       Punto: '',
       Estado: [],
       TipoReserva: '',
-      Empty: false,
     });
     this.puntoSeleccionado = null;
     this.puntoSugerencias.set([]);
@@ -474,7 +472,6 @@ seleccionarPuntoAutocomplete(p: any) {
       TipoReserva: ['Grupal', 'Privada'].includes(String(params.get('tipoReserva')))
         ? String(params.get('tipoReserva')) as 'Grupal' | 'Privada'
         : '',
-      Empty: params.get('vacios') === '1',
     });
 
     this.page.set(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
@@ -495,7 +492,6 @@ seleccionarPuntoAutocomplete(p: any) {
       reserva: filter.Id_Reserva.trim() || null,
       documento: filter.IdPas.trim() || null,
       punto: filter.Punto.trim() || null,
-      vacios: filter.Empty ? 1 : null,
       pagina: this.page() > 1 ? this.page() : null,
       buscar: searchApplied ? 1 : null,
     };
@@ -568,8 +564,6 @@ seleccionarPuntoAutocomplete(p: any) {
 
     // PUNTO
     if (f.Punto?.trim()) api.Punto = f.Punto.trim(); // o Id_Punto
-
-    if (f.Empty) api.Empty = true;
 
     return api;
   }

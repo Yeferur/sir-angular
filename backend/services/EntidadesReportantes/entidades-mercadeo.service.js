@@ -32,14 +32,14 @@ function filters(query) {
   if (validation && !['PENDIENTE_VALIDACION', 'VALIDADA', 'RECHAZADA'].includes(validation))
     fail(400, 'ENTITY_STATE_INVALID', 'Validación no válida.');
   const activity = query.actividad || '';
-  if (activity && !['CON_RESERVAS', 'SIN_RESERVAS'].includes(activity))
+  if (activity && !['CON_RESERVAS', 'SIN_RESERVAS', 'SIN_REPORTAR'].includes(activity))
     fail(400, 'ACTIVITY_INVALID', 'Actividad no válida.');
   const availability = query.estado || '';
   if (availability && !['ACTIVA', 'INACTIVA'].includes(availability))
     fail(400, 'ENTITY_AVAILABILITY_INVALID', 'Estado no válido.');
   const daysValue = query.diasSinReportarMin ?? query.sinReportarHaceMasDe ?? '';
   const days = daysValue === '' || daysValue === null || daysValue === undefined
-    ? null
+    ? (activity === 'SIN_REPORTAR' ? DIAS_SIN_REPORTAR_ALERTA : null)
     : Number(daysValue);
   if (days !== null && (!Number.isSafeInteger(days) || days < 0 || days > 36500))
     fail(400, 'INACTIVITY_DAYS_INVALID', 'Indica un número de días entre 0 y 36500.');
@@ -107,7 +107,19 @@ function activitySql(f) {
         AND historyEntity.Estado_Validacion='VALIDADA' AND historyEntity.Activo=1
       WHERE tr.Id_Entidad_Reportante IS NOT NULL
       GROUP BY tr.Id_Entidad_Reportante
-    ) th ON th.Id_Entidad_Reportante=e.Id_Entidad_Reportante`;
+    ) th ON th.Id_Entidad_Reportante=e.Id_Entidad_Reportante
+    LEFT JOIN (
+      SELECT activity.Id_Entidad_Reportante, MAX(activity.Fecha_Registro) AS Ultimo_Reporte
+      FROM (
+        SELECT r.Id_Entidad_Reportante, r.Fecha_Registro
+        FROM reservas r
+        WHERE r.Id_Entidad_Reportante IS NOT NULL AND ${reservaNoEliminadaPredicate('r')}
+        UNION ALL
+        SELECT tr.Id_Entidad_Reportante, tr.Fecha_Registro
+        FROM transfers tr WHERE tr.Id_Entidad_Reportante IS NOT NULL
+      ) activity
+      GROUP BY activity.Id_Entidad_Reportante
+    ) lr ON lr.Id_Entidad_Reportante=e.Id_Entidad_Reportante`;
   return { joins, params };
 }
 
@@ -141,7 +153,7 @@ function orderBySql(f) {
   const columns = {
     nombre: 'e.Nombre', tipo: 'e.Tipo', estado: 'e.Activo', validacion: 'e.Estado_Validacion',
     operaciones: 'Operaciones', pasajeros: 'Pasajeros', reservas: 'Reservas', transfers: 'Transfers',
-    primera_reserva: 'Primera_Reserva', ultima_reserva: 'Ultima_Reserva',
+    primera_reserva: 'Primera_Reserva', ultima_reserva: 'Ultima_Reserva', ultimo_reporte: 'Ultimo_Reporte',
     dias_sin_reportar: 'Dias_Sin_Reportar',
   };
   return `${columns[f.sortBy] || columns.nombre} ${f.sortDirection}, e.Id_Entidad_Reportante ${f.sortDirection}`;
@@ -155,7 +167,8 @@ function filteredSql(f) {
   if (f.validation) { where.push('e.Estado_Validacion=?'); params.push(f.validation); }
   if (f.availability) { where.push('e.Activo=?'); params.push(f.availability === 'ACTIVA' ? 1 : 0); }
   if (f.search) { where.push('e.Nombre_Normalizado LIKE ?'); params.push(`%${f.search}%`); }
-  if (f.activity) where.push(f.activity === 'CON_RESERVAS' ? `${operationsSql()}>0` : `${operationsSql()}=0`);
+  if (f.activity === 'CON_RESERVAS') where.push(`${operationsSql()}>0`);
+  if (f.activity === 'SIN_RESERVAS') where.push(`${operationsSql()}=0`);
   if (f.daysSinceReportMin !== null) {
     where.push(`e.Estado_Validacion='VALIDADA' AND e.Activo=1
       AND ${reportAgeFilterSql()} > ?`);
@@ -179,6 +192,7 @@ function columnsSql() {
   CASE WHEN e.Estado_Validacion='VALIDADA' AND e.Activo=1 THEN ${firstActivitySql()} ELSE NULL END AS Primera_Actividad,
   CASE WHEN e.Estado_Validacion='VALIDADA' AND e.Activo=1 THEN ${lastActivitySql()} ELSE NULL END AS Ultima_Actividad,
   DATE_FORMAT(CASE WHEN e.Estado_Validacion='VALIDADA' AND e.Activo=1 THEN ${lastActivitySql()} ELSE NULL END,'%Y-%m-%d') AS Fecha_Ultima_Actividad,
+  DATE_FORMAT(lr.Ultimo_Reporte,'%Y-%m-%d') AS Ultimo_Reporte,
   ${daysSinceReportSql()} AS Dias_Sin_Reportar,
   (SELECT r3.Nombre_Reportante FROM reservas r3
     WHERE r3.Id_Entidad_Reportante=e.Id_Entidad_Reportante
@@ -307,7 +321,7 @@ async function detail(rawId, query = {}) {
   return { entity, historic, period: periodSummary, contacts, observed, associated };
 }
 
-async function createEntity(input, actorId) {
+async function createEntity(input, actorId, canValidate = false) {
   const type = input.Tipo;
   if (!TYPES.includes(type)) fail(400, 'ENTITY_TYPE_INVALID', 'Selecciona un tipo válido.');
   const name = normalizeName(input.Nombre), key = searchKey(name);
@@ -316,16 +330,24 @@ async function createEntity(input, actorId) {
   let id;
   try {
     await conn.beginTransaction();
+    const initialState = canValidate ? 'VALIDADA' : 'PENDIENTE_VALIDACION';
+    const validAt = canValidate ? new Date() : null;
     const [result] = await conn.query(`INSERT INTO entidades_reportantes
-      (Tipo,Nombre,Nombre_Normalizado,Creado_Por,Actualizado_Por) VALUES (?,?,?,?,?)`,
-    [type, name, key, actorId, actorId]);
+      (Tipo,Nombre,Nombre_Normalizado,Estado_Validacion,Creado_Por,Actualizado_Por,Validado_Por,Validado_En)
+      VALUES (?,?,?,?,?,?,?,?)`, [type, name, key, initialState, actorId, actorId,
+      canValidate ? actorId : null, validAt]);
     id = result.insertId;
     await recordHistorial({ conexion: conn, tabla: 'entidades_reportantes', id_registro: id,
       accion: 'CREAR', id_usuario: actorId,
       detalles: [{ columna: 'Tipo', anterior: null, nuevo: type },
-        { columna: 'Nombre', anterior: null, nuevo: name }] });
-    const { upsertEntityValidationPending } = require('./entidades-reportantes.service');
-    await upsertEntityValidationPending(conn, id, name);
+        { columna: 'Nombre', anterior: null, nuevo: name },
+        { columna: 'Estado_Validacion', anterior: null, nuevo: initialState },
+        ...(canValidate ? [{ columna: 'Validado_Por', anterior: null, nuevo: actorId },
+          { columna: 'Validado_En', anterior: null, nuevo: validAt }] : [])] });
+    if (!canValidate) {
+      const { upsertEntityValidationPending } = require('./entidades-reportantes.service');
+      await upsertEntityValidationPending(conn, id, name);
+    }
     await conn.commit();
   } catch (e) {
     await conn.rollback();
@@ -399,14 +421,15 @@ async function streamExcel(query = {}, output) {
     ['Tipo', 'Tipo', 25], ['Entidad', 'Nombre', 38], ['Estado', 'Activo', 14],
     ['Validación', 'Estado_Validacion', 24], ['Reservas', 'Reservas', 13],
     ['Pasajeros', 'Pasajeros', 13], ['Primera actividad', 'Primera_Actividad', 22],
-    ['Última actividad', 'Ultima_Actividad', 22], ['Días desde última actividad', 'Dias', 28],
+    ['Última actividad', 'Ultima_Actividad', 22], ['Último reporte', 'Ultimo_Reporte', 22],
+    ['Días desde última actividad', 'Dias', 28],
     ['Contacto reciente', 'Contacto_Reciente', 30],
     ['Puntos observados', 'Puntos_Observados', 40],
     ['Puntos asociados', 'Puntos_Asociados', 40],
     ['Transfers', 'Transfers', 13], ['Operaciones', 'Operaciones', 13],
   ].map(([header, key, width]) => ({ header, key, width }));
   sheet.getRow(1).font = { bold: true };
-  sheet.autoFilter = { from: 'A1', to: 'N1' };
+  sheet.autoFilter = { from: 'A1', to: 'O1' };
   while (true) {
     const ids = result.items.map(item => item.Id_Entidad_Reportante);
     const observed = new Map(), associated = new Map();

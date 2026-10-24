@@ -203,6 +203,38 @@
           @if (form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid) {
             <div class="errorMessage">Selecciona la entidad reportante.</div>
           }
+          <button type="button" class="sir-action sir-action--secondary" (click)="openQuickEntityDrawer()">+ Registrar entidad</button>
+          @if (quickEntityDrawerOpen) {
+            <div class="transfer-entity-quick-backdrop" (click)="quickEntityDrawerOpen = false"></div>
+            <aside class="transfer-entity-quick-drawer" role="dialog" aria-modal="true" aria-labelledby="transfer-entity-create-title"
+              cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+              <button type="button" class="transfer-entity-quick-close" aria-label="Cerrar registro" (click)="quickEntityDrawerOpen = false">×</button>
+              <h3 id="transfer-entity-create-title">Registrar entidad</h3>
+              <p>Tipo: {{ quickEntityTypeLabel }}. El estado se asigna según tu permiso de validación.</p>
+              <label class="form-label" for="transfer-quick-entity-name">Nombre</label>
+              <input id="transfer-quick-entity-name" class="form-input" type="text" autocomplete="off" minlength="2" maxlength="255"
+                [value]="quickEntityName" (input)="onQuickEntityNameInput($any($event.target).value)" placeholder="Nombre comercial" />
+              @if (quickEntityName.trim().length > 0 && quickEntityName.trim().length < 2) {
+                <small class="errorMessage">Escribe al menos 2 caracteres.</small>
+              }
+              @if (quickEntityLoading) { <p role="status">Verificando nombre…</p> }
+              @if (quickEntityMatch; as match) {
+                @if (quickEntityMatchUsable) {
+                  <p role="status">Ya existe {{ match.Nombre }}.</p>
+                  <button type="button" class="sir-action sir-action--secondary" (click)="useQuickEntityMatch()">Usar entidad existente</button>
+                } @else {
+                  <p class="errorMessage" role="status">{{ match.Nombre }} ya existe, pero está inactiva o rechazada. Solicita su revisión.</p>
+                }
+              }
+              @if (quickEntityError) { <p class="errorMessage" role="alert">{{ quickEntityError }}</p> }
+              <div class="transfer-entity-quick-actions">
+                <button type="button" class="sir-action sir-action--secondary" (click)="quickEntityDrawerOpen = false">Cancelar</button>
+                <button type="button" class="sir-action sir-action--primary"
+                  [disabled]="quickEntitySaving || quickEntityLoading || quickEntityName.trim().length < 2 || !!quickEntityMatch"
+                  (click)="createQuickEntity()">{{ quickEntitySaving ? 'Registrando…' : 'Registrar entidad' }}</button>
+              </div>
+            </aside>
+          }
         </div>
         }
         <div class="form-group">

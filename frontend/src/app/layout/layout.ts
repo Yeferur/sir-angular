@@ -55,7 +55,7 @@ interface SidebarItem {
     key: string;
     label: string;
     icon: string;
-    group?: 'principal' | 'operacion' | 'gestion' | 'sistema';
+    group?: 'principal' | 'operacion' | 'programacion' | 'despues-viaje' | 'mercadeo' | 'sistema';
     kind?: 'action' | 'destination';
     route?: string;
     permission?: string | string[];
@@ -1147,7 +1147,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'aforos',
             label: 'Aforos',
             icon: 'bx bxs-dashboard',
-            group: 'principal',
+            group: 'operacion',
             route: '/Aforos',
             permission: 'AFOROS.LEER',
             exact: true,
@@ -1159,15 +1159,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             group: 'principal',
             route: '/Informes',
             permission: 'INFORMES.LEER',
-            exact: true,
-        },
-        {
-            key: 'historial',
-            label: 'Historial',
-            icon: 'bx bx-history',
-            group: 'principal',
-            route: '/Historial',
-            permission: 'HISTORIAL.LEER',
             exact: true,
         },
         {
@@ -1277,7 +1268,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'programacion-general',
             label: 'Listado general',
             icon: 'bx bx-spreadsheet',
-            group: 'gestion',
+            group: 'programacion',
             route: '/Programacion/General',
             permission: 'PROGRAMACION.LEER',
             exact: true,
@@ -1286,7 +1277,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'programacion',
             label: 'Listado de buses',
             icon: 'bx bx-list-check',
-            group: 'gestion',
+            group: 'programacion',
             route: '/Programacion',
             permission: 'PROGRAMACION.LEER',
             exact: false,
@@ -1295,16 +1286,19 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'mercadeo',
             label: 'Mercadeo',
             icon: 'bx bx-bar-chart-alt-2',
-            group: 'gestion',
-            route: '/Mercadeo',
-            permission: ['ENTIDADES_REPORTANTES.LEER', 'ENTIDADES_REPORTANTES.VALIDAR', 'MERCADEO.RESERVAS.LEER'],
-            exact: true,
+            group: 'mercadeo',
+            children: [
+                { key: 'mercadeo-origen', label: 'Origen de reservas', icon: 'bx bx-transfer-alt',
+                    route: '/Mercadeo/Reservas', permission: 'MERCADEO.RESERVAS.LEER', exact: true },
+                { key: 'mercadeo-entidades', label: 'Entidades reportantes', icon: 'bx bx-buildings',
+                    route: '/Mercadeo/Entidades', permission: 'ENTIDADES_REPORTANTES.LEER', exact: true },
+            ],
         },
         {
             key: 'control-viaje',
             label: 'Control de Viaje',
             icon: 'bx bx-trip',
-            group: 'gestion',
+            group: 'despues-viaje',
             route: '/Reservas/Confirmacion',
             permission: 'CONTROL_VIAJE.LEER',
             exact: true,
@@ -1313,7 +1307,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'seguros',
             label: 'Seguros',
             icon: 'bx bx-shield',
-            group: 'gestion',
+            group: 'despues-viaje',
             route: '/Seguros',
             permission: 'SEGUROS.LEER',
             exact: true,
@@ -1322,7 +1316,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             key: 'comisiones',
             label: 'Comisiones',
             icon: 'bx bx-dollar',
-            group: 'gestion',
+            group: 'despues-viaje',
             route: '/Comisiones',
             permission: 'COMISIONES.LEER',
             exact: true,
@@ -1360,6 +1354,15 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 },
             ],
         },
+        {
+            key: 'historial',
+            label: 'Historial',
+            icon: 'bx bx-history',
+            group: 'sistema',
+            route: '/Historial',
+            permission: 'HISTORIAL.LEER',
+            exact: true,
+        },
     ];
 
 
@@ -1383,12 +1386,22 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return this.getVisibleMenuItems().filter(item => item.group === group);
     }
 
+    getVisibleSubmenuItemsByGroup(group: NonNullable<SidebarItem['group']>): SidebarItem[] {
+        return this.getVisibleMenuItemsByGroup(group).filter(item => !!item.children?.length);
+    }
+
     getNavigationPanelWidth(): number {
         const items = this.getVisibleMenuItems();
-        const groups = new Set(items.map(item => item.group)).size;
-        const operationColumns = items.filter(item => item.group === 'operacion').length > 1 ? 2 : 1;
-        // Las categorías ocultas por permisos no reservan ancho en el panel.
-        return Math.min(1140, groups * 220 + (operationColumns - 1) * 220 + Math.max(0, groups - 1) * 16 + 32);
+        const columns = new Set(items.map(item => {
+            if (item.group === 'programacion' || item.group === 'despues-viaje') return 'programacion';
+            if (item.group === 'mercadeo' || item.group === 'sistema') return 'mercadeo';
+            return item.group;
+        })).size;
+        // Las columnas sin destinos visibles no reservan ancho en el panel.
+        const operationSubgroups = this.getVisibleSubmenuItemsByGroup('operacion').length;
+        return Math.min(1140, columns * 220 + Math.max(0, columns - 1) * 16 +
+            (items.some(item => item.key === 'aforos') ? 180 : 0) +
+            (operationSubgroups > 1 ? 220 : 0) + 32);
     }
 
     getCreateActions(): SidebarItem[] {
@@ -1406,9 +1419,13 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             informes: 'Análisis y reportes',
             historial: 'Actividad del sistema',
             'programacion-general': 'Reservas para operación y exportación',
-            programacion: 'Listado diario de buses',
+            programacion: 'Programación operativa',
             mercadeo: 'Análisis comercial',
-            seguros: 'Vehículos, guías y conductores',
+            'mercadeo-origen': 'Quién reportó cada reserva',
+            'mercadeo-entidades': 'Hoteles y agencias',
+            'control-viaje': 'Quién viajó',
+            'turnos-asesores': 'Horarios del rol asesor',
+            'usuarios-nuevo': 'Nueva cuenta de acceso',
             comisiones: 'Pendientes por liquidar',
         };
         return descriptions[item.key] || '';
@@ -1429,7 +1446,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         if (this.isClientUser() && !item.clientVisible) return false;
         if (item.advisorVisible && !this.isAdvisorUser()) return false;
         if (item.children?.length) {
-            return this.tienePermiso(item.permission) &&
+            return (!item.permission || this.tienePermiso(item.permission)) &&
                 this.getVisibleChildren(item).length > 0;
         }
         return this.tienePermiso(item.permission);

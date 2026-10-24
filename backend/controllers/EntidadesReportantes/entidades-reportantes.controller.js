@@ -18,7 +18,8 @@ exports.list = handle(async (req, res) => {
 
 exports.quickCreate = handle(async (req, res) => {
   const result = await service.quickCreate({ channelId: req.body?.Id_Canal,
-    name: req.body?.Nombre, actorId: req.user?.id });
+    name: req.body?.Nombre, actorId: req.user?.id,
+    canValidate: (req.userPermissions || []).includes('ENTIDADES_REPORTANTES.VALIDAR') });
   res.status(result.created ? 201 : 200).json({ success: true, data: result.entity, created: result.created });
 });
 
@@ -49,7 +50,8 @@ exports.detail = handle(async (req, res) => {
   res.json({ success: true, data });
 });
 exports.create = handle(async (req, res) => {
-  res.status(201).json({ success: true, data: await marketing.createEntity(req.body || {}, req.user?.id) });
+  res.status(201).json({ success: true, data: await marketing.createEntity(req.body || {}, req.user?.id,
+    (req.userPermissions || []).includes('ENTIDADES_REPORTANTES.VALIDAR')) });
 });
 exports.update = handle(async (req, res) => {
   res.json({ success: true, data: await marketing.updateEntity(req.params.id, req.body || {}, req.user?.id) });
