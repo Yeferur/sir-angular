@@ -1,14 +1,13 @@
 :host { display: block; }
 .entity-page { display: grid; gap: 14px; width: 100%; min-width: 0; max-width: 1350px; margin-inline: auto; color: var(--text-primary); }
-.entity-page app-query-empty-state { position: relative; }
-.entity-empty-create { position: absolute; top: 14px; right: 16px; }
+.entity-empty-create { margin-top: 9px; }
 #entity-filter-panel .form-grid {
   grid-template-columns: 280px repeat(3, 245px);
   justify-content: start;
 }
 #entity-filter-panel { margin-top: -4px; }
 :host ::ng-deep #entity-filter-panel .sir-select-trigger { box-sizing: border-box; height: 40px; min-height: 40px; }
-.entity-results-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.entity-results-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; min-width: 0; padding: 8px 13px; border-bottom: 1px solid var(--separator-color); }
 .results-heading-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; }
 .results-heading-summary strong { font-size: .92rem; }
 .results-heading-summary span { color: var(--text-secondary); font-size: .78rem; }
@@ -54,8 +53,14 @@ tbody tr:last-child td { border-bottom: 0; }
 .entity-point-toggle { margin-top: 18px; }
 .entity-edit { display: grid; gap: 9px; padding: 14px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .entity-edit label { font-size: .78rem; color: var(--text-secondary); }
-.entity-input { width: 100%; box-sizing: border-box; min-height: 42px; padding: 9px 12px; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font: inherit; }
-.entity-input:focus-visible, .entity-link:focus-visible, .entity-suggestions button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.entity-input { width: 100%; box-sizing: border-box; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); }
+input.entity-input { height: 40px; padding: 0 13px; font: 500 .875rem var(--font-family); transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease; }
+textarea.entity-input { min-height: 42px; padding: 9px 12px; font: inherit; }
+input.entity-input:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color)); }
+input.entity-input:focus { outline: none; border-color: var(--accent-blue); background: var(--bg-secondary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+input.entity-input:disabled, input.entity-input[readonly] { color: var(--text-secondary); cursor: not-allowed; opacity: .72; }
+input.entity-input::placeholder { color: var(--text-tertiary); opacity: .55; }
+textarea.entity-input:focus-visible, .entity-link:focus-visible, .entity-suggestions button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .entity-suggestions { overflow-y: auto; max-height: 220px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .entity-suggestions h3 { margin: 0; padding: 8px 11px 3px; color: var(--text-secondary); font-size: .69rem; text-transform: uppercase; letter-spacing: .06em; }
 .entity-suggestions button { display: block; width: 100%; padding: 9px 11px; border: 0; border-bottom: 1px solid var(--separator-color); background: transparent; color: var(--text-primary); font: inherit; font-size: .82rem; text-align: left; cursor: pointer; }
@@ -64,8 +69,6 @@ tbody tr:last-child td { border-bottom: 0; }
 .entity-associate-option input { margin-top: 2px; accent-color: var(--accent-blue); }
 .entity-form-note { font-size: .77rem !important; }
 @media (max-width: 760px) {
-  .entity-results-toolbar { align-items: flex-start; }
-  .entity-results-actions { width: 100%; justify-content: flex-start; }
   .entity-table-wrap { display: none; }
   .entity-cards { display: grid; gap: 8px; padding: 10px; }
   .entity-card { padding: 12px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }

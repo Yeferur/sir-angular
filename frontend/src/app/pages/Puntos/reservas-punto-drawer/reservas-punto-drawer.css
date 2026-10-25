@@ -73,13 +73,6 @@
 .point-reservations__filter app-select,
 .point-reservations__filter app-date-range-picker { display: block; }
 
-:host ::ng-deep .point-reservations__filter .sir-dp-field,
-:host ::ng-deep .point-reservations__filter .sir-select-trigger {
-  box-sizing: border-box;
-  height: 42px;
-  min-height: 42px;
-}
-
 .point-reservations__filters .reservation-search-button {
   width: 108px;
   height: 42px;

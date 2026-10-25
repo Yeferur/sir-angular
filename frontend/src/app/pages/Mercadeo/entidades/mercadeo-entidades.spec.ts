@@ -152,6 +152,22 @@ describe('MercadeoEntidadesComponent', () => {
     expect(html).toContain('Puntos asociados oficialmente');
   });
 
+  it('renderiza el nombre editable con la geometría y opacidad compartidas', async () => {
+    await component.open(page.items[0]);
+    component.startEdit();
+    fixture.detectChanges();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('#edit-entity-name') as HTMLInputElement;
+    const style = getComputedStyle(input);
+    expect(style.height).toBe('40px');
+    expect(style.borderTopWidth).toBe('1px');
+    expect(style.borderRadius).toBe('8px');
+    expect(style.paddingLeft).toBe('13px');
+    expect(style.fontSize).toBe('14px');
+    expect(style.fontWeight).toBe('500');
+    input.disabled = true;
+    expect(getComputedStyle(input).opacity).toBe('0.72');
+  });
+
   it('mantiene Entidades en una ruta separada protegida por lectura o validación', async () => {
     const routes = await import('../../../app.routes').then(module => module.routes);
     const origin = routes.find(item => item.path === 'Mercadeo/Reservas');

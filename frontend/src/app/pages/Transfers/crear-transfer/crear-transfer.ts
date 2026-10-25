@@ -1,16 +1,17 @@
 import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
-import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, HostListener, inject } from '@angular/core';
-import { finalize, firstValueFrom, forkJoin, of } from 'rxjs';
+import { Component, OnInit, OnDestroy, signal, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
+import { finalize, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators, FormArray } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { A11yModule } from '@angular/cdk/a11y';
 import { Router } from '@angular/router';
 import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.service';
 import { TransferService } from '../../../services/Transfers/transfers';
 import type { Canal, EntidadReportante } from '../../../services/Reservas/reservas';
-import { claveNombreEntidad, tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
+import { tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
+import { ReservaEntidadCreateDrawerController } from '../../Reservas/reserva-entidad-create-drawer';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
@@ -33,7 +34,7 @@ interface WizardStep {
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, A11yModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
   templateUrl: './crear-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })
@@ -50,6 +51,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   private alerts = inject(SirAlertService);
   private uiState = inject(UiStateService);
   private drawer = inject(SirDrawerService);
+  private permisosService = inject(PermisosService);
   form!: FormGroup;
   readonly compareSelectValues = compareSelectValuesAsStrings;
   readonly flightSelectOptions = [{ value: 'Nacional', label: 'Nacional' }, { value: 'Internacional', label: 'Internacional' }];
@@ -57,7 +59,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
 
   readonly wizardSteps: WizardStep[] = [
     { id: 'servicio', label: 'Servicio' },
-    { id: 'responsable', label: 'Responsable' },
+    { id: 'responsable', label: 'Reportante' },
     { id: 'pago', label: 'Pago' },
     { id: 'resumen', label: 'Resumen' }
   ];
@@ -256,7 +258,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
         this.navbar.showAlert({
           type: 'warning',
           title: 'Paso incompleto',
-          message: 'Completa los datos del responsable antes de continuar.',
+          message: 'Completa los datos del reportante antes de continuar.',
           autoClose: true,
           buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
         });
@@ -324,14 +326,7 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   entidadError = '';
   private entidadSearchTimer: ReturnType<typeof setTimeout> | null = null;
   private entidadSearchVersion = 0;
-  quickEntityDrawerOpen = false;
-  quickEntityName = '';
-  quickEntityMatches: EntidadReportante[] = [];
-  quickEntityLoading = false;
-  quickEntitySaving = false;
-  quickEntityError = '';
-  private quickEntitySearchTimer: ReturnType<typeof setTimeout> | null = null;
-  private quickEntitySearchVersion = 0;
+  private entityCreateController: ReservaEntidadCreateDrawerController | null = null;
   selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
@@ -355,11 +350,6 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     control?.updateValueAndValidity({ emitEvent: false });
     if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
     this.entidadSearchVersion++;
-    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
-    this.quickEntitySearchVersion++;
-    this.quickEntityDrawerOpen = false;
-    this.quickEntityMatches = [];
-    this.quickEntityLoading = false;
     if (!preserve) this.busquedaEntidad = '';
     this.entidadAutocompleteOpen = false;
     this.entidadCargando = false;
@@ -387,6 +377,9 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
+    this.resultsEntidadesReportantes = [];
+    this.entidadCargando = true;
+    this.cdr.markForCheck();
     this.entidadSearchTimer = setTimeout(() => this.buscarEntidadesReportantes(), 220);
   }
 
@@ -400,6 +393,12 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
   }
 
   cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
+
+  cerrarSugerenciasEntidadSiSale(event: FocusEvent): void {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+      this.cerrarSugerenciasEntidad();
+    }
+  }
 
   seleccionarEntidadReportante(entidad: EntidadReportante): void {
     this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
@@ -434,113 +433,41 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
     });
   }
 
-  get quickEntityMatch(): EntidadReportante | null {
-    const type = this.tipoEntidadSeleccionada();
-    const key = claveNombreEntidad(this.quickEntityName);
-    if (!type || !key) return null;
-    return this.quickEntityMatches.find(entity => entity.Tipo === type && claveNombreEntidad(entity.Nombre) === key) || null;
+  abrirRegistroEntidad(): void {
+    const initialType = this.tipoEntidadSeleccionada();
+    if (!initialType) return;
+    this.entityCreateController?.dispose();
+    this.entityCreateController = new ReservaEntidadCreateDrawerController(
+      this.transferSvc, this.drawer, this.permisosService,
+      type => this.canalIdParaTipoEntidad(type),
+      (entity, channelId) => this.seleccionarEntidadDesdeDrawer(entity, channelId),
+      () => { this.entityCreateController = null; }, initialType, '',
+    );
+    this.entityCreateController.open();
   }
 
-  get quickEntityMatchUsable(): boolean {
-    const match = this.quickEntityMatch;
-    return !!match && !!Number(match.Activo) && match.Estado_Validacion !== 'RECHAZADA';
+  private canalIdParaTipoEntidad(type: EntidadReportante['Tipo']): number | null {
+    const currentId = this.form?.get('Id_Canal')?.value;
+    const current = this.resultsCanales.find(channel => String(channel.Id_Canal) === String(currentId));
+    if (current && tipoEntidadPorCanal(this.resultsCanales, current.Id_Canal) === type) return Number(current.Id_Canal);
+    const matching = this.resultsCanales.find(channel => tipoEntidadPorCanal(this.resultsCanales, channel.Id_Canal) === type);
+    return matching ? Number(matching.Id_Canal) : null;
   }
 
-  get quickEntityTypeLabel(): string {
-    switch (this.tipoEntidadSeleccionada()) {
-      case 'HOTEL': return 'Hotel';
-      case 'AGENCIA_NACIONAL': return 'Agencia nacional';
-      case 'AGENCIA_INTERNACIONAL': return 'Agencia internacional';
-      default: return 'Entidad reportante';
+  private async seleccionarEntidadDesdeDrawer(entity: EntidadReportante, channelId: number): Promise<void> {
+    const channelControl = this.form?.get('Id_Canal');
+    if (!channelControl) throw new Error('No encontramos el canal del transfer.');
+    if (String(channelControl.value) !== String(channelId)) {
+      channelControl.setValue(channelId, { emitEvent: false });
+      this.onCanalEntidadChange();
     }
-  }
-
-  openQuickEntityDrawer(): void {
-    if (!this.tipoEntidadSeleccionada()) return;
-    this.quickEntityError = '';
-    this.quickEntityName = this.busquedaEntidad;
-    this.quickEntityDrawerOpen = true;
-    this.onQuickEntityNameInput(this.quickEntityName);
-  }
-
-  @HostListener('window:keydown.escape') closeQuickEntityDrawerOnEscape(): void {
-    this.quickEntityDrawerOpen = false;
-  }
-
-  onQuickEntityNameInput(value: string): void {
-    this.quickEntityName = value;
-    this.quickEntityError = '';
-    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
-    const version = ++this.quickEntitySearchVersion;
-    const type = this.tipoEntidadSeleccionada();
-    const term = value.trim();
-    if (!type || term.length < 2) {
-      this.quickEntityMatches = [];
-      this.quickEntityLoading = false;
-      this.cdr.markForCheck();
-      return;
-    }
-    this.quickEntityLoading = true;
-    this.quickEntitySearchTimer = setTimeout(() => {
-      this.transferSvc.getEntidadesReportantes(type, term, true).subscribe({
-        next: entities => {
-          if (version !== this.quickEntitySearchVersion) return;
-          this.quickEntityMatches = Array.isArray(entities) ? entities : [];
-          this.quickEntityLoading = false;
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          if (version !== this.quickEntitySearchVersion) return;
-          this.quickEntityError = 'No pudimos verificar si ya existe.';
-          this.quickEntityLoading = false;
-          this.cdr.markForCheck();
-        },
-      });
-    }, 220);
-  }
-
-  useQuickEntityMatch(): void {
-    const match = this.quickEntityMatch;
-    if (!match || !this.quickEntityMatchUsable) return;
-    this.form.get('Id_Entidad_Reportante')?.setValue(match.Id_Entidad_Reportante);
+    this.resultsEntidadesReportantes = [entity];
+    this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
     this.form.get('Id_Entidad_Reportante')?.markAsTouched();
-    this.busquedaEntidad = match.Nombre;
-    this.resultsEntidadesReportantes = [match];
+    this.busquedaEntidad = entity.Nombre;
+    this.entidadAutocompleteOpen = false;
     this.entidadError = '';
-    this.quickEntityDrawerOpen = false;
-    this.quickEntityName = '';
     this.cdr.markForCheck();
-  }
-
-  async createQuickEntity(): Promise<void> {
-    const name = this.quickEntityName.trim();
-    const type = this.tipoEntidadSeleccionada();
-    if (!type || this.quickEntitySaving) return;
-    if (name.length < 2) { this.quickEntityError = 'Escribe al menos 2 caracteres para el nombre.'; return; }
-    if (this.quickEntityMatch) {
-      if (this.quickEntityMatchUsable) this.useQuickEntityMatch();
-      else this.quickEntityError = `${this.quickEntityMatch.Nombre} ya existe, pero está inactiva o rechazada. Solicita su revisión.`;
-      return;
-    }
-    const channelId = this.form.get('Id_Canal')?.value;
-    if (!channelId) { this.quickEntityError = 'Selecciona primero el canal.'; return; }
-    this.quickEntitySaving = true;
-    this.quickEntityError = '';
-    try {
-      const entity = await firstValueFrom(this.transferSvc.registrarEntidadReportanteRapida(channelId, name));
-      this.resultsEntidadesReportantes = [...this.resultsEntidadesReportantes.filter(item =>
-        String(item.Id_Entidad_Reportante) !== String(entity.Id_Entidad_Reportante)), entity];
-      this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
-      this.form.get('Id_Entidad_Reportante')?.markAsTouched();
-      this.busquedaEntidad = entity.Nombre;
-      this.quickEntityDrawerOpen = false;
-      this.quickEntityName = '';
-    } catch (error: any) {
-      this.quickEntityError = error?.error?.message || 'No pudimos registrar la entidad. Revisa el nombre e intenta nuevamente.';
-    } finally {
-      this.quickEntitySaving = false;
-      this.cdr.markForCheck();
-    }
   }
 
   nombreCanalSeleccionado(): string {
@@ -1326,7 +1253,13 @@ export class CrearTransferComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
-    if (this.quickEntitySearchTimer) clearTimeout(this.quickEntitySearchTimer);
+    const activeDrawer = this.drawer.drawer();
+    if (activeDrawer?.type === 'entity-create'
+      && activeDrawer.props?.['controller'] === this.entityCreateController) {
+      this.entityCreateController?.close();
+    } else {
+      this.entityCreateController?.dispose();
+    }
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     this.navbar?.clearOverlay?.();
   }

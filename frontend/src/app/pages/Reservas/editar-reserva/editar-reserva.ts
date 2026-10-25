@@ -8,7 +8,6 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { A11yModule } from '@angular/cdk/a11y';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray, AbstractControl } from '@angular/forms';
 import { firstValueFrom, of, from } from 'rxjs';
 import { WebSocketService } from '../../../services/WebSocket/web-socket';
@@ -16,6 +15,7 @@ import {
   Reservas, Tour, Canal, EntidadReportante, Moneda, Plan, Horario, PrecioMap, Punto, ReservaHistorialCambio,
 } from '../../../services/Reservas/reservas';
 import { tipoEntidadPorCanal, claveNombreEntidad } from '../entidad-reportante.utils';
+import { ReservaEntidadCreateDrawerController } from '../reserva-entidad-create-drawer';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -76,7 +76,7 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, A11yModule, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
   templateUrl: './editar-reserva.html',
   styleUrls: ['../reserva-shared.css'],
 })
@@ -101,7 +101,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   activePaisOrigenIndex: number | null = null;
   readonly wizardSteps: WizardStep[] = [
     { id: 'viaje', label: 'Viaje' },
-    { id: 'responsable', label: 'Responsable' },
+    { id: 'responsable', label: 'Reportante' },
     { id: 'configuracion', label: 'Configuración' },
     { id: 'pasajeros', label: 'Pasajeros' },
     { id: 'pago', label: 'Pago' },
@@ -878,7 +878,56 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   registrandoEntidad = signal(false);
   entidadError = signal('');
   private entidadBusquedaTimer: ReturnType<typeof setTimeout> | null = null;
-  @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void { this.mostrarRegistroEntidad = false; }
+  private entityCreateController: ReservaEntidadCreateDrawerController | null = null;
+  @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void {
+    if (this.mostrarRegistroEntidad) this.entityCreateController?.close();
+  }
+
+  abrirRegistroEntidad(): void {
+    const initialType = this.tipoEntidadSeleccionada();
+    if (!initialType) return;
+    this.mostrarRegistroEntidad = true;
+    this.entityCreateController?.dispose();
+    this.entityCreateController = new ReservaEntidadCreateDrawerController(
+      this.reservasSvc,
+      this.drawer,
+      this.permisosService,
+      type => this.canalIdParaTipoEntidad(type),
+      (entity, channelId) => this.seleccionarEntidadDesdeDrawer(entity, channelId),
+      () => { this.mostrarRegistroEntidad = false; },
+      initialType,
+      '',
+    );
+    this.entityCreateController.open();
+  }
+
+  private canalIdParaTipoEntidad(type: EntidadReportante['Tipo']): number | null {
+    const currentId = this.form?.get('Id_Canal')?.value;
+    const currentChannel = this.canales().find(channel => String(channel.Id_Canal) === String(currentId));
+    if (currentChannel && tipoEntidadPorCanal(this.canales(), currentChannel.Id_Canal) === type) {
+      return Number(currentChannel.Id_Canal);
+    }
+    const matchingChannel = this.canales().find(channel => tipoEntidadPorCanal(this.canales(), channel.Id_Canal) === type);
+    return matchingChannel ? Number(matchingChannel.Id_Canal) : null;
+  }
+
+  private async seleccionarEntidadDesdeDrawer(entity: EntidadReportante, channelId: number): Promise<void> {
+    const channelControl = this.form?.get('Id_Canal');
+    if (!channelControl) throw new Error('No encontramos el canal de la reserva.');
+    if (String(channelControl.value) !== String(channelId)) {
+      channelControl.setValue(channelId, { emitEvent: false });
+      await this.onCanalEntidadChange();
+      await this.recalcularComisionesPorCanal();
+      await this.autollenarPrecios();
+    }
+    this.entidadesReportantes.set([entity]);
+    this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = entity.Nombre;
+    this.entidadAutocompleteOpen = false;
+    this.entidadError.set('');
+    this.cdr.markForCheck();
+  }
   onEntidadInput(value: string): void {
     const previousValue = this.busquedaEntidad;
     const selectedId = this.form?.get('Id_Entidad_Reportante')?.value;
@@ -895,6 +944,12 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     }
   }
   cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
+
+  cerrarSugerenciasEntidadSiSale(event: FocusEvent): void {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+      this.cerrarSugerenciasEntidad();
+    }
+  }
   seleccionarEntidadReportante(entidad: EntidadReportante): void {
     this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
     this.form.get('Id_Entidad_Reportante')?.markAsTouched();
@@ -908,6 +963,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
     this.busquedaEntidadVersion++;
     this.entidadCargando = false;
+    this.entidadesReportantes.set([]);
     const term = this.busquedaEntidad.trim();
     if (showSuggestions) this.entidadAutocompleteOpen = term.length >= 2;
     if (term.length < 2) {
@@ -915,6 +971,8 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
+    this.entidadCargando = true;
+    this.cdr.markForCheck();
     this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(), 250);
   }
   coincidenciaEntidad(): EntidadReportante | undefined {
@@ -3604,6 +3662,13 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const activeDrawer = this.drawer.drawer();
+    if (activeDrawer?.type === 'entity-create'
+      && activeDrawer.props?.['controller'] === this.entityCreateController) {
+      this.entityCreateController?.close();
+    } else {
+      this.entityCreateController?.dispose();
+    }
     if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
     this.busquedaEntidadVersion++;
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);

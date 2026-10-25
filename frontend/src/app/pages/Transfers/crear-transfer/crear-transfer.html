@@ -159,8 +159,8 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Responsable</h2>
-          <p class="card-header-hint">Registra el canal, la entidad reportante cuando corresponda y la persona de contacto.</p>
+          <h2>Reportante</h2>
+          <p class="card-header-hint">Persona que reporta el transfer y canal de origen.</p>
         </div>
       </div>
 
@@ -178,62 +178,39 @@
         @if (tipoEntidadSeleccionada()) {
         <div class="form-group">
           <label class="form-label" for="crear-transfer-entidad">Entidad reportante <span class="required-star">*</span></label>
-          <div class="transfer-entity-autocomplete">
+          <div class="transfer-entity-autocomplete" (focusout)="cerrarSugerenciasEntidadSiSale($event)">
             <input type="text" id="crear-transfer-entidad" class="form-input" role="combobox"
               aria-autocomplete="list" aria-controls="crear-transfer-entidad-opciones"
               [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
               [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
-              placeholder="Buscar hotel o agencia por nombre" [value]="busquedaEntidad" autocomplete="off"
-              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()"
-              (blur)="cerrarSugerenciasEntidad()" />
+              placeholder="Buscar entidad por nombre" [value]="busquedaEntidad" autocomplete="off"
+              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()" />
             @if (entidadAutocompleteOpen) {
-              <ul id="crear-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
-                @if (entidadCargando) { <li role="status">Buscando entidades…</li> }
-                @else if (resultsEntidadesReportantes.length) {
+              @if (!entidadCargando && !entidadError && resultsEntidadesReportantes.length) {
+                <ul id="crear-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
                   @for (entidad of resultsEntidadesReportantes; track entidad.Id_Entidad_Reportante) {
                     <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
                       {{ entidad.Nombre }}
                     </li>
                   }
-                } @else { <li role="status">No encontramos entidades con ese nombre.</li> }
-              </ul>
+                </ul>
+              } @else {
+                <div id="crear-transfer-entidad-opciones" class="transfer-entity-options entity-search-state">
+                  <p role="status">
+                    @if (entidadCargando) { Buscando entidades… }
+                    @else if (entidadError) { {{ entidadError }} }
+                    @else { No encontramos entidades con ese nombre }
+                  </p>
+                  @if (!entidadCargando && !entidadError) {
+                    <button type="button" class="sir-action sir-action--primary entity-create-action" (click)="abrirRegistroEntidad()">Crear entidad</button>
+                  }
+                </div>
+              }
             }
           </div>
-          @if (entidadError) { <div class="errorMessage" role="status">{{ entidadError }}</div> }
+          @if (entidadError && !entidadAutocompleteOpen) { <div class="errorMessage" role="status">{{ entidadError }}</div> }
           @if (form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid) {
             <div class="errorMessage">Selecciona la entidad reportante.</div>
-          }
-          <button type="button" class="sir-action sir-action--secondary" (click)="openQuickEntityDrawer()">+ Registrar entidad</button>
-          @if (quickEntityDrawerOpen) {
-            <div class="transfer-entity-quick-backdrop" (click)="quickEntityDrawerOpen = false"></div>
-            <aside class="transfer-entity-quick-drawer" role="dialog" aria-modal="true" aria-labelledby="transfer-entity-create-title"
-              cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
-              <button type="button" class="transfer-entity-quick-close" aria-label="Cerrar registro" (click)="quickEntityDrawerOpen = false">×</button>
-              <h3 id="transfer-entity-create-title">Registrar entidad</h3>
-              <p>Tipo: {{ quickEntityTypeLabel }}. El estado se asigna según tu permiso de validación.</p>
-              <label class="form-label" for="transfer-quick-entity-name">Nombre</label>
-              <input id="transfer-quick-entity-name" class="form-input" type="text" autocomplete="off" minlength="2" maxlength="255"
-                [value]="quickEntityName" (input)="onQuickEntityNameInput($any($event.target).value)" placeholder="Nombre comercial" />
-              @if (quickEntityName.trim().length > 0 && quickEntityName.trim().length < 2) {
-                <small class="errorMessage">Escribe al menos 2 caracteres.</small>
-              }
-              @if (quickEntityLoading) { <p role="status">Verificando nombre…</p> }
-              @if (quickEntityMatch; as match) {
-                @if (quickEntityMatchUsable) {
-                  <p role="status">Ya existe {{ match.Nombre }}.</p>
-                  <button type="button" class="sir-action sir-action--secondary" (click)="useQuickEntityMatch()">Usar entidad existente</button>
-                } @else {
-                  <p class="errorMessage" role="status">{{ match.Nombre }} ya existe, pero está inactiva o rechazada. Solicita su revisión.</p>
-                }
-              }
-              @if (quickEntityError) { <p class="errorMessage" role="alert">{{ quickEntityError }}</p> }
-              <div class="transfer-entity-quick-actions">
-                <button type="button" class="sir-action sir-action--secondary" (click)="quickEntityDrawerOpen = false">Cancelar</button>
-                <button type="button" class="sir-action sir-action--primary"
-                  [disabled]="quickEntitySaving || quickEntityLoading || quickEntityName.trim().length < 2 || !!quickEntityMatch"
-                  (click)="createQuickEntity()">{{ quickEntitySaving ? 'Registrando…' : 'Registrar entidad' }}</button>
-              </div>
-            </aside>
           }
         </div>
         }
@@ -506,7 +483,7 @@
           </div>
 
           <div class="resumen-review-card">
-            <div class="resumen-review-card-header"><h3>Responsables</h3></div>
+            <div class="resumen-review-card-header"><h3>Reportante</h3></div>
             <div class="resumen-review-card-body">
               <div class="resumen-info-row"><span class="resumen-info-label">Titular</span><span class="resumen-info-value">{{ form.get('Titular')?.value || '—' }}</span></div>
               <div class="resumen-info-row"><span class="resumen-info-label">Documento</span><span class="resumen-info-value">{{ form.get('DNI')?.value || '—' }}</span></div>

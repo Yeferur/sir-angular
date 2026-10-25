@@ -16,7 +16,7 @@ h2,
 p { margin: 0; }
 
 button,
-input { font: inherit; }
+input:not(.form-input) { font: inherit; }
 
 .button {
   min-height: 40px;
@@ -250,26 +250,6 @@ app-filter-bar { display: block; }
   letter-spacing: .045em;
   text-transform: uppercase;
 }
-
-.form-control {
-  width: 100%;
-  height: 40px;
-  padding: 0 13px;
-  border: 1px solid var(--separator-color);
-  border-radius: var(--radius-sm, 8px);
-  outline: 0;
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-  font-size: .8rem;
-  transition: border-color .16s ease, box-shadow .16s ease;
-}
-
-.form-control:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 13%, transparent);
-}
-
-.form-control::placeholder { color: var(--text-tertiary); }
 
 .workflow-card {
   margin-top: 14px;

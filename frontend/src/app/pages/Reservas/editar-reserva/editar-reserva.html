@@ -167,8 +167,8 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Responsable</h2>
-          <p class="card-header-hint">Persona que realiza la reserva y canal de origen.</p>
+          <h2>Reportante</h2>
+          <p class="card-header-hint">Persona que reporta la reserva y canal de origen.</p>
         </div>
       </div>
       <div class="form-grid">
@@ -183,59 +183,42 @@
         </div>
 
         @if (tipoEntidadSeleccionada()) {
-        <div class="form-group full-width">
+        <div class="form-group">
           <label class="form-label">Entidad reportante <span class="required-star">*</span></label>
-          <div class="punto-autocomplete-wrapper">
-            <input type="text" id="editar-entidad-reportante" class="form-control" role="combobox"
+          <div class="punto-autocomplete-wrapper" (focusout)="cerrarSugerenciasEntidadSiSale($event)">
+            <input type="text" id="editar-entidad-reportante" class="form-input" role="combobox"
               aria-autocomplete="list" aria-controls="editar-entidad-reportante-opciones"
               [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
               [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
-              placeholder="Buscar hotel o agencia por nombre" [value]="busquedaEntidad" autocomplete="off"
-              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()"
-              (blur)="cerrarSugerenciasEntidad()" />
+              placeholder="Buscar entidad por nombre" [value]="busquedaEntidad" autocomplete="off"
+              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()" />
             @if (entidadAutocompleteOpen) {
-              <ul id="editar-entidad-reportante-opciones" class="autocomplete-list" role="listbox" aria-label="Entidades reportantes">
-                @if (entidadCargando) { <li role="status">Buscando entidades…</li> }
-                @else if (entidadesReportantes().length) {
+              @if (!entidadCargando && !entidadError() && entidadesReportantes().length) {
+                <ul id="editar-entidad-reportante-opciones" class="autocomplete-list" role="listbox" aria-label="Entidades reportantes">
                   @for (entidad of entidadesReportantes(); track entidad.Id_Entidad_Reportante) {
                     <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
                       <span class="autocomplete-point-name">{{ entidad.Nombre }}</span>
                     </li>
                   }
-                } @else { <li role="status">No encontramos entidades con ese nombre.</li> }
-              </ul>
+                </ul>
+              } @else {
+                <div id="editar-entidad-reportante-opciones" class="autocomplete-list entity-search-state">
+                  <p role="status">
+                    @if (entidadCargando) { Buscando entidades… }
+                    @else if (entidadError()) { {{ entidadError() }} }
+                    @else { No encontramos entidades con ese nombre }
+                  </p>
+                  @if (!entidadCargando && !entidadError()) {
+                    <button type="button" class="sir-action sir-action--primary entity-create-action" (click)="abrirRegistroEntidad()">Crear entidad</button>
+                  }
+                </div>
+              }
             }
           </div>
-          <div class="field-hint">La entidad origina la reserva; el punto de encuentro se elige aparte.</div>
           @if (form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid) {
           <div class="errorMessage">Selecciona o registra una entidad reportante.</div>
           }
-          <button type="button" class="sir-action sir-action--secondary" (click)="mostrarRegistroEntidad = true">+ Registrar nueva entidad</button>
-          @if (mostrarRegistroEntidad) {
-          <div class="entity-quick-backdrop" (click)="mostrarRegistroEntidad = false"></div>
-          <div class="entity-quick-dialog" role="dialog" aria-modal="true" aria-labelledby="editar-entidad-titulo"
-            cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
-            <button type="button" class="entity-quick-close" aria-label="Cerrar registro" (click)="mostrarRegistroEntidad = false">×</button>
-            <h3 id="editar-entidad-titulo">Registrar nueva entidad</h3>
-            <p>Tipo: {{ tipoEntidadSeleccionada() === 'HOTEL' ? 'Hotel' : tipoEntidadSeleccionada() === 'AGENCIA_NACIONAL' ? 'Agencia nacional' : 'Agencia internacional' }} · Quedará pendiente de validación.</p>
-            <div class="form-group">
-              <label class="form-label" for="editar-nueva-entidad">Nombre comercial</label>
-              <input id="editar-nueva-entidad" type="text" class="form-input" [value]="nuevoNombreEntidad"
-                (input)="nuevoNombreEntidad = $any($event.target).value; buscarCoincidenciaEntidad()" placeholder="Travel Colombia" />
-            </div>
-            @if (coincidenciaEntidad(); as match) {
-              <p role="status">Ya existe <strong>{{ match.Nombre }}</strong>.</p>
-              <button type="button" class="sir-action sir-action--secondary" (click)="usarCoincidenciaEntidad()">Usar entidad existente</button>
-            }
-            <div class="entity-quick-actions">
-              <button type="button" class="sir-action sir-action--secondary" (click)="mostrarRegistroEntidad = false">Cancelar</button>
-              <button type="button" class="sir-action sir-action--primary" [disabled]="registrandoEntidad() || !nuevoNombreEntidad.trim() || !!coincidenciaEntidad()"
-                (click)="registrarEntidadRapida()">Guardar entidad pendiente de validación</button>
-            </div>
-            @if (entidadError()) { <div class="errorMessage" role="alert">{{ entidadError() }}</div> }
-          </div>
-          }
-          @if (entidadError()) { <div class="errorMessage">{{ entidadError() }}</div> }
+          @if (entidadError() && !entidadAutocompleteOpen) { <div class="errorMessage">{{ entidadError() }}</div> }
         </div>
         }
 
@@ -935,7 +918,7 @@
 
         <div class="resumen-review-card">
           <div class="resumen-review-card-header">
-            <h3>Responsable</h3>
+            <h3>Reportante</h3>
           </div>
           <div class="resumen-review-card-body">
             <div class="resumen-info-row">

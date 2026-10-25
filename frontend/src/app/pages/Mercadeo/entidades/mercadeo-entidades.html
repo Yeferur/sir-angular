@@ -65,38 +65,36 @@
     @else if (loading() && !result()) { <app-loading-state label="Consultando entidades…" /> }
     @if (result(); as data) {
     @if (error()) { <p class="inline-error" role="alert">{{ error() }} Los resultados anteriores siguen disponibles.</p> }
-    @if (data.items.length) {
-      <div class="entity-results-toolbar">
-        <div class="results-heading-summary"><strong>{{ data.total }} {{ data.total === 1 ? 'entidad' : 'entidades' }}</strong>
-          @if (data.summary.Con_Actividad) { <span>{{ data.summary.Con_Actividad }} con actividad</span> }
-          @if (data.summary.Total_Reservas) { <span>{{ data.summary.Total_Reservas }} {{ one(data.summary.Total_Reservas) ? 'reserva' : 'reservas' }}</span> }
-          @if (data.summary.Total_Transfers) { <span>{{ data.summary.Total_Transfers }} {{ one(data.summary.Total_Transfers) ? 'transfer' : 'transfers' }}</span> }
-          @if (data.summary.Total_Pasajeros) { <span>{{ data.summary.Total_Pasajeros }} {{ one(data.summary.Total_Pasajeros) ? 'pasajero' : 'pasajeros' }}</span> }
-        </div>
-        @if (canExport || canCreate) {
-          <div class="entity-results-actions">
-            @if (canExport) {
-              <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !!dateError()" (click)="export()">
-                <i class="bx bx-download" aria-hidden="true"></i> {{ exporting() ? 'Exportando…' : 'Exportar Excel' }}
-              </button>
-            }
-            @if (canCreate) {
-              <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">Nueva entidad</button>
-            }
-          </div>
-        }
-      </div>
-    }
     @if (!data.items.length) {
       <app-query-empty-state
-        [title]="appliedHasEntityCriteria() ? 'Sin resultados para estos filtros' : 'Sin entidades registradas'"
-        [description]="appliedHasEntityCriteria() ? 'Ajusta la búsqueda o los filtros para ver resultados.' : 'Aún no hay hoteles o agencias reportantes registrados para consultar.'">
-        @if (canCreate) {
+        [title]="emptyStateTitle()"
+        [description]="emptyStateDescription()">
+        @if (showEmptyCreate()) {
           <button type="button" class="sir-action sir-action--primary entity-empty-create" (click)="startCreate()">Nueva entidad</button>
         }
       </app-query-empty-state>
     } @else {
       <section class="entity-results" aria-label="Actividad por entidad">
+        <div class="entity-results-toolbar">
+          <div class="results-heading-summary"><strong>{{ data.total }} {{ data.total === 1 ? 'entidad' : 'entidades' }}</strong>
+            @if (data.summary.Con_Actividad) { <span>{{ data.summary.Con_Actividad }} con actividad</span> }
+            @if (data.summary.Total_Reservas) { <span>{{ data.summary.Total_Reservas }} {{ one(data.summary.Total_Reservas) ? 'reserva' : 'reservas' }}</span> }
+            @if (data.summary.Total_Transfers) { <span>{{ data.summary.Total_Transfers }} {{ one(data.summary.Total_Transfers) ? 'transfer' : 'transfers' }}</span> }
+            @if (data.summary.Total_Pasajeros) { <span>{{ data.summary.Total_Pasajeros }} {{ one(data.summary.Total_Pasajeros) ? 'pasajero' : 'pasajeros' }}</span> }
+          </div>
+          @if (canExport || canCreate) {
+            <div class="entity-results-actions">
+              @if (canExport) {
+                <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !!dateError()" (click)="export()">
+                  <i class="bx bx-download" aria-hidden="true"></i> {{ exporting() ? 'Exportando…' : 'Exportar Excel' }}
+                </button>
+              }
+              @if (canCreate) {
+                <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">Nueva entidad</button>
+              }
+            </div>
+          }
+        </div>
         <div class="entity-table-wrap">
           <table><thead><tr><th>Entidad</th><th>Tipo</th><th>Estado</th><th>Validación</th><th>Actividad del período</th>
             <th scope="col">Último reporte</th>

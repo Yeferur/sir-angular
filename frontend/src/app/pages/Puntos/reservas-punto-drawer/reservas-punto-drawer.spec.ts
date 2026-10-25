@@ -58,6 +58,18 @@ describe('Reservas asociadas a punto', () => {
     expect(fixture.nativeElement.textContent).toContain('RSV1');
   });
 
+  it('conserva 40 px en el select y el rango de fechas del drawer', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    const select = root.querySelector('.point-reservations__filter .sir-select-trigger') as HTMLButtonElement;
+    const range = root.querySelector('.point-reservations__filter .sir-dp-field') as HTMLButtonElement;
+    for (const field of [select, range]) {
+      const style = getComputedStyle(field);
+      expect(style.height).toBe('40px');
+      expect(style.borderTopWidth).toBe('1px');
+      expect(style.borderRadius).toBe('8px');
+    }
+  });
+
   it('muestra solo loading local al buscar por primera vez y solo empty state sin datos', () => {
     const pending = new Subject<ReservasPuntoPage>();
     api.getReservasPunto.and.returnValue(pending.asObservable());

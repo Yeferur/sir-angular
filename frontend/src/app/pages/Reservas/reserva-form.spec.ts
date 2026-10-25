@@ -150,7 +150,30 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       ]);
     });
 
-    it('consulta solo el tipo del canal y oculta Entidad para Freelance y otros canales', async () => {
+    it('renderiza Entidad reportante con la geometría y estados del input compartido', async () => {
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }]);
+      c.form.get('Id_Canal').setValue(1);
+      await c.onCanalEntidadChange();
+      c.currentStep = 1;
+      render();
+      const field = fixture.nativeElement.querySelector(`#${mode}-entidad-reportante`) as HTMLInputElement;
+      expect(field.classList.contains('form-input')).toBeTrue();
+      const style = getComputedStyle(field);
+      expect(style.height).toBe('40px');
+      expect(style.borderTopWidth).toBe('1px');
+      expect(style.borderRadius).toBe('8px');
+      expect(style.paddingLeft).toBe('13px');
+      expect(style.fontSize).toBe('14px');
+      expect(style.fontWeight).toBe('500');
+      const normalBorder = style.borderColor;
+      field.focus();
+      await new Promise(resolve => setTimeout(resolve, 220));
+      expect(getComputedStyle(field).borderColor).not.toBe(normalBorder);
+      field.disabled = true;
+      expect(getComputedStyle(field).opacity).toBe('0.72');
+    });
+
+    it('consulta el tipo del canal al buscar por nombre y oculta Entidad para Freelance y otros canales', async () => {
       c.canales.set([
         { Id_Canal: 1, Nombre_Canal: 'HOTEL' },
         { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' },
@@ -159,10 +182,14 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
         { Id_Canal: 5, Nombre_Canal: 'DIRECTO' },
       ]);
       for (const [id, type] of [[1, 'HOTEL'], [2, 'AGENCIA_NACIONAL'], [3, 'AGENCIA_INTERNACIONAL']] as const) {
+        const previousQueries = reservasApi.getEntidadesReportantes.calls.count();
         c.form.get('Id_Canal').setValue(id);
         await c.onCanalEntidadChange();
-        expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith(type);
+        expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledTimes(previousQueries);
         expect(c.tipoEntidadSeleccionada()).toBe(type);
+        c.busquedaEntidad = 'Entidad';
+        await c.buscarEntidades();
+        expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith(type, 'Entidad');
       }
       const entityQueries = reservasApi.getEntidadesReportantes.calls.count();
 
@@ -189,12 +216,19 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       ]);
       c.form.get('Id_Canal').setValue(1);
       await c.onCanalEntidadChange();
+      expect(reservasApi.getEntidadesReportantes).not.toHaveBeenCalled();
+      c.busquedaEntidad = 'Hotel';
+      await c.buscarEntidades();
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith('HOTEL', 'Hotel');
       c.form.get('Id_Entidad_Reportante').setValue(7);
 
       c.form.get('Id_Canal').setValue(2);
       await c.onCanalEntidadChange();
       expect(c.form.get('Id_Entidad_Reportante').value).toBeNull();
-      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith('AGENCIA_NACIONAL');
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledTimes(1);
+      c.busquedaEntidad = 'Agencia';
+      await c.buscarEntidades();
+      expect(reservasApi.getEntidadesReportantes).toHaveBeenCalledWith('AGENCIA_NACIONAL', 'Agencia');
 
       c.form.get('Id_Entidad_Reportante').setValue(8);
       c.form.get('Id_Canal').setValue(3);

@@ -107,7 +107,7 @@ describe('Comisiones: filtros', () => {
     const response = new Subject<ComisionCanal[]>();
     commissions.and.returnValue(response);
 
-    expect(fixture.nativeElement.querySelector('#commissions-ready-title')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-query-empty-state h3')?.textContent).toContain('Listo para buscar');
     component.buscar();
     render();
 
@@ -116,7 +116,7 @@ describe('Comisiones: filtros', () => {
     expect(button.getAttribute('aria-busy')).toBe('true');
     expect(button.querySelector('.btn-spinner--active')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.loading-state')?.textContent).toContain('Buscando comisiones');
-    expect(fixture.nativeElement.querySelector('#commissions-ready-title')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-query-empty-state')).toBeNull();
     component.buscar();
     expect(commissions).toHaveBeenCalledTimes(1);
 
@@ -125,7 +125,7 @@ describe('Comisiones: filtros', () => {
     render();
     expect(button.disabled).toBeFalse();
     expect(button.getAttribute('aria-busy')).toBe('false');
-    expect(fixture.nativeElement.querySelector('#commissions-empty-title')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-query-empty-state h3')?.textContent).toContain('No hay comisiones registradas');
   });
 
   it('conserva resultados al actualizar y muestra el error local al fallar', async () => {

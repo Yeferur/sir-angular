@@ -6,7 +6,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { environment } from '../../../../environments/environment';
 import { CommonModule, DecimalPipe } from '@angular/common';
-import { A11yModule } from '@angular/cdk/a11y';
 import { Router } from '@angular/router';
 import {
   ReactiveFormsModule, FormBuilder, FormGroup, Validators,
@@ -23,7 +22,9 @@ import {
   Reservas, Tour, Canal, EntidadReportante, Moneda, Plan, Horario, PrecioMap, Punto,
 } from '../../../services/Reservas/reservas';
 import { tipoEntidadPorCanal, claveNombreEntidad } from '../entidad-reportante.utils';
+import { ReservaEntidadCreateDrawerController } from '../reserva-entidad-create-drawer';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
+import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { TourRulesService } from '../../../services/Reservas/tour-rules.service';
@@ -55,7 +56,7 @@ interface SubmitValidationIssue {
   selector: 'app-crear-reserva',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule, DecimalPipe, A11yModule,
+    CommonModule, ReactiveFormsModule, DecimalPipe,
     SirSelectComponent, SirSelectOptionsPipe, DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
   ],
   templateUrl: './crear-reserva.html',
@@ -79,6 +80,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   private readonly router = inject(Router);
   private readonly drawer = inject(SirDrawerService);
+  private readonly permisosService = inject(PermisosService);
 
   // ═══════════════════════════════════════════════════════════════════
   // WIZARD STATE
@@ -86,7 +88,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   readonly wizardSteps: WizardStep[] = [
     { id: 'viaje',         label: 'Viaje'         },
-    { id: 'responsable',   label: 'Responsable'    },
+    { id: 'responsable',   label: 'Reportante'    },
     { id: 'configuracion', label: 'Configuración'  },
     { id: 'pasajeros',     label: 'Pasajeros'      },
     { id: 'pago',          label: 'Pago'           },
@@ -785,13 +787,63 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   entidadAutocompleteOpen = false;
   entidadCargando = false;
   private busquedaEntidadVersion = 0;
+  private entityCreateController: ReservaEntidadCreateDrawerController | null = null;
   nuevoNombreEntidad = '';
   registrandoEntidad = signal(false);
   entidadError = signal('');
   private entidadBusquedaTimer: ReturnType<typeof setTimeout> | null = null;
-  @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void { this.mostrarRegistroEntidad = false; }
+  @HostListener('window:keydown.escape') cerrarRegistroEntidad(): void {
+    if (this.mostrarRegistroEntidad) this.entityCreateController?.close();
+  }
+
+  abrirRegistroEntidad(): void {
+    const initialType = this.tipoEntidadSeleccionada();
+    if (!initialType) return;
+    this.mostrarRegistroEntidad = true;
+    this.entityCreateController?.dispose();
+    this.entityCreateController = new ReservaEntidadCreateDrawerController(
+      this.reservasSvc,
+      this.drawer,
+      this.permisosService,
+      type => this.canalIdParaTipoEntidad(type),
+      (entity, channelId) => this.seleccionarEntidadDesdeDrawer(entity, channelId),
+      () => { this.mostrarRegistroEntidad = false; },
+      initialType,
+      '',
+    );
+    this.entityCreateController.open();
+  }
+
+  private canalIdParaTipoEntidad(type: EntidadReportante['Tipo']): number | null {
+    const currentId = this.form?.get('Id_Canal')?.value;
+    const currentChannel = this.canales().find(channel => String(channel.Id_Canal) === String(currentId));
+    if (currentChannel && tipoEntidadPorCanal(this.canales(), currentChannel.Id_Canal) === type) {
+      return Number(currentChannel.Id_Canal);
+    }
+    const matchingChannel = this.canales().find(channel => tipoEntidadPorCanal(this.canales(), channel.Id_Canal) === type);
+    return matchingChannel ? Number(matchingChannel.Id_Canal) : null;
+  }
+
+  private async seleccionarEntidadDesdeDrawer(entity: EntidadReportante, channelId: number): Promise<void> {
+    const channelControl = this.form?.get('Id_Canal');
+    if (!channelControl) throw new Error('No encontramos el canal de la reserva.');
+    if (String(channelControl.value) !== String(channelId)) {
+      channelControl.setValue(channelId, { emitEvent: false });
+      await this.onCanalEntidadChange();
+      await this.recalcularComisionesPorCanal();
+      await this.autollenarPrecios();
+    }
+    this.entidadesReportantes.set([entity]);
+    this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = entity.Nombre;
+    this.entidadAutocompleteOpen = false;
+    this.entidadError.set('');
+    this.cdr.markForCheck();
+  }
   onEntidadInput(value: string): void {
     this.busquedaEntidad = value;
+    this.entidadError.set('');
     const selectedId = this.form.get('Id_Entidad_Reportante')?.value;
     const selected = this.entidadesReportantes().find(item => String(item.Id_Entidad_Reportante) === String(selectedId));
     if (selectedId && value !== selected?.Nombre) this.form.get('Id_Entidad_Reportante')?.setValue(null);
@@ -809,6 +861,12 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
 
   cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
 
+  cerrarSugerenciasEntidadSiSale(event: FocusEvent): void {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+      this.cerrarSugerenciasEntidad();
+    }
+  }
+
   seleccionarEntidadReportante(entidad: EntidadReportante): void {
     this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
     this.form.get('Id_Entidad_Reportante')?.markAsTouched();
@@ -824,6 +882,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (this.entidadBusquedaTimer) clearTimeout(this.entidadBusquedaTimer);
     this.busquedaEntidadVersion++;
     this.entidadCargando = false;
+    this.entidadesReportantes.set([]);
     const term = this.busquedaEntidad.trim();
     if (showSuggestions) this.entidadAutocompleteOpen = term.length >= 2;
     if (term.length < 2) {
@@ -831,6 +890,8 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
+    this.entidadCargando = true;
+    this.cdr.markForCheck();
     this.entidadBusquedaTimer = setTimeout(() => this.buscarEntidades(includeInactive), 250);
   }
   coincidenciaEntidad(): EntidadReportante | undefined {
@@ -894,6 +955,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (term.length < 2) return;
     const version = ++this.busquedaEntidadVersion;
     this.entidadCargando = true;
+    this.entidadError.set('');
     try {
       const request = includeInactive
         ? this.reservasSvc.getEntidadesReportantes(tipo, term, true)
@@ -2527,6 +2589,13 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const activeDrawer = this.drawer.drawer();
+    if (activeDrawer?.type === 'entity-create'
+      && activeDrawer.props?.['controller'] === this.entityCreateController) {
+      this.entityCreateController?.close();
+    } else {
+      this.entityCreateController?.dispose();
+    }
     this.cuposStripInfo.set(null);
     this.alertService.closeModal();
   }

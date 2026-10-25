@@ -175,6 +175,35 @@ describe('Comisiones: grupos por entidad y reserva', () => {
     expect((fixture.nativeElement.querySelector('.central-switch input') as HTMLInputElement).checked).toBeTrue();
   });
 
+  it('usa la geometría compartida en los datos de pago en ambos temas', async () => {
+    const { fixture, component, loadProfile, render } = await mount();
+    loadProfile.and.returnValue(of(profile()));
+    component.abrirPagoGrupo(group());
+    await fixture.whenStable();
+    render();
+    const input = fixture.nativeElement.querySelector('#payment-account') as HTMLInputElement;
+    expect(input.classList.contains('form-input')).toBeTrue();
+    const style = getComputedStyle(input);
+    expect(style.height).toBe('40px');
+    expect(style.borderTopWidth).toBe('1px');
+    expect(style.borderRadius).toBe('8px');
+    expect(style.paddingLeft).toBe('13px');
+    expect(style.fontSize).toBe('14px');
+    expect(style.fontWeight).toBe('500');
+    const originalTheme = document.documentElement.getAttribute('data-theme');
+    const darkBackground = style.backgroundColor;
+    try {
+      document.documentElement.setAttribute('data-theme', 'light');
+      await new Promise(resolve => setTimeout(resolve, 220));
+      expect(getComputedStyle(input).backgroundColor).not.toBe(darkBackground);
+    } finally {
+      if (originalTheme === null) document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', originalTheme);
+    }
+    input.disabled = true;
+    expect(getComputedStyle(input).opacity).toBe('0.72');
+  });
+
   it('carga también el perfil existente de Agencia Nacional', async () => {
     const { component, loadProfile } = await mount();
     const agency = group({ Id_Entidad_Reportante: 22, Id_Perfil_Comision: 52, Tipo_Entidad: 'AGENCIA_NACIONAL',

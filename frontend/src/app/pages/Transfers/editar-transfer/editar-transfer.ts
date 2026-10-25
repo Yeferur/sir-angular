@@ -10,6 +10,7 @@ import { AlertButton, SirAlertService } from '../../../services/Alertas/alert.se
 import { TransferService } from '../../../services/Transfers/transfers';
 import type { Canal, EntidadReportante } from '../../../services/Reservas/reservas';
 import { tipoEntidadPorCanal } from '../../Reservas/entidad-reportante.utils';
+import { ReservaEntidadCreateDrawerController } from '../../Reservas/reserva-entidad-create-drawer';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
@@ -51,7 +52,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
 
   readonly wizardSteps: WizardStep[] = [
     { id: 'servicio', label: 'Servicio' },
-    { id: 'responsable', label: 'Responsable' },
+    { id: 'responsable', label: 'Reportante' },
     { id: 'pago', label: 'Pago' },
     { id: 'resumen', label: 'Resumen' }
   ];
@@ -271,7 +272,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         this.navbar.showAlert({
           type: 'warning',
           title: 'Paso incompleto',
-          message: 'Completa los datos del responsable antes de continuar.',
+          message: 'Completa los datos del reportante antes de continuar.',
           autoClose: true,
           buttons: [{ text: 'Entendido', style: 'primary', onClick: () => this.navbar.clearOverlay() }]
         });
@@ -339,6 +340,7 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   entidadError = '';
   private entidadSearchTimer: ReturnType<typeof setTimeout> | null = null;
   private entidadSearchVersion = 0;
+  private entityCreateController: ReservaEntidadCreateDrawerController | null = null;
   selectedRango: any | null = null;
   selectedRangoDescripcion: string | null = null;
   precioSeleccionado: number | null = null;
@@ -389,6 +391,9 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
       this.cdr.markForCheck();
       return;
     }
+    this.resultsEntidadesReportantes = [];
+    this.entidadCargando = true;
+    this.cdr.markForCheck();
     this.entidadSearchTimer = setTimeout(() => this.buscarEntidadesReportantes(), 220);
   }
 
@@ -402,6 +407,12 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
   }
 
   cerrarSugerenciasEntidad(): void { this.entidadAutocompleteOpen = false; }
+
+  cerrarSugerenciasEntidadSiSale(event: FocusEvent): void {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+      this.cerrarSugerenciasEntidad();
+    }
+  }
 
   seleccionarEntidadReportante(entidad: EntidadReportante): void {
     this.form.get('Id_Entidad_Reportante')?.setValue(entidad.Id_Entidad_Reportante);
@@ -434,6 +445,43 @@ export class EditarTransferComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  abrirRegistroEntidad(): void {
+    const initialType = this.tipoEntidadSeleccionada();
+    if (!initialType) return;
+    this.entityCreateController?.dispose();
+    this.entityCreateController = new ReservaEntidadCreateDrawerController(
+      this.transferSvc, this.drawer, this.permisosSvc,
+      type => this.canalIdParaTipoEntidad(type),
+      (entity, channelId) => this.seleccionarEntidadDesdeDrawer(entity, channelId),
+      () => { this.entityCreateController = null; }, initialType, '',
+    );
+    this.entityCreateController.open();
+  }
+
+  private canalIdParaTipoEntidad(type: EntidadReportante['Tipo']): number | null {
+    const currentId = this.form?.get('Id_Canal')?.value;
+    const current = this.resultsCanales.find(channel => String(channel.Id_Canal) === String(currentId));
+    if (current && tipoEntidadPorCanal(this.resultsCanales, current.Id_Canal) === type) return Number(current.Id_Canal);
+    const matching = this.resultsCanales.find(channel => tipoEntidadPorCanal(this.resultsCanales, channel.Id_Canal) === type);
+    return matching ? Number(matching.Id_Canal) : null;
+  }
+
+  private async seleccionarEntidadDesdeDrawer(entity: EntidadReportante, channelId: number): Promise<void> {
+    const channelControl = this.form?.get('Id_Canal');
+    if (!channelControl) throw new Error('No encontramos el canal del transfer.');
+    if (String(channelControl.value) !== String(channelId)) {
+      channelControl.setValue(channelId, { emitEvent: false });
+      this.onCanalEntidadChange();
+    }
+    this.resultsEntidadesReportantes = [entity];
+    this.form.get('Id_Entidad_Reportante')?.setValue(entity.Id_Entidad_Reportante);
+    this.form.get('Id_Entidad_Reportante')?.markAsTouched();
+    this.busquedaEntidad = entity.Nombre;
+    this.entidadAutocompleteOpen = false;
+    this.entidadError = '';
+    this.cdr.markForCheck();
   }
 
   nombreCanalSeleccionado(): string {
@@ -1411,6 +1459,13 @@ private actualizarRangoDetectado(opts: { preservarValor?: boolean; notificarSinP
 
   ngOnDestroy(): void {
     if (this.entidadSearchTimer) clearTimeout(this.entidadSearchTimer);
+    const activeDrawer = this.drawer.drawer();
+    if (activeDrawer?.type === 'entity-create'
+      && activeDrawer.props?.['controller'] === this.entityCreateController) {
+      this.entityCreateController?.close();
+    } else {
+      this.entityCreateController?.dispose();
+    }
     if (this.navbar?.cuposInfo) this.navbar.cuposInfo.set(null);
     this.navbar?.clearOverlay?.();
   }

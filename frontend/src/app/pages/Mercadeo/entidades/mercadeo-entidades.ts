@@ -72,7 +72,6 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly detailError = signal('');
   readonly detailNotice = signal('');
   readonly filterOpen = signal(false);
-  readonly appliedHasEntityCriteria = signal(false);
   readonly editing = signal(false);
   readonly creating = signal(false);
   readonly rejecting = signal(false);
@@ -98,10 +97,24 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   readonly filterCount = computed(() => Number(!!this.filters().tipo) + Number(!!this.filters().estado)
     + Number(!!this.filters().desde && !!this.filters().hasta));
-  readonly hasEntityCriteria = computed(() => {
+  readonly emptyStateTitle = computed(() => {
     const current = this.appliedFilters();
-    return !!(current.buscar.trim() || current.tipo || current.estado);
+    if (current.estado && (current.buscar.trim() || current.tipo)) return 'Sin entidades que coincidan';
+    if (current.estado) return 'Sin entidades con este estado';
+    if (current.buscar.trim() && current.tipo) return 'Sin entidades que coincidan';
+    if (current.buscar.trim()) return 'Sin entidades con ese nombre';
+    if (current.tipo) return 'Sin entidades de este tipo';
+    return 'Sin entidades registradas';
   });
+  readonly emptyStateDescription = computed(() => {
+    const current = this.appliedFilters();
+    if (current.estado && (current.buscar.trim() || current.tipo))
+      return 'No hay entidades que coincidan con el estado y los demás filtros aplicados.';
+    if (current.estado) return 'No hay entidades con el estado seleccionado.';
+    if (current.buscar.trim() || current.tipo) return 'Prueba otros criterios o crea una nueva entidad.';
+    return 'Aún no hay hoteles o agencias reportantes registrados para consultar.';
+  });
+  readonly showEmptyCreate = computed(() => this.canCreate && !this.appliedFilters().estado);
   readonly dateError = computed(() => {
     const f = this.filters();
     if (!f.desde && !f.hasta) return '';
@@ -175,7 +188,6 @@ export class MercadeoEntidadesComponent implements OnInit {
     const applied = { ...this.filters() };
     this.appliedFilters.set(applied);
     if (syncUrl) this.writeUrl(applied, page);
-    this.appliedHasEntityCriteria.set(this.hasEntityCriteria());
     this.filterOpen.set(false);
     this.loading.set(true); this.error.set('');
     try { this.result.set(await firstValueFrom(this.api.activity(applied, page))); }

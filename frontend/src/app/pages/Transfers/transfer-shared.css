@@ -98,40 +98,33 @@
   top: calc(100% + 6px);
   right: 0;
   left: 0;
-  max-height: 240px;
+  max-height: 280px;
   margin: 0;
   padding: 6px;
   overflow-y: auto;
   list-style: none;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, .12));
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .28);
+  border: 1.5px solid var(--separator-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .03);
+  backdrop-filter: blur(18px);
 }
 
 .transfer-entity-options li {
-  padding: 10px 12px;
-  border-radius: 7px;
+  padding: 11px 12px;
+  border-radius: 10px;
   color: var(--text-primary);
+  font-size: .93rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
-.transfer-entity-options li[role="status"] { color: var(--text-secondary); cursor: default; }
-.transfer-entity-options li:not([role="status"]):hover { background: rgba(10, 132, 255, .12); }
-
-.transfer-entity-quick-backdrop { position: fixed; inset: 0; z-index: calc(var(--z-modal, 1500) - 2); background: #0008; }
-.transfer-entity-quick-drawer { position: fixed; z-index: calc(var(--z-modal, 1500) - 1); inset: 0 0 0 auto; box-sizing: border-box;
-  display: grid; align-content: start; gap: 14px; width: min(100%, 480px); padding: 24px;
-  overflow-y: auto; border: 1px solid var(--separator-color); background: var(--bg-secondary);
-  color: var(--text-primary); box-shadow: 0 16px 44px rgba(0,0,0,.28); }
-.transfer-entity-quick-drawer h3, .transfer-entity-quick-drawer p { margin: 0; }
-.transfer-entity-quick-drawer p { color: var(--text-secondary); font-size: .85rem; }
-.transfer-entity-quick-close { position: absolute; top: 14px; right: 15px; display: grid; place-items: center;
-  width: 32px; height: 32px; border: 0; border-radius: 8px; background: var(--bg-tertiary);
-  color: var(--text-secondary); font-size: 1.3rem; cursor: pointer; }
-.transfer-entity-quick-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.transfer-entity-quick-drawer :focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
-@media (max-width: 520px) { .transfer-entity-quick-drawer { padding: 18px; } }
+.transfer-entity-options li:hover { background: rgba(10, 132, 255, .12); }
+.transfer-entity-options.entity-search-state { padding: 13px 14px; }
 
 .pago-total-badge {
   display: flex;

@@ -340,7 +340,7 @@
             @if (panelRequiereCuenta) {
               <div class="field-group">
                 <label class="form-label" for="payment-account">{{ panelCuentaLabel }}</label>
-                <input id="payment-account" class="form-control" inputmode="numeric" autocomplete="off"
+                <input id="payment-account" class="form-input" inputmode="numeric" autocomplete="off"
                   [(ngModel)]="panel.cuenta" (ngModelChange)="panel.touched = true" [placeholder]="panelCuentaPlaceholder"
                   [class.input-error]="panel.touched && panelError" />
               </div>
@@ -349,14 +349,14 @@
             @if (panel.formaPago) {
               <div class="field-group">
                 <label class="form-label" for="payment-recipient">Persona o empresa que recibe</label>
-                <input id="payment-recipient" class="form-control" autocomplete="off" maxlength="255"
+                <input id="payment-recipient" class="form-input" autocomplete="off" maxlength="255"
                   [(ngModel)]="panel.nombreReceptor" (ngModelChange)="panel.touched = true"
                   placeholder="Nombre completo o razón social" />
               </div>
 
               <div class="field-group">
                 <label class="form-label" for="payment-recipient-id">DNI, NIT o documento</label>
-                <input id="payment-recipient-id" class="form-control" autocomplete="off" maxlength="50"
+                <input id="payment-recipient-id" class="form-input" autocomplete="off" maxlength="50"
                   [(ngModel)]="panel.dniReceptor" (ngModelChange)="panel.touched = true"
                   placeholder="Documento de quien recibe" />
               </div>

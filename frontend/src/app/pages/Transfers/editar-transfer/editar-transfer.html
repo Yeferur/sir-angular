@@ -185,8 +185,8 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>Responsable</h2>
-          <p class="card-header-hint">Registra el canal, la entidad reportante cuando corresponda y la persona de contacto.</p>
+          <h2>Reportante</h2>
+          <p class="card-header-hint">Persona que reporta el transfer y canal de origen.</p>
         </div>
       </div>
 
@@ -204,28 +204,37 @@
         @if (tipoEntidadSeleccionada()) {
         <div class="form-group">
           <label class="form-label" for="editar-transfer-entidad">Entidad reportante <span class="required-star">*</span></label>
-          <div class="transfer-entity-autocomplete">
+          <div class="transfer-entity-autocomplete" (focusout)="cerrarSugerenciasEntidadSiSale($event)">
             <input type="text" id="editar-transfer-entidad" class="form-input" role="combobox"
               aria-autocomplete="list" aria-controls="editar-transfer-entidad-opciones"
               [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
               [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
-              placeholder="Buscar hotel o agencia por nombre" [value]="busquedaEntidad" autocomplete="off"
-              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()"
-              (blur)="cerrarSugerenciasEntidad()" />
+              placeholder="Buscar entidad por nombre" [value]="busquedaEntidad" autocomplete="off"
+              (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()" />
             @if (entidadAutocompleteOpen) {
-              <ul id="editar-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
-                @if (entidadCargando) { <li role="status">Buscando entidades…</li> }
-                @else if (resultsEntidadesReportantes.length) {
+              @if (!entidadCargando && !entidadError && resultsEntidadesReportantes.length) {
+                <ul id="editar-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
                   @for (entidad of resultsEntidadesReportantes; track entidad.Id_Entidad_Reportante) {
                     <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
                       {{ entidad.Nombre }}
                     </li>
                   }
-                } @else { <li role="status">No encontramos entidades con ese nombre.</li> }
-              </ul>
+                </ul>
+              } @else {
+                <div id="editar-transfer-entidad-opciones" class="transfer-entity-options entity-search-state">
+                  <p role="status">
+                    @if (entidadCargando) { Buscando entidades… }
+                    @else if (entidadError) { {{ entidadError }} }
+                    @else { No encontramos entidades con ese nombre }
+                  </p>
+                  @if (!entidadCargando && !entidadError) {
+                    <button type="button" class="sir-action sir-action--primary entity-create-action" (click)="abrirRegistroEntidad()">Crear entidad</button>
+                  }
+                </div>
+              }
             }
           </div>
-          @if (entidadError) { <div class="errorMessage" role="status">{{ entidadError }}</div> }
+          @if (entidadError && !entidadAutocompleteOpen) { <div class="errorMessage" role="status">{{ entidadError }}</div> }
           @if (form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid) {
             <div class="errorMessage">Selecciona la entidad reportante.</div>
           }
@@ -498,7 +507,7 @@
           </div>
 
           <div class="resumen-review-card">
-            <div class="resumen-review-card-header"><h3>Responsables</h3></div>
+            <div class="resumen-review-card-header"><h3>Reportante</h3></div>
             <div class="resumen-review-card-body">
               <div class="resumen-info-row"><span class="resumen-info-label">Titular</span><span class="resumen-info-value">{{ form.get('Titular')?.value || '—' }}</span></div>
               <div class="resumen-info-row"><span class="resumen-info-label">Documento</span><span class="resumen-info-value">{{ form.get('DNI')?.value || '—' }}</span></div>
