@@ -63,33 +63,6 @@ interface SidebarItem {
     clientVisible?: boolean;
     advisorVisible?: boolean;
     children?: SidebarItem[];
-    /** Acción ("+") que se fusiona con la fila de la vista indicada (key). */
-    pairWith?: string;
-    /** Etiqueta de la fila en el launcher (por defecto, label). */
-    rowLabel?: string;
-}
-
-interface LauncherRow {
-    key: string;
-    label: string;
-    icon: string;
-    route: string;
-    description: string;
-    item: SidebarItem;
-    add?: SidebarItem;
-}
-
-interface LauncherBlock {
-    key: string;
-    title: string;
-    rows: LauncherRow[];
-}
-
-interface LauncherModel {
-    primary: SidebarItem[];
-    blocks: LauncherBlock[];
-    columns: number;
-    width: number;
 }
 
 
@@ -1171,21 +1144,21 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             exact: true,
         },
         {
+            key: 'aforos',
+            label: 'Aforos',
+            icon: 'bx bxs-dashboard',
+            group: 'operacion',
+            route: '/Aforos',
+            permission: 'AFOROS.LEER',
+            exact: true,
+        },
+        {
             key: 'informes',
             label: 'Informes',
             icon: 'bx bx-line-chart',
             group: 'principal',
             route: '/Informes',
             permission: 'INFORMES.LEER',
-            exact: true,
-        },
-        {
-            key: 'aforos',
-            label: 'Aforos',
-            icon: 'bx bxs-dashboard',
-            group: 'principal',
-            route: '/Aforos',
-            permission: 'AFOROS.LEER',
             exact: true,
         },
         {
@@ -1200,7 +1173,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     label: 'Nueva Reserva',
                     icon: 'bx bx-calendar-event',
                     kind: 'action',
-                    pairWith: 'reservas-ver',
                     route: '/Reservas/NuevaReserva',
                     permission: 'RESERVAS.CREAR',
                     exact: true,
@@ -1209,7 +1181,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 {
                     key: 'reservas-ver',
                     label: 'Ver Reservas',
-                    rowLabel: 'Reservas',
                     icon: 'bx bx-list-ul',
                     route: '/Reservas/VerReservas',
                     permission: 'RESERVAS.LEER',
@@ -1229,7 +1200,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     label: 'Nuevo Transfer',
                     icon: 'bx bx-car',
                     kind: 'action',
-                    pairWith: 'transfers-ver',
                     route: '/Transfers/NuevoTransfer',
                     permission: 'TRANSFERS.CREAR',
                     exact: true,
@@ -1237,7 +1207,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 {
                     key: 'transfers-ver',
                     label: 'Ver Transfer',
-                    rowLabel: 'Transfer',
                     icon: 'bx bx-list-ul',
                     route: '/Transfers/VerTransfers',
                     permission: 'TRANSFERS.LEER',
@@ -1256,7 +1225,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     label: 'Nuevo Tour',
                     icon: 'bx bx-flag',
                     kind: 'action',
-                    pairWith: 'tours-ver',
                     route: '/Tours/NuevoTour',
                     permission: 'TOURS.CREAR',
                     exact: true,
@@ -1264,7 +1232,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 {
                     key: 'tours-ver',
                     label: 'Ver Tours',
-                    rowLabel: 'Tours',
                     icon: 'bx bx-list-ul',
                     route: '/Tours/VerTours',
                     permission: 'TOURS.LEER',
@@ -1283,7 +1250,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     label: 'Nuevo Punto',
                     icon: 'bx bx-map-pin',
                     kind: 'action',
-                    pairWith: 'puntos-ver',
                     route: '/Puntos/NuevoPunto',
                     permission: 'PUNTOS.CREAR',
                     exact: true,
@@ -1291,7 +1257,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                 {
                     key: 'puntos-ver',
                     label: 'Ver Puntos',
-                    rowLabel: 'Puntos de encuentro',
                     icon: 'bx bx-map-alt',
                     route: '/Puntos/VerPuntos',
                     permission: 'PUNTOS.LEER',
@@ -1375,7 +1340,6 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
                     label: 'Crear Usuarios',
                     icon: 'bx bx-user',
                     kind: 'action',
-                    pairWith: 'usuarios',
                     route: '/Usuarios/NuevoUsuario',
                     permission: 'USUARIOS.CREAR',
                     exact: true,
@@ -1422,72 +1386,22 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
         return this.getVisibleMenuItems().filter(item => item.group === group);
     }
 
-    // ── Modelo del launcher ──────────────────────────────────────
-    // El panel se construye 100% desde los permisos: cada bloque nace de
-    // sus filas visibles y desaparece si queda vacío. Las columnas se
-    // calculan por cantidad de filas, no por grupo fijo, así no quedan huecos.
-
-    private static readonly LAUNCHER_BLOCKS: ReadonlyArray<{
-        key: string; title: string; groups: ReadonlyArray<NonNullable<SidebarItem['group']>>;
-    }> = [
-        { key: 'gestion', title: 'Gestión', groups: ['operacion'] },
-        { key: 'programacion', title: 'Programación', groups: ['programacion'] },
-        { key: 'despues-viaje', title: 'Después del viaje', groups: ['despues-viaje'] },
-        { key: 'mercadeo', title: 'Mercadeo', groups: ['mercadeo'] },
-        { key: 'sistema', title: 'Sistema', groups: ['sistema'] },
-    ];
-
-    getLauncherModel(): LauncherModel {
-        const primary = this.getVisibleMenuItemsByGroup('principal').filter(item => !!item.route);
-
-        const blocks = LayoutComponent.LAUNCHER_BLOCKS
-            .map(def => ({
-                key: def.key,
-                title: def.title,
-                rows: this.toLauncherRows(
-                    def.groups.flatMap(group => this.getVisibleMenuItemsByGroup(group))
-                ),
-            }))
-            .filter(block => block.rows.length > 0);
-
-        const totalRows = blocks.reduce((sum, block) => sum + block.rows.length + .8, 0);
-        const columns = Math.min(4, blocks.length, Math.max(1, Math.round(totalRows / 6)));
-        const width = Math.min(1100, Math.max(
-            primary.length ? Math.min(primary.length, 4) * 168 + 32 : 0,
-            columns ? columns * 232 + (columns - 1) * 14 + 32 : 0,
-            320,
-        ));
-
-        return { primary, blocks, columns, width };
+    getVisibleSubmenuItemsByGroup(group: NonNullable<SidebarItem['group']>): SidebarItem[] {
+        return this.getVisibleMenuItemsByGroup(group).filter(item => !!item.children?.length);
     }
 
-    /**
-     * Aplana padres con hijos y fusiona cada acción "crear" con la fila de
-     * su vista. Si solo hay permiso de crear, la fila pasa a ser la acción.
-     */
-    private toLauncherRows(items: SidebarItem[]): LauncherRow[] {
-        const rows: LauncherRow[] = [];
-        for (const item of items) {
-            const source = item.children?.length ? this.getVisibleChildren(item) : [item];
-            for (const entry of source) {
-                if (!entry.route) continue;
-                const isPairedAction = entry.kind === 'action' && !!entry.pairWith;
-                if (isPairedAction && source.some(s => s.key === entry.pairWith)) continue;
-                const add = isPairedAction
-                    ? undefined
-                    : source.find(s => s.kind === 'action' && s.pairWith === entry.key);
-                rows.push({
-                    key: entry.key,
-                    label: entry.rowLabel ?? entry.label,
-                    icon: entry.icon,
-                    route: entry.route,
-                    description: this.getMenuDescription(entry),
-                    item: entry,
-                    add,
-                });
-            }
-        }
-        return rows;
+    getNavigationPanelWidth(): number {
+        const items = this.getVisibleMenuItems();
+        const columns = new Set(items.map(item => {
+            if (item.group === 'programacion' || item.group === 'despues-viaje') return 'programacion';
+            if (item.group === 'mercadeo' || item.group === 'sistema') return 'mercadeo';
+            return item.group;
+        })).size;
+        // Las columnas sin destinos visibles no reservan ancho en el panel.
+        const operationSubgroups = this.getVisibleSubmenuItemsByGroup('operacion').length;
+        return Math.min(1140, columns * 220 + Math.max(0, columns - 1) * 16 +
+            (items.some(item => item.key === 'aforos') ? 180 : 0) +
+            (operationSubgroups > 1 ? 220 : 0) + 32);
     }
 
     getCreateActions(): SidebarItem[] {

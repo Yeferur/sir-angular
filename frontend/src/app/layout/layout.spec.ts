@@ -99,77 +99,55 @@ describe('Navegación superior', () => {
     await render();
   });
 
-  it('agrupa el menú en bloques, fusiona "crear" con su vista y conserva las rutas de creación', () => {
-    const headings = Array.from(fixture.nativeElement.querySelectorAll('.launcher-block > h3'))
+  it('distribuye el menú en cuatro columnas y conserva las rutas de creación', () => {
+    const headings = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column > h3'))
       .map(node => (node as HTMLElement).textContent?.trim());
-    expect(headings).toEqual(['Gestión', 'Programación', 'Después del viaje', 'Mercadeo', 'Sistema']);
+    expect(headings).toEqual(['Principal', 'Operación', 'Programación', 'Mercadeo']);
     expect(layout.getCreateActions().map(item => item.route)).toEqual([
       '/Reservas/NuevaReserva', '/Transfers/NuevoTransfer', '/Tours/NuevoTour',
       '/Puntos/NuevoPunto', '/Usuarios/NuevoUsuario',
     ]);
-
-    // Principal es una franja aparte e incluye Aforos
-    expect(Array.from(fixture.nativeElement.querySelectorAll('.launcher-primary .launcher-card strong'))
-      .map(node => node.textContent?.trim())).toEqual(['Inicio', 'Avisos', 'Informes', 'Aforos']);
-    expect(element('.launcher-primary .launcher-card-copy small')?.textContent?.trim()).toBe('Resumen general');
-
-    // Una fila por entidad, con "+" inline hacia la ruta de creación
-    const reservas = element('a[href="/Reservas/VerReservas"]').closest('.launcher-row') as HTMLElement;
-    expect(reservas.querySelector('.launcher-row-main span')?.textContent?.trim()).toBe('Reservas');
-    expect(reservas.querySelector('.launcher-row-add')?.getAttribute('href')).toBe('/Reservas/NuevaReserva');
-    expect(element('a[href="/Reservas/NuevaReserva"]').classList.contains('launcher-row-add')).toBeTrue();
-
-    const systemRows = (Array.from(fixture.nativeElement.querySelectorAll('.launcher-block')) as HTMLElement[])
-      .find(block => block.querySelector('h3')?.textContent?.trim() === 'Sistema')!;
-    expect(Array.from(systemRows.querySelectorAll('.launcher-row-main span')).map(n => n.textContent?.trim()))
-      .toEqual(['Administrar Usuarios', 'Turnos de asesores', 'Historial']);
-    expect(systemRows.querySelector('a[href="/Usuarios/NuevoUsuario"]')?.classList.contains('launcher-row-add')).toBeTrue();
-
-    expect(element('a[href="/Programacion/General"]')?.closest('.launcher-block')?.querySelector('h3')?.textContent?.trim()).toBe('Programación');
-    expect(element('a[href="/Mercadeo/Reservas"]')?.closest('.launcher-block')?.querySelector('h3')?.textContent?.trim()).toBe('Mercadeo');
-    expect(element('a[href="/Programacion/General"]').getAttribute('title')).toBe('Reservas para operación y exportación');
-    expect(element('a[href="/Seguros"]').getAttribute('title')).toBeNull();
+    expect(element('.launcher-operation-grid').children.length).toBe(4);
+    expect(element('a[href="/Aforos"]')?.classList.contains('launcher-card--feature')).toBeTrue();
+    expect(element('a[href="/Reservas/Confirmacion"]')?.closest('.launcher-subsection')?.querySelector('h3')?.textContent?.trim()).toBe('Después del viaje');
+    const systemSection = (Array.from(fixture.nativeElement.querySelectorAll('.launcher-subsection')) as HTMLElement[])
+      .find(section => section.querySelector('h3')?.textContent?.trim() === 'Sistema');
+    expect(Array.from(systemSection?.querySelectorAll('.launcher-card strong') || [])
+      .map(node => node.textContent?.trim())).toEqual([
+        'Administrar Usuarios', 'Crear Usuarios', 'Turnos de asesores', 'Historial',
+      ]);
+    expect(element('a[href="/Programacion/General"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Programación');
+    expect(element('a[href="/Mercadeo/Reservas"]')?.closest('.launcher-column')?.querySelector('h3')?.textContent?.trim()).toBe('Mercadeo');
+    expect(element('a[href="/Programacion/General"] .launcher-card-copy small')?.textContent?.trim())
+      .toBe('Reservas para operación y exportación');
+    expect(element('a[href="/Usuarios"] .launcher-card-copy small')).toBeNull();
+    expect(element('a[href="/Reservas/Confirmacion"] .launcher-card-copy small')?.textContent?.trim()).toBe('Quién viajó');
+    expect(element('a[href="/Seguros"] .launcher-card-copy small')).toBeNull();
     expect(element('a[href="/"]').getAttribute('href')).toBe('/');
     expect(element('[data-create-trigger]').querySelector('.bx-plus')).toBeNull();
   });
 
-  it('calcula las columnas según las filas visibles y no por grupo fijo', () => {
-    const model = layout.getLauncherModel();
-    expect(model.blocks.length).toBe(5);
-    expect(model.columns).toBe(3);
-    expect(model.width).toBeLessThanOrEqual(1100);
-  });
-
-  it('muestra Mercadeo y Entidades como filas independientes con su permiso', () => {
+  it('muestra Mercadeo y Entidades como tarjetas independientes con su permiso', () => {
     const origin = element('a[href="/Mercadeo/Reservas"]');
     const entities = element('a[href="/Mercadeo/Entidades"]');
     expect(origin.textContent).toContain('Origen de reservas');
     expect(entities.textContent).toContain('Entidades reportantes');
-    expect(origin.closest('.launcher-row')?.querySelector('.launcher-row-add')).toBeNull();
-    expect(entities.closest('.launcher-row')?.querySelector('.launcher-row-add')).toBeNull();
+    expect(origin.closest('.launcher-subgroup')).toBeNull();
+    expect(entities.closest('.launcher-subgroup')).toBeNull();
   });
 
-  it('oculta bloques sin filas visibles y deja fluir los restantes', async () => {
+  it('oculta columnas y subsecciones sin elementos visibles y deja fluir las restantes', async () => {
     allowed = new Set(['INFORMES.LEER', 'SEGUROS.LEER']);
     await render();
 
-    expect(Array.from(fixture.nativeElement.querySelectorAll('.launcher-block > h3')).map(n => n.textContent?.trim()))
-      .toEqual(['Después del viaje']);
-    expect(Array.from(fixture.nativeElement.querySelectorAll('.launcher-primary .launcher-card strong')).map(n => n.textContent?.trim()))
-      .toEqual(['Inicio', 'Informes']);
-    expect(layout.getLauncherModel().columns).toBe(1);
+    const columns = Array.from(fixture.nativeElement.querySelectorAll('.launcher-column')) as HTMLElement[];
+    expect(columns.length).toBe(2);
+    expect(columns.map(column => column.querySelector(':scope > h3')?.textContent?.trim()))
+      .toEqual(['Principal', undefined]);
+    expect(element('.launcher-subsection > h3').textContent?.trim()).toBe('Después del viaje');
+    expect(element('.launcher-operation-grid')).toBeNull();
     expect(element('a[href="/Mercadeo/Reservas"]')).toBeNull();
-  });
-
-  it('si solo hay permiso de crear, la fila pasa a ser la acción sin "+"', async () => {
-    allowed = new Set(['TOURS.CREAR', 'TRANSFERS.LEER']);
-    await render();
-
-    const crear = element('a[href="/Tours/NuevoTour"]');
-    expect(crear.classList.contains('launcher-row-main')).toBeTrue();
-    expect(crear.textContent).toContain('Nuevo Tour');
-    const transfer = element('a[href="/Transfers/VerTransfers"]').closest('.launcher-row') as HTMLElement;
-    expect(transfer.querySelector('.launcher-row-add')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.launcher-subsection').length).toBe(1);
   });
 
   it('conserva el título anterior mientras inicia una navegación lazy', () => {
@@ -257,8 +235,8 @@ describe('Navegación superior', () => {
     await render();
     expect(layout.getCreateActions().map(item => item.key)).toEqual(['reservas-nueva']);
     expect(element('#topbar-create-menu').querySelectorAll('a').length).toBe(1);
-    expect(fixture.nativeElement.querySelectorAll('.launcher-block .launcher-row').length).toBe(1);
-    expect(element('a[href="/Reservas/NuevaReserva"]').classList.contains('launcher-row-add')).toBeTrue();
+    expect(element('.launcher-operation-grid').children.length).toBe(1);
+    expect(element('.launcher-column--wide')).toBeNull();
   });
 
   it('muestra y carga el centro personal sin NOTIFICACIONES.LEER', async () => {

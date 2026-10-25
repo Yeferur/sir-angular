@@ -610,8 +610,7 @@
 
 .small-dropdown-item:focus-visible,
 .launcher-card:focus-visible,
-.launcher-row-main:focus-visible,
-.launcher-row-add:focus-visible,
+.launcher-subitem:focus-visible,
 .topbar-control:focus-visible,
 .topbar-avatar-btn:focus-visible {
   outline: 2px solid var(--accent-blue);
@@ -801,34 +800,36 @@
 .launcher-close:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
 .launcher-close:active { transform: scale(.9); }
 
-/* Franja Principal: tarjetas de igual ancho que se reparten la fila */
-.launcher-primary {
+.navigation-launcher-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 20px 16px;
+}
+
+.launcher-column {
+  flex: 1.1 1 190px;
+  min-width: 0;
+}
+
+.launcher-column--operation { flex: 2.2 1 380px; container: operation / inline-size; }
+
+.launcher-operation-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--separator-translucent);
-}
-.launcher-primary:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
-
-/* Bloques: multi-columna balancea alturas solo; sin huecos por permisos */
-.launcher-blocks {
-  columns: var(--launcher-cols, 3) 210px;
-  column-gap: 14px;
 }
 
-.launcher-block {
-  break-inside: avoid;
-  margin: 0 0 14px;
-  padding: 8px;
-  border: 1px solid var(--separator-color);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--text-primary) 1.5%, transparent);
+@container operation (min-width: 400px) {
+  .launcher-operation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.launcher-block > h3 {
-  margin: 2px 6px 6px;
+.launcher-operation-grid > .launcher-subgroup:only-child { grid-column: 1 / -1; }
+
+.launcher-column > h3,
+.launcher-subsection > h3 {
+  margin: 0 5px 8px;
   color: var(--text-secondary);
   font-size: .6875rem;
   font-weight: 700;
@@ -837,60 +838,10 @@
   text-transform: uppercase;
 }
 
-.launcher-row {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border-radius: 10px;
-  transition: background 140ms ease;
-}
-.launcher-row:hover,
-.launcher-row:focus-within { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
-.launcher-row.active { background: color-mix(in srgb, var(--accent-blue) 12%, transparent); }
+.launcher-subsection { margin-top: 17px; }
 
-.launcher-row-main {
-  min-width: 0;
-  flex: 1;
-  min-height: 40px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 5px 8px;
-  border-radius: 10px;
-  color: var(--text-secondary);
-  font-size: .8125rem;
-  line-height: 1.35;
-  text-decoration: none;
-  transition: color 140ms ease;
-}
-.launcher-row-main > i:first-child { flex: 0 0 auto; font-size: 1rem; }
-.launcher-row-main > span { min-width: 0; flex: 1; }
-.launcher-row:hover .launcher-row-main,
-.launcher-row-main:focus-visible { color: var(--text-primary); }
-.launcher-row.active .launcher-row-main { color: var(--accent-blue); }
-
-.launcher-row-add {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  margin-right: 6px;
-  border-radius: 8px;
-  color: var(--accent-blue);
-  text-decoration: none;
-  opacity: .5;
-  transition: opacity 150ms ease, background 150ms ease, transform 150ms ease;
-}
-.launcher-row-add i { font-size: 1.05rem; }
-.launcher-row:hover .launcher-row-add,
-.launcher-row-add:focus-visible { opacity: 1; }
-.launcher-row-add:hover { background: color-mix(in srgb, var(--accent-blue) 16%, transparent); }
-.launcher-row-add:active { transform: scale(.9); }
-
-.launcher-card {
+.launcher-card,
+.launcher-subitem {
   text-decoration: none;
 }
 
@@ -904,6 +855,8 @@
   color: var(--text-secondary);
   transition: color 150ms ease, background 150ms ease, transform 150ms ease;
 }
+
+.launcher-card--feature { margin-bottom: 8px; }
 
 .launcher-card:hover,
 .launcher-card:focus-visible {
@@ -953,6 +906,40 @@
   font-size: .58rem;
   font-weight: 850;
 }
+
+.launcher-subgroup {
+  padding: 8px;
+  border: 1px solid var(--separator-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text-primary) 1.5%, transparent);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.launcher-column > .launcher-subgroup + .launcher-subgroup { margin-top: 8px; }
+.launcher-subgroup.has-active-child { border-color: color-mix(in srgb, var(--accent-blue) 32%, var(--separator-color)); }
+.launcher-subgroup h4 { margin: 2px 5px 6px; color: var(--text-primary); font-size: .8125rem; line-height: 1.4; }
+
+.launcher-subitem {
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: .8125rem;
+  line-height: 1.35;
+  transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.launcher-subitem > i:first-child { font-size: .95rem; }
+.launcher-subitem span { flex: 1; min-width: 0; }
+.launcher-subitem:hover,
+.launcher-subitem:focus-visible { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 6%, transparent); transform: translateX(2px); }
+.launcher-subitem.action { color: var(--accent-blue); }
+.launcher-subitem.active { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 12%, transparent); }
+.launcher-arrow { margin-left: auto; font-size: .9rem; opacity: .72; }
 
 .topbar-create-menu {
   width: min(240px, calc(100vw - 20px));
@@ -1016,13 +1003,12 @@
   }
 
   .navigation-launcher.is-open { transform: translateY(0) scale(1); }
-  .launcher-primary { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-  .launcher-blocks { columns: 1; }
+  .navigation-launcher-grid { flex-direction: column; gap: 18px; }
+  .launcher-column { flex: none; width: 100%; }
   .navigation-launcher-header { position: sticky; top: -13px; z-index: 2; margin: -1px -1px 0; padding: 4px 4px 12px; background: color-mix(in srgb, var(--bg-secondary) 92%, transparent); backdrop-filter: blur(18px); }
   .navigation-launcher-header p { display: none; }
   .launcher-card { min-height: 50px; }
-  .launcher-row, .launcher-row-main { min-height: 44px; }
-  .launcher-row-add { opacity: 1; }
+  .launcher-subitem { min-height: 44px; }
 
   .small-dropdown { max-height: calc(100dvh - 82px); }
 
@@ -1119,12 +1105,10 @@
   .topbar-overlay,
   .navigation-launcher,
   .small-dropdown,
-  .launcher-block,
+  .launcher-column,
   .topbar-control,
   .launcher-card,
-  .launcher-row,
-  .launcher-row-main,
-  .launcher-row-add,
+  .launcher-subitem,
   .create-menu-list a {
     animation: none !important;
     transition-duration: 0.01ms !important;
