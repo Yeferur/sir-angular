@@ -6,8 +6,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SirDateRange, SirDateRangePickerComponent } from '../../../shared/date-range-picker/date-range-picker';
 import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
-import { SirFilterBarComponent } from '../../../shared/filter-bar/filter-bar';
-import { SirFilterPanelComponent } from '../../../shared/filter-panel/filter-panel';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
@@ -19,41 +17,28 @@ import { ActividadEntidad, DetalleEntidad, EntidadesReportantesService, FiltrosE
   PaginaEntidades, TipoEntidad, ValidacionEntidad } from '../../../services/Mercadeo/entidades-reportantes.service';
 
 const typeOptions: SirSelectOption[] = [
-  { value: '', label: 'Todos los tipos' }, { value: 'HOTEL', label: 'Hoteles' },
-  { value: 'AGENCIA_NACIONAL', label: 'Agencias nacionales' },
-  { value: 'AGENCIA_INTERNACIONAL', label: 'Agencias internacionales' },
-];
-const validationOptions: SirSelectOption[] = [
-  { value: '', label: 'Toda validación' }, { value: 'PENDIENTE_VALIDACION', label: 'Pendiente de validación' },
-  { value: 'VALIDADA', label: 'Validada' }, { value: 'RECHAZADA', label: 'Rechazada' },
+  { value: '', label: 'Todos' }, { value: 'HOTEL', label: 'Hotel' },
+  { value: 'AGENCIA_NACIONAL', label: 'Agencia nacional' },
+  { value: 'AGENCIA_INTERNACIONAL', label: 'Agencia internacional' },
 ];
 const statusOptions: SirSelectOption[] = [
-  { value: 'ACTIVA', label: 'Sí' }, { value: 'INACTIVA', label: 'No' }, { value: '', label: 'Todas' },
+  { value: '', label: 'Todos' }, { value: 'ACTIVA', label: 'Activa' },
+  { value: 'PENDIENTE_VALIDACION', label: 'Pendiente de validación' }, { value: 'INACTIVA', label: 'Inactiva' },
 ];
-const activityOptions: SirSelectOption[] = [
-  { value: '', label: 'Todas' }, { value: 'CON_RESERVAS', label: 'Con actividad en el período' },
-  { value: 'SIN_RESERVAS', label: 'Sin actividad en el período' },
-  { value: 'SIN_REPORTAR', label: 'Sin reportar hace más de…' },
-];
-function bogotaDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric',
-    month: '2-digit', day: '2-digit' }).format(date);
-}
 function addCalendarDays(value: string, days: number): string {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 function initialFilters(): FiltrosEntidades {
-  const today = bogotaDate(new Date());
-  return { desde: addCalendarDays(today, -29), hasta: today,
-    tipo: '', validacion: '', estado: 'ACTIVA', actividad: '', buscar: '', diasSinReportarMin: '' };
+  return { desde: '', hasta: '',
+    tipo: '', validacion: '', estado: '', actividad: '', buscar: '', diasSinReportarMin: '' };
 }
 
 @Component({
   selector: 'app-mercadeo-entidades', standalone: true,
   imports: [CommonModule, DatePipe, FormsModule, A11yModule, SirDateRangePickerComponent, SirSearchInputComponent,
-    SirFilterBarComponent, SirFilterPanelComponent, QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent],
-  templateUrl: './mercadeo-entidades.html', styleUrl: './mercadeo-entidades.css',
+    QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent],
+  templateUrl: './mercadeo-entidades.html', styleUrls: ['../../listado-reservas-transfers.css', './mercadeo-entidades.css'],
 })
 export class MercadeoEntidadesComponent implements OnInit {
   private readonly api = inject(EntidadesReportantesService);
@@ -68,9 +53,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   private suggestionRun = 0;
   private lastUrlState = '';
   readonly typeOptions = typeOptions;
-  readonly validationOptions = validationOptions;
+  readonly createTypeOptions = typeOptions.filter(option => !!option.value);
   readonly statusOptions = statusOptions;
-  readonly activityOptions = activityOptions;
   readonly filters = signal<FiltrosEntidades>(initialFilters());
   readonly appliedFilters = signal<FiltrosEntidades>(initialFilters());
   readonly dateRange = computed<SirDateRange>(() => ({ start: this.filters().desde, end: this.filters().hasta }));
@@ -112,13 +96,11 @@ export class MercadeoEntidadesComponent implements OnInit {
     return this.entitySuggestions().find(entity =>
       entity.Tipo === this.type && this.normalize(entity.Nombre) === this.normalize(this.name)) || null;
   }
-  readonly filterCount = computed(() => Number(!!this.filters().tipo)
-    + Number(!!this.filters().validacion) + Number(this.filters().estado !== 'ACTIVA')
-    + Number(!!this.filters().actividad));
+  readonly filterCount = computed(() => Number(!!this.filters().tipo) + Number(!!this.filters().estado)
+    + Number(!!this.filters().desde && !!this.filters().hasta));
   readonly hasEntityCriteria = computed(() => {
     const current = this.appliedFilters();
-    return !!(current.buscar.trim() || current.tipo || current.validacion
-      || current.actividad || current.diasSinReportarMin || current.estado !== 'ACTIVA');
+    return !!(current.buscar.trim() || current.tipo || current.estado);
   });
   readonly dateError = computed(() => {
     const f = this.filters();
@@ -134,16 +116,18 @@ export class MercadeoEntidadesComponent implements OnInit {
     this.route.queryParamMap.subscribe(params => {
       const defaults = initialFilters();
       const requestedValidation = params.get('validacion') || '';
+      const requestedStatus = params.get('estado') || '';
+      const hasNewFilterState = params.get('filtrosVersion') === '2';
+      const status = (['PENDIENTE_VALIDACION', 'INACTIVA'].includes(requestedStatus)
+        || (requestedStatus === 'ACTIVA' && hasNewFilterState)) ? requestedStatus
+        : requestedValidation === 'PENDIENTE_VALIDACION' ? 'PENDIENTE_VALIDACION'
+          : requestedValidation === 'VALIDADA' ? 'ACTIVA' : '';
       const filters: FiltrosEntidades = {
         ...defaults,
-        desde: params.get('periodo') === '0' ? '' : params.get('desde') || defaults.desde,
-        hasta: params.get('periodo') === '0' ? '' : params.get('hasta') || defaults.hasta,
+        desde: params.get('periodo') === '0' ? '' : (params.get('desde') || defaults.desde),
+        hasta: params.get('periodo') === '0' ? '' : (params.get('hasta') || defaults.hasta),
         tipo: params.get('tipo') || '',
-        validacion: this.validationOptions.some(option => option.value === requestedValidation) ? requestedValidation : '',
-        estado: params.has('estado') ? (params.get('estado') || '')
-          : requestedValidation === 'PENDIENTE_VALIDACION' ? '' : defaults.estado,
-        actividad: params.get('actividad') || '',
-        diasSinReportarMin: params.get('diasSinReportarMin') || '',
+        validacion: '', estado: status, actividad: '', diasSinReportarMin: '',
         buscar: params.get('buscar') || '',
         ordenarPor: params.get('ordenarPor') || undefined,
         orden: params.get('orden') === 'DESC' ? 'DESC' : 'ASC',
@@ -159,13 +143,7 @@ export class MercadeoEntidadesComponent implements OnInit {
     });
   }
   setFilter(key: keyof FiltrosEntidades, value: string): void {
-    if (key === 'actividad' && value === 'SIN_REPORTAR') {
-      const days = this.result()?.umbralDiasSinReportar || 90;
-      this.filters.update(current => ({ ...current, actividad: value, diasSinReportarMin: current.diasSinReportarMin || String(days) }));
-      return;
-    }
-    this.filters.update(current => ({ ...current, [key]: value || '',
-      ...(key === 'actividad' ? { diasSinReportarMin: '' } : {}) }));
+    this.filters.update(current => ({ ...current, [key]: value || '' }));
   }
   setDaysFilter(value: number | string | null): void {
     this.setFilter('diasSinReportarMin', value === null || value === '' ? '' : String(value));
@@ -173,20 +151,24 @@ export class MercadeoEntidadesComponent implements OnInit {
   setRange(range: SirDateRange): void {
     this.filters.update(current => ({ ...current, desde: range.start || '', hasta: range.end || '' }));
   }
-  removeAppliedFilter(key: 'periodo' | 'buscar' | 'tipo' | 'validacion' | 'estado' | 'actividad'): void {
+  removeAppliedFilter(key: 'buscar' | 'tipo' | 'estado' | 'periodo'): void {
     const next = { ...this.appliedFilters() };
-    if (key === 'periodo') { next.desde = ''; next.hasta = ''; }
     if (key === 'buscar') next.buscar = '';
     if (key === 'tipo') next.tipo = '';
-    if (key === 'validacion') next.validacion = '';
     if (key === 'estado') next.estado = '';
-    if (key === 'actividad') { next.actividad = ''; next.diasSinReportarMin = ''; }
+    if (key === 'periodo') { next.desde = ''; next.hasta = ''; }
     this.filters.set(next);
     void this.search();
   }
   periodLabel(): string {
     const f = this.appliedFilters();
-    return f.desde && f.hasta ? f.desde + ' – ' + f.hasta : f.desde || f.hasta;
+    const format = (value: string) => {
+      if (!value) return '';
+      const [year, month, day] = value.split('-').map(Number);
+      return new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', year: 'numeric',
+        timeZone: 'America/Bogota' }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+    };
+    return f.desde && f.hasta ? format(f.desde) + ' – ' + format(f.hasta) : f.desde ? 'Desde ' + format(f.desde) : f.hasta ? 'Hasta ' + format(f.hasta) : '';
   }
   async search(page = 1, syncUrl = true): Promise<void> {
     if (this.loading() || this.dateError()) return;
@@ -202,8 +184,9 @@ export class MercadeoEntidadesComponent implements OnInit {
   private writeUrl(filters: FiltrosEntidades, page: number): void {
     this.lastUrlState = JSON.stringify({ filters, page });
     void this.router.navigate([], { relativeTo: this.route, queryParams: {
-      tipo: filters.tipo || null, validacion: filters.validacion || null, estado: filters.estado || null,
-      actividad: filters.actividad || null, diasSinReportarMin: filters.actividad === 'SIN_REPORTAR' ? filters.diasSinReportarMin || '90' : null,
+      tipo: filters.tipo || null, validacion: null, estado: filters.estado || null,
+      filtrosVersion: '2',
+      actividad: null, diasSinReportarMin: null,
       buscar: filters.buscar || null, desde: filters.desde || null, hasta: filters.hasta || null,
       periodo: !filters.desde && !filters.hasta ? '0' : null,
       ordenarPor: filters.ordenarPor || null, orden: filters.ordenarPor ? filters.orden || 'ASC' : null,
@@ -258,19 +241,27 @@ export class MercadeoEntidadesComponent implements OnInit {
     return item.tipo === 'TRANSFER' ? 'TRS' + String(item.id_transfer).padStart(5, '0') : item.id_reserva || item.id_operacion;
   }
   close(): void {
+    const globalCreateDrawerOpen = this.drawer.drawer()?.type === 'entity-create';
     this.selected.set(null); this.selectedActivity.set(null); this.creating.set(false); this.editing.set(false);
     this.operations.set(null); this.operationsError.set('');
     this.rejecting.set(false); this.rejectionReason = ''; this.detailNotice.set(''); this.pointMatches.set([]);
     this.pointPickerOpen.set(false);
     this.entitySuggestions.set([]);
     clearTimeout(this.suggestionTimer); this.suggestionRun++;
-    if (this.previousFocus?.isConnected) this.previousFocus.focus();
+    if (globalCreateDrawerOpen) this.drawer.close();
+    else if (this.previousFocus?.isConnected) this.previousFocus.focus();
     this.previousFocus = null;
   }
   @HostListener('window:keydown.escape') onEscape(): void { this.close(); }
   startCreate(): void {
-    this.close(); this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.close(); this.previousFocus = null;
     this.name = ''; this.type = 'HOTEL'; this.detailError.set(''); this.creating.set(true);
+    this.drawer.openEntityCreate({ controller: this });
+  }
+  openSuggestedEntity(entity: ActividadEntidad): void {
+    this.drawer.close(true);
+    this.creating.set(false);
+    void this.open(entity);
   }
   onCreateNameChange(value: string): void {
     this.name = value;
@@ -313,6 +304,7 @@ export class MercadeoEntidadesComponent implements OnInit {
     try {
       if (this.creating()) {
         const detail = await firstValueFrom(this.api.create(this.type, this.name));
+        this.drawer.close(true);
         this.creating.set(false); this.selected.set(detail);
         await this.search();
       } else if (this.selected()) {
@@ -394,8 +386,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   validationLabel(state: ValidacionEntidad): string {
     return { PENDIENTE_VALIDACION: 'Pendiente', VALIDADA: 'Validada', RECHAZADA: 'Rechazada' }[state];
   }
-  activityFilterLabel(value: string): string {
-    return this.activityOptions.find(option => option.value === value)?.label || value;
+  statusLabel(state: string): string {
+    return this.statusOptions.find(option => option.value === state)?.label || state;
   }
   one(value: number): boolean { return Number(value) === 1; }
   activitySummary(item: ActividadEntidad): string {
@@ -404,8 +396,5 @@ export class MercadeoEntidadesComponent implements OnInit {
     if (item.Transfers) parts.push(`${item.Transfers} ${this.one(item.Transfers) ? 'transfer' : 'transfers'}`);
     if (item.Pasajeros) parts.push(`${item.Pasajeros} ${this.one(item.Pasajeros) ? 'pasajero' : 'pasajeros'}`);
     return parts.length ? parts.join(' · ') : 'Sin actividad';
-  }
-  inactivityDaysPlaceholder(): string {
-    return String(this.result()?.umbralDiasSinReportar || 90);
   }
 }

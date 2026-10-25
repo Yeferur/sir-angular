@@ -104,6 +104,13 @@
   flex-direction: column;
 }
 
+.sir-drawer-panel app-mercadeo-entidad-create-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .sir-drawer-panel:has(app-reservas-punto-drawer) {
   width: min(860px, 72vw);
 }
@@ -131,6 +138,10 @@
 
 .sir-drawer-panel:has(app-usuario-detail) {
   width: clamp(380px, 38vw, 640px);
+}
+
+.sir-drawer-panel:has(app-mercadeo-entidad-create-panel) {
+  width: clamp(380px, 38vw, 580px);
 }
 
 /* ── Mapa: ancho más generoso ───────────────────────────────── */

@@ -1288,7 +1288,7 @@ export class LayoutComponent implements OnInit, OnDestroy, AfterViewInit {
             icon: 'bx bx-bar-chart-alt-2',
             group: 'mercadeo',
             children: [
-                { key: 'mercadeo-origen', label: 'Origen de reservas', icon: 'bx bx-transfer-alt',
+                { key: 'mercadeo-origen', label: 'Origen de operaciones', icon: 'bx bx-transfer-alt',
                     route: '/Mercadeo/Reservas', permission: 'MERCADEO.RESERVAS.LEER', exact: true },
                 { key: 'mercadeo-entidades', label: 'Entidades reportantes', icon: 'bx bx-buildings',
                     route: '/Mercadeo/Entidades', permission: 'ENTIDADES_REPORTANTES.LEER', exact: true },

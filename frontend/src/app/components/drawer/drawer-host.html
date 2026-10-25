@@ -23,6 +23,7 @@
                           drawer()!.type === 'turnos-vacaciones' ? 'Programar vacaciones' :
                           drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
                           drawer()!.type === 'punto-reservas' ? 'Reservas asociadas al punto' :
+                          drawer()!.type === 'entity-create' ? 'Nueva entidad' :
                           drawer()!.type === 'mi-actividad' ? 'Avisos' :
                           drawer()!.type === 'programacion-listado' ? (drawer()!.props?.['novedades'] ? 'Novedades de Programación' : 'Listado de programación') : 'Novedades de la app'">
 
@@ -38,6 +39,10 @@
         [puntoId]="drawer()!.id!"
         [puntoNombre]="drawer()!.props?.['nombre'] || ''"
         (closed)="close()" />
+    }
+
+    @if (drawer()!.type === 'entity-create') {
+      <app-mercadeo-entidad-create-panel [controller]="$any(drawer()!.props?.['controller'])" />
     }
 
     @if (drawer()!.type === 'transfer') {

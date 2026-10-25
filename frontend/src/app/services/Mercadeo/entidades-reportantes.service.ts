@@ -63,9 +63,10 @@ export class EntidadesReportantesService {
       params: this.params(filters).set('page', page).set('pageSize', 25),
     });
   }
-  search(tipo: TipoEntidad, nombre: string) {
-    return this.http.get<ActividadEntidad[]>(this.url, { params: new HttpParams()
-      .set('tipo', tipo).set('buscar', nombre).set('limite', 20).set('incluirInactivas', '1') });
+  search(tipo: TipoEntidad | '', nombre: string) {
+    let params = new HttpParams().set('buscar', nombre).set('limite', 20).set('incluirInactivas', '1');
+    if (tipo) params = params.set('tipo', tipo);
+    return this.http.get<ActividadEntidad[]>(this.url, { params });
   }
   detail(id: number, filters: FiltrosEntidades) {
     return this.http.get<DetalleEntidad>(`${this.url}/${id}`, { params: this.params(filters) });

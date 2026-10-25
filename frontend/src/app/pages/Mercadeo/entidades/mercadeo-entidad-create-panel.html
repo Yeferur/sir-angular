@@ -1,0 +1,54 @@
+<section class="entity-create-panel" aria-labelledby="create-entity-title">
+  <app-drawer-close-button label="Cerrar nueva entidad" (dismiss)="controller.close()" />
+  <header class="entity-create-header">
+    <div class="entity-create-heading-copy">
+      <h2 id="create-entity-title">Nueva entidad</h2>
+    </div>
+  </header>
+
+  <div class="entity-create-content">
+    <div class="entity-create-fields">
+      <div class="form-group">
+        <label for="create-entity-type">Tipo de entidad <span class="required-star">*</span></label>
+        <app-select inputId="create-entity-type" [options]="controller.createTypeOptions"
+          [ngModel]="controller.type" (ngModelChange)="controller.onCreateTypeChange($event)" />
+      </div>
+      <div class="form-group">
+        <label for="create-entity-name">Nombre <span class="required-star">*</span></label>
+        <input id="create-entity-name" class="form-input" [ngModel]="controller.name"
+          (ngModelChange)="controller.onCreateNameChange($event)" minlength="2" maxlength="255"
+          autocomplete="off" placeholder="Nombre del hotel o agencia" />
+      </div>
+    </div>
+    @if (controller.name.trim().length > 0 && controller.name.trim().length < 2) {
+      <small class="inline-error">Escribe al menos 2 caracteres.</small>
+    }
+    @if (controller.suggesting()) { <small class="entity-create-hint" role="status">Buscando coincidencias…</small> }
+    @if (controller.entitySuggestions().length) {
+      <div class="entity-suggestions" aria-label="Sugerencias de nombre">
+        <h3>Entidades existentes</h3>
+        @for (entity of controller.entitySuggestions(); track entity.Id_Entidad_Reportante) {
+          <button type="button" (click)="controller.openSuggestedEntity(entity)">
+            {{ entity.Nombre }} · {{ controller.typeLabel(entity.Tipo) }}
+          </button>
+        }
+      </div>
+    }
+    @if (controller.exactDuplicate) {
+      <p class="inline-error" role="alert">Ya existe {{ controller.exactDuplicate.Nombre }}. Abre su detalle para administrarla.</p>
+    }
+    @if (!controller.canValidate) { <p class="entity-validation-note">
+      <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01" />
+      </svg>
+      <span>La entidad quedará pendiente de validación.</span>
+    </p> }
+    @if (controller.detailError()) { <p class="inline-error" role="alert">{{ controller.detailError() }}</p> }
+  </div>
+  <div class="entity-form-actions">
+    <button type="button" class="sir-action sir-action--secondary" (click)="controller.close()">Cancelar</button>
+    <button type="button" class="sir-action sir-action--primary"
+      [disabled]="controller.saving() || controller.name.trim().length < 2 || !controller.type || !!controller.exactDuplicate"
+      (click)="controller.save()">{{ controller.saving() ? 'Creando…' : 'Crear entidad' }}</button>
+  </div>
+</section>

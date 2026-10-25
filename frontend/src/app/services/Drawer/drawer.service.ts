@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'turnos-intercambio' | 'mi-actividad' | 'punto-reservas';
+export type DrawerType = 'reserva' | 'transfer' | 'tour' | 'usuario' | 'mapa' | 'duplicar' | 'app-updates' | 'programacion-listado' | 'turnos-vacaciones' | 'turnos-intercambio' | 'mi-actividad' | 'punto-reservas' | 'entity-create';
 
 export interface DrawerMapPoint {
   lat: number;
@@ -118,6 +118,10 @@ export class SirDrawerService {
 
   openTurnosVacaciones(props: Record<string, any>): void {
     this.open({ type: 'turnos-vacaciones', props });
+  }
+
+  openEntityCreate(props: Record<string, any>): void {
+    this.open({ type: 'entity-create', props });
   }
 
   close(immediate = false): void {

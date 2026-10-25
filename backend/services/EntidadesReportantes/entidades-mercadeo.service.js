@@ -35,7 +35,7 @@ function filters(query) {
   if (activity && !['CON_RESERVAS', 'SIN_RESERVAS', 'SIN_REPORTAR'].includes(activity))
     fail(400, 'ACTIVITY_INVALID', 'Actividad no válida.');
   const availability = query.estado || '';
-  if (availability && !['ACTIVA', 'INACTIVA'].includes(availability))
+  if (availability && !['ACTIVA', 'INACTIVA', 'PENDIENTE_VALIDACION'].includes(availability))
     fail(400, 'ENTITY_AVAILABILITY_INVALID', 'Estado no válido.');
   const daysValue = query.diasSinReportarMin ?? query.sinReportarHaceMasDe ?? '';
   const days = daysValue === '' || daysValue === null || daysValue === undefined
@@ -165,7 +165,9 @@ function filteredSql(f) {
   const params = [...a.params, ...TYPES];
   if (f.type) { where.push('e.Tipo=?'); params.push(f.type); }
   if (f.validation) { where.push('e.Estado_Validacion=?'); params.push(f.validation); }
-  if (f.availability) { where.push('e.Activo=?'); params.push(f.availability === 'ACTIVA' ? 1 : 0); }
+  if (f.availability === 'ACTIVA') where.push("e.Activo=1 AND e.Estado_Validacion<>'PENDIENTE_VALIDACION'");
+  if (f.availability === 'INACTIVA') where.push('e.Activo=0');
+  if (f.availability === 'PENDIENTE_VALIDACION') where.push("e.Estado_Validacion='PENDIENTE_VALIDACION'");
   if (f.search) { where.push('e.Nombre_Normalizado LIKE ?'); params.push(`%${f.search}%`); }
   if (f.activity === 'CON_RESERVAS') where.push(`${operationsSql()}>0`);
   if (f.activity === 'SIN_RESERVAS') where.push(`${operationsSql()}=0`);

@@ -445,9 +445,10 @@ body.sir-session-scroll-lock {
 .form-select {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--separator-color);
-  border-radius: 8px;
-  padding: 0 14px;
-  font-size: 1rem;
+  border-radius: var(--radius-sm, 8px);
+  padding: 0 13px;
+  font-size: .875rem;
+  font-weight: 500;
   font-family: var(--font-family);
   width: 100%;
   box-sizing: border-box;
@@ -620,7 +621,7 @@ main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .s
   height: 40px;
   min-height: 40px;
   padding: 0 13px;
-  border: 1.5px solid var(--separator-color);
+  border: 1px solid var(--separator-color);
   border-radius: var(--radius-sm, 8px);
   font-family: var(--font-family);
   font-size: .875rem;
@@ -639,7 +640,7 @@ main.sir-query-form :is(.search-card, .filters-card, .advanced-filters-panel, .s
   box-sizing: border-box;
   height: 40px;
   min-height: 40px;
-  border-width: 1.5px;
+  border-width: 1px;
   border-radius: var(--radius-sm, 8px);
 }
 

@@ -82,7 +82,7 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/Mercadeo/reservas/mercadeo-reservas').then((m) => m.MercadeoReservasComponent),
     canActivate: [authGuard, permisoGuard],
     data: { permiso: 'MERCADEO.RESERVAS.LEER', redirectTo: '/Aforos' },
-    title: 'Origen de reservas',
+    title: 'Origen de operaciones',
   },
   {
     path: 'Mercadeo/Entidades',

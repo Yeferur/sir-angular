@@ -14,11 +14,12 @@ import { TurnosVacacionesPanelComponent } from '../turnos-vacaciones-panel/turno
 import { TurnosIntercambioPanelComponent } from '../turnos-intercambio-panel/turnos-intercambio-panel';
 import { MiActividadPanelComponent } from '../mi-actividad-panel/mi-actividad-panel';
 import { ReservasPuntoDrawerComponent } from '../../pages/Puntos/reservas-punto-drawer/reservas-punto-drawer';
+import { MercadeoEntidadCreatePanelComponent } from '../../pages/Mercadeo/entidades/mercadeo-entidad-create-panel';
 
 @Component({
   selector: 'app-sir-drawer',
   standalone: true,
-  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent],
+  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent, MercadeoEntidadCreatePanelComponent],
   templateUrl: './drawer-host.html',
   styleUrls: ['./drawer-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,12 +59,18 @@ export class SirDrawerHostComponent implements OnDestroy {
   });
 
   close(): void {
+    if (this.drawer()?.type === 'entity-create') {
+      const controller = this.drawer()!.props?.['controller'];
+      if (typeof controller?.close === 'function') controller.close();
+      else this.drawerSvc.close();
+      return;
+    }
     this.drawerSvc.close();
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (this.drawer()) this.drawerSvc.close();
+    if (this.drawer()) this.close();
   }
 
   onPanelKeydown(event: KeyboardEvent): void {

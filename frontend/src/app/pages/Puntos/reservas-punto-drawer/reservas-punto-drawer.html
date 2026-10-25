@@ -1,4 +1,4 @@
-<section class="point-reservations" aria-labelledby="point-reservations-title">
+<section class="point-reservations reservation-browser" aria-labelledby="point-reservations-title">
   <header class="point-reservations__header">
     <div>
       <h2 id="point-reservations-title">Reservas asociadas</h2>
@@ -8,22 +8,24 @@
   </header>
 
   <div class="point-reservations__scroll">
-    <div class="point-reservations__filters">
-      <div class="point-reservations__filter">
-        <label for="point-reservations-range">Período</label>
-        <app-date-range-picker inputId="point-reservations-range" [value]="draftRange()"
-          (rangeChange)="setRange($event)" />
+    <div class="page-header reservation-search-panel point-reservations__filter-card">
+      <div class="point-reservations__filters">
+        <div class="point-reservations__filter">
+          <label for="point-reservations-range">Período</label>
+          <app-date-range-picker inputId="point-reservations-range" [value]="draftRange()"
+            (rangeChange)="setRange($event)" />
+        </div>
+        <div class="point-reservations__filter point-reservations__filter--state">
+          <label for="point-reservations-state">Estado</label>
+          <app-select inputId="point-reservations-state" [ngModel]="draftEstado()"
+            (ngModelChange)="draftEstado.set($event)" [options]="estadoOptions()"
+            ariaLabel="Estado de reserva" />
+        </div>
+        <button type="button" class="btn-primary reservation-search-button" (click)="buscar()"
+          [disabled]="loading() || !!rangeError" [attr.aria-busy]="loading()">
+          Buscar
+        </button>
       </div>
-      <div class="point-reservations__filter point-reservations__filter--state">
-        <label for="point-reservations-state">Estado</label>
-        <app-select inputId="point-reservations-state" [ngModel]="draftEstado()"
-          (ngModelChange)="draftEstado.set($event)" [options]="estadoOptions()"
-          ariaLabel="Estado de reserva" />
-      </div>
-      <button type="button" class="btn-primary reservation-search-button" (click)="buscar()"
-        [disabled]="loading() || !!rangeError" [attr.aria-busy]="loading()">
-        Buscar
-      </button>
     </div>
     @if (rangeError) { <p class="point-reservations__error" role="alert">{{ rangeError }}</p> }
 

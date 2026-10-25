@@ -82,6 +82,7 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
   @ViewChild('panelTpl', { static: true }) panelTpl!: TemplateRef<void>;
   @Input() inputId = '';
   @Input() placeholder = 'Seleccionar rango';
+  @Input() displayPrefix = '';
   @Input() minDate: string | Date | null = null;
   @Input() maxDate: string | Date | null = null;
   @Input() dateFilter: ((date: Date) => boolean) | null = null;
@@ -116,12 +117,15 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
     return Array.from({ length: 25 }, (_, index) => year + 12 - index);
   }
   get displayText(): string {
-    if (this.draftStart) return this.formatDate(this.draftStart);
+    if (this.draftStart) return this.displayPrefix + this.formatDate(this.draftStart);
     if (this.selectedRange.start && this.selectedRange.end) {
-      if (this.selectedRange.start === this.selectedRange.end) return this.formatDate(this.selectedRange.start);
-      return `${this.formatDate(this.selectedRange.start)} — ${this.formatDate(this.selectedRange.end)}`;
+      if (this.selectedRange.start === this.selectedRange.end) return this.displayPrefix + this.formatDate(this.selectedRange.start);
+      const rangeText = this.displayPrefix
+        ? this.formatRange(this.selectedRange.start, this.selectedRange.end)
+        : `${this.formatDate(this.selectedRange.start)} — ${this.formatDate(this.selectedRange.end)}`;
+      return this.displayPrefix + rangeText;
     }
-    return this.placeholder;
+    return this.displayPrefix + this.placeholder;
   }
   get selectionHint(): string {
     return this.rangeError || 'Selecciona otra fecha para completar el rango.';
@@ -284,6 +288,14 @@ export class SirDateRangePickerComponent implements ControlValueAccessor, OnDest
   private formatDate(iso: string): string {
     return new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
       .format(parseLocalDate(iso)!);
+  }
+  private formatRange(startIso: string, endIso: string): string {
+    const start = parseLocalDate(startIso)!;
+    const end = parseLocalDate(endIso)!;
+    const month = (date: Date) => new Intl.DateTimeFormat('es-CO', { month: 'short' })
+      .format(date).replace(/\./g, '').toLocaleLowerCase('es-CO');
+    const formatStart = `${start.getDate()} ${month(start)}${start.getFullYear() === end.getFullYear() ? '' : ' ' + start.getFullYear()}`;
+    return `${formatStart} – ${end.getDate()} ${month(end)} ${end.getFullYear()}`;
   }
   private isAllowed(date: Date): boolean {
     const iso = isoFromDate(date);
