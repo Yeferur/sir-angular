@@ -184,6 +184,7 @@ export class MercadeoReservasComponent implements OnInit {
     this.filters.set(next);
     this.appliedFilters.set(next);
     this.hasSearched.set(true);
+    this.filtersOpen.set(false);
     this.writeUrl(next, 1);
     this.fetch(next, 1);
   }

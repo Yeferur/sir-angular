@@ -52,14 +52,28 @@ describe('MercadeoReservasComponent', () => {
     expect(html.querySelector('button[aria-label*="limpiar filtros" i]')).toBeNull();
     expect(html.textContent).not.toContain('Preparando…');
     expect(html.querySelector('app-search-input')).toBeNull();
-    expect(html.textContent).toContain('Servicio');
+    expect(html.textContent).toContain('Aplicar');
     expect(html.textContent).not.toContain('Entidad reportante');
   });
 
-  it('inicia con los últimos 30 días según el calendario local de Bogotá', () => {
+  it('inicia sin período implícito', () => {
     const filters = component.filters();
-    expect(filters.fechaRegistroHasta).toBeTruthy();
-    expect((Date.parse(filters.fechaRegistroHasta) - Date.parse(filters.fechaRegistroDesde)) / 86400000).toBe(29);
+    expect(filters.fechaRegistroDesde).toBe('');
+    expect(filters.fechaRegistroHasta).toBe('');
+  });
+
+  it('ubica las pills en el buscador, cierra filtros al aplicar y muestra solo el vacío cuando no hay operaciones', async () => {
+    component.filtersOpen.set(true);
+    component.setFilter('tipo', 'TRANSFER');
+    component.search();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const html = fixture.nativeElement as HTMLElement;
+    expect(component.filtersOpen()).toBeFalse();
+    expect(html.querySelector('.reservation-search-panel .filter-token')?.textContent).toContain('Transfers');
+    expect(html.textContent).toContain('Sin coincidencias');
+    expect(html.querySelector('.results-heading')).toBeNull();
+    expect(html.textContent).not.toContain('Exportar detalle');
   });
 
   it('consulta origen unificado y sincroniza el tipo seleccionado en la URL', async () => {
@@ -75,7 +89,7 @@ describe('MercadeoReservasComponent', () => {
     }));
     const navigation = (router.navigate as jasmine.Spy).calls.mostRecent().args[1] as any;
     expect(navigation.queryParams.vista).toBeUndefined();
-    expect(navigation.queryParams.idEntidadReportante).toBeUndefined();
+    expect(navigation.queryParams.idEntidadReportante).toBeNull();
   });
 
   it('restaura Transfers desde la ruta anterior y ejecuta la consulta', async () => {

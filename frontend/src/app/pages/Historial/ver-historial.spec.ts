@@ -67,7 +67,7 @@ describe('VerHistorialComponent', () => {
     expect(primary.querySelector('app-date-range-picker')).toBeNull();
     expect(primary.querySelector('.btn-filter svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
     expect(fixture.nativeElement.querySelector('.sir-select-search')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.results-heading .export-button i.bx-download')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.results-heading .export-button i.bx-download')).not.toBeNull();
     component.toggleAdvancedFilters(); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('#historial-advanced-filters app-date-range-picker')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('#historial-advanced-filters .multi-filter-trigger').length).toBe(3);
@@ -153,6 +153,7 @@ describe('VerHistorialComponent', () => {
   });
 
   it('mantiene separado el borrador hasta Aplicar y sincroniza la consulta aplicada', async () => {
+    component.toggleAdvancedFilters();
     component.toggleUser(3, true);
     component.toggleActivity('accesos', true);
     component.onDateChange('2026-10-13');
@@ -160,6 +161,7 @@ describe('VerHistorialComponent', () => {
     expect(component.appliedGroupCount()).toBe(0);
     component.buscar();
     await Promise.resolve();
+    expect(component.advancedFiltersVisible()).toBeFalse();
     expect(component.appliedFilters().usuarios).toEqual([3]);
     expect(component.appliedFilters().actividad).toEqual(['accesos']);
     expect(component.appliedGroupCount()).toBe(2);

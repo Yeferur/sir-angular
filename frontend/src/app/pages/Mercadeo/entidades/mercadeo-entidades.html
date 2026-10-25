@@ -20,11 +20,23 @@
       </button>
       <button type="button" class="btn-primary reservation-search-button" (click)="search()"
         [disabled]="loading() || !!dateError()" [attr.aria-busy]="loading()"
-        [attr.aria-label]="loading() ? 'Buscando entidades' : 'Buscar entidades'">
-        <span class="search-button-label" [class.search-button-label--hidden]="loading()">Buscar</span>
+        [attr.aria-label]="loading() ? 'Aplicando filtros de entidades' : 'Aplicar filtros de entidades'">
+        <span class="search-button-label" [class.search-button-label--hidden]="loading()">Aplicar</span>
         <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="loading()" aria-hidden="true"></span>
       </button>
     </div>
+    @if (appliedFilters().tipo || appliedFilters().estado || (appliedFilters().desde && appliedFilters().hasta)) {
+      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
+        <div class="active-filter-tokens">
+          @if (appliedFilters().tipo) { <div class="filter-token">Tipo: {{ typeLabel($any(appliedFilters().tipo)) }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo" (click)="removeAppliedFilter('tipo')">×</button></div> }
+          @if (appliedFilters().estado) { <div class="filter-token">Estado: {{ statusLabel(appliedFilters().estado) }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar estado" (click)="removeAppliedFilter('estado')">×</button></div> }
+          @if (appliedFilters().desde && appliedFilters().hasta) { <div class="filter-token">Período: {{ periodLabel() }}
+            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período" (click)="removeAppliedFilter('periodo')">×</button></div> }
+        </div>
+      </div>
+    }
   </div>
 
   @if (filterOpen()) {
@@ -45,18 +57,6 @@
       </div>
     </div>
   }
-    @if (appliedFilters().tipo || appliedFilters().estado || (appliedFilters().desde && appliedFilters().hasta)) {
-      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
-        <div class="active-filter-tokens">
-          @if (appliedFilters().tipo) { <div class="filter-token">Tipo: {{ typeLabel($any(appliedFilters().tipo)) }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo" (click)="removeAppliedFilter('tipo')">×</button></div> }
-          @if (appliedFilters().estado) { <div class="filter-token">Estado: {{ statusLabel(appliedFilters().estado) }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar estado" (click)="removeAppliedFilter('estado')">×</button></div> }
-          @if (appliedFilters().desde && appliedFilters().hasta) { <div class="filter-token">Período: {{ periodLabel() }}
-            <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período" (click)="removeAppliedFilter('periodo')">×</button></div> }
-        </div>
-      </div>
-    }
   @if (dateError()) { <p class="inline-error" role="alert">{{ dateError() }}</p> }
   @if (validationNotice()) { <p class="entity-notice" role="status">{{ validationNotice() }}</p> }
 
@@ -65,32 +65,36 @@
     @else if (loading() && !result()) { <app-loading-state label="Consultando entidades…" /> }
     @if (result(); as data) {
     @if (error()) { <p class="inline-error" role="alert">{{ error() }} Los resultados anteriores siguen disponibles.</p> }
-    <div class="entity-results-toolbar">
-      @if (data.items.length) {
+    @if (data.items.length) {
+      <div class="entity-results-toolbar">
         <div class="results-heading-summary"><strong>{{ data.total }} {{ data.total === 1 ? 'entidad' : 'entidades' }}</strong>
           @if (data.summary.Con_Actividad) { <span>{{ data.summary.Con_Actividad }} con actividad</span> }
           @if (data.summary.Total_Reservas) { <span>{{ data.summary.Total_Reservas }} {{ one(data.summary.Total_Reservas) ? 'reserva' : 'reservas' }}</span> }
           @if (data.summary.Total_Transfers) { <span>{{ data.summary.Total_Transfers }} {{ one(data.summary.Total_Transfers) ? 'transfer' : 'transfers' }}</span> }
           @if (data.summary.Total_Pasajeros) { <span>{{ data.summary.Total_Pasajeros }} {{ one(data.summary.Total_Pasajeros) ? 'pasajero' : 'pasajeros' }}</span> }
         </div>
-      }
-      <div class="entity-results-actions">
-        @if (canExport && data.items.length) {
-          <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !!dateError()" (click)="export()">
-            <i class="bx bx-download" aria-hidden="true"></i> {{ exporting() ? 'Exportando…' : 'Exportar Excel' }}
-          </button>
+        @if (canExport || canCreate) {
+          <div class="entity-results-actions">
+            @if (canExport) {
+              <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !!dateError()" (click)="export()">
+                <i class="bx bx-download" aria-hidden="true"></i> {{ exporting() ? 'Exportando…' : 'Exportar Excel' }}
+              </button>
+            }
+            @if (canCreate) {
+              <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">Nueva entidad</button>
+            }
+          </div>
         }
-        @if (canCreate) { <button type="button" class="sir-action sir-action--primary" (click)="startCreate()">Nueva entidad</button> }
       </div>
-    </div>
+    }
     @if (!data.items.length) {
-      @if (appliedHasEntityCriteria()) {
-        <app-query-empty-state title="Sin resultados para estos filtros"
-          description="Ajusta la búsqueda o los filtros para ver resultados." />
-      } @else {
-        <app-query-empty-state title="Sin entidades registradas"
-          description="Aún no hay hoteles o agencias reportantes registrados para consultar." />
-      }
+      <app-query-empty-state
+        [title]="appliedHasEntityCriteria() ? 'Sin resultados para estos filtros' : 'Sin entidades registradas'"
+        [description]="appliedHasEntityCriteria() ? 'Ajusta la búsqueda o los filtros para ver resultados.' : 'Aún no hay hoteles o agencias reportantes registrados para consultar.'">
+        @if (canCreate) {
+          <button type="button" class="sir-action sir-action--primary entity-empty-create" (click)="startCreate()">Nueva entidad</button>
+        }
+      </app-query-empty-state>
     } @else {
       <section class="entity-results" aria-label="Actividad por entidad">
         <div class="entity-table-wrap">

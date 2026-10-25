@@ -1,4 +1,4 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localeEsCO from '@angular/common/locales/es-CO';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -61,7 +61,8 @@ describe('MercadeoEntidadesComponent', () => {
     buscarPuntos = jasmine.createSpy('buscarPuntos').and.returnValue(of([]));
     origenApi = jasmine.createSpyObj<MercadeoService>('MercadeoService', ['buscarOrigen']);
     origenApi.buscarOrigen.and.returnValue(of(operationsPage));
-    drawer = jasmine.createSpyObj<SirDrawerService>('SirDrawerService', ['openReserva', 'openTransfer']);
+    drawer = jasmine.createSpyObj<SirDrawerService>('SirDrawerService',
+      ['openReserva', 'openTransfer', 'openEntityCreate', 'close'], { drawer: signal(null) });
     await TestBed.configureTestingModule({
       imports: [MercadeoEntidadesComponent],
       providers: [provideZonelessChangeDetection(), provideRouter([]),
@@ -91,17 +92,41 @@ describe('MercadeoEntidadesComponent', () => {
     expect(html.textContent).toContain('13 oct 2026');
   });
 
-  it('inicia con Activa = Sí y un período de 30 días calendario', () => {
-    expect(component.filters().estado).toBe('ACTIVA');
-    expect((Date.parse(component.filters().hasta) - Date.parse(component.filters().desde)) / 86400000).toBe(29);
+  it('consulta todas las entidades al entrar, sin fecha ni estado implícitos', () => {
+    expect(component.filters().estado).toBe('');
+    expect(component.filters().desde).toBe('');
+    expect(component.filters().hasta).toBe('');
     expect(component.filterCount()).toBe(0);
+    expect(api.activity.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      desde: '', hasta: '', tipo: '', estado: '', buscar: '',
+    }));
   });
 
-  it('no trata el filtro predeterminado Activa = Sí como una búsqueda con cero coincidencias', async () => {
+  it('muestra el vacío de entidades solo cuando la consulta sin filtros no devuelve filas', async () => {
     api.activity.and.returnValue(of({ ...page, items: [], total: 0 }));
     await component.search();
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sin entidades registradas');
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Sin entidades registradas');
+    expect(html.querySelector('.entity-results-toolbar')).toBeNull();
+    const create = html.querySelector<HTMLButtonElement>('app-query-empty-state .entity-empty-create');
+    expect(create?.textContent).toContain('Nueva entidad');
+    create?.click();
+    expect(drawer.openEntityCreate).toHaveBeenCalled();
+  });
+
+  it('integra Nueva entidad en el resumen y mantiene las pills dentro del buscador', async () => {
+    await fixture.whenStable();
+    component.filterOpen.set(true);
+    component.setFilter('tipo', 'HOTEL');
+    await component.search();
+    fixture.detectChanges();
+    const html = fixture.nativeElement as HTMLElement;
+    expect(component.filterOpen()).toBeFalse();
+    expect(html.querySelector('.entity-top-actions')).toBeNull();
+    expect(html.querySelector('.entity-results-toolbar .entity-results-actions button.sir-action--primary')?.textContent).toContain('Nueva entidad');
+    expect(html.querySelector('.reservation-search-panel .filter-token')?.textContent).toContain('Hotel');
+    expect(html.querySelector('.reservation-search-button')?.textContent).toContain('Aplicar');
   });
 
   it('rechaza un rango mayor a 31 días y envía filtros completos', () => {
@@ -155,7 +180,7 @@ describe('MercadeoEntidadesComponent', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     fixture.detectChanges();
     expect(component.exactDuplicate?.Nombre).toBe('Hotel Niño');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Ya existe Hotel Niño');
+    expect(drawer.openEntityCreate).toHaveBeenCalled();
     await component.save();
     expect(api.create).not.toHaveBeenCalled();
   });

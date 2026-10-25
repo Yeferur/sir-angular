@@ -36,11 +36,37 @@
       </button>
       <button type="button" class="btn-primary reservation-search-button" (click)="search()"
         [disabled]="loading() || !!registrationRangeError()" [attr.aria-busy]="loading()"
-        [attr.aria-label]="loading() ? 'Buscando operaciones' : 'Buscar operaciones'">
-        <span class="search-button-label" [class.search-button-label--hidden]="loading()">Buscar</span>
+        [attr.aria-label]="loading() ? 'Aplicando filtros de operaciones' : 'Aplicar filtros de operaciones'">
+        <span class="search-button-label" [class.search-button-label--hidden]="loading()">Aplicar</span>
         <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="loading()" aria-hidden="true"></span>
       </button>
     </div>
+    @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS' || appliedFilters().categoria || appliedFilters().creadorIds.length || (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta)) {
+      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
+        <div class="active-filter-tokens">
+          @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS') {
+            <div class="filter-token">Tipo: {{ serviceLabel() }}
+              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo" (click)="removeAppliedFilter('tipo')">×</button>
+            </div>
+          }
+          @if (appliedFilters().categoria) {
+            <div class="filter-token">Canal: {{ categoryLabel(appliedFilters().categoria) }}
+              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar canal" (click)="removeAppliedFilter('canal')">×</button>
+            </div>
+          }
+          @if (appliedFilters().creadorIds.length) {
+            <div class="filter-token">Creado por: {{ creatorLabel() }}
+              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar usuarios creadores" (click)="removeAppliedFilter('creadores')">×</button>
+            </div>
+          }
+          @if (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta) {
+            <div class="filter-token">Período de registro: {{ registrationRangeLabel() }}
+              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período de registro" (click)="removeAppliedFilter('periodo')">×</button>
+            </div>
+          }
+        </div>
+      </div>
+    }
   </div>
   @if (categoryError()) { <p class="inline-error" role="status">{{ categoryError() }}</p> }
   @if (userError()) { <p class="inline-error" role="status">{{ userError() }}</p> }
@@ -77,34 +103,6 @@
       </div>
     </div>
   }
-    @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS' || appliedFilters().categoria || appliedFilters().creadorIds.length || (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta)) {
-      <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
-        <div class="active-filter-tokens">
-          @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS') {
-            <div class="filter-token">Tipo: {{ serviceLabel() }}
-              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo" (click)="removeAppliedFilter('tipo')">×</button>
-            </div>
-          }
-          @if (appliedFilters().categoria) {
-            <div class="filter-token">Canal: {{ categoryLabel(appliedFilters().categoria) }}
-              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar canal" (click)="removeAppliedFilter('canal')">×</button>
-            </div>
-          }
-          @if (appliedFilters().creadorIds.length) {
-            <div class="filter-token">Creado por: {{ creatorLabel() }}
-              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar usuarios creadores" (click)="removeAppliedFilter('creadores')">×</button>
-            </div>
-          }
-          @if (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta) {
-            <div class="filter-token">Período de registro: {{ registrationRangeLabel() }}
-              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar período de registro" (click)="removeAppliedFilter('periodo')">×</button>
-            </div>
-          }
-        </div>
-      </div>
-    }
-
-
   @if (error() && !result()) {
     <app-loading-state mode="error" label="No se pudo consultar el origen" [detail]="error()" actionLabel="Reintentar" (action)="retrySearch()" />
   } @else if (loading() && !result()) {
@@ -118,18 +116,18 @@
       description="Consulta las reservas y transfers por período, canal, entidad o creador." />
   } @else if (result(); as data) {
     @if (loading()) { <div class="results-toolbar"><span class="updating-pill" role="status"><span aria-hidden="true"></span>Actualizando</span></div> }
-    <section class="results-list marketing-results" [attr.aria-busy]="loading()" aria-label="Origen de reservas y transfers">
-      <div class="results-heading">
-        <div><h2>Resultados</h2><span>{{ resultCountLabel(data) }} · {{ data.totalPasajeros | number }} pasajeros en esta página</span></div>
-        @if (canExport) { <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !data.totalOperaciones" (click)="exportDetail()">{{ exporting() ? 'Preparando…' : 'Exportar detalle' }}</button> }
-      </div>
-      @if (!data.items.length) {
-        @if (hasAppliedFilters()) {
-          <app-query-empty-state title="Sin coincidencias" [headingLevel]="3" description="No hay operaciones que coincidan con los filtros aplicados." />
-        } @else {
-          <app-query-empty-state title="Sin operaciones registradas" [headingLevel]="3" description="Aún no hay reservas ni transfers para consultar." />
-        }
+    @if (!data.items.length) {
+      @if (hasAppliedFilters()) {
+        <app-query-empty-state title="Sin coincidencias" [headingLevel]="3" description="No hay operaciones que coincidan con los filtros aplicados." />
       } @else {
+        <app-query-empty-state title="Sin operaciones registradas" [headingLevel]="3" description="Aún no hay reservas ni transfers para consultar." />
+      }
+    } @else {
+      <section class="results-list marketing-results" [attr.aria-busy]="loading()" aria-label="Origen de reservas y transfers">
+        <div class="results-heading">
+          <div><h2>Resultados</h2><span>{{ resultCountLabel(data) }} · {{ data.totalPasajeros | number }} pasajeros en esta página</span></div>
+          @if (canExport) { <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting()" (click)="exportDetail()">{{ exporting() ? 'Preparando…' : 'Exportar detalle' }}</button> }
+        </div>
         <div class="table-scroll">
           <table class="marketing-table">
             <thead><tr>
@@ -167,7 +165,6 @@
             </article>
           }
         </div>
-      }
       @if (data.totalPages > 1) {
         <nav class="results-pagination" aria-label="Paginación del origen de reservas">
           <button type="button" class="pagination-button" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()">Anterior</button>
@@ -175,6 +172,7 @@
           <button type="button" class="pagination-button" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
         </nav>
       }
-    </section>
+      </section>
+    }
   }
 </main>

@@ -1,5 +1,7 @@
 :host { display: block; }
 .entity-page { display: grid; gap: 14px; width: 100%; min-width: 0; max-width: 1350px; margin-inline: auto; color: var(--text-primary); }
+.entity-page app-query-empty-state { position: relative; }
+.entity-empty-create { position: absolute; top: 14px; right: 16px; }
 #entity-filter-panel .form-grid {
   grid-template-columns: 280px repeat(3, 245px);
   justify-content: start;

@@ -188,6 +188,8 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     }
     this.referenceInputError.set('');
     this.appliedFilters.set(applied);
+    this.advancedFiltersVisible.set(false);
+    this.openFilterDropdown.set(null);
     this.currentPage.set(1);
     this.syncUrlAndLoad();
   }

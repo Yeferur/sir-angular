@@ -176,6 +176,7 @@ export class MercadeoEntidadesComponent implements OnInit {
     this.appliedFilters.set(applied);
     if (syncUrl) this.writeUrl(applied, page);
     this.appliedHasEntityCriteria.set(this.hasEntityCriteria());
+    this.filterOpen.set(false);
     this.loading.set(true); this.error.set('');
     try { this.result.set(await firstValueFrom(this.api.activity(applied, page))); }
     catch (e: any) { this.error.set(e?.error?.message || 'No se pudo consultar la actividad.'); }
@@ -217,7 +218,6 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   private async loadOperations(entityId: number, page: number): Promise<void> {
     const period = this.appliedFilters();
-    if (!period.desde || !period.hasta) { this.operations.set(null); this.operationsError.set('Selecciona un período para consultar operaciones.'); return; }
     this.operationsLoading.set(true); this.operationsError.set('');
     try {
       this.operations.set(await firstValueFrom(this.mercadeo.buscarOrigen({
