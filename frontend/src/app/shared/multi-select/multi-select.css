@@ -1,46 +1,54 @@
+:root { --multi-select-disabled-opacity: .55; }
+
+app-multi-select { display: block; min-width: 0; }
 .multi-filter { position: relative; width: 100%; }
 .multi-filter-trigger {
-  width: 100%; min-height: 41px; display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; background-color: var(--bg-tertiary); border: 1.5px solid var(--separator-color);
-  border-radius: 11px; padding: 9px 12px; font-size: .92rem; font-family: var(--font-family);
+  box-sizing: border-box; width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; background-color: var(--bg-tertiary); border: 1px solid var(--separator-color);
+  border-radius: var(--radius-sm, 8px); padding: 0 13px; font-size: 14px; font-weight: 500; font-family: var(--font-family);
   color: var(--text-primary); cursor: pointer; text-align: left;
-  transition: border-color .18s, background .18s, box-shadow .18s, color .18s;
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease, color .18s ease;
 }
-.multi-filter-trigger:hover { border-color: color-mix(in srgb, var(--accent-blue) 30%, var(--separator-color)); }
+.multi-filter-trigger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent-blue) 35%, var(--separator-color)); }
 .multi-filter-trigger.active, .multi-filter-trigger:focus-visible {
   border-color: var(--accent-blue); background-color: var(--bg-secondary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1); outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); outline: none;
 }
 .multi-filter-trigger.multi-filter-trigger-active { color: var(--accent-blue); }
-.multi-filter-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.multi-filter-trigger:disabled { opacity: var(--multi-select-disabled-opacity); cursor: not-allowed; }
+.multi-filter-trigger svg { flex-shrink: 0; transition: transform .18s var(--ease-soft, ease); }
+.multi-filter-trigger.active svg { transform: rotate(180deg); }
 .multi-filter-menu {
   position: absolute; top: calc(100% + 6px); left: 0; width: max-content; min-width: 100%; max-width: min(500px, 90vw);
-  background: var(--bg-secondary); border: 1.5px solid var(--separator-color); border-radius: 12px;
+  box-sizing: border-box; background: var(--bg-secondary); border: 1px solid var(--separator-color); border-radius: var(--radius-md, 12px);
   padding: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto;
-  z-index: 500; box-shadow: 0 12px 30px rgba(0,0,0,.26); animation: sirMultiFilterFadeDown .16s ease;
+  z-index: 500; box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color)); animation: sirMultiFilterFadeDown .18s var(--ease-soft, ease);
 }
 .multi-filter-option {
-  width: 100%; display: flex; align-items: flex-start; gap: 10px; background: transparent;
-  border: 1px solid transparent; border-radius: 9px; color: var(--text-primary); font-size: .87rem;
-  font-family: var(--font-family); padding: 8px 10px; cursor: pointer; text-align: left;
-  word-wrap: break-word; overflow-wrap: break-word; transition: background .15s, border-color .15s;
+  box-sizing: border-box; width: 100%; display: flex; align-items: flex-start; gap: 10px; background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius-sm, 8px); color: var(--text-primary); font-size: .875rem;
+  font-family: var(--font-family); padding: 7px 10px; cursor: pointer; text-align: left;
+  word-wrap: break-word; overflow-wrap: break-word; transition: background-color .18s ease, border-color .18s ease;
 }
 .multi-filter-option span:last-child { white-space: normal; word-break: break-word; flex: 1; }
-.multi-filter-option:hover { background: var(--bg-tertiary); border-color: var(--separator-color); }
+.multi-filter-option:hover:not(:disabled):not(.is-disabled) { background: var(--bg-tertiary); border-color: var(--separator-color); }
+.multi-filter-option:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
 .multi-filter-option:disabled { opacity: .55; cursor: not-allowed; }
 .multi-filter-checkbox {
-  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--separator-color);
-  background: var(--bg-tertiary); color: #fff; display: inline-flex; align-items: center;
-  justify-content: center; flex-shrink: 0; transition: border-color .15s, background .15s;
+  box-sizing: border-box; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--separator-color);
+  background: var(--bg-tertiary); color: var(--text-on-accent); display: inline-flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: border-color .18s ease, background-color .18s ease;
 }
 .multi-filter-checkbox.checked { background: var(--accent-blue); border-color: var(--accent-blue); }
 .multi-filter-clear {
-  margin-top: 2px; width: 100%; background: rgba(10, 132, 255, .08); border: 1px dashed rgba(10, 132, 255, .28);
-  border-radius: 9px; color: var(--accent-blue); font-size: .82rem; font-weight: 700;
-  font-family: var(--font-family); padding: 8px 10px; cursor: pointer; transition: filter .15s, border-color .15s;
+  box-sizing: border-box; margin-top: 2px; width: 100%; background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent-blue) 28%, transparent);
+  border-radius: var(--radius-sm, 8px); color: var(--accent-blue); font-size: .82rem; font-weight: 700;
+  font-family: var(--font-family); padding: 8px 10px; cursor: pointer; transition: filter .18s ease, border-color .18s ease;
 }
-.multi-filter-clear:hover { filter: brightness(1.06); border-color: rgba(10, 132, 255, .46); }
-.multi-filter-clear:disabled { opacity: .5; cursor: not-allowed; }
+.multi-filter-clear:hover:not(:disabled) { filter: brightness(1.06); border-color: color-mix(in srgb, var(--accent-blue) 46%, transparent); }
+.multi-filter-clear:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.multi-filter-clear:disabled { opacity: var(--multi-select-disabled-opacity); cursor: not-allowed; }
 
 @keyframes sirMultiFilterFadeDown {
   from { opacity: 0; transform: translateY(-5px); }
@@ -49,4 +57,10 @@
 
 @media (max-width: 560px) {
   .multi-filter-menu { min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multi-filter-trigger, .multi-filter-trigger svg, .multi-filter-option,
+  .multi-filter-checkbox, .multi-filter-clear { transition: none; }
+  .multi-filter-menu { animation: none; }
 }

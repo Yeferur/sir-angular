@@ -91,6 +91,35 @@ describe('SirSelectComponent: formulario, interacción y overlay', () => {
     expect(host.control.value).toEqual([2]);
   });
 
+  it('alinea el trigger, el estado disabled y el menú múltiple con la familia', () => {
+    host.multiple = true;
+    host.control.setValue([2]);
+    render();
+    const style = getComputedStyle(trigger);
+    expect(style.height).toBe('40px');
+    expect(style.borderTopWidth).toBe('1px');
+    expect(style.borderRadius).toBe('8px');
+    expect(style.paddingLeft).toBe('13px');
+    expect(style.fontSize).toBe('14px');
+    expect(style.fontWeight).toBe('500');
+    expect(style.transitionDuration).toContain('0.18s');
+
+    trigger.click(); render();
+    const dropdown = getComputedStyle(panel());
+    expect(dropdown.borderTopWidth).toBe('1px');
+    expect(dropdown.borderRadius).toBe('12px');
+    expect(dropdown.fontSize).toBe('14px');
+    expect(dropdown.animationDuration).toBe('0.18s');
+    const checked = panel().querySelector<HTMLElement>('.multi-filter-checkbox.checked')!;
+    const unchecked = panel().querySelector<HTMLElement>('.multi-filter-checkbox:not(.checked)')!;
+    expect(getComputedStyle(checked).backgroundColor).not.toBe(getComputedStyle(unchecked).backgroundColor);
+    expect(getComputedStyle(panel().querySelector<HTMLElement>('.sir-select-option.is-disabled')!).opacity).toBe('0.55');
+
+    host.control.disable(); render();
+    expect(getComputedStyle(trigger).opacity).toBe('0.55');
+    expect(host.select.isOpen).toBeFalse();
+  });
+
   it('respeta la equivalencia explícita de selects nativos precargados sin convertir lo emitido', () => {
     host.compareWith = compareSelectValuesAsStrings;
     host.control.patchValue(3); render();

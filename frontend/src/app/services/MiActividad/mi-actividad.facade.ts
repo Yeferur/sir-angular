@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { EMPTY, Observable, catchError, finalize, forkJoin, of, tap } from 'rxjs';
@@ -131,10 +131,22 @@ export class MiActividadFacade {
   private active = false;
   private requestInFlight = false;
   private readonly announcedNotificationIds = new Set<string>();
+  private readonly rejectionToastIds = new Map<string, string>();
   private contextualBatch: SirNotification[] = [];
   private contextualBatchTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
+    effect(() => {
+      const items = this.notifications.items();
+      for (const [notificationId, toastId] of this.rejectionToastIds) {
+        const item = items.find(candidate => candidate.idNotificacion === notificationId);
+        if (item?.leida) {
+          this.alerts.dismissToast(toastId);
+          this.desktopNotifications.close(notificationId);
+          this.rejectionToastIds.delete(notificationId);
+        }
+      }
+    });
     this.websocket.events$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(event => this.handleWebSocketEvent(event));
@@ -143,7 +155,11 @@ export class MiActividadFacade {
 
   get canReadPending(): boolean {
     return this.permissions.tienePermiso('PENDIENTES.LEER')
-      || this.permissions.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR');
+      || this.permissions.tienePermiso('ENTIDADES_REPORTANTES.VALIDAR')
+      || this.permissions.tienePermiso('RESERVAS.CREAR')
+      || this.permissions.tienePermiso('RESERVAS.ACTUALIZAR')
+      || this.permissions.tienePermiso('TRANSFERS.CREAR')
+      || this.permissions.tienePermiso('TRANSFERS.ACTUALIZAR');
   }
   get canManagePending(): boolean { return this.permissions.tienePermiso('PENDIENTES.GESTIONAR'); }
   get canReadReminders(): boolean { return this.permissions.tienePermiso('RECORDATORIOS.LEER'); }
@@ -176,6 +192,8 @@ export class MiActividadFacade {
     this.error.set('');
     this.registeredEmail.set('');
     this.announcedNotificationIds.clear();
+    for (const toastId of this.rejectionToastIds.values()) this.alerts.dismissToast(toastId);
+    this.rejectionToastIds.clear();
     this.contextualBatch = [];
     clearTimeout(this.contextualBatchTimer);
     this.contextualBatchTimer = undefined;
@@ -410,6 +428,11 @@ export class MiActividadFacade {
     if (!await this.desktopNotifications.claimInternal(notification.idNotificacion)) return;
     if (this.router.url.startsWith('/Pendientes') || this.drawer.drawer()?.type === 'mi-actividad') return;
 
+    if (type === 'ENTIDAD_REPORTANTE_RECHAZADA') {
+      this.showContextual(notification);
+      return;
+    }
+
     this.contextualBatch.push(notification);
     clearTimeout(this.contextualBatchTimer);
     this.contextualBatchTimer = setTimeout(() => this.flushContextualBatch(), 700);
@@ -436,15 +459,19 @@ export class MiActividadFacade {
 
   private showContextual(notification: SirNotification): void {
     const type = notification.tipo.toUpperCase();
-    this.alerts.notify({
+    const toastId = this.alerts.notify({
       type: type === 'RECORDATORIO' ? 'info' : 'warning',
       title: notification.titulo,
       message: notification.mensaje,
       operational: true,
       priority: contextualNotificationPriority(notification),
+      persistent: type === 'ENTIDAD_REPORTANTE_RECHAZADA',
+      dismissible: type !== 'ENTIDAD_REPORTANTE_RECHAZADA',
       durationMs: type === 'RECORDATORIO' || type === 'PENDIENTE' ? 12_000 : 8_000,
       actions: this.contextualActions(notification),
     });
+    if (type === 'ENTIDAD_REPORTANTE_RECHAZADA')
+      this.rejectionToastIds.set(notification.idNotificacion, toastId);
   }
 
   openNotification(notification: SirNotification): void {
@@ -471,6 +498,10 @@ export class MiActividadFacade {
 
   private contextualActions(notification: SirNotification): ToastAction[] {
     const type = notification.tipo.toUpperCase();
+    if (type === 'ENTIDAD_REPORTANTE_RECHAZADA') {
+      return [{ label: this.notificationActionLabel(notification),
+        onClick: () => this.openNotification(notification), keepOpen: true }];
+    }
     if (type === 'RECORDATORIO') {
       const reminder = this.recordatorios().find(item => item.idRecordatorio === notification.entidadId);
       const actions: ToastAction[] = [];

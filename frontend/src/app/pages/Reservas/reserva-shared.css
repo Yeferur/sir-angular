@@ -89,40 +89,6 @@
   position: relative;
 }
 
-.autocomplete-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  max-height: 220px;
-  overflow-y: auto;
-  background-color: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
-  padding: 6px;
-  gap: 4px;
-}
-
-.autocomplete-option {
-  border: none;
-  background: transparent;
-  text-align: left;
-  width: 100%;
-  border-radius: 10px;
-  padding: 9px 10px;
-  color: var(--text-primary);
-  cursor: pointer;
-  font: inherit;
-}
-
-.autocomplete-option:hover {
-  background-color: var(--bg-tertiary);
-}
-
 .punto-autocomplete-wrapper {
   position: relative;
   display: flex;
@@ -173,54 +139,11 @@
   background: rgba(10, 132, 255, .2);
 }
 
-.autocomplete-list {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  width: 100%;
-  max-height: 280px;
-  overflow-y: auto;
-  z-index: 300;
-  list-style: none;
-  margin: 0;
-  padding: 6px;
-  background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 14px;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .03);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-.autocomplete-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--text-primary);
-  transition: background-color .16s ease, transform .12s ease;
-}
-
-.autocomplete-list li:hover {
-  background: rgba(10, 132, 255, .12);
-}
-
-.autocomplete-list li:active {
-  transform: scale(.99);
-}
-
 .autocomplete-point-name {
   min-width: 0;
-  font-size: .93rem;
-  font-weight: 700;
   line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .autocomplete-point-route {

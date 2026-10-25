@@ -115,24 +115,40 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       expect(field(`${mode}-reserva-canal`).invalid).toBeTrue();
     });
 
-    it('requiere entidad compatible y sugiere usar un duplicado normalizado sin cambiar contacto ni punto', () => {
-      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' },
-        { Id_Canal: 2, Nombre_Canal: 'AGENCIA NACIONAL' }]);
+    it('selecciona una entidad desde el autocomplete y conserva el contacto y el punto', () => {
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }]);
       c.entidadesReportantes.set([{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL',
         Nombre: 'Hotel Poblado Boutique', Activo: 1, Estado_Validacion: 'VALIDADA' }]);
       c.form.get('Id_Entidad_Reportante').setValidators(Validators.required);
       c.form.get('Id_Entidad_Reportante').updateValueAndValidity();
       c.currentStep = 1;
-      c.nuevoNombreEntidad = 'HÓTEL   POBLADO - BOUTIQUE';
-      c.mostrarRegistroEntidad = true;
+      c.busquedaEntidad = 'Hotel Poblado';
+      c.entidadAutocompleteOpen = true;
       render();
       expect(c.form.get('Id_Entidad_Reportante').invalid).toBeTrue();
-      expect(fixture.nativeElement.textContent).toContain('Usar entidad existente');
-      c.usarCoincidenciaEntidad();
+      const option = fixture.nativeElement.querySelector('.sir-autocomplete-option') as HTMLButtonElement;
+      expect(option?.textContent).toContain('Hotel Poblado Boutique');
+      option.click();
+      render();
       expect(c.form.get('Id_Entidad_Reportante').value).toBe(7);
+      expect(c.form.get('Id_Entidad_Reportante').valid).toBeTrue();
       expect(c.form.get('Nombre_Reportante').value).toBe('CONTACTO');
       expect(c.form.get('Telefono_Reportante').value).toBe('+573001234567');
       expect(c.puntosSeleccionados()[0].Id_Punto).toBe(397);
+    });
+
+    it('cierra el autocomplete de entidad al pulsar Escape', () => {
+      c.canales.set([{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }]);
+      c.form.get('Id_Canal').setValue(1, { emitEvent: false });
+      c.currentStep = 1;
+      c.busquedaEntidad = 'Hotel Poblado';
+      c.entidadAutocompleteOpen = true;
+      render();
+      const field = fixture.nativeElement.querySelector(`#${mode}-entidad-reportante`) as HTMLInputElement;
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      render();
+      expect(c.entidadAutocompleteOpen).toBeFalse();
+      expect(field.getAttribute('aria-expanded')).toBe('false');
     });
 
     it('ordena Canal, Entidad, Nombre y Teléfono en Crear y Editar', async () => {
@@ -158,6 +174,9 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       render();
       const field = fixture.nativeElement.querySelector(`#${mode}-entidad-reportante`) as HTMLInputElement;
       expect(field.classList.contains('form-input')).toBeTrue();
+      c.form.get('Id_Entidad_Reportante')?.markAsTouched();
+      render();
+      expect(field.classList.contains('errorInput')).toBeTrue();
       const style = getComputedStyle(field);
       expect(style.height).toBe('40px');
       expect(style.borderTopWidth).toBe('1px');
@@ -165,10 +184,10 @@ for (const [mode, component] of [['crear', CrearReservaComponent], ['editar', Ed
       expect(style.paddingLeft).toBe('13px');
       expect(style.fontSize).toBe('14px');
       expect(style.fontWeight).toBe('500');
-      const normalBorder = style.borderColor;
+      const errorBorder = style.borderColor;
       field.focus();
       await new Promise(resolve => setTimeout(resolve, 220));
-      expect(getComputedStyle(field).borderColor).not.toBe(normalBorder);
+      expect(getComputedStyle(field).borderColor).toBe(errorBorder);
       field.disabled = true;
       expect(getComputedStyle(field).opacity).toBe('0.72');
     });

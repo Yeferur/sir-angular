@@ -145,25 +145,29 @@
         @if (tipoEntidadSeleccionada()) {
         <div class="form-group">
           <label class="form-label">Entidad reportante <span class="required-star">*</span></label>
-          <div class="punto-autocomplete-wrapper" (focusout)="cerrarSugerenciasEntidadSiSale($event)">
+          <div class="punto-autocomplete-wrapper" (focusout)="cerrarSugerenciasEntidadSiSale($event)" (keydown.escape)="cerrarSugerenciasEntidad()">
             <input type="text" id="crear-entidad-reportante" class="form-input" role="combobox"
               aria-autocomplete="list" aria-controls="crear-entidad-reportante-opciones"
               [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
+              [attr.aria-busy]="entidadCargando"
               [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
               placeholder="Buscar entidad por nombre" [value]="busquedaEntidad" autocomplete="off"
               (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()" />
             @if (entidadAutocompleteOpen) {
               @if (!entidadCargando && !entidadError() && entidadesReportantes().length) {
-                <ul id="crear-entidad-reportante-opciones" class="autocomplete-list" role="listbox" aria-label="Entidades reportantes">
+                <div id="crear-entidad-reportante-opciones" class="autocomplete-list sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--form"
+                  role="listbox" aria-label="Entidades reportantes" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
                   @for (entidad of entidadesReportantes(); track entidad.Id_Entidad_Reportante) {
-                    <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
-                      <span class="autocomplete-point-name">{{ entidad.Nombre }}</span>
-                    </li>
+                    <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false"
+                      (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
+                      <span class="autocomplete-point-name sir-autocomplete-option__label">{{ entidad.Nombre }}</span>
+                    </button>
                   }
-                </ul>
+                </div>
               } @else {
-                <div id="crear-entidad-reportante-opciones" class="autocomplete-list entity-search-state">
-                  <p role="status">
+                <div id="crear-entidad-reportante-opciones" class="autocomplete-list entity-search-state sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--form sir-autocomplete-status"
+                  animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
+                  <p role="status" [class.sir-autocomplete-error]="!!entidadError()">
                     @if (entidadCargando) { Buscando entidades… }
                     @else if (entidadError()) { {{ entidadError() }} }
                     @else { No encontramos entidades con ese nombre }
@@ -242,17 +246,21 @@
           </div>
           }
           @if (puntosSeleccionados().length < 3) { <div class="form-group" style="position:relative;">
-            <input type="text" class="form-input" id="crear-punto-busqueda" placeholder="Buscar y añadir punto..." #puntoInput
+            <input type="text" class="form-input" id="crear-punto-busqueda" role="combobox" aria-autocomplete="list"
+              aria-controls="crear-puntos-sugerencias" [attr.aria-expanded]="puntoBusquedaResults().length > 0"
+              aria-label="Buscar y añadir punto de encuentro" placeholder="Buscar y añadir punto..." #puntoInput
               (input)="onPuntoSearch($event)" />
             @if (puntoBusquedaResults().length > 0) {
-            <ul class="autocomplete-list">
+            <div id="crear-puntos-sugerencias" class="autocomplete-list sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--form"
+              role="listbox" aria-label="Puntos de encuentro" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
               @for (result of puntoBusquedaResults(); track result.Id_Punto) {
-              <li (click)="seleccionarPunto(result, puntoInput)">
-                <span class="autocomplete-point-name">{{ result.NombrePunto }}</span>
+              <button type="button" class="sir-autocomplete-option sir-autocomplete-option--rich" role="option" aria-selected="false"
+                (click)="seleccionarPunto(result, puntoInput)">
+                <span class="autocomplete-point-name sir-autocomplete-option__label">{{ result.NombrePunto }}</span>
                 <span class="autocomplete-point-route">R{{ result.ruta || '-' }}</span>
-              </li>
+              </button>
               }
-            </ul>
+            </div>
             }
         </div>
         }
@@ -424,15 +432,19 @@
         @if (modoNacionalidad === 'global') {
         <div class="config-row-body">
           <div class="form-group" style="max-width:360px; position:relative;">
-            <label class="form-label">País de origen (todos los pasajeros)</label>
+            <label class="form-label" for="crear-nacionalidad-global">País de origen (todos los pasajeros)</label>
             <div class="autocomplete-shell">
-              <input type="text" class="form-input" formControlName="NacionalidadGlobal" maxlength="80"
+              <input type="text" id="crear-nacionalidad-global" class="form-input" formControlName="NacionalidadGlobal" maxlength="80"
+                role="combobox" aria-autocomplete="list" aria-controls="crear-nacionalidad-global-opciones"
+                [attr.aria-expanded]="activePaisOrigenIndex === -1 && getPaisOrigenSuggestionsGlobal().length > 0"
                 autocomplete="off" placeholder="Ej: COLOMBIA, ESTADOS UNIDOS" (focus)="activePaisOrigenIndex = -1"
-                (blur)="onPaisOrigenBlur()" />
+                (blur)="onPaisOrigenBlur()" (keydown.escape)="$event.preventDefault(); activePaisOrigenIndex = null" />
               @if (activePaisOrigenIndex === -1 && getPaisOrigenSuggestionsGlobal().length > 0) {
-              <div class="autocomplete-menu">
+              <div id="crear-nacionalidad-global-opciones" class="autocomplete-menu sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--search"
+                role="listbox" aria-label="Países de origen" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
                 @for (pais of getPaisOrigenSuggestionsGlobal(); track pais) {
-                <button type="button" class="autocomplete-option" (mousedown)="selectPaisOrigenGlobal(pais)">{{ pais
+                <button type="button" class="autocomplete-option sir-autocomplete-option" role="option" aria-selected="false"
+                  (mousedown)="$event.preventDefault()" (click)="selectPaisOrigenGlobal(pais)">{{ pais
                   }}</button>
                 }
               </div>
@@ -546,14 +558,19 @@
           <!-- CAMPO INDIVIDUAL: Nacionalidad -->
           @if (modoNacionalidad === 'individual') {
           <div class="form-group">
-            <label class="form-label">País de origen</label>
+            <label class="form-label" [attr.for]="'crear-pasajero-' + i + '-nacionalidad'">País de origen</label>
             <div class="autocomplete-shell">
-              <input type="text" class="form-input" formControlName="Nacionalidad" [attr.id]="'crear-pasajero-' + i + '-nacionalidad'" maxlength="80" autocomplete="off"
-                placeholder="Ej: COLOMBIA" (focus)="onPaisOrigenFocus(i)" (blur)="onPaisOrigenBlur()" />
+              <input type="text" class="form-input" formControlName="Nacionalidad" [attr.id]="'crear-pasajero-' + i + '-nacionalidad'" maxlength="80"
+                role="combobox" aria-autocomplete="list" [attr.aria-controls]="'crear-pasajero-' + i + '-nacionalidad-opciones'"
+                [attr.aria-expanded]="showPaisOrigenSuggestions(i)" autocomplete="off"
+                placeholder="Ej: COLOMBIA" (focus)="onPaisOrigenFocus(i)" (blur)="onPaisOrigenBlur()"
+                (keydown.escape)="$event.preventDefault(); activePaisOrigenIndex = null" />
               @if (showPaisOrigenSuggestions(i)) {
-              <div class="autocomplete-menu">
+              <div [id]="'crear-pasajero-' + i + '-nacionalidad-opciones'" class="autocomplete-menu sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--search"
+                role="listbox" aria-label="Países de origen" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
                 @for (pais of getPaisOrigenSuggestions(i); track pais) {
-                <button type="button" class="autocomplete-option" (mousedown)="selectPaisOrigen(i, pais)">{{ pais
+                <button type="button" class="autocomplete-option sir-autocomplete-option" role="option" aria-selected="false"
+                  (mousedown)="$event.preventDefault()" (click)="selectPaisOrigen(i, pais)">{{ pais
                   }}</button>
                 }
               </div>

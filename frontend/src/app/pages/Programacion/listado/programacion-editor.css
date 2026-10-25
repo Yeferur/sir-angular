@@ -892,12 +892,6 @@ h2 {
   gap: 10px;
 }
 
-.bus-fields input {
-  height: 36px;
-  padding-inline: 10px;
-  font-size: .82rem;
-}
-
 .capacity-control {
   display: flex;
   min-width: 0;

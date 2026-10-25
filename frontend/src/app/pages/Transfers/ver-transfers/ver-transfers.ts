@@ -11,12 +11,13 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { finalize, Subscription } from 'rxjs';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
+import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-transfers',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent],
   templateUrl: './ver-transfers.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })

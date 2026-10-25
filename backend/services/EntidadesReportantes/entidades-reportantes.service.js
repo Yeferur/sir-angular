@@ -128,8 +128,8 @@ async function quickCreate({ channelId, name, actorId, canValidate = false }) {
 }
 
 const ENTITY_VALIDATION_RULE = 'ENTIDAD_REPORTANTE_PENDIENTE_VALIDACION';
+const ENTITY_CORRECTION_RULE = 'ENTIDAD_REPORTANTE_RECHAZADA_SIN_REASIGNAR';
 const ENTITY_OPEN_OPERATION_STATES = ['Pendiente', 'Pendiente de datos', 'Pendiente de pago', 'Confirmada', 'Confirmado'];
-const ENTITY_OPEN_STATE_MARKS = ENTITY_OPEN_OPERATION_STATES.map(() => '?').join(',');
 
 function entityValidationPendingKey(id) {
   return `ENTIDAD_REPORTANTE:PENDIENTE_VALIDACION:${String(id)}`;
@@ -165,100 +165,181 @@ async function usersWithEntityValidationPermission(connection) {
 }
 
 async function rejectRelatedOperations(connection, {
-  id, actorId, name, reason, eventId, notify = notifications, recordHistory = recordHistorial,
+  id, actorId, name, reason, eventId, notify = notifications, pending = pendingService,
+  recordHistory = recordHistorial,
 }) {
   const [reservations] = await connection.query(`SELECT r.Id_Reserva,r.Estado,r.Creado_Por,r.Pendiente_Por_Entidad_En
-    FROM reservas r WHERE r.Id_Entidad_Reportante=? AND r.Eliminada_En IS NULL
-      AND r.Estado IN (${ENTITY_OPEN_STATE_MARKS}) FOR UPDATE`, [id, ...ENTITY_OPEN_OPERATION_STATES]);
+    FROM reservas r WHERE r.Id_Entidad_Reportante=? FOR UPDATE`, [id]);
   const [transfers] = await connection.query(`SELECT tr.Id_Transfer,tr.Estado,tr.Creado_Por,tr.Pendiente_Por_Entidad_En
-    FROM transfers tr WHERE tr.Id_Entidad_Reportante=?
-      AND tr.Estado IN (${ENTITY_OPEN_STATE_MARKS}) FOR UPDATE`, [id, ...ENTITY_OPEN_OPERATION_STATES]);
-  const affected = [];
+    FROM transfers tr WHERE tr.Id_Entidad_Reportante=? FOR UPDATE`, [id]);
+  const byCreator = new Map();
+  const addCreator = (userId, kind, operationId) => {
+    if (!userId) return;
+    const key = String(userId);
+    if (!byCreator.has(key)) byCreator.set(key, { reservas: [], transfers: [] });
+    byCreator.get(key)[kind].push(String(operationId));
+  };
 
   for (const row of reservations) {
-    await connection.query(`UPDATE reservas SET Estado='Pendiente de datos',
-      Pendiente_Por_Entidad_En=(SELECT Validado_En FROM entidades_reportantes WHERE Id_Entidad_Reportante=?)
-      WHERE Id_Reserva=? AND Eliminada_En IS NULL`, [id, row.Id_Reserva]);
+    await connection.query(`UPDATE reservas SET Id_Entidad_Reportante=NULL, Estado='Pendiente de datos',
+      Pendiente_Por_Entidad_En=NULL WHERE Id_Reserva=?`, [row.Id_Reserva]);
     await recordHistory({ conexion: connection, tabla: 'reservas', id_registro: row.Id_Reserva,
       accion: 'ENTIDAD_REPORTANTE_RECHAZADA', id_usuario: actorId,
       detalles: [
         { columna: 'Estado', anterior: row.Estado, nuevo: 'Pendiente de datos' },
-        { columna: 'Pendiente_Por_Entidad_En', anterior: row.Pendiente_Por_Entidad_En || null, nuevo: 'Fecha del rechazo de la entidad' },
+        { columna: 'Id_Entidad_Reportante', anterior: id, nuevo: null },
+        { columna: 'Pendiente_Por_Entidad_En', anterior: row.Pendiente_Por_Entidad_En || null, nuevo: null },
       ] });
-    if (row.Creado_Por) affected.push(String(row.Creado_Por));
+    addCreator(row.Creado_Por, 'reservas', row.Id_Reserva);
   }
   for (const row of transfers) {
-    await connection.query(`UPDATE transfers SET Estado='Pendiente de datos',
-      Pendiente_Por_Entidad_En=(SELECT Validado_En FROM entidades_reportantes WHERE Id_Entidad_Reportante=?)
-      WHERE Id_Transfer=?`, [id, row.Id_Transfer]);
+    await connection.query(`UPDATE transfers SET Id_Entidad_Reportante=NULL, Estado='Pendiente de datos',
+      Pendiente_Por_Entidad_En=NULL WHERE Id_Transfer=?`, [row.Id_Transfer]);
     await recordHistory({ conexion: connection, tabla: 'transfers', id_registro: row.Id_Transfer,
       accion: 'ENTIDAD_REPORTANTE_RECHAZADA', id_usuario: actorId,
       detalles: [
         { columna: 'Estado', anterior: row.Estado, nuevo: 'Pendiente de datos' },
-        { columna: 'Pendiente_Por_Entidad_En', anterior: row.Pendiente_Por_Entidad_En || null, nuevo: 'Fecha del rechazo de la entidad' },
+        { columna: 'Id_Entidad_Reportante', anterior: id, nuevo: null },
+        { columna: 'Pendiente_Por_Entidad_En', anterior: row.Pendiente_Por_Entidad_En || null, nuevo: null },
       ] });
-    if (row.Creado_Por) affected.push(String(row.Creado_Por));
+    addCreator(row.Creado_Por, 'transfers', row.Id_Transfer);
   }
 
   const validators = await usersWithEntityValidationPermission(connection);
-  const recipients = [...new Set([...affected, ...validators])];
-  const message = `${reservations.length} ${reservations.length === 1 ? 'reserva' : 'reservas'} y `
-    + `${transfers.length} ${transfers.length === 1 ? 'transfer' : 'transfers'} quedaron en “Pendiente de datos”. `
-    + `Motivo: ${reason}`;
+  const audiences = [
+    ...[...byCreator].map(([userId, counts]) => ({ userId, role: 'CREADOR', counts })),
+    { userId: null, role: 'VALIDADOR', counts: {
+      reservas: reservations.map(row => String(row.Id_Reserva)),
+      transfers: transfers.map(row => String(row.Id_Transfer)),
+    } },
+  ];
   const notificationIds = [];
-  for (const userId of recipients) {
-    const idNotificacion = await notify.createNotification(connection, {
-      userId,
-      type: 'ENTIDAD_REPORTANTE_RECHAZADA',
+  for (const { userId, role, counts } of audiences) {
+    if (!counts.reservas.length && !counts.transfers.length) continue;
+    const isValidator = role === 'VALIDADOR';
+    const route = counts.reservas.length === 1 && !counts.transfers.length
+      ? `/Reservas/EditarReserva/${encodeURIComponent(counts.reservas[0])}`
+      : counts.transfers.length === 1 && !counts.reservas.length
+        ? `/Transfers/EditarTransfer/${encodeURIComponent(counts.transfers[0])}`
+        : '/Mercadeo/Reservas';
+    const message = `${name}: ${counts.reservas.length} reservas y ${counts.transfers.length} transfers pendientes de entidad.`
+      + (reason ? ` Motivo: ${reason}.` : '');
+    const key = `ENTIDAD_RECHAZO:${eventId}:${role}:${userId || 'VALIDADORES'}`;
+    const data = { nombreEntidad: name, ruta: route, rol: role, eventoRechazo: eventId,
+      reservasAfectadas: counts.reservas.length, transfersAfectados: counts.transfers.length,
+      reservasIds: counts.reservas, transfersIds: counts.transfers, motivo: reason };
+    await pending.upsertCondition({ ruleCode: ENTITY_CORRECTION_RULE,
+      deduplicationKey: key, entityType: 'ENTIDAD_REPORTANTE_RECHAZADA', entityId: eventId,
+      userId, audiencePermission: isValidator ? 'ENTIDADES_REPORTANTES.VALIDAR' : null,
       title: `Entidad rechazada: ${String(name || '').slice(0, 110)}`,
-      message,
-      entityType: 'ENTIDAD_REPORTANTE',
-      entityId: String(id),
-      deduplicationKey: `ENTIDAD_RECHAZO:${id}:${eventId}`,
-      data: {
-        idEntidadReportante: String(id),
-        eventoRechazo: eventId,
-        reservasAfectadas: reservations.length,
-        transfersAfectados: transfers.length,
-        motivo: reason,
-      },
-    });
-    notificationIds.push({ userId, idNotificacion });
+      description: message, operationDate: new Date(), data,
+    }, connection);
+    for (const recipientId of isValidator ? validators : [userId]) {
+      const idNotificacion = await notify.createNotification(connection, {
+        userId: recipientId,
+        type: 'ENTIDAD_REPORTANTE_RECHAZADA',
+        title: `Entidad rechazada: ${String(name || '').slice(0, 110)}`,
+        message,
+        entityType: 'ENTIDAD_REPORTANTE_RECHAZADA',
+        entityId: eventId,
+        deduplicationKey: key,
+        data,
+      });
+      notificationIds.push({ userId: recipientId, idNotificacion });
+    }
   }
-  return { reservations: reservations.length, transfers: transfers.length, notificationIds };
+  return { reservations: reservations.length, transfers: transfers.length,
+    reservationIds: reservations.map(row => String(row.Id_Reserva)),
+    transferIds: transfers.map(row => String(row.Id_Transfer)), notificationIds };
+}
+
+async function resolveRejectedEntityOperation(connection, kind, operationId, pending = pendingService) {
+  if (!['RESERVA', 'TRANSFER'].includes(kind)) throw new Error('Tipo de operación inválido.');
+  const field = kind === 'RESERVA' ? 'reservasIds' : 'transfersIds';
+  const [rows] = await connection.query(`SELECT p.Clave_Deduplicacion,p.Datos
+    FROM pendientes_operativos p JOIN reglas_pendientes rp ON rp.Id_Regla=p.Id_Regla
+    WHERE rp.Codigo=? AND p.Estado='ACTIVO'
+      AND JSON_CONTAINS(JSON_EXTRACT(p.Datos, ?), JSON_QUOTE(?))
+    FOR UPDATE`, [ENTITY_CORRECTION_RULE, `$.${field}`, String(operationId)]);
+  const recipients = new Set();
+  for (const row of rows) {
+    const [noticeRows] = await connection.query(
+      'SELECT Id_Usuario FROM notificaciones WHERE Clave_Deduplicacion=?', [row.Clave_Deduplicacion]);
+    for (const notice of noticeRows) recipients.add(String(notice.Id_Usuario));
+    const data = typeof row.Datos === 'string' ? JSON.parse(row.Datos) : row.Datos;
+    data[field] = (data[field] || []).filter(value => String(value) !== String(operationId));
+    data.reservasAfectadas = data.reservasIds.length;
+    data.transfersAfectados = data.transfersIds.length;
+    if (!data.reservasAfectadas && !data.transfersAfectados) {
+      await pending.resolveCondition(row.Clave_Deduplicacion, connection);
+      await connection.query(`UPDATE notificaciones SET Leida=1,Fecha_Lectura=COALESCE(Fecha_Lectura,NOW())
+        WHERE Clave_Deduplicacion=?`, [row.Clave_Deduplicacion]);
+    } else {
+      const message = `${data.nombreEntidad}: ${data.reservasAfectadas} reservas y `
+        + `${data.transfersAfectados} transfers pendientes de entidad.`
+        + (data.motivo ? ` Motivo: ${data.motivo}.` : '');
+      await connection.query(`UPDATE pendientes_operativos SET Datos=?,Descripcion=?
+        WHERE Clave_Deduplicacion=?`, [JSON.stringify(data), message, row.Clave_Deduplicacion]);
+      await connection.query(`UPDATE notificaciones SET Datos=?,Mensaje=?
+        WHERE Clave_Deduplicacion=?`, [JSON.stringify(data), message, row.Clave_Deduplicacion]);
+    }
+  }
+  return [...recipients];
 }
 
 async function validateEntityInTransaction(connection, id, state, actorId, reason, dependencies = {}) {
   const pending = dependencies.pendingService || pendingService;
   const notify = dependencies.notifications || notifications;
   const recordHistory = dependencies.recordHistory || recordHistorial;
-  const [[before]] = await connection.query(`SELECT Id_Entidad_Reportante,Nombre,Activo,Estado_Validacion
+  const [[before]] = await connection.query(`SELECT Id_Entidad_Reportante,Nombre,Tipo,Activo,Estado_Validacion,Creado_Por,Fecha_Creacion
     FROM entidades_reportantes WHERE Id_Entidad_Reportante=? FOR UPDATE`, [id]);
-  if (!before) throw error(404, 'ENTITY_NOT_FOUND', 'Entidad reportante no encontrada.');
+  if (!before) {
+    if (state === 'RECHAZADA') throw error(409, 'ENTITY_ALREADY_RESOLVED', 'Esta entidad ya fue resuelta.');
+    throw error(404, 'ENTITY_NOT_FOUND', 'Entidad reportante no encontrada.');
+  }
+  if (state === 'RECHAZADA' && (before.Estado_Validacion !== 'PENDIENTE_VALIDACION' || !Number(before.Activo))) {
+    throw error(409, 'ENTITY_ALREADY_RESOLVED', 'Esta entidad ya fue resuelta. Solo se puede rechazar una entidad pendiente de validación y activa.');
+  }
   if (before.Estado_Validacion === state) throw error(409, 'ENTITY_STATE_UNCHANGED', 'La entidad ya tiene ese estado de validación.');
   const normalizedReason = String(reason || '').trim();
-  if (state === 'RECHAZADA' && (!normalizedReason || normalizedReason.length > 300)) {
-    throw error(400, 'ENTITY_REJECTION_REASON_INVALID', 'Escribe un motivo de rechazo de hasta 300 caracteres.');
+  if (state === 'RECHAZADA' && normalizedReason.length > 200) {
+    throw error(400, 'ENTITY_REJECTION_REASON_INVALID', 'El motivo de rechazo puede tener hasta 200 caracteres.');
   }
-
-  await connection.query(`UPDATE entidades_reportantes SET Estado_Validacion=?,Actualizado_Por=?,
-    Validado_Por=?,Validado_En=? WHERE Id_Entidad_Reportante=?`,
-  [state, actorId, state === 'PENDIENTE_VALIDACION' ? null : actorId,
-    state === 'PENDIENTE_VALIDACION' ? null : new Date(), id]);
-  const historyDetails = [{ columna: 'Estado_Validacion', anterior: before.Estado_Validacion, nuevo: state }];
-  if (state === 'RECHAZADA') historyDetails.push({ columna: 'Motivo de rechazo', anterior: null, nuevo: normalizedReason });
-  await recordHistory({ conexion: connection, tabla: 'entidades_reportantes', id_registro: id,
-    accion: state === 'RECHAZADA' ? 'RECHAZAR' : 'VALIDAR', id_usuario: actorId, detalles: historyDetails });
 
   let affected = { reservations: 0, transfers: 0, notificationIds: [] };
   if (state === 'RECHAZADA') {
+    const eventId = (dependencies.eventIdFactory || randomUUID)();
+    const rejectedAt = new Date();
     affected = await rejectRelatedOperations(connection, {
-      id, actorId, name: before.Nombre, reason: normalizedReason, eventId: randomUUID(), notify, recordHistory,
+      id, actorId, name: before.Nombre, reason: normalizedReason, eventId, notify, pending, recordHistory,
     });
     await pending.resolveCondition(entityValidationPendingKey(id), connection);
+    await recordHistory({ conexion: connection, tabla: 'entidades_reportantes', id_registro: id,
+      accion: 'RECHAZAR', id_usuario: actorId, detalles: [
+        { columna: 'Evento', anterior: null, nuevo: eventId },
+        { columna: 'Nombre', anterior: null, nuevo: before.Nombre },
+        { columna: 'Tipo', anterior: null, nuevo: before.Tipo },
+        { columna: 'Creado_Por', anterior: null, nuevo: before.Creado_Por },
+        { columna: 'Fecha_Creacion', anterior: null, nuevo: before.Fecha_Creacion },
+        { columna: 'Rechazado_Por', anterior: null, nuevo: actorId },
+        { columna: 'Rechazado_En', anterior: null, nuevo: rejectedAt },
+        { columna: 'Motivo de rechazo', anterior: null, nuevo: normalizedReason || null },
+        { columna: 'Reservas afectadas', anterior: null, nuevo: JSON.stringify(affected.reservationIds) },
+        { columna: 'Transfers afectados', anterior: null, nuevo: JSON.stringify(affected.transferIds) },
+      ] });
+    await connection.query('DELETE FROM entidad_reportante_puntos WHERE Id_Entidad_Reportante=?', [id]);
+    await connection.query('DELETE FROM perfiles_comision_entidad WHERE Id_Entidad_Reportante=?', [id]);
+    await connection.query('DELETE FROM entidades_reportantes WHERE Id_Entidad_Reportante=?', [id]);
   } else if (state === 'VALIDADA') {
+    await connection.query(`UPDATE entidades_reportantes SET Estado_Validacion=?,Actualizado_Por=?,Validado_Por=?,Validado_En=?
+      WHERE Id_Entidad_Reportante=?`, [state, actorId, actorId, new Date(), id]);
+    await recordHistory({ conexion: connection, tabla: 'entidades_reportantes', id_registro: id,
+      accion: 'VALIDAR', id_usuario: actorId,
+      detalles: [{ columna: 'Estado_Validacion', anterior: before.Estado_Validacion, nuevo: state }] });
     await pending.resolveCondition(entityValidationPendingKey(id), connection);
   } else {
+    await connection.query(`UPDATE entidades_reportantes SET Estado_Validacion=?,Actualizado_Por=?,Validado_Por=NULL,Validado_En=NULL
+      WHERE Id_Entidad_Reportante=?`, [state, actorId, id]);
     await upsertEntityValidationPending(connection, id, before.Nombre, pending);
   }
   return {
@@ -302,8 +383,8 @@ async function validateEntity(id, state, actorId, reason = '') {
     throw error(400, 'ENTITY_STATE_INVALID', 'Estado de validación no válido.');
   }
   const normalizedReason = String(reason || '').trim();
-  if (state === 'RECHAZADA' && (!normalizedReason || normalizedReason.length > 300)) {
-    throw error(400, 'ENTITY_REJECTION_REASON_INVALID', 'Escribe un motivo de rechazo de hasta 300 caracteres.');
+  if (state === 'RECHAZADA' && normalizedReason.length > 200) {
+    throw error(400, 'ENTITY_REJECTION_REASON_INVALID', 'El motivo de rechazo puede tener hasta 200 caracteres.');
   }
   const conn = await db.getConnection();
   try {
@@ -315,5 +396,5 @@ async function validateEntity(id, state, actorId, reason = '') {
 module.exports = { TYPES, CHANNEL_TYPES, normalizeName, typeForChannel,
   searchKey, validateReservationEntity, listEntities, quickCreate, validateEntity,
   entityValidationPendingKey, upsertEntityValidationPending, rejectRelatedOperations,
-  validateEntityInTransaction, runValidationTransaction,
+  validateEntityInTransaction, runValidationTransaction, resolveRejectedEntityOperation,
   ENTITY_OPEN_OPERATION_STATES };

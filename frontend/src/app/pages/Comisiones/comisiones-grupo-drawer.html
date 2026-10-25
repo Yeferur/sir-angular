@@ -1,0 +1,198 @@
+<div class="commission-group-drawer">
+  <header class="drawer-header">
+    <div>
+      <span class="eyebrow">Grupo de pago</span>
+      <h1>{{ detail?.grupo?.Nombre_Entidad || group?.Nombre_Entidad || 'Entidad reportante' }}</h1>
+      @if (detail?.grupo; as entityGroup) {
+        <p>{{ typeLabel(entityGroup.Tipo_Entidad) }} · {{ formatDate(entityGroup.Fecha_Tour) }} · entidad #{{ entityGroup.Id_Entidad_Reportante }}</p>
+      }
+      @if (detail?.grupo && !detail.grupo.Entidad_Activa) { <span class="entity-tag">Entidad inactiva · historial conservado</span> }
+    </div>
+    <app-drawer-close-button label="Cerrar detalle de comisiones" [disabled]="saving" (dismiss)="close()" />
+  </header>
+
+  @if (loading && !detail) {
+    <app-loading-state label="Cargando detalle de comisiones…" />
+  } @else if (error && !detail) {
+    <app-loading-state mode="error" label="No pudimos cargar el grupo" [detail]="error" actionLabel="Reintentar" (action)="loadDetail()" />
+  } @else if (detail) {
+    <div class="drawer-body">
+      @if (error) { <div class="drawer-error" role="alert">{{ error }}</div> }
+      <section class="drawer-summary">
+        <div><span>Reservas pendientes</span><strong>{{ pendingCount }}</strong></div>
+        <div><span>Monto pendiente</span><strong>{{ formatCOP(pendingTotal) }}</strong></div>
+        <div><span>Lotes pagados</span><strong>{{ group?.Cantidad_Lotes_Pagados || 0 }}</strong></div>
+        @if (group?.Tiene_Ajuste_Pendiente) { <span class="status-pill status-pill--adjustment">Con ajuste pendiente</span> }
+      </section>
+
+      @if (profileSaveWarning) {
+        <section class="profile-save-warning" role="alert">
+          <div><strong>Perfil de pago pendiente</strong><p>{{ profileSaveWarning }}</p></div>
+          <div class="profile-save-actions">
+            <button type="button" class="button button--secondary button--small" (click)="retryProfileSave()" [disabled]="savingProfile">
+              {{ savingProfile ? 'Guardando…' : 'Reintentar guardado' }}
+            </button>
+            <button type="button" class="button button--secondary button--small" (click)="dismissProfileSaveWarning()" [disabled]="savingProfile">Descartar aviso</button>
+          </div>
+        </section>
+      }
+
+      @if (group?.Motivo_No_Pagable === 'ENTIDAD_PENDIENTE_VALIDACION' || detail.grupo.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+        <div class="block-notice" role="status">La entidad está pendiente de validación. El grupo no se puede marcar como pagado.</div>
+      } @else if (group?.Motivo_No_Pagable === 'ENTIDAD_NO_VALIDADA') {
+        <div class="block-notice" role="status">La entidad no está validada. El grupo no se puede marcar como pagado.</div>
+      } @else if (group?.Motivo_No_Pagable === 'JORNADA_NO_CERRADA') {
+        <div class="block-notice" role="status">La jornada de Control de viaje relacionada con estas reservas todavía no está cerrada.</div>
+      }
+
+      <section class="drawer-section">
+        <header class="section-heading"><div><h2>Reservas pendientes</h2><span>{{ detail.paginacionReservasPendientes?.total || 0 }} reserva(s) en el ajuste actual</span></div>
+          @if (group?.Puede_Pagar && pendingCount) {
+            <button type="button" class="button button--primary" (click)="openPaymentDialog()" [disabled]="saving">{{ group?.Tiene_Ajuste_Pendiente ? 'Pagar ajuste' : 'Marcar pagada' }}</button>
+          }
+        </header>
+        @if (detail.reservasPendientes.length) {
+          <div class="reservation-list">
+            @for (reservation of detail.reservasPendientes; track reservation.Id_Reserva) {
+              <button type="button" class="reservation-row" (click)="openReservation(reservation.Id_Reserva)">
+                <span class="reservation-id">#{{ reservation.Id_Reserva }}</span>
+                <span class="reservation-tour"><strong>{{ reservation.Nombre_Tour || 'Tour' }}</strong><small>{{ formatDate(reservation.Fecha_Tour) }}</small></span>
+                <strong>{{ formatCOP(reservation.Monto_Comision) }}</strong>
+                <span aria-hidden="true">›</span>
+              </button>
+            }
+          </div>
+          @if ((detail.paginacionReservasPendientes?.paginas || 0) > 1) {
+            <nav class="pagination" aria-label="Páginas de reservas pendientes">
+              <button type="button" class="button button--secondary button--small" (click)="loadDetail(pendingPage - 1)" [disabled]="loadingPendingPage || pendingPage <= 1">Anterior</button>
+              <span>Página {{ pendingPage }} de {{ detail.paginacionReservasPendientes?.paginas }}</span>
+              <button type="button" class="button button--secondary button--small" (click)="loadDetail(pendingPage + 1)" [disabled]="loadingPendingPage || pendingPage >= (detail.paginacionReservasPendientes?.paginas || 1)">Siguiente</button>
+            </nav>
+          }
+        } @else {
+          <p class="empty-note">No hay reservas pendientes en este momento.</p>
+        }
+      </section>
+
+      <section class="drawer-section">
+        <header class="section-heading"><div><h2>Historial de lotes</h2><span>El comprobante y el pago pertenecen a cada lote.</span></div></header>
+        @if (detail.lotes.length) {
+          <div class="lot-list">
+            @for (lot of detail.lotes; track lot.Id_Grupo_Comision) {
+              <article class="lot-card">
+                <header class="lot-heading">
+                  <button type="button" class="lot-expander" (click)="toggleLot(lot.Id_Grupo_Comision)" [attr.aria-expanded]="expandedLotId === lot.Id_Grupo_Comision">
+                    <span class="lot-number">Lote {{ lot.Numero_Lote }}</span>
+                    <span class="status-pill" [class.status-pill--paid]="lot.Estado === 'PAGADO'" [class.status-pill--annulled]="lot.Estado === 'ANULADO'">{{ lot.Estado === 'PAGADO' ? 'Pagado' : 'Anulado' }}</span>
+                    <span class="lot-amount">{{ formatCOP(lot.Monto_Pagado) }}</span>
+                    <span class="lot-count">{{ lot.Cantidad_Reservas_Pagadas }} reservas · {{ formatDate(lot.Fecha_Pago) }}</span>
+                  </button>
+                  <div class="lot-actions">
+                    @if (lot.Tiene_Comprobante) {
+                      <button type="button" class="button button--secondary button--small" (click)="downloadProof(lot.Id_Grupo_Comision, lot.Comprobante_Nombre_Original)">Descargar comprobante</button>
+                    } @else if (lot.Estado === 'PAGADO' || lot.Estado === 'ANULADO') {
+                      <label class="button button--secondary button--small file-button">
+                        Adjuntar comprobante
+                        <input type="file" accept="application/pdf,image/jpeg,image/png" (change)="onLotFileSelected(lot.Id_Grupo_Comision, $event)" />
+                      </label>
+                      @if (proofFileName(lot.Id_Grupo_Comision); as fileName) {
+                        <button type="button" class="button button--primary button--small" (click)="uploadProof(lot.Id_Grupo_Comision)" [disabled]="uploadingLotId === lot.Id_Grupo_Comision">{{ uploadingLotId === lot.Id_Grupo_Comision ? 'Guardando…' : 'Guardar' }}</button>
+                        <small class="selected-file">{{ fileName }}</small>
+                      }
+                    }
+                    @if (lot.Estado === 'PAGADO') {
+                      <button type="button" class="button button--danger button--small" (click)="requestAnnul(lot.Id_Grupo_Comision)">Anular pago</button>
+                    }
+                  </div>
+                </header>
+                @if (lot.Motivo_Anulacion) { <p class="annulled-reason"><strong>Motivo de anulación:</strong> {{ lot.Motivo_Anulacion }}</p> }
+                @if (expandedLotId === lot.Id_Grupo_Comision) {
+                  @if (loadingLot) { <p class="empty-note">Cargando reservas del lote…</p> }
+                  @else if (expandedLot) {
+                    <div class="reservation-list reservation-list--lot">
+                      @for (reservation of expandedLot.reservas; track reservation.Id_Reserva) {
+                        <button type="button" class="reservation-row" (click)="openReservation(reservation.Id_Reserva)">
+                          <span class="reservation-id">#{{ reservation.Id_Reserva }}</span>
+                          <span class="reservation-tour"><strong>{{ reservation.Nombre_Tour || 'Tour' }}</strong><small>{{ formatDate(reservation.Fecha_Tour) }} · monto histórico</small></span>
+                          <strong>{{ formatCOP(reservation.Monto_Comision_Pagada) }}</strong><span aria-hidden="true">›</span>
+                        </button>
+                      }
+                    </div>
+                    @if (expandedLot.paginacion.paginas > 1) {
+                      <nav class="pagination" aria-label="Páginas de reservas del lote">
+                        <button type="button" class="button button--secondary button--small" (click)="loadLot(lot.Id_Grupo_Comision, lotPage - 1)" [disabled]="loadingLot || lotPage <= 1">Anterior</button>
+                        <span>Página {{ lotPage }} de {{ expandedLot.paginacion.paginas }}</span>
+                        <button type="button" class="button button--secondary button--small" (click)="loadLot(lot.Id_Grupo_Comision, lotPage + 1)" [disabled]="loadingLot || lotPage >= expandedLot.paginacion.paginas">Siguiente</button>
+                      </nav>
+                    }
+                  }
+                }
+              </article>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">Todavía no hay lotes pagados para este día.</p>
+        }
+      </section>
+    </div>
+  }
+
+  @if (showPaymentDialog) {
+    <div class="dialog-backdrop" role="presentation">
+      <section class="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="group-payment-title">
+        <header><div><span class="eyebrow">Confirmación de pago</span><h2 id="group-payment-title">{{ group?.Tiene_Ajuste_Pendiente ? 'Pagar ajuste' : 'Marcar grupo como pagado' }}</h2></div>
+          <button type="button" class="icon-close" (click)="closePaymentDialog()" [disabled]="saving" aria-label="Cerrar diálogo">×</button>
+        </header>
+        @if (paymentConflict) { <div class="conflict-notice" role="alert">{{ paymentConflict }}</div> }
+        <div class="payment-totals"><span><small>Reservas pendientes</small><strong>{{ pendingCount }}</strong></span><span><small>Total esperado ahora</small><strong>{{ formatCOP(pendingTotal) }}</strong></span></div>
+        <p class="external-payment-note">La transferencia la realiza contabilidad por fuera de la aplicación. Este registro solo marca el pago.</p>
+
+        @if (profileLoading) { <p class="empty-note">Cargando perfil de pago…</p> }
+        <div class="payment-fields">
+          <div class="field-group"><label class="form-label" for="group-payment-method">Medio de pago</label>
+            <select id="group-payment-method" class="form-input" [(ngModel)]="paymentMethod">
+              <option value="">Selecciona un medio</option>
+              @for (option of paymentMethodOptions; track option.value) { <option [value]="option.value">{{ option.label }}</option> }
+            </select>
+          </div>
+          @if (paymentMethod === 'TRANSFERENCIA_BANCOLOMBIA' || paymentMethod === 'NEQUI') {
+            <div class="field-group"><label class="form-label" for="group-payment-account">{{ paymentMethod === 'NEQUI' ? 'Celular Nequi' : 'Número de cuenta' }}</label>
+              <input id="group-payment-account" class="form-input" [(ngModel)]="paymentAccount" inputmode="numeric" autocomplete="off" [placeholder]="paymentMethod === 'NEQUI' ? 'Ej. 3001234567' : '11 dígitos'" />
+            </div>
+          }
+          <div class="field-group"><label class="form-label" for="group-payment-recipient">Persona o empresa que recibió</label><input id="group-payment-recipient" class="form-input" [(ngModel)]="paymentRecipient" maxlength="255" autocomplete="off" /></div>
+          <div class="field-group"><label class="form-label" for="group-payment-recipient-id">DNI, NIT o documento</label><input id="group-payment-recipient-id" class="form-input" [(ngModel)]="paymentRecipientId" maxlength="50" autocomplete="off" /></div>
+        </div>
+        @if (profile) {
+          <label class="save-profile"><input type="checkbox" [(ngModel)]="saveProfile" /><span>Actualizar el perfil para próximos pagos de esta entidad.</span></label>
+        } @else {
+          <label class="save-profile"><input type="checkbox" [(ngModel)]="saveProfile" /><span>Guardar estos datos para próximos pagos de esta entidad.</span></label>
+        }
+        <div class="field-group receipt-field"><label class="form-label" for="payment-receipt">Comprobante opcional · PDF, JPG o PNG · máximo 5 MB</label><input id="payment-receipt" class="form-input" type="file" accept="application/pdf,image/jpeg,image/png" (change)="onReceiptSelected($event)" />
+          @if (receiptFile) { <small>{{ receiptFile.name }}</small> }
+          @if (receiptError) { <small class="field-error">{{ receiptError }}</small> }
+        </div>
+        @if (paymentError && !profileLoading) { <p class="field-error">{{ paymentError }}</p> }
+        @if (error) { <p class="field-error" role="alert">{{ error }}</p> }
+        <footer><button type="button" class="button button--secondary" (click)="closePaymentDialog()" [disabled]="saving">Cancelar</button>
+          <button type="button" class="button button--primary" (click)="submitPayment()" [disabled]="saving || profileLoading || !!paymentError || !!receiptError">{{ saving ? 'Registrando…' : 'Confirmar pago' }}</button>
+        </footer>
+      </section>
+    </div>
+  }
+
+  @if (showAnnulDialog) {
+    <div class="dialog-backdrop" role="presentation">
+      <section class="payment-dialog annul-dialog" role="dialog" aria-modal="true" aria-labelledby="annul-title">
+        <header><div><span class="eyebrow">Acción irreversible en el historial</span><h2 id="annul-title">Anular pago</h2></div>
+          <button type="button" class="icon-close" (click)="showAnnulDialog = false" [disabled]="saving" aria-label="Cerrar diálogo">×</button>
+        </header>
+        <p>El lote y su comprobante se conservarán. Las reservas quedarán disponibles para un pago posterior.</p>
+        <div class="field-group"><label class="form-label" for="annul-reason">Motivo · entre 5 y 1000 caracteres</label><textarea id="annul-reason" class="form-input" rows="4" maxlength="1000" [(ngModel)]="annulReason"></textarea></div>
+        @if (annulError) { <p class="field-error">{{ annulError }}</p> }
+        <footer><button type="button" class="button button--secondary" (click)="showAnnulDialog = false" [disabled]="saving">Cancelar</button>
+          <button type="button" class="button button--danger" (click)="annulPayment(expandedLotId)" [disabled]="saving || !!annulError">{{ saving ? 'Anulando…' : 'Confirmar anulación' }}</button></footer>
+      </section>
+    </div>
+  }
+</div>

@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateReservationEntity } = require('../services/EntidadesReportantes/entidades-reportantes.service');
+const { validateReservationEntity, typeForChannel } = require('../services/EntidadesReportantes/entidades-reportantes.service');
+const { resolverEstadoReserva } = require('../services/Reservas/reservas.service');
+const { resolverEstadoTransfer } = require('../services/Transfers/transfers.service');
 
 const channels = new Map([
   [1, 'HOTEL'],
@@ -8,6 +10,7 @@ const channels = new Map([
   [3, 'AGENCIA INTERNACIONAL'],
   [4, 'FREELANCE'],
   [5, 'DIRECTO'],
+  [6, 'MAXI'], [7, 'IG'], [8, 'META'], [9, 'WEB'], [11, 'ELLOS'],
 ]);
 
 const entities = new Map([
@@ -43,11 +46,20 @@ test('mapped channels require an entity and reject inactive or rejected entities
     error => error.errorCode === 'ENTITY_REQUIRED');
   entities.set(40, { Id_Entidad_Reportante: 40, Tipo: 'HOTEL', Activo: 0, Estado_Validacion: 'VALIDADA' });
   await assert.rejects(validateReservationEntity(executor, 1, 40),
-    error => error.errorCode === 'ENTITY_INVALID');
+    error => error.errorCode === 'ENTITY_INACTIVE');
 });
 
 test('Freelance and channels without an entity always normalize the reservation FK to null', async () => {
-  assert.equal(await validateReservationEntity(executor, 4, null), null);
-  assert.equal(await validateReservationEntity(executor, 4, 10), null);
-  assert.equal(await validateReservationEntity(executor, 5, 10), null);
+  for (const channel of [4, 5, 6, 7, 8, 9, 11]) {
+    assert.equal(await typeForChannel(executor, channel), null);
+    assert.equal(await validateReservationEntity(executor, channel, 10), null);
+  }
+});
+
+test('el cálculo automático exige entidad solo para hotel y agencias', async () => {
+  for (const channel of [1, 2, 3]) assert.ok(await typeForChannel(executor, channel));
+  assert.equal(resolverEstadoReserva({ fechaTour: '2030-01-01', requiereEntidad: true }), 'Pendiente de datos');
+  assert.equal(resolverEstadoTransfer({ FechaTransfer: '2030-01-01', RequiereEntidad: true }), 'Pendiente de datos');
+  assert.equal(resolverEstadoReserva({ fechaTour: '2030-01-01' }), 'Pendiente');
+  assert.equal(resolverEstadoTransfer({ FechaTransfer: '2030-01-01' }), 'Pendiente');
 });

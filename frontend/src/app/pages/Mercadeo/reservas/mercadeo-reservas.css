@@ -18,11 +18,8 @@
   grid-template-columns: 280px repeat(3, 245px);
   justify-content: start;
 }
-:host ::ng-deep #marketing-more-filters .multi-filter-trigger { box-sizing: border-box; height: 40px; min-height: 40px; padding: 0 13px; }
-.marketing-entity-suggestions small { color: var(--text-secondary); white-space: nowrap; }
 #marketing-more-filters { margin-top: -4px; }
-.marketing-entity-suggestions .autocomplete-item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  width: 100%; background: transparent; color: var(--text-primary); font: inherit; text-align: left; }
+.marketing-entity-suggestions .sir-autocomplete-option__meta { font-size: .76rem; }
 .inline-error { margin: 0; color: var(--danger-color, #b42318); font-size: .78rem; }
 
 .results-heading {

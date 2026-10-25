@@ -100,10 +100,16 @@
 }
 
 .search-field .form-input {
-  height: 40px;
+  height: var(--search-control-height);
   padding-left: 38px;
   background: var(--bg-tertiary);
+  border-width: var(--search-control-border-width);
+  border-radius: var(--search-control-radius);
+  font-size: var(--search-control-font-size);
+  font-weight: var(--search-control-font-weight);
+  transition: border-color var(--search-control-transition), background-color var(--search-control-transition), box-shadow var(--search-control-transition);
 }
+.search-field .form-input:disabled { opacity: var(--search-control-disabled-opacity); }
 
 .status-filters {
   display: flex;

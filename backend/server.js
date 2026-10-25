@@ -113,6 +113,8 @@ const confirmacionRoutes = require('./routes/Confirmacion/confirmacion.routes');
 app.use('/api/confirmacion', confirmacionRoutes);
 
 const comisionesRoutes = require('./routes/Comisiones/comisiones.routes');
+const comisionesGruposRoutes = require('./routes/Comisiones/comisiones-grupos.routes');
+app.use('/api/comisiones/grupos', comisionesGruposRoutes);
 app.use('/api/comisiones', comisionesRoutes);
 
 const segurosRoutes = require('./routes/Seguros/seguros.routes');

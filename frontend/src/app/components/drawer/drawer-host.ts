@@ -15,11 +15,12 @@ import { TurnosIntercambioPanelComponent } from '../turnos-intercambio-panel/tur
 import { MiActividadPanelComponent } from '../mi-actividad-panel/mi-actividad-panel';
 import { ReservasPuntoDrawerComponent } from '../../pages/Puntos/reservas-punto-drawer/reservas-punto-drawer';
 import { MercadeoEntidadCreatePanelComponent } from '../../pages/Mercadeo/entidades/mercadeo-entidad-create-panel';
+import { ComisionesGrupoDrawerComponent } from '../../pages/Comisiones/comisiones-grupo-drawer';
 
 @Component({
   selector: 'app-sir-drawer',
   standalone: true,
-  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent, MercadeoEntidadCreatePanelComponent],
+  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent, MercadeoEntidadCreatePanelComponent, ComisionesGrupoDrawerComponent],
   templateUrl: './drawer-host.html',
   styleUrls: ['./drawer-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -33,7 +33,8 @@
     <section class="turnos-workspace">
       <aside class="advisor-panel">
         <div class="panel-heading"><div><span class="eyebrow">Equipo</span><h2>Asesores</h2></div><span>{{ filteredAdvisors().length }} de {{ asesores().length }}</span></div>
-        <label class="search-field"><i class="bx bx-search"></i><input type="search" placeholder="Buscar asesor…" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
+        <app-search-input inputId="advisor-search" [showClear]="false" ariaLabel="Buscar asesor" placeholder="Buscar asesor…"
+          [value]="search()" (valueChange)="search.set($event)" />
         <div class="advisor-list">
           @for (group of groupedAdvisors(); track group.name) {
             <div class="channel-heading"><span>{{ group.name }}</span><small>{{ group.advisors.length }}</small></div>

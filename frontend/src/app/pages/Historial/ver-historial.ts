@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, QueryList, ViewChildren, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,6 +7,8 @@ import { Historial, HistorialFilterOptions, HistorialFilters, HistorialService }
 import { DatepickerComponent } from '../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
+import { SirSearchInputComponent } from '../../shared/search-input/search-input';
+import { SirMultiSelectComponent, SirMultiSelectOption } from '../../shared/multi-select/multi-select';
 
 interface HistorialFilterState {
   fecha: string;
@@ -48,16 +50,16 @@ function isValidReference(value: string): boolean { return /^(?:[A-Z]{2,4}|TRS)\
 @Component({
   selector: 'app-ver-historial',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent, SirMultiSelectComponent],
   templateUrl: './ver-historial.html',
   styleUrls: ['../listado-reservas-transfers.css', './ver-historial.css'],
 })
 export class VerHistorialComponent implements OnInit, OnDestroy {
   private readonly historialService = inject(HistorialService);
-  private readonly hostElement = inject(ElementRef<HTMLElement>);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
+  @ViewChildren(SirMultiSelectComponent) private historyMultiSelects!: QueryList<SirMultiSelectComponent>;
   private requestId = 0;
   private searchRequest?: Subscription;
   private pendingOwnNavigation = false;
@@ -79,9 +81,15 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   readonly referenceInputError = signal('');
   readonly hasQueried = signal(false);
   readonly advancedFiltersVisible = signal(false);
-  readonly openFilterDropdown = signal<'usuarios' | 'actividad' | 'modulos' | null>(null);
   readonly expandedId = signal<number | null>(null);
   readonly pageSize = 10;
+
+  readonly userFilterOptions = computed<SirMultiSelectOption<number>[]>(() => this.filterOptions().usuarios
+    .map((user) => ({ value: user.id, label: user.label })));
+  readonly activityFilterOptions = computed<SirMultiSelectOption<string>[]>(() => this.filterOptions().actividades
+    .map((activity) => ({ value: activity.value, label: activity.label })));
+  readonly moduleFilterOptions = computed<SirMultiSelectOption<string>[]>(() => this.filterOptions().modulos
+    .map((module) => ({ value: module.value, label: module.label })));
 
   readonly appliedGroupCount = computed(() => {
     const applied = this.appliedFilters();
@@ -119,31 +127,13 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   toggleAdvancedFilters(): void {
     const shouldOpen = !this.advancedFiltersVisible();
-    this.closeFilterDropdowns();
     this.advancedFiltersVisible.set(shouldOpen);
   }
 
-  toggleDropdown(group: 'usuarios' | 'actividad' | 'modulos'): void {
-    this.openFilterDropdown.update((current) => current === group ? null : group);
-  }
-
-  @HostListener('document:pointerdown', ['$event'])
-  onFilterPointerDown(event: PointerEvent): void {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const clickedOwnMultiFilter = this.hostElement.nativeElement.contains(target) && !!target.closest('.multi-filter');
-    if (!clickedOwnMultiFilter) this.closeFilterDropdowns();
-  }
-
-  @HostListener('document:keydown.escape')
-  onFilterEscape(): void { this.closeFilterDropdowns(); }
-
-  private closeFilterDropdowns(): void { this.openFilterDropdown.set(null); }
-
-  multiFilterLabel(group: 'usuarios' | 'actividad' | 'modulos'): string {
-    const values = this.draftFilters()[group];
-    if (!values.length) return group === 'usuarios' ? 'Todos los usuarios' : group === 'actividad' ? 'Todos los tipos' : 'Todos los módulos';
-    return values.length === 1 ? '1 seleccionado' : `${values.length} seleccionados`;
+  closeOtherHistoryFilters(inputId: string): void {
+    this.historyMultiSelects?.forEach((filter) => {
+      if (filter.inputId !== inputId) filter.close();
+    });
   }
 
   setDraftUsers(values: number[] | null): void {
@@ -189,7 +179,6 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     this.referenceInputError.set('');
     this.appliedFilters.set(applied);
     this.advancedFiltersVisible.set(false);
-    this.openFilterDropdown.set(null);
     this.currentPage.set(1);
     this.syncUrlAndLoad();
   }
@@ -281,10 +270,6 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
     const filters = this.appliedFilters();
     return !!filters.referencia || !!filters.usuarios.length || !!filters.actividad.length || !!filters.modulos.length;
   }
-  isDraftSelected(group: 'usuarios' | 'actividad' | 'modulos', value: number | string): boolean {
-    return (this.draftFilters()[group] as Array<number | string>).includes(value);
-  }
-
   actionClass(action: string): string {
     const value = String(action || '').toUpperCase();
     if (/^(CREAR|CREATE|DUPLICAR)_?/.test(value)) return 'create';

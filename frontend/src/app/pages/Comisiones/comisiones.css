@@ -12,6 +12,12 @@
 
 .commissions-page--with-footer { padding-bottom: 112px; }
 
+.legacy-freelance-section { display: grid; gap: 10px; margin-top: 34px; }
+.legacy-freelance-heading { display: grid; gap: 4px; }
+.legacy-freelance-heading h2 { margin: 0; font-size: 1.08rem; color: var(--text-primary); }
+.legacy-freelance-heading p { color: var(--text-secondary); font-size: .78rem; }
+.legacy-payment-note { color: var(--text-secondary); font-size: .72rem; font-weight: 700; }
+
 h2,
 p { margin: 0; }
 

@@ -36,6 +36,7 @@ import { ConfirmacionService, EstadoConfirmacion, JornadaConfirmacion } from '..
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
 import { DrawerCloseButtonComponent } from '../../shared/drawer-close-button/drawer-close-button';
+import { ComisionesGruposComponent } from './comisiones-grupos';
 
 type FormaPagoPanel = FormaPagoComision | '';
 
@@ -69,7 +70,7 @@ interface PanelPagoState {
 @Component({
   selector: 'app-comisiones',
   standalone: true,
-  imports: [SirSelectComponent, SirFilterBarComponent, CommonModule, FormsModule, DatepickerComponent,
+  imports: [ComisionesGruposComponent, SirSelectComponent, SirFilterBarComponent, CommonModule, FormsModule, DatepickerComponent,
     LoadingStateComponent, QueryEmptyStateComponent, DrawerCloseButtonComponent],
   templateUrl: './comisiones.html',
   styleUrl: './comisiones.css',
@@ -221,7 +222,16 @@ export class ComisionesComponent implements OnInit {
     ).subscribe({
       next: ({ canales, estado }) => {
         this.appliedFilters = { ...filters };
-        this.canales = canales || [];
+        this.canales = (canales || []).map((canal) => {
+          const grupos = (canal.grupos || []).filter((grupo) => !grupo.Id_Entidad_Reportante);
+          return {
+            ...canal,
+            grupos,
+            Total_Canal: grupos.reduce((total, grupo) => total + Number(grupo.Total_Reportante || 0), 0),
+            Pendiente_Canal: grupos.reduce((total, grupo) => total + Number(grupo.Pendiente_Reportante || 0), 0),
+            Pagado_Canal: grupos.reduce((total, grupo) => total + Number(grupo.Pagado_Reportante || 0), 0),
+          };
+        }).filter((canal) => canal.grupos.length > 0);
         this.estadoConfirmacion = estado;
         this.syncFiltersToUrl(true);
         this.cdr.markForCheck();
@@ -338,6 +348,7 @@ export class ComisionesComponent implements OnInit {
   }
 
   abrirPagoGrupo(grupo: ComisionGrupo): void {
+    if (this.esEntidadComisionable(grupo)) return;
     const pendientes = this.reservasPendientesDeGrupo(grupo);
     if (!pendientes.length) return;
     this.panel.modoCola = false;
@@ -349,7 +360,7 @@ export class ComisionesComponent implements OnInit {
   iniciarColaPagos(): void {
     const cola = this.canales
       .flatMap((canal) => canal.grupos)
-      .filter((grupo) => this.pendientesDe(grupo) > 0);
+      .filter((grupo) => !this.esEntidadComisionable(grupo) && this.pendientesDe(grupo) > 0);
     if (!cola.length) return;
     this.panel.modoCola = true;
     this.panel.cola = cola;
@@ -548,6 +559,7 @@ export class ComisionesComponent implements OnInit {
   }
 
   async reabrirGrupo(grupo: ComisionGrupo): Promise<void> {
+    if (this.esEntidadComisionable(grupo)) return;
     const pagadas = grupo.reservas.filter((reserva) => reserva.Estado_Liquidacion === 'PAGADO');
     if (!pagadas.length) return;
     const accepted = await this.alerts.confirmDecision(

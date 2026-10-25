@@ -23,9 +23,8 @@
     </div>
   } @else {
     <label class="permission-search-label" for="permission-search">Buscar permiso</label>
-    <input id="permission-search" class="permission-search" type="search" [(ngModel)]="query"
-      [ngModelOptions]="{ standalone: true }"
-      placeholder="Nombre, módulo o código" autocomplete="off" />
+    <app-search-input class="permission-search" inputId="permission-search" [showClear]="false" ariaLabel="Buscar permiso"
+      placeholder="Nombre, módulo o código" [value]="query" (valueChange)="query = $event" />
     <div class="permission-workspace">
       <nav class="permission-module-nav" aria-label="Módulos de permisos">
         @for (group of groups; track group.key) {

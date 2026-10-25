@@ -17,6 +17,7 @@ import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { UppercaseInputDirective } from '../../../shared/directives/uppercase-input.directive';
 import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 type CrearTransferLoadResult = {
@@ -34,7 +35,7 @@ interface WizardStep {
 @Component({
   selector: 'app-crear-transfer',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './crear-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })

@@ -17,6 +17,7 @@ import { WebSocketService } from '../../../services/WebSocket/web-socket';
 import { SirSelectComponent, SirSelectOption, SirSelectOptionsPipe, compareSelectValuesAsStrings } from '../../../shared/select/select';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { isTourDateAvailable, toDateOnly } from '../../../shared/utils/calendar-date';
 import {
   Reservas, Tour, Canal, EntidadReportante, Moneda, Plan, Horario, PrecioMap, Punto,
@@ -57,7 +58,8 @@ interface SubmitValidationIssue {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, DecimalPipe,
-    SirSelectComponent, SirSelectOptionsPipe, DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent
+    SirSelectComponent, SirSelectOptionsPipe, DatepickerComponent, UppercaseInputDirective, CuposStripComponent, LoadingStateComponent,
+    SirAutocompletePanelPositionDirective
   ],
   templateUrl: './crear-reserva.html',
   styleUrls: ['../reserva-shared.css'],

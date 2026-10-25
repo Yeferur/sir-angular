@@ -104,6 +104,13 @@
   flex-direction: column;
 }
 
+.sir-drawer-panel app-comisiones-grupo-drawer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .sir-drawer-panel app-mercadeo-entidad-create-panel {
   flex: 1;
   min-height: 0;
@@ -144,6 +151,10 @@
   width: clamp(380px, 38vw, 580px);
 }
 
+.sir-drawer-panel:has(app-comisiones-grupo-drawer) {
+  width: min(900px, 72vw);
+}
+
 /* ── Mapa: ancho más generoso ───────────────────────────────── */
 .sir-drawer-panel:has(app-mapa) {
   width: min(92vw, 1440px);
@@ -158,6 +169,7 @@
   .sir-drawer-panel:has(app-turnos-vacaciones-panel),
   .sir-drawer-panel:has(app-usuario-detail),
   .sir-drawer-panel:has(app-reservas-punto-drawer),
+    .sir-drawer-panel:has(app-comisiones-grupo-drawer),
   .sir-drawer-panel:has(app-mapa) {
     top: 0;
     right: 0;

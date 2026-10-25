@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PermisoCompleto } from '../../../services/Permisos/permisos.service';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
+import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
 
 export interface PermissionGroup {
   key: string;
@@ -12,7 +13,7 @@ export interface PermissionGroup {
 @Component({
   selector: 'app-permission-picker',
   standalone: true,
-  imports: [FormsModule, SirSelectComponent],
+  imports: [FormsModule, SirSelectComponent, SirSearchInputComponent],
   templateUrl: './permission-picker.html',
   styleUrl: './permission-picker.css',
 })

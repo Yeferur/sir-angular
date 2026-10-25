@@ -22,10 +22,6 @@
 .entity-create-hint { color: var(--text-secondary); font-size: .78rem; }
 .entity-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; padding: 15px 24px 20px; border-top: 1px solid var(--separator-color); }
 .inline-error { margin: 0; color: var(--accent-red); font-size: .82rem; }
-.entity-suggestions { overflow-y: auto; max-height: 220px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
-.entity-suggestions h3 { margin: 0; padding: 8px 11px 3px; color: var(--text-secondary); font-size: .69rem; text-transform: uppercase; letter-spacing: .06em; }
-.entity-suggestions button { display: block; width: 100%; padding: 9px 11px; border: 0; border-bottom: 1px solid var(--separator-color); background: transparent; color: var(--text-primary); font: inherit; font-size: .82rem; text-align: left; cursor: pointer; }
-.entity-suggestions button:hover { background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
 @media (max-width: 600px) {
   .entity-create-header { padding: 18px 60px 14px 18px; }
   .entity-create-content { padding: 18px; }

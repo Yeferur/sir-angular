@@ -60,11 +60,7 @@ input.entity-input:hover:not(:disabled) { border-color: color-mix(in srgb, var(-
 input.entity-input:focus { outline: none; border-color: var(--accent-blue); background: var(--bg-secondary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); }
 input.entity-input:disabled, input.entity-input[readonly] { color: var(--text-secondary); cursor: not-allowed; opacity: .72; }
 input.entity-input::placeholder { color: var(--text-tertiary); opacity: .55; }
-textarea.entity-input:focus-visible, .entity-link:focus-visible, .entity-suggestions button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
-.entity-suggestions { overflow-y: auto; max-height: 220px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
-.entity-suggestions h3 { margin: 0; padding: 8px 11px 3px; color: var(--text-secondary); font-size: .69rem; text-transform: uppercase; letter-spacing: .06em; }
-.entity-suggestions button { display: block; width: 100%; padding: 9px 11px; border: 0; border-bottom: 1px solid var(--separator-color); background: transparent; color: var(--text-primary); font: inherit; font-size: .82rem; text-align: left; cursor: pointer; }
-.entity-suggestions button:hover { background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+textarea.entity-input:focus-visible, .entity-link:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .entity-associate-option { display: flex; align-items: flex-start; gap: 9px; padding: 11px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); font-size: .82rem; line-height: 1.4; }
 .entity-associate-option input { margin-top: 2px; accent-color: var(--accent-blue); }
 .entity-form-note { font-size: .77rem !important; }

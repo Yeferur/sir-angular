@@ -1,0 +1,3459 @@
+{
+  "reportVersion": 1,
+  "mode": "apply",
+  "targetDatabase": "sir2",
+  "sourceFile": "C:\\Users\\USUARIO\\Downloads\\Agencias 2026.xlsx",
+  "generatedAt": "2026-10-25T19:26:44.742Z",
+  "actorId": "43917211",
+  "worksheet": "Consolidado ",
+  "columnsDetected": 13,
+  "rowsRead": 428,
+  "summary": {
+    "rowsRead": 428,
+    "inserted": 422,
+    "plannedInsertions": 0,
+    "omittedByDuplicate": 1,
+    "waitingForMarketing": 5,
+    "errors": 0,
+    "existingEntitiesFound": 0
+  },
+  "inserted": [
+    {
+      "row": 2,
+      "originalName": "LA FANTASTICA YER - YEIMAR",
+      "Nombre": "LA FANTASTICA YER - YEIMAR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "1",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 3,
+      "originalName": "TRANSPORTAMOS BOGOTA",
+      "Nombre": "TRANSPORTAMOS BOGOTA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "2",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 4,
+      "originalName": "PURE COLOMBIA TRAVEL",
+      "Nombre": "PURE COLOMBIA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "3",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 5,
+      "originalName": "ZIPPYTOURS COMUNA 13",
+      "Nombre": "ZIPPYTOURS COMUNA 13",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "4",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 6,
+      "originalName": "STYLE TRAVEL COLOMBIA",
+      "Nombre": "STYLE TRAVEL COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "5",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 7,
+      "originalName": "TURISMO COTRA - DANERIS",
+      "Nombre": "TURISMO COTRA - DANERIS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "6",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 8,
+      "originalName": "GO2MEDELLIN",
+      "Nombre": "GO2MEDELLIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "7",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 9,
+      "originalName": "AGENCIA - MEDELLIN TRIP COL",
+      "Nombre": "AGENCIA - MEDELLIN TRIP COL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "8",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 10,
+      "originalName": "CONT. ARRANQUEMOS PUES",
+      "Nombre": "CONT. ARRANQUEMOS PUES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "9",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 11,
+      "originalName": "MELO VIAJES",
+      "Nombre": "MELO VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "10",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 12,
+      "originalName": "JUANMI AGENCIA",
+      "Nombre": "JUANMI AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "11",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 13,
+      "originalName": "VIAJEMOS NG - CAROLINA",
+      "Nombre": "VIAJEMOS NG - CAROLINA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "12",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 14,
+      "originalName": "TOURTUGA - AGENCIA",
+      "Nombre": "TOURTUGA - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "13",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 15,
+      "originalName": "MEDELLIN COLOMBIA TOURS",
+      "Nombre": "MEDELLIN COLOMBIA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "14",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 16,
+      "originalName": "N & C INVERSIONES COLOMBIA",
+      "Nombre": "N & C INVERSIONES COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "15",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 17,
+      "originalName": "MOCHILEANDO COLOMBIA TOURS",
+      "Nombre": "MOCHILEANDO COLOMBIA TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "16",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 18,
+      "originalName": "MEDELLIN VIVO",
+      "Nombre": "MEDELLIN VIVO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "17",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 19,
+      "originalName": "FANTASTICA TRAVEL",
+      "Nombre": "FANTASTICA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "18",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 20,
+      "originalName": "CIBELES TOURS - YARITZA",
+      "Nombre": "CIBELES TOURS - YARITZA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "19",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 21,
+      "originalName": "DETOUR - AGENCIA",
+      "Nombre": "DETOUR - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "20",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 22,
+      "originalName": "COLOMBIA EN TUS OJOS TOURS",
+      "Nombre": "COLOMBIA EN TUS OJOS TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "21",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 23,
+      "originalName": "COLOMBIA EN TUS OJOS TOURS - ALEJA",
+      "Nombre": "COLOMBIA EN TUS OJOS TOURS - ALEJA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "22",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 24,
+      "originalName": "COLOMBIA EN TUS OJOS TOURS - JUAN JOSE",
+      "Nombre": "COLOMBIA EN TUS OJOS TOURS - JUAN JOSE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "23",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 25,
+      "originalName": "MATUCA",
+      "Nombre": "MATUCA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "24",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 26,
+      "originalName": "TRAVEL LUXURY COMPANY",
+      "Nombre": "TRAVEL LUXURY COMPANY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "25",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 27,
+      "originalName": "SEVEN TRAVEL",
+      "Nombre": "SEVEN TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "26",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 28,
+      "originalName": "BELIEVE IN TRAVEL PANAMA",
+      "Nombre": "BELIEVE IN TRAVEL PANAMA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "27",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 29,
+      "originalName": "DOLCI TOURS",
+      "Nombre": "DOLCI TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "28",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 30,
+      "originalName": "NEXT TRAVEL",
+      "Nombre": "NEXT TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "29",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 31,
+      "originalName": "VIAJES ECOSALIDAS - MARIA",
+      "Nombre": "VIAJES ECOSALIDAS - MARIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "30",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 32,
+      "originalName": "GOVADIS - AGENCIA",
+      "Nombre": "GOVADIS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "31",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 33,
+      "originalName": "VIAJES JUAN HERRERA",
+      "Nombre": "VIAJES JUAN HERRERA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "32",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 34,
+      "originalName": "PRESTIGE CONCIERGE - PAOLA",
+      "Nombre": "PRESTIGE CONCIERGE - PAOLA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "33",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 35,
+      "originalName": "EXPLOREMOS COLOMBIA - DANIELA",
+      "Nombre": "EXPLOREMOS COLOMBIA - DANIELA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "34",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 36,
+      "originalName": "VIAJES TRAVESSIA- AGENCIA",
+      "Nombre": "VIAJES TRAVESSIA- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "35",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 37,
+      "originalName": "TRANSPORTE Y TURISMO DEL EJE-AGENCIA",
+      "Nombre": "TRANSPORTE Y TURISMO DEL EJE-AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "36",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 39,
+      "originalName": "PAISA TOUR MEDELLÍN",
+      "Nombre": "PAISA TOUR MEDELLÍN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "37",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 40,
+      "originalName": "WILL STYLE SHOP - WALTER",
+      "Nombre": "WILL STYLE SHOP - WALTER",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "38",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 41,
+      "originalName": "WORLD LION TOURS LEANDRO",
+      "Nombre": "WORLD LION TOURS LEANDRO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "39",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 42,
+      "originalName": "RESERVAS MAXITOUR  - MEDELLIN",
+      "Nombre": "RESERVAS MAXITOUR - MEDELLIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "40",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 43,
+      "originalName": "CHIVAS EL SUPER PAISA - MANUELA",
+      "Nombre": "CHIVAS EL SUPER PAISA - MANUELA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "41",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 44,
+      "originalName": "VIAJA MEDELLIN - CELENE",
+      "Nombre": "VIAJA MEDELLIN - CELENE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "42",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 45,
+      "originalName": "FANTASY TOURS",
+      "Nombre": "FANTASY TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "43",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 46,
+      "originalName": "NOMADAS DMC - AGENCIA",
+      "Nombre": "NOMADAS DMC - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "44",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 47,
+      "originalName": "DIVERSITRIP YEISMY",
+      "Nombre": "DIVERSITRIP YEISMY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "45",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 48,
+      "originalName": "SOMOS YOUR POINT TRAVEL",
+      "Nombre": "SOMOS YOUR POINT TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "46",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 49,
+      "originalName": "ENDLESS TRAVEL - MISHEL FLORES",
+      "Nombre": "ENDLESS TRAVEL - MISHEL FLORES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "47",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 50,
+      "originalName": "LOKIEROO TRAVELS",
+      "Nombre": "LOKIEROO TRAVELS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "48",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 51,
+      "originalName": "DESCUBRE MEDELLIN CO",
+      "Nombre": "DESCUBRE MEDELLIN CO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "49",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 52,
+      "originalName": "VIAJEROS JM - CINDY",
+      "Nombre": "VIAJEROS JM - CINDY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "50",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 53,
+      "originalName": "LETS GO TRAVEL EL SALVADOR- AGENCIA",
+      "Nombre": "LETS GO TRAVEL EL SALVADOR- AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "51",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 54,
+      "originalName": "FORE TOURS",
+      "Nombre": "FORE TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "52",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 55,
+      "originalName": "PAISA TOUR - NICOLLE",
+      "Nombre": "PAISA TOUR - NICOLLE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "53",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 56,
+      "originalName": "MEDELLIN LIVE TOUR - AGENCIA",
+      "Nombre": "MEDELLIN LIVE TOUR - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "54",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 57,
+      "originalName": "UNIVIAJES -CLAUDIA",
+      "Nombre": "UNIVIAJES -CLAUDIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "55",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 58,
+      "originalName": "WORLD LION TOURS",
+      "Nombre": "WORLD LION TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "56",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 59,
+      "originalName": "LATINAMERICAN TOURS - ESTEFANIA",
+      "Nombre": "LATINAMERICAN TOURS - ESTEFANIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "57",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 60,
+      "originalName": "FANTASY TOUR - AGENCIA",
+      "Nombre": "FANTASY TOUR - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "58",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 61,
+      "originalName": "SERVITOURS",
+      "Nombre": "SERVITOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "59",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 62,
+      "originalName": "TRAVEL DANCE",
+      "Nombre": "TRAVEL DANCE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "60",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 63,
+      "originalName": "PLAYA MISTICA - AGENCIA",
+      "Nombre": "PLAYA MISTICA - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "61",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 64,
+      "originalName": "ETHAN TRAVEL AGENCY",
+      "Nombre": "ETHAN TRAVEL AGENCY",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "62",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 65,
+      "originalName": "ELITE GROUP",
+      "Nombre": "ELITE GROUP",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "63",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 66,
+      "originalName": "BEYOURNEY",
+      "Nombre": "BEYOURNEY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "64",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 67,
+      "originalName": "PROVIDENCES TRAVEL GROUP - AGENCIA",
+      "Nombre": "PROVIDENCES TRAVEL GROUP - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "65",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 68,
+      "originalName": "VIAJES HOME TRAVEL",
+      "Nombre": "VIAJES HOME TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "66",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 69,
+      "originalName": "SOTOTOURSRD - AGENCIA",
+      "Nombre": "SOTOTOURSRD - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "67",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 70,
+      "originalName": "PROTOUR - CAMILO",
+      "Nombre": "PROTOUR - CAMILO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "68",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 71,
+      "originalName": "PREMIUM TOURS",
+      "Nombre": "PREMIUM TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "69",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 72,
+      "originalName": "TRAVESIAS EUREKA",
+      "Nombre": "TRAVESIAS EUREKA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "70",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 73,
+      "originalName": "AGENCIA DE VIAJES SOMERTUR",
+      "Nombre": "AGENCIA DE VIAJES SOMERTUR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "71",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 74,
+      "originalName": "SUMMER TRAVEL TOURS",
+      "Nombre": "SUMMER TRAVEL TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "72",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 75,
+      "originalName": "VIAJEROS JM - PAOLA RIOS",
+      "Nombre": "VIAJEROS JM - PAOLA RIOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "73",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 76,
+      "originalName": "VIVIR VIAJANDO TRAVELS",
+      "Nombre": "VIVIR VIAJANDO TRAVELS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "74",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 77,
+      "originalName": "MEET COLOMBIA ADVENTURES",
+      "Nombre": "MEET COLOMBIA ADVENTURES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "75",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 78,
+      "originalName": "THE BEST - MAXITOURS",
+      "Nombre": "THE BEST - MAXITOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "76",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 79,
+      "originalName": "ENCARTAGENA TOURS",
+      "Nombre": "ENCARTAGENA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "77",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 80,
+      "originalName": "WEEK TRAVEL - ANGELICA",
+      "Nombre": "WEEK TRAVEL - ANGELICA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "78",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 81,
+      "originalName": "PA COLOMBIA - AGENCIA",
+      "Nombre": "PA COLOMBIA - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "79",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 82,
+      "originalName": "MONCADA TOURS - JOHANA",
+      "Nombre": "MONCADA TOURS - JOHANA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "80",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 83,
+      "originalName": "VIAJES MH - AGENCIA",
+      "Nombre": "VIAJES MH - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "81",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 84,
+      "originalName": "MEDELLIN FLORECE",
+      "Nombre": "MEDELLIN FLORECE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "82",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 85,
+      "originalName": "VIAJES MUNDO TURISMO PANAMA",
+      "Nombre": "VIAJES MUNDO TURISMO PANAMA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "83",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 86,
+      "originalName": "VACACIONES TODO INCLUIDO - AGENCIA",
+      "Nombre": "VACACIONES TODO INCLUIDO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "84",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 87,
+      "originalName": "AVENTURA Y NATURALEZA",
+      "Nombre": "AVENTURA Y NATURALEZA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "85",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 88,
+      "originalName": "CONECTA TU VIAJE - DANIEL",
+      "Nombre": "CONECTA TU VIAJE - DANIEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "86",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 89,
+      "originalName": "YATOURS- AGENCIA",
+      "Nombre": "YATOURS- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "87",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 90,
+      "originalName": "DECORAL DESTINOS Y TOURS - AGENCIA",
+      "Nombre": "DECORAL DESTINOS Y TOURS - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "88",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 91,
+      "originalName": "COUTIN TRAVEL",
+      "Nombre": "COUTIN TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "89",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 92,
+      "originalName": "THIS IS MEDELLIN - ALEX",
+      "Nombre": "THIS IS MEDELLIN - ALEX",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "90",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 93,
+      "originalName": "MEDELLIN FLORECE JOSE",
+      "Nombre": "MEDELLIN FLORECE JOSE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "91",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 94,
+      "originalName": "SERVICIOS TURISTICOS MULTY TRAVEL",
+      "Nombre": "SERVICIOS TURISTICOS MULTY TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "92",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 95,
+      "originalName": "MEDELLIN FLORECE - MARCELA 2",
+      "Nombre": "MEDELLIN FLORECE - MARCELA 2",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "93",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 96,
+      "originalName": "CONSCIENTE TRAVEL S.A.S.",
+      "Nombre": "CONSCIENTE TRAVEL S.A.S.",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "94",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 97,
+      "originalName": "CARTAGENA BAY TOURS",
+      "Nombre": "CARTAGENA BAY TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "95",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 98,
+      "originalName": "ARRANQUEMOS PUES - MARCELA",
+      "Nombre": "ARRANQUEMOS PUES - MARCELA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "96",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 99,
+      "originalName": "AGENCIA DE VIAJES Y TURISMO NACIONAL E INTERNACIONAL",
+      "Nombre": "AGENCIA DE VIAJES Y TURISMO NACIONAL E INTERNACIONAL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "97",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 100,
+      "originalName": "ANAYA",
+      "Nombre": "ANAYA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "98",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 101,
+      "originalName": "LATINAMERICAN TOURS",
+      "Nombre": "LATINAMERICAN TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "99",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 102,
+      "originalName": "HUELLA PERU TOURS VENTAS 1",
+      "Nombre": "HUELLA PERU TOURS VENTAS 1",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "100",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 103,
+      "originalName": "VIAJES LA OCTAVA MARAVILLA",
+      "Nombre": "VIAJES LA OCTAVA MARAVILLA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "101",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 104,
+      "originalName": "DE PASEO- AGENCIA",
+      "Nombre": "DE PASEO- AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "102",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 105,
+      "originalName": "COLOMBIA SENSES",
+      "Nombre": "COLOMBIA SENSES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "103",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 106,
+      "originalName": "CARTAGENA TURIST - AGENCIA",
+      "Nombre": "CARTAGENA TURIST - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "104",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 107,
+      "originalName": "AGENCIA INNOBA DMC",
+      "Nombre": "AGENCIA INNOBA DMC",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "105",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 108,
+      "originalName": "TURISKA",
+      "Nombre": "TURISKA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "106",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 109,
+      "originalName": "BEYOURNEY COLOMBIA",
+      "Nombre": "BEYOURNEY COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "107",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 110,
+      "originalName": "MEDELLIN DE CERCA TOURS",
+      "Nombre": "MEDELLIN DE CERCA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "108",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 111,
+      "originalName": "DE TOUR POR MEDELLIN",
+      "Nombre": "DE TOUR POR MEDELLIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "109",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 112,
+      "originalName": "AVAL TURISTICA - ANGHIE",
+      "Nombre": "AVAL TURISTICA - ANGHIE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "110",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 113,
+      "originalName": "JET SET TRAVEL - ANDRES",
+      "Nombre": "JET SET TRAVEL - ANDRES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "111",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 114,
+      "originalName": "CB VIAJES",
+      "Nombre": "CB VIAJES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "112",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 115,
+      "originalName": "MAKROTOURS IPIALES",
+      "Nombre": "MAKROTOURS IPIALES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "113",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 116,
+      "originalName": "ELDA HOTELES - AGENCIA",
+      "Nombre": "ELDA HOTELES - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "114",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 117,
+      "originalName": "VIAJANDO MEDELLIN - AGENCIA",
+      "Nombre": "VIAJANDO MEDELLIN - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "115",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 118,
+      "originalName": "TRUEMEDELLIN - AGENCIA",
+      "Nombre": "TRUEMEDELLIN - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "116",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 119,
+      "originalName": "SPRING HOSTEL",
+      "Nombre": "SPRING HOSTEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "117",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 120,
+      "originalName": "MAS TURISMO",
+      "Nombre": "MAS TURISMO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "118",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 121,
+      "originalName": "SANT VIAJES",
+      "Nombre": "SANT VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "119",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 122,
+      "originalName": "VIAJES AL MUNDO - AGENCIA",
+      "Nombre": "VIAJES AL MUNDO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "120",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 123,
+      "originalName": "MIGFRA AVENTURAS",
+      "Nombre": "MIGFRA AVENTURAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "121",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 124,
+      "originalName": "SOLUTOURS - JUAN JOSE",
+      "Nombre": "SOLUTOURS - JUAN JOSE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "122",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 125,
+      "originalName": "VISITOURS MEDELLIN - AGENCIA",
+      "Nombre": "VISITOURS MEDELLIN - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "123",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 126,
+      "originalName": "VIAJA MAS CAMPANY - AGENCIA",
+      "Nombre": "VIAJA MAS CAMPANY - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "124",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 127,
+      "originalName": "MEDELLINTOURS01",
+      "Nombre": "MEDELLINTOURS01",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "125",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 128,
+      "originalName": "TRI ADVENTUREGYO",
+      "Nombre": "TRI ADVENTUREGYO",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "126",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 129,
+      "originalName": "RUMBO A LO MIO - AGENCIA",
+      "Nombre": "RUMBO A LO MIO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "127",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 130,
+      "originalName": "MATICES TRAVEL",
+      "Nombre": "MATICES TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "128",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 131,
+      "originalName": "GRINGO TOURS",
+      "Nombre": "GRINGO TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "129",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 132,
+      "originalName": "VERANO EN LA PLAYA CARTAGENA",
+      "Nombre": "VERANO EN LA PLAYA CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "130",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 133,
+      "originalName": "RUHAMA TRAVEL",
+      "Nombre": "RUHAMA TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "131",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 134,
+      "originalName": "INNOBA- AGENCIA",
+      "Nombre": "INNOBA- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "132",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 135,
+      "originalName": "CONECTA TOURS -ESTEBAN",
+      "Nombre": "CONECTA TOURS -ESTEBAN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "133",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 136,
+      "originalName": "COLOMBIA TOURS",
+      "Nombre": "COLOMBIA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "134",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 137,
+      "originalName": "XPERIENCIAS TRAVEL AGENCY",
+      "Nombre": "XPERIENCIAS TRAVEL AGENCY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "135",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 138,
+      "originalName": "EK TOURS - ENDERWER",
+      "Nombre": "EK TOURS - ENDERWER",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "136",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 139,
+      "originalName": "MEDELLIN PAL MUNDO TOURS",
+      "Nombre": "MEDELLIN PAL MUNDO TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "137",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 140,
+      "originalName": "DESTINOS MUNDIALES GUAYAQUIL",
+      "Nombre": "DESTINOS MUNDIALES GUAYAQUIL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "138",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 141,
+      "originalName": "DESTINOS MUNDIALES",
+      "Nombre": "DESTINOS MUNDIALES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "139",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 142,
+      "originalName": "SENSATIONAL TRIPS - MARITZA",
+      "Nombre": "SENSATIONAL TRIPS - MARITZA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "140",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 143,
+      "originalName": "SPONDYLUS TRAVEL- AGENCIA",
+      "Nombre": "SPONDYLUS TRAVEL- AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "141",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 144,
+      "originalName": "STYLE TRAVEL PERU",
+      "Nombre": "STYLE TRAVEL PERU",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "142",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 145,
+      "originalName": "KALIMAGO TRAVEL",
+      "Nombre": "KALIMAGO TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "143",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 146,
+      "originalName": "TRANSPORTCARS COLOMBIA SAS",
+      "Nombre": "TRANSPORTCARS COLOMBIA SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "144",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 147,
+      "originalName": "TRUEMEDELLINTOURS",
+      "Nombre": "TRUEMEDELLINTOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "145",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 148,
+      "originalName": "TRAVEL COL - AGENCIA",
+      "Nombre": "TRAVEL COL - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "146",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 149,
+      "originalName": "CLUB HOUSE - AGENCIA",
+      "Nombre": "CLUB HOUSE - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "147",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 150,
+      "originalName": "TOUR & SERVICES- NAYELI",
+      "Nombre": "TOUR & SERVICES- NAYELI",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "148",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 151,
+      "originalName": "LATINO TRAVEL COLOMBIA",
+      "Nombre": "LATINO TRAVEL COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "149",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 152,
+      "originalName": "EMPRESA DE TRANSPORTE FREELANCE DESTINO PERFECTO",
+      "Nombre": "EMPRESA DE TRANSPORTE FREELANCE DESTINO PERFECTO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "150",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 153,
+      "originalName": "KALINAGO TRAVEL",
+      "Nombre": "KALINAGO TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "151",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 154,
+      "originalName": "SOMETUR - VERONICA",
+      "Nombre": "SOMETUR - VERONICA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "152",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 155,
+      "originalName": "VIAJES EXPLOREMOS",
+      "Nombre": "VIAJES EXPLOREMOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "153",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 156,
+      "originalName": "MEDELLÍN SERVICE",
+      "Nombre": "MEDELLÍN SERVICE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "154",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 157,
+      "originalName": "AGENCIA - ENTREGAMED",
+      "Nombre": "AGENCIA - ENTREGAMED",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "155",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 158,
+      "originalName": "VALERIA VASQUEZ - AGENCIA",
+      "Nombre": "VALERIA VASQUEZ - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "156",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 159,
+      "originalName": "TURISMO ACTIVO - CAROLINA",
+      "Nombre": "TURISMO ACTIVO - CAROLINA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "157",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 160,
+      "originalName": "LA RUTA PAISA- AGENCIA",
+      "Nombre": "LA RUTA PAISA- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "158",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 161,
+      "originalName": "DIVERSITRIP",
+      "Nombre": "DIVERSITRIP",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "159",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 162,
+      "originalName": "VIAJEMOS NG N.G",
+      "Nombre": "VIAJEMOS NG N.G",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "160",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 163,
+      "originalName": "CHIVAS EL SUPER PAISA - ANDRES",
+      "Nombre": "CHIVAS EL SUPER PAISA - ANDRES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "161",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 164,
+      "originalName": "DAD TOURS CARTAGENA",
+      "Nombre": "DAD TOURS CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "162",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 165,
+      "originalName": "CIBELES TOURS - VANE",
+      "Nombre": "CIBELES TOURS - VANE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "163",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 166,
+      "originalName": "COLTOURS - AGENCIA",
+      "Nombre": "COLTOURS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "164",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 167,
+      "originalName": "MEDELLIN TURISTICA - JANETH",
+      "Nombre": "MEDELLIN TURISTICA - JANETH",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "165",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 168,
+      "originalName": "TRAVESIA'S BACANAS S&K",
+      "Nombre": "TRAVESIA'S BACANAS S&K",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "166",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 169,
+      "originalName": "FORETOURS",
+      "Nombre": "FORETOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "167",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 170,
+      "originalName": "HORIZON ASESORIAS Y TURISMOS",
+      "Nombre": "HORIZON ASESORIAS Y TURISMOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "168",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 171,
+      "originalName": "DREAMTRIP PLUS - STIVEN AVENDAÑO",
+      "Nombre": "DREAMTRIP PLUS - STIVEN AVENDAÑO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "169",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 172,
+      "originalName": "CHIVAS RUMBA JENNY",
+      "Nombre": "CHIVAS RUMBA JENNY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "170",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 173,
+      "originalName": "JAIME - GUIA",
+      "Nombre": "JAIME - GUIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "171",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 174,
+      "originalName": "RUTAGENA - AGENCIA",
+      "Nombre": "RUTAGENA - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "172",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 175,
+      "originalName": "MAYORISTA DE VIAJES",
+      "Nombre": "MAYORISTA DE VIAJES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "173",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 176,
+      "originalName": "MUNDO ESCAPADA - AGENCIA",
+      "Nombre": "MUNDO ESCAPADA - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "174",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 177,
+      "originalName": "ELDA HOTELES - AGENCIA 2",
+      "Nombre": "ELDA HOTELES - AGENCIA 2",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "175",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 178,
+      "originalName": "RYC EXCURSIONES",
+      "Nombre": "RYC EXCURSIONES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "176",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 179,
+      "originalName": "MARIANA LAGENCIA REP",
+      "Nombre": "MARIANA LAGENCIA REP",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "177",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 180,
+      "originalName": "TURISTAS MEDELLIN - JOSE",
+      "Nombre": "TURISTAS MEDELLIN - JOSE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "178",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 181,
+      "originalName": "TRAVEL TURISMO ANTIOQUIA",
+      "Nombre": "TRAVEL TURISMO ANTIOQUIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "179",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 182,
+      "originalName": "JOMINO GROUP S.R.L. - AGENCIA",
+      "Nombre": "JOMINO GROUP S.R.L. - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "180",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 183,
+      "originalName": "SENSATIONAL TRIPS - DANIEL JARA",
+      "Nombre": "SENSATIONAL TRIPS - DANIEL JARA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "181",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 184,
+      "originalName": "TURISYASMID",
+      "Nombre": "TURISYASMID",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "182",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 185,
+      "originalName": "JHONATAN ISI TOURS CARIBE",
+      "Nombre": "JHONATAN ISI TOURS CARIBE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "183",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 186,
+      "originalName": "SERTRAVEL- LEIDY",
+      "Nombre": "SERTRAVEL- LEIDY",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "184",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 187,
+      "originalName": "FRONTERAS TRAVEL",
+      "Nombre": "FRONTERAS TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "185",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 188,
+      "originalName": "MONCADA TOURS",
+      "Nombre": "MONCADA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "186",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 189,
+      "originalName": "VIAJES LUCITOURS",
+      "Nombre": "VIAJES LUCITOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "187",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 190,
+      "originalName": "ENMOT TOURS",
+      "Nombre": "ENMOT TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "188",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 191,
+      "originalName": "BARAKVIAJESYTURISMOCARTAGENA",
+      "Nombre": "BARAKVIAJESYTURISMOCARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "189",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 192,
+      "originalName": "DOMINICK TRAVEL",
+      "Nombre": "DOMINICK TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "190",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 194,
+      "originalName": "LINVING COLOMBIA -AGENCIA",
+      "Nombre": "LINVING COLOMBIA -AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "191",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 195,
+      "originalName": "TOUR 502 TZ’UTUJIL",
+      "Nombre": "TOUR 502 TZ’UTUJIL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "192",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 196,
+      "originalName": "JEPS TRAVEL - ANGELA PACHON",
+      "Nombre": "JEPS TRAVEL - ANGELA PACHON",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "193",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 197,
+      "originalName": "EXODO CITY & BEACH TOURS - AGENCIA",
+      "Nombre": "EXODO CITY & BEACH TOURS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "194",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 198,
+      "originalName": "TRAVELINGIN - JESSICA",
+      "Nombre": "TRAVELINGIN - JESSICA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "195",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 199,
+      "originalName": "AGASESORIATURISTICA- AGENCIA",
+      "Nombre": "AGASESORIATURISTICA- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "196",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 200,
+      "originalName": "TRAVEL UP - CELVIN",
+      "Nombre": "TRAVEL UP - CELVIN",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "197",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 201,
+      "originalName": "COLOMBIA DE LUJO - DIANA",
+      "Nombre": "COLOMBIA DE LUJO - DIANA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "198",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 202,
+      "originalName": "VIAJA CON DARLING",
+      "Nombre": "VIAJA CON DARLING",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "199",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 203,
+      "originalName": "UNIVIAJES SAS",
+      "Nombre": "UNIVIAJES SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "200",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 204,
+      "originalName": "KANAS TOUR EL SALVADOR",
+      "Nombre": "KANAS TOUR EL SALVADOR",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "201",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 205,
+      "originalName": "TURITRANS - AGENCIA",
+      "Nombre": "TURITRANS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "202",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 206,
+      "originalName": "VIAJES SCAPE - DIEGO",
+      "Nombre": "VIAJES SCAPE - DIEGO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "203",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 207,
+      "originalName": "VISION FUTURO",
+      "Nombre": "VISION FUTURO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "204",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 208,
+      "originalName": "TURISMO COTRA - ESTEFANIA",
+      "Nombre": "TURISMO COTRA - ESTEFANIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "205",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 209,
+      "originalName": "DESTIDNOS - AGENCIA",
+      "Nombre": "DESTIDNOS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "206",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 210,
+      "originalName": "EME TOURS - TOMAS MARTINEZ",
+      "Nombre": "EME TOURS - TOMAS MARTINEZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "207",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 211,
+      "originalName": "TURISMAURO",
+      "Nombre": "TURISMAURO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "208",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 212,
+      "originalName": "LATINAMERICAN TOURS SAS - ANDREA",
+      "Nombre": "LATINAMERICAN TOURS SAS - ANDREA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "209",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 213,
+      "originalName": "TRAVEL TOUR JVSAS",
+      "Nombre": "TRAVEL TOUR JVSAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "210",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 214,
+      "originalName": "PRIME TRAVEL SRL",
+      "Nombre": "PRIME TRAVEL SRL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "211",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 215,
+      "originalName": "BENDITO VIAJE - MARI",
+      "Nombre": "BENDITO VIAJE - MARI",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "212",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 216,
+      "originalName": "ELITE TRAVEL",
+      "Nombre": "ELITE TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "213",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 217,
+      "originalName": "BENTOURUSA CORP",
+      "Nombre": "BENTOURUSA CORP",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "214",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 218,
+      "originalName": "MEMORABLE EXPERIENCES",
+      "Nombre": "MEMORABLE EXPERIENCES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "215",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 219,
+      "originalName": "ROUTE TOURS - JORGE DIEZ",
+      "Nombre": "ROUTE TOURS - JORGE DIEZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "216",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 220,
+      "originalName": "HUBSTRAVEL COLOMBIA",
+      "Nombre": "HUBSTRAVEL COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "217",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 221,
+      "originalName": "TERA VIAJES",
+      "Nombre": "TERA VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "218",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 222,
+      "originalName": "MV TRAVEL CUCUTA",
+      "Nombre": "MV TRAVEL CUCUTA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "219",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 223,
+      "originalName": "PULGARCITO TRAVEL",
+      "Nombre": "PULGARCITO TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "220",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 224,
+      "originalName": "TERRA CERO AGENCIA",
+      "Nombre": "TERRA CERO AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "221",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 225,
+      "originalName": "MA TRAVEL SERVICE",
+      "Nombre": "MA TRAVEL SERVICE",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "222",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 226,
+      "originalName": "CIBELES TOUR - ELIANA",
+      "Nombre": "CIBELES TOUR - ELIANA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "223",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 227,
+      "originalName": "PASEOS TRAVEL",
+      "Nombre": "PASEOS TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "224",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 228,
+      "originalName": "EME TOUR",
+      "Nombre": "EME TOUR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "225",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 229,
+      "originalName": "CHIVAS WHATSAPP",
+      "Nombre": "CHIVAS WHATSAPP",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "226",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 230,
+      "originalName": "AGENCIA DE VIAJES Y TURISMO TERRA TRAVEL",
+      "Nombre": "AGENCIA DE VIAJES Y TURISMO TERRA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "227",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 231,
+      "originalName": "VUELAMAX ACTIVIDADES TOURS",
+      "Nombre": "VUELAMAX ACTIVIDADES TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "228",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 232,
+      "originalName": "WORLD TRAVEL GUATEMALA",
+      "Nombre": "WORLD TRAVEL GUATEMALA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "229",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 233,
+      "originalName": "AGENCIA - SUPER TOURS MEDELLIN - CAROLINA ",
+      "Nombre": "AGENCIA - SUPER TOURS MEDELLIN - CAROLINA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "230",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 234,
+      "originalName": "LETSGO LESLY TRANSPORTE Y TURISMO",
+      "Nombre": "LETSGO LESLY TRANSPORTE Y TURISMO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "231",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 235,
+      "originalName": "DESEOS VIAJEROS - MARIA JOSE COSTA RICA",
+      "Nombre": "DESEOS VIAJEROS - MARIA JOSE COSTA RICA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "232",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 236,
+      "originalName": "GLOBAL ADVENTURE - AGENCIA",
+      "Nombre": "GLOBAL ADVENTURE - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "233",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 237,
+      "originalName": "WAYBE EXPERIENCIAS TURÍSTICAS",
+      "Nombre": "WAYBE EXPERIENCIAS TURÍSTICAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "234",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 238,
+      "originalName": "DESTINOS MUNDIALES 2",
+      "Nombre": "DESTINOS MUNDIALES 2",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "235",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 239,
+      "originalName": "COSTEÑA TRAVEL",
+      "Nombre": "COSTEÑA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "236",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 240,
+      "originalName": "TOURSMEDELLINOFICIAL-LUIS",
+      "Nombre": "TOURSMEDELLINOFICIAL-LUIS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "237",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 241,
+      "originalName": "GRUPO FARWOS",
+      "Nombre": "GRUPO FARWOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "238",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 242,
+      "originalName": "ANTIOQUIA TOURISM",
+      "Nombre": "ANTIOQUIA TOURISM",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "239",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 243,
+      "originalName": "DREAM TRAVEL",
+      "Nombre": "DREAM TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "240",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 244,
+      "originalName": "ELLOOS",
+      "Nombre": "ELLOOS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "241",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 245,
+      "originalName": "VIAJANDO CON CHEKYNAH - PAULA",
+      "Nombre": "VIAJANDO CON CHEKYNAH - PAULA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "242",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 246,
+      "originalName": "GUATAPE MAGIC TOUR",
+      "Nombre": "GUATAPE MAGIC TOUR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "243",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 247,
+      "originalName": "BRIYA SUNSET AGENCIA",
+      "Nombre": "BRIYA SUNSET AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "244",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 248,
+      "originalName": "JUILYN MARTÍNEZ LETS TRAVEL AGENCIA DE VIAJES",
+      "Nombre": "JUILYN MARTÍNEZ LETS TRAVEL AGENCIA DE VIAJES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "245",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 249,
+      "originalName": "AGENCIA PRIMAVERA LIFE",
+      "Nombre": "AGENCIA PRIMAVERA LIFE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "246",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 250,
+      "originalName": "TURISMO",
+      "Nombre": "TURISMO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "247",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 251,
+      "originalName": "MEDALLO GO",
+      "Nombre": "MEDALLO GO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "248",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 252,
+      "originalName": "ANA LUZ TOURS",
+      "Nombre": "ANA LUZ TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "249",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 253,
+      "originalName": "CARTAGENA STOP JUAN DE LA CRUZ",
+      "Nombre": "CARTAGENA STOP JUAN DE LA CRUZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "250",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 254,
+      "originalName": "KARTHÁGO EXPLORE",
+      "Nombre": "KARTHÁGO EXPLORE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "251",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 255,
+      "originalName": "EMETOURS - FRANCY SERNA",
+      "Nombre": "EMETOURS - FRANCY SERNA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "252",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 256,
+      "originalName": "TU VIAJE CON ANITA",
+      "Nombre": "TU VIAJE CON ANITA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "253",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 257,
+      "originalName": "MI GUIA MEDELLIN SAS",
+      "Nombre": "MI GUIA MEDELLIN SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "254",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 258,
+      "originalName": "MAKRO TOURS",
+      "Nombre": "MAKRO TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "255",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 259,
+      "originalName": "TURISTRANSPORTE - JUAN CARLOS",
+      "Nombre": "TURISTRANSPORTE - JUAN CARLOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "256",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 260,
+      "originalName": "QUICKLY TRAVEL",
+      "Nombre": "QUICKLY TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "257",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 261,
+      "originalName": "PRIMAVERAS TOURS SAS",
+      "Nombre": "PRIMAVERAS TOURS SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "258",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 262,
+      "originalName": "AVMTOUR ANGELLYS",
+      "Nombre": "AVMTOUR ANGELLYS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "259",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 263,
+      "originalName": "TRANSPORTAMOS COLOMBIA",
+      "Nombre": "TRANSPORTAMOS COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "260",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 264,
+      "originalName": "CETINSA - SANDRA",
+      "Nombre": "CETINSA - SANDRA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "261",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 265,
+      "originalName": "TURIEVENTOS- CARLOS MARIO 2",
+      "Nombre": "TURIEVENTOS- CARLOS MARIO 2",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "262",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 266,
+      "originalName": "XPLORE ADVENTOURS - AGENCIA",
+      "Nombre": "XPLORE ADVENTOURS - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "263",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 267,
+      "originalName": "NICE CARTAGENA",
+      "Nombre": "NICE CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "264",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 268,
+      "originalName": "SAMMY TOURS",
+      "Nombre": "SAMMY TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "265",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 269,
+      "originalName": "NASSAU TOUR",
+      "Nombre": "NASSAU TOUR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "266",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 270,
+      "originalName": "EL DORADO TRIPS",
+      "Nombre": "EL DORADO TRIPS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "267",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 271,
+      "originalName": "VIAJES LUAN TRAVEL",
+      "Nombre": "VIAJES LUAN TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "268",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 272,
+      "originalName": "VIAJANDO CON LALO",
+      "Nombre": "VIAJANDO CON LALO",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "269",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 273,
+      "originalName": "AGENCIA A BORDO",
+      "Nombre": "AGENCIA A BORDO",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "270",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 274,
+      "originalName": "EDDY HAPPY TOURS",
+      "Nombre": "EDDY HAPPY TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "271",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 275,
+      "originalName": "DM VIAJES GUATEMALA",
+      "Nombre": "DM VIAJES GUATEMALA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "272",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 276,
+      "originalName": "MAKE YOUR PLAN",
+      "Nombre": "MAKE YOUR PLAN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "273",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 277,
+      "originalName": "EMITOURS TRAVELS S A S",
+      "Nombre": "EMITOURS TRAVELS S A S",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "274",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 278,
+      "originalName": "LOREENTH DIAZ - AGENCIA DE VIAJES TRAVELEA",
+      "Nombre": "LOREENTH DIAZ - AGENCIA DE VIAJES TRAVELEA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "275",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 279,
+      "originalName": "EVENTOS Y TURISMO - AGENCIA",
+      "Nombre": "EVENTOS Y TURISMO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "276",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 280,
+      "originalName": "INVERSIONES K&H",
+      "Nombre": "INVERSIONES K&H",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "277",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 281,
+      "originalName": "DESTINOS COLOMBIA AGENCIA",
+      "Nombre": "DESTINOS COLOMBIA AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "278",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 282,
+      "originalName": "SKYGO TRAVEL",
+      "Nombre": "SKYGO TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "279",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 283,
+      "originalName": "TRAVEL DANCE ENVIO DE SOPORTES",
+      "Nombre": "TRAVEL DANCE ENVIO DE SOPORTES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "280",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 284,
+      "originalName": "ESSENTIA TRAVEL",
+      "Nombre": "ESSENTIA TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "281",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 285,
+      "originalName": "TURY VIAJES",
+      "Nombre": "TURY VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "282",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 286,
+      "originalName": "MEDELLIN BLOOMING HOTEL",
+      "Nombre": "MEDELLIN BLOOMING HOTEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "283",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 287,
+      "originalName": "INTERSCAPE SAS",
+      "Nombre": "INTERSCAPE SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "284",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 288,
+      "originalName": "VUELAMAX - JOHAN OLIVARES",
+      "Nombre": "VUELAMAX - JOHAN OLIVARES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "285",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 289,
+      "originalName": "VIATOR AGENCIA",
+      "Nombre": "VIATOR AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "286",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 290,
+      "originalName": "TICOXPLORER",
+      "Nombre": "TICOXPLORER",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "287",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 291,
+      "originalName": "OSO TRAVEL - CRISTIAN",
+      "Nombre": "OSO TRAVEL - CRISTIAN",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "288",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 292,
+      "originalName": "INNOBA- VALENTINA",
+      "Nombre": "INNOBA- VALENTINA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "289",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 293,
+      "originalName": "DIAZ PENA JOHANN CAMILO - AGENCIA",
+      "Nombre": "DIAZ PENA JOHANN CAMILO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "290",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 295,
+      "originalName": "REPUBLICA JULIO CAMPOS - AGENCIA",
+      "Nombre": "REPUBLICA JULIO CAMPOS - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "291",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 296,
+      "originalName": "OPERATOURCOL - CAMILO PEREZ",
+      "Nombre": "OPERATOURCOL - CAMILO PEREZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "292",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 297,
+      "originalName": "LA MOCHILA ROSA- AGENCIA",
+      "Nombre": "LA MOCHILA ROSA- AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "293",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 298,
+      "originalName": "CONNECTA TRAVEL",
+      "Nombre": "CONNECTA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "294",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 299,
+      "originalName": "VIAJEROS JM - JUANFER",
+      "Nombre": "VIAJEROS JM - JUANFER",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "295",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 300,
+      "originalName": "TURISMO EN MEDELLIN",
+      "Nombre": "TURISMO EN MEDELLIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "296",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 301,
+      "originalName": "TURISMO LOCAL",
+      "Nombre": "TURISMO LOCAL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "297",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 302,
+      "originalName": "COLOMBIA CON EL PARCE",
+      "Nombre": "COLOMBIA CON EL PARCE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "298",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 303,
+      "originalName": "CIBELES TOURS",
+      "Nombre": "CIBELES TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "299",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 304,
+      "originalName": "DLRDTRAVELS - IVANY",
+      "Nombre": "DLRDTRAVELS - IVANY",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "300",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 305,
+      "originalName": "ENRUTATE JAIRO - AGENCIA",
+      "Nombre": "ENRUTATE JAIRO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "301",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 306,
+      "originalName": "GO VACATION",
+      "Nombre": "GO VACATION",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "302",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 307,
+      "originalName": "MAR Y SOL - AGENCIA",
+      "Nombre": "MAR Y SOL - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "303",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 308,
+      "originalName": "RECREA PAISAS TOURS",
+      "Nombre": "RECREA PAISAS TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "304",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 309,
+      "originalName": "EME TOURS - AGENCIA",
+      "Nombre": "EME TOURS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "305",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 310,
+      "originalName": "NEW TRIP -ANA MARIA VALDES",
+      "Nombre": "NEW TRIP -ANA MARIA VALDES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "306",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 311,
+      "originalName": "AGENCIA GOLD TRAVEL",
+      "Nombre": "AGENCIA GOLD TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "307",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 312,
+      "originalName": "EDIFICIO ALMAR - CLAUDIA URUBURO",
+      "Nombre": "EDIFICIO ALMAR - CLAUDIA URUBURO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "308",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 313,
+      "originalName": "EXCLUSIVE COLOMIA SAS AGENCIA",
+      "Nombre": "EXCLUSIVE COLOMIA SAS AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "309",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 314,
+      "originalName": "BEYOND THE WALL CARTAGENA",
+      "Nombre": "BEYOND THE WALL CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "310",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 315,
+      "originalName": "YOSHI TRAVELS S.R.L- AGENCIA",
+      "Nombre": "YOSHI TRAVELS S.R.L- AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "311",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 316,
+      "originalName": "VIAJEROS JM - AGENCIA 1",
+      "Nombre": "VIAJEROS JM - AGENCIA 1",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "312",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 317,
+      "originalName": "ESCAPATE TRAVEL",
+      "Nombre": "ESCAPATE TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "313",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 318,
+      "originalName": "CLUB PREFERENCIAL - AGENCIA",
+      "Nombre": "CLUB PREFERENCIAL - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "314",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 319,
+      "originalName": "VIAJES Y TIQUETES - SANDRA",
+      "Nombre": "VIAJES Y TIQUETES - SANDRA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "315",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 320,
+      "originalName": "AEROTRAVEL",
+      "Nombre": "AEROTRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "316",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 321,
+      "originalName": "BAQUIANOS TRAVEL - KAREN OTERO",
+      "Nombre": "BAQUIANOS TRAVEL - KAREN OTERO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "317",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 322,
+      "originalName": "GH TRAVEL",
+      "Nombre": "GH TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "318",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 323,
+      "originalName": "SOMOS TRAVEL SAS",
+      "Nombre": "SOMOS TRAVEL SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "319",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 324,
+      "originalName": "PRIVATE TURISMO MEDELLÍN",
+      "Nombre": "PRIVATE TURISMO MEDELLÍN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "320",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 325,
+      "originalName": "VIAJAR.CO AGENCIA DE VIAJES",
+      "Nombre": "VIAJAR.CO AGENCIA DE VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "321",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 326,
+      "originalName": "W TRAVEL - VANESSA GONZALEZ",
+      "Nombre": "W TRAVEL - VANESSA GONZALEZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "322",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 327,
+      "originalName": "VIBU TRAVEL",
+      "Nombre": "VIBU TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "323",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 328,
+      "originalName": "PARCE TOURS",
+      "Nombre": "PARCE TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "324",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 329,
+      "originalName": "INFINITY TRIP - AGENCIA",
+      "Nombre": "INFINITY TRIP - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "325",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 330,
+      "originalName": "TU TOURS ANTIOQUIA",
+      "Nombre": "TU TOURS ANTIOQUIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "326",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 331,
+      "originalName": "VIAJES PREMIUM TRAVEL - AGENCIA",
+      "Nombre": "VIAJES PREMIUM TRAVEL - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "327",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 332,
+      "originalName": "EK TOURS COLOMBIA",
+      "Nombre": "EK TOURS COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "328",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 334,
+      "originalName": "CARTAGENA STOP - KERLYN SANTOYA",
+      "Nombre": "CARTAGENA STOP - KERLYN SANTOYA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "329",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 335,
+      "originalName": "TRAVELPASS - PAULA",
+      "Nombre": "TRAVELPASS - PAULA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "330",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 336,
+      "originalName": "VIAJES AL NATURAL",
+      "Nombre": "VIAJES AL NATURAL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "331",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 337,
+      "originalName": "INVERSIONES JD TRAVEL - AGENCIA",
+      "Nombre": "INVERSIONES JD TRAVEL - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "332",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 338,
+      "originalName": "RMC TRAVEL",
+      "Nombre": "RMC TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "333",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 339,
+      "originalName": "NOMADIA - VIAJEROS DE TLAXCALA AGENCIA",
+      "Nombre": "NOMADIA - VIAJEROS DE TLAXCALA AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "334",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 340,
+      "originalName": "KANAS TOUR EL SALVADOR - AGENCIA",
+      "Nombre": "KANAS TOUR EL SALVADOR - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "335",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 341,
+      "originalName": "COLOMBIA VENTURA NEGOCIOS Y TURISMO S A S",
+      "Nombre": "COLOMBIA VENTURA NEGOCIOS Y TURISMO S A S",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "336",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 342,
+      "originalName": "LEGENDARY TRAVEL - JOHN JAIRO ORTIZ",
+      "Nombre": "LEGENDARY TRAVEL - JOHN JAIRO ORTIZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "337",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 343,
+      "originalName": "COSTA RICA TRAVELLING TOURS",
+      "Nombre": "COSTA RICA TRAVELLING TOURS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "338",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 344,
+      "originalName": "BYTRAVELWORLD",
+      "Nombre": "BYTRAVELWORLD",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "339",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 345,
+      "originalName": "VIAJES LOGITUR - ELIZABETH",
+      "Nombre": "VIAJES LOGITUR - ELIZABETH",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "340",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 346,
+      "originalName": "AVENTINO TOURS",
+      "Nombre": "AVENTINO TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "341",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 347,
+      "originalName": "AGENCIA SANTIAGO TRUJILLO",
+      "Nombre": "AGENCIA SANTIAGO TRUJILLO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "342",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 348,
+      "originalName": "LUIS BUSTAMANTE AGENCIA",
+      "Nombre": "LUIS BUSTAMANTE AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "343",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 349,
+      "originalName": "DE VACACIONES MEDELLIN",
+      "Nombre": "DE VACACIONES MEDELLIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "344",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 350,
+      "originalName": "LAURYS TOURS",
+      "Nombre": "LAURYS TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "345",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 351,
+      "originalName": "5 CONTINENTES - INGRID AGENCIA",
+      "Nombre": "5 CONTINENTES - INGRID AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "346",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 352,
+      "originalName": "VIAJES Y TURISMO DEJANDO HUELLA",
+      "Nombre": "VIAJES Y TURISMO DEJANDO HUELLA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "347",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 353,
+      "originalName": "REMOTE GUATAPE SAS - AGENCIA",
+      "Nombre": "REMOTE GUATAPE SAS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "348",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 354,
+      "originalName": "WE TRAVEL EXVITUR",
+      "Nombre": "WE TRAVEL EXVITUR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "349",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 355,
+      "originalName": "PASAPORTE LLENO",
+      "Nombre": "PASAPORTE LLENO",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "350",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 356,
+      "originalName": "INFINITY TRAVEL - EMILY SUAREZ",
+      "Nombre": "INFINITY TRAVEL - EMILY SUAREZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "351",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 357,
+      "originalName": "MEDELLIN DESTINOS Y VIAJES",
+      "Nombre": "MEDELLIN DESTINOS Y VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "352",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 358,
+      "originalName": "VIAJES LA CORONA - AGENCIA",
+      "Nombre": "VIAJES LA CORONA - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "353",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 359,
+      "originalName": "JORGETTA- DISCOVERING COLOMBIA",
+      "Nombre": "JORGETTA- DISCOVERING COLOMBIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "354",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 360,
+      "originalName": "AVIAJAR TOURS MEDELLÍN - YULIE RENDON",
+      "Nombre": "AVIAJAR TOURS MEDELLÍN - YULIE RENDON",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "355",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 361,
+      "originalName": "TRAVEL 360",
+      "Nombre": "TRAVEL 360",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "356",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 362,
+      "originalName": "MEDELLÍN MAXITOURS- TICAENELMUNDO",
+      "Nombre": "MEDELLÍN MAXITOURS- TICAENELMUNDO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "357",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 363,
+      "originalName": "AGENCIA MEXICO",
+      "Nombre": "AGENCIA MEXICO",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "358",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 364,
+      "originalName": "BRUJULA CONCIEGRE - AGENCIA",
+      "Nombre": "BRUJULA CONCIEGRE - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "359",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 365,
+      "originalName": "DESTINOS EL SOL",
+      "Nombre": "DESTINOS EL SOL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "360",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 366,
+      "originalName": "GM INTERNATIONAL TRAVEL",
+      "Nombre": "GM INTERNATIONAL TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "361",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 367,
+      "originalName": "FLIGHT PLAN YELITZA FUENTES",
+      "Nombre": "FLIGHT PLAN YELITZA FUENTES",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "362",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 368,
+      "originalName": "GRUPO ENSUEÑOS",
+      "Nombre": "GRUPO ENSUEÑOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "363",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 369,
+      "originalName": "EMILY TOUR MDE",
+      "Nombre": "EMILY TOUR MDE",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "364",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 370,
+      "originalName": "TOURS INEFABLES - AGENCIA",
+      "Nombre": "TOURS INEFABLES - AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "365",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 371,
+      "originalName": "MEJITRAVEL",
+      "Nombre": "MEJITRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "366",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 372,
+      "originalName": "MAGIC WORLD TRAVEL CUCUTA - AGENCIA",
+      "Nombre": "MAGIC WORLD TRAVEL CUCUTA - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "367",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 373,
+      "originalName": "ASESOR DE VIAJES LA CORONA - ISAAC",
+      "Nombre": "ASESOR DE VIAJES LA CORONA - ISAAC",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "368",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 374,
+      "originalName": "AGENCIA - TURISMO SIN BARRERA - LINA SANCHEZ",
+      "Nombre": "AGENCIA - TURISMO SIN BARRERA - LINA SANCHEZ",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "369",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 375,
+      "originalName": "STAMPS AGENCIA DE VIAJES",
+      "Nombre": "STAMPS AGENCIA DE VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "370",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 376,
+      "originalName": "SENSE STYLE",
+      "Nombre": "SENSE STYLE",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "371",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 377,
+      "originalName": "AGENCIA - EXPLORE MEDELLIN TRAVEL",
+      "Nombre": "AGENCIA - EXPLORE MEDELLIN TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "372",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 378,
+      "originalName": "AGENCIA - PRIMAVERAS TOURS",
+      "Nombre": "AGENCIA - PRIMAVERAS TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "373",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 379,
+      "originalName": "SKY TRAVEL AGENCIA - BELEN",
+      "Nombre": "SKY TRAVEL AGENCIA - BELEN",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "374",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 380,
+      "originalName": "AGENCIA - MUNDOS PAISA TOURS",
+      "Nombre": "AGENCIA - MUNDOS PAISA TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "375",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 381,
+      "originalName": "VACACIONES MEDELLIN - CESAR",
+      "Nombre": "VACACIONES MEDELLIN - CESAR",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "376",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 382,
+      "originalName": "MEDELLINTOURS01 -AGENCIA",
+      "Nombre": "MEDELLINTOURS01 -AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "377",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 383,
+      "originalName": "AGENCIA - MEDELLIN TURISMO - MARIANA",
+      "Nombre": "AGENCIA - MEDELLIN TURISMO - MARIANA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "378",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 384,
+      "originalName": "MEDELLIN TURISMO",
+      "Nombre": "MEDELLIN TURISMO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "379",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 385,
+      "originalName": "EMANUEL TRAVELS",
+      "Nombre": "EMANUEL TRAVELS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "380",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 386,
+      "originalName": "CHELA TRAVEL",
+      "Nombre": "CHELA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "381",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 387,
+      "originalName": "AQUÍ TUS VIAJES - AGENCIA",
+      "Nombre": "AQUÍ TUS VIAJES - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "382",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 388,
+      "originalName": "INDUTRAVELS",
+      "Nombre": "INDUTRAVELS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "383",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 389,
+      "originalName": "DISCOVERY GROUP",
+      "Nombre": "DISCOVERY GROUP",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "384",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 390,
+      "originalName": "GLG EVENTS",
+      "Nombre": "GLG EVENTS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "385",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 391,
+      "originalName": "AGENCIA - CT GUIA - CINTHYA",
+      "Nombre": "AGENCIA - CT GUIA - CINTHYA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "386",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 392,
+      "originalName": "EL VIAJON MX",
+      "Nombre": "EL VIAJON MX",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "387",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 393,
+      "originalName": "TRAVEL ALMAVIVA S A S",
+      "Nombre": "TRAVEL ALMAVIVA S A S",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "388",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 394,
+      "originalName": "VIBRA MUNDO SAS",
+      "Nombre": "VIBRA MUNDO SAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "389",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 395,
+      "originalName": "SELENA",
+      "Nombre": "SELENA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "390",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 396,
+      "originalName": "VIAAJA DIFERENTE - IVAN",
+      "Nombre": "VIAAJA DIFERENTE - IVAN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "391",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 397,
+      "originalName": "AGENCIA - BENDITO VIAJE - JESSYKA",
+      "Nombre": "AGENCIA - BENDITO VIAJE - JESSYKA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "392",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 398,
+      "originalName": "AGENCIA - DESCUBRE MEDELLIN CO",
+      "Nombre": "AGENCIA - DESCUBRE MEDELLIN CO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "393",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 399,
+      "originalName": "DESTIDNOS -  MARTHA FLOREZ- AGENCIA",
+      "Nombre": "DESTIDNOS - MARTHA FLOREZ- AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "394",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 400,
+      "originalName": "GOTRAVEL -AGENCIA",
+      "Nombre": "GOTRAVEL -AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "395",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 402,
+      "originalName": "AGENCIA DE VIAJES AVETUR PASTO",
+      "Nombre": "AGENCIA DE VIAJES AVETUR PASTO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "396",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 403,
+      "originalName": "ARRANQUEMOS PUES - ALEXANDRA",
+      "Nombre": "ARRANQUEMOS PUES - ALEXANDRA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "397",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 404,
+      "originalName": "FAMILY&FRIENDS TOURS - AGENCIA",
+      "Nombre": "FAMILY&FRIENDS TOURS - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "398",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 405,
+      "originalName": "HOSTAL -  CASA LOS NARANJOS",
+      "Nombre": "HOSTAL - CASA LOS NARANJOS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "399",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 406,
+      "originalName": "SPONDYLUS TRAVEL",
+      "Nombre": "SPONDYLUS TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "400",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 407,
+      "originalName": "ETERNAL TOURS",
+      "Nombre": "ETERNAL TOURS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "401",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 408,
+      "originalName": "ANGELO CANO - GUIA",
+      "Nombre": "ANGELO CANO - GUIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "402",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 409,
+      "originalName": "AMAZING LATIN TRAVEL - AGENCIA",
+      "Nombre": "AMAZING LATIN TRAVEL - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "403",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 410,
+      "originalName": "COSTA DORADA TRAVEL",
+      "Nombre": "COSTA DORADA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "404",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 411,
+      "originalName": "RUTA ENCANTADA",
+      "Nombre": "RUTA ENCANTADA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "405",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 412,
+      "originalName": "EL VIAJERO - AGENCIA",
+      "Nombre": "EL VIAJERO - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "406",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 413,
+      "originalName": "JONKETOUR CARTAGENA",
+      "Nombre": "JONKETOUR CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "407",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 414,
+      "originalName": "AGENCIA- CORAZON VIAJERO",
+      "Nombre": "AGENCIA- CORAZON VIAJERO",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "408",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 415,
+      "originalName": "TURISMO COTRA - DANIELA",
+      "Nombre": "TURISMO COTRA - DANIELA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "409",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 416,
+      "originalName": "CLICK GO TRAVEL",
+      "Nombre": "CLICK GO TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "410",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 417,
+      "originalName": "TACUBA-TRAVELS",
+      "Nombre": "TACUBA-TRAVELS",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "411",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 418,
+      "originalName": "PURE COLOMBIA - JAZMIN",
+      "Nombre": "PURE COLOMBIA - JAZMIN",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "412",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 419,
+      "originalName": "LUOL BOAT - AGENCIA",
+      "Nombre": "LUOL BOAT - AGENCIA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "413",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 420,
+      "originalName": "TRAVEL AGENCY SRL",
+      "Nombre": "TRAVEL AGENCY SRL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "414",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 421,
+      "originalName": "AVENTURAS SUREÑAS",
+      "Nombre": "AVENTURAS SUREÑAS",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "415",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 422,
+      "originalName": "RIOTRAVELS AGENCIA DE VIAJES",
+      "Nombre": "RIOTRAVELS AGENCIA DE VIAJES",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "416",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 423,
+      "originalName": "SEJOTOUR AND TRAVEL",
+      "Nombre": "SEJOTOUR AND TRAVEL",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "417",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 424,
+      "originalName": "AVENTURAS CARTAGENA",
+      "Nombre": "AVENTURAS CARTAGENA",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "418",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 426,
+      "originalName": "AGENCIA - RISE TRAVEL - EXPERTLY DESIGNED",
+      "Nombre": "AGENCIA - RISE TRAVEL - EXPERTLY DESIGNED",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "419",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 427,
+      "originalName": "MIGFRA TRAVEL",
+      "Nombre": "MIGFRA TRAVEL",
+      "Tipo": "AGENCIA_NACIONAL",
+      "Id_Entidad_Reportante": "420",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 428,
+      "originalName": "PEÑITA TOURS AGENCIA",
+      "Nombre": "PEÑITA TOURS AGENCIA",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "421",
+      "Estado_Validacion": "VALIDADA"
+    },
+    {
+      "row": 429,
+      "originalName": "RISE TRAVEL - EXPERTLY DESIGNED",
+      "Nombre": "RISE TRAVEL - EXPERTLY DESIGNED",
+      "Tipo": "AGENCIA_INTERNACIONAL",
+      "Id_Entidad_Reportante": "422",
+      "Estado_Validacion": "VALIDADA"
+    }
+  ],
+  "plannedInsertions": [],
+  "omittedByDuplicate": [
+    {
+      "row": 401,
+      "originalName": "AGENCIA - SUPER TOURS MEDELLIN - CAROLINA",
+      "normalizedName": "AGENCIA - SUPER TOURS MEDELLIN - CAROLINA",
+      "type": "AGENCIA_NACIONAL",
+      "reason": "DUPLICATE_IN_FILE",
+      "duplicateOfRow": 233
+    }
+  ],
+  "waitingForMarketing": [
+    {
+      "row": 38,
+      "originalName": "COLOMBIA TRIPS",
+      "normalizedName": "COLOMBIA TRIPS",
+      "sourceType": "Nacional ",
+      "type": "AGENCIA_NACIONAL",
+      "group": "COLOMBIA TRIPS / COLOMBIA TRIPS S A S",
+      "reason": "Pareja con sufijo legal; en espera de confirmación de Mercadeo."
+    },
+    {
+      "row": 193,
+      "originalName": "VACACIONES MEDELLÍN SAS",
+      "normalizedName": "VACACIONES MEDELLÍN SAS",
+      "sourceType": "Nacional ",
+      "type": "AGENCIA_NACIONAL",
+      "group": "VACACIONES MEDELLÍN SAS / VACACIONES MEDELLÍN",
+      "reason": "Pareja con sufijo legal; en espera de confirmación de Mercadeo."
+    },
+    {
+      "row": 294,
+      "originalName": "ᴀᴠᴇɴᴛᴏᴜƦ",
+      "normalizedName": "ᴀᴠᴇɴᴛᴏᴜƦ",
+      "sourceType": "Nacional ",
+      "type": "AGENCIA_NACIONAL",
+      "group": "Fila 294: nombre no normalizable",
+      "reason": "La clave normalizada del backend queda vacía; en espera de confirmación de Mercadeo."
+    },
+    {
+      "row": 333,
+      "originalName": "COLOMBIA TRIPS S A S",
+      "normalizedName": "COLOMBIA TRIPS S A S",
+      "sourceType": "Nacional ",
+      "type": "AGENCIA_NACIONAL",
+      "group": "COLOMBIA TRIPS / COLOMBIA TRIPS S A S",
+      "reason": "Pareja con sufijo legal; en espera de confirmación de Mercadeo."
+    },
+    {
+      "row": 425,
+      "originalName": "VACACIONES MEDELLÍN",
+      "normalizedName": "VACACIONES MEDELLÍN",
+      "sourceType": "Nacional ",
+      "type": "AGENCIA_NACIONAL",
+      "group": "VACACIONES MEDELLÍN SAS / VACACIONES MEDELLÍN",
+      "reason": "Pareja con sufijo legal; en espera de confirmación de Mercadeo."
+    }
+  ],
+  "errors": [],
+  "existingEntitiesFound": [],
+  "reportPath": "C:\\Users\\USUARIO\\OneDrive\\Documentos\\Sir-Angular\\backend\\reports\\agencias-import-20261025-142644-apply.json"
+}

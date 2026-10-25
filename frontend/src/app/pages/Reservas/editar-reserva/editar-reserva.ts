@@ -3,6 +3,7 @@ import { hasValidPassengerPhone, isValidReporterPhone, RESERVA_PHONE_PATTERN } f
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener, inject, signal, computed, effect, Injector, runInInjectionContext } from '@angular/core';
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../../environments/environment';
@@ -76,7 +77,7 @@ interface LegacyNavbarFacade {
 @Component({
   selector: 'app-editar-reserva',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './editar-reserva.html',
   styleUrls: ['../reserva-shared.css'],
 })

@@ -17,6 +17,9 @@ export class SirSearchInputComponent implements ControlValueAccessor {
   @Input() placeholder = 'Buscar';
   @Input() inputId = '';
   @Input() ariaLabel = 'Buscar';
+  @Input() inputType: 'search' | 'text' = 'search';
+  @Input() showClear = true;
+  @Input() clearLabel = 'Limpiar búsqueda';
   @Input() disabled = false;
   @Output() valueChange = new EventEmitter<string>();
   @Output() search = new EventEmitter<string>();

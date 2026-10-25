@@ -2,12 +2,10 @@
   <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input id="entity-name" type="text" class="search-input" placeholder="Buscar por nombre"
-          [value]="filters().buscar" (input)="setFilter('buscar', $any($event.target).value)"
-          (keyup.enter)="search()" autocomplete="off" aria-label="Buscar entidad" [disabled]="loading()" />
+        <app-search-input inputId="entity-name" inputType="text" [showClear]="false"
+          placeholder="Buscar por nombre" ariaLabel="Buscar entidad"
+          [value]="filters().buscar" (valueChange)="setFilter('buscar', $event)"
+          (search)="search()" [disabled]="loading()" />
       </div>
       <button type="button" class="btn-filter" (click)="filterOpen.set(!filterOpen())"
         [class.btn-filter--active]="filterOpen()" aria-controls="entity-filter-panel"
@@ -159,14 +157,14 @@
       </div>
       @if (rejecting()) {
         <section class="entity-rejection-form" aria-labelledby="entity-rejection-label">
-          <label id="entity-rejection-label" for="entity-rejection-reason">Motivo del rechazo <span>(obligatorio)</span></label>
-          <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="300"
+          <label id="entity-rejection-label" for="entity-rejection-reason">Motivo del rechazo <span>(opcional)</span></label>
+          <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="200"
             [(ngModel)]="rejectionReason" [disabled]="saving()" placeholder="Describe brevemente por qué se rechaza"></textarea>
-          <small>{{ rejectionReason.length }}/300</small>
+          <small>{{ rejectionReason.length }}/200</small>
           <div class="entity-form-actions">
             <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="cancelReject()">Cancelar</button>
             <button type="button" class="sir-action sir-action--primary"
-              [disabled]="saving() || !rejectionReason.trim() || rejectionReason.trim().length > 300"
+              [disabled]="saving() || rejectionReason.trim().length > 200"
               (click)="validate('RECHAZADA')">{{ saving() ? 'Rechazando…' : 'Confirmar rechazo' }}</button>
           </div>
         </section>
@@ -223,9 +221,16 @@
       @if (canManagePointRelations) {
         <button type="button" class="sir-action sir-action--ghost entity-point-toggle" [attr.aria-expanded]="pointPickerOpen()" (click)="pointPickerOpen.set(!pointPickerOpen())">{{ pointPickerOpen() ? 'Cerrar búsqueda de puntos' : 'Asociar punto de encuentro' }}</button>
         @if (pointPickerOpen()) {
-          <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" [value]="pointSearch" (valueChange)="pointSearch = $event; searchPoints()" />
-          @for (point of pointMatches(); track point.Id_Punto) {
-            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">{{ point.NombrePunto }}</button>
+          <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" ariaLabel="Buscar punto de encuentro"
+            [value]="pointSearch" (valueChange)="pointSearch = $event; searchPoints()" />
+          @if (pointMatches().length) {
+            <div class="entity-point-suggestions sir-autocomplete-panel sir-autocomplete-panel--inline" role="listbox"
+              aria-label="Puntos de encuentro encontrados" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
+              @for (point of pointMatches(); track point.Id_Punto) {
+                <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false"
+                  [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">{{ point.NombrePunto }}</button>
+              }
+            </div>
           }
         }
       }

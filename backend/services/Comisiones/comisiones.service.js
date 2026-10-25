@@ -518,6 +518,17 @@ async function actualizarLiquidacionesLote(payload, userId = null) {
       );
     }
 
+    // HOTEL y AGENCIA NACIONAL pasan al pago por grupo entidad+día.
+    // El camino heredado sigue intacto para Freelance, pero no puede crear ni
+    // reabrir liquidaciones individuales de entidades después de activar lotes.
+    if (elegibles.some((row) => TIPOS_ENTIDAD_COMISIONABLE.has(row.Tipo_Entidad))) {
+      throw createServiceError(
+        'HOTEL y AGENCIA NACIONAL se liquidan desde sus grupos por entidad y día.',
+        409,
+        'ENTITY_GROUP_PAYMENT_REQUIRED',
+      );
+    }
+
     const byId = new Map(elegibles.map((row) => [String(row.Id_Reserva), row]));
     const montoPorReserva = Object.fromEntries(elegibles.map((row) => [String(row.Id_Reserva), Number(row.Monto_Comision || 0)]));
     const montoTotalLote = Object.values(montoPorReserva).reduce((sum, value) => sum + value, 0);

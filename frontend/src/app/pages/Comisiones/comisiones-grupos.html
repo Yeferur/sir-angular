@@ -1,0 +1,176 @@
+<section class="group-commissions" aria-labelledby="group-commissions-title">
+  <header class="group-section-heading">
+    <div>
+      <p class="eyebrow">Comisiones</p>
+      <h2 id="group-commissions-title">Hoteles y agencias nacionales</h2>
+      <p>Pagos agrupados por entidad y día del tour.</p>
+    </div>
+    <button type="button" class="refresh-button" (click)="applyFilters(groupPagination.pagina)" [disabled]="loading" aria-label="Actualizar grupos">
+      Actualizar
+    </button>
+  </header>
+
+  <section class="group-search-card" aria-label="Buscar grupos de comisión">
+    <app-filter-bar [showFilters]="false" [showSearch]="false">
+      <div sirPrimaryFilters class="group-search-field">
+        <label class="visually-hidden" for="commission-group-search">Buscar grupo</label>
+        <input id="commission-group-search" class="form-input" type="search" [(ngModel)]="busqueda"
+          (keyup.enter)="applyFilters()" placeholder="Buscar entidad, día, reserva o tour" autocomplete="off" />
+      </div>
+      <button sirFilterActions type="button" class="btn-filter" (click)="showFilters = !showFilters"
+        [class.btn-filter--active]="showFilters" aria-controls="commission-group-filters"
+        [attr.aria-expanded]="showFilters" [attr.aria-label]="activeFilters.length ? 'Filtros, ' + activeFilters.length + ' activos' : 'Filtros'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        Filtros <span class="filter-count" [class.filter-count--empty]="!activeFilters.length">{{ activeFilters.length }}</span>
+      </button>
+      <button sirFilterActions type="button" class="btn-primary reservation-search-button" (click)="applyFilters()" [disabled]="loading" [attr.aria-busy]="loading">
+        <span>{{ loading ? 'Buscando…' : 'Buscar' }}</span>
+      </button>
+    </app-filter-bar>
+
+    @if (activeFilters.length) {
+      <div class="active-filters" aria-label="Filtros aplicados">
+        @for (filter of activeFilters; track filter.key) {
+          <div class="filter-token">
+            {{ filter.label }}
+            <button type="button" class="remove-token-btn" [disabled]="loading" [attr.aria-label]="'Quitar filtro ' + filter.label" (click)="removeFilter(filter.key)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        }
+        @if (applied.q) {
+          <div class="filter-token">Búsqueda: {{ applied.q }}
+            <button type="button" class="remove-token-btn" [disabled]="loading" aria-label="Quitar búsqueda" (click)="busqueda = ''; applyFilters()">×</button>
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  @if (showFilters) {
+    <section id="commission-group-filters" class="advanced-filters-panel" aria-label="Filtros de grupos de comisión">
+      <div class="group-filter-grid">
+        <div class="field-group">
+          <label class="form-label" for="group-from">Desde</label>
+          <app-datepicker inputId="group-from" [ngModel]="desde" (dateChange)="desde = $event || ''" placeholder="Fecha inicial" />
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="group-to">Hasta</label>
+          <app-datepicker inputId="group-to" [ngModel]="hasta" (dateChange)="hasta = $event || ''" [maxDate]="today" placeholder="Fecha final" />
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="group-entity">Entidad</label>
+          <app-select inputId="group-entity" [ngModel]="entidad" (ngModelChange)="entidad = $any($event || '')"
+            [options]="entityOptions" [compareWith]="compareSelectValues" ariaLabel="Entidad reportante" />
+          @if (entityError) { <small class="field-hint field-hint--error">{{ entityError }}</small> }
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="group-type">Tipo</label>
+          <app-select inputId="group-type" [ngModel]="tipo" (ngModelChange)="tipo = $event || ''"
+            [options]="tipoOptions" [compareWith]="compareSelectValues" ariaLabel="Tipo de entidad" />
+        </div>
+        <div class="field-group">
+          <label class="form-label" for="group-status">Estado</label>
+          <app-select inputId="group-status" [ngModel]="estado" (ngModelChange)="estado = $event || ''"
+            [options]="estadoOptions" [compareWith]="compareSelectValues" ariaLabel="Estado del pago" />
+        </div>
+      </div>
+      <div class="filter-panel-actions">
+        <span>Las entidades inactivas con historial también aparecen.</span>
+        <button type="button" class="btn-primary" (click)="applyFilters()" [disabled]="loading">Aplicar filtros</button>
+      </div>
+    </section>
+  }
+
+  @if (error && loaded) {
+    <div class="group-error" role="alert">{{ error }} <button type="button" (click)="applyFilters(groupPagination.pagina)">Reintentar</button></div>
+  }
+
+  @if (loading && !loaded) {
+    <app-loading-state label="Cargando grupos de comisión…" />
+  } @else if (!loaded && error) {
+    <app-loading-state mode="error" label="No pudimos cargar los grupos" [detail]="error" actionLabel="Reintentar" (action)="applyFilters()" />
+  } @else {
+    <section class="group-results" aria-label="Grupos de pago por entidad y día" [attr.aria-busy]="loading">
+      <header class="group-results-heading">
+        <div><h3>Grupos entidad y día</h3><span>{{ groupRange }}</span></div>
+        @if (loading) { <span class="updating-pill" role="status">Actualizando</span> }
+      </header>
+
+      @if (groups.length) {
+        <div class="group-table" role="table" aria-label="Grupos de comisión">
+          <div class="group-table-head" role="row">
+            <span role="columnheader">Entidad</span><span role="columnheader">Tipo · día</span>
+            <span role="columnheader">Reservas</span><span role="columnheader">Total a comisionar</span>
+            <span role="columnheader">Estado</span><span role="columnheader">Acciones</span>
+          </div>
+          @for (group of groups; track group.Id) {
+            <article class="group-row" role="row">
+              <div class="group-entity" role="cell">
+                <strong>{{ group.Nombre_Entidad }}</strong>
+                <span>Entidad #{{ group.Id_Entidad_Reportante }}</span>
+                @if (group.Entidad_Inactiva) { <span class="entity-tag">Inactiva</span> }
+                @if (group.Entidad_Pendiente_Validacion) { <span class="entity-tag entity-tag--warning">Pendiente de validación</span> }
+              </div>
+              <div class="group-kind-date" role="cell"><span>{{ typeLabel(group.Tipo_Entidad) }}</span><strong>{{ formatDate(group.Fecha_Tour) }}</strong></div>
+              <div class="group-count" role="cell"><strong>{{ group.Cantidad_Reservas }}</strong><span>{{ group.Cantidad_Reservas_Pendientes }} pendientes</span></div>
+              <div class="group-total" role="cell"><strong>{{ formatCOP(group.Total_A_Comisionar) }}</strong><span>{{ formatCOP(group.Monto_Pendiente) }} pendiente</span></div>
+              <div role="cell">
+                <span class="status-pill" [class.status-pill--paid]="group.Estado === 'PAGADO' && !hasPendingAdjustment(group)"
+                  [class.status-pill--adjustment]="hasPendingAdjustment(group)">{{ statusLabel(group) }}</span>
+                @if (blockReason(group)) { <small class="payment-block-reason">{{ blockReason(group) }}</small> }
+              </div>
+              <div class="group-actions" role="cell">
+                <button type="button" class="button button--secondary button--small" (click)="openDetails(group)" [disabled]="loading">Detalle</button>
+                @if (group.Cantidad_Reservas_Pendientes > 0) {
+                  <button type="button" class="button button--primary button--small" (click)="openDetails(group, true)"
+                    [disabled]="loading || !group.Puede_Pagar" [attr.title]="blockReason(group) || null">{{ group.Tiene_Ajuste_Pendiente ? 'Pagar ajuste' : 'Marcar pagada' }}</button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <app-query-empty-state title="Sin grupos para mostrar" [headingLevel]="3" [compact]="true"
+          description="No hay grupos de entidades para el período y los filtros seleccionados." />
+      }
+      @if (groupPagination.paginas > 1) {
+        <nav class="pagination" aria-label="Páginas de grupos">
+          <button type="button" class="button button--secondary button--small" (click)="changePage(groupPagination.pagina - 1)" [disabled]="loading || groupPagination.pagina <= 1">Anterior</button>
+          <span>Página {{ groupPagination.pagina }} de {{ groupPagination.paginas }}</span>
+          <button type="button" class="button button--secondary button--small" (click)="changePage(groupPagination.pagina + 1)" [disabled]="loading || groupPagination.pagina >= groupPagination.paginas">Siguiente</button>
+        </nav>
+      }
+    </section>
+
+    <section class="unlinked-results" aria-label="Pendientes por asociar entidad">
+      <header class="group-results-heading">
+        <div><h3>Pendientes por asociar entidad</h3><span>{{ unlinkedRange }} · No entran en pagos</span></div>
+      </header>
+      @if (unlinked.length) {
+        <div class="unlinked-list">
+          @for (reservation of unlinked; track reservation.Id_Reserva) {
+            <article class="unlinked-row">
+              <strong>#{{ reservation.Id_Reserva }}</strong><span>{{ formatDate(reservation.Fecha_Tour) }}</span>
+              <span>{{ typeLabel(reservation.Tipo_Entidad) }} · {{ reservation.Nombre_Tour || 'Tour' }}</span>
+              <span>{{ reservation.Cantidad_Pasajeros }} pasajeros</span><strong>{{ formatCOP(reservation.Monto_Comision) }}</strong>
+            </article>
+          }
+        </div>
+        @if (unlinkedPagination.paginas > 1) {
+          <nav class="pagination" aria-label="Páginas de reservas sin entidad">
+            <button type="button" class="button button--secondary button--small" (click)="changeUnlinkedPage(unlinkedPagination.pagina - 1)" [disabled]="loading || unlinkedPagination.pagina <= 1">Anterior</button>
+            <span>Página {{ unlinkedPagination.pagina }} de {{ unlinkedPagination.paginas }}</span>
+            <button type="button" class="button button--secondary button--small" (click)="changeUnlinkedPage(unlinkedPagination.pagina + 1)" [disabled]="loading || unlinkedPagination.pagina >= unlinkedPagination.paginas">Siguiente</button>
+          </nav>
+        }
+      } @else {
+        <p class="unlinked-empty">No hay reservas pendientes por asociar entidad.</p>
+      }
+    </section>
+  }
+</section>

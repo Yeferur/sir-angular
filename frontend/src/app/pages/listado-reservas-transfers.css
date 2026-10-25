@@ -119,25 +119,28 @@
 
 .search-input {
   width: 100%;
-  height: 40px;
-  background-color: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px 10px 40px;
-  font-size: .95rem;
+  height: var(--search-control-height);
+  background-color: var(--bg-tertiary);
+  border: var(--search-control-border-width) solid var(--separator-color);
+  border-radius: var(--search-control-radius);
+  padding: 0 14px 0 40px;
+  font-size: var(--search-control-font-size);
+  font-weight: var(--search-control-font-weight);
   font-family: var(--font-family);
   color: var(--text-primary);
   outline: none;
   box-sizing: border-box;
-  transition: border-color .2s, box-shadow .2s;
+  transition: border-color var(--search-control-transition), box-shadow var(--search-control-transition);
 }
 
+.search-input:hover:not(:disabled),
 .search-input:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, .1);
 }
 
-.search-input::placeholder { color: var(--text-tertiary); opacity: .6; }
+.search-input:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.search-input::placeholder { color: var(--text-tertiary); }
+.search-container:has(.search-input:disabled) { opacity: var(--search-control-disabled-opacity); cursor: not-allowed; }
 
 .search-clear {
   position: absolute;
@@ -161,40 +164,6 @@
   background: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-tertiary));
   color: var(--accent-blue);
   transform: translateY(-50%) scale(1.06);
-}
-
-/* =========================================================
-   AUTOCOMPLETE
-   ========================================================= */
-.autocomplete-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 100%;
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--separator-color);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
-  z-index: 50;
-  max-height: 220px;
-  overflow-y: auto;
-  animation: fadeDown .18s ease;
-}
-
-.autocomplete-item {
-  padding: 11px 16px;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: .9rem;
-  border-bottom: 1px solid var(--separator-color);
-  transition: background .12s;
-}
-
-.autocomplete-item:last-child { border-bottom: none; }
-
-.autocomplete-item:hover {
-  background: var(--bg-tertiary);
-  color: var(--accent-blue);
 }
 
 /* =========================================================
@@ -638,7 +607,7 @@
 }
 
 .reservation-browser .search-input {
-  height: 42px;
+  height: var(--search-control-height);
   padding-right: 44px;
   background: var(--bg-tertiary);
 }
@@ -905,7 +874,6 @@
 @media (prefers-reduced-motion: reduce) {
   .page-container,
   .advanced-filters-panel,
-  .autocomplete-dropdown,
   .updating-pill > span,
   .results-list--updating::before,
   .search-idle-hint {

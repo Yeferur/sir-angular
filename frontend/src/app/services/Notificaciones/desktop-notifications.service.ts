@@ -26,6 +26,7 @@ export class DesktopNotificationsService implements OnDestroy {
   private focusTimer?: number;
   private presenceChannel?: BroadcastChannel;
   private readonly presenceWaiters = new Map<string, (focused: boolean) => void>();
+  private readonly rejectionNotifications = new Map<string, Notification>();
   private readonly handleFocusChange = () => {
     this.refreshPermissionState();
     this.updateFocusPresence();
@@ -64,6 +65,7 @@ export class DesktopNotificationsService implements OnDestroy {
   }
 
   clearSession(): void {
+    for (const notificationId of this.rejectionNotifications.keys()) this.close(notificationId);
     this.userId = null;
     this.enabled.set(false);
     this.onboardingEligible.set(false);
@@ -146,14 +148,20 @@ export class DesktopNotificationsService implements OnDestroy {
         ? 'Tienes un recordatorio pendiente. Abre SIR para consultar los detalles.'
         : type === 'PENDIENTE'
           ? 'Hay una actividad operativa que requiere tu atención. Abre SIR para consultar los detalles.'
+          : type === 'ENTIDAD_REPORTANTE_RECHAZADA'
+            ? notification.mensaje
           : 'Hay una novedad en SIR. Abre la aplicación para consultar los detalles.';
       const desktopNotification = new Notification(`SIR · ${notification.titulo}`, {
-        body: String(body || 'Hay una actividad que requiere tu atención.').slice(0, 220),
+        body: type === 'ENTIDAD_REPORTANTE_RECHAZADA'
+          ? String(body) : String(body || 'Hay una actividad que requiere tu atención.').slice(0, 220),
         tag: `sir-notification-${notification.idNotificacion}`,
+        requireInteraction: type === 'ENTIDAD_REPORTANTE_RECHAZADA',
       });
+      if (type === 'ENTIDAD_REPORTANTE_RECHAZADA')
+        this.rejectionNotifications.set(notification.idNotificacion, desktopNotification);
       desktopNotification.onclick = () => {
         window.focus();
-        desktopNotification.close();
+        if (type !== 'ENTIDAD_REPORTANTE_RECHAZADA') desktopNotification.close();
         onOpen();
       };
       return true;
@@ -161,6 +169,11 @@ export class DesktopNotificationsService implements OnDestroy {
       this.releaseClaim(notification.idNotificacion);
       return false;
     }
+  }
+
+  close(notificationId: string): void {
+    this.rejectionNotifications.get(notificationId)?.close();
+    this.rejectionNotifications.delete(notificationId);
   }
 
   private syncPreference(): void {

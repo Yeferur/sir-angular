@@ -36,7 +36,7 @@ describe('Comisiones: filtros', () => {
     return { fixture, component, commissions, navigate, render };
   }
 
-  it('aplica Canal y Estado solo al buscar y conserva Fecha/Tour al limpiar pills', async () => {
+  it('aplica Canal y Estado solo al buscar y quita cada filtro desde su pill', async () => {
     const { fixture, component, commissions, navigate, render } = await mount();
     const response = new Subject<ComisionCanal[]>();
     commissions.and.returnValues(response, of([]));
@@ -66,7 +66,13 @@ describe('Comisiones: filtros', () => {
 
     component.actualizarFiltro('idCanal', '');
     expect(component.activeAdvancedFilters).toBe(2);
-    fixture.nativeElement.querySelector('.clear-filters-link').click();
+    expect(fixture.nativeElement.querySelector('.clear-filters-link')).toBeNull();
+    commissions.and.returnValue(of([]));
+    fixture.nativeElement.querySelector('.active-filters .remove-token-btn').click();
+    render();
+    expect(commissions.calls.mostRecent().args[0]).toEqual({ Fecha: '2026-10-14', Id_Tour: '7', Id_Canal: undefined, Estado: 'PENDIENTE' });
+    expect(component.activeAdvancedFilters).toBe(1);
+    fixture.nativeElement.querySelector('.active-filters .remove-token-btn').click();
     render();
     expect(commissions.calls.mostRecent().args[0]).toEqual({ Fecha: '2026-10-14', Id_Tour: '7', Id_Canal: undefined, Estado: '' });
     expect(component.activeAdvancedFilters).toBe(0);

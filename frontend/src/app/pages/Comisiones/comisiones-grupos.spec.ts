@@ -1,348 +1,226 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { Observable, Subject, of, throwError } from 'rxjs';
+import { provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
 
-import { ComisionesComponent } from './comisiones';
-import {
-  ComisionCanal,
-  ComisionGrupo,
-  ComisionReserva,
-  ComisionesService,
-  PerfilComisionEntidad,
-} from '../../services/Comisiones/comisiones.service';
-import { ConfirmacionService } from '../../services/confirmacion.service';
-import { PermisosService } from '../../services/Permisos/permisos.service';
+import { ComisionesGruposComponent } from './comisiones-grupos';
+import { ComisionesGrupoDrawerComponent } from './comisiones-grupo-drawer';
+import { ComisionesService, DetalleGrupoComision, GrupoComisionDia, PerfilComisionEntidad, ResultadoGruposComision } from '../../services/Comisiones/comisiones.service';
+import { Reservas } from '../../services/Reservas/reservas';
 import { SirAlertService } from '../../services/Alertas/alert.service';
+import { SirDrawerService } from '../../services/Drawer/drawer.service';
 
-describe('Comisiones: grupos por entidad y reserva', () => {
-  const reserve = (id: string, overrides: Partial<ComisionReserva> = {}): ComisionReserva => ({
-    Id_Reserva: id,
-    Fecha_Tour: '2026-10-15',
-    Nombre_Reportante: null,
-    Telefono_Reportante: null,
-    Id_Tour: 1,
-    Nombre_Tour: 'Tour centro',
-    Tipo_Reserva: 'Grupal',
-    Num_Pasajeros: 1,
-    Total_Comision: 10000,
-    Monto_Comision_Pagada: null,
-    Comision_Minima: 10000,
-    Comision_Maxima: 10000,
-    Estado_Liquidacion: 'PENDIENTE',
-    Forma_Pago: null,
-    Cuenta_Bancaria: null,
-    Nombre_Receptor: null,
-    DNI_Receptor: null,
-    Fecha_Pago: null,
-    pasajeros: [{ Id_Pasajero: 1, Nombre_Pasajero: 'Pasajero', DNI: null, Tipo_Pasajero: 'ADULTO', Comision: 10000 }],
+describe('Comisiones: pagos por entidad y día', () => {
+  const group = (overrides: Partial<GrupoComisionDia> = {}): GrupoComisionDia => ({
+    Id: 'e12~2026-10-15', Id_Entidad_Reportante: 12, Nombre_Entidad: 'Hotel Dann', Tipo_Entidad: 'HOTEL',
+    Fecha_Tour: '2026-10-15', Estado: 'PENDIENTE', Cantidad_Reservas: 2, Cantidad_Reservas_Actuales: 2,
+    Cantidad_Reservas_Pendientes: 2, Cantidad_Reservas_Pagadas: 0, Total_A_Comisionar: 35000,
+    Monto_Pendiente: 35000, Monto_Pagado: 0, Tiene_Ajuste_Pendiente: false, Entidad_Inactiva: false,
+    Entidad_Pendiente_Validacion: false, Estado_Validacion_Entidad: 'VALIDADA', Puede_Pagar: true,
+    Motivo_No_Pagable: null, Ultimo_Id_Grupo_Pagado: null, Cantidad_Lotes: 0, Cantidad_Lotes_Pagados: 0,
     ...overrides,
   });
 
-  const group = (overrides: Partial<ComisionGrupo> = {}): ComisionGrupo => ({
-    Id_Entidad_Reportante: 12,
-    Id_Perfil_Comision: null,
-    Tipo_Entidad: 'HOTEL',
-    Nombre_Entidad: 'Hotel Dann Carlton',
-    Nombre_Reportante: null,
-    Telefono: null,
-    Forma_Pago: null,
-    Cuenta_Bancaria: null,
-    Nombre_Receptor: null,
-    DNI_Receptor: null,
-    Total_Reportante: 10000,
-    Pendiente_Reportante: 10000,
-    Pagado_Reportante: 0,
-    reservas: [reserve('TG12345')],
-    ...overrides,
+  const result = (rows: GrupoComisionDia[] = []): ResultadoGruposComision => ({
+    grupos: rows,
+    paginacion: { pagina: 1, limite: 25, total: rows.length, paginas: rows.length ? 1 : 0 },
+    pendientesPorAsociarEntidad: { reservas: [], paginacion: { pagina: 1, limite: 25, total: 0, paginas: 0 } },
   });
 
-  const channel = (name: string, id: number, groups: ComisionGrupo[]): ComisionCanal => ({
-    Id_Canal: id,
-    Nombre_Canal: name,
-    Total_Canal: groups.reduce((sum, item) => sum + item.Total_Reportante, 0),
-    Pendiente_Canal: groups.reduce((sum, item) => sum + item.Pendiente_Reportante, 0),
-    Pagado_Canal: groups.reduce((sum, item) => sum + item.Pagado_Reportante, 0),
-    grupos: groups,
-  });
-
-  const profile = (overrides: Partial<PerfilComisionEntidad> = {}): PerfilComisionEntidad => ({
-    Id_Perfil_Comision: 41,
-    Id_Entidad_Reportante: 12,
-    Tipo_Entidad: 'HOTEL',
-    Nombre_Entidad: 'Hotel Dann Carlton',
-    Forma_Pago: 'NEQUI',
-    Numero_Cuenta: '3001234567',
-    Nombre_Receptor: 'Receptor del hotel',
-    DNI_Receptor: 'NIT-1234',
-    Activo: 1,
-    ...overrides,
-  });
-
-  async function mount() {
-    spyOn(ComisionesComponent.prototype, 'ngOnInit');
-    const alerts = {
-      errorToast: jasmine.createSpy('errorToast'),
-      successToast: jasmine.createSpy('successToast'),
-      warningToast: jasmine.createSpy('warningToast'),
-      confirmDecision: jasmine.createSpy('confirmDecision').and.resolveTo(true),
-    };
+  it('muestra el estado propio del ajuste y bloquea el pago indicando la jornada abierta', async () => {
+    const list = jasmine.createSpy('listarGrupos').and.returnValue(of(result([group({
+      Estado: 'PENDIENTE', Tiene_Ajuste_Pendiente: true, Cantidad_Reservas: 3,
+      Cantidad_Reservas_Pendientes: 1, Cantidad_Reservas_Pagadas: 2, Monto_Pendiente: 8000,
+      Puede_Pagar: false, Motivo_No_Pagable: 'JORNADA_NO_CERRADA',
+    }), group({
+      Id: 'e13~2026-10-16', Id_Entidad_Reportante: 13, Nombre_Entidad: 'Agencia Sur',
+      Tipo_Entidad: 'AGENCIA_NACIONAL', Fecha_Tour: '2026-10-16',
+      Entidad_Pendiente_Validacion: true, Estado_Validacion_Entidad: 'PENDIENTE_VALIDACION',
+      Puede_Pagar: false, Motivo_No_Pagable: 'ENTIDAD_PENDIENTE_VALIDACION',
+    })])));
+    const drawer = { openComisionesGrupo: jasmine.createSpy('openComisionesGrupo') };
     await TestBed.configureTestingModule({
-      imports: [ComisionesComponent],
+      imports: [ComisionesGruposComponent],
       providers: [
-        provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
-        { provide: PermisosService, useValue: { tienePermiso: () => true } },
-        { provide: SirAlertService, useValue: alerts },
+        provideZonelessChangeDetection(), provideRouter([]),
+        { provide: ComisionesService, useValue: { listarGrupos: list } },
+        { provide: Reservas, useValue: { getEntidadesReportantes: () => of([]) } },
+        { provide: SirAlertService, useValue: { warningToast() {}, errorToast() {}, successToast() {} } },
+        { provide: SirDrawerService, useValue: drawer },
       ],
     }).compileComponents();
-    const fixture = TestBed.createComponent(ComisionesComponent);
+    const fixture = TestBed.createComponent(ComisionesGruposComponent);
+    fixture.detectChanges();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Con ajuste pendiente');
+    expect(fixture.nativeElement.textContent).toContain('La jornada de Control de viaje no está cerrada.');
+    expect(fixture.nativeElement.textContent).toContain('La entidad está pendiente de validación.');
+    const pay = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((button: any) => button.textContent.includes('Pagar ajuste')) as HTMLButtonElement;
+    expect(pay.disabled).toBeTrue();
+    expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('limpiar filtros');
+    fixture.nativeElement.querySelector('.group-actions .button--secondary').click();
+    expect(drawer.openComisionesGrupo).toHaveBeenCalledWith('e12~2026-10-15', false, jasmine.any(Object));
+  });
+
+  it('envía los filtros y recupera por página la sección de reservas sin entidad', async () => {
+    const first = result([]);
+    first.pendientesPorAsociarEntidad = {
+      reservas: [{ Id_Reserva: 'R-1', Fecha_Tour: '2026-10-15', Tipo_Entidad: 'HOTEL', Nombre_Reportante: 'ZZ', Nombre_Tour: 'Centro', Cantidad_Pasajeros: 1, Monto_Comision: 4000 }],
+      paginacion: { pagina: 1, limite: 25, total: 31, paginas: 2 },
+    };
+    const list = jasmine.createSpy('listarGrupos').and.returnValues(of(first), of(first));
+    await TestBed.configureTestingModule({
+      imports: [ComisionesGruposComponent],
+      providers: [
+        provideZonelessChangeDetection(), provideRouter([]),
+        { provide: ComisionesService, useValue: { listarGrupos: list } },
+        { provide: Reservas, useValue: { getEntidadesReportantes: () => of([]) } },
+        { provide: SirAlertService, useValue: { warningToast() {}, errorToast() {}, successToast() {} } },
+        { provide: SirDrawerService, useValue: { openComisionesGrupo() {} } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ComisionesGruposComponent);
+    fixture.detectChanges();
+    await Promise.resolve();
     const component = fixture.componentInstance;
-    component.catalogLoading = false;
-    component.tours = [];
-    component.canalesDisponibles = [];
-    const service = TestBed.inject(ComisionesService);
-    const loadProfile = spyOn(service, 'obtenerPerfilEntidad').and.returnValue(of(null));
-    const createProfile = spyOn(service, 'crearPerfilEntidad').and.returnValue(of(profile()));
-    const updateProfile = spyOn(service, 'actualizarPerfilEntidad').and.returnValue(of(profile()));
-    const pay = spyOn(service, 'actualizarLiquidacion').and.returnValue(of({ updated: 1, montos: { TG12345: 10000 } }));
-    const render = () => { fixture.changeDetectorRef.markForCheck(); fixture.detectChanges(); };
-    render();
-    return { fixture, component, service, alerts, loadProfile, createProfile, updateProfile, pay, render };
-  }
-
-  it('representa Hotel y Agencia Nacional por el nombre de entidad, no por el contacto', async () => {
-    const { fixture, component, render } = await mount();
-    component.canales = [
-      channel('HOTEL', 1, [group({ Nombre_Entidad: 'Hotel Dann Carlton', Nombre_Reportante: null })]),
-      channel('AGENCIA NACIONAL', 2, [group({ Id_Entidad_Reportante: 22, Tipo_Entidad: 'AGENCIA_NACIONAL',
-        Nombre_Entidad: 'Viajes Andinos', Nombre_Reportante: null })]),
-    ];
-    render();
-
-    const titles = Array.from(fixture.nativeElement.querySelectorAll('.reporter-identity > strong') as NodeListOf<Element>)
-      .map((element: Element) => element.textContent?.trim());
-    expect(titles).toEqual(['Hotel Dann Carlton', 'Viajes Andinos']);
-    expect(fixture.nativeElement.textContent).not.toContain('Nombre_Reportante');
-  });
-
-  it('mantiene varias reservas de Hotel juntas y separa Freelance homónimos por reserva', async () => {
-    const { fixture, component, render } = await mount();
-    const hotelGroup = group({ reservas: [reserve('H-1'), reserve('H-2')], Total_Reportante: 30000,
-      Pendiente_Reportante: 30000 });
-    const freelance = (id: string) => group({ Id_Entidad_Reportante: null, Tipo_Entidad: null,
-      Nombre_Entidad: null, Nombre_Reportante: 'Juan Pérez', reservas: [reserve(id)],
-      Total_Reportante: 10000, Pendiente_Reportante: 10000 });
-    component.canales = [channel('HOTEL', 1, [hotelGroup]), channel('FREELANCE', 4, [freelance('F-1'), freelance('F-2')])];
-    render();
-
-    expect(fixture.nativeElement.querySelectorAll('.reporter-group').length).toBe(3);
-    expect(fixture.nativeElement.querySelectorAll('.reservation-row').length).toBe(4);
-    expect(component.trackGrupo(0, freelance('F-1'))).not.toBe(component.trackGrupo(1, freelance('F-2')));
-    const freelanceGroups = Array.from(fixture.nativeElement.querySelectorAll('.reporter-group') as NodeListOf<Element>)
-      .slice(1).map((element: Element) => element.textContent || '');
-    expect(freelanceGroups.every(text => text.includes('Juan Pérez'))).toBeTrue();
-  });
-
-  it('no consulta ni ofrece un perfil reutilizable para Freelance', async () => {
-    const { fixture, component, loadProfile, render } = await mount();
-    const freelance = group({ Id_Entidad_Reportante: null, Tipo_Entidad: null, Nombre_Entidad: null,
-      Nombre_Reportante: 'Juan Pérez', reservas: [reserve('TG12345')] });
-    component.abrirPagoGrupo(freelance);
-    render();
-
-    expect(loadProfile).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('.central-switch')).toBeNull();
-    expect(fixture.nativeElement.querySelector('#payment-title')?.textContent).toContain('Juan Pérez');
-    expect(fixture.nativeElement.textContent).toContain('Reserva TG12345');
-  });
-
-  it('carga el perfil existente de Hotel y precarga los datos de pago', async () => {
-    const { fixture, component, loadProfile, render } = await mount();
-    loadProfile.and.returnValue(of(profile()));
-    const hotel = group();
-    component.abrirPagoGrupo(hotel);
-    await fixture.whenStable();
-    render();
-
-    expect(loadProfile).toHaveBeenCalledOnceWith(12);
-    expect(component.panel.formaPago).toBe('NEQUI');
-    expect(component.panel.cuenta).toBe('3001234567');
-    expect(component.panel.nombreReceptor).toBe('Receptor del hotel');
-    expect(component.panel.guardarPerfil).toBeTrue();
-    expect((fixture.nativeElement.querySelector('.central-switch input') as HTMLInputElement).checked).toBeTrue();
-  });
-
-  it('usa la geometría compartida en los datos de pago en ambos temas', async () => {
-    const { fixture, component, loadProfile, render } = await mount();
-    loadProfile.and.returnValue(of(profile()));
-    component.abrirPagoGrupo(group());
-    await fixture.whenStable();
-    render();
-    const input = fixture.nativeElement.querySelector('#payment-account') as HTMLInputElement;
-    expect(input.classList.contains('form-input')).toBeTrue();
-    const style = getComputedStyle(input);
-    expect(style.height).toBe('40px');
-    expect(style.borderTopWidth).toBe('1px');
-    expect(style.borderRadius).toBe('8px');
-    expect(style.paddingLeft).toBe('13px');
-    expect(style.fontSize).toBe('14px');
-    expect(style.fontWeight).toBe('500');
-    const originalTheme = document.documentElement.getAttribute('data-theme');
-    const darkBackground = style.backgroundColor;
-    try {
-      document.documentElement.setAttribute('data-theme', 'light');
-      await new Promise(resolve => setTimeout(resolve, 220));
-      expect(getComputedStyle(input).backgroundColor).not.toBe(darkBackground);
-    } finally {
-      if (originalTheme === null) document.documentElement.removeAttribute('data-theme');
-      else document.documentElement.setAttribute('data-theme', originalTheme);
-    }
-    input.disabled = true;
-    expect(getComputedStyle(input).opacity).toBe('0.72');
-  });
-
-  it('carga también el perfil existente de Agencia Nacional', async () => {
-    const { component, loadProfile } = await mount();
-    const agency = group({ Id_Entidad_Reportante: 22, Id_Perfil_Comision: 52, Tipo_Entidad: 'AGENCIA_NACIONAL',
-      Nombre_Entidad: 'Viajes Andinos' });
-    loadProfile.and.returnValue(of(profile({ Id_Perfil_Comision: 52, Id_Entidad_Reportante: 22,
-      Tipo_Entidad: 'AGENCIA_NACIONAL', Nombre_Entidad: 'Viajes Andinos', Forma_Pago: 'EFECTIVO',
-      Numero_Cuenta: null, Nombre_Receptor: 'Receptor agencia', DNI_Receptor: 'NIT-5678' })));
-    component.abrirPagoGrupo(agency);
+    component.desde = '2026-10-01';
+    component.hasta = '2026-10-20';
+    component.entidad = '12';
+    component.tipo = 'HOTEL';
+    component.estado = 'PENDIENTE';
+    component.busqueda = 'Hotel';
+    component.applyFilters(2);
     await Promise.resolve();
+    fixture.detectChanges();
 
-    expect(loadProfile).toHaveBeenCalledOnceWith(22);
-    expect(component.panel.formaPago).toBe('EFECTIVO');
-    expect(component.panel.nombreReceptor).toBe('Receptor agencia');
-  });
-
-  it('permite ingresar datos sin perfil y crea el perfil al pagar si se marca guardar', async () => {
-    const { component, loadProfile, createProfile, pay } = await mount();
-    const hotel = group({ reservas: [reserve('H-1'), reserve('H-2')], Total_Reportante: 30000,
-      Pendiente_Reportante: 30000 });
-    loadProfile.and.returnValue(of(null));
-    component.abrirPagoGrupo(hotel);
-    await Promise.resolve();
-    component.panel.formaPago = 'NEQUI';
-    component.panel.cuenta = '3001234567';
-    component.panel.nombreReceptor = 'Receptor nuevo';
-    component.panel.dniReceptor = 'NIT-1234';
-    component.panel.guardarPerfil = true;
-    pay.and.returnValue(of({ updated: 2, montos: { 'H-1': 10000, 'H-2': 20000 } }));
-
-    await component.registrarPagoActual();
-
-    expect(createProfile).toHaveBeenCalledOnceWith(jasmine.objectContaining({
-      Id_Entidad_Reportante: 12, Forma_Pago: 'NEQUI', Numero_Cuenta: '3001234567',
-      Nombre_Receptor: 'Receptor nuevo', DNI_Receptor: 'NIT-1234',
+    expect(list.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      desde: '2026-10-01', hasta: '2026-10-20', Id_Entidad_Reportante: '12',
+      Tipo: 'HOTEL', Estado: 'PENDIENTE', q: 'Hotel', page: 2, limit: 25, unlinkedPage: 1,
     }));
-    expect(pay).toHaveBeenCalledOnceWith(jasmine.objectContaining({
-      Estado: 'PAGADO', reservas: ['H-1', 'H-2'],
+    expect(fixture.nativeElement.textContent).toContain('Pendientes por asociar entidad');
+    expect(fixture.nativeElement.textContent).toContain('No entran en pagos');
+  });
+
+  it('recarga en un 409 y requiere una segunda acción con el total y cantidad nuevos', async () => {
+    const initialGroup = group({ Cantidad_Reservas: 1, Cantidad_Reservas_Pendientes: 1, Total_A_Comisionar: 10000, Monto_Pendiente: 10000 });
+    const changedGroup = group({ Cantidad_Reservas: 2, Cantidad_Reservas_Pendientes: 2, Total_A_Comisionar: 35000, Monto_Pendiente: 35000 });
+    const detail: DetalleGrupoComision = {
+      grupo: { Id: initialGroup.Id, Id_Entidad_Reportante: 12, Nombre_Entidad: 'Hotel Dann', Tipo_Entidad: 'HOTEL', Fecha_Tour: '2026-10-15', Entidad_Activa: true, Estado_Validacion: 'VALIDADA' },
+      reservasPendientes: [{ Id_Reserva: 'R-1', Fecha_Tour: '2026-10-15', Nombre_Tour: 'Centro', Monto_Comision: 10000 }],
+      paginacionReservasPendientes: { pagina: 1, limite: 25, total: 1, paginas: 1 }, lotes: [],
+    };
+    const service = {
+      obtenerDetalleGrupo: jasmine.createSpy('obtenerDetalleGrupo').and.returnValue(of(detail)),
+      obtenerPerfilEntidad: jasmine.createSpy('obtenerPerfilEntidad').and.returnValue(of(null)),
+      listarGrupos: jasmine.createSpy('listarGrupos').and.returnValue(of(result([changedGroup]))),
+      marcarGrupoPagado: jasmine.createSpy('marcarGrupoPagado').and.returnValues(
+        throwError(() => ({ status: 409, error: { errorCode: 'GROUP_TOTAL_CHANGED' } })),
+        of({ Id_Grupo_Comision: '700', Estado: 'PAGADO' }),
+      ),
+      actualizarPerfilEntidad: jasmine.createSpy('actualizarPerfilEntidad').and.returnValue(of(null)),
+      crearPerfilEntidad: jasmine.createSpy('crearPerfilEntidad').and.returnValue(of(null)),
+    };
+    const alerts = { warningToast() {}, errorToast() {}, successToast: jasmine.createSpy('successToast') };
+    await TestBed.configureTestingModule({
+      imports: [ComisionesGrupoDrawerComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        { provide: ComisionesService, useValue: service },
+        { provide: SirAlertService, useValue: alerts },
+        { provide: SirDrawerService, useValue: { openReserva() {}, close() {} } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ComisionesGrupoDrawerComponent);
+    const component = fixture.componentInstance;
+    component.groupId = initialGroup.Id;
+    component.group = initialGroup;
+    fixture.detectChanges();
+    await Promise.resolve();
+    fixture.detectChanges();
+    await component.openPaymentDialog();
+    component.paymentMethod = 'EFECTIVO';
+    component.paymentRecipient = 'Contabilidad';
+    component.paymentRecipientId = 'NIT-1234';
+
+    await component.submitPayment();
+    fixture.detectChanges();
+    expect(service.marcarGrupoPagado.calls.argsFor(0)[1]).toEqual(jasmine.objectContaining({
+      Monto_Pendiente_Esperado: 10000, Cantidad_Reservas_Pendientes_Esperada: 1,
     }));
-    expect(hotel.reservas.map(item => item.Monto_Comision_Pagada)).toEqual([10000, 20000]);
-    expect(hotel.reservas.every(item => item.Estado_Liquidacion === 'PAGADO')).toBeTrue();
-  });
+    expect(component.showPaymentDialog).toBeTrue();
+    expect(component.paymentConflict).toContain('confirma otra vez');
+    expect(component.pendingTotal).toBe(35000);
+    expect(component.pendingCount).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('35000');
 
-  it('actualiza el perfil existente antes del pago', async () => {
-    const { component, loadProfile, createProfile, updateProfile } = await mount();
-    loadProfile.and.returnValue(of(profile()));
-    const hotel = group();
-    component.abrirPagoGrupo(hotel);
-    await Promise.resolve();
-    component.panel.nombreReceptor = 'Receptor actualizado';
-    component.panel.dniReceptor = 'NIT-4321';
-
-    await component.registrarPagoActual();
-
-    expect(updateProfile).toHaveBeenCalledOnceWith(jasmine.objectContaining({
-      Id_Perfil_Comision: 41, Id_Entidad_Reportante: 12, Nombre_Receptor: 'Receptor actualizado',
+    await component.submitPayment();
+    expect(service.marcarGrupoPagado.calls.argsFor(1)[1]).toEqual(jasmine.objectContaining({
+      Monto_Pendiente_Esperado: 35000, Cantidad_Reservas_Pendientes_Esperada: 2,
     }));
-    expect(createProfile).not.toHaveBeenCalled();
+    expect(component.showPaymentDialog).toBeFalse();
   });
 
-  it('muestra el monto histórico de una comisión pagada en la fila y en el total pagado', async () => {
-    const { fixture, component, render } = await mount();
-    const paid = reserve('P-1', { Total_Comision: 12000, Monto_Comision_Pagada: 9500,
-      Estado_Liquidacion: 'PAGADO', Fecha_Pago: '2026-10-16' });
-    component.canales = [channel('HOTEL', 1, [group({ reservas: [paid], Total_Reportante: 12000,
-      Pendiente_Reportante: 0, Pagado_Reportante: 9500 })])];
-    render();
-
-    expect(fixture.nativeElement.querySelector('.reservation-value')?.textContent).toContain(component.formatCOP(9500));
-    expect(fixture.nativeElement.querySelector('.reporter-amounts')?.textContent).toContain(component.formatCOP(9500));
-    expect(fixture.nativeElement.textContent).toContain('monto histórico');
-  });
-
-  it('reabre el grupo, borra monto histórico y vuelve a sumar la comisión dinámica', async () => {
-    const { component, alerts, pay } = await mount();
-    const paid = reserve('P-1', { Total_Comision: 12000, Monto_Comision_Pagada: 9500,
-      Estado_Liquidacion: 'PAGADO', Fecha_Pago: '2026-10-16' });
-    const hotel = group({ reservas: [paid], Total_Reportante: 12000, Pendiente_Reportante: 0, Pagado_Reportante: 9500 });
-    component.canales = [channel('HOTEL', 1, [hotel])];
-    pay.and.returnValue(of({ updated: 1 }));
-
-    await component.reabrirGrupo(hotel);
-
-    expect(alerts.confirmDecision).toHaveBeenCalled();
-    expect(pay).toHaveBeenCalledOnceWith(jasmine.objectContaining({ Estado: 'PENDIENTE', reservas: ['P-1'] }));
-    expect(paid.Estado_Liquidacion).toBe('PENDIENTE');
-    expect(paid.Monto_Comision_Pagada).toBeNull();
-    expect(hotel.Pagado_Reportante).toBe(0);
-    expect(hotel.Pendiente_Reportante).toBe(12000);
-  });
-
-  it('respeta que el backend no devuelva AGENCIA_INTERNACIONAL', async () => {
-    const { fixture, component, render } = await mount();
-    component.canales = [channel('HOTEL', 1, [group()]), channel('AGENCIA NACIONAL', 2, [group({
-      Id_Entidad_Reportante: 22, Tipo_Entidad: 'AGENCIA_NACIONAL', Nombre_Entidad: 'Viajes Andinos',
-    })])];
-    render();
-
-    expect(fixture.nativeElement.textContent).not.toContain('AGENCIA INTERNACIONAL');
-    expect(fixture.nativeElement.querySelectorAll('.channel-card').length).toBe(2);
-  });
-
-  it('deja registrar manualmente si falla la lectura del perfil y muestra errores del pago', async () => {
-    const { fixture, component, loadProfile, alerts, pay, createProfile, render } = await mount();
-    loadProfile.and.returnValue(throwError(() => ({ error: { message: 'Servicio de perfiles no disponible' } })));
-    const hotel = group();
-    component.abrirPagoGrupo(hotel);
+  it('mantiene el aviso de perfil dentro del drawer hasta guardar o descartar', async () => {
+    const payableGroup = group({ Cantidad_Reservas: 1, Cantidad_Reservas_Pendientes: 1, Total_A_Comisionar: 10000, Monto_Pendiente: 10000 });
+    const detail: DetalleGrupoComision = {
+      grupo: { Id: payableGroup.Id, Id_Entidad_Reportante: 12, Nombre_Entidad: 'Hotel Dann', Tipo_Entidad: 'HOTEL', Fecha_Tour: '2026-10-15', Entidad_Activa: true, Estado_Validacion: 'VALIDADA' },
+      reservasPendientes: [{ Id_Reserva: 'R-1', Fecha_Tour: '2026-10-15', Nombre_Tour: 'Centro', Monto_Comision: 10000 }],
+      paginacionReservasPendientes: { pagina: 1, limite: 25, total: 1, paginas: 1 }, lotes: [],
+    };
+    const profile: PerfilComisionEntidad = {
+      Id_Perfil_Comision: 42, Id_Entidad_Reportante: 12, Tipo_Entidad: 'HOTEL' as const,
+      Nombre_Entidad: 'Hotel Dann', Forma_Pago: 'EFECTIVO' as const, Numero_Cuenta: null,
+      Nombre_Receptor: 'Contabilidad', DNI_Receptor: 'NIT-1234', Activo: 1,
+    };
+    const service = {
+      obtenerDetalleGrupo: jasmine.createSpy('obtenerDetalleGrupo').and.returnValue(of(detail)),
+      obtenerPerfilEntidad: jasmine.createSpy('obtenerPerfilEntidad').and.returnValue(of(null)),
+      listarGrupos: jasmine.createSpy('listarGrupos').and.returnValue(of(result([payableGroup]))),
+      marcarGrupoPagado: jasmine.createSpy('marcarGrupoPagado').and.returnValue(of({ Id_Grupo_Comision: '701' })),
+      actualizarPerfilEntidad: jasmine.createSpy('actualizarPerfilEntidad').and.returnValue(of(profile)),
+      crearPerfilEntidad: jasmine.createSpy('crearPerfilEntidad').and.returnValues(
+        throwError(() => new Error('No hay conexión')),
+        of(profile),
+      ),
+      recordarPerfilPendiente: jasmine.createSpy('recordarPerfilPendiente'),
+      olvidarPerfilPendiente: jasmine.createSpy('olvidarPerfilPendiente'),
+      obtenerPerfilPendiente: jasmine.createSpy('obtenerPerfilPendiente').and.returnValue(null),
+    };
+    const alerts = { warningToast() {}, errorToast() {}, successToast: jasmine.createSpy('successToast') };
+    await TestBed.configureTestingModule({
+      imports: [ComisionesGrupoDrawerComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        { provide: ComisionesService, useValue: service },
+        { provide: SirAlertService, useValue: alerts },
+        { provide: SirDrawerService, useValue: { openReserva() {}, close() {} } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ComisionesGrupoDrawerComponent);
+    const component = fixture.componentInstance;
+    component.groupId = payableGroup.Id;
+    component.group = payableGroup;
+    fixture.detectChanges();
     await Promise.resolve();
-    render();
+    await component.openPaymentDialog();
+    component.paymentMethod = 'EFECTIVO';
+    component.paymentRecipient = 'Contabilidad';
+    component.paymentRecipientId = 'NIT-1234';
+    component.saveProfile = true;
 
-    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent)
-      .toContain('Servicio de perfiles no disponible');
-    expect(fixture.nativeElement.querySelector('.central-switch')).toBeNull();
-    component.panel.formaPago = 'EFECTIVO';
-    component.panel.nombreReceptor = 'Receptor manual';
-    component.panel.dniReceptor = 'NIT-1234';
-    pay.and.returnValue(throwError(() => ({ error: { message: 'No se pudo registrar el pago' } })));
+    await component.submitPayment();
+    fixture.detectChanges();
+    expect(component.profileSaveWarning).toContain('El pago quedó registrado');
+    expect(fixture.nativeElement.querySelector('.profile-save-warning')).not.toBeNull();
+    expect(service.recordarPerfilPendiente).toHaveBeenCalled();
 
-    await component.registrarPagoActual();
-
-    expect(createProfile).not.toHaveBeenCalled();
-    expect(alerts.errorToast).toHaveBeenCalledWith('No pudimos registrar el pago', 'No se pudo registrar el pago');
-  });
-
-  it('mantiene loading mientras consulta el perfil y bloquea el pago hasta resolver', async () => {
-    const { fixture, component, loadProfile, render } = await mount();
-    const profileRequest = new Subject<PerfilComisionEntidad | null>();
-    loadProfile.and.returnValue(profileRequest as Observable<PerfilComisionEntidad | null>);
-    component.abrirPagoGrupo(group());
-    render();
-
-    expect(component.panel.perfilCargando).toBeTrue();
-    expect(fixture.nativeElement.textContent).toContain('Cargando los datos de pago');
-    expect(fixture.nativeElement.querySelector('.sheet-footer .button--primary').disabled).toBeTrue();
-
-    profileRequest.next(null);
-    profileRequest.complete();
-    await Promise.resolve();
-    render();
-    expect(component.panel.perfilCargando).toBeFalse();
-    expect(fixture.nativeElement.querySelector('.sheet-footer .button--primary').disabled).toBeFalse();
+    await component.retryProfileSave();
+    fixture.detectChanges();
+    expect(component.profileSaveWarning).toBe('');
+    expect(fixture.nativeElement.querySelector('.profile-save-warning')).toBeNull();
+    expect(service.olvidarPerfilPendiente).toHaveBeenCalledWith(12);
   });
 });

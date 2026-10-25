@@ -338,8 +338,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   async validate(state: ValidacionEntidad): Promise<void> {
     const id = this.selected()?.entity.Id_Entidad_Reportante; if (!id || this.saving()) return;
     const reason = state === 'RECHAZADA' ? this.rejectionReason.trim() : '';
-    if (state === 'RECHAZADA' && (!reason || reason.length > 300)) {
-      this.detailError.set('Escribe un motivo de rechazo de hasta 300 caracteres.');
+    if (state === 'RECHAZADA' && reason.length > 200) {
+      this.detailError.set('El motivo de rechazo puede tener hasta 200 caracteres.');
       return;
     }
     this.saving.set(true);
@@ -348,9 +348,15 @@ export class MercadeoEntidadesComponent implements OnInit {
       const result = await firstValueFrom(this.api.validate(id, state, reason));
       this.rejecting.set(false); this.rejectionReason = '';
       this.detailNotice.set(result?.warning || '');
+      if (state === 'RECHAZADA') {
+        this.selected.set(null);
+        this.validationNotice.set('Entidad rechazada. Las operaciones afectadas están pendientes de datos.');
+        await this.search(this.result()?.page || 1);
+        return;
+      }
       if (this.canValidate && !this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER')) {
         this.selected.set(null);
-        this.validationNotice.set(result?.warning || (state === 'RECHAZADA' ? 'Entidad rechazada.' : 'Entidad validada.'));
+        this.validationNotice.set(result?.warning || 'Entidad validada.');
         await this.search(this.result()?.page || 1);
         return;
       }

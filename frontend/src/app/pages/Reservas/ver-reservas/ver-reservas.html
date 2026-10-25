@@ -20,6 +20,10 @@
         <input
           type="text"
           class="search-input"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="reservation-point-suggestions"
+          [attr.aria-expanded]="puntoAutocompleteVisible()"
           placeholder="Buscar por ID, nombre, DNI, punto..."
           [value]="filters().NombreApellido"
           (input)="onMainSearchInput($any($event.target).value)"
@@ -28,6 +32,7 @@
           aria-label="Buscar reservas"
           (focus)="onMainInputFocus()"
           (blur)="onMainInputBlur()"
+          (keydown.escape)="puntoAutocompleteVisible.set(false)"
         />
         @if (filters().NombreApellido) {
           <button
@@ -41,11 +46,13 @@
           </button>
         }
         @if (puntoAutocompleteVisible()) {
-          <div class="autocomplete-dropdown">
+          <div id="reservation-point-suggestions" class="autocomplete-dropdown sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--search"
+            role="listbox" aria-label="Puntos de encuentro encontrados" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
             @for (p of puntoSugerencias(); track p) {
-              <div class="autocomplete-item" (mousedown)="seleccionarPuntoAutocomplete(p)">
+              <button type="button" class="autocomplete-item sir-autocomplete-option" role="option" aria-selected="false"
+                (mousedown)="$event.preventDefault()" (click)="seleccionarPuntoAutocomplete(p)">
                 {{ p.NombrePunto }}
-              </div>
+              </button>
             }
           </div>
         }

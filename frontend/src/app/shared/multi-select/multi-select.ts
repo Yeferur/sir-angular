@@ -1,6 +1,6 @@
 import {
-  ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener,
-  forwardRef, inject, Input, ViewEncapsulation,
+  ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener,
+  forwardRef, inject, Input, Output, ViewEncapsulation,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -9,6 +9,8 @@ export interface SirMultiSelectOption<T extends string | number = string | numbe
   label: string;
   disabled?: boolean;
 }
+
+let multiSelectId = 0;
 
 @Component({
   selector: 'app-multi-select',
@@ -30,9 +32,13 @@ export class SirMultiSelectComponent implements ControlValueAccessor {
   @Input() inputId = '';
   @Input() ariaLabel: string | null = null;
   @Input() disabled = false;
+  @Output() opened = new EventEmitter<void>();
   value: Array<string | number> = [];
   isOpen = false;
+  readonly generatedId = `sir-multi-select-${++multiSelectId}`;
 
+  get resolvedInputId(): string { return this.inputId || this.generatedId; }
+  get resolvedListId(): string { return `${this.resolvedInputId}-options`; }
   get effectivelyDisabled(): boolean { return this.disabled || this.formDisabled; }
   get selectionText(): string {
     if (!this.value.length) return this.placeholder;
@@ -55,7 +61,15 @@ export class SirMultiSelectComponent implements ControlValueAccessor {
   toggle(): void {
     if (this.effectivelyDisabled) return;
     this.isOpen = !this.isOpen;
-    if (!this.isOpen) this.onTouched();
+    if (this.isOpen) this.opened.emit();
+    else this.onTouched();
+    this.cdr.markForCheck();
+  }
+
+  close(): void {
+    if (!this.isOpen) return;
+    this.isOpen = false;
+    this.onTouched();
     this.cdr.markForCheck();
   }
 
@@ -83,17 +97,12 @@ export class SirMultiSelectComponent implements ControlValueAccessor {
   @HostListener('document:pointerdown', ['$event'])
   onDocumentPointerDown(event: PointerEvent): void {
     if (this.isOpen && event.target instanceof Node && !this.host.nativeElement.contains(event.target)) {
-      this.isOpen = false;
-      this.onTouched();
-      this.cdr.markForCheck();
+      this.close();
     }
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (!this.isOpen) return;
-    this.isOpen = false;
-    this.onTouched();
-    this.cdr.markForCheck();
+    this.close();
   }
 }

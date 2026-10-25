@@ -11,11 +11,12 @@ import { UiStateService } from '../../../services/ui-state.service';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
+import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
 
 @Component({
   selector: 'app-ver-tours',
   standalone: true,
-  imports: [CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent],
   templateUrl: './ver-tours.html',
   styleUrls: ['../../listado-reservas-transfers.css', './ver-tours.css'],
 })

@@ -8,13 +8,14 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
+import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
 
 type AccountFilter = 'todos' | 'activos' | 'inactivos';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, RouterModule, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [CommonModule, RouterModule, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent],
   templateUrl: './usuarios.html',
   styleUrls: ['../../listado-reservas-transfers.css', './usuarios.css'],
 })

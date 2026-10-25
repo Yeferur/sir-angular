@@ -5,7 +5,14 @@
     <app-loading-state mode="error" label="No pudimos preparar el módulo" [detail]="catalogError"
       actionLabel="Reintentar" (action)="cargarCatalogos()" />
   } @else {
-    <section class="search-card" aria-label="Buscar comisiones">
+    <app-comisiones-grupos />
+
+    <section class="legacy-freelance-section" aria-labelledby="freelance-commissions-title">
+      <header class="legacy-freelance-heading">
+        <h2 id="freelance-commissions-title">Comisiones Freelance</h2>
+        <p>El flujo de freelancers y beneficiarios conserva su proceso por reserva.</p>
+      </header>
+    <section class="search-card" aria-label="Buscar comisiones Freelance">
       <app-filter-bar [showFilters]="false" [showSearch]="false">
         <div sirPrimaryFilters class="field-group field-group--date">
           <label class="form-label" for="commission-date">Fecha del tour</label>
@@ -61,9 +68,6 @@
                 </svg>
               </button>
             </div>
-          }
-          @if (activeAdvancedFilters > 1) {
-            <button type="button" class="clear-filters-link" [disabled]="isSearching" (click)="limpiarFiltros()">Limpiar filtros</button>
           }
         </div>
       }
@@ -132,7 +136,7 @@
             <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
           </svg>
           <input type="search" [ngModel]="filtroLista" (ngModelChange)="actualizarBusquedaLocal($event)"
-            placeholder="Buscar entidad, reportante, reserva o tour" aria-label="Buscar en los resultados" />
+            placeholder="Buscar freelancer, reserva o tour" aria-label="Buscar en las comisiones Freelance" />
           <span>{{ textoCantidad(canalesVisibles.length, 'canal', 'canales') }}</span>
         </div>
 
@@ -172,11 +176,13 @@
                           <span><small>Pagado</small><strong>{{ formatCOP(grupo.Pagado_Reportante) }}</strong></span>
                           <span><small>Total comisión</small><strong>{{ formatCOP(grupo.Total_Reportante) }}</strong></span>
                         </div>
-                        @if (pendientesDe(grupo)) {
+                        @if (esEntidadComisionable(grupo)) {
+                          <span class="legacy-payment-note">Pago diario en la lista de entidades.</span>
+                        } @else if (pendientesDe(grupo)) {
                           <button type="button" class="button button--primary button--small" (click)="abrirPagoGrupo(grupo)">
                             Registrar pago
                           </button>
-                        } @else {
+                        } @else if (esFreelance(grupo)) {
                           <button type="button" class="button button--secondary button--small" (click)="reabrirGrupo(grupo)">
                             Volver a pendiente
                           </button>
@@ -234,11 +240,12 @@
         description="Selecciona la fecha del tour y presiona ‘Buscar’ para cargar las comisiones." />
       }
     </div>
+    </section>
   }
 </main>
 
 @if (canales.length) {
-  <div class="wizard-nav wizard-nav--page-enter module-footer" role="region" aria-label="Resumen y acciones de comisiones">
+  <div class="wizard-nav wizard-nav--page-enter module-footer" role="region" aria-label="Resumen y acciones de Freelance">
     <div class="wizard-nav-row">
       <div class="wizard-nav-left">
         <button type="button" class="btn-wizard-back" (click)="exportar()" [disabled]="isExporting">

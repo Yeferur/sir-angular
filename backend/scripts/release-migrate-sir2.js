@@ -37,6 +37,8 @@ const MIGRATIONS = Object.freeze([
   '20261021_0017_mercadeo_exportar.sql',
   '20261021_0018_entidades_reportantes_validacion.sql',
   '20261024_0019_mercadeo_lectura.sql',
+  '20261025_0020_entidad_rechazada_correccion.sql',
+  '20261025_0021_comisiones_grupos_pago.sql',
 ]);
 
 function assertTargetConfiguration(env) {

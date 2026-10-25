@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
-import { ComisionesService, PerfilComisionEntidad, PerfilComisionEntidadPayload } from './comisiones.service';
+import { ComisionesService, PerfilComisionEntidad, PerfilComisionEntidadPayload, ResultadoGruposComision } from './comisiones.service';
 
 describe('ComisionesService: modelo por entidad', () => {
   let service: ComisionesService;
@@ -113,5 +113,62 @@ describe('ComisionesService: modelo por entidad', () => {
     expect(groups[0].grupos[0].Nombre_Entidad).toBe('Hotel Dann Carlton');
     expect('Id_Beneficiario' in groups[0].grupos[0]).toBeFalse();
     expect(groups[0].grupos[0].reservas[0].Monto_Comision_Pagada).toBe(9500);
+  });
+
+  it('consulta la lista paginada de grupos por fecha, entidad, tipo, estado y texto', () => {
+    const response: ResultadoGruposComision = { grupos: [], paginacion: { pagina: 2, limite: 25, total: 30, paginas: 2 },
+      pendientesPorAsociarEntidad: { reservas: [], paginacion: { pagina: 1, limite: 25, total: 0, paginas: 0 } } };
+    let result: any;
+    service.listarGrupos({ desde: '2026-10-01', hasta: '2026-10-25', Id_Entidad_Reportante: '12',
+      Tipo: 'HOTEL', Estado: 'PENDIENTE', q: 'Dann', page: 2, limit: 25 }).subscribe(value => { result = value; });
+    const request = http.expectOne(req => req.url === '/api/comisiones/grupos'
+      && req.params.get('desde') === '2026-10-01' && req.params.get('hasta') === '2026-10-25'
+      && req.params.get('Id_Entidad_Reportante') === '12' && req.params.get('Tipo') === 'HOTEL'
+      && req.params.get('Estado') === 'PENDIENTE' && req.params.get('q') === 'Dann'
+      && req.params.get('page') === '2' && req.params.get('limit') === '25');
+    request.flush({ success: true, data: response });
+    expect(result).toEqual(response);
+  });
+
+  it('pide el detalle al abrir el drawer y envía los valores esperados junto al comprobante opcional', () => {
+    service.obtenerDetalleGrupo('e12~2026-10-15', 2, 25, '701').subscribe();
+    const detail = http.expectOne(req => req.url === '/api/comisiones/grupos/e12~2026-10-15/reservas'
+      && req.params.get('page') === '2' && req.params.get('limit') === '25' && req.params.get('loteId') === '701');
+    expect(detail.request.method).toBe('GET');
+    detail.flush({ data: { grupo: {}, reservasPendientes: [], lotes: [] } });
+
+    const file = new File(['pdf-content'], 'pago.pdf', { type: 'application/pdf' });
+    service.marcarGrupoPagado('e12~2026-10-15', {
+      Monto_Pendiente_Esperado: 42000, Cantidad_Reservas_Pendientes_Esperada: 3,
+      Forma_Pago: 'EFECTIVO', Nombre_Receptor: 'Contabilidad', DNI_Receptor: 'NIT-1234',
+    }, file).subscribe();
+    const payment = http.expectOne('/api/comisiones/grupos/e12~2026-10-15/pago');
+    expect(payment.request.method).toBe('PUT');
+    expect(payment.request.body instanceof FormData).toBeTrue();
+    expect(payment.request.body.get('Monto_Pendiente_Esperado')).toBe('42000');
+    expect(payment.request.body.get('Cantidad_Reservas_Pendientes_Esperada')).toBe('3');
+    expect(payment.request.body.get('comprobante')).toBe(file);
+    payment.flush({ data: { Id_Grupo_Comision: '701' } });
+  });
+
+  it('expone anulación, carga posterior y descarga autenticada por lote', () => {
+    service.anularLote('701', 'Motivo de prueba').subscribe();
+    const annul = http.expectOne('/api/comisiones/grupos/lotes/701/anulacion');
+    expect(annul.request.method).toBe('PUT');
+    expect(annul.request.body).toEqual({ Motivo: 'Motivo de prueba' });
+    annul.flush({ data: { Estado: 'ANULADO' } });
+
+    const proof = new File(['image'], 'receipt.png', { type: 'image/png' });
+    service.subirComprobanteLote('701', proof).subscribe();
+    const upload = http.expectOne('/api/comisiones/grupos/lotes/701/comprobante');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body.get('comprobante')).toBe(proof);
+    upload.flush({ data: { Tiene_Comprobante: true } });
+
+    service.descargarComprobanteLote('701').subscribe();
+    const download = http.expectOne('/api/comisiones/grupos/lotes/701/comprobante');
+    expect(download.request.method).toBe('GET');
+    expect(download.request.responseType).toBe('blob');
+    download.flush(new Blob(['image'], { type: 'image/png' }));
   });
 });

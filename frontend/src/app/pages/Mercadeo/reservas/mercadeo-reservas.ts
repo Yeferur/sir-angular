@@ -7,6 +7,7 @@ import { finalize, firstValueFrom } from 'rxjs';
 import { SirDateRange, SirDateRangePickerComponent } from '../../../shared/date-range-picker/date-range-picker';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { ActividadEntidad, EntidadesReportantesService } from '../../../services/Mercadeo/entidades-reportantes.service';
@@ -25,7 +26,7 @@ function defaultFilters(): MercadeoFilters {
   selector: 'app-mercadeo-reservas',
   standalone: true,
   imports: [CommonModule, DatePipe, FormsModule, SirDateRangePickerComponent, QueryEmptyStateComponent,
-    SirSelectComponent, LoadingStateComponent],
+    SirSelectComponent, LoadingStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './mercadeo-reservas.html',
   styleUrls: ['../../listado-reservas-transfers.css', './mercadeo-reservas.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

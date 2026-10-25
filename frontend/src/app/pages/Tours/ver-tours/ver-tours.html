@@ -12,25 +12,8 @@
     <div class="page-header reservation-search-panel">
       <div class="search-row">
         <div class="search-container">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Buscar por nombre o abreviación…"
-            [ngModel]="busqueda()"
-            (ngModelChange)="busqueda.set($event)"
-            autocomplete="off"
-            aria-label="Buscar tours"
-          />
-          @if (busqueda()) {
-            <button type="button" class="search-clear" (click)="clearSearch()" aria-label="Limpiar búsqueda">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-              </svg>
-            </button>
-          }
+          <app-search-input inputId="tour-search" inputType="text" placeholder="Buscar por nombre o abreviación…"
+            ariaLabel="Buscar tours" [value]="busqueda()" (valueChange)="busqueda.set($event)" />
         </div>
 
         @if (canCreateTour) {

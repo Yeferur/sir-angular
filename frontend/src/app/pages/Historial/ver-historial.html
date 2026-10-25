@@ -2,19 +2,10 @@
   <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" class="search-input" placeholder="Buscar por código de reserva o transfer"
-          [value]="draftFilters().referencia" (input)="onReferenceInput($any($event.target).value)"
-          (keyup.enter)="buscar()" autocomplete="off" aria-label="Buscar por código de reserva o transfer" />
-        @if (draftFilters().referencia) {
-          <button type="button" class="search-clear" (click)="onReferenceInput('')" aria-label="Limpiar búsqueda por código">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        }
+        <app-search-input inputId="history-reference-search" inputType="text" clearLabel="Limpiar búsqueda por código"
+          placeholder="Buscar por código de reserva o transfer"
+          ariaLabel="Buscar por código de reserva o transfer" [value]="draftFilters().referencia"
+          (valueChange)="onReferenceInput($event)" (search)="buscar()" />
         @if (referenceInputError()) { <span class="visually-hidden" role="alert">{{ referenceInputError() }}</span> }
       </div>
       <div class="historial-date">
@@ -66,99 +57,24 @@
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Usuario</label>
-          <div class="multi-filter">
-            <button type="button" class="multi-filter-trigger"
-              [class.active]="openFilterDropdown() === 'usuarios'"
-              [class.multi-filter-trigger-active]="draftFilters().usuarios.length > 0"
-              (click)="toggleDropdown('usuarios')"
-              [attr.aria-expanded]="openFilterDropdown() === 'usuarios'">
-              <span>{{ multiFilterLabel('usuarios') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (openFilterDropdown() === 'usuarios') {
-              <div class="multi-filter-menu">
-                @for (user of filterOptions().usuarios; track user.id) {
-                  <button type="button" class="multi-filter-option" (click)="toggleUser(user.id, !isDraftSelected('usuarios', user.id))">
-                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('usuarios', user.id)">
-                      @if (isDraftSelected('usuarios', user.id)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ user.label }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="setDraftUsers([])">Limpiar selección</button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="history-users-filter" ariaLabel="Filtrar por usuario"
+            [options]="userFilterOptions()" [ngModel]="draftFilters().usuarios"
+            (ngModelChange)="setDraftUsers($event)" (opened)="closeOtherHistoryFilters('history-users-filter')"
+            placeholder="Todos los usuarios" />
         </div>
         <div class="form-group hist-filter-module">
           <label class="form-label">Módulo</label>
-          <div class="multi-filter">
-            <button type="button" class="multi-filter-trigger"
-              [class.active]="openFilterDropdown() === 'modulos'"
-              [class.multi-filter-trigger-active]="draftFilters().modulos.length > 0"
-              (click)="toggleDropdown('modulos')"
-              [attr.aria-expanded]="openFilterDropdown() === 'modulos'">
-              <span>{{ multiFilterLabel('modulos') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (openFilterDropdown() === 'modulos') {
-              <div class="multi-filter-menu">
-                @for (module of filterOptions().modulos; track module.value) {
-                  <button type="button" class="multi-filter-option" (click)="toggleModule(module.value, !isDraftSelected('modulos', module.value))">
-                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('modulos', module.value)">
-                      @if (isDraftSelected('modulos', module.value)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ module.label }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="setDraftModules([])">Limpiar selección</button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="history-modules-filter" ariaLabel="Filtrar por módulo"
+            [options]="moduleFilterOptions()" [ngModel]="draftFilters().modulos"
+            (ngModelChange)="setDraftModules($event)" (opened)="closeOtherHistoryFilters('history-modules-filter')"
+            placeholder="Todos los módulos" />
         </div>
         <div class="form-group hist-filter-action">
           <label class="form-label">Actividad</label>
-          <div class="multi-filter">
-            <button type="button" class="multi-filter-trigger"
-              [class.active]="openFilterDropdown() === 'actividad'"
-              [class.multi-filter-trigger-active]="draftFilters().actividad.length > 0"
-              (click)="toggleDropdown('actividad')"
-              [attr.aria-expanded]="openFilterDropdown() === 'actividad'">
-              <span>{{ multiFilterLabel('actividad') }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-            @if (openFilterDropdown() === 'actividad') {
-              <div class="multi-filter-menu">
-                @for (activity of filterOptions().actividades; track activity.value) {
-                  <button type="button" class="multi-filter-option" (click)="toggleActivity(activity.value, !isDraftSelected('actividad', activity.value))">
-                    <span class="multi-filter-checkbox" [class.checked]="isDraftSelected('actividad', activity.value)">
-                      @if (isDraftSelected('actividad', activity.value)) {
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      }
-                    </span>
-                    <span>{{ activity.label }}</span>
-                  </button>
-                }
-                <button type="button" class="multi-filter-clear" (click)="setDraftActivity([])">Limpiar selección</button>
-              </div>
-            }
-          </div>
+          <app-multi-select inputId="history-activity-filter" ariaLabel="Filtrar por actividad"
+            [options]="activityFilterOptions()" [ngModel]="draftFilters().actividad"
+            (ngModelChange)="setDraftActivity($event)" (opened)="closeOtherHistoryFilters('history-activity-filter')"
+            placeholder="Todos los tipos" />
         </div>
       </div>
     </div>

@@ -107,7 +107,7 @@ test('migración de perfiles de comisión está en release y protege columnas y 
 
 test('migración nueva agrega el índice de actividad de transfers y queda sin aplicar', async () => {
   const name = '20261020_0016_transfers_entidad_fecha_registro.sql';
-  assert.equal(MIGRATIONS[MIGRATIONS.length - 4], name);
+  assert.ok(MIGRATIONS.indexOf(name) < MIGRATIONS.indexOf('20261021_0017_mercadeo_exportar.sql'));
   const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(migration.statements.some(statement => statement.includes('ALTER TABLE transfers ADD INDEX ix_transfers_entidad_registro (Id_Entidad_Reportante, Fecha_Registro)')));
@@ -132,7 +132,7 @@ test('la guarda idempotente del esquema de transfers precede a 0016', async () =
 
 test('migración 0017 registra MERCADEO.EXPORTAR y su asignación por defecto sin aplicarla', async () => {
   const name = '20261021_0017_mercadeo_exportar.sql';
-  assert.equal(MIGRATIONS.at(-3), name);
+  assert.ok(MIGRATIONS.indexOf(name) < MIGRATIONS.indexOf('20261021_0018_entidades_reportantes_validacion.sql'));
   const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(migration.statements.some(statement => statement.includes("'MERCADEO.EXPORTAR'")));
@@ -143,7 +143,7 @@ test('migración 0017 registra MERCADEO.EXPORTAR y su asignación por defecto si
 
 test('migración 0018 agrega marcas de rechazo y la regla de validación sin aplicar', async () => {
   const name = '20261021_0018_entidades_reportantes_validacion.sql';
-  assert.equal(MIGRATIONS.at(-2), name);
+  assert.ok(MIGRATIONS.indexOf(name) < MIGRATIONS.indexOf('20261024_0019_mercadeo_lectura.sql'));
   const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   assert.ok(REQUIRED_COLUMNS.reservas.includes('Pendiente_Por_Entidad_En'));
@@ -156,8 +156,7 @@ test('migración 0018 agrega marcas de rechazo y la regla de validación sin apl
 
 test('migración 0019 agrega lectura de reservas y transfers a Mercadeo, sin Historial ni escritura', async () => {
   const name = '20261024_0019_mercadeo_lectura.sql';
-  assert.equal(MIGRATIONS.at(-1), name);
-  const migration = (await readMigrations()).at(-1);
+  const migration = (await readMigrations()).find(item => item.name === name);
   assert.equal(migration.name, name);
   const sql = await fs.readFile(path.join(__dirname, '../database/migrations', name), 'utf8');
   for (const code of ['TRANSFERS.LEER', 'RESERVAS.LEER']) assert.ok(sql.includes(code));
@@ -165,4 +164,34 @@ test('migración 0019 agrega lectura de reservas y transfers a Mercadeo, sin His
   assert.match(sql, /Nombre_Rol\)\)='mercadeo'/);
   assert.doesNotMatch(sql, /(?:CREAR|ACTUALIZAR|ELIMINAR)\.(?:RESERVAS|TRANSFERS)/);
   assert.equal(migration.statements.some(statement => /^\s*(?:DROP|TRUNCATE|DELETE)\b/i.test(statement)), false);
+});
+
+test('el runner conserva 0020 como checkpoint anterior a 0021 y --through se detiene en ella', async () => {
+  const name = '20261025_0020_entidad_rechazada_correccion.sql';
+  const nextName = '20261025_0021_comisiones_grupos_pago.sql';
+  assert.equal(MIGRATIONS.at(-2), name);
+  const migrations = await readMigrations();
+  assert.equal(migrations.at(-2).name, name);
+  const selected = selectMigrationsThrough(migrations, name);
+  assert.equal(selected.at(-1).name, name);
+  assert.ok(selected.at(-1).statements.some(statement =>
+    statement.includes('ENTIDAD_REPORTANTE_RECHAZADA_SIN_REASIGNAR')));
+  assert.equal(MIGRATIONS.at(-1), nextName);
+});
+
+test('la migración 0021 registra lotes, vínculo nullable y no hace backfill', async () => {
+  const name = '20261025_0021_comisiones_grupos_pago.sql';
+  assert.equal(MIGRATIONS.at(-1), name);
+  const migration = (await readMigrations()).at(-1);
+  assert.equal(migration.name, name);
+  const sql = await fs.readFile(path.join(__dirname, '../database/migrations', name), 'utf8');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS comisiones_grupos_pago/);
+  assert.match(sql, /ENUM\('PENDIENTE','PAGADO','ANULADO'\)/);
+  assert.match(sql, /UNIQUE KEY ux_comisiones_grupo_entidad_fecha_lote \(Id_Entidad_Reportante, Fecha_Tour, Numero_Lote\)/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS comisiones_grupos_pago_reservas/);
+  assert.match(sql, /Id_Reserva VARCHAR\(20\) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci/);
+  assert.match(sql, /Nombre_Receptor_Snap VARCHAR\(255\)/);
+  assert.match(sql, /ADD COLUMN Id_Grupo_Comision BIGINT UNSIGNED NULL/);
+  assert.match(sql, /ADD CONSTRAINT fk_liquidaciones_grupo_comision/);
+  assert.doesNotMatch(sql, /\b(?:INSERT INTO|UPDATE)\s+liquidaciones\b/i);
 });

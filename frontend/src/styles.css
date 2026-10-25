@@ -1,5 +1,6 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 @import './app/shared/multi-select/multi-select.css';
+@import './app/shared/autocomplete/autocomplete.css';
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap");
 
 ::selection { background: var(--accent-blue); color: var(--text-on-accent); }
@@ -112,6 +113,14 @@
   /* Tarjetas principales (cards de layout) */
   --radius-pill: 999px;
   /* Badges, pastillas */
+
+  --search-control-height: 40px;
+  --search-control-border-width: 1px;
+  --search-control-radius: var(--radius-sm, 8px);
+  --search-control-font-size: 14px;
+  --search-control-font-weight: 500;
+  --search-control-transition: .18s ease;
+  --search-control-disabled-opacity: .55;
 
   /* Escala de Z-Index */
   --z-dropdown: 100;
@@ -1459,14 +1468,6 @@ input[type=number] {
   gap: 16px;
 }
 
-.wizard-shell .entity-search-state { padding: 13px 14px; }
-.wizard-shell .entity-search-state p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: .78rem;
-  line-height: 1.4;
-  user-select: none;
-}
 .wizard-shell .entity-create-action { width: 100%; margin-top: 10px; }
 
 .wizard-shell--page-enter,

@@ -1,0 +1,149 @@
+.sir-autocomplete-panel {
+  --sir-autocomplete-max-height: 280px;
+  --sir-autocomplete-layer: 50;
+  box-sizing: border-box;
+  max-height: min(var(--sir-autocomplete-max-height), calc(100dvh - 120px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--separator-color);
+  border-radius: var(--radius-md, 12px);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg, 0 18px 44px var(--shadow-color));
+}
+
+.sir-autocomplete-panel--overlay {
+  position: absolute;
+  z-index: var(--sir-autocomplete-layer);
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  width: 100%;
+  padding: 6px;
+}
+
+.sir-autocomplete-panel--above { top: auto; bottom: calc(100% + 6px); }
+
+.sir-autocomplete-panel--form { --sir-autocomplete-layer: 300; }
+.sir-autocomplete-panel--search { --sir-autocomplete-layer: 50; --sir-autocomplete-max-height: 220px; }
+
+.sir-autocomplete-panel--inline {
+  --sir-autocomplete-max-height: 220px;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  background: var(--bg-tertiary);
+}
+
+.sir-autocomplete-panel--inline .sir-autocomplete-panel-title {
+  margin: 0;
+  padding: 8px 11px 3px;
+  color: var(--text-secondary);
+  font-size: .69rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.sir-autocomplete-panel--inline .sir-autocomplete-option {
+  border-bottom-color: var(--separator-color);
+  border-radius: 0;
+}
+
+.sir-autocomplete-panel--inline .sir-autocomplete-option:last-child { border-bottom-color: transparent; }
+
+.sir-autocomplete-option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-primary);
+  font: 500 14px/1.4 var(--font-family);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.sir-autocomplete-option:hover:not(:disabled) {
+  border-color: var(--separator-color);
+  background: var(--bg-tertiary);
+}
+
+.sir-autocomplete-option:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -2px;
+}
+
+.sir-autocomplete-option[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
+  color: var(--accent-blue);
+}
+
+.sir-autocomplete-option:disabled { opacity: .55; cursor: not-allowed; }
+
+.sir-autocomplete-option--rich {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.sir-autocomplete-option__label { min-width: 0; overflow-wrap: anywhere; }
+.sir-autocomplete-option__meta {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: .78rem;
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.sir-autocomplete-status {
+  display: grid;
+  gap: 10px;
+  padding: 13px 14px;
+  color: var(--text-secondary);
+  font-size: .875rem;
+  line-height: 1.4;
+}
+
+.sir-autocomplete-status p { margin: 0; }
+.sir-autocomplete-inline-status { color: var(--text-secondary); font-size: .875rem; }
+.sir-autocomplete-error { color: var(--danger-color, var(--accent-red)); }
+
+.sir-autocomplete-enter { animation: sirAutocompleteEnter .18s var(--ease-soft, ease) both; }
+.sir-autocomplete-leave { animation: sirAutocompleteLeave .18s ease both; pointer-events: none; }
+
+@keyframes sirAutocompleteEnter {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sirAutocompleteLeave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (pointer: coarse) {
+  .sir-autocomplete-option { min-height: 40px; }
+}
+
+@media (max-width: 600px) {
+  .sir-autocomplete-panel--overlay {
+    max-width: min(100%, calc(100vw - 24px));
+    max-height: min(var(--sir-autocomplete-max-height), calc(100dvh - 104px));
+  }
+  .sir-autocomplete-option--rich { align-items: flex-start; }
+  .sir-autocomplete-option__meta { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sir-autocomplete-option { transition: none; }
+  .sir-autocomplete-enter, .sir-autocomplete-leave { animation: none; }
+}

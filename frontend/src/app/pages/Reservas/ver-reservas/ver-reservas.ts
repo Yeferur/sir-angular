@@ -15,12 +15,13 @@ import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [SirSelectComponent, SirMultiSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [SirSelectComponent, SirMultiSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './ver-reservas.html',
   styleUrls: ['../../listado-reservas-transfers.css']
 })

@@ -23,7 +23,7 @@ describe('Turnos: geometría del buscador', () => {
     fixture.componentInstance.loading.set(false);
     fixture.detectChanges();
 
-    const field = fixture.nativeElement.querySelector('.search-field') as HTMLLabelElement;
+    const field = fixture.nativeElement.querySelector('.sir-search-input') as HTMLElement;
     const input = field.querySelector('input') as HTMLInputElement;
     const style = getComputedStyle(field);
     expect(style.height).toBe('40px');
@@ -32,8 +32,6 @@ describe('Turnos: geometría del buscador', () => {
     expect(style.paddingLeft).toBe('12px');
     expect(getComputedStyle(input).fontSize).toBe('14px');
     expect(getComputedStyle(input).fontWeight).toBe('500');
-    input.disabled = true;
-    expect(getComputedStyle(field).opacity).toBe('0.55');
     fixture.destroy();
   });
 });

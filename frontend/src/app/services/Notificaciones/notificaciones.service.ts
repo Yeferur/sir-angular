@@ -47,6 +47,7 @@ export class NotificacionesService {
     });
   }
   markRead(id: string): void {
+    if (this.items().some(item => item.idNotificacion === id && item.tipo === 'ENTIDAD_REPORTANTE_RECHAZADA')) return;
     this.http.patch(`${this.baseUrl}/${id}/leer`, {}).subscribe({ next: () => {
       this.items.update(items => items.map(item => item.idNotificacion === id ? { ...item, leida: true } : item));
       this.noLeidas.update(value => Math.max(0, value - 1));
@@ -54,7 +55,9 @@ export class NotificacionesService {
   }
   markAllRead(): void {
     this.http.patch(`${this.baseUrl}/leer-todas`, {}).subscribe({ next: () => {
-      this.items.update(items => items.map(item => ({ ...item, leida: true }))); this.noLeidas.set(0);
+      this.items.update(items => items.map(item => item.tipo === 'ENTIDAD_REPORTANTE_RECHAZADA'
+        ? item : { ...item, leida: true }));
+      this.noLeidas.set(this.items().filter(item => !item.leida).length);
     }});
   }
 

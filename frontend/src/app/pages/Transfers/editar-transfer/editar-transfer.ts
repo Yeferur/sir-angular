@@ -17,6 +17,7 @@ import { UppercaseInputDirective } from '../../../shared/directives/uppercase-in
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { UiStateService } from '../../../services/ui-state.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
+import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 interface WizardStep {
@@ -27,7 +28,7 @@ interface WizardStep {
 @Component({
   selector: 'app-editar-transfer',
   standalone: true,
-  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent],
+  imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './editar-transfer.html',
   styleUrls: ['../transfer-shared.css']
 })

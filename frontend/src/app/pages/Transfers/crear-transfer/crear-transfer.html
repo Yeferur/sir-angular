@@ -178,25 +178,29 @@
         @if (tipoEntidadSeleccionada()) {
         <div class="form-group">
           <label class="form-label" for="crear-transfer-entidad">Entidad reportante <span class="required-star">*</span></label>
-          <div class="transfer-entity-autocomplete" (focusout)="cerrarSugerenciasEntidadSiSale($event)">
+          <div class="transfer-entity-autocomplete" (focusout)="cerrarSugerenciasEntidadSiSale($event)" (keydown.escape)="cerrarSugerenciasEntidad()">
             <input type="text" id="crear-transfer-entidad" class="form-input" role="combobox"
               aria-autocomplete="list" aria-controls="crear-transfer-entidad-opciones"
               [attr.aria-expanded]="entidadAutocompleteOpen" aria-label="Entidad reportante"
+              [attr.aria-busy]="entidadCargando"
               [ngClass]="form.get('Id_Entidad_Reportante')?.touched && form.get('Id_Entidad_Reportante')?.invalid ? 'errorInput' : ''"
               placeholder="Buscar entidad por nombre" [value]="busquedaEntidad" autocomplete="off"
               (input)="onEntidadInput($any($event.target).value)" (focus)="abrirSugerenciasEntidad()" />
             @if (entidadAutocompleteOpen) {
               @if (!entidadCargando && !entidadError && resultsEntidadesReportantes.length) {
-                <ul id="crear-transfer-entidad-opciones" class="transfer-entity-options" role="listbox" aria-label="Entidades reportantes">
+                <div id="crear-transfer-entidad-opciones" class="transfer-entity-options sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--form"
+                  role="listbox" aria-label="Entidades reportantes" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
                   @for (entidad of resultsEntidadesReportantes; track entidad.Id_Entidad_Reportante) {
-                    <li role="option" (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
-                      {{ entidad.Nombre }}
-                    </li>
+                    <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false"
+                      (mousedown)="$event.preventDefault()" (click)="seleccionarEntidadReportante(entidad)">
+                      <span class="sir-autocomplete-option__label">{{ entidad.Nombre }}</span>
+                    </button>
                   }
-                </ul>
+                </div>
               } @else {
-                <div id="crear-transfer-entidad-opciones" class="transfer-entity-options entity-search-state">
-                  <p role="status">
+                <div id="crear-transfer-entidad-opciones" class="transfer-entity-options entity-search-state sir-autocomplete-panel sir-autocomplete-panel--overlay sir-autocomplete-panel--form sir-autocomplete-status"
+                  animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
+                  <p role="status" [class.sir-autocomplete-error]="!!entidadError">
                     @if (entidadCargando) { Buscando entidades… }
                     @else if (entidadError) { {{ entidadError }} }
                     @else { No encontramos entidades con ese nombre }

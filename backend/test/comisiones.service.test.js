@@ -292,7 +292,7 @@ test('consulta perfiles ligados a entidad y devuelve los datos reutilizables', a
   assert.ok(calls.every((call) => call.params[0] === 10));
 });
 
-test('pago grupal guarda una liquidación y monto por reserva, prioriza el perfil y conserva snapshots', async (t) => {
+test('el endpoint heredado no paga HOTEL por reserva; debe usarse el grupo entidad-día', async (t) => {
   const profile = {
     Id_Perfil_Comision: 88, Forma_Pago_Perfil: 'NEQUI', Cuenta_Perfil: '3001234567',
     Nombre_Receptor_Perfil: 'Hotel Central SAS', DNI_Receptor_Perfil: '900123456',
@@ -302,25 +302,11 @@ test('pago grupal guarda una liquidación y monto por reserva, prioriza el perfi
     eligibleReservation({ Id_Reserva: 'H-2', Id_Entidad_Reportante: 10, Tipo_Entidad: 'HOTEL', Nombre_Entidad: 'Hotel Central', Monto_Comision: '23000', ...profile }),
   ] });
   installConnectionMock(t, mocked);
-  const result = await actualizarLiquidacionesLote({ Estado: 'PAGADO', pagos: [{
+  await assert.rejects(actualizarLiquidacionesLote({ Estado: 'PAGADO', pagos: [{
     reservas: ['H-1', 'H-2'], Forma_Pago: 'EFECTIVO', Nombre_Receptor: 'Ignorado por perfil', DNI_Receptor: 'DOC-1234',
-  }] }, 42);
-  assert.equal(result.updated, 2);
-  assert.deepEqual(result.montos, { 'H-1': 12000, 'H-2': 23000 });
-  const write = mocked.calls.find((call) => call.sql?.includes('INSERT INTO liquidaciones'));
-  const rows = write.params[0];
-  assert.equal(rows.length, 2);
-  assert.deepEqual(rows.map((row) => row[0]), ['H-1', 'H-2']);
-  assert.ok(rows.every((row) => row[1] === 'Hotel Central'));
-  assert.ok(rows.every((row) => row[2] === 'NEQUI' && row[3] === '3001234567'));
-  assert.ok(rows.every((row) => row[4] === 'Hotel Central SAS' && row[5] === '900123456'));
-  assert.deepEqual(rows.map((row) => row[8]), [12000, 23000]);
-  assert.match(write.sql, /Monto_Comision_Pagada/);
-  assert.doesNotMatch(write.sql, /Id_Beneficiario_Comision/);
-  const historyDetails = mocked.calls.find((call) => call.sql?.includes('INSERT INTO detalle_historial'));
-  assert.ok(historyDetails);
-  assert.ok(historyDetails.params.includes('Monto_Comision_Pagada_Total'));
-  assert.ok(historyDetails.params.some((value) => String(value).includes('"H-1":12000')));
+  }] }, 42), (error) => error.errorCode === 'ENTITY_GROUP_PAYMENT_REQUIRED');
+  assert.equal(mocked.calls.some((call) => call.sql?.includes('INSERT INTO liquidaciones')), false);
+  assert.ok(mocked.calls.some((call) => call.kind === 'rollback'));
 });
 
 test('el backend rechaza Agencia Internacional para pago aunque el query devuelva accidentalmente una fila', async (t) => {
@@ -373,19 +359,15 @@ test('pago Freelance guarda los datos manuales en la liquidación de su única r
   assert.equal(write.params[0][0][8], 18000);
 });
 
-test('reabrir borra monto y fecha de pago y devuelve cada fila a PENDIENTE', async (t) => {
+test('el endpoint heredado no reabre pagos de HOTEL; la anulación pertenece al lote', async (t) => {
   const mocked = mockConnection({ eligible: [
     eligibleReservation({ Id_Reserva: 'H-1', Id_Entidad_Reportante: 10, Tipo_Entidad: 'HOTEL', Nombre_Entidad: 'Hotel Central', Estado_Liquidacion: 'PAGADO' }),
     eligibleReservation({ Id_Reserva: 'H-2', Id_Entidad_Reportante: 10, Tipo_Entidad: 'HOTEL', Nombre_Entidad: 'Hotel Central', Estado_Liquidacion: 'PAGADO' }),
   ] });
   installConnectionMock(t, mocked);
-  const result = await actualizarLiquidacionesLote({ Estado: 'PENDIENTE', pagos: [{
+  await assert.rejects(actualizarLiquidacionesLote({ Estado: 'PENDIENTE', pagos: [{
     reservas: ['H-1', 'H-2'], Forma_Pago: 'NEQUI', Cuenta_Bancaria: '3001234567',
     Nombre_Receptor: 'Hotel Central SAS', DNI_Receptor: '900123456',
-  }] }, 42);
-  assert.equal(result.updated, 2);
-  const write = mocked.calls.find((call) => call.sql?.includes('INSERT INTO liquidaciones'));
-  assert.ok(write.params[0].every((row) => row[6] === 'PENDIENTE' && row[7] === null && row[8] === null));
-  assert.match(write.sql, /Fecha_Pago = VALUES\(Fecha_Pago\)/);
-  assert.match(write.sql, /Monto_Comision_Pagada = VALUES\(Monto_Comision_Pagada\)/);
+  }] }, 42), (error) => error.errorCode === 'ENTITY_GROUP_PAYMENT_REQUIRED');
+  assert.equal(mocked.calls.some((call) => call.sql?.includes('INSERT INTO liquidaciones')), false);
 });

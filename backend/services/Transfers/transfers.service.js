@@ -4,7 +4,8 @@ const fs = require('fs');
 const { recordHistorial, logSistema } = require('../Historial/logger');
 const { normalizarFechaMysql } = require('../../utils/mysqlDate');
 const { prepararComprobante, guardarComprobanteAtomico } = require('../../utils/comprobanteArchivo');
-const { validateReservationEntity } = require('../EntidadesReportantes/entidades-reportantes.service');
+const { validateReservationEntity, typeForChannel, resolveRejectedEntityOperation } = require('../EntidadesReportantes/entidades-reportantes.service');
+const websocketManager = require('../../websocketManager');
 const transferNovedades = require('../Programacion/programacion-transfers-novedades.service');
 
 function sincronizarListadoPreparado(idTransfer) {
@@ -172,6 +173,7 @@ function resolverEstadoTransfer(payload = {}, estadoActual = null) {
   if (estadoBase === 'Cancelado' || estadoBase === 'Completado') {
     return estadoBase;
   }
+  if (payload.RequiereEntidad && !payload.Id_Entidad_Reportante) return 'Pendiente de datos';
 
   if (payload.ModoDuplicado) {
     return 'Pendiente';
@@ -250,7 +252,7 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     if (!useExternalConn) await conn.beginTransaction();
 
     const [candidatos] = await conn.query(
-      `SELECT tr.Id_Transfer, tr.Estado, tr.Fecha_Transfer,
+      `SELECT tr.Id_Transfer, tr.Estado, tr.Fecha_Transfer, tr.Id_Canal, tr.Id_Entidad_Reportante,
               e.Estado_Validacion AS Estado_Validacion_Entidad
          FROM transfers tr LEFT JOIN entidades_reportantes e
            ON e.Id_Entidad_Reportante=tr.Id_Entidad_Reportante
@@ -266,6 +268,7 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
     resumen.evaluados = Number(candidatos?.length || 0);
 
     for (const row of candidatos || []) {
+      if (!row.Id_Entidad_Reportante && await typeForChannel(conn, row.Id_Canal)) continue;
       const transicion = resolverTransicionTransferVencido(row.Estado, row.Fecha_Transfer);
       if (!transicion || transicion.nuevoEstado === row.Estado) continue;
       if (row.Estado_Validacion_Entidad === 'RECHAZADA' && transicion.nuevoEstado === 'Confirmado') continue;
@@ -276,6 +279,9 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
           WHERE Id_Transfer = ?
             AND Estado = ?
             AND Pendiente_Por_Entidad_En IS NULL
+            AND (Id_Entidad_Reportante IS NOT NULL OR Id_Canal NOT IN
+              (SELECT Id_Canal FROM canales_reservas WHERE UPPER(TRIM(Nombre_Canal)) IN
+                ('HOTEL','AGENCIA NACIONAL','AGENCIA INTERNACIONAL')))
             AND (? <> 'Confirmado' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
               WHERE er.Id_Entidad_Reportante=transfers.Id_Entidad_Reportante
                 AND er.Estado_Validacion='RECHAZADA'))`,
@@ -498,6 +504,8 @@ async function crearTransferSvc(payload, files = {}) {
       : [[]];
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
+      RequiereEntidad: !!(await typeForChannel(conn, idCanal)),
+      Id_Entidad_Reportante: idEntidadReportante,
       Id_Moneda: idMoneda,
       Id_Rango: pricing.idRango,
       Rango: pricing.idRango,
@@ -923,7 +931,7 @@ async function normalizarEstadosTransfersExistentes(conexion = db) {
         tr.DNI, tr.Telefono_Titular, tr.Cantidad_Personas, tr.Id_Rango,
         tr.Id_Servicio, tr.Punto_Salida, tr.Punto_Destino, tr.Hora_Recogida,
         tr.Nombre_Reportante, tr.Telefono_Reportante, tr.Valor, tr.Vuelo, tr.TipoVuelo,
-        tr.Id_Entidad_Reportante, tr.Pendiente_Por_Entidad_En,
+        tr.Id_Canal, tr.Id_Entidad_Reportante, tr.Pendiente_Por_Entidad_En,
         e.Estado_Validacion AS Estado_Validacion_Entidad
        FROM transfers tr LEFT JOIN entidades_reportantes e
          ON e.Id_Entidad_Reportante=tr.Id_Entidad_Reportante`
@@ -971,6 +979,8 @@ async function normalizarEstadosTransfersExistentes(conexion = db) {
     let nuevoEstado = estadoActual;
     if (!['Cancelado', 'Completado'].includes(estadoActual)) {
       nuevoEstado = resolverEstadoTransfer({
+        RequiereEntidad: !!(await typeForChannel(conexion, transfer.Id_Canal)),
+        Id_Entidad_Reportante: transfer.Id_Entidad_Reportante,
         FechaTransfer: transfer.Fecha_Transfer,
         Pago: { Tipo: tipoPago, Abonos: abonos },
         Titular: transfer.Nombre_Titular,
@@ -1147,6 +1157,8 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
 
     const estadoCalculado = resolverEstadoTransfer({
       ...payload,
+      RequiereEntidad: !!(await typeForChannel(conn, idCanal)),
+      Id_Entidad_Reportante: idEntidadReportante,
       Id_Moneda: idMoneda,
       Id_Rango: pricing.idRango,
       Rango: pricing.idRango,
@@ -1306,8 +1318,14 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       ]
     });
 
+    const correctionRecipients = idEntidadReportante
+      ? await resolveRejectedEntityOperation(conn, 'TRANSFER', Id_Transfer) : [];
     // Commit transacción
     await conn.commit();
+    for (const recipientId of correctionRecipients) {
+      try { websocketManager.sendToUser(recipientId, { type: 'actividadActualizada' }); }
+      catch (error) { console.error('No se pudo actualizar Avisos tras corregir el transfer:', error); }
+    }
     sincronizarListadoPreparado(Id_Transfer);
 
     if (rutasPendientesEliminar.length > 0) {
@@ -1498,4 +1516,4 @@ async function resolverComprobanteSeguroTransferPorNombre(nombreArchivo) {
   };
 }
 
-module.exports = { getServiciosTransferSvc, getCanalesTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos, normalizarEstadosTransfersExistentes };
+module.exports = { getServiciosTransferSvc, getCanalesTransferSvc, crearTransferSvc, actualizarTransferSvc, cancelarTransferSvc, eliminarTransferSvc, filtrarTransfersSvc, getRangosSvc, getPreciosPorRangoSvc, getPrecioBasePorRangoYMonedaSvc, getDetalleTransferSvc, subirComprobanteTransferSvc, resolverComprobanteSeguroTransferPorNombre, actualizarEstadosTransfersVencidos, normalizarEstadosTransfersExistentes, resolverEstadoTransfer };

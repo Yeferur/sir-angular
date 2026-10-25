@@ -62,7 +62,7 @@ describe('VerHistorialComponent', () => {
 
   it('muestra la fecha única y la búsqueda por código en la barra principal', () => {
     const primary = fixture.nativeElement.querySelector('.reservation-search-panel') as HTMLElement;
-    expect(primary.querySelector('input.search-input')?.getAttribute('placeholder')).toBe('Buscar por código de reserva o transfer');
+    expect(primary.querySelector('app-search-input input')?.getAttribute('placeholder')).toBe('Buscar por código de reserva o transfer');
     expect(primary.querySelector('app-datepicker')).not.toBeNull();
     expect(primary.querySelector('app-date-range-picker')).toBeNull();
     expect(primary.querySelector('.btn-filter svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
@@ -74,7 +74,8 @@ describe('VerHistorialComponent', () => {
     expect(window.getComputedStyle(fixture.nativeElement.querySelector('.hist-filter-action')).order).toBe('3');
     expect(window.getComputedStyle(fixture.nativeElement.querySelector('.hist-filter-module')).order).toBe('4');
     expect(fixture.nativeElement.querySelector('.hist-filter-action .form-label')?.textContent).toContain('Actividad');
-    component.toggleDropdown('actividad'); fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.hist-filter-action .multi-filter-trigger') as HTMLButtonElement).click();
+    fixture.detectChanges();
     const labels = Array.from(fixture.nativeElement.querySelectorAll('.hist-filter-action .multi-filter-option') as NodeListOf<HTMLElement>)
       .map((option) => option.textContent?.trim());
     expect(labels).toEqual(options.actividades.map((activity) => activity.label));
@@ -172,7 +173,42 @@ describe('VerHistorialComponent', () => {
     expect(router.navigate).toHaveBeenCalled();
   });
 
-  it('restaura la fecha, multiselects y página desde query params', () => {
+  it('conecta los multiselects compartidos al borrador y conserva selección múltiple y limpieza', () => {
+    component.toggleAdvancedFilters(); fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const trigger = host.querySelector('#history-users-filter') as HTMLButtonElement;
+    const users = trigger.closest('app-multi-select') as HTMLElement;
+    trigger.click(); fixture.detectChanges();
+    const options = Array.from(users.querySelectorAll<HTMLButtonElement>('.multi-filter-option'));
+    options.find(option => option.textContent?.includes('Julieta'))!.click(); fixture.detectChanges();
+    options.find(option => option.textContent?.includes('Yeferson'))!.click(); fixture.detectChanges();
+    expect(component.draftFilters().usuarios).toEqual([3, 4]);
+    expect(component.appliedFilters().usuarios).toEqual([]);
+    expect(trigger.textContent).toContain('2 seleccionados');
+    expect(users.querySelectorAll('.multi-filter-checkbox.checked').length).toBe(2);
+
+    options.find(option => option.textContent?.includes('Julieta'))!.click(); fixture.detectChanges();
+    expect(component.draftFilters().usuarios).toEqual([4]);
+    (users.querySelector('.multi-filter-clear') as HTMLButtonElement).click(); fixture.detectChanges();
+    expect(component.draftFilters().usuarios).toEqual([]);
+    expect(component.appliedFilters().usuarios).toEqual([]);
+  });
+
+  it('mantiene un solo desplegable abierto al activar filtros del historial', () => {
+    component.toggleAdvancedFilters(); fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const users = host.querySelector<HTMLButtonElement>('#history-users-filter')!;
+    const modules = host.querySelector<HTMLButtonElement>('#history-modules-filter')!;
+    users.click(); fixture.detectChanges();
+    expect(host.querySelector('#history-users-filter-options')).not.toBeNull();
+
+    // Native keyboard activation dispatches click without a preceding pointerdown.
+    modules.click(); fixture.detectChanges();
+    expect(host.querySelector('#history-users-filter-options')).toBeNull();
+    expect(host.querySelector('#history-modules-filter-options')).not.toBeNull();
+  });
+
+  it('restaura la fecha, multiselects y página desde query params', async () => {
     queryParams.next(convertToParamMap({
       fecha: '2026-10-01', usuarios: ['3', '4'],
       actividad: ['accesos', 'creaciones'], modulos: ['reservas'], page: '3',
@@ -182,6 +218,9 @@ describe('VerHistorialComponent', () => {
       fecha: '2026-10-01', referencia: '', usuarios: [3, 4],
       actividad: ['accesos', 'creaciones'], modulos: ['reservas'],
     });
+    component.toggleAdvancedFilters(); fixture.detectChanges();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#history-users-filter')?.textContent).toContain('2 seleccionados');
     expect(component.currentPage()).toBe(3);
     expect(service.getHistorial.calls.mostRecent().args[0].page).toBe(3);
   });

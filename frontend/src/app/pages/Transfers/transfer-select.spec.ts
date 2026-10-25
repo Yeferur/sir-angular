@@ -25,6 +25,7 @@ for (const [mode, component] of [['crear', CrearTransferComponent], ['editar', E
         providers: [provideZonelessChangeDetection(), provideRouter([]),
           { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'T-SELECT' }), queryParamMap: convertToParamMap({}), url: [] } } },
           { provide: TransferService, useValue: {
+            getCanales: () => of([{ Id_Canal: 1, Nombre_Canal: 'Directo' }, { Id_Canal: 2, Nombre_Canal: 'Agencia Nacional' }]),
             getServicios: () => of([{ Id_Servicio: 2, Servicio: 'Hotel / Aeropuerto' }, { id: 3, Servicio: 'Aeropuerto / Hotel' }]),
             getRangos: () => of([]), getMonedas: () => of([{ Codigo: 'COP', Nombre_Moneda: 'Peso colombiano', Id_Moneda: 1 }]),
             getTransfer: () => of({ transfer: { Id_Transfer: 'T-SELECT', Id_Servicio: 2, TipoVuelo: 'Internacional', Fecha_Transfer: '2099-10-15' }, pagos: [] }),
@@ -81,6 +82,20 @@ for (const [mode, component] of [['crear', CrearTransferComponent], ['editar', E
       c.form.get('Moneda').reset('COP'); render();
       expect(select('Moneda').selectedOption?.value).toBe('COP');
       c.resultsMonedas = []; render(); expect(select('Moneda').options).toEqual([]);
+    });
+
+    it('cierra el autocomplete de entidad al pulsar Escape', () => {
+      c.resultsCanales = [{ Id_Canal: 1, Nombre_Canal: 'HOTEL' }];
+      c.form.get('Id_Canal').setValue(1, { emitEvent: false });
+      c.currentStep = 1;
+      c.busquedaEntidad = 'Hotel Poblado';
+      c.entidadAutocompleteOpen = true;
+      render();
+      const field = fixture.nativeElement.querySelector(`#${mode}-transfer-entidad`) as HTMLInputElement;
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      render();
+      expect(c.entidadAutocompleteOpen).toBeFalse();
+      expect(field.getAttribute('aria-expanded')).toBe('false');
     });
   });
 }

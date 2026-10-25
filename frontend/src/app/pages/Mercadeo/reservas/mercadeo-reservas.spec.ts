@@ -62,6 +62,25 @@ describe('MercadeoReservasComponent', () => {
     expect(filters.fechaRegistroHasta).toBe('');
   });
 
+  it('mantiene el multiselect de creadores en la geometría de SirSelect', () => {
+    component.filtersOpen.set(true);
+    fixture.detectChanges();
+    const trigger = fixture.nativeElement.querySelector('#marketing-creators') as HTMLButtonElement;
+    const style = getComputedStyle(trigger);
+    expect(style.height).toBe('40px');
+    expect(style.borderTopWidth).toBe('1px');
+    expect(style.borderRadius).toBe('8px');
+    expect(style.paddingLeft).toBe('13px');
+    expect(style.fontSize).toBe('14px');
+    expect(style.fontWeight).toBe('500');
+
+    trigger.click(); fixture.detectChanges();
+    const list = document.querySelector<HTMLElement>('.sir-select-overlay-panel .sir-select-list')!;
+    expect(list.getAttribute('aria-multiselectable')).toBe('true');
+    expect(getComputedStyle(list).borderTopWidth).toBe('1px');
+    expect(getComputedStyle(list).borderRadius).toBe('12px');
+  });
+
   it('ubica las pills en el buscador, cierra filtros al aplicar y muestra solo el vacío cuando no hay operaciones', async () => {
     component.filtersOpen.set(true);
     component.setFilter('tipo', 'TRANSFER');

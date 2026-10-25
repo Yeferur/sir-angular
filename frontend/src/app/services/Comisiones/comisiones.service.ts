@@ -101,10 +101,189 @@ export interface GrupoPagoComision {
   DNI_Receptor: string | null;
 }
 
+export interface GrupoComisionDia {
+  Id: string;
+  Id_Entidad_Reportante: number;
+  Nombre_Entidad: string;
+  Tipo_Entidad: TipoEntidadComision;
+  Fecha_Tour: string;
+  Estado: EstadoLiquidacion;
+  Cantidad_Reservas: number;
+  Cantidad_Reservas_Actuales: number;
+  Cantidad_Reservas_Pendientes: number;
+  Cantidad_Reservas_Pagadas: number;
+  Total_A_Comisionar: number;
+  Monto_Pendiente: number;
+  Monto_Pagado: number;
+  Tiene_Ajuste_Pendiente: boolean | number;
+  Entidad_Inactiva: boolean;
+  Entidad_Pendiente_Validacion: boolean;
+  Estado_Validacion_Entidad: string;
+  Puede_Pagar: boolean;
+  Motivo_No_Pagable: string | null;
+  Ultimo_Id_Grupo_Pagado: string | number | null;
+  Cantidad_Lotes: number;
+  Cantidad_Lotes_Pagados: number;
+}
+
+export interface ReservaSinEntidadComision {
+  Id_Reserva: string;
+  Fecha_Tour: string;
+  Tipo_Entidad: TipoEntidadComision;
+  Nombre_Reportante: string | null;
+  Nombre_Tour: string | null;
+  Cantidad_Pasajeros: number;
+  Monto_Comision: number;
+}
+
+export interface PaginaComision {
+  pagina: number;
+  limite: number;
+  total: number;
+  paginas: number;
+}
+
+export interface ResultadoGruposComision {
+  grupos: GrupoComisionDia[];
+  paginacion: PaginaComision;
+  pendientesPorAsociarEntidad: { reservas: ReservaSinEntidadComision[]; paginacion: PaginaComision };
+}
+
+export interface DetalleGrupoComision {
+  grupo: {
+    Id: string;
+    Id_Entidad_Reportante: number;
+    Nombre_Entidad: string;
+    Tipo_Entidad: TipoEntidadComision;
+    Fecha_Tour: string;
+    Entidad_Activa: boolean;
+    Estado_Validacion: string;
+  };
+  reservasPendientes: Array<{
+    Id_Reserva: string;
+    Fecha_Tour: string;
+    Nombre_Tour: string | null;
+    Monto_Comision: number;
+  }>;
+  paginacionReservasPendientes: PaginaComision | null;
+  lotes: Array<{
+    Id_Grupo_Comision: string;
+    Numero_Lote: number;
+    Estado: 'PAGADO' | 'ANULADO';
+    Fecha_Pago: string | null;
+    Monto_Pagado: number | null;
+    Cantidad_Reservas_Pagadas: number | null;
+    Comprobante_Nombre_Original: string | null;
+    Comprobante_Mime_Type: string | null;
+    Comprobante_Tamano_Bytes: number | null;
+    Tiene_Comprobante: boolean;
+    Motivo_Anulacion: string | null;
+  }>;
+  loteDetalle?: {
+    Id_Grupo_Comision: string;
+    Numero_Lote: number;
+    Estado: 'PAGADO' | 'ANULADO';
+    reservas: Array<{
+      Id_Reserva: string;
+      Fecha_Tour: string;
+      Nombre_Tour: string | null;
+      Monto_Comision_Pagada: number;
+    }>;
+    paginacion: PaginaComision;
+  };
+}
+
+export interface FiltrosGruposComision {
+  desde?: string;
+  hasta?: string;
+  Id_Entidad_Reportante?: string;
+  Tipo?: TipoEntidadComision | '';
+  Estado?: EstadoLiquidacion | '';
+  q?: string;
+  page?: number;
+  limit?: number;
+  unlinkedPage?: number;
+}
+
+export interface PagoGrupoComisionPayload {
+  Monto_Pendiente_Esperado: number;
+  Cantidad_Reservas_Pendientes_Esperada: number;
+  Forma_Pago?: FormaPagoComision | null;
+  Cuenta_Bancaria?: string | null;
+  Nombre_Receptor?: string | null;
+  DNI_Receptor?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ComisionesService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/comisiones`;
+  private readonly gruposApiUrl = `${this.apiUrl}/grupos`;
+  private readonly pendingProfileSaves = new Map<number, { payload: PerfilComisionEntidadPayload; message: string }>();
+
+  recordarPerfilPendiente(payload: PerfilComisionEntidadPayload, message: string): void {
+    this.pendingProfileSaves.set(payload.Id_Entidad_Reportante, { payload: { ...payload }, message });
+  }
+
+  obtenerPerfilPendiente(idEntidad: number): { payload: PerfilComisionEntidadPayload; message: string } | null {
+    return this.pendingProfileSaves.get(idEntidad) || null;
+  }
+
+  olvidarPerfilPendiente(idEntidad: number): void {
+    this.pendingProfileSaves.delete(idEntidad);
+  }
+
+  listarGrupos(filtros: FiltrosGruposComision = {}): Observable<ResultadoGruposComision> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(filtros)) {
+      if (value !== undefined && value !== null && String(value).trim()) params = params.set(key, String(value));
+    }
+    return this.http.get<unknown>(this.gruposApiUrl, { params }).pipe(
+      map((response: any) => (response?.data ?? response) as ResultadoGruposComision),
+    );
+  }
+
+  obtenerDetalleGrupo(id: string, page = 1, limit = 25, loteId?: string): Observable<DetalleGrupoComision> {
+    let params = new HttpParams().set('page', page).set('limit', limit);
+    if (loteId) params = params.set('loteId', loteId);
+    return this.http.get<unknown>(`${this.gruposApiUrl}/${encodeURIComponent(id)}/reservas`, { params }).pipe(
+      map((response: any) => (response?.data ?? response) as DetalleGrupoComision),
+    );
+  }
+
+  marcarGrupoPagado(id: string, payload: PagoGrupoComisionPayload, comprobante?: File | null) {
+    if (comprobante) {
+      const body = new FormData();
+      for (const [key, value] of Object.entries(payload)) {
+        if (value !== undefined && value !== null) body.append(key, String(value));
+      }
+      body.append('comprobante', comprobante, comprobante.name);
+      return this.http.put<unknown>(`${this.gruposApiUrl}/${encodeURIComponent(id)}/pago`, body).pipe(
+        map((response: any) => response?.data ?? response),
+      );
+    }
+    return this.http.put<unknown>(`${this.gruposApiUrl}/${encodeURIComponent(id)}/pago`, payload).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  anularLote(id: string, motivo: string) {
+    return this.http.put<unknown>(`${this.gruposApiUrl}/lotes/${encodeURIComponent(id)}/anulacion`, { Motivo: motivo }).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  subirComprobanteLote(id: string, comprobante: File) {
+    const body = new FormData();
+    body.append('comprobante', comprobante, comprobante.name);
+    return this.http.post<unknown>(`${this.gruposApiUrl}/lotes/${encodeURIComponent(id)}/comprobante`, body).pipe(
+      map((response: any) => response?.data ?? response),
+    );
+  }
+
+  descargarComprobanteLote(id: string) {
+    return this.http.get(`${this.gruposApiUrl}/lotes/${encodeURIComponent(id)}/comprobante`, { responseType: 'blob' });
+  }
 
   listarComisiones(filtros: FiltrosComisiones): Observable<ComisionCanal[]> {
     return this.http.get<unknown>(this.apiUrl, { params: this.params(filtros) }).pipe(

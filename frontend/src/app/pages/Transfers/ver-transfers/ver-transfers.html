@@ -14,30 +14,9 @@
   <div class="page-header reservation-search-panel">
     <div class="search-row">
       <div class="search-container">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          type="text"
-          class="search-input"
-          placeholder="Buscar por ID, titular, DNI, teléfono, salida o destino..."
-          [value]="filters().Nombre_Titular"
-          (input)="onMainSearchInput($any($event.target).value)"
-          (keyup.enter)="buscarTransfers()"
-          autocomplete="off"
-          aria-label="Buscar transfers"
-        />
-        @if (filters().Nombre_Titular) {
-          <button
-            type="button"
-            class="search-clear"
-            (click)="clearMainSearch()"
-            aria-label="Limpiar búsqueda">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        }
+        <app-search-input inputId="transfer-search" inputType="text" placeholder="Buscar por ID, titular, DNI, teléfono, salida o destino..."
+          ariaLabel="Buscar transfers" [value]="filters().Nombre_Titular"
+          (valueChange)="onMainSearchInput($event)" (search)="buscarTransfers()" />
       </div>
 
       <button type="button" class="btn-filter" (click)="toggleAdvancedFilters()"

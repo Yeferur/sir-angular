@@ -17,18 +17,21 @@
         <label for="create-entity-name">Nombre <span class="required-star">*</span></label>
         <input id="create-entity-name" class="form-input" [ngModel]="controller.name"
           (ngModelChange)="controller.onCreateNameChange($event)" minlength="2" maxlength="255"
+          role="combobox" aria-autocomplete="list" aria-controls="create-entity-name-suggestions"
+          [attr.aria-expanded]="controller.entitySuggestions().length > 0" [attr.aria-busy]="controller.suggesting()"
           autocomplete="off" placeholder="Nombre del hotel o agencia" />
       </div>
     </div>
     @if (controller.name.trim().length > 0 && controller.name.trim().length < 2) {
       <small class="inline-error">Escribe al menos 2 caracteres.</small>
     }
-    @if (controller.suggesting()) { <small class="entity-create-hint" role="status">Buscando coincidencias…</small> }
+    @if (controller.suggesting()) { <small class="entity-create-hint sir-autocomplete-inline-status" role="status">Buscando coincidencias…</small> }
     @if (controller.entitySuggestions().length) {
-      <div class="entity-suggestions" aria-label="Sugerencias de nombre">
-        <h3>Entidades existentes</h3>
+      <div id="create-entity-name-suggestions" class="entity-suggestions sir-autocomplete-panel sir-autocomplete-panel--inline sir-autocomplete-panel--form"
+        role="listbox" aria-label="Entidades existentes" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
+        <h3 class="sir-autocomplete-panel-title">Entidades existentes</h3>
         @for (entity of controller.entitySuggestions(); track entity.Id_Entidad_Reportante) {
-          <button type="button" (click)="controller.openSuggestedEntity(entity)">
+          <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false" (click)="controller.openSuggestedEntity(entity)">
             {{ entity.Nombre }} · {{ controller.typeLabel(entity.Tipo) }}
           </button>
         }

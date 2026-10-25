@@ -233,11 +233,13 @@
         (click)="closeNavigationLauncher(true)"
         aria-hidden="true"></div>
 
+      @let launcher = getLauncherModel();
       <section
         #navigationLauncher
         id="navigation-launcher"
         class="navigation-launcher"
-        [style.--navigation-panel-width.px]="getNavigationPanelWidth()"
+        [style.--navigation-panel-width.px]="launcher.width"
+        [style.--launcher-cols]="launcher.columns"
         [class.is-open]="navigationLauncherOpen()"
         [attr.aria-hidden]="!navigationLauncherOpen()"
         [inert]="!navigationLauncherOpen()"
@@ -247,97 +249,39 @@
         aria-modal="true"
         aria-label="Navegación principal">
 
-        <div class="navigation-launcher-grid">
-          @if (getVisibleMenuItemsByGroup('principal').length) {
-          <section class="launcher-column"><h3>Principal</h3>
-            @for (item of getVisibleMenuItemsByGroup('principal'); track item.key) {
-              @if (item.route) {
-              <a class="launcher-card" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
-                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
-                @if (item.key === 'pendientes' && pendingCenter.activeCount()) { <span class="launcher-count">{{ pendingCenter.activeCount() > 99 ? '99+' : pendingCenter.activeCount() }}</span> }
-              </a>
-              }
-            }
-          </section>
+        @if (launcher.primary.length) {
+        <nav class="launcher-primary" aria-label="Principal">
+          @for (item of launcher.primary; track item.key) {
+            <a class="launcher-card" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
+              <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span>
+              <span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
+              @if (item.key === 'pendientes' && pendingCenter.activeCount()) { <span class="launcher-count">{{ pendingCenter.activeCount() > 99 ? '99+' : pendingCenter.activeCount() }}</span> }
+            </a>
           }
-          @if (getVisibleMenuItemsByGroup('operacion').length) {
-          <section class="launcher-column launcher-column--operation"><h3>Operación</h3>
-            @for (item of getVisibleMenuItemsByGroup('operacion'); track item.key) {
-              @if (item.route) {
-              <a class="launcher-card launcher-card--feature" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
-                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
-              </a>
-              }
-            }
-            @if (getVisibleSubmenuItemsByGroup('operacion').length) {
-            <div class="launcher-operation-grid">
-              @for (item of getVisibleSubmenuItemsByGroup('operacion'); track item.key) {
-                <div class="launcher-subgroup" [class.has-active-child]="isSubmenuActive(item)"><h4>{{ item.label }}</h4>
-                  @for (child of getVisibleChildren(item); track child.key) {
-                    @if (child.route) {
-                    <a class="launcher-subitem" [class.action]="child.kind === 'action'" [class.active]="isRouteActive(child.route, child.exact ?? false)" [attr.aria-current]="isRouteActive(child.route, child.exact ?? false) ? 'page' : null" [routerLink]="child.route" (click)="navigateFromTopbar()">
-                      <i [class]="child.icon" aria-hidden="true"></i><span>{{ child.label }}</span>
-                      @if (child.kind === 'action') { <i class="bx bx-right-arrow-alt launcher-arrow" aria-hidden="true"></i> }
+        </nav>
+        }
+
+        @if (launcher.blocks.length) {
+        <div class="launcher-blocks">
+          @for (block of launcher.blocks; track block.key) {
+            <section class="launcher-block">
+              <h3>{{ block.title }}</h3>
+              @for (row of block.rows; track row.key) {
+                <div class="launcher-row" [class.active]="isMenuRouteActive(row.item)">
+                  <a class="launcher-row-main" [routerLink]="row.route" [attr.aria-current]="isMenuRouteActive(row.item) ? 'page' : null" [attr.title]="row.description || null" (click)="navigateFromTopbar()">
+                    <i [class]="row.icon" aria-hidden="true"></i><span>{{ row.label }}</span>
+                  </a>
+                  @if (row.add) {
+                    <a class="launcher-row-add" [routerLink]="row.add.route" [attr.aria-label]="row.add.label" [attr.title]="row.add.label" (click)="navigateFromTopbar()">
+                      <i class="bx bx-plus" aria-hidden="true"></i>
                     </a>
-                    }
                   }
                 </div>
               }
-            </div>
-            }
-          </section>
-          }
-          @if (getVisibleMenuItemsByGroup('programacion').length || getVisibleMenuItemsByGroup('despues-viaje').length) {
-          <section class="launcher-column">
-            @if (getVisibleMenuItemsByGroup('programacion').length) { <h3>Programación</h3>
-              @for (item of getVisibleMenuItemsByGroup('programacion'); track item.key) {
-              <a class="launcher-card" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
-                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
-              </a>
-              }
-            }
-            @if (getVisibleMenuItemsByGroup('despues-viaje').length) {
-            <div class="launcher-subsection"><h3>Después del viaje</h3>
-              @for (item of getVisibleMenuItemsByGroup('despues-viaje'); track item.key) {
-              <a class="launcher-card" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
-                <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
-              </a>
-              }
-            </div>
-            }
-          </section>
-          }
-          @if (getVisibleMenuItemsByGroup('mercadeo').length || getVisibleMenuItemsByGroup('sistema').length) {
-          <section class="launcher-column">
-            @if (getVisibleMenuItemsByGroup('mercadeo').length) { <h3>Mercadeo</h3>
-              @for (item of getVisibleMenuItemsByGroup('mercadeo'); track item.key) {
-                @for (child of getVisibleChildren(item); track child.key) {
-                <a class="launcher-card" [class.active]="isRouteActive(child.route!, child.exact ?? false)" [attr.aria-current]="isRouteActive(child.route!, child.exact ?? false) ? 'page' : null" [routerLink]="child.route" (click)="navigateFromTopbar()">
-                  <span class="launcher-card-icon"><i [class]="child.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ child.label }}</strong>@if (getMenuDescription(child)) { <small>{{ getMenuDescription(child) }}</small> }</span>
-                </a>
-                }
-              }
-            }
-            @if (getVisibleMenuItemsByGroup('sistema').length) {
-            <div class="launcher-subsection"><h3>Sistema</h3>
-              @for (item of getVisibleMenuItemsByGroup('sistema'); track item.key) {
-                @if (item.route) {
-                <a class="launcher-card" [class.active]="isMenuRouteActive(item)" [attr.aria-current]="isMenuRouteActive(item) ? 'page' : null" [routerLink]="item.route" (click)="navigateFromTopbar()">
-                  <span class="launcher-card-icon"><i [class]="item.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ item.label }}</strong>@if (getMenuDescription(item)) { <small>{{ getMenuDescription(item) }}</small> }</span>
-                </a>
-                } @else {
-                  @for (child of getVisibleChildren(item); track child.key) {
-                  <a class="launcher-card" [class.active]="isRouteActive(child.route!, child.exact ?? false)" [attr.aria-current]="isRouteActive(child.route!, child.exact ?? false) ? 'page' : null" [routerLink]="child.route" (click)="navigateFromTopbar()">
-                    <span class="launcher-card-icon"><i [class]="child.icon" aria-hidden="true"></i></span><span class="launcher-card-copy"><strong>{{ child.label }}</strong>@if (getMenuDescription(child)) { <small>{{ getMenuDescription(child) }}</small> }</span>
-                  </a>
-                  }
-                }
-              }
-            </div>
-            }
-          </section>
+            </section>
           }
         </div>
+        }
       </section>
 
       <div #profileMenu id="topbar-profile-menu" class="profile-dropdown small-dropdown"

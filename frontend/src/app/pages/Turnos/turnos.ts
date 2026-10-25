@@ -11,6 +11,7 @@ import {
 import { LoadingStateComponent } from '../../shared/loading-state/loading-state';
 import { TimepickerComponent } from '../../shared/timepicker/timepicker';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
+import { SirSearchInputComponent } from '../../shared/search-input/search-input';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -71,7 +72,7 @@ interface ScheduleWarning {
 
 @Component({
   selector: 'app-turnos', standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, TimepickerComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, TimepickerComponent, SirSearchInputComponent],
   templateUrl: './turnos.html', styleUrl: './turnos.css',
 })
 export class TurnosComponent implements OnInit {

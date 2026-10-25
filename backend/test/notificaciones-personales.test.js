@@ -57,11 +57,28 @@ test('la consulta personal y el contador solo incluyen filas del usuario autenti
 
   assert.equal(response.notificaciones[0].idNotificacion, '31');
   assert.equal(response.noLeidas, 1);
-  assert.equal(queries.length, 2);
+  assert.equal(queries.length, 3);
   for (const query of queries) {
-    assert.match(query.sql, /WHERE Id_Usuario = \?/);
+    assert.match(query.sql, /WHERE (?:n\.)?Id_Usuario\s*=\s*\?/);
     assert.equal(query.params[0], 41);
   }
+});
+
+test('un rechazo activo sigue en Avisos aunque haya salido de los avisos recientes', async (t) => {
+  const originalQuery = db.query;
+  db.query = async (sql) => {
+    if (sql.includes('COUNT(*)')) return [[{ Total: 1 }]];
+    if (sql.includes('FROM notificaciones n')) return [[{
+      Id_Notificacion: 90, Tipo: 'ENTIDAD_REPORTANTE_RECHAZADA',
+      Titulo: 'Entidad rechazada: Hotel Sol', Mensaje: 'Debe reasignarse', Datos: '{}',
+      Leida: 0, Fecha_Creacion: '2026-10-01 10:00:00',
+    }]];
+    return [[]];
+  };
+  t.after(() => { db.query = originalQuery; });
+  const response = await service.listMine(41, 1);
+  assert.equal(response.notificaciones[0].idNotificacion, '90');
+  assert.equal(response.noLeidas, 1);
 });
 
 test('marcar leída limita la actualización al propietario y no modifica avisos ajenos', async (t) => {
@@ -76,7 +93,7 @@ test('marcar leída limita la actualización al propietario y no modifica avisos
   const updated = await service.markRead(52, '900');
 
   assert.equal(updated, false);
-  assert.match(captured.sql, /WHERE Id_Notificacion = \? AND Id_Usuario = \?/);
+  assert.match(captured.sql, /WHERE n\.Id_Notificacion = \? AND n\.Id_Usuario = \?/);
   assert.deepEqual(captured.params, ['900', 52]);
 });
 
@@ -88,7 +105,7 @@ test('marcar todas como leídas solo actualiza notificaciones propias', async (t
 
   await service.markAllRead(63);
 
-  assert.match(captured.sql, /WHERE Id_Usuario = \? AND Leida = 0/);
+  assert.match(captured.sql, /WHERE n\.Id_Usuario = \? AND n\.Leida = 0/);
   assert.deepEqual(captured.params, [63]);
 });
 

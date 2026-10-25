@@ -1,7 +1,7 @@
 // services/Reservas/reservas.service.js
 const db = require('../../database/db');
 const { isValidReporterPhone, hasValidPassengerPhone, validarContactoReserva } = require('./reserva-contact');
-const { validateReservationEntity } = require('../EntidadesReportantes/entidades-reportantes.service');
+const { validateReservationEntity, typeForChannel, resolveRejectedEntityOperation } = require('../EntidadesReportantes/entidades-reportantes.service');
 const fs = require('fs');
 const path = require('path');
 const websocketManager = require('../../websocketManager');
@@ -397,7 +397,8 @@ function construirImpactoCuposReserva({
   };
 }
 
-function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null, telefonoReportante = null }) {
+function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoActual = null,
+  telefonoReportante = null, requiereEntidad = false, idEntidadReportante = null }) {
   const estadoBase = normalizarEstadoReservaLegacy(estadoActual);
 
   if (estadoBase === 'Completada') {
@@ -407,6 +408,7 @@ function resolverEstadoReserva({ fechaTour, pasajeros = [], pagos = [], estadoAc
   if (estadoBase === 'Cancelada' && fechaEsPasadaBogota(fechaTour)) {
     return 'Cancelada';
   }
+  if (requiereEntidad && !idEntidadReportante) return 'Pendiente de datos';
 
   const pasajerosArray = Array.isArray(pasajeros) ? pasajeros : [];
   const pagosArray = Array.isArray(pagos) ? pagos : [];
@@ -475,7 +477,8 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     if (!useExternalConn) await conn.beginTransaction();
 
     const [candidatos] = await conn.query(
-      `SELECT r.Id_Reserva, r.Estado, r.Fecha_Tour, e.Estado_Validacion AS Estado_Validacion_Entidad
+      `SELECT r.Id_Reserva, r.Estado, r.Fecha_Tour, r.Id_Canal, r.Id_Entidad_Reportante,
+              e.Estado_Validacion AS Estado_Validacion_Entidad
          FROM reservas r LEFT JOIN entidades_reportantes e
            ON e.Id_Entidad_Reportante=r.Id_Entidad_Reportante
         WHERE ${reservaNoEliminadaPredicate('r')}
@@ -491,6 +494,7 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
     resumen.evaluados = Number(candidatos?.length || 0);
 
     for (const row of candidatos || []) {
+      if (!row.Id_Entidad_Reportante && await typeForChannel(conn, row.Id_Canal)) continue;
       const transicion = resolverTransicionReservaVencida(row.Estado, row.Fecha_Tour);
       if (!transicion || transicion.nuevoEstado === row.Estado) continue;
       if (row.Estado_Validacion_Entidad === 'RECHAZADA' && transicion.nuevoEstado === 'Confirmada') continue;
@@ -507,6 +511,9 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
           WHERE Id_Reserva = ?
             AND Estado = ?
             AND Pendiente_Por_Entidad_En IS NULL
+            AND (Id_Entidad_Reportante IS NOT NULL OR Id_Canal NOT IN
+              (SELECT Id_Canal FROM canales_reservas WHERE UPPER(TRIM(Nombre_Canal)) IN
+                ('HOTEL','AGENCIA NACIONAL','AGENCIA INTERNACIONAL')))
             AND (? <> 'Confirmada' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
               WHERE er.Id_Entidad_Reportante=reservas.Id_Entidad_Reportante
                 AND er.Estado_Validacion='RECHAZADA'))`,
@@ -1223,7 +1230,7 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
 
 async function normalizarEstadosReservasExistentes(conexion = db) {
   const [reservasRows] = await conexion.query(
-    `SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Telefono_Reportante,
+    `SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Telefono_Reportante,r.Id_Canal,
             r.Id_Entidad_Reportante, r.Pendiente_Por_Entidad_En,
             e.Estado_Validacion AS Estado_Validacion_Entidad
        FROM reservas r LEFT JOIN entidades_reportantes e
@@ -1275,6 +1282,8 @@ async function normalizarEstadosReservasExistentes(conexion = db) {
       nuevoEstado = resolverEstadoReserva({
         fechaTour: reserva.Fecha_Tour,
         telefonoReportante: reserva.Telefono_Reportante,
+        requiereEntidad: !!(await typeForChannel(conexion, reserva.Id_Canal)),
+        idEntidadReportante: reserva.Id_Entidad_Reportante,
         pasajeros: pasajerosMap.get(idReserva) || [],
         pagos: pagosMap.get(idReserva) || [],
         estadoActual: estadoActual || null,
@@ -1525,6 +1534,8 @@ async function crearReservaConPasajerosYPagos(
     const estadoCalculado = resolverEstadoReserva({
       fechaTour: r.Fecha_Tour,
       telefonoReportante: r.Telefono_Reportante,
+      requiereEntidad: !!(await typeForChannel(conn, r.Id_Canal)),
+      idEntidadReportante,
       pasajeros: pasajerosArray,
       pagos: pagosArray,
     });
@@ -1948,6 +1959,8 @@ async function actualizarReservaConPasajerosYPagos(
     const estadoCalculado = resolverEstadoReserva({
       fechaTour: fechaTourFinal,
       telefonoReportante: telefonoReportanteFinal,
+      requiereEntidad: !!(await typeForChannel(conn, idCanalFinal)),
+      idEntidadReportante,
       pasajeros: pasajerosFinales,
       pagos: pagosArray,
       estadoActual: estadoAnterior,
@@ -2195,8 +2208,14 @@ async function actualizarReservaConPasajerosYPagos(
       }
     }
 
+    const correctionRecipients = idEntidadReportante
+      ? await resolveRejectedEntityOperation(conn, 'RESERVA', Id_Reserva) : [];
     await conn.commit();
     committed = true;
+    for (const recipientId of correctionRecipients) {
+      try { websocketManager.sendToUser(recipientId, { type: 'actividadActualizada' }); }
+      catch (error) { console.error('No se pudo actualizar Avisos tras corregir la reserva:', error); }
+    }
 
     if (rutasPendientesEliminar.length > 0) {
       await Promise.all(
@@ -2640,6 +2659,7 @@ module.exports = {
   filtrarReservas,
   ESTADOS_RESERVA_CANONICOS,
   normalizarEstadoReservaLegacy,
+  resolverEstadoReserva,
   expandirEstadoReservaFiltro,
   obtenerReserva,
   verificarCupos,
