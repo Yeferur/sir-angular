@@ -6,7 +6,7 @@ const MODULOS_HISTORIAL = Object.freeze([
   { value: 'usuarios', label: 'Usuarios', tablas: ['usuarios', 'sesiones'] },
   { value: 'entidades_reportantes', label: 'Entidades reportantes', tablas: ['entidades_reportantes', 'entidad_reportante_puntos'] },
   { value: 'programacion', label: 'Programación', tablas: ['programacion', 'programacion_buses'] },
-  { value: 'comisiones', label: 'Comisiones', tablas: ['liquidaciones', 'beneficiarios_comision'] },
+  { value: 'comisiones', label: 'Comisiones', tablas: ['liquidaciones'] },
   { value: 'aforos', label: 'Aforos', tablas: ['aforos'] },
   { value: 'turnos', label: 'Turnos', tablas: ['turnos_dias', 'turnos_semanas', 'turnos_intercambios'] },
   { value: 'otros', label: 'Otros registros', tablas: [] },
@@ -17,14 +17,13 @@ const MODULOS_HISTORIAL = Object.freeze([
 const TIPOS_ACTIVIDAD = Object.freeze([
   { value: 'creaciones', label: 'Creaciones', acciones: [
     'CREAR', 'CREAR_USUARIO', 'CREAR_RESERVA', 'DUPLICAR_RESERVA', 'CREAR_TRANSFER', 'AGREGAR_PASAJERO',
-    'CREAR_TOUR', 'CREAR_PUNTO', 'CREAR_HORARIO_PUNTO', 'CREAR_BENEFICIARIO_COMISION',
+    'CREAR_TOUR', 'CREAR_PUNTO', 'CREAR_HORARIO_PUNTO',
   ] },
   { value: 'modificaciones', label: 'Modificaciones', acciones: [
     'ACTUALIZAR', 'ACTUALIZAR_USUARIO', 'ACTUALIZAR_PERFIL', 'ACTUALIZAR_AVATAR',
     'ACTUALIZAR_RESERVA', 'ACTUALIZAR_PASAJERO', 'ACTUALIZAR_ESTADO_AUTOMATICO', 'CAMBIO_ESTADO_RESERVA',
     'ACTUALIZAR_TRANSFER', 'AGREGAR_COMPROBANTE_TRANSFER', 'ACTUALIZAR_TOUR', 'UPSERT_PRECIOS',
     'ACTUALIZAR_PUNTO', 'ACTUALIZAR_HORARIO_PUNTO', 'ACTUALIZAR_DATOS_PAGO_COMISION',
-    'ACTUALIZAR_BENEFICIARIO_COMISION',
   ] },
   { value: 'cancelaciones', label: 'Cancelaciones y eliminaciones', acciones: [
     'ELIMINAR', 'ELIMINAR_USUARIO', 'ELIMINAR_AVATAR', 'ELIMINAR_PASAJERO', 'CANCELAR_RESERVA', 'ELIMINAR_RESERVA',

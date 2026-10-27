@@ -9,16 +9,11 @@ test('Mercadeo construye filtros parametrizados, incluida la combinación comple
   const fields = [
     ['fechaRegistroDesde', '2026-08-01', 'r.Fecha_Registro >= ?', '2026-08-01 00:00:00'],
     ['fechaRegistroHasta', '2026-08-31', 'r.Fecha_Registro < DATE_ADD(?, INTERVAL 1 DAY)', '2026-08-31'],
-    ['fechaTourDesde', '2026-09-01', 'r.Fecha_Tour >= ?', '2026-09-01'],
-    ['fechaTourHasta', '2026-09-30', 'r.Fecha_Tour < DATE_ADD(?, INTERVAL 1 DAY)', '2026-09-30'],
     ['fechaTour', '2026-09-04', 'r.Fecha_Tour = ?', '2026-09-04'],
     ['codigoReserva', 'BOOK-17', 'r.Id_Reserva = ?', 'BOOK-17'],
     ['categoria', '4', 'r.Id_Canal = ?', 4],
-    ['nombreReportante', 'Juan Pérez', 'r.Nombre_Reportante LIKE ?', '%Juan Pérez%'],
-    ['nombreEntidad', 'Hótel Dann', 'er_filter.Nombre_Normalizado LIKE ?', '%hotel dann%'],
     ['idEntidadReportante', '7', 'r.Id_Entidad_Reportante = ?', 7],
-    ['nombrePasajero', 'Ana Pérez', 'p.Nombre_Pasajero LIKE ?', 'Ana Pérez%'],
-    ['documento', 'CC-992', 'p.DNI = ?', 'CC-992'],
+    ['creadorIds', ['101', '202'], 'r.Creado_Por IN (?,?)', 101],
   ];
 
   for (const [key, value, expectedSql, expectedParam] of fields) {
@@ -26,34 +21,23 @@ test('Mercadeo construye filtros parametrizados, incluida la combinación comple
       ? { fechaRegistroDesde: value, fechaRegistroHasta: '2026-08-31' }
       : key === 'fechaRegistroHasta'
         ? { fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: value }
-        : key === 'fechaTourDesde'
-          ? { fechaTourDesde: value, fechaTourHasta: '2026-09-30' }
-          : key === 'fechaTourHasta'
-            ? { fechaTourDesde: '2026-09-01', fechaTourHasta: value }
-            : { [key]: value };
+        : { [key]: value };
     const built = buildFilters(query);
     assert.ok(built.where.includes(expectedSql), key);
-    assert.ok([...built.values, ...built.passengerValues].some(value => value === expectedParam), key);
+    assert.ok(built.values.some(value => value === expectedParam), key);
   }
 
   const malicious = "X' OR 1=1 --";
   const combined = buildFilters({
     fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-08-31',
     fechaTour: '2026-09-04', codigoReserva: malicious, categoria: '4',
-    nombrePasajero: 'Ana', documento: 'CC-992',
   });
   assert.equal(combined.values.length, 5);
-  assert.deepEqual(combined.passengerValues, ['Ana%','CC-992']);
   assert.ok(!combined.where.includes(malicious));
-  assert.ok(combined.where.includes('EXISTS (SELECT 1 FROM pasajeros'));
   assert.equal(buildFilters({}).where, '');
   assert.throws(() => buildFilters({ fechaRegistroDesde: '2026-08-01' }), e => e.errorCode === 'DATE_RANGE_INVALID');
   assert.throws(() => buildFilters({ fechaRegistroDesde: '2026-08-01', fechaRegistroHasta: '2026-09-01' }),
     e => e.errorCode === 'DATE_RANGE_TOO_LONG');
-  assert.throws(() => buildFilters({ fechaTourDesde: '2026-09-01' }),
-    e => e.errorCode === 'TOUR_DATE_RANGE_INVALID');
-  assert.throws(() => buildFilters({ fechaTourDesde: '2026-09-01', fechaTourHasta: '2026-10-02' }),
-    e => e.errorCode === 'TOUR_DATE_RANGE_TOO_LONG');
   assert.throws(() => buildFilters({ idEntidadReportante: '0' }),
     e => e.errorCode === 'ENTITY_ID_INVALID');
 });
@@ -69,13 +53,9 @@ test('Mercadeo devuelve conteos de reservas/pasajeros y agrupa varios pasajeros 
       NombreReporta: 'Juan Pérez', Telefono: '3001234567', Id_Canal: 2,
       Id_Entidad_Reportante: 7, Nombre_Entidad_Reportante: 'Hotel Dann',
       Tipo_Entidad_Reportante: 'HOTEL', Categoria: 'AGENCIA NACIONAL',
+      Cantidad_Pasajeros: 3,
       CreadorId: null, UsuarioCreador: null,
     }]];
-    if (sql.includes('SELECT Id_Reserva, Id_Pasajero')) return [[
-      { Id_Reserva: 'MK-3PAX', Id_Pasajero: 21, Nombre_Pasajero: 'Ana', DNI: 'CC-1' },
-      { Id_Reserva: 'MK-3PAX', Id_Pasajero: 22, Nombre_Pasajero: 'Luis', DNI: 'CC-2' },
-      { Id_Reserva: 'MK-3PAX', Id_Pasajero: 23, Nombre_Pasajero: 'Sol', DNI: null },
-    ]];
     throw new Error(`Consulta inesperada: ${sql}`);
   };
   t.after(() => { db.query = originalQuery; });
@@ -84,23 +64,23 @@ test('Mercadeo devuelve conteos de reservas/pasajeros y agrupa varios pasajeros 
   assert.equal(page.totalReservas, 1);
   assert.equal(page.totalPasajeros, 3);
   assert.equal(page.items.length, 1);
-  assert.equal(page.items[0].pasajeros.length, 3);
+  assert.equal(page.items[0].Cantidad_Pasajeros, 3);
   assert.equal(page.items[0].UsuarioCreador, null);
   assert.equal(page.items[0].Id_Entidad_Reportante, 7);
   assert.equal(page.items[0].Nombre_Entidad_Reportante, 'Hotel Dann');
   assert.equal(page.items[0].Tipo_Entidad_Reportante, 'HOTEL');
   assert.equal(page.items[0].NombreReporta, 'Juan Pérez');
   assert.equal(page.pageSize, 25);
-  assert.equal(calls.length, 3, 'summary + page + one batched passenger query, never one query per reservation');
+  assert.equal(calls.length, 2, 'summary y página; la cantidad de pasajeros viene en la consulta de reservas');
   assert.ok(calls[1].sql.includes('LIMIT ? OFFSET ?'));
   assert.match(calls[1].sql, /LEFT JOIN entidades_reportantes er ON er\.Id_Entidad_Reportante = r\.Id_Entidad_Reportante/);
   assert.match(calls[1].sql, /er\.Nombre AS Nombre_Entidad_Reportante/);
   assert.match(calls[1].sql, /er\.Tipo AS Tipo_Entidad_Reportante/);
   assert.deepEqual(calls[1].values.slice(-2), [25, 0]);
-  assert.ok(calls[2].sql.includes('Id_Reserva IN (?)'));
+  assert.match(calls[1].sql, /SELECT COUNT\(\*\) FROM pasajeros p_count WHERE p_count\.Id_Reserva = r\.Id_Reserva/);
 });
 
-test('Mercadeo filtra por persona y por entidad mediante la FK de la reserva', async (t) => {
+test('Mercadeo filtra por entidad mediante la FK de la reserva', async (t) => {
   const originalQuery = db.query;
   const calls = [];
   db.query = async (sql, values) => {
@@ -119,15 +99,12 @@ test('Mercadeo filtra por persona y por entidad mediante la FK de la reserva', a
   t.after(() => { db.query = originalQuery; });
 
   const page = await buscarReservasMercadeo({
-    nombreReportante: 'Juan Pérez', nombreEntidad: 'Hótel Dann', idEntidadReportante: '7',
+    idEntidadReportante: '7',
   });
   assert.equal(page.items[0].NombreReporta, 'Juan Pérez');
   assert.equal(page.items[0].Nombre_Entidad_Reportante, 'Hotel Dann');
-  assert.match(calls[0].sql, /r\.Nombre_Reportante LIKE \?/);
-  assert.match(calls[0].sql, /er_filter\.Id_Entidad_Reportante = r\.Id_Entidad_Reportante/);
   assert.match(calls[0].sql, /r\.Id_Entidad_Reportante = \?/);
-  assert.ok(calls[0].values.includes('%Juan Pérez%'));
-  assert.ok(calls[0].values.includes('%hotel dann%'));
+  assert.match(calls[1].sql, /er\.Id_Entidad_Reportante = r\.Id_Entidad_Reportante/);
   assert.ok(calls[0].values.includes(7));
 });
 
@@ -162,7 +139,7 @@ test('Mercadeo Entidades limita el universo a hoteles/agencias y calcula activid
     assert.ok(call.values.includes('HOTEL'));
     assert.ok(call.values.includes('AGENCIA_NACIONAL'));
     assert.ok(call.values.includes('AGENCIA_INTERNACIONAL'));
-    assert.doesNotMatch(call.sql, /(?:WHERE|AND)\s+e\.(?:Activo|Estado_Validacion)\s*=/i);
+    assert.match(call.sql, /WHERE e\.Tipo IN \(\?, \?, \?\)\s*(?:ORDER BY|$)/i);
   }
 });
 
@@ -201,13 +178,13 @@ test('Mercadeo pagina por reserva, usa pageSize 25 y ejecuta un lote de pasajero
   const originalQuery = db.query;
   const calls = [];
   const reservations = Array.from({ length: 25 }, (_, index) => ({
-    Id_Reserva: `MK-P2-${index}`, CreadorId: null, UsuarioCreador: null,
+    Id_Reserva: `MK-P2-${index}`, Cantidad_Pasajeros: index === 0 ? 1 : 0,
+    CreadorId: null, UsuarioCreador: null,
   }));
   db.query = async (sql, values) => {
     calls.push({ sql, values });
     if (sql.includes('COUNT(DISTINCT r.Id_Reserva)')) return [[{ totalReservas: 40, totalPasajeros: 41 }]];
     if (sql.includes('SELECT r.Id_Reserva')) return [reservations];
-    if (sql.includes('SELECT Id_Reserva, Id_Pasajero')) return [[{ Id_Reserva: reservations[0].Id_Reserva, Id_Pasajero: 1, Nombre_Pasajero: 'X', DNI: null }]];
     throw new Error('Consulta inesperada');
   };
   t.after(() => { db.query = originalQuery; });
@@ -218,9 +195,9 @@ test('Mercadeo pagina por reserva, usa pageSize 25 y ejecuta un lote de pasajero
   assert.equal(page.totalPages, 2);
   assert.equal(page.items.length, 25);
   assert.deepEqual(calls[1].values.slice(-2), [25, 25]);
-  assert.equal(calls.filter((call) => call.sql.includes('SELECT Id_Reserva, Id_Pasajero')).length, 1);
-  assert.equal(page.items[0].pasajeros.length, 1);
-  assert.equal(page.items[1].pasajeros.length, 0);
+  assert.equal(calls.length, 2, 'solo ejecuta el conteo y la consulta paginada de reservas');
+  assert.equal(page.items[0].Cantidad_Pasajeros, 1);
+  assert.equal(page.items[1].Cantidad_Pasajeros, 0);
 });
 
 test('Mercadeo maneja resultados vacíos y propaga errores de consulta', async (t) => {

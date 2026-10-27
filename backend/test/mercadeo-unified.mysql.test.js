@@ -45,7 +45,7 @@ test('MySQL aislado: origen unificado, colaciones, filtros, paginación y soft d
   const [[target]] = await db.query('SELECT DATABASE() AS selectedDatabase');
   assert.equal(target.selectedDatabase, databaseName);
 
-  await db.query(`CREATE TABLE canales_reservas (
+  await db.query(`CREATE TABLE canales_origen (
     Id_Canal INT NOT NULL PRIMARY KEY,
     Nombre_Canal VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL
   ) ENGINE=InnoDB`);
@@ -89,7 +89,7 @@ test('MySQL aislado: origen unificado, colaciones, filtros, paginación y soft d
     Creado_Por BIGINT UNSIGNED NULL
   ) ENGINE=InnoDB`);
 
-  await db.query(`INSERT INTO canales_reservas VALUES
+  await db.query(`INSERT INTO canales_origen VALUES
     (1,'Canál HOTEL'),(2,'Agencia Nacional'),(3,'Venta directa')`);
   await db.query(`INSERT INTO entidades_reportantes VALUES
     (11,'Hotel Prueba Álamo','HOTEL'),(12,'Agencia Norte','AGENCIA_NACIONAL')`);

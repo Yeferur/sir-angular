@@ -158,7 +158,7 @@ function origenUnionSql() {
       r.Pendiente_Por_Entidad_En AS pendiente_por_entidad_en
     FROM ${reservasOperativasSource('r')}
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN usuarios u ON u.Id_Usuario = r.Creado_Por
   UNION ALL
   SELECT ${collatedText("'TRANSFER'")} AS tipo,
@@ -176,7 +176,7 @@ function origenUnionSql() {
       tr.Pendiente_Por_Entidad_En AS pendiente_por_entidad_en
     FROM transfers tr
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
-    LEFT JOIN canales_reservas c ON c.Id_Canal = tr.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = tr.Id_Canal
     LEFT JOIN usuarios u ON u.Id_Usuario = tr.Creado_Por`;
 }
 
@@ -275,7 +275,7 @@ async function buscarReservasMercadeo(query = {}) {
            u.Nombres_Apellidos AS UsuarioCreador
     FROM ${reservasOperativasSource('r')}
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN usuarios u ON u.Id_Usuario = r.Creado_Por
     ${where}
     ORDER BY r.Fecha_Registro DESC, r.Id_Reserva DESC
@@ -368,7 +368,7 @@ async function buscarTransfersMercadeo(query = {}) {
            tr.Creado_Por AS CreadorId, u.Nombres_Apellidos AS UsuarioCreador,
            s.Nombre_Servicio
       FROM transfers tr
-      LEFT JOIN canales_reservas c ON c.Id_Canal = tr.Id_Canal
+      LEFT JOIN canales_origen c ON c.Id_Canal = tr.Id_Canal
       LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
       LEFT JOIN usuarios u ON u.Id_Usuario = tr.Creado_Por
       LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
@@ -382,7 +382,7 @@ async function buscarTransfersMercadeo(query = {}) {
 async function obtenerCategoriasMercadeo() {
   const [rows] = await db.query(`
     SELECT Id_Canal, Nombre_Canal
-    FROM canales_reservas
+    FROM canales_origen
     ORDER BY Nombre_Canal
   `);
   return rows;

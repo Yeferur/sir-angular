@@ -51,27 +51,6 @@ async function actualizarDatosPago(req, res) {
     }
 }
 
-async function guardarBeneficiario(req, res) {
-    try {
-        const payload = { ...req.body };
-        if (typeof payload.reservas === 'string') {
-            try { payload.reservas = JSON.parse(payload.reservas); }
-            catch { payload.reservas = []; }
-        }
-        const result = await comisionesService.guardarBeneficiarioDesdeComision(payload, req.user?.id || null, req.files || []);
-        return sendSuccess(res, {
-            data: result,
-            message: result.created
-                ? 'Beneficiario centralizado correctamente'
-                : 'Beneficiario actualizado correctamente',
-            status: result.created ? 201 : 200,
-        });
-    } catch (error) {
-        console.error('Error al guardar beneficiario de comisión:', error);
-        return handleError(res, error, 'Error al guardar el beneficiario', 'BENEFICIARY_SAVE_FAILED');
-    }
-}
-
 async function obtenerPerfilComisionEntidad(req, res) {
     try {
         const result = await comisionesService.obtenerPerfilComisionEntidad(req.params.idEntidad);
@@ -94,29 +73,6 @@ async function guardarPerfilComisionEntidad(req, res) {
     }
 }
 
-async function descargarDocumento(req, res) {
-    try {
-        const document = await comisionesService.obtenerDocumentoBeneficiario(Number(req.params.idDocumento));
-        res.setHeader('Content-Type', document.Mime_Type);
-        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(document.Nombre_Original)}`);
-        return res.sendFile(document.absolutePath);
-    } catch (error) {
-        return handleError(res, error, 'Error al descargar el documento', 'DOCUMENT_DOWNLOAD_FAILED');
-    }
-}
-
-async function eliminarDocumento(req, res) {
-    try {
-        const result = await comisionesService.eliminarDocumentoBeneficiario(
-            Number(req.params.idBeneficiario),
-            Number(req.params.idDocumento),
-        );
-        return sendSuccess(res, { data: result, message: 'Documento eliminado correctamente' });
-    } catch (error) {
-        return handleError(res, error, 'Error al eliminar el documento', 'DOCUMENT_DELETE_FAILED');
-    }
-}
-
 async function exportarExcel(req, res) {
     try {
         await comisionesService.generarExcelComisiones(req.query, res);
@@ -135,8 +91,5 @@ module.exports = {
     actualizarDatosPago,
     obtenerPerfilComisionEntidad,
     guardarPerfilComisionEntidad,
-    guardarBeneficiario,
-    descargarDocumento,
-    eliminarDocumento,
     exportarExcel
 };

@@ -21,7 +21,7 @@ const entities = new Map([
 
 const executor = {
   async query(sql, params) {
-    if (sql.includes('SELECT Nombre_Canal FROM canales_reservas')) {
+    if (sql.includes('SELECT Nombre_Canal FROM canales_origen')) {
       const nombre = channels.get(Number(params[0]));
       return [nombre ? [{ Nombre_Canal: nombre }] : []];
     }

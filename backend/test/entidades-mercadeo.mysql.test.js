@@ -49,7 +49,7 @@ test('MySQL local: entidades reportantes y actividad de Mercadeo', {
   await require('../services/schema-capabilities').initializeSchemaCapabilities(db);
   const [[actor]] = await connection.query(`SELECT u.Id_Usuario FROM usuarios u JOIN roles r ON r.Id_Rol=u.Id_Rol
     WHERE LOWER(TRIM(r.Nombre_Rol))='administrador' LIMIT 1`);
-  const [channels] = await connection.query('SELECT Id_Canal,Nombre_Canal FROM canales_reservas');
+  const [channels] = await connection.query('SELECT Id_Canal,Nombre_Canal FROM canales_origen');
   const [points] = await connection.query('SELECT Id_Punto FROM puntos WHERE Activo=1 ORDER BY Id_Punto LIMIT 2');
   const [[currency]] = await connection.query('SELECT Id_Moneda FROM monedas LIMIT 1');
   assert.ok(actor && currency && points.length === 2);

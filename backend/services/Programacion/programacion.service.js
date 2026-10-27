@@ -3469,7 +3469,7 @@ async function generarExcelListadoBus({ fecha, idTour, bus, nombreTour, formato 
         FROM ${reservasOperativasSource('r')}
         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
         LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-        LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+        LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
         LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
         WHERE r.Id_Reserva IN (${reservaIds.map(() => '?').join(',')})
           AND UPPER(TRIM(COALESCE(r.Estado, ''))) IN (${estadosPlaceholders})

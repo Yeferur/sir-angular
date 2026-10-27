@@ -565,7 +565,7 @@ async function getPassengersByChannelSvc(filters = {}) {
       COUNT(p.Id_Pasajero)                  AS cantidad
     FROM pasajeros p
     JOIN ${reservasOperativasSource('r')} ON p.Id_Reserva = r.Id_Reserva
-    LEFT JOIN canales_reservas c ON r.Id_Canal = c.Id_Canal
+    LEFT JOIN canales_origen c ON r.Id_Canal = c.Id_Canal
     ${tourJoin}
     WHERE ${ACTIVE_RESERVATION_SQL}
     ${andConds}
@@ -838,7 +838,7 @@ async function getDashboardOperationalSvc(filters = {}) {
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
     GROUP BY agrupador ORDER BY programados DESC
   `;
-  const channelAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(c.Nombre_Canal, 'Sin canal')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal');
+  const channelAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(c.Nombre_Canal, 'Sin canal')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal');
   const tourAbsenceSql = absenceBase.replace('%GROUP%', "COALESCE(t.Nombre_Tour, 'Sin tour')").replace('LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario', 'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario\n    LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour');
   const tariffSql = `
     SELECT COALESCE(m.Codigo, 'COP') AS moneda,
@@ -871,7 +871,7 @@ async function getDashboardOperationalSvc(filters = {}) {
     FROM pasajeros p JOIN ${reservasOperativasSource('r')} ON r.Id_Reserva = p.Id_Reserva
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     WHERE ${ACTIVE_RESERVATION_SQL} ${andConds}
     GROUP BY canal, COALESCE(m.Codigo, 'COP') ORDER BY moneda, ingresos DESC
   `;

@@ -124,7 +124,7 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       `f3_${key}_${database.slice(-6)}@example.invalid`, 'solo-fixture', roleId]);
     userIds[key] = id;
   }
-  const [channelRows] = await target.query(`INSERT INTO canales_reservas (Nombre_Canal,Tiene_Comision) VALUES
+  const [channelRows] = await target.query(`INSERT INTO canales_origen (Nombre_Canal,Tiene_Comision) VALUES
     ('HOTEL',0),('AGENCIA NACIONAL',0),('AGENCIA INTERNACIONAL',0),('FREELANCE',0)`);
   const channels = {
     hotel: channelRows.insertId,

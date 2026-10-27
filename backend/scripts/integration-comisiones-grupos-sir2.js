@@ -191,7 +191,7 @@ async function main() {
     );
     for (const row of autoRows) autoIncrementBaseline.set(row.TABLE_NAME, row.AUTO_INCREMENT);
     const [[channel]] = await conn.query(
-      `SELECT Id_Canal FROM canales_reservas
+      `SELECT Id_Canal FROM canales_origen
         WHERE Id_Canal = 1 AND Nombre_Canal = 'HOTEL' AND Tiene_Comision = 1`,
     );
     if (!channel) throw new Error('No existe el canal HOTEL esperado para la fixture.');

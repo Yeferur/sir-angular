@@ -121,7 +121,7 @@ async function guardarComisionesTour(conn, Id_Tour, comisiones) {
 async function obtenerCanalesComision() {
   const [rows] = await db.query(
     `SELECT Id_Canal, Nombre_Canal
-     FROM canales_reservas
+     FROM canales_origen
      WHERE Tiene_Comision = 1
      ORDER BY Nombre_Canal ASC`
   );
@@ -145,7 +145,7 @@ async function obtenerComisionesToursMap(idsTour) {
        COALESCE(cr.Nombre_Canal, CONCAT('CANAL ', tc.Id_Canal)) AS Nombre_Canal,
        tc.Valor
      FROM tour_comisiones tc
-     LEFT JOIN canales_reservas cr ON cr.Id_Canal = tc.Id_Canal
+     LEFT JOIN canales_origen cr ON cr.Id_Canal = tc.Id_Canal
      WHERE tc.Id_Tour IN (${ids.map(() => '?').join(',')})
      ORDER BY tc.Id_Tour ASC, tc.Id_Canal ASC`,
     ids
@@ -813,34 +813,37 @@ async function eliminarTour(Id_Tour, userId = null) {
       [Id_Tour]
     );
     const reservasAsociadas = Number(usoReservas?.total || 0);
-    let result;
-    let accion;
-    if (reservasAsociadas > 0) {
-      [result] = await conn.query('UPDATE tours SET Activo = 0, Actualizado_Por = ? WHERE Id_Tour = ?', [userId || null, Id_Tour]);
-      accion = 'DESACTIVADO';
-    } else {
-      await conn.query('DELETE FROM programacion_tours WHERE Id_Tour = ?', [Id_Tour]);
-      await conn.query('DELETE FROM programaciones WHERE Id_Tour = ?', [Id_Tour]);
-      await conn.query('DELETE FROM horarios WHERE Id_Tour = ?', [Id_Tour]);
-      await conn.query('DELETE FROM tour_comisiones WHERE Id_Tour = ?', [Id_Tour]);
-      [result] = await conn.query('DELETE FROM tours WHERE Id_Tour = ?', [Id_Tour]);
-      accion = 'ELIMINADO';
+    const alreadyInactive = Number(prev.Activo) === 0;
+    let result = { affectedRows: 0 };
+    if (!alreadyInactive) {
+      [result] = await conn.query(
+        'UPDATE tours SET Activo = 0, Actualizado_Por = ? WHERE Id_Tour = ?',
+        [userId || null, Id_Tour]
+      );
     }
 
-    await recordHistorial({
-      conexion: conn,
-      tabla: 'tours',
-      id_registro: Id_Tour,
-      accion: accion === 'DESACTIVADO' ? 'DESACTIVAR_TOUR' : 'ELIMINAR_TOUR',
-      id_usuario: userId,
-      detalles: [
-        { columna: 'Nombre_Tour', anterior: prev ? prev.Nombre_Tour : null, nuevo: prev ? prev.Nombre_Tour : null },
-        { columna: 'Abreviacion', anterior: prev ? prev.Abreviacion : null, nuevo: prev ? prev.Abreviacion : null },
-        { columna: 'Activo', anterior: prev ? prev.Activo : null, nuevo: accion === 'DESACTIVADO' ? 0 : null }
-      ]
-    });
+    if (!alreadyInactive) {
+      await recordHistorial({
+        conexion: conn,
+        tabla: 'tours',
+        id_registro: Id_Tour,
+        accion: 'DESACTIVAR_TOUR',
+        id_usuario: userId,
+        detalles: [
+          { columna: 'Nombre_Tour', anterior: prev.Nombre_Tour, nuevo: prev.Nombre_Tour },
+          { columna: 'Abreviacion', anterior: prev.Abreviacion, nuevo: prev.Abreviacion },
+          { columna: 'Activo', anterior: prev.Activo, nuevo: 0 }
+        ]
+      });
+    }
     await conn.commit();
-    return { success: true, accion, reservasAsociadas, affectedRows: result.affectedRows };
+    return {
+      success: true,
+      accion: 'DESACTIVADO',
+      reservasAsociadas,
+      alreadyInactive,
+      affectedRows: result?.affectedRows || 0,
+    };
   } catch (e) {
     await conn.rollback();
     try { await logSistema({ mensaje: `eliminarTour error: ${e.message || e}`, meta: { Id_Tour } }); } catch (_) {}

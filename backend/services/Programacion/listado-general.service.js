@@ -102,7 +102,7 @@ function standardJoins() {
   return `
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
     LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto
@@ -113,7 +113,7 @@ async function obtenerOpcionesListadoGeneral() {
   const [[tours], [rutas], [canales]] = await Promise.all([
     db.query(`SELECT Id_Tour, Nombre_Tour, Activo FROM tours ORDER BY Activo DESC, Nombre_Tour`),
     db.query(`SELECT DISTINCT COALESCE(NULLIF(TRIM(ruta), ''), 'Pendiente') AS Ruta FROM puntos ORDER BY Ruta`),
-    db.query(`SELECT Id_Canal, Nombre_Canal FROM canales_reservas ORDER BY Nombre_Canal`),
+    db.query(`SELECT Id_Canal, Nombre_Canal FROM canales_origen ORDER BY Nombre_Canal`),
   ]);
   return {
     tours: tours || [],
@@ -193,7 +193,7 @@ async function obtenerFilasListadoGeneral(input = {}, format = 'nuevo', reportTy
       FROM ${reservasOperativasSource('r')}
       INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
       LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-      LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+      LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
       LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
       INNER JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
       LEFT JOIN puntos pt ON pt.Id_Punto = p.Id_Punto

@@ -33,7 +33,7 @@ function searchKey(value) {
 }
 
 async function typeForChannel(executor, channelId) {
-  const [rows] = await executor.query('SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal=? LIMIT 1', [channelId]);
+  const [rows] = await executor.query('SELECT Nombre_Canal FROM canales_origen WHERE Id_Canal=? LIMIT 1', [channelId]);
   if (!rows.length) throw error(400, 'CHANNEL_INVALID', 'Selecciona un canal válido para este servicio.');
   return CHANNEL_TYPES[String(rows[0].Nombre_Canal).trim().toLocaleUpperCase('es')] || null;
 }

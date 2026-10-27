@@ -73,7 +73,7 @@ async function lookupByReference(reference, message) {
       [
         'SELECT r.Id_Reserva, r.Fecha_Tour, r.Estado, r.Nombre_Reportante, c.Nombre_Canal, t.Nombre_Tour',
         'FROM ' + reservasOperativasSource('r'),
-        'LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal',
+        'LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal',
         'LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario',
         'LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour',
         "WHERE REPLACE(UPPER(r.Id_Reserva), '-', '') = ?",
@@ -99,7 +99,7 @@ async function lookupByReference(reference, message) {
         entityType: 'reservas',
         expectedAction: 'buscar_reservas',
         rows,
-        tables: ['reservas', 'canales_reservas', 'horarios', 'tours'],
+        tables: ['reservas', 'canales_origen', 'horarios', 'tours'],
         contexto: {},
       }),
     };
@@ -115,7 +115,7 @@ async function lookupByReference(reference, message) {
         intent: 'entity_lookup_reserva_codigo',
         entityType: 'reservas',
         rows,
-        tables: ['reservas', 'canales_reservas', 'horarios', 'tours'],
+        tables: ['reservas', 'canales_origen', 'horarios', 'tours'],
         accion,
       }),
     };

@@ -109,9 +109,9 @@ exports.deleteTour = async (req, res) => {
     const data = await eliminarTour(id, userId);
     return sendSuccess(res, {
       data,
-      message: data?.accion === 'DESACTIVADO'
-        ? 'El tour se desactivó porque tiene reservas asociadas.'
-        : 'Tour eliminado definitivamente.'
+      message: data?.alreadyInactive
+        ? 'El tour ya estaba desactivado.'
+        : 'El tour se desactivó y sus referencias se conservaron.'
     });
   } catch (e) {
     console.error('Error al eliminar tour:', e);

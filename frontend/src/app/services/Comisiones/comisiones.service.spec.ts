@@ -73,7 +73,7 @@ describe('ComisionesService: modelo por entidad', () => {
     update.flush({ data: result });
   });
 
-  it('adapta el contrato de grupos, elimina identificadores legacy y conserva el monto pagado', () => {
+  it('adapta el contrato de grupos de comisión y conserva el monto pagado', () => {
     let groups: any[] = [];
     service.listarComisiones({ Fecha: '2026-10-16' }).subscribe(channels => { groups = channels; });
     const request = http.expectOne(req => req.url === '/api/comisiones'
@@ -86,8 +86,6 @@ describe('ComisionesService: modelo por entidad', () => {
       Pagado_Canal: 9500,
       reportantes: [{
         Key_Beneficiario: 'wire-only',
-        Id_Beneficiario: 7,
-        Tipo_Beneficiario: 'HOTEL',
         Id_Entidad_Reportante: 12,
         Id_Perfil_Comision: 41,
         Tipo_Entidad: 'HOTEL',
@@ -111,7 +109,6 @@ describe('ComisionesService: modelo por entidad', () => {
     expect(groups.length).toBe(1);
     expect(groups[0].grupos.length).toBe(1);
     expect(groups[0].grupos[0].Nombre_Entidad).toBe('Hotel Dann Carlton');
-    expect('Id_Beneficiario' in groups[0].grupos[0]).toBeFalse();
     expect(groups[0].grupos[0].reservas[0].Monto_Comision_Pagada).toBe(9500);
   });
 

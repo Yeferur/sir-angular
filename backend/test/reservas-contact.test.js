@@ -22,7 +22,9 @@ test('un teléfono de pasajero no sustituye al teléfono obligatorio del reporta
 test('el teléfono de pasajero es obligatorio para al menos uno y los formatos inválidos se rechazan', () => {
   assert.throws(() => validarContactoReserva('', [{ Telefono_Pasajero: null }]), e => e.status === 400 && e.errorCode === 'RESERVA_REPORTER_PHONE_REQUIRED' && e.message.includes('reportante'));
   assert.throws(() => validarContactoReserva('+573001234567', [{ Telefono_Pasajero: null }]), e => e.status === 400 && e.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED' && e.message.includes('pasajero'));
-  for (const phone of ['123', ' ', '+01234567890', '+573001234567xxxx']) {
+  assert.throws(() => validarContactoReserva('+573001234567', [{ Telefono_Pasajero: ' ' }]),
+    e => e.status === 400 && e.errorCode === 'RESERVA_PASSENGER_PHONE_REQUIRED');
+  for (const phone of ['123', '+01234567890', '+573001234567xxxx']) {
     assert.throws(() => validarContactoReserva('+573001234567', [{ Telefono_Pasajero: phone }]), e => e.status === 400 && e.errorCode === 'RESERVA_PHONE_INVALID');
   }
 });
@@ -49,7 +51,7 @@ test('creación y edición reales preservan contacto, pasajeros y datos tras err
   const [[configuration]] = await db.query(`SELECT h.Id_Horario,h.Id_Tour,h.Id_Punto,m.Id_Moneda,c.Id_Canal
     FROM horarios h JOIN tours t ON t.Id_Tour=h.Id_Tour AND t.Activo=1
     JOIN puntos p ON p.Id_Punto=h.Id_Punto AND p.Activo=1
-    CROSS JOIN monedas m CROSS JOIN canales_reservas c
+    CROSS JOIN monedas m CROSS JOIN canales_origen c
     WHERE c.Nombre_Canal='WEB' AND t.Cupo_Base>=4 LIMIT 1`);
   assert.ok(configuration);
   const date = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);

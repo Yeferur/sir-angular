@@ -280,7 +280,7 @@ async function actualizarEstadosTransfersVencidos(conexion = db) {
             AND Estado = ?
             AND Pendiente_Por_Entidad_En IS NULL
             AND (Id_Entidad_Reportante IS NOT NULL OR Id_Canal NOT IN
-              (SELECT Id_Canal FROM canales_reservas WHERE UPPER(TRIM(Nombre_Canal)) IN
+              (SELECT Id_Canal FROM canales_origen WHERE UPPER(TRIM(Nombre_Canal)) IN
                 ('HOTEL','AGENCIA NACIONAL','AGENCIA INTERNACIONAL')))
             AND (? <> 'Confirmado' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
               WHERE er.Id_Entidad_Reportante=transfers.Id_Entidad_Reportante
@@ -352,7 +352,7 @@ async function getServiciosTransferSvc() {
 }
 
 async function getCanalesTransferSvc() {
-  const [rows] = await db.query('SELECT Id_Canal, Nombre_Canal, Tiene_Comision FROM canales_reservas ORDER BY Nombre_Canal');
+  const [rows] = await db.query('SELECT Id_Canal, Nombre_Canal, Tiene_Comision FROM canales_origen ORDER BY Nombre_Canal');
   return rows;
 }
 
@@ -497,7 +497,7 @@ async function crearTransferSvc(payload, files = {}) {
     const idCanal = payload.Id_Canal;
     const idEntidadReportante = await validateReservationEntity(conn, idCanal, payload.Id_Entidad_Reportante);
     const [[canalReportante]] = await conn.query(
-      'SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal = ? LIMIT 1', [idCanal]
+      'SELECT Nombre_Canal FROM canales_origen WHERE Id_Canal = ? LIMIT 1', [idCanal]
     );
     const [entidadReportanteRows] = idEntidadReportante
       ? await conn.query('SELECT Nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante = ? LIMIT 1', [idEntidadReportante])
@@ -796,7 +796,7 @@ async function filtrarTransfersSvc(q) {
       s.Nombre_Servicio AS Nombre_Servicio,
       tr.Fecha_Registro
     FROM transfers tr
-    LEFT JOIN canales_reservas c ON c.Id_Canal = tr.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = tr.Id_Canal
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = tr.Id_Entidad_Reportante
     LEFT JOIN servicios_transfer s ON s.Id_Servicio = tr.Id_Servicio
     LEFT JOIN transfers_rangos rg ON rg.Id_Rango = tr.Id_Rango
@@ -1103,7 +1103,7 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
       `SELECT t.Estado, t.Id_Canal, t.Id_Entidad_Reportante, t.Nombre_Titular, t.Fecha_Transfer,
               c.Nombre_Canal, er.Nombre AS Nombre_Entidad_Reportante
          FROM transfers t
-         LEFT JOIN canales_reservas c ON c.Id_Canal = t.Id_Canal
+         LEFT JOIN canales_origen c ON c.Id_Canal = t.Id_Canal
          LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = t.Id_Entidad_Reportante
         WHERE t.Id_Transfer = ?
         LIMIT 1
@@ -1149,7 +1149,7 @@ async function actualizarTransferSvc(Id_Transfer, payload, userId = null) {
     const idCanal = payload.Id_Canal;
     const idEntidadReportante = await validateReservationEntity(conn, idCanal, payload.Id_Entidad_Reportante);
     const [[canalReportante]] = await conn.query(
-      'SELECT Nombre_Canal FROM canales_reservas WHERE Id_Canal = ? LIMIT 1', [idCanal]
+      'SELECT Nombre_Canal FROM canales_origen WHERE Id_Canal = ? LIMIT 1', [idCanal]
     );
     const [entidadReportanteRows] = idEntidadReportante
       ? await conn.query('SELECT Nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante = ? LIMIT 1', [idEntidadReportante])

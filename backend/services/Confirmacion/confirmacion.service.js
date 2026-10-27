@@ -56,7 +56,7 @@ async function obtenerPasajerosPorTour(idTourValue, fechaValue) {
      FROM pasajeros P
      INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
      INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
-     LEFT JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+     LEFT JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
      LEFT JOIN puntos PP ON PP.Id_Punto = P.Id_Punto
      LEFT JOIN puntos PH ON PH.Id_Punto = H.Id_Punto
      WHERE H.Id_Tour = ?

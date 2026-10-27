@@ -52,7 +52,7 @@ test('MySQL local: endpoint Mercadeo cubre filtros, paginación, permiso y autor
   });
   connection = await mysql.createConnection(connectionOptions(databaseName));
 
-  const [categories] = await connection.query('SELECT Id_Canal,Nombre_Canal FROM canales_reservas ORDER BY Id_Canal');
+  const [categories] = await connection.query('SELECT Id_Canal,Nombre_Canal FROM canales_origen ORDER BY Id_Canal');
   assert.ok(categories.length >= 1, 'se requiere al menos una categoría de reserva');
   const channelOne = categories[0].Id_Canal;
   const channelTwo = categories[1]?.Id_Canal ?? channelOne;

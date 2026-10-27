@@ -12,7 +12,7 @@ const IA_MODULE_PERMISSIONS = {
   tours: 'TOURS.LEER',
   transfers: 'TRANSFERS.LEER',
   puntos: 'PUNTOS.LEER',
-  canales_reservas: 'RESERVAS.LEER',
+  canales_origen: 'RESERVAS.LEER',
   horarios: 'RESERVAS.LEER',
   aforos: 'TOURS.LEER',
   pasajeros: 'RESERVAS.LEER',
@@ -26,7 +26,7 @@ const IA_ALLOWED_TABLES = {
     logicalName: 'Reservas',
     permission: IA_MODULE_PERMISSIONS.reservas,
     description:
-      'Cabecera de reservas de tours. Une con horarios por Id_Horario, con canales_reservas por Id_Canal y con pagos_reservas/pasajeros por Id_Reserva.',
+      'Cabecera de reservas de tours. Une con horarios por Id_Horario, con canales_origen por Id_Canal y con pagos_reservas/pasajeros por Id_Reserva.',
     allowedColumns: [
       'Id_Reserva',
       'Tipo_Reserva',
@@ -126,10 +126,10 @@ const IA_ALLOWED_TABLES = {
       'Latitud y Longitud pueden venir nulas o en 0.0000000 para puntos pendientes o sin coordenadas utiles.',
     ],
   },
-  canales_reservas: {
-    sqlName: 'canales_reservas',
+  canales_origen: {
+    sqlName: 'canales_origen',
     logicalName: 'Canales',
-    permission: IA_MODULE_PERMISSIONS.canales_reservas,
+    permission: IA_MODULE_PERMISSIONS.canales_origen,
     description: 'Canales comerciales asociados a reservas por Id_Canal.',
     allowedColumns: [
       'Id_Canal',
@@ -350,7 +350,7 @@ function buildSchemaContextPrompt() {
     '- reservas.Id_Horario = horarios.Id_Horario',
     '- horarios.Id_Tour = tours.Id_Tour',
     '- horarios.Id_Punto = puntos.Id_Punto',
-    '- reservas.Id_Canal = canales_reservas.Id_Canal',
+    '- reservas.Id_Canal = canales_origen.Id_Canal',
     '- pasajeros.Id_Reserva = reservas.Id_Reserva',
     '- pasajeros.Id_Punto = puntos.Id_Punto',
     '- pagos_reservas.Id_Reserva = reservas.Id_Reserva',

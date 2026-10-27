@@ -67,7 +67,12 @@ test('MySQL temporal: la guarda de esquema transfers agrega solo lo que falta y 
 
   target = await mysql.createConnection(connectionOptions(database));
   await assertValidationConnection(target, database);
-  await target.query(`CREATE TABLE canales_reservas (
+  const migration = (await readMigrations()).find(item => item.name === '20261019_0001_transfers_entidad_schema_guard.sql');
+  assert.ok(migration, 'la guarda debe estar registrada en release-migrate-sir2');
+  const channelTable = migration.statements.join('\n').match(/REFERENCES\s+([A-Za-z0-9_]+)\s*\(\s*Id_Canal\s*\)/i)?.[1];
+  assert.ok(channelTable, 'la migración debe declarar la tabla referenciada por la FK de canal');
+
+  await target.query(`CREATE TABLE ${quoteIdentifier(channelTable)} (
     Id_Canal BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
   ) ENGINE=InnoDB`);
   await target.query(`CREATE TABLE entidades_reportantes (
@@ -78,9 +83,6 @@ test('MySQL temporal: la guarda de esquema transfers agrega solo lo que falta y 
     Fecha_Registro DATETIME NULL
   ) ENGINE=InnoDB`);
 
-  const migration = (await readMigrations()).find(item => item.name === '20261019_0001_transfers_entidad_schema_guard.sql');
-  assert.ok(migration, 'la guarda debe estar registrada en release-migrate-sir2');
-
   await applyGuard(target, migration);
   const fullState = await evidence(target);
   assert.deepEqual(fullState.columns, [
@@ -89,7 +91,7 @@ test('MySQL temporal: la guarda de esquema transfers agrega solo lo que falta y 
   ]);
   assert.deepEqual(fullState.foreignKeys, [
     { CONSTRAINT_NAME: 'fk_transfers_canal', COLUMN_NAME: 'Id_Canal',
-      REFERENCED_TABLE_NAME: 'canales_reservas', REFERENCED_COLUMN_NAME: 'Id_Canal',
+      REFERENCED_TABLE_NAME: channelTable, REFERENCED_COLUMN_NAME: 'Id_Canal',
       DELETE_RULE: 'SET NULL', UPDATE_RULE: 'CASCADE' },
     { CONSTRAINT_NAME: 'fk_transfers_entidad_reportante', COLUMN_NAME: 'Id_Entidad_Reportante',
       REFERENCED_TABLE_NAME: 'entidades_reportantes', REFERENCED_COLUMN_NAME: 'Id_Entidad_Reportante',

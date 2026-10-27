@@ -39,6 +39,9 @@ const MIGRATIONS = Object.freeze([
   '20261024_0019_mercadeo_lectura.sql',
   '20261025_0020_entidad_rechazada_correccion.sql',
   '20261025_0021_comisiones_grupos_pago.sql',
+  '20261025_0022_integridad.sql',
+  '20261026_0023_limpieza_legacy.sql',
+  '20261026_0024_rename_canales_origen.sql',
 ]);
 
 function assertTargetConfiguration(env) {
@@ -149,6 +152,7 @@ const CREATE_LEDGER_SQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
 
 const REQUIRED_COLUMNS = Object.freeze({
   schema_migrations: ['Migration_Id', 'Checksum_SHA256', 'Estado', 'Paso_Actual'],
+  canales_origen: ['Id_Canal', 'Nombre_Canal', 'Tiene_Comision'],
   permisos_cache_revision: ['Tipo', 'Id_Entidad', 'Revision'],
   reservas: ['Eliminada_En', 'Eliminada_Por', 'Motivo_Eliminacion', 'Id_Entidad_Reportante', 'Pendiente_Por_Entidad_En'],
   transfers: ['Pendiente_Por_Entidad_En'],
@@ -176,10 +180,16 @@ const REQUIRED_COLUMNS = Object.freeze({
 });
 
 const REQUIRED_FKS = Object.freeze([
+  ['reservas', 'fk_reservas_canal', 'SET NULL', 'canales_origen'],
+  ['pasajeros', 'fk_pasajeros_plan', 'RESTRICT'],
+  ['disponibilidad', 'fk_disponibilidad_tour', 'RESTRICT'],
+  ['confirmaciones_jornada', 'fk_confirmaciones_jornada_tour', 'RESTRICT'],
+  ['confirmaciones_jornada', 'fk_confirmaciones_jornada_confirmada_por', 'SET NULL'],
   ['reservas', 'fk_reservas_eliminada_por', 'SET NULL'],
   ['chat_participantes', 'fk_chat_part_ultimo_mensaje', 'RESTRICT'],
   ['tour_comisiones', 'fk_tour_comisiones_tour', 'RESTRICT'],
-  ['tour_comisiones', 'fk_tour_comisiones_canal', 'RESTRICT'],
+  ['tour_comisiones', 'fk_tour_comisiones_canal', 'RESTRICT', 'canales_origen'],
+  ['transfers', 'fk_transfers_canal', 'SET NULL', 'canales_origen'],
   ['ia_tool_runs', 'fk_ia_tool_runs_interaccion', 'RESTRICT'],
   ['pagos_reservas', 'fk_pagosreserva_reserva_restrict', 'RESTRICT'],
   ['pagos_transfers', 'fk_pagostransfers_transfer_restrict', 'RESTRICT'],
@@ -197,6 +207,19 @@ const REQUIRED_FKS = Object.freeze([
   ['perfiles_comision_entidad', 'fk_perfiles_comision_creado_por', 'SET NULL'],
   ['perfiles_comision_entidad', 'fk_perfiles_comision_actualizado_por', 'SET NULL'],
   ['programaciones', 'fk_programaciones_creado_por', 'SET NULL'],
+]);
+const REQUIRED_TABLE_COLLATIONS = Object.freeze([
+  ['tour_comisiones', 'utf8mb4_unicode_ci'],
+]);
+const RETIRED_TABLES = Object.freeze([
+  'beneficiarios_comision',
+  'beneficiarios_comision_documentos',
+  'mensaje_destinatario',
+  'mensajes',
+]);
+const RETIRED_COLUMNS = Object.freeze([
+  ['reservas', 'Id_Beneficiario_Comision'],
+  ['liquidaciones', 'Id_Beneficiario_Comision'],
 ]);
 
 function migrationVersion(name) { return name.match(/^\d{8}_(\d{4})_/)?.[1] || '0000'; }
@@ -260,12 +283,44 @@ async function readSchemaDrift(connection) {
   for (const expected of ['tour_comisiones', 'ia_interacciones', 'ia_tool_runs']) {
     if (!engines.some((row) => row.TABLE_NAME === expected)) missing.push(`${expected} (tabla requerida para conversión)`);
   }
-  const [foreignKeys] = await connection.query(`SELECT TABLE_NAME,CONSTRAINT_NAME,DELETE_RULE
-    FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()`);
-  const foreignKeyDrift = REQUIRED_FKS.filter(([table, name, deletion]) =>
-    !foreignKeys.some((fk) => fk.TABLE_NAME === table && fk.CONSTRAINT_NAME === name && fk.DELETE_RULE === deletion))
-    .map(([table, name, deletion]) => `${table}.${name}:${deletion}`);
-  return { missing, engineDrift, foreignKeyDrift };
+  const [foreignKeys] = await connection.query(`SELECT r.TABLE_NAME,r.CONSTRAINT_NAME,r.DELETE_RULE,
+      r.UPDATE_RULE,k.REFERENCED_TABLE_NAME,k.REFERENCED_COLUMN_NAME
+    FROM information_schema.REFERENTIAL_CONSTRAINTS r
+    JOIN information_schema.KEY_COLUMN_USAGE k ON k.CONSTRAINT_SCHEMA=r.CONSTRAINT_SCHEMA
+      AND k.TABLE_NAME=r.TABLE_NAME AND k.CONSTRAINT_NAME=r.CONSTRAINT_NAME
+    WHERE r.CONSTRAINT_SCHEMA=DATABASE()`);
+  const foreignKeyDrift = REQUIRED_FKS.filter(([table, name, deletion, referencedTable]) =>
+    !foreignKeys.some((fk) => fk.TABLE_NAME === table && fk.CONSTRAINT_NAME === name
+      && fk.DELETE_RULE === deletion && (!referencedTable || fk.REFERENCED_TABLE_NAME === referencedTable)))
+    .map(([table, name, deletion, referencedTable]) =>
+      `${table}.${name}:${deletion}${referencedTable ? `->${referencedTable}` : ''}`);
+  const collationTables = REQUIRED_TABLE_COLLATIONS.map(([table]) => table);
+  const [tableCollations] = await connection.query(`SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?)`, [collationTables]);
+  const collationDrift = REQUIRED_TABLE_COLLATIONS.filter(([table, collation]) =>
+    !tableCollations.some((row) => row.TABLE_NAME === table && row.TABLE_COLLATION === collation))
+    .map(([table, collation]) => `${table}:${collation}`);
+  const renamedTableSources = await readRenamedTableSources();
+  const retiredSchemaDrift = [
+    ...[...RETIRED_TABLES, ...renamedTableSources]
+      .filter((table) => found.has(table)).map((table) => `tabla ${table}`),
+    ...RETIRED_COLUMNS.filter(([table, column]) => found.get(table)?.has(column))
+      .map(([table, column]) => `columna ${table}.${column}`),
+  ];
+  return { missing, engineDrift, foreignKeyDrift, collationDrift, retiredSchemaDrift };
+}
+
+async function readRenamedTableSources() {
+  const renameMigrations = MIGRATIONS.filter((name) => /rename_canales_origen/i.test(name));
+  const sources = [];
+  for (const name of renameMigrations) {
+    const sql = await fs.readFile(path.join(__dirname, '..', 'database', 'migrations', name), 'utf8');
+    for (const statement of parseMigrationSql(sql)) {
+      const match = statement.match(/^\s*RENAME\s+TABLE\s+`?([A-Za-z0-9_]+)`?\s+TO\s+`?([A-Za-z0-9_]+)`?\s*$/i);
+      if (match && match[2].toLowerCase() === 'canales_origen') sources.push(match[1]);
+    }
+  }
+  return sources;
 }
 
 async function classifyDatabase(connection) {
@@ -343,8 +398,8 @@ async function applyMigrations(connection, migrations, { verifyFinal = true } = 
     }
     if (verifyFinal) {
       const drift = await readSchemaDrift(connection);
-      if (drift.missing.length || drift.engineDrift.length || drift.foreignKeyDrift.length) {
-        throw new Error(`Drift después de migraciones. Faltan: ${drift.missing.join(', ') || 'ninguna'}; motores: ${drift.engineDrift.join(', ') || 'ninguno'}; FKs: ${drift.foreignKeyDrift.join(', ') || 'ninguna'}`);
+      if (drift.missing.length || drift.engineDrift.length || drift.foreignKeyDrift.length || drift.collationDrift.length || drift.retiredSchemaDrift.length) {
+        throw new Error(`Drift después de migraciones. Faltan: ${drift.missing.join(', ') || 'ninguna'}; motores: ${drift.engineDrift.join(', ') || 'ninguno'}; FKs: ${drift.foreignKeyDrift.join(', ') || 'ninguna'}; collations: ${drift.collationDrift.join(', ') || 'ninguna'}; objetos retirados presentes: ${drift.retiredSchemaDrift.join(', ') || 'ninguno'}`);
       }
     }
   } finally {
@@ -421,7 +476,8 @@ module.exports = {
   TARGET_DATABASE, MIGRATIONS, assertTargetConfiguration,
   assertConnectedDatabase, assertConfirmation, selectMigrationsThrough, parseMigrationSql,
   assertMigrationSafe, readMigrations, applyMigrations, readMigrationStatus,
-  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS, REQUIRED_FKS,
+  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS, REQUIRED_FKS, REQUIRED_TABLE_COLLATIONS,
+  RETIRED_TABLES, RETIRED_COLUMNS,
   classifyDatabase,
   readAvailabilityPreflight,
 };

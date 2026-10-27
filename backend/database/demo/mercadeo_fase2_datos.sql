@@ -6,10 +6,10 @@ START TRANSACTION;
 
 SET @demo_prefix = 'MKT2D_';
 SET @demo_creator = (SELECT Id_Usuario FROM usuarios ORDER BY Id_Usuario LIMIT 1);
-SET @channel_hotel = (SELECT Id_Canal FROM canales_reservas WHERE UPPER(Nombre_Canal)='HOTEL' LIMIT 1);
-SET @channel_national = (SELECT Id_Canal FROM canales_reservas WHERE UPPER(Nombre_Canal)='AGENCIA NACIONAL' LIMIT 1);
-SET @channel_international = (SELECT Id_Canal FROM canales_reservas WHERE UPPER(Nombre_Canal)='AGENCIA INTERNACIONAL' LIMIT 1);
-SET @channel_freelance = (SELECT Id_Canal FROM canales_reservas WHERE UPPER(Nombre_Canal)='FREELANCE' LIMIT 1);
+SET @channel_hotel = (SELECT Id_Canal FROM canales_origen WHERE UPPER(Nombre_Canal)='HOTEL' LIMIT 1);
+SET @channel_national = (SELECT Id_Canal FROM canales_origen WHERE UPPER(Nombre_Canal)='AGENCIA NACIONAL' LIMIT 1);
+SET @channel_international = (SELECT Id_Canal FROM canales_origen WHERE UPPER(Nombre_Canal)='AGENCIA INTERNACIONAL' LIMIT 1);
+SET @channel_freelance = (SELECT Id_Canal FROM canales_origen WHERE UPPER(Nombre_Canal)='FREELANCE' LIMIT 1);
 SET @transfer_range = (SELECT Id_Rango FROM transfers_rangos WHERE Minimo >= 1 ORDER BY Minimo, Id_Rango LIMIT 1);
 SET @transfer_people = (SELECT Minimo FROM transfers_rangos WHERE Id_Rango=@transfer_range LIMIT 1);
 SET @transfer_service = (SELECT Id_Servicio FROM servicios_transfer ORDER BY Id_Servicio LIMIT 1);

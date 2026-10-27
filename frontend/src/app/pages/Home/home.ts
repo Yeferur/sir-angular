@@ -36,8 +36,6 @@ const ACTIVITY_LABELS: Record<string, string> = {
   PAGAR_COMISIONES: 'Marcó comisiones como pagadas',
   REABRIR_COMISIONES: 'Reabrió comisiones para revisión',
   ACTUALIZAR_DATOS_PAGO_COMISION: 'Actualizó los datos de pago de comisiones',
-  CREAR_BENEFICIARIO_COMISION: 'Agregó un beneficiario de comisión',
-  ACTUALIZAR_BENEFICIARIO_COMISION: 'Actualizó un beneficiario de comisión',
   ACTUALIZAR_ASISTENCIA: 'Actualizó la asistencia de pasajeros',
   CAMBIAR_AFORO_TOUR: 'Actualizó el aforo de un tour',
   REORDENAR_RUTA: 'Reordenó una ruta de recogida',

@@ -130,11 +130,11 @@ export class VerToursComponent implements OnInit {
   desactivarTour(tour: Tour): void {
     if (!tour.Id_Tour || !this.canDeleteTour) return;
     this.alerts.confirm(
-      '¿Eliminar tour?',
-      `Se eliminará “${tour.Nombre_Tour}”. Si tiene reservas asociadas, el sistema conservará su histórico y lo desactivará automáticamente.`,
+      '¿Desactivar tour?',
+      `“${tour.Nombre_Tour}” dejará de estar disponible. Sus reservas, horarios, comisiones y demás referencias se conservarán.`,
       () => this.confirmarDesactivacion(tour),
       undefined,
-      { confirmText: 'Eliminar tour', cancelText: 'Conservar', type: 'warning' }
+      { confirmText: 'Desactivar tour', cancelText: 'Conservar', type: 'warning' }
     );
   }
 
@@ -147,10 +147,10 @@ export class VerToursComponent implements OnInit {
       next: (result: any) => {
         this.tours.update((current) => current.filter((item) => item.Id_Tour !== id));
         this.alerts.successToast(
-          result?.accion === 'DESACTIVADO' ? 'Tour retirado' : 'Tour eliminado',
-          result?.accion === 'DESACTIVADO'
-            ? 'Tenía reservas asociadas; su histórico se conservó.'
-            : 'El tour se eliminó definitivamente.'
+          'Tour desactivado',
+          result?.alreadyInactive
+            ? 'El tour ya estaba desactivado; sus referencias se conservaron.'
+            : 'El tour dejó de estar disponible y sus referencias se conservaron.'
         );
       },
       error: (error) => {

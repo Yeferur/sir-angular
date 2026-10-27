@@ -217,7 +217,7 @@ function sqlReservasComisionables({ incluirEntityless = false } = {}) {
       FROM ${reservationSource}
       INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
       INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
-      INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+      INNER JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
       ${entityJoin}
       INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
       LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva
@@ -345,7 +345,7 @@ function buildUnlinkedQueries(filtros) {
       FROM ${reservasOperativasSource('R')}
       INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
       INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
-      INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+      INNER JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
       INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
       LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva
      WHERE ${reservaNoEliminadaPredicate('R')}
@@ -434,7 +434,7 @@ async function obtenerEstadoJornadasDeGrupos(conn, groups) {
             H.Id_Tour
        FROM ${reservasOperativasSource('R')}
        INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
-       INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+       INNER JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
        INNER JOIN entidades_reportantes E ON E.Id_Entidad_Reportante = R.Id_Entidad_Reportante
        INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
        LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva
@@ -506,7 +506,7 @@ async function obtenerReservasPendientes(conn, entityId, fechaTour, { lock = fal
       `SELECT R.Id_Reserva
          FROM reservas R
          INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
-         INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+         INNER JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
          INNER JOIN entidades_reportantes E ON E.Id_Entidad_Reportante = R.Id_Entidad_Reportante
          INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
          LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva
@@ -534,7 +534,7 @@ async function obtenerReservasPendientes(conn, entityId, fechaTour, { lock = fal
        FROM ${reservasOperativasSource('R')}
        INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
        INNER JOIN tours T ON T.Id_Tour = H.Id_Tour
-       INNER JOIN canales_reservas C ON C.Id_Canal = R.Id_Canal
+       INNER JOIN canales_origen C ON C.Id_Canal = R.Id_Canal
        INNER JOIN entidades_reportantes E ON E.Id_Entidad_Reportante = R.Id_Entidad_Reportante
        INNER JOIN pasajeros P ON P.Id_Reserva = R.Id_Reserva
        LEFT JOIN liquidaciones L ON L.Id_Reserva = R.Id_Reserva

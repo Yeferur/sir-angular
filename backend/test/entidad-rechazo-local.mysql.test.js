@@ -23,7 +23,7 @@ test('rechazo de entidad en el MySQL local configurado', {
     ('ENTIDAD_REPORTANTE_PENDIENTE_VALIDACION','ENTIDAD_REPORTANTE_RECHAZADA_SIN_REASIGNAR')`);
   assert.equal(rules.length, 2,
     'La prueba requiere las reglas de 0018 y 0020 ya aplicadas; esta prueba no aplica migraciones.');
-  const [[channel]] = await db.query("SELECT Id_Canal FROM canales_reservas WHERE UPPER(TRIM(Nombre_Canal))='HOTEL' LIMIT 1");
+  const [[channel]] = await db.query("SELECT Id_Canal FROM canales_origen WHERE UPPER(TRIM(Nombre_Canal))='HOTEL' LIMIT 1");
   const [users] = await db.query('SELECT Id_Usuario FROM usuarios WHERE Activo=1 ORDER BY Id_Usuario LIMIT 2');
   assert.ok(channel && users.length === 2, 'Se requieren un canal HOTEL y dos usuarios activos existentes.');
   const userIds = users.map(user => user.Id_Usuario);

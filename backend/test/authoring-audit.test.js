@@ -47,7 +47,7 @@ test('History conserva el detalle sin inventar snapshot para un actor no resolub
   assert.deepEqual(event.params.slice(3), [null, null, null]);
 });
 
-test('Liquidaciones usan el actor autenticado al crear y al hacer upsert', async (t) => {
+test('Liquidaciones Freelance usan el actor autenticado al crear y al hacer upsert', async (t) => {
   const original = db.getConnection;
   const calls = [];
   const connection = {
@@ -59,9 +59,9 @@ test('Liquidaciones usan el actor autenticado al crear y al hacer upsert', async
         return [[{ Id_Reserva: 'R-AUDIT-1' }]];
       }
       if (statement.startsWith('SELECT R.Id_Reserva,') && statement.includes('P.Id_Pasajero')) return [[{
-        Id_Reserva: 'R-AUDIT-1', Id_Canal: 1, Nombre_Canal: 'HOTEL', Tiene_Comision: 1,
-        Id_Entidad_Reportante: 11, Tipo_Entidad: 'HOTEL', Nombre_Entidad: 'Hotel de prueba',
-        Entidad_Activa: 1, Estado_Validacion_Entidad: 'VALIDADA',
+        Id_Reserva: 'R-AUDIT-1', Id_Canal: 4, Nombre_Canal: 'FREELANCE', Tiene_Comision: 1,
+        Id_Entidad_Reportante: null, Tipo_Entidad: null, Nombre_Entidad: null,
+        Entidad_Activa: null, Estado_Validacion_Entidad: null,
         Nombre_Reportante: 'Contacto de prueba', Telefono_Reportante: '3000000000',
         Monto_Comision: '10000', Id_Pasajero: 1, Tipo_Pasajero: 'ADULTO',
         Comision_Pasajero: '10000', Nombre_Pasajero: 'Pasajero de prueba',
@@ -113,7 +113,7 @@ test('desactivación de tours y puntos conserva History junto con el actor de ed
       if (statement.includes('SELECT Nombre_Tour, Abreviacion, Activo FROM tours')) {
         return [[{ Nombre_Tour: 'Tour', Abreviacion: 'T', Activo: 1 }]];
       }
-      if (statement.includes('COUNT(DISTINCT r.Id_Reserva)')) return [[{ total: 1 }]];
+      if (statement.includes('COUNT(DISTINCT r.Id_Reserva)')) return [[{ total: 0 }]];
       if (statement.includes('SELECT Id_Punto, Nombre_Punto, Sector, Direccion, ruta, Activo FROM puntos')) {
         return [[{ Id_Punto: 8, Nombre_Punto: 'Punto', Sector: 'S', Direccion: 'D', ruta: 'R', Activo: 1 }]];
       }
@@ -136,6 +136,7 @@ test('desactivación de tours y puntos conserva History junto con el actor de ed
   assert.equal(tourResult.accion, 'DESACTIVADO');
   assert.equal(pointResult.accion, 'DESACTIVADO');
   assert.ok(statements.some(call => call.sql.includes('UPDATE tours SET Activo = 0, Actualizado_Por')));
+  assert.equal(statements.some(call => /DELETE FROM (?:tours|horarios|tour_comisiones|programacion_tours|programaciones)/.test(call.sql)), false);
   assert.ok(statements.some(call => call.sql.includes('UPDATE puntos SET Activo = 0, posicion = 0, Actualizado_Por')));
   assert.ok(statements.some(call => call.sql.includes('INSERT INTO historial') && call.params[2] === 'DESACTIVAR_TOUR'));
   assert.ok(statements.some(call => call.sql.includes('INSERT INTO historial') && call.params[2] === 'DESACTIVAR_PUNTO'));

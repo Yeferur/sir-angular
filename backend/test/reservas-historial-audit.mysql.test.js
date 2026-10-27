@@ -56,7 +56,7 @@ test('MySQL local: auditoría real de reservas y pasajeros en copia temporal', {
       JOIN horarios h2 ON h2.Id_Tour=t.Id_Tour AND h2.Id_Punto<>h1.Id_Punto
       JOIN puntos p2 ON p2.Id_Punto=h2.Id_Punto AND p2.Activo=1
       CROSS JOIN monedas m
-      JOIN canales_reservas c ON c.Nombre_Canal='WEB'
+      JOIN canales_origen c ON c.Nombre_Canal='WEB'
       WHERE t.Activo=1 AND t.Cupo_Base>=4
       ORDER BY t.Id_Tour,h1.Id_Horario,h2.Id_Horario LIMIT 1`);
     assert.ok(configuration, 'se requieren dos puntos activos del mismo tour y canal WEB');

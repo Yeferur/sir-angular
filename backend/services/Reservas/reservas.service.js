@@ -512,7 +512,7 @@ async function actualizarEstadosReservasVencidas(conexion = db) {
             AND Estado = ?
             AND Pendiente_Por_Entidad_En IS NULL
             AND (Id_Entidad_Reportante IS NOT NULL OR Id_Canal NOT IN
-              (SELECT Id_Canal FROM canales_reservas WHERE UPPER(TRIM(Nombre_Canal)) IN
+              (SELECT Id_Canal FROM canales_origen WHERE UPPER(TRIM(Nombre_Canal)) IN
                 ('HOTEL','AGENCIA NACIONAL','AGENCIA INTERNACIONAL')))
             AND (? <> 'Confirmada' OR NOT EXISTS (SELECT 1 FROM entidades_reportantes er
               WHERE er.Id_Entidad_Reportante=reservas.Id_Entidad_Reportante
@@ -978,7 +978,7 @@ async function filtrarReservas(q, ownerUserId = null) {
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     ${where}
   `;
 
@@ -998,7 +998,7 @@ async function filtrarReservas(q, ownerUserId = null) {
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
@@ -1068,7 +1068,7 @@ async function obtenerReserva(Id_Reserva, ownerUserId = null) {
     FROM reservas r
     LEFT JOIN horarios h ON h.Id_Horario = r.Id_Horario
     LEFT JOIN tours t ON t.Id_Tour = h.Id_Tour
-    LEFT JOIN canales_reservas c ON c.Id_Canal = r.Id_Canal
+    LEFT JOIN canales_origen c ON c.Id_Canal = r.Id_Canal
     LEFT JOIN entidades_reportantes er ON er.Id_Entidad_Reportante = r.Id_Entidad_Reportante
     LEFT JOIN monedas m ON m.Id_Moneda = r.Id_Moneda
     LEFT JOIN puntos pto ON pto.Id_Punto = h.Id_Punto
@@ -1317,7 +1317,7 @@ async function obtenerCanales() {
        Id_Canal,
        Nombre_Canal,
        Tiene_Comision
-     FROM canales_reservas
+     FROM canales_origen
      ORDER BY Nombre_Canal ASC`
   );
   return rows.map((row) => ({
