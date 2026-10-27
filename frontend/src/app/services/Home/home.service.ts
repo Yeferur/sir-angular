@@ -72,6 +72,7 @@ export interface HomeProcess {
   description: string;
   count: number;
   route: string;
+  routeParams?: Record<string, string | number | null>;
   permission: string;
 }
 

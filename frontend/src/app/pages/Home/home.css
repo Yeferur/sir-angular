@@ -602,7 +602,6 @@ button { font: inherit; }
   background: color-mix(in srgb, var(--accent-orange) 12%, transparent);
 }
 
-.capacity-gauge[data-status='critical'],
 .capacity-gauge[data-status='full'],
 .capacity-gauge[data-status='missing'] { color: var(--accent-red); background: color-mix(in srgb, var(--accent-red) 11%, transparent); }
 

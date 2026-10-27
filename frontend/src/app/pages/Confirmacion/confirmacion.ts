@@ -209,6 +209,7 @@ export class ConfirmacionComponent implements OnInit {
     const fecha = this.filters.Fecha;
     this.hasSearched = true;
     this.isLoading = true;
+    this.jornadaConfirmada = false;
     this.loadError = '';
     this.busqueda = '';
     this.filtroEstado = 'TODOS';
@@ -225,7 +226,7 @@ export class ConfirmacionComponent implements OnInit {
     ).subscribe({
       next: ({ pasajeros, estado }) => {
         this.pasajeros = this.normalizePasajeros(pasajeros);
-        this.jornadaConfirmada = Boolean(estado?.jornadas?.[0]?.Confirmada);
+        this.jornadaConfirmada = Boolean(estado?.jornadas?.[0]?.jornadaConfirmada);
         this.loadedTourId = idTour;
         this.loadedFecha = fecha;
         this.syncSavedConfirmaciones();
@@ -349,7 +350,7 @@ export class ConfirmacionComponent implements OnInit {
 
   private restoreFiltersFromQuery(): boolean {
     const params = this.route.snapshot.queryParamMap;
-    const fecha = String(params.get('fechaTour') || '').trim();
+    const fecha = String(params.get('fecha') || params.get('fechaTour') || '').trim();
     const tour = Number(params.get('tour') || params.get('tours'));
     const hasValidFecha = /^\d{4}-\d{2}-\d{2}$/.test(fecha);
     const hasValidTour = Number.isFinite(tour) && tour > 0;

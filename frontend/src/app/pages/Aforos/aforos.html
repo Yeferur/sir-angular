@@ -82,7 +82,9 @@
       <div class="tours-grid">
 
         <div
+          id="aforo-tour-shared"
           class="tour-card card-linked"
+          [class.card-targeted]="isRequestedLinkedCard()"
           [class.has-privados]="hasAnyLinkedPrivados()"
           [class.card-flash]="flashLinked">
           <div class="card-head">
@@ -164,7 +166,7 @@
 
         @for (tour of tours; track tour.Id_Tour) {
           @if (!isLinked(tour)) {
-            <div class="tour-card" [class.has-privados]="hasPrivados(tour)" [class.card-flash]="isFlashing(tour)">
+            <div [id]="'aforo-tour-' + tour.Id_Tour" class="tour-card" [class.card-targeted]="isRequestedTour(tour)" [class.has-privados]="hasPrivados(tour)" [class.card-flash]="isFlashing(tour)">
               <div class="card-head">
                 <div class="card-name-col">
                   <span class="card-tour-name">{{ tour.Nombre_Tour }}</span>

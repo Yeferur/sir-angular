@@ -82,6 +82,7 @@ function normalizarEstadoJornadas(rows, Fecha) {
       Total_Viajaron: totalViajaron,
       Total_No_Viajaron: totalPasajeros - totalViajaron,
       Confirmada: fueConfirmada && !cambioCantidad,
+      jornadaConfirmada: fueConfirmada && !cambioCantidad,
       Requiere_Confirmacion: !fueConfirmada || cambioCantidad,
       Cambio_Cantidad: cambioCantidad,
       Confirmada_En: row.Confirmada_En || null,
@@ -96,6 +97,27 @@ function normalizarEstadoJornadas(rows, Fecha) {
     Total_Pasajeros: jornadas.reduce((sum, jornada) => sum + jornada.Total_Pasajeros, 0),
     jornadas,
   };
+}
+
+async function jornadaConfirmada(idTourValue, fechaValue) {
+  const { Id_Tour, Fecha } = validarFiltros(idTourValue, fechaValue);
+  const [rows] = await db.query(
+    `SELECT
+       COUNT(P.Id_Pasajero) AS Total_Pasajeros,
+       CJ.Total_Pasajeros AS Total_Pasajeros_Confirmados,
+       CJ.Confirmada_En
+     FROM pasajeros P
+     INNER JOIN ${reservasOperativasSource('R')} ON R.Id_Reserva = P.Id_Reserva
+     INNER JOIN horarios H ON H.Id_Horario = R.Id_Horario
+     LEFT JOIN confirmaciones_jornada CJ
+       ON CJ.Id_Tour = H.Id_Tour AND CJ.Fecha_Tour = R.Fecha_Tour
+     WHERE H.Id_Tour = ?
+       AND R.Fecha_Tour = ?
+       AND UPPER(TRIM(COALESCE(R.Estado, ''))) NOT IN ('CANCELADA', 'CANCELADO', 'ELIMINADA', 'ELIMINADO')
+     GROUP BY CJ.Id_Confirmacion, CJ.Total_Pasajeros, CJ.Confirmada_En`,
+    [Id_Tour, Fecha],
+  );
+  return Boolean(normalizarEstadoJornadas(rows, Fecha).jornadas[0]?.jornadaConfirmada);
 }
 
 async function obtenerEstadoConfirmacion(fechaValue, idTourValue = null) {
@@ -260,6 +282,7 @@ async function actualizarConfirmacion(payload, userId = null) {
 module.exports = {
   obtenerPasajerosPorTour,
   obtenerEstadoConfirmacion,
+  jornadaConfirmada,
   actualizarConfirmacion,
   normalizarCambios,
   validarFiltros,

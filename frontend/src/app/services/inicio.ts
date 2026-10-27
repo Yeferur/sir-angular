@@ -26,6 +26,10 @@ export interface Tour {
   privados: Privado[];
   /** Presente solo cuando el tour tiene multiples planes y el backend los incluye */
   planes?: PlanSummary[];
+  Tours_Cupo_Compartido?: number[];
+  Fuente_Cupo_Compartido?: number;
+  Cupo_Compartido?: number;
+  Ocupacion_Compartida?: number;
 }
 
 export interface Transfer {

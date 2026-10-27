@@ -311,7 +311,7 @@
               <button
                 type="button"
                 class="process-card"
-                (click)="navigate(process.route)"
+                (click)="navigate(process.route, process.routeParams)"
               >
                 <span class="process-icon">
                   @switch (process.id) {
@@ -363,7 +363,7 @@
 
               <div class="item-list">
                 @for (alert of summary.operations.capacityAlerts; track alert.tourId + '-' + alert.date) {
-                  <button type="button" class="capacity-item" (click)="navigate('/Aforos')">
+                  <button type="button" class="capacity-item" (click)="navigate('/Aforos', { tour: alert.tourId, fecha: alert.date })">
                     <span class="capacity-gauge" [attr.data-status]="alert.status">
                       <i class="bx bx-bar-chart-alt-2" aria-hidden="true"></i>
                     </span>

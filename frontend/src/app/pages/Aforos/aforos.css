@@ -1,5 +1,11 @@
 @import "../../shared/operational-controls.css";
 
+.card-targeted {
+  outline: 3px solid color-mix(in srgb, var(--accent-blue, #2563eb) 70%, transparent);
+  outline-offset: 3px;
+  scroll-margin-top: 92px;
+}
+
 /* ============================================================
    INICIO / AFOROS
    ============================================================ */

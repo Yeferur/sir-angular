@@ -40,6 +40,15 @@
         description="No encontramos pasajeros activos para el tour y la fecha seleccionados. Revisa los filtros e intenta nuevamente." />
     } @else {
       <section class="control-card" aria-live="polite">
+        @if (!jornadaConfirmada) {
+          <section class="trip-confirmation-banner" role="status" aria-live="polite">
+            <span class="trip-confirmation-banner__icon" aria-hidden="true">!</span>
+            <div class="trip-confirmation-banner__copy">
+              <strong>La jornada aún no está confirmada</strong>
+              <span>Guarda la asistencia para cerrar esta jornada y habilitar Seguros.</span>
+            </div>
+          </section>
+        }
         <div class="list-tools">
           <div class="search-field">
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

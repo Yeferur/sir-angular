@@ -5,6 +5,7 @@ const {
   bogotaDate,
   hasAnyPermission,
   normalizeOverview,
+  filterCommissionRowsByJourneyConfirmation,
 } = require('../services/Home/home.service');
 
 test('detecta capacidades usando permisos efectivos y no el nombre del rol', () => {
@@ -57,4 +58,21 @@ test('genera fechas de Bogotá en formato estable y respeta el desplazamiento', 
   assert.match(tomorrow, /^\d{4}-\d{2}-\d{2}$/);
   const difference = new Date(`${tomorrow}T12:00:00Z`) - new Date(`${today}T12:00:00Z`);
   assert.equal(difference, 24 * 60 * 60 * 1000);
+});
+
+const commissionRow = {
+  Id_Reserva: 501,
+  Id_Tour: 2,
+  Fecha_Tour: '2026-08-08',
+  Nombre_Tour: 'Guatapé',
+};
+
+test('comisiones pendientes cuentan jornadas confirmadas', async () => {
+  const rows = await filterCommissionRowsByJourneyConfirmation([commissionRow], async () => true);
+  assert.equal(rows.length, 1);
+});
+
+test('comisiones pendientes excluyen jornadas sin confirmar', async () => {
+  const rows = await filterCommissionRowsByJourneyConfirmation([commissionRow], async () => false);
+  assert.equal(rows.length, 0);
 });

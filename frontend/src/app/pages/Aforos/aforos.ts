@@ -55,6 +55,7 @@ export class Inicio implements OnInit, OnDestroy {
   private drawerClearTimer?: ReturnType<typeof setTimeout>;
   private previousBodyOverflow = '';
   private previousFocus: HTMLElement | null = null;
+  requestedTourId: number | null = null;
 
   fecha: string = this.getTomorrowIso();
 
@@ -82,9 +83,6 @@ export class Inicio implements OnInit, OnDestroy {
   private flashTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private flashLinkedTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private readonly LINKED_IDS = [1, 5];
-  private readonly CUPO_SOURCE = 5;
-
   constructor() {
     effect(() => {
       const aforo = this.inicioService.aforoActualizado();
@@ -99,12 +97,13 @@ export class Inicio implements OnInit, OnDestroy {
 
       this.tours.forEach((tour) => {
         const isDirectMatch = tour.Id_Tour === id;
-        const isLinkedMatch = this.LINKED_IDS.includes(id) && this.LINKED_IDS.includes(tour.Id_Tour);
+        const isLinkedMatch = this.isLinked(tour) && this.getLinkedTourIds().includes(id);
 
         if ((isDirectMatch || isLinkedMatch) && tour.cupos !== nuevo) {
           tour.cupos = nuevo;
 
           if (this.isLinked(tour)) {
+            tour.Cupo_Compartido = nuevo;
             touchedLinked = true;
           } else {
             this.flashTour(tour.Id_Tour);
@@ -139,7 +138,9 @@ export class Inicio implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const routeDate = this.normalizeYmd(this.route.snapshot.queryParamMap.get('fecha'));
+    const routeTour = Number(this.route.snapshot.queryParamMap.get('tour'));
     if (routeDate) this.fecha = routeDate;
+    if (Number.isInteger(routeTour) && routeTour > 0) this.requestedTourId = routeTour;
     this.syncDateToUrl();
     this.loadData();
   }
@@ -240,6 +241,7 @@ export class Inicio implements OnInit, OnDestroy {
         this.loadedFecha = requestDate;
         this.loadError = null;
         this.cdr.markForCheck();
+        if (this.requestedTourId) setTimeout(() => this.scrollToRequestedTour(), 0);
       },
       error: (error) => {
         if (requestId !== this.loadRequestId) return;
@@ -310,7 +312,7 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   isLinked(tour: Tour): boolean {
-    return this.LINKED_IDS.includes(tour.Id_Tour);
+    return (tour.Tours_Cupo_Compartido || []).includes(Number(tour.Id_Tour));
   }
 
   hasPrivados(tour: Tour): boolean {
@@ -318,9 +320,29 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   getLinkedTours(): Tour[] {
-    return this.LINKED_IDS
+    return this.getLinkedTourIds()
       .map((id) => this.tours.find((tour) => tour.Id_Tour === id))
       .filter((tour): tour is Tour => Boolean(tour));
+  }
+
+  private getLinkedTourIds(): number[] {
+    return this.tours.find((tour) => Array.isArray(tour.Tours_Cupo_Compartido))
+      ?.Tours_Cupo_Compartido?.map(Number) || [];
+  }
+
+  private scrollToRequestedTour(): void {
+    if (!this.requestedTourId || typeof document === 'undefined') return;
+    const linked = this.getLinkedTourIds().includes(this.requestedTourId);
+    const targetId = linked ? 'aforo-tour-shared' : `aforo-tour-${this.requestedTourId}`;
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  isRequestedLinkedCard(): boolean {
+    return Boolean(this.requestedTourId && this.getLinkedTourIds().includes(this.requestedTourId));
+  }
+
+  isRequestedTour(tour: Tour): boolean {
+    return this.requestedTourId === Number(tour.Id_Tour) && !this.isLinked(tour);
   }
 
   irAReservas(tours: Tour | Tour[], tipoReserva: '' | 'Grupal' | 'Privada' = ''): void {
@@ -367,13 +389,11 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   getCupoCompartido(): number {
-    return Number(
-      this.tours.find((tour) => tour.Id_Tour === this.CUPO_SOURCE)?.cupos ?? 0,
-    );
+    return Number(this.getLinkedTours()[0]?.Cupo_Compartido ?? 0);
   }
 
   getCuposParaMeta(tour: Tour): number {
-    return this.isLinked(tour) ? this.getCupoCompartido() : Number(tour.cupos || 0);
+    return this.isLinked(tour) ? Number(tour.Cupo_Compartido || 0) : Number(tour.cupos || 0);
   }
 
   getAvailableSeats(tour: Tour): number {
@@ -403,10 +423,7 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   getLinkedTotalPax(): number {
-    return this.getLinkedTours().reduce(
-      (total, tour) => total + Number(tour.NumeroPasajeros || 0),
-      0,
-    );
+    return Number(this.getLinkedTours()[0]?.Ocupacion_Compartida || 0);
   }
 
   getLinkedAvailableSeats(): number {
@@ -441,7 +458,8 @@ export class Inicio implements OnInit, OnDestroy {
   }
 
   abrirDrawerEdicionCompartido(): void {
-    const sourceTour = this.tours.find((tour) => tour.Id_Tour === this.CUPO_SOURCE);
+    const sourceId = this.getLinkedTours()[0]?.Fuente_Cupo_Compartido;
+    const sourceTour = this.tours.find((tour) => tour.Id_Tour === Number(sourceId));
 
     if (!sourceTour) {
       this.alerts.errorToast('No disponible', 'No se encontró el tour que administra el cupo compartido.');
@@ -579,7 +597,9 @@ export class Inicio implements OnInit, OnDestroy {
 
     const cupo = Number(this.nuevoCupoDrawer);
     const isSharedCapacity = this.isLinked(this.drawerTour);
-    const targetTourId = isSharedCapacity ? this.CUPO_SOURCE : this.drawerTour.Id_Tour;
+    const targetTourId = isSharedCapacity
+      ? Number(this.drawerTour.Fuente_Cupo_Compartido)
+      : this.drawerTour.Id_Tour;
     const nombre = isSharedCapacity
       ? this.getLinkedTourNames()
       : this.drawerTour.Nombre_Tour;

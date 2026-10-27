@@ -4,6 +4,8 @@ const db = require('../../database/db');
 const crypto = require('crypto');
 const { isClientRoleName } = require('../../utils/clientAccess');
 const { syncHomeProcesses } = require('../Pendientes/home-process-detector.service');
+const { jornadaConfirmada } = require('../Confirmacion/confirmacion.service');
+const { consolidateCapacityAlerts } = require('../Aforos/shared-capacity.service');
 
 const ACTIVE_RESERVATION_SQL = activeReservationSql('r');
 const ACTIVE_TRANSFER_SQL = "UPPER(TRIM(COALESCE(tr.Estado, ''))) NOT IN ('CANCELADA','CANCELADO','ANULADA','ANULADO','ELIMINADA','ELIMINADO')";
@@ -63,6 +65,40 @@ function commissionProcess(rows = []) {
       ? `${count} ${count === 1 ? 'reserva viajada' : 'reservas viajadas'} ${period} ${count === 1 ? 'tiene comisión pendiente' : 'tienen comisiones pendientes'}.`
       : 'No hay reservas viajadas con comisiones pendientes.',
   };
+}
+
+async function filterUnconfirmedJourneys(rows = [], isConfirmed = jornadaConfirmada) {
+  const pairs = new Map();
+  for (const row of rows || []) {
+    const tour = Number(row.Id_Tour);
+    const date = String(row.Fecha_Tour || '').slice(0, 10);
+    if (tour > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)) pairs.set(`${tour}:${date}`, { tour, date });
+  }
+  const states = new Map(await Promise.all(Array.from(pairs, async ([key, pair]) => [
+    key,
+    await isConfirmed(pair.tour, pair.date),
+  ])));
+  return (rows || []).filter((row) => !states.get(`${Number(row.Id_Tour)}:${String(row.Fecha_Tour || '').slice(0, 10)}`));
+}
+
+async function filterCommissionRowsByJourneyConfirmation(rows = [], isConfirmed = jornadaConfirmada) {
+  const pairs = new Map();
+  for (const row of rows || []) {
+    const tour = Number(row.Id_Tour);
+    const date = String(row.Fecha_Tour || '').slice(0, 10);
+    if (tour > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)) pairs.set(`${tour}:${date}`, { tour, date });
+  }
+  const states = new Map(await Promise.all(Array.from(pairs, async ([key, pair]) => [
+    key,
+    await isConfirmed(pair.tour, pair.date),
+  ])));
+  return (rows || []).filter((row) => states.get(`${Number(row.Id_Tour)}:${String(row.Fecha_Tour || '').slice(0, 10)}`));
+}
+
+function shiftIsoDate(date, offset) {
+  const shifted = new Date(`${date}T12:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + offset);
+  return shifted.toISOString().slice(0, 10);
 }
 
 function normalizeOverview(rows, dates) {
@@ -238,81 +274,77 @@ async function getPersonalWork(userId, dates, permissions, clientMode = false) {
 }
 
 async function getCapacityAlerts(dates) {
-  const aforoCapacitySql = getSchemaCapabilities().aforoOperation
-    ? "CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END"
-    : 'a.Cupo';
+  const capabilities = getSchemaCapabilities();
+  const capacitySql = capabilities.aforoOperation
+    ? "COALESCE(CASE WHEN a.Operacion = 'USAR_BASE' THEN NULL ELSE a.Cupo END, t.Cupo_Base, 0)"
+    : 'COALESCE(a.Cupo, t.Cupo_Base, 0)';
+  const scanDates = Array.from({ length: 8 }, (_, index) => shiftIsoDate(dates.today, index));
+  const dateTableSql = scanDates.map(() => 'SELECT ? AS Fecha').join(' UNION ALL ');
   const [rows] = await db.query(
     `SELECT
        t.Id_Tour,
        t.Nombre_Tour,
-       DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha,
-       COALESCE(${aforoCapacitySql}, t.Cupo_Base, 0) AS Capacidad,
-       SUM(${passengerSeatSql('p')}) AS Ocupados
-     FROM ${reservasOperativasSource('r')}
-     INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
-     INNER JOIN tours t ON t.Id_Tour = h.Id_Tour
-     LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+       DATE_FORMAT(d.Fecha, '%Y-%m-%d') AS Fecha,
+       ${capacitySql} AS Capacidad,
+       COALESCE(o.Ocupados, 0) AS Ocupados
+     FROM tours t
+     CROSS JOIN (${dateTableSql}) d
      LEFT JOIN aforos a ON a.Id_Aforo = (
        SELECT a2.Id_Aforo
        FROM aforos a2
-       WHERE a2.Id_Tour = h.Id_Tour AND a2.Fecha_Aforo = r.Fecha_Tour
+       WHERE a2.Id_Tour = t.Id_Tour AND a2.Fecha_Aforo = d.Fecha
        ORDER BY a2.Id_Aforo DESC
        LIMIT 1
      )
-     WHERE r.Fecha_Tour BETWEEN ? AND ?
-       AND ${consumingReservationSql('r')}
-     GROUP BY t.Id_Tour, t.Nombre_Tour, r.Fecha_Tour, a.Cupo,
-       ${getSchemaCapabilities().aforoOperation ? 'a.Operacion,' : ''} t.Cupo_Base
-     HAVING Capacidad <= 0 OR (Ocupados / NULLIF(Capacidad, 0)) >= 0.8
-     ORDER BY
-       CASE WHEN Capacidad <= 0 THEN 2 ELSE Ocupados / NULLIF(Capacidad, 0) END DESC,
-       r.Fecha_Tour ASC
-     LIMIT 8`,
-    [dates.today, bogotaDate(7)],
+     LEFT JOIN (
+       SELECT h.Id_Tour, r.Fecha_Tour, SUM(${passengerSeatSql('p')}) AS Ocupados
+       FROM ${reservasOperativasSource('r')}
+       INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+       LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+       WHERE r.Fecha_Tour BETWEEN ? AND ?
+         AND ${consumingReservationSql('r', { softDelete: capabilities.reservasSoftDelete })}
+       GROUP BY h.Id_Tour, r.Fecha_Tour
+     ) o ON o.Id_Tour = t.Id_Tour AND o.Fecha_Tour = d.Fecha
+     WHERE t.Activo = 1
+     ORDER BY d.Fecha ASC, t.Id_Tour ASC`,
+    [...scanDates, dates.today, scanDates[scanDates.length - 1]],
   );
-  return (rows || []).map((row) => {
-    const capacity = Number(row.Capacidad || 0);
-    const occupied = Number(row.Ocupados || 0);
-    const percentage = capacity > 0 ? Math.round((occupied / capacity) * 100) : null;
-    return {
-      tourId: Number(row.Id_Tour),
-      tourName: row.Nombre_Tour,
-      date: row.Fecha,
-      capacity,
-      occupied,
-      percentage,
-      status: capacity <= 0 ? 'missing' : percentage >= 100 ? 'full' : percentage >= 90 ? 'critical' : 'warning',
-    };
-  });
+  return consolidateCapacityAlerts(rows || [], 8);
+}
+
+async function findPendingJourneys(startDate, endDate) {
+  const [rows] = await db.query(
+    `SELECT h.Id_Tour, DATE_FORMAT(r.Fecha_Tour, '%Y-%m-%d') AS Fecha_Tour,
+            COUNT(p.Id_Pasajero) AS Total_Pasajeros
+       FROM ${reservasOperativasSource('r')}
+       INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
+       LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
+      WHERE r.Fecha_Tour BETWEEN ? AND ?
+        AND ${ACTIVE_RESERVATION_SQL}
+      GROUP BY h.Id_Tour, r.Fecha_Tour
+     HAVING COUNT(p.Id_Pasajero) > 0
+      ORDER BY r.Fecha_Tour, h.Id_Tour`,
+    [startDate, endDate],
+  );
+  return filterUnconfirmedJourneys(rows || []);
 }
 
 async function getOperationalProcesses(dates, permissions) {
   const processes = [];
+  const canReadConfirmation = hasAnyPermission(permissions, 'CONTROL_VIAJE.LEER');
+  const canReadInsurance = hasAnyPermission(permissions, 'SEGUROS.LEER');
+  const pendingJourneys = canReadConfirmation || canReadInsurance
+    ? await findPendingJourneys(bogotaDate(-2), dates.today)
+    : [];
 
-  if (hasAnyPermission(permissions, 'CONTROL_VIAJE.LEER')) {
-    const [rows] = await db.query(
-      `SELECT COUNT(*) AS Total
-       FROM (
-         SELECT h.Id_Tour, r.Fecha_Tour
-         FROM ${reservasOperativasSource('r')}
-         INNER JOIN horarios h ON h.Id_Horario = r.Id_Horario
-         LEFT JOIN pasajeros p ON p.Id_Reserva = r.Id_Reserva
-         LEFT JOIN confirmaciones_jornada cj
-           ON cj.Id_Tour = h.Id_Tour AND cj.Fecha_Tour = r.Fecha_Tour
-         WHERE r.Fecha_Tour BETWEEN ? AND ?
-           AND ${ACTIVE_RESERVATION_SQL}
-         GROUP BY h.Id_Tour, r.Fecha_Tour, cj.Id_Confirmacion, cj.Total_Pasajeros
-         HAVING COUNT(p.Id_Pasajero) > 0
-            AND (cj.Id_Confirmacion IS NULL OR cj.Total_Pasajeros <> COUNT(p.Id_Pasajero))
-       ) pendientes`,
-      [bogotaDate(-2), dates.today],
-    );
+  if (canReadConfirmation) {
     processes.push({
       id: 'confirmation',
       label: 'Control de viaje',
       description: 'Jornadas vencidas o de hoy pendientes de cierre.',
-      count: Number(rows?.[0]?.Total || 0),
+      count: pendingJourneys.length,
       route: '/Reservas/Confirmacion',
+      ...(pendingJourneys[0] ? { routeParams: { tour: pendingJourneys[0].Id_Tour, fecha: pendingJourneys[0].Fecha_Tour, buscar: 1 } } : {}),
       permission: 'CONTROL_VIAJE.LEER',
     });
   }
@@ -371,6 +403,7 @@ async function getOperationalProcesses(dates, permissions) {
       description: 'Vehículos con datos de guía o conductor incompletos.',
       count: Number(rows?.[0]?.Total || 0),
       route: '/Seguros',
+      ...(pendingJourneys[0] ? { routeParams: { tour: pendingJourneys[0].Id_Tour, fecha: pendingJourneys[0].Fecha_Tour, buscar: 1 } } : {}),
       permission: 'SEGUROS.LEER',
     });
   }
@@ -392,7 +425,8 @@ async function getOperationalProcesses(dates, permissions) {
        ORDER BY r.Fecha_Tour, r.Id_Reserva`,
       [dates.today],
     );
-    const commissions = commissionProcess(rows);
+    const confirmedRows = await filterCommissionRowsByJourneyConfirmation(rows || []);
+    const commissions = commissionProcess(confirmedRows);
     processes.push({
       id: 'commissions',
       label: 'Comisiones',
@@ -511,4 +545,7 @@ module.exports = {
   hasAnyPermission,
   normalizeOverview,
   commissionProcess,
+  getCapacityAlerts,
+  filterUnconfirmedJourneys,
+  filterCommissionRowsByJourneyConfirmation,
 };

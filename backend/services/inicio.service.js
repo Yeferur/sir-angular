@@ -5,6 +5,7 @@ const {
 } = require('./schema-capabilities');
 const db = require('../database/db');
 const { passengerSeatSql, consumingReservationSql, activeReservationSql } = require('./Reservas/cupos-compartidos');
+const { annotateSharedCapacity } = require('./Aforos/shared-capacity.service');
 
 const availabilityPolicy = alias => consumingReservationSql(alias, { softDelete: getSchemaCapabilities().reservasSoftDelete });
 const activePolicy = alias => activeReservationSql(alias, { softDelete: getSchemaCapabilities().reservasSoftDelete });
@@ -222,7 +223,7 @@ async function obtenerDatosInicio(fecha) {
       const planes = planesMap[t.Id_Tour];
       if (planes && planes.length > 0) t.planes = planes;
     }
-    return { tours, transfers };
+    return { tours: annotateSharedCapacity(tours), transfers };
   } catch (error) {
     throw error;
   }

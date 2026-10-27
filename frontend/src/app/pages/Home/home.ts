@@ -285,8 +285,8 @@ export class HomeComponent implements OnInit {
       });
   }
 
-  navigate(route: string): void {
-    this.router.navigateByUrl(route);
+  navigate(route: string, queryParams?: Record<string, string | number | null>): void {
+    this.router.navigateByUrl(this.router.createUrlTree([route], { queryParams }));
   }
 
   openReservation(reservation: HomeReservation): void {
@@ -460,7 +460,7 @@ export class HomeComponent implements OnInit {
   }
 
   isCriticalAlert(alert: HomeCapacityAlert): boolean {
-    return alert.status === 'critical' || alert.status === 'full' || alert.status === 'missing';
+    return alert.status === 'full' || alert.status === 'missing';
   }
 
   trackById(_: number, item: HomeReservation | HomeTransfer | HomeProcess | HomeCapacityAlert): number | string {

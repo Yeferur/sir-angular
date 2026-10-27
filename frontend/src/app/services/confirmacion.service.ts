@@ -32,6 +32,7 @@ export interface JornadaConfirmacion {
   Total_Viajaron: number;
   Total_No_Viajaron: number;
   Confirmada: boolean;
+  jornadaConfirmada: boolean;
   Requiere_Confirmacion: boolean;
   Cambio_Cantidad: boolean;
   Confirmada_En: string | null;

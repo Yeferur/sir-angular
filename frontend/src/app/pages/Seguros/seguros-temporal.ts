@@ -153,7 +153,7 @@ export class SegurosTemporalComponent implements OnInit {
   irAConfirmacion(): void {
     if (!this.canOpenConfirmation || !this.fecha || !this.idTour) return;
     void this.router.navigate(['/Reservas/Confirmacion'], {
-      queryParams: { fechaTour: this.fecha, tour: this.idTour, buscar: 1, origen: 'seguros' },
+      queryParams: { fecha: this.fecha, tour: this.idTour, buscar: 1, origen: 'seguros' },
     });
   }
 
@@ -167,7 +167,7 @@ export class SegurosTemporalComponent implements OnInit {
 
   private restoreFiltersFromQuery(): boolean {
     const params = this.route.snapshot.queryParamMap;
-    const fecha = String(params.get('fechaTour') || '').trim();
+    const fecha = String(params.get('fecha') || params.get('fechaTour') || '').trim();
     const tour = Number(params.get('tour'));
     const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(fecha);
     const tourValido = Number.isInteger(tour) && tour > 0;

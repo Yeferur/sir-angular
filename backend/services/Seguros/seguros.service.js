@@ -2,7 +2,7 @@ const { reservasOperativasSource } = require('../schema-capabilities');
 const db = require('../../database/db');
 const ExcelJS = require('exceljs');
 const { recordHistorial } = require('../Historial/logger');
-const { obtenerPasajerosPorTour, obtenerEstadoConfirmacion } = require('../Confirmacion/confirmacion.service');
+const { obtenerPasajerosPorTour, jornadaConfirmada } = require('../Confirmacion/confirmacion.service');
 
 function createServiceError(message, statusCode = 400, errorCode = 'SEGUROS_ERROR', details = []) {
     const error = new Error(message);
@@ -271,13 +271,14 @@ async function listarSegurosTemporales(filtros = {}) {
         throw createServiceError('Selecciona una fecha y un tour válidos.', 400, 'INVALID_FILTERS');
     }
 
-    const [todosLosPasajeros, estado, tourRows] = await Promise.all([
-        obtenerPasajerosPorTour(Id_Tour, Fecha),
-        obtenerEstadoConfirmacion(Fecha, Id_Tour),
+    const [confirmada, tourRows] = await Promise.all([
+        jornadaConfirmada(Id_Tour, Fecha),
         db.query('SELECT Nombre_Tour FROM tours WHERE Id_Tour = ? LIMIT 1', [Id_Tour]),
     ]);
-    const pasajeros = (todosLosPasajeros || []).filter(pasajero => Number(pasajero.Confirmacion) === 1);
-    const jornada = estado?.jornadas?.find(item => Number(item.Id_Tour) === Id_Tour) || null;
+    const todosLosPasajeros = confirmada ? await obtenerPasajerosPorTour(Id_Tour, Fecha) : [];
+    const pasajeros = confirmada
+        ? (todosLosPasajeros || []).filter(pasajero => Number(pasajero.Confirmacion) === 1)
+        : [];
     const pasajerosSinDocumento = pasajeros.filter(pasajero => !String(pasajero.DNI || '').trim()).length;
 
     return {
@@ -286,14 +287,21 @@ async function listarSegurosTemporales(filtros = {}) {
         Nombre_Tour: tourRows?.[0]?.[0]?.Nombre_Tour || 'Tour',
         totalPasajeros: pasajeros.length,
         pasajerosSinDocumento,
-        jornadaConfirmada: Boolean(jornada?.Confirmada),
-        requiereConfirmacion: Boolean(jornada?.Requiere_Confirmacion),
+        jornadaConfirmada: confirmada,
+        requiereConfirmacion: !confirmada,
         pasajeros,
     };
 }
 
 async function generarExcelSegurosTemporales(filtros = {}) {
     const data = await listarSegurosTemporales(filtros);
+    if (!data.jornadaConfirmada) {
+        throw createServiceError(
+            'La jornada aún no está confirmada. Cierra Control de Viaje antes de descargar seguros.',
+            409,
+            'JOURNEY_NOT_CONFIRMED',
+        );
+    }
     if (!data.totalPasajeros) {
         throw createServiceError('No hay pasajeros confirmados como viajeros para esta fecha y tour.', 404, 'NO_CONFIRMED_PASSENGERS');
     }
