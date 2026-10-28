@@ -94,30 +94,104 @@
           }
         </div>
         <div class="entity-table-wrap">
-          <table><thead><tr><th>Entidad</th><th>Tipo</th><th>Estado</th><th>Validación</th><th>Actividad del período</th>
+          <table><thead><tr><th>Entidad</th><th>Tipo</th>
+            @if (data.summary.Pendientes > 0 || data.summary.Inactivas > 0) { <th scope="col">Alerta</th> }
+            @if (hasSelectedPeriod()) { <th scope="col">Actividad del período</th> }
             <th scope="col">Último reporte</th>
-            <th scope="col" [attr.aria-sort]="filters().ordenarPor === 'dias_sin_reportar' ? (filters().orden === 'DESC' ? 'descending' : 'ascending') : 'none'">
-              <button type="button" class="entity-sort" [attr.aria-label]="sortLabel('dias_sin_reportar') + ' por días sin reportar'" (click)="setSort('dias_sin_reportar')">Días sin reportar</button>
-            </th></tr></thead>
+            @if (canEdit) { <th scope="col" class="entity-actions-heading">Acciones</th> }</tr></thead>
             <tbody>@for (item of data.items; track item.Id_Entidad_Reportante) {
-              <tr><td><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button>
-                @if (!item.Activo) { <span class="entity-inactive-badge">Inactiva</span> }</td>
-                <td>{{ typeLabel(item.Tipo) }}</td><td>{{ item.Activo ? 'Activa' : 'Inactiva' }}</td>
-                <td>{{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</td>
-                <td>{{ activitySummary(item) }}</td>
-                <td>{{ item.Ultimo_Reporte ? (item.Ultimo_Reporte | date:'d MMM y':'':'es-CO') : '—' }}</td>
-                <td><span [class.entity-activity-alert]="item.Dias_Sin_Reportar !== null && item.Dias_Sin_Reportar > data.umbralDiasSinReportar">
-                  {{ item.Dias_Sin_Reportar === null ? '—' : item.Dias_Sin_Reportar }}</span></td>
+              <tr class="entity-row" tabindex="0" [attr.aria-label]="'Ver detalle de ' + item.Nombre"
+                (click)="open(item)" (keydown.enter)="openFromRowKey($event, item)"
+                (keydown.space)="openFromRowKey($event, item)">
+                <td>
+                  @if (rowEditingId() === item.Id_Entidad_Reportante) {
+                    <input class="entity-input entity-row-edit-name" [id]="'entity-name-' + item.Id_Entidad_Reportante"
+                      [(ngModel)]="rowEditName" (click)="$event.stopPropagation()" />
+                  } @else { <span class="entity-link">{{ item.Nombre }}</span> }
+                </td>
+                <td>
+                  @if (rowEditingId() === item.Id_Entidad_Reportante) {
+                    <app-select [inputId]="'entity-type-' + item.Id_Entidad_Reportante" [options]="createTypeOptions"
+                      [(ngModel)]="rowEditType" (click)="$event.stopPropagation()" />
+                  } @else { {{ typeLabel(item.Tipo) }} }
+                </td>
+                @if (data.summary.Pendientes > 0 || data.summary.Inactivas > 0) {
+                  <td>
+                    @if (item.Estado_Validacion === 'PENDIENTE_VALIDACION') { <span class="entity-inactive-badge">Pendiente de validación</span> }
+                    @if (!item.Activo) { <span class="entity-inactive-badge">Inactiva</span> }
+                  </td>
+                }
+                @if (hasSelectedPeriod()) { <td>{{ activitySummary(item) }}</td> }
+                <td>{{ lastReportLabel(item.Ultimo_Reporte) }}</td>
+                @if (canEdit) {
+                  <td class="entity-row-actions">
+                    <div class="item-actions">
+                      @if (rowEditingId() === item.Id_Entidad_Reportante) {
+                        <button type="button" class="btn-row-edit" [disabled]="saving() || loading() || !rowEditName.trim()"
+                          (click)="$event.stopPropagation(); saveRowEdit(item)" [attr.aria-label]="'Guardar cambios de ' + item.Nombre">
+                          <i class="bx bx-save" aria-hidden="true"></i>Guardar
+                        </button>
+                        <button type="button" class="btn-row-cancel" [disabled]="saving() || loading()"
+                          (click)="$event.stopPropagation(); cancelRowEdit()" [attr.aria-label]="'Cancelar edición de ' + item.Nombre">
+                          <i class="bx bx-x" aria-hidden="true"></i>Cancelar
+                        </button>
+                      } @else {
+                        <button type="button" class="btn-row-edit" [disabled]="saving() || loading()"
+                          (click)="$event.stopPropagation(); startRowEdit(item)" [attr.aria-label]="'Editar ' + item.Nombre">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                          </svg>Editar
+                        </button>
+                        <button type="button" [class]="item.Activo ? 'btn-row-cancel' : 'btn-row-edit'" [disabled]="saving() || loading()"
+                          (click)="$event.stopPropagation(); toggleRowActive(item)"
+                          [attr.aria-label]="(item.Activo ? 'Desactivar ' : 'Activar ') + item.Nombre">
+                          <i class="bx bx-power-off" aria-hidden="true"></i>{{ item.Activo ? 'Desactivar' : 'Activar' }}
+                        </button>
+                      }
+                    </div>
+                  </td>
+                }
               </tr>
             }</tbody></table>
         </div>
         <div class="entity-cards">@for (item of data.items; track item.Id_Entidad_Reportante) {
-          <article class="entity-card"><button type="button" class="entity-link" (click)="open(item)">{{ item.Nombre }}</button>
-            @if (!item.Activo) { <span class="entity-inactive-badge">Inactiva</span> }
-            <p>{{ typeLabel(item.Tipo) }} · {{ item.Activo ? 'Activa' : 'Inactiva' }} · {{ item.Estado_Validacion === 'PENDIENTE_VALIDACION' ? 'Pendiente' : item.Estado_Validacion === 'VALIDADA' ? 'Validada' : 'Rechazada' }}</p>
-            @if (item.Operaciones) { <small>{{ activitySummary(item) }}</small> } @else { <small>Sin actividad en el período</small> }
-            <small>Último reporte: {{ item.Ultimo_Reporte ? (item.Ultimo_Reporte | date:'d MMM y':'':'es-CO') : 'Nunca' }}</small>
-            @if (item.Dias_Sin_Reportar !== null) { <small [class.entity-activity-alert]="item.Dias_Sin_Reportar > data.umbralDiasSinReportar">{{ item.Dias_Sin_Reportar }} días sin reportar</small> }
+          <article class="entity-card entity-row" tabindex="0" [attr.aria-label]="'Ver detalle de ' + item.Nombre"
+            (click)="open(item)" (keydown.enter)="openFromRowKey($event, item)"
+            (keydown.space)="openFromRowKey($event, item)">
+            @if (rowEditingId() === item.Id_Entidad_Reportante) {
+              <input class="entity-input entity-row-edit-name" [id]="'entity-card-name-' + item.Id_Entidad_Reportante"
+                [(ngModel)]="rowEditName" (click)="$event.stopPropagation()" />
+              <app-select [inputId]="'entity-card-type-' + item.Id_Entidad_Reportante" [options]="createTypeOptions"
+                [(ngModel)]="rowEditType" (click)="$event.stopPropagation()" />
+            } @else {
+              <span class="entity-link">{{ item.Nombre }}</span>
+              <p>{{ typeLabel(item.Tipo) }}</p>
+            }
+            @if (item.Estado_Validacion === 'PENDIENTE_VALIDACION' || !item.Activo) {
+              <p>
+                @if (item.Estado_Validacion === 'PENDIENTE_VALIDACION') { <span class="entity-inactive-badge">Pendiente de validación</span> }
+                @if (!item.Activo) { <span class="entity-inactive-badge">Inactiva</span> }
+              </p>
+            }
+            @if (hasSelectedPeriod()) { <small>{{ activitySummary(item) }}</small> }
+            <small>Último reporte: {{ lastReportLabel(item.Ultimo_Reporte) }}</small>
+            @if (canEdit) {
+              <div class="item-actions entity-card-actions">
+                @if (rowEditingId() === item.Id_Entidad_Reportante) {
+                  <button type="button" class="btn-row-edit" [disabled]="saving() || loading() || !rowEditName.trim()"
+                    (click)="$event.stopPropagation(); saveRowEdit(item)"><i class="bx bx-save" aria-hidden="true"></i>Guardar</button>
+                  <button type="button" class="btn-row-cancel" [disabled]="saving() || loading()"
+                    (click)="$event.stopPropagation(); cancelRowEdit()"><i class="bx bx-x" aria-hidden="true"></i>Cancelar</button>
+                } @else {
+                  <button type="button" class="btn-row-edit" [disabled]="saving() || loading()"
+                    (click)="$event.stopPropagation(); startRowEdit(item)"><i class="bx bx-edit-alt" aria-hidden="true"></i>Editar</button>
+                  <button type="button" [class]="item.Activo ? 'btn-row-cancel' : 'btn-row-edit'" [disabled]="saving() || loading()"
+                    (click)="$event.stopPropagation(); toggleRowActive(item)">
+                    <i class="bx bx-power-off" aria-hidden="true"></i>{{ item.Activo ? 'Desactivar' : 'Activar' }}
+                  </button>
+                }
+              </div>
+            }
           </article>
         }</div>
         @if (data.totalPages > 1) { <footer class="entity-pagination"><span>Página {{ data.page }} de {{ data.totalPages }}</span>
@@ -133,108 +207,106 @@
     <div class="entity-backdrop" (click)="close()"></div>
     <aside class="entity-drawer" role="dialog" aria-modal="true" aria-labelledby="entity-detail-title"
       cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
-      <button type="button" class="drawer-close" aria-label="Cerrar detalle" (click)="close()">×</button>
-      <h2 id="entity-detail-title">{{ detail.entity.Nombre }}</h2>
-      <p>{{ typeLabel(detail.entity.Tipo) }} · {{ detail.entity.Activo ? 'Activa' : 'Inactiva' }} · {{ validationLabel(detail.entity.Estado_Validacion) }}</p>
-      @if (detail.entity.Motivo_Rechazo) { <p class="entity-rejection-reason"><strong>Último motivo de rechazo:</strong> {{ detail.entity.Motivo_Rechazo }}</p> }
-      @if (detailNotice()) { <p class="entity-notice" role="status">{{ detailNotice() }}</p> }
-      <div class="drawer-actions">
-        @if (canEdit) {
-          <button type="button" class="sir-action sir-action--secondary" (click)="startEdit()">Editar</button>
-          <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="setActive(!detail.entity.Activo)">
-            {{ detail.entity.Activo ? 'Desactivar' : 'Activar' }}</button>
-        }
-        @if (canValidate) {
-          @if (detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
-            <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Validar</button>
-            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="beginReject()">Rechazar</button>
-          } @else if (detail.entity.Estado_Validacion === 'RECHAZADA') {
-            <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="validate('VALIDADA')">Revalidar</button>
-          } @else {
-            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="beginReject()">Rechazar</button>
-          }
-        }
-      </div>
-      @if (rejecting()) {
-        <section class="entity-rejection-form" aria-labelledby="entity-rejection-label">
-          <label id="entity-rejection-label" for="entity-rejection-reason">Motivo del rechazo <span>(opcional)</span></label>
-          <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="200"
-            [(ngModel)]="rejectionReason" [disabled]="saving()" placeholder="Describe brevemente por qué se rechaza"></textarea>
-          <small>{{ rejectionReason.length }}/200</small>
-          <div class="entity-form-actions">
-            <button type="button" class="sir-action sir-action--ghost" [disabled]="saving()" (click)="cancelReject()">Cancelar</button>
-            <button type="button" class="sir-action sir-action--primary"
-              [disabled]="saving() || rejectionReason.trim().length > 200"
-              (click)="validate('RECHAZADA')">{{ saving() ? 'Rechazando…' : 'Confirmar rechazo' }}</button>
-          </div>
-        </section>
-      }
-      @if (editing()) {
-        <div class="entity-edit"><label for="edit-entity-name">Nombre comercial</label>
-          <input id="edit-entity-name" class="entity-input" [(ngModel)]="name" maxlength="255" />
-          <label for="edit-entity-type">Tipo</label>
-          <app-select inputId="edit-entity-type" [options]="typeOptions" [(ngModel)]="type" />
-          <button type="button" class="sir-action sir-action--primary" [disabled]="saving() || !name.trim()" (click)="save()">Guardar cambios</button>
-          <button type="button" class="sir-action sir-action--ghost" (click)="editing.set(false)">Cancelar</button>
+      <header class="entity-drawer-header">
+        <div class="entity-drawer-heading">
+          <h2 id="entity-detail-title">{{ detail.entity.Nombre }}</h2>
+          <p>{{ typeLabel(detail.entity.Tipo) }} · {{ detail.entity.Activo ? 'Activa' : 'Inactiva' }} · {{ validationLabel(detail.entity.Estado_Validacion) }}</p>
         </div>
-      }
-      @if (detail.historic.Operaciones) {
-      <h3>Actividad</h3>
-      <p>Histórico: {{ detail.historic.Reservas }} {{ one(detail.historic.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.historic.Transfers }} {{ one(detail.historic.Transfers) ? 'transfer' : 'transfers' }} · {{ detail.historic.Pasajeros }} {{ one(detail.historic.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p>
-      @if (detail.period.Operaciones) { <p>Período: {{ detail.period.Reservas }} {{ one(detail.period.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.period.Transfers }} {{ one(detail.period.Transfers) ? 'transfer' : 'transfers' }} · {{ detail.period.Pasajeros }} {{ one(detail.period.Pasajeros) ? 'pasajero' : 'pasajeros' }}</p> }
-      @if (detail.historic.Ultima_Actividad) { <p>Último reporte: {{ detail.historic.Ultima_Actividad | date:'d MMM y':'':'es-CO' }}@if (detail.historic.Dias_Sin_Reportar !== null) { · {{ detail.historic.Dias_Sin_Reportar }} días sin reportar }</p> }
-      }
-      <section class="entity-operations" aria-label="Operaciones asociadas en el período">
-        <h3>Operaciones del período</h3>
-        @if (operationsLoading()) { <p role="status">Cargando operaciones…</p> }
-        @if (operationsError()) { <p class="inline-error" role="alert">{{ operationsError() }}</p> }
-        @if (operations(); as data) {
-          @if (!data.items.length && !operationsLoading()) { <p>No hay operaciones en este período.</p> }
-          @for (operation of data.items; track operation.tipo + ':' + operation.id_operacion) {
-            <div class="entity-operation-row">
-              <span>{{ operation.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }} · {{ operationLabel(operation) }}</span>
-              <span>{{ operation.fecha_registro | date:'d MMM y':'':'es-CO' }} · {{ operation.estado || '—' }}</span>
-              @if ((operation.tipo === 'RESERVA' && canReadReservations) || (operation.tipo === 'TRANSFER' && canReadTransfers)) {
-                <button type="button" class="sir-action sir-action--ghost sir-action--compact" (click)="openOperation(operation)">Abrir</button>
-              }
-            </div>
-          }
-          @if (data.totalPages > 1) { <footer class="entity-pagination"><span>{{ data.totalOperaciones }} operaciones · Página {{ data.page }} de {{ data.totalPages }}</span>
-            <button type="button" class="sir-action sir-action--secondary" [disabled]="operationsLoading() || data.page <= 1" (click)="changeOperationsPage(data.page - 1)">Anterior</button>
-            <button type="button" class="sir-action sir-action--secondary" [disabled]="operationsLoading() || data.page >= data.totalPages" (click)="changeOperationsPage(data.page + 1)">Siguiente</button>
-          </footer> }
+        <app-drawer-close-button label="Cerrar detalle de entidad" (dismiss)="close()" />
+        @if (detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+          <p class="entity-notice" role="status"><i class="bx bx-time-five" aria-hidden="true"></i> Pendiente de validación.</p>
         }
-      </section>
-      @if (detail.contacts.length) { <h3>Contactos que han reportado</h3>
-      @for (contact of detail.contacts; track contact.Nombre + ':' + contact.Telefono) { <p>{{ contact.Nombre }} @if (contact.Telefono) { · {{ contact.Telefono }} } · {{ contact.Reservas }} {{ one(contact.Reservas) ? 'reserva' : 'reservas' }}</p> }
-      }
-      @if (detail.observed.length) { <h3>Puntos observados en reservas</h3>
-      @for (point of detail.observed; track point.Id_Punto) {
-        <p>{{ point.Nombre_Punto }} · {{ point.Reservas }} {{ one(point.Reservas) ? 'reserva' : 'reservas' }}
-          @if (canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">Asociar</button> }</p>
-      } }
-      @if (detail.associated.length) { <h3>Puntos asociados oficialmente</h3>
-      @for (point of detail.associated; track point.Id_Punto) {
-        <p>{{ point.Nombre_Punto }} · {{ point.Estado_Validacion }}
-          @if (canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="saving()" (click)="setPoint(point.Id_Punto, false)">Quitar</button> }</p>
-      } }
-      @if (canManagePointRelations) {
-        <button type="button" class="sir-action sir-action--ghost entity-point-toggle" [attr.aria-expanded]="pointPickerOpen()" (click)="pointPickerOpen.set(!pointPickerOpen())">{{ pointPickerOpen() ? 'Cerrar búsqueda de puntos' : 'Asociar punto de encuentro' }}</button>
-        @if (pointPickerOpen()) {
-          <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" ariaLabel="Buscar punto de encuentro"
-            [value]="pointSearch" (valueChange)="pointSearch = $event; searchPoints()" />
-          @if (pointMatches().length) {
-            <div class="entity-point-suggestions sir-autocomplete-panel sir-autocomplete-panel--inline" role="listbox"
-              aria-label="Puntos de encuentro encontrados" animate.enter="sir-autocomplete-enter" animate.leave="sir-autocomplete-leave">
-              @for (point of pointMatches(); track point.Id_Punto) {
-                <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false"
-                  [disabled]="saving()" (click)="setPoint(point.Id_Punto, true)">{{ point.NombrePunto }}</button>
-              }
-            </div>
+        @if (!detail.entity.Activo) {
+          <p class="entity-notice" role="status"><i class="bx bx-power-off" aria-hidden="true"></i> Entidad inactiva.</p>
+        }
+        @if (detail.entity.Motivo_Rechazo) {
+          <p class="entity-rejection-reason"><strong>Último motivo de rechazo:</strong> {{ detail.entity.Motivo_Rechazo }}</p>
+        }
+        @if (detailNotice()) { <p class="entity-notice" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i> {{ detailNotice() }}</p> }
+      </header>
+
+      <main class="entity-drawer-scroll">
+        @if (editing()) {
+          <div class="entity-edit"><label for="edit-entity-name">Nombre comercial</label>
+            <input id="edit-entity-name" class="entity-input" [(ngModel)]="name" maxlength="255" />
+            <label for="edit-entity-type">Tipo</label>
+            <app-select inputId="edit-entity-type" [options]="typeOptions" [(ngModel)]="type" />
+          </div>
+        }
+        @if (rejecting()) {
+          <section class="entity-rejection-form" aria-labelledby="entity-rejection-label">
+            <label id="entity-rejection-label" for="entity-rejection-reason">Motivo del rechazo <span>(opcional)</span></label>
+            <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="200"
+              [(ngModel)]="rejectionReason" [disabled]="saving()" placeholder="Describe brevemente por qué se rechaza"></textarea>
+            <small>{{ rejectionReason.length }}/200</small>
+          </section>
+        }
+        @if (detailError()) { <p class="inline-error" role="alert">{{ detailError() }}</p> }
+        <section class="entity-reported-contacts" aria-labelledby="reported-contacts-title">
+          <h3 id="reported-contacts-title">Contactos que han reportado</h3>
+          @if (topReportedContacts().length) {
+            @for (contact of topReportedContacts(); track contact.key) {
+              <p><i class="bx bx-user" aria-hidden="true"></i> <strong>{{ contact.Nombre }}</strong>
+                · {{ contact.Telefono || 'Sin teléfono' }} · {{ contact.Reservas }}
+                {{ contact.Reservas === 1 ? 'reporte' : 'reportes' }}</p>
+            }
+            @if (additionalContactCount() > 0) { <p>y {{ additionalContactCount() }} más</p> }
+          } @else {
+            <p>No hay contactos registrados.</p>
+          }
+        </section>
+      </main>
+
+      <footer class="entity-detail-footer">
+        @if (!editing() && !rejecting()) {
+          <button type="button" class="sir-action sir-action--secondary" (click)="viewOperations()">
+            <i class="bx bx-transfer-alt" aria-hidden="true"></i>Ver operaciones
+          </button>
+        }
+        @if (canEdit || canValidate || editing() || rejecting()) {
+          @if (editing()) {
+            <button type="button" class="sir-action sir-action--secondary" (click)="editing.set(false)">
+              <i class="bx bx-x" aria-hidden="true"></i>Cancelar
+            </button>
+            <button type="button" class="sir-action sir-action--primary" [disabled]="saving() || !name.trim()" (click)="save()">
+              <i class="bx bx-save" aria-hidden="true"></i>{{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+            </button>
+          } @else if (rejecting()) {
+            <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="cancelReject()">
+              <i class="bx bx-x" aria-hidden="true"></i>Cancelar
+            </button>
+            <button type="button" class="sir-action sir-action--primary" [disabled]="saving() || rejectionReason.trim().length > 200"
+              (click)="validate('RECHAZADA')">
+              <i class="bx bx-shield-x" aria-hidden="true"></i>{{ saving() ? 'Rechazando…' : 'Confirmar rechazo' }}
+            </button>
+          } @else {
+            @if (canEdit) {
+              <button type="button" class="sir-action sir-action--secondary" (click)="startEdit()">
+                <i class="bx bx-edit-alt" aria-hidden="true"></i>Editar
+              </button>
+              <button type="button" class="sir-action sir-action--secondary" [disabled]="saving()" (click)="setActive(!detail.entity.Activo)">
+                <i class="bx bx-power-off" aria-hidden="true"></i>{{ detail.entity.Activo ? 'Desactivar' : 'Activar' }}
+              </button>
+            }
+            @if (canValidate && detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+              <button type="button" class="sir-action sir-action--primary" [disabled]="saving()" (click)="validate('VALIDADA')">
+                <i class="bx bx-check-circle" aria-hidden="true"></i>Validar
+              </button>
+              <button type="button" class="sir-action sir-action--ghost entity-action--reject" [disabled]="saving()" (click)="beginReject()">
+                <i class="bx bx-shield-x" aria-hidden="true"></i>Rechazar
+              </button>
+            } @else if (canValidate && detail.entity.Estado_Validacion === 'RECHAZADA') {
+              <button type="button" class="sir-action sir-action--primary" [disabled]="saving()" (click)="validate('VALIDADA')">
+                <i class="bx bx-check-circle" aria-hidden="true"></i>Revalidar
+              </button>
+            } @else if (canValidate) {
+              <button type="button" class="sir-action sir-action--ghost entity-action--reject" [disabled]="saving()" (click)="beginReject()">
+                <i class="bx bx-shield-x" aria-hidden="true"></i>Rechazar
+              </button>
+            }
           }
         }
-      }
-      @if (detailError()) { <p class="inline-error" role="alert">{{ detailError() }}</p> }
+      </footer>
     </aside>
   }
 </main>

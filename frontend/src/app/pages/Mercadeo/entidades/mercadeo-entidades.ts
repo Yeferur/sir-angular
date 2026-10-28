@@ -1,4 +1,4 @@
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -9,12 +9,22 @@ import { SirSearchInputComponent } from '../../../shared/search-input/search-inp
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
+import { DrawerCloseButtonComponent } from '../../../shared/drawer-close-button/drawer-close-button';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { Reservas, Punto } from '../../../services/Reservas/reservas';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { MercadeoOrigenOperacion, MercadeoOrigenPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
 import { ActividadEntidad, DetalleEntidad, EntidadesReportantesService, FiltrosEntidades,
   PaginaEntidades, TipoEntidad, ValidacionEntidad } from '../../../services/Mercadeo/entidades-reportantes.service';
+import { sirToday } from '../../../shared/utils/sir-datetime';
+
+interface ContactoReportanteAgrupado {
+  key: string;
+  Nombre: string;
+  Telefono: string | null;
+  Reservas: number;
+  Ultimo_Reporte: string | null;
+}
 
 const typeOptions: SirSelectOption[] = [
   { value: '', label: 'Todos' }, { value: 'HOTEL', label: 'Hotel' },
@@ -36,8 +46,8 @@ function initialFilters(): FiltrosEntidades {
 
 @Component({
   selector: 'app-mercadeo-entidades', standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, A11yModule, SirDateRangePickerComponent, SirSearchInputComponent,
-    QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent],
+  imports: [CommonModule, FormsModule, A11yModule, SirDateRangePickerComponent, SirSearchInputComponent,
+    QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent, DrawerCloseButtonComponent],
   templateUrl: './mercadeo-entidades.html', styleUrls: ['../../listado-reservas-transfers.css', './mercadeo-entidades.css'],
 })
 export class MercadeoEntidadesComponent implements OnInit {
@@ -61,6 +71,31 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly result = signal<PaginaEntidades | null>(null);
   readonly selected = signal<DetalleEntidad | null>(null);
   readonly selectedActivity = signal<ActividadEntidad | null>(null);
+  readonly consolidatedContacts = computed<ContactoReportanteAgrupado[]>(() => {
+    const groups = new Map<string, ContactoReportanteAgrupado>();
+    (this.selected()?.contacts ?? []).forEach((contact, index) => {
+      const phone = (contact.Telefono ?? '').trim();
+      const phoneKey = phone.replace(/\D/g, '') || phone.toLocaleLowerCase('es');
+      const key = phoneKey ? `telefono:${phoneKey}` : `sin-telefono:${index}`;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, { key, Nombre: contact.Nombre, Telefono: phone || null,
+          Reservas: Number(contact.Reservas) || 0, Ultimo_Reporte: contact.Ultimo_Reporte || null });
+        return;
+      }
+      existing.Reservas += Number(contact.Reservas) || 0;
+      const nextReport = contact.Ultimo_Reporte || null;
+      if (nextReport && (!existing.Ultimo_Reporte || Date.parse(nextReport) > Date.parse(existing.Ultimo_Reporte))) {
+        existing.Nombre = contact.Nombre;
+        existing.Telefono = phone || null;
+        existing.Ultimo_Reporte = nextReport;
+      }
+    });
+    return [...groups.values()].sort((a, b) => b.Reservas - a.Reservas
+      || String(b.Ultimo_Reporte || '').localeCompare(String(a.Ultimo_Reporte || '')));
+  });
+  readonly topReportedContacts = computed(() => this.consolidatedContacts().slice(0, 5));
+  readonly additionalContactCount = computed(() => Math.max(0, this.consolidatedContacts().length - 5));
   readonly operations = signal<MercadeoOrigenPage | null>(null);
   readonly operationsLoading = signal(false);
   readonly operationsError = signal('');
@@ -73,6 +108,7 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly detailNotice = signal('');
   readonly filterOpen = signal(false);
   readonly editing = signal(false);
+  readonly rowEditingId = signal<number | null>(null);
   readonly creating = signal(false);
   readonly rejecting = signal(false);
   readonly pointMatches = signal<Punto[]>([]);
@@ -88,6 +124,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly canReadReservations = this.permissions.tienePermiso('RESERVAS.LEER');
   readonly canReadTransfers = this.permissions.tienePermiso('TRANSFERS.LEER');
   name = '';
+  rowEditName = '';
+  rowEditType: TipoEntidad = 'HOTEL';
   rejectionReason = '';
   type: TipoEntidad = 'HOTEL';
   pointSearch = '';
@@ -183,8 +221,31 @@ export class MercadeoEntidadesComponent implements OnInit {
     };
     return f.desde && f.hasta ? format(f.desde) + ' – ' + format(f.hasta) : f.desde ? 'Desde ' + format(f.desde) : f.hasta ? 'Hasta ' + format(f.hasta) : '';
   }
+  hasSelectedPeriod(): boolean {
+    const applied = this.appliedFilters();
+    return !!applied.desde && !!applied.hasta;
+  }
+  lastReportLabel(value: string | null): string {
+    if (!value) return 'Nunca';
+    const dateValue = value.slice(0, 10);
+    const [year, month, day] = dateValue.split('-').map(Number);
+    const reportDate = new Date(Date.UTC(year, month - 1, day, 12));
+    if (!year || !month || !day || Number.isNaN(reportDate.getTime())) return 'Nunca';
+    const exact = new Intl.DateTimeFormat('es-CO', {
+      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+    }).format(reportDate).replace(/\./g, '');
+    const today = sirToday();
+    const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
+    const difference = Math.round((Date.UTC(todayYear, todayMonth - 1, todayDay)
+      - Date.UTC(year, month - 1, day)) / 86400000);
+    const relative = difference === 0 ? 'hoy'
+      : difference > 0 ? `hace ${difference} ${difference === 1 ? 'día' : 'días'}`
+        : `dentro de ${Math.abs(difference)} ${Math.abs(difference) === 1 ? 'día' : 'días'}`;
+    return `${exact} · ${relative}`;
+  }
   async search(page = 1, syncUrl = true): Promise<void> {
     if (this.loading() || this.dateError()) return;
+    if (this.rowEditingId() !== null) this.cancelRowEdit();
     const applied = { ...this.filters() };
     this.appliedFilters.set(applied);
     if (syncUrl) this.writeUrl(applied, page);
@@ -215,6 +276,11 @@ export class MercadeoEntidadesComponent implements OnInit {
   sortLabel(column: string): string {
     if (this.filters().ordenarPor !== column) return 'Ordenar';
     return this.filters().orden === 'DESC' ? 'Orden descendente' : 'Orden ascendente';
+  }
+  openFromRowKey(event: Event, item: ActividadEntidad): void {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    void this.open(item);
   }
   async open(item: ActividadEntidad): Promise<void> {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -248,6 +314,19 @@ export class MercadeoEntidadesComponent implements OnInit {
   openOperation(item: MercadeoOrigenOperacion): void {
     if (item.tipo === 'RESERVA' && this.canReadReservations && item.id_reserva) this.drawer.openReserva(item.id_reserva);
     if (item.tipo === 'TRANSFER' && this.canReadTransfers && item.id_transfer) this.drawer.openTransfer(String(item.id_transfer));
+  }
+  viewOperations(): void {
+    const entityId = this.selected()?.entity.Id_Entidad_Reportante;
+    if (!entityId) return;
+    const period = this.appliedFilters();
+    this.close();
+    void this.router.navigate(['/Mercadeo/Reservas'], { queryParams: {
+      idEntidadReportante: String(entityId),
+      ...(period.desde && period.hasta ? {
+        fechaRegistroDesde: period.desde,
+        fechaRegistroHasta: period.hasta,
+      } : {}),
+    } });
   }
   operationLabel(item: MercadeoOrigenOperacion): string {
     return item.tipo === 'TRANSFER' ? 'TRS' + String(item.id_transfer).padStart(5, '0') : item.id_reserva || item.id_operacion;
@@ -309,6 +388,44 @@ export class MercadeoEntidadesComponent implements OnInit {
   startEdit(): void {
     const entity = this.selected()?.entity; if (!entity) return;
     this.name = entity.Nombre; this.type = entity.Tipo; this.editing.set(true);
+  }
+  startRowEdit(item: ActividadEntidad): void {
+    if (!this.canEdit || this.saving() || this.loading()) return;
+    this.rowEditingId.set(item.Id_Entidad_Reportante);
+    this.rowEditName = item.Nombre;
+    this.rowEditType = item.Tipo;
+    this.error.set('');
+  }
+  cancelRowEdit(): void {
+    this.rowEditingId.set(null);
+    this.rowEditName = '';
+    this.rowEditType = 'HOTEL';
+  }
+  async saveRowEdit(item: ActividadEntidad): Promise<void> {
+    if (!this.canEdit || this.saving() || this.loading() || this.rowEditingId() !== item.Id_Entidad_Reportante
+      || !this.rowEditName.trim()) return;
+    this.saving.set(true);
+    this.error.set('');
+    try {
+      await firstValueFrom(this.api.update(item.Id_Entidad_Reportante, {
+        Nombre: this.rowEditName.trim(), Tipo: this.rowEditType,
+      }));
+      this.cancelRowEdit();
+      await this.search(this.result()?.page || 1);
+    } catch (e: any) {
+      this.error.set(e?.error?.message || 'No se pudo actualizar la entidad.');
+    } finally { this.saving.set(false); }
+  }
+  async toggleRowActive(item: ActividadEntidad): Promise<void> {
+    if (!this.canEdit || this.saving() || this.loading()) return;
+    this.saving.set(true);
+    this.error.set('');
+    try {
+      await firstValueFrom(this.api.update(item.Id_Entidad_Reportante, { Activo: item.Activo ? 0 : 1 }));
+      await this.search(this.result()?.page || 1);
+    } catch (e: any) {
+      this.error.set(e?.error?.message || 'No se pudo cambiar el estado de la entidad.');
+    } finally { this.saving.set(false); }
   }
   async save(): Promise<void> {
     if (!this.name.trim() || this.saving() || (this.creating() && this.exactDuplicate)) return;

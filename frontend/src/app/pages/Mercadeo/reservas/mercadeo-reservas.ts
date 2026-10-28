@@ -9,6 +9,7 @@ import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/quer
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
+import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
 import { ActividadEntidad, EntidadesReportantesService } from '../../../services/Mercadeo/entidades-reportantes.service';
 import { MercadeoFilters, MercadeoOrigenOperacion, MercadeoOrigenPage, MercadeoService, MercadeoUsuario } from '../../../services/Mercadeo/mercadeo.service';
@@ -35,6 +36,7 @@ export class MercadeoReservasComponent implements OnInit {
   private readonly api = inject(MercadeoService);
   private readonly entitiesApi = inject(EntidadesReportantesService);
   private readonly permissions = inject(PermisosService);
+  private readonly drawer = inject(SirDrawerService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -244,6 +246,10 @@ export class MercadeoReservasComponent implements OnInit {
   entityLabel(): string { return this.selectedEntity()?.Nombre || 'Entidad #' + this.appliedFilters().idEntidadReportante; }
   operationCode(item: MercadeoOrigenOperacion): string {
     return item.tipo === 'TRANSFER' ? 'TRS' + String(item.id_transfer).padStart(5, '0') : item.id_reserva || item.id_operacion;
+  }
+  openOperation(item: MercadeoOrigenOperacion): void {
+    if (item.tipo === 'RESERVA' && item.id_reserva) this.drawer.openReserva(item.id_reserva);
+    if (item.tipo === 'TRANSFER' && item.id_transfer) this.drawer.openTransfer(String(item.id_transfer));
   }
   resultCountLabel(data: MercadeoOrigenPage): string {
     return data.totalOperaciones.toLocaleString('es-CO') + ' ' + (data.totalOperaciones === 1 ? 'operación' : 'operaciones');

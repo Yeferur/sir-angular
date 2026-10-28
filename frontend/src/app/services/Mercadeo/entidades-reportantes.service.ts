@@ -20,7 +20,7 @@ export interface ActividadEntidad {
 export interface PaginaEntidades {
   items: ActividadEntidad[];
   summary: { Total_Entidades: number; Con_Reservas: number; Sin_Reservas: number;
-    Con_Actividad: number; Sin_Actividad: number; Pendientes: number; Total_Reservas: number;
+    Con_Actividad: number; Sin_Actividad: number; Pendientes: number; Inactivas: number; Total_Reservas: number;
     Total_Transfers: number; Total_Operaciones: number; Total_Pasajeros: number };
   page: number; pageSize: number; totalPages: number; total: number;
   umbralDiasSinReportar: number; ordenarPor: string; orden: 'ASC' | 'DESC';
@@ -32,7 +32,7 @@ export interface DetalleEntidad {
     };
   historic: { Reservas: number; Transfers: number; Operaciones: number; Pasajeros: number;
     Primera_Reserva: string | null; Ultima_Reserva: string | null; Dias_Sin_Reportar: number | null;
-    Primera_Actividad: string | null; Ultima_Actividad: string | null };
+    Primera_Actividad: string | null; Ultima_Actividad: string | null; Ultimo_Reporte: string | null };
   period: { Reservas: number; Transfers: number; Operaciones: number; Pasajeros: number };
   contacts: { Nombre: string; Telefono: string | null; Reservas: number; Ultimo_Reporte: string }[];
   observed: { Id_Punto: number; Nombre_Punto: string; Reservas: number }[];

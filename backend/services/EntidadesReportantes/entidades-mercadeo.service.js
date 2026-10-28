@@ -213,6 +213,7 @@ async function listActivity(query = {}, unpaged = false) {
     SUM(CASE WHEN COALESCE(ar.Reservas,0)>0 THEN 1 ELSE 0 END) AS Con_Reservas,
     SUM(CASE WHEN COALESCE(ar.Reservas,0)=0 THEN 1 ELSE 0 END) AS Sin_Reservas,
     SUM(CASE WHEN e.Estado_Validacion='PENDIENTE_VALIDACION' THEN 1 ELSE 0 END) AS Pendientes,
+    SUM(CASE WHEN e.Activo=0 THEN 1 ELSE 0 END) AS Inactivas,
     COALESCE(SUM(COALESCE(ar.Reservas,0)),0) AS Total_Reservas,
     COALESCE(SUM(COALESCE(at.Transfers,0)),0) AS Total_Transfers,
     COALESCE(SUM(${operationsSql()}),0) AS Total_Operaciones,
@@ -240,7 +241,8 @@ function combinedDateSql(reservationAlias, transferAlias, field) {
     ELSE ${field === 'Primera_Actividad' ? 'LEAST' : 'GREATEST'}(${reservationDate},${transferDate}) END`;
 }
 
-async function entityActivity(rawId, f = {}, includeDays = false, includeActivityDates = true) {
+async function entityActivity(rawId, f = {}, includeDays = false, includeActivityDates = true,
+  includeLatestReport = false) {
   const reservationPeriod = f.start
     ? 'AND r.Fecha_Registro>=? AND r.Fecha_Registro<DATE_ADD(?,INTERVAL 1 DAY)'
     : '';
@@ -250,12 +252,14 @@ async function entityActivity(rawId, f = {}, includeDays = false, includeActivit
   const periodParams = f.start ? [`${f.start} 00:00:00`, f.end] : [];
   const firstDate = combinedDateSql('ra', 'ta', 'Primera_Actividad');
   const lastDate = combinedDateSql('ra', 'ta', 'Ultima_Actividad');
+  const latestReport = lastDate;
   const daysExpression = `CASE WHEN (${lastDate}) IS NOT NULL
     THEN GREATEST(DATEDIFF(?,DATE(${lastDate})),0) ELSE NULL END`;
   const sql = `SELECT COALESCE(ra.Reservas,0) AS Reservas,
       COALESCE(ta.Transfers,0) AS Transfers,
       COALESCE(ra.Reservas,0)+COALESCE(ta.Transfers,0) AS Operaciones,
       COALESCE(ra.Pasajeros,0)+COALESCE(ta.Pasajeros,0) AS Pasajeros
+      ${includeLatestReport ? `,${latestReport} AS Ultimo_Reporte` : ''}
       ${includeActivityDates ? `,${firstDate} AS Primera_Reserva,${lastDate} AS Ultima_Reserva,
         ${firstDate} AS Primera_Actividad,${lastDate} AS Ultima_Actividad` : ''}
       ${includeDays ? `,${daysExpression} AS Dias_Sin_Reportar` : ''}
@@ -299,7 +303,7 @@ async function detail(rawId, query = {}) {
     WHERE e.Id_Entidad_Reportante=? AND e.Tipo IN (?, ?, ?)`, [id, ...TYPES]);
   if (!entity) fail(404, 'ENTITY_NOT_FOUND', 'Entidad reportante no encontrada.');
   const eligibleForActivityDates = entity.Estado_Validacion === 'VALIDADA' && Number(entity.Activo) === 1;
-  const historic = await entityActivity(id, {}, eligibleForActivityDates, eligibleForActivityDates);
+  const historic = await entityActivity(id, {}, eligibleForActivityDates, eligibleForActivityDates, true);
   const periodSummary = await entityActivity(id, f, false, false);
   if (!eligibleForActivityDates) {
     historic.Primera_Reserva = null;

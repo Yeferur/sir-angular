@@ -148,7 +148,7 @@
               <th scope="col">Entidad reportante</th><th scope="col">Estado</th>
             </tr></thead>
             <tbody>@for (item of data.items; track item.tipo + ':' + item.id_operacion) {
-              <tr>
+              <tr (click)="openOperation(item)">
                 <td>{{ item.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }}</td><td class="booking-code">{{ operationCode(item) }}</td>
                 <td class="origin-column--creation">{{ item.fecha_registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
                 <td>{{ item.fecha_servicio | date:'d MMM y':'':'es-CO' }}</td><td>{{ item.pasajeros | number }}</td>

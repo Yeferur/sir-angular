@@ -16,7 +16,7 @@ registerLocaleData(localeEsCO);
 const page: PaginaEntidades = {
   page: 1, pageSize: 25, totalPages: 1, total: 1,
   summary: { Total_Entidades: 1, Con_Reservas: 1, Sin_Reservas: 0,
-    Con_Actividad: 1, Sin_Actividad: 0, Pendientes: 1, Total_Reservas: 2,
+    Con_Actividad: 1, Sin_Actividad: 0, Pendientes: 1, Inactivas: 0, Total_Reservas: 2,
     Total_Transfers: 0, Total_Operaciones: 2, Total_Pasajeros: 3 },
   items: [{ Id_Entidad_Reportante: 7, Tipo: 'HOTEL', Nombre: 'Hotel Niño', Activo: 1,
     Estado_Validacion: 'PENDIENTE_VALIDACION', Fecha_Creacion: '2026-10-13', Reservas: 2,

@@ -29,7 +29,16 @@ th { color: var(--text-secondary); background: var(--bg-tertiary); font-size: .7
 .entity-sort:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .entity-activity-alert { color: var(--accent-orange, #d97706); font-weight: 700; }
 tbody tr:hover { background: color-mix(in srgb, var(--accent-blue) 4%, transparent); }
+tbody tr.entity-row { cursor: pointer; }
+tbody tr.entity-row:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+.entity-card.entity-row { cursor: pointer; }
+.entity-card.entity-row:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 tbody tr:last-child td { border-bottom: 0; }
+.entity-actions-heading, .entity-row-actions { text-align: right; }
+.entity-row-actions { white-space: nowrap; }
+.entity-row-actions .item-actions { justify-content: flex-end; }
+.entity-row-edit-name { min-width: 170px; }
+.entity-card-actions { flex-wrap: wrap; margin-top: 10px; }
 .entity-link { border: 0; background: transparent; padding: 0; color: var(--accent-blue); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
 .entity-link:hover { text-decoration: underline; }
 .entity-inactive-badge { display: inline-block; margin-inline-start: 7px; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--accent-orange, #d97706) 28%, transparent);
@@ -39,18 +48,20 @@ tbody tr:last-child td { border-bottom: 0; }
 .entity-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--separator-color); font-size: .78rem; }
 .entity-pagination span { margin-right: auto; color: var(--text-secondary); }
 .entity-backdrop { position: fixed; inset: 0; z-index: calc(var(--z-modal, 1500) - 2); background: rgba(0,0,0,.56); }
-.entity-drawer { position: fixed; z-index: calc(var(--z-modal, 1500) - 1); box-sizing: border-box; overflow-y: auto; border: 1px solid var(--separator-color); background: var(--bg-secondary); color: var(--text-primary); box-shadow: 0 16px 44px rgba(0,0,0,.26); }
-.entity-drawer { inset: 0 0 0 auto; width: min(100%, 520px); padding: 25px; }
+.entity-drawer { position: fixed; z-index: calc(var(--z-modal, 1500) - 1); box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border: 1px solid var(--separator-color); background: var(--bg-secondary); color: var(--text-primary); box-shadow: 0 16px 44px rgba(0,0,0,.26); }
+.entity-drawer { inset: 0 0 0 auto; width: min(100%, 520px); }
+.entity-drawer-header { position: relative; flex: 0 0 auto; min-width: 0; padding: 20px 68px 14px 24px; border-bottom: 1px solid var(--separator-color); }
+.entity-drawer-heading { min-width: 0; }
 .entity-drawer h2 { margin: 0 32px 0 0; font-size: 1.22rem; line-height: 1.2; }
-.drawer-close { position: absolute; top: 14px; right: 15px; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-secondary); font-size: 1.3rem; cursor: pointer; }
-.entity-drawer > p { color: var(--text-secondary); font-size: .83rem; }
+.entity-drawer-heading > p { margin: 7px 0 0; color: var(--text-secondary); font-size: .83rem; }
+.entity-drawer-header > .entity-notice, .entity-drawer-header > .entity-rejection-reason { margin: 9px 0 0; }
+.entity-drawer-scroll { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 18px 24px 20px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-tertiary) 45%, transparent) transparent; }
 .entity-drawer h3 { margin: 22px 0 8px; padding-top: 16px; border-top: 1px solid var(--separator-color); font-size: .9rem; }
 .entity-drawer p { line-height: 1.5; }
-.drawer-actions, .entity-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
-.drawer-actions { justify-content: flex-start; margin: 18px 0; }
-.entity-operation-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--separator-color); font-size: .78rem; }
-.entity-operation-row > span:nth-child(2) { color: var(--text-secondary); }
-.entity-point-toggle { margin-top: 18px; }
+.entity-detail-footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 14px 24px 20px; border-top: 1px solid var(--separator-color); background: color-mix(in srgb, var(--bg-secondary) 88%, transparent); }
+.entity-detail-footer .sir-action { justify-content: center; gap: 6px; }
+.entity-detail-footer .sir-action i { font-size: .98rem; }
+.entity-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
 .entity-edit { display: grid; gap: 9px; padding: 14px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .entity-edit label { font-size: .78rem; color: var(--text-secondary); }
 .entity-input { width: 100%; box-sizing: border-box; border: 1px solid var(--separator-color); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); }
@@ -70,10 +81,10 @@ textarea.entity-input:focus-visible, .entity-link:focus-visible { outline: 2px s
   .entity-card { padding: 12px; border: 1px solid var(--separator-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
   .entity-card p { margin: 5px 0; color: var(--text-secondary); font-size: .77rem; }
   .entity-card small { color: var(--text-secondary); }
-  .entity-drawer { padding: 18px; }
-  .entity-operation-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .entity-operation-row > span:nth-child(2) { grid-column: 1; }
-  .entity-operation-row > button { grid-column: 2; grid-row: 1 / span 2; }
+  .entity-drawer-header { padding: 18px 60px 14px 18px; }
+  .entity-drawer-scroll { padding: 16px 18px 18px; }
+  .entity-detail-footer { justify-content: stretch; padding: 12px 18px 16px; }
+  .entity-detail-footer .sir-action { flex: 1 1 calc(50% - 8px); }
 }
 @media (max-width: 1100px) { #entity-filter-panel .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) {
