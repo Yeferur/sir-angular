@@ -1,10 +1,14 @@
 import { provideZonelessChangeDetection } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeEsCO from '@angular/common/locales/es-CO';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { MercadeoReservasComponent } from './mercadeo-reservas';
 import { MercadeoService, MercadeoOrigenPage } from '../../../services/Mercadeo/mercadeo.service';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+
+registerLocaleData(localeEsCO);
 
 const emptyPage: MercadeoOrigenPage = {
   items: [], page: 1, pageSize: 25, totalPages: 0, totalOperaciones: 0,
@@ -111,11 +115,46 @@ describe('MercadeoReservasComponent', () => {
     expect(navigation.queryParams.idEntidadReportante).toBeNull();
   });
 
+  it('muestra la entidad seleccionada como pill activa y la incluye en el conteo', async () => {
+    component.setFilter('idEntidadReportante', '7');
+    component.entitySearch.set('Hotel Niño');
+    component.search();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.filterCount()).toBe(1);
+    expect(fixture.nativeElement.querySelector('.active-filter-tokens .filter-token')?.textContent).toContain('Entidad: Hotel Niño');
+  });
+
   it('restaura Transfers desde la ruta anterior y ejecuta la consulta', async () => {
     params.next(convertToParamMap({ tipo: 'Transfers', consultar: '1', vista: 'origen' }));
     await fixture.whenStable();
 
     expect(api.buscarOrigen).toHaveBeenCalledWith(jasmine.objectContaining({ tipo: 'TRANSFER' }), 1, 25);
     expect(component.appliedFilters().tipo).toBe('TRANSFER');
+  });
+
+  it('mantiene una tabla compacta con Estado visible y exportación Excel', async () => {
+    api.buscarOrigen.and.returnValue(of({
+      ...emptyPage,
+      items: [{ tipo: 'RESERVA', id_operacion: 'R-1', id_reserva: 'R-1', id_transfer: null,
+        fecha_registro: '2026-10-27T10:00:00', fecha_servicio: '2026-11-01', id_canal: 1,
+        canal: 'Hotel', id_entidad_reportante: 7, entidad: 'Hotel Niño', tipo_entidad: 'HOTEL',
+        nombre_reportante: 'Andrea', telefono_reportante: '300', creador_id: 8, creador: 'Mercadeo',
+        pasajeros: 2, estado: 'Confirmada', pendiente_por_entidad_en: null }],
+      page: 1, totalPages: 1, totalOperaciones: 1, totalPasajeros: 2, totalPasajerosEnPagina: 2,
+    }));
+    component.search();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const html = fixture.nativeElement as HTMLElement;
+    const headers = Array.from(html.querySelectorAll('.origin-table th')).map(cell => cell.textContent?.trim());
+    expect(headers).toEqual(['Tipo', 'Código', 'Creación', 'Fecha del servicio', 'Pasajeros', 'Canal', 'Entidad reportante', 'Estado']);
+    expect(headers).not.toContain('Quién reportó');
+    expect(html.querySelector('.sir-results-heading')).not.toBeNull();
+    expect(html.querySelector('.origin-table td:last-child')?.textContent).toContain('Confirmada');
+    expect(html.querySelector('.sir-results-heading button')?.textContent).toContain('Exportar Excel');
+    expect(html.querySelector('.sir-results-heading .bx-download')).not.toBeNull();
   });
 });

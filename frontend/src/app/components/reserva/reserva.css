@@ -43,6 +43,8 @@
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-tertiary) 45%, transparent) transparent;
+  container-type: inline-size;
+  container-name: reservation-detail;
 }
 
 .detail-scroll::-webkit-scrollbar {
@@ -479,17 +481,23 @@
 }
 
 .info-label {
-  min-width: 0;
+  flex-shrink: 0;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .info-value {
-  flex-shrink: 0;
+  min-width: 0;
+  flex-shrink: 1;
   color: var(--text-primary);
   font-size: 0.92rem;
   font-weight: 650;
   text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@container reservation-detail (max-width: 520px) {
+  .info-row { flex-direction: column; align-items: stretch; gap: 3px; }
 }
 
 .observations-section {

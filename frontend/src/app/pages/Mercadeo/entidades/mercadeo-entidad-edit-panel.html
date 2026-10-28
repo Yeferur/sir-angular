@@ -1,0 +1,34 @@
+<section class="entity-create-panel" aria-labelledby="edit-entity-title">
+  <app-drawer-close-button label="Cerrar edición de entidad" (dismiss)="controller.close()" />
+  <header class="entity-create-header">
+    <div class="entity-create-heading-copy">
+      <span class="entity-detail-eyebrow">Entidad reportante</span>
+      <h2 id="edit-entity-title">Editar entidad</h2>
+    </div>
+  </header>
+
+  <main class="entity-create-content">
+    <p class="entity-edit-intro">Actualiza el nombre o el tipo de esta entidad.</p>
+    <div class="entity-create-fields">
+      <div class="form-group">
+        <label for="edit-entity-name">Nombre comercial <span class="required-star">*</span></label>
+        <input id="edit-entity-name" class="form-input" [(ngModel)]="controller.name" maxlength="255" autocomplete="organization" />
+      </div>
+      <div class="form-group">
+        <label for="edit-entity-type">Tipo de entidad <span class="required-star">*</span></label>
+        <app-select inputId="edit-entity-type" [options]="controller.createTypeOptions"
+          [ngModel]="controller.type" (ngModelChange)="controller.type = $event" />
+      </div>
+    </div>
+    @if (controller.detailError()) { <p class="inline-error" role="alert">{{ controller.detailError() }}</p> }
+  </main>
+
+  <footer class="entity-form-actions">
+    <button type="button" class="sir-action sir-action--secondary" [disabled]="controller.saving()" (click)="controller.cancelEdit()">
+      <i class="bx bx-x" aria-hidden="true"></i> Cancelar
+    </button>
+    <button type="button" class="sir-action sir-action--primary" [disabled]="controller.saving() || !controller.name.trim() || !controller.type" (click)="controller.save()">
+      <i class="bx bx-save" aria-hidden="true"></i>{{ controller.saving() ? 'Guardando…' : 'Guardar cambios' }}
+    </button>
+  </footer>
+</section>

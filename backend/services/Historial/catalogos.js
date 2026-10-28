@@ -65,6 +65,7 @@ const ETIQUETAS_ACCION = Object.freeze({
 
 function etiquetaAccion(value) {
   const action = String(value || '').trim().toUpperCase();
+  if (!ACCIONES_CONOCIDAS.includes(action) && !ETIQUETAS_ACCION[action]) return 'Otra actividad';
   if (ETIQUETAS_ACCION[action]) return ETIQUETAS_ACCION[action];
   const labels = {
     CREAR: 'Creación', ACTUALIZAR: 'Actualización', ELIMINAR: 'Eliminación',

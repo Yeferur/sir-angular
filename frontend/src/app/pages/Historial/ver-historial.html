@@ -154,7 +154,9 @@
                       <td colspan="7">
                         <div class="detail-panel">
                           <div class="detail-meta">
-                            <span><strong>Actor:</strong> {{ record.Actor_Nombre || record.Usuario_Nombre || 'Sistema' }}</span>
+                            @if (record.Actor_Nombre && record.Actor_Nombre !== record.Usuario_Nombre) {
+                              <span><strong>Actor:</strong> {{ record.Actor_Nombre }}</span>
+                            }
                             @if (record.Actor_Rol) { <span><strong>Rol al registrar:</strong> {{ record.Actor_Rol }}</span> }
                             <span><strong>Referencia:</strong> {{ record.Modulo }} · {{ record.Id_Registro ?? '—' }}</span>
                           </div>

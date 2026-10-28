@@ -241,7 +241,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   }
 
   selectedUserLabel(id: number): string { return this.filterOptions().usuarios.find((option) => option.id === id)?.label || `Usuario #${id}`; }
-  selectedActionLabel(value: string): string { return this.filterOptions().acciones.find((option) => option.value === value)?.label || value; }
+  selectedActionLabel(value: string): string { return this.filterOptions().acciones.find((option) => option.value === value)?.label || 'Otra actividad'; }
   selectedActivityLabel(value: string): string { return this.filterOptions().actividades.find((option) => option.value === value)?.label || value; }
   selectedModuleLabel(value: string): string { return this.filterOptions().modulos.find((option) => option.value === value)?.label || value; }
 
@@ -284,13 +284,44 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
 
   detailColumnLabel(column: string): string {
     const labels: Record<string, string> = {
-      Estado: 'Estado', Canal: 'Canal', Id_Tour: 'Tour', Fecha_Tour: 'Fecha del tour',
-      Id_Punto: 'Punto de encuentro', Nombre_Punto: 'Punto de encuentro', Cupo: 'Cupo',
+      Estado: 'Estado', Canal: 'Canal', Id_Tour: 'Tour', Id_Moneda: 'Moneda', Id_Canal: 'Canal',
+      Id_Punto: 'Punto de encuentro', Id_Plan: 'Plan', Id_Entidad_Reportante: 'Entidad reportante',
+      Id_Usuario: 'Usuario', Creado_Por: 'Creado por', Validado_Por: 'Validado por',
+      Rechazado_Por: 'Rechazado por', Eliminado_Por: 'Eliminado por', Descartado_Por: 'Descartado por',
+      Fecha_Tour: 'Fecha del tour', Fecha_Transfer: 'Fecha del transfer',
+      Nombre_Punto: 'Punto de encuentro', Cupo: 'Cupo',
       Tipo: 'Tipo', TipoServicio: 'Tipo de servicio', Forma_Pago: 'Forma de pago',
       Nombres_Apellidos: 'Nombre', Activo: 'Estado', Hora_Salida: 'Hora de salida',
-      Fecha_Aforo: 'Fecha de aforo', Id_Programacion: 'Programación',
+      Fecha_Aforo: 'Fecha de aforo', Id_Programacion: 'Programación', Estado_Validacion: 'Validación',
+      Nombre: 'Nombre', Nombre_Tour: 'Tour', Abreviacion: 'Abreviación', Fecha_Creacion: 'Fecha de creación',
+      Validado_En: 'Fecha de validación', Rechazado_En: 'Fecha de rechazo', Motivo_Rechazo: 'Motivo de rechazo',
+      'Motivo de rechazo': 'Motivo de rechazo', 'Reservas afectadas': 'Reservas afectadas',
+      'Transfers afectados': 'Transfers afectados', 'Pasajeros iniciales': 'Pasajeros iniciales',
+      Id_Reserva_Origen: 'Reserva original', Id_Reserva_Nueva: 'Nueva reserva', 'Entidad reportante': 'Entidad reportante',
+      Fecha: 'Fecha', Operacion: 'Operación', Cambios: 'Cambios', Confirmados: 'Confirmados',
+      No_Viajaron: 'No viajaron', Reservas: 'Reservas', Estado_Anterior: 'Estado anterior',
+      Estado_Nuevo: 'Estado nuevo', Hora: 'Hora', 'Nombre_Titular': 'Titular', 'Nombre_Reportante': 'Reportante',
+      'Punto de encuentro': 'Punto de encuentro', Telefono: 'Teléfono', 'Teléfono': 'Teléfono', Observaciones: 'Observaciones',
+      Entidad: 'Entidad reportante', Nombre_Receptor: 'Nombre del receptor', Puntos_Recogida: 'Puntos de recogida',
+      Monto_Pagado: 'Monto pagado', Cantidad_Reservas_Pagadas: 'Reservas pagadas',
+      Numero_Lote: 'Número de lote', Comprobante: 'Comprobante', Ruta_Comprobante: 'Comprobante',
+      Advertencias_Aceptadas: 'Advertencias aceptadas', Buses: 'Vehículos',
+      Comprobantes_Conservados: 'Comprobantes conservados', Correos_Solicitados: 'Correos solicitados',
+      Cuenta: 'Cuenta', Direccion: 'Dirección', Eliminada_En: 'Fecha de eliminación',
+      Eliminada_Por: 'Eliminada por', Evento: 'Evento', Descripcion: 'Descripción',
+      Id_Semana_Origen: 'Semana de origen',
+      Jornada_Semana: 'Semana de turnos', Jornadas_Publicadas: 'Jornadas publicadas', Mime_Type: 'Tipo de archivo',
+      Monto_Comision_Pagada_Total: 'Comisión total pagada', Monto_Pagado_Conservado: 'Monto pagado conservado',
+      Montos_Por_Reserva: 'Montos por reserva', Motivo: 'Motivo', Motivo_Anulacion: 'Motivo de anulación',
+      Motivo_Eliminacion: 'Motivo de eliminación', Numero_Cuenta: 'Cuenta', Pago_Comprobante: 'Comprobante de pago',
+      Pagos: 'Pagos', Pagos_Conservados: 'Pagos conservados', Pagos_Eliminados: 'Pagos eliminados',
+      Pasajero: 'Pasajero', 'Pasajero afectado': 'Pasajero afectado', Pasajeros_Conservados: 'Pasajeros conservados',
+      Pendiente_Por_Entidad_En: 'Pendiente por entidad desde', posicion: 'Posición', ruta: 'Ruta',
+      Reservas_Actualizadas: 'Reservas actualizadas', Reservas_Liberadas: 'Reservas liberadas', Sector: 'Sector',
+      Tamano_Bytes: 'Tamaño del archivo', 'Teléfono de contacto': 'Teléfono de contacto',
+      Tours: 'Tours', Vehiculos: 'Vehículos', DNI_Receptor: 'Documento del receptor', Cupos_Liberados: 'Cupos liberados',
     };
-    return labels[column] || column.replace(/_/g, ' ');
+    return labels[column] || 'Otro dato';
   }
 
   formatTimestamp(value: string): string {

@@ -87,11 +87,44 @@ test('Historial acepta un solo día e incluye otros registros sin revelar tablas
   assert.equal(result.data[0].Modulo, 'Usuarios');
   assert.equal(result.data[0].Id_Registro, null);
   assert.deepEqual(result.data[0].Detalles, []);
-  assert.equal(result.data[0].Descripcion, 'Inicio de sesión en Usuarios');
+  assert.equal(result.data[0].Descripcion, 'Inició sesión');
   assert.equal(result.data[1].Actor_Nombre, null);
   assert.equal(result.data[1].Usuario_Nombre, 'Elena Actual');
   assert.match(calls[0].sql, /h\.Fecha_Hora_Registro >= \?/);
   assert.match(calls[0].sql, /DATE_ADD\(\?, INTERVAL 1 DAY\)/);
+});
+
+test('resuelve referencias y arma un resumen natural sin filtrar valores técnicos desconocidos', async () => {
+  db.query = async (sql) => {
+    const statement = String(sql);
+    if (statement.includes('COUNT(*)')) return [[{ total: 2 }]];
+    if (statement.includes('SELECT h.Id_Historial')) return [[
+      { Id_Historial: 91, Id_Usuario: 8, Usuario_Nombre: 'Ana', Actor_Nombre: 'Ana', Actor_Rol: null,
+        Tipo_Accion: 'CREAR_RESERVA', Tabla_Afectada: 'reservas', Id_Registro: 'COF50183', Fecha_Accion: '2026-10-20 09:00:00' },
+      { Id_Historial: 90, Id_Usuario: 8, Usuario_Nombre: 'Ana', Actor_Nombre: 'Ana', Actor_Rol: null,
+        Tipo_Accion: 'ACCION_INTERNA_DESCONOCIDA', Tabla_Afectada: 'entidades_reportantes', Id_Registro: '3', Fecha_Accion: '2026-10-20 08:00:00' },
+    ]];
+    if (statement.includes('FROM detalle_historial')) return [[
+      { Id_Historial: 91, Columna: 'Id_Tour', Valor_Anterior: null, Valor_Nuevo: '4' },
+      { Id_Historial: 91, Columna: 'Id_Moneda', Valor_Anterior: null, Valor_Nuevo: '1' },
+      { Id_Historial: 91, Columna: 'Id_Canal', Valor_Anterior: null, Valor_Nuevo: '2' },
+      { Id_Historial: 91, Columna: 'Id_Usuario', Valor_Anterior: null, Valor_Nuevo: '8' },
+      { Id_Historial: 91, Columna: 'Fecha_Tour', Valor_Anterior: null, Valor_Nuevo: '2026-11-21' },
+      { Id_Historial: 91, Columna: 'Pasajeros iniciales', Valor_Anterior: null, Valor_Nuevo: 'Ana Pérez · Luis Gómez' },
+      { Id_Historial: 90, Columna: 'Campo_Tecnico', Valor_Anterior: null, Valor_Nuevo: 'valor' },
+    ]];
+    if (statement.includes('FROM tours')) return [[{ id: 4, nombre: 'Coffee Tour' }]];
+    if (statement.includes('FROM monedas')) return [[{ id: 1, nombre: 'COP' }]];
+    if (statement.includes('FROM canales_origen')) return [[{ id: 2, nombre: 'Hotel' }]];
+    if (statement.includes('FROM usuarios WHERE')) return [[{ id: 8, nombre: 'Ana Pérez' }]];
+    throw new Error(`Consulta inesperada: ${statement}`);
+  };
+  const result = await service.getHistorial({ fechaInicio: '2026-10-20', fechaFin: '2026-10-20' });
+  assert.equal(result.data[0].Descripcion, 'Creó la reserva COF50183 · Coffee Tour · 21 nov · 2 pax');
+  assert.deepEqual(result.data[0].Detalles.slice(0, 4).map((item) => item.nuevo),
+    ['Coffee Tour', 'COP', 'Hotel', 'Ana Pérez']);
+  assert.equal(result.data[1].Descripcion, 'Se registró actividad en Entidades reportantes');
+  assert.equal(require('../services/Historial/catalogos').etiquetaAccion('ACCION_INTERNA_DESCONOCIDA'), 'Otra actividad');
 });
 
 test('Historial rechaza periodos inválidos e identificadores de usuario manipulados', () => {

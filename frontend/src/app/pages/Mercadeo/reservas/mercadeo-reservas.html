@@ -46,9 +46,14 @@
         <span class="btn-spinner btn-spinner--centered" [class.btn-spinner--active]="loading()" aria-hidden="true"></span>
       </button>
     </div>
-    @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS' || appliedFilters().categoria || appliedFilters().creadorIds.length || (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta)) {
+    @if (appliedFilters().idEntidadReportante || (appliedFilters().tipo || 'TODOS') !== 'TODOS' || appliedFilters().categoria || appliedFilters().creadorIds.length || (appliedFilters().fechaRegistroDesde && appliedFilters().fechaRegistroHasta)) {
       <div class="active-filters active-filters--managed" aria-label="Filtros aplicados">
         <div class="active-filter-tokens">
+          @if (appliedFilters().idEntidadReportante) {
+            <div class="filter-token">Entidad: {{ selectedEntity()?.Nombre || entitySearch() || 'Seleccionada' }}
+              <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar entidad" (click)="removeAppliedFilter('entidad')">×</button>
+            </div>
+          }
           @if ((appliedFilters().tipo || 'TODOS') !== 'TODOS') {
             <div class="filter-token">Tipo: {{ serviceLabel() }}
               <button type="button" class="remove-token-btn" [disabled]="loading()" aria-label="Quitar tipo" (click)="removeAppliedFilter('tipo')">×</button>
@@ -129,52 +134,37 @@
       }
     } @else {
       <section class="results-list marketing-results" [attr.aria-busy]="loading()" aria-label="Origen de reservas y transfers">
-        <div class="results-heading">
-          <div><h2>Resultados</h2><span>{{ resultCountLabel(data) }} · {{ data.totalPasajeros | number }} pasajeros en esta página</span></div>
-          @if (canExport) { <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting()" (click)="exportDetail()">{{ exporting() ? 'Preparando…' : 'Exportar detalle' }}</button> }
+        <div class="sir-results-heading">
+          <div class="sir-results-heading__copy"><h2>Resultados</h2><span>{{ resultCountLabel(data) }} · {{ data.totalPasajeros | number }} pasajeros en esta página</span></div>
+          @if (canExport) { <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting()" (click)="exportDetail()">
+            <i class="bx bx-download" aria-hidden="true"></i> {{ exporting() ? 'Preparando…' : 'Exportar Excel' }}
+          </button> }
         </div>
-        <div class="table-scroll">
-          <table class="marketing-table">
+        <div class="sir-data-table-scroll">
+          <table class="sir-data-table origin-table">
             <thead><tr>
-              <th scope="col">Tipo</th><th scope="col">Código</th><th scope="col">Creación</th>
-              <th scope="col">Fecha del servicio</th><th scope="col">Pasajeros</th><th scope="col">Canal</th>
-              <th scope="col">Entidad reportante</th><th scope="col">Quién reportó</th>
-              <th scope="col">Teléfono</th><th scope="col">Usuario creador</th><th scope="col">Estado</th>
+              <th scope="col">Tipo</th><th scope="col">Código</th><th scope="col" class="origin-column--creation">Creación</th>
+              <th scope="col">Fecha del servicio</th><th scope="col">Pasajeros</th><th scope="col" class="origin-column--channel">Canal</th>
+              <th scope="col">Entidad reportante</th><th scope="col">Estado</th>
             </tr></thead>
             <tbody>@for (item of data.items; track item.tipo + ':' + item.id_operacion) {
               <tr>
                 <td>{{ item.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }}</td><td class="booking-code">{{ operationCode(item) }}</td>
-                <td>{{ item.fecha_registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
+                <td class="origin-column--creation">{{ item.fecha_registro | date:'d MMM y, HH:mm':'':'es-CO' }}</td>
                 <td>{{ item.fecha_servicio | date:'d MMM y':'':'es-CO' }}</td><td>{{ item.pasajeros | number }}</td>
-                <td>{{ item.canal || '—' }}</td><td>{{ item.entidad || '—' }}</td>
-                <td>{{ item.nombre_reportante || '—' }}</td><td>{{ item.telefono_reportante || '—' }}</td>
-                <td>{{ item.creador || 'No disponible' }}</td><td>{{ item.estado || '—' }}
+                <td class="origin-column--channel">{{ item.canal || '—' }}</td><td>{{ item.entidad || '—' }}</td>
+                <td>{{ item.estado || '—' }}
                   @if (item.pendiente_por_entidad_en) { <small class="entity-pending-indicator">Pendiente por entidad</small> }
                 </td>
               </tr>
             }</tbody>
           </table>
         </div>
-        <div class="marketing-mobile-list">
-          @for (item of data.items; track item.tipo + ':' + item.id_operacion) {
-            <article class="marketing-mobile-card">
-              <div class="marketing-mobile-card-head"><strong>{{ operationCode(item) }}</strong><span>{{ item.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }}</span></div>
-              <h3>{{ item.entidad || 'Sin entidad reportante' }}</h3>
-              <p>{{ item.pasajeros | number }} {{ item.pasajeros === 1 ? 'pasajero' : 'pasajeros' }} · {{ item.fecha_servicio | date:'d MMM y':'':'es-CO' }}</p>
-              <p>Canal: {{ item.canal || 'No disponible' }} · Reportó: {{ item.nombre_reportante || 'No disponible' }}</p>
-              <dl><div><dt>Creación</dt><dd>{{ item.fecha_registro | date:'d MMM y, HH:mm':'':'es-CO' }}</dd></div>
-                <div><dt>Teléfono</dt><dd>{{ item.telefono_reportante || 'No disponible' }}</dd></div>
-                <div><dt>Creó</dt><dd>{{ item.creador || 'No disponible' }}</dd></div><div><dt>Estado</dt><dd>{{ item.estado || 'No disponible' }}
-                  @if (item.pendiente_por_entidad_en) { <small class="entity-pending-indicator">Pendiente por entidad</small> }
-                </dd></div></dl>
-            </article>
-          }
-        </div>
       @if (data.totalPages > 1) {
-        <nav class="results-pagination" aria-label="Paginación del origen de reservas">
-          <button type="button" class="pagination-button" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()">Anterior</button>
-          <span class="pagination-indicator" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
-          <button type="button" class="pagination-button" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
+        <nav class="sir-results-pagination" aria-label="Paginación del origen de operaciones">
+          <span class="sir-results-pagination__summary" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
+          <button type="button" class="sir-action sir-action--secondary sir-action--compact" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()">Anterior</button>
+          <button type="button" class="sir-action sir-action--secondary sir-action--compact" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
         </nav>
       }
       </section>

@@ -1,5 +1,5 @@
 <main class="page-container reservation-browser general-list-page" [attr.aria-busy]="loading() || exporting()">
-  <section class="page-header general-list-search" aria-label="Filtros del listado general">
+  <section class="page-header reservation-search-panel general-list-search" aria-label="Filtros del listado general">
     <app-filter-bar
       panelId="general-list-filters"
       [expanded]="filtersOpen()"
@@ -12,7 +12,7 @@
       (search)="search()"
       (clear)="clearFilters()">
       <div sirPrimaryFilters class="general-primary-field general-format-field">
-        <label class="visually-hidden" for="general-report-type">Tipo de listado</label>
+        <label class="sir-visually-hidden" for="general-report-type">Tipo de listado</label>
         <app-select inputId="general-report-type" [ngModel]="selectedReportType()"
           (ngModelChange)="onReportTypeChange($event)" [options]="reportTypeOptions"
           [disabled]="loading() || loadingOptions()" placeholder="Tipo de listado" />
@@ -20,7 +20,7 @@
 
       @if (!isTransfers()) {
         <div sirPrimaryFilters class="general-primary-field general-format-field">
-          <label class="visually-hidden" for="general-export-format">Formato del listado</label>
+          <label class="sir-visually-hidden" for="general-export-format">Formato del listado</label>
           <app-select inputId="general-export-format" [ngModel]="selectedFormat()"
             (ngModelChange)="onFormatChange($event)" [options]="formatOptions"
             [disabled]="loading() || loadingOptions()" placeholder="Formato del listado" />
@@ -29,14 +29,14 @@
 
       @if (!isMasivo() || isTransfers()) {
         <div sirPrimaryFilters class="general-primary-field general-exact-date">
-          <label class="visually-hidden" for="general-list-tour-date">{{ isTransfers() ? 'Fecha del transfer' : 'Fecha del tour' }}</label>
+          <label class="sir-visually-hidden" for="general-list-tour-date">{{ isTransfers() ? 'Fecha del transfer' : 'Fecha del tour' }}</label>
           <app-datepicker inputId="general-list-tour-date" [ngModel]="filters().fechaTour"
             [placeholder]="isTransfers() ? 'Fecha del transfer' : 'Fecha del tour'" [disabled]="loading() || loadingOptions()"
             (dateChange)="onExactTourDate($event)" />
         </div>
       } @else {
         <div sirPrimaryFilters class="general-primary-field general-tour-range">
-          <label class="visually-hidden" for="general-list-tour-range">Rango de fecha del tour para el formato Masivo</label>
+          <label class="sir-visually-hidden" for="general-list-tour-range">Rango de fecha del tour para el formato Masivo</label>
           <app-date-range-picker inputId="general-list-tour-range" [value]="tourRange()"
             placeholder="Rango de fecha del tour" [disabled]="loading() || loadingOptions()"
             [invalid]="searchAttempted() && !!tourRangeError" (rangeChange)="onTourRangeChange($event)" />
@@ -45,7 +45,7 @@
 
       @if (!isTransfers()) {
         <div sirPrimaryFilters class="general-primary-field general-tour-select">
-          <label class="visually-hidden" for="general-list-tours">Tours</label>
+          <label class="sir-visually-hidden" for="general-list-tours">Tours</label>
           <app-multi-select inputId="general-list-tours" [ngModel]="filters().tours"
             (ngModelChange)="setMultiFilter('tours', $event)" [options]="tourOptions()"
             placeholder="Todos los tours" [disabled]="loading() || loadingOptions()" />
@@ -63,6 +63,19 @@
       <p class="general-inline-error" role="alert">{{ visibleValidationError }}</p>
     }
   </section>
+
+  @if (activeFilterTokens().length) {
+    <div class="active-filters active-filters--managed general-active-filters" aria-label="Filtros aplicados">
+      <div class="active-filter-tokens">
+        @for (token of activeFilterTokens(); track token.key) {
+          <div class="filter-token">{{ token.label }}
+            <button type="button" class="remove-token-btn" [disabled]="loading() || loadingOptions() || exporting()"
+              [attr.aria-label]="'Quitar ' + token.label" (click)="removeFilterToken(token.key)">×</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
 
   @if (!isTransfers()) {
     <app-filter-panel panelId="general-list-filters" [open]="filtersOpen()" label="Filtros adicionales del listado general">
@@ -99,14 +112,14 @@
       <div class="general-stale-note" role="status">Cambiaste la fecha o el tipo de listado. Busca de nuevo para actualizar los resultados y habilitar la descarga.</div>
     }
     <section class="results-list general-results" aria-label="Resultado de transfers" [attr.aria-busy]="loading()">
-      <div class="results-heading general-results-heading">
-        <div>
+      <div class="sir-results-heading">
+        <div class="sir-results-heading__copy">
           <h2>Transfers</h2>
           <span>{{ data.totalTransfers | number }} {{ data.totalTransfers === 1 ? 'transfer' : 'transfers' }} ·
             {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span>
         </div>
         @if (canExport()) {
-          <button type="button" class="btn-primary" [disabled]="exporting() || !data.totalTransfers || resultsStale()"
+          <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !data.totalTransfers || resultsStale()"
             [attr.aria-busy]="exporting()" (click)="exportar()">
             {{ exporting() ? 'Generando…' : 'Descargar Excel' }}
           </button>
@@ -116,8 +129,8 @@
         <app-query-empty-state title="Sin resultados" [compact]="true"
           description="No encontramos transfers para la fecha seleccionada." />
       } @else {
-        <div class="table-scroll">
-          <table class="general-list-table">
+      <div class="sir-data-table-scroll">
+          <table class="sir-data-table">
             <thead><tr>
               <th scope="col">Código</th><th scope="col">Servicio</th><th scope="col">Hora</th>
               <th scope="col">Pasajeros</th><th scope="col">Punto de salida</th><th scope="col">Destino</th>
@@ -144,8 +157,8 @@
       <div class="general-stale-note" role="status">Cambiaste los filtros o el formato. Busca de nuevo para actualizar los resultados y habilitar la descarga.</div>
     }
     <section class="results-list general-results" aria-label="Resultado del listado general" [attr.aria-busy]="loading()">
-      <div class="results-heading general-results-heading">
-        <div>
+      <div class="sir-results-heading">
+        <div class="sir-results-heading__copy">
           <h2>{{ reportTypeLabel() }}</h2>
           <span>{{ data.totalReservas | number }} {{ data.totalReservas === 1 ? 'reserva' : 'reservas' }} ·
             {{ data.totalPasajeros | number }} {{ data.totalPasajeros === 1 ? 'pasajero' : 'pasajeros' }}</span>
@@ -154,7 +167,7 @@
           }
         </div>
         @if (canExport()) {
-          <button type="button" class="btn-primary" [disabled]="exporting() || !data.totalReservas || resultsStale()"
+          <button type="button" class="sir-action sir-action--secondary" [disabled]="exporting() || !data.totalReservas || resultsStale()"
             [attr.aria-busy]="exporting()" (click)="exportar()">
             {{ exporting() ? 'Generando…' : 'Descargar Excel' }}
           </button>
@@ -165,8 +178,8 @@
         <app-query-empty-state title="Sin resultados" [compact]="true"
           description="No encontramos reservas con los filtros seleccionados." />
       } @else {
-        <div class="table-scroll">
-          <table class="general-list-table">
+        <div class="sir-data-table-scroll">
+          <table class="sir-data-table">
             <thead><tr>
               <th scope="col">Fecha del tour</th>
               <th scope="col">Tour</th><th scope="col">Pasajeros</th><th scope="col">Ruta</th>
@@ -187,7 +200,7 @@
             </tbody>
           </table>
         </div>
-        <div class="general-preview-note">La tabla resume una fila por reserva. Excel incluye el detalle de cada pasajero.</div>
+        <div class="sir-note">La tabla resume una fila por reserva. Excel incluye el detalle de cada pasajero.</div>
       }
     </section>
   } @else {

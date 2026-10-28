@@ -130,13 +130,16 @@ describe('VerHistorialComponent', () => {
     row.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); fixture.detectChanges();
     expect(component.expandedId()).toBe(11);
     expect(fixture.nativeElement.querySelector('.detail-row')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.detail-meta').textContent).toContain('Actor:');
+    expect(fixture.nativeElement.querySelector('.detail-meta').textContent).not.toContain('Actor:');
     expect(fixture.nativeElement.querySelector('.detail-meta').textContent).toContain('Rol al registrar:');
     expect(fixture.nativeElement.querySelector('.detail-meta').textContent).toContain('Referencia:');
     const detailHeaders = fixture.nativeElement.querySelectorAll('.detail-table thead th') as NodeListOf<HTMLElement>;
     expect(Array.from(detailHeaders).map((cell) => cell.textContent?.trim() ?? ''))
       .toEqual(['Campo', 'Anterior', 'Nuevo']);
     expect(fixture.nativeElement.querySelector('.detail-table tbody').textContent).toContain('Julieta Pérez');
+    expect(component.detailColumnLabel('Id_Moneda')).toBe('Moneda');
+    expect(component.detailColumnLabel('Columna_Tecnica_Desconocida')).toBe('Otro dato');
+    expect(component.selectedActionLabel('ACCION_TECNICA_DESCONOCIDA')).toBe('Otra actividad');
 
     button.click(); fixture.detectChanges();
     expect(component.expandedId()).toBeNull();

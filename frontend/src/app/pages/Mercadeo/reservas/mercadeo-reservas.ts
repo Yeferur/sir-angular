@@ -73,7 +73,8 @@ export class MercadeoReservasComponent implements OnInit {
   readonly registrationRangeError = computed(() => this.validateRange(this.filters().fechaRegistroDesde, this.filters().fechaRegistroHasta));
   readonly filterCount = computed(() => {
     const f = this.filters();
-    return Number((f.tipo || 'TODOS') !== 'TODOS') + Number(!!f.categoria) + Number(!!f.creadorIds.length)
+    return Number(!!f.idEntidadReportante) + Number((f.tipo || 'TODOS') !== 'TODOS')
+      + Number(!!f.categoria) + Number(!!f.creadorIds.length)
       + Number(!!f.fechaRegistroDesde && !!f.fechaRegistroHasta);
   });
   readonly hasAppliedFilters = computed(() => {

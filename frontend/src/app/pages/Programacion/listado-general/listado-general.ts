@@ -18,6 +18,8 @@ import { SirSelectComponent, SirSelectOption } from '../../../shared/select/sele
 import { DatepickerComponent } from '../../../shared/datepicker/datepicker';
 
 type ExportFormat = 'tradicional' | 'nuevo' | 'masivo';
+type ActiveFilterTokenKey = 'reportType' | 'tourDate' | 'tourRange' | 'tours' | 'routes' | 'states' | 'channels';
+interface ActiveFilterToken { key: ActiveFilterTokenKey; label: string; }
 
 const EMPTY_FILTERS: ListadoGeneralFilters = {
   fechaTour: '', fechaTourDesde: '', fechaTourHasta: '',
@@ -101,6 +103,25 @@ export class ListadoGeneralComponent {
       + Number(filters.tours.length > 0) + Number(filters.rutas.length > 0)
       + Number(filters.estados.length > 0) + Number(filters.canales.length > 0);
   });
+  readonly activeFilterTokens = computed<ActiveFilterToken[]>(() => {
+    const filters = this.filters();
+    const tokens: ActiveFilterToken[] = [];
+    if (this.selectedReportType() !== 'reservas_grupales') {
+      tokens.push({ key: 'reportType', label: `Tipo: ${this.reportTypeOptions.find(option => option.value === this.selectedReportType())?.label || 'Reservas'}` });
+    }
+    if (this.isTransfers() && filters.fechaTour) {
+      tokens.push({ key: 'tourDate', label: `Fecha del transfer: ${this.shortDate(filters.fechaTour)}` });
+    } else if (this.isMasivo() && (filters.fechaTourDesde || filters.fechaTourHasta)) {
+      tokens.push({ key: 'tourRange', label: `Período: ${this.shortDate(filters.fechaTourDesde) || '…'} – ${this.shortDate(filters.fechaTourHasta) || '…'}` });
+    } else if (filters.fechaTour) {
+      tokens.push({ key: 'tourDate', label: `Fecha del tour: ${this.shortDate(filters.fechaTour)}` });
+    }
+    if (filters.tours.length) tokens.push({ key: 'tours', label: `Tours: ${this.selectedNames(filters.tours, this.tourOptions(), 'tours')}` });
+    if (filters.rutas.length) tokens.push({ key: 'routes', label: `Rutas: ${this.selectedNames(filters.rutas, this.routeOptions(), 'rutas')}` });
+    if (filters.estados.length) tokens.push({ key: 'states', label: `Estados: ${this.selectedNames(filters.estados, this.statusOptions(), 'estados')}` });
+    if (filters.canales.length) tokens.push({ key: 'channels', label: `Canales: ${this.selectedNames(filters.canales, this.channelOptions(), 'canales')}` });
+    return tokens;
+  });
   readonly canSearch = computed(() => !this.loadingOptions() && !this.loading());
   readonly resultsStale = computed(() => {
     const applied = this.appliedFilters();
@@ -171,6 +192,20 @@ export class ListadoGeneralComponent {
   }
 
   toggleFilters(): void { this.filtersOpen.update(value => !value); }
+
+  removeFilterToken(key: ActiveFilterTokenKey): void {
+    if (this.loading() || this.loadingOptions() || this.exporting()) return;
+    switch (key) {
+      case 'reportType': this.onReportTypeChange('reservas_grupales'); break;
+      case 'tourDate': this.onExactTourDate(null); break;
+      case 'tourRange': this.onTourRangeChange({ start: null, end: null }); break;
+      case 'tours': this.setMultiFilter('tours', []); break;
+      case 'routes': this.setMultiFilter('rutas', []); break;
+      case 'states': this.setMultiFilter('estados', []); break;
+      case 'channels': this.setMultiFilter('canales', []); break;
+    }
+    this.search();
+  }
 
   search(): void {
     this.searchAttempted.set(true);
@@ -270,6 +305,19 @@ export class ListadoGeneralComponent {
   }
   reportTypeLabel(reportType = this.appliedReportType()): string {
     return this.reportTypeOptions.find(option => option.value === reportType)?.label || 'Reservas';
+  }
+
+  private shortDate(value: string): string {
+    if (!value) return '';
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value;
+    return new Intl.DateTimeFormat('es-CO', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, month - 1, day))).replace(/\.$/, '');
+  }
+
+  private selectedNames<T extends string | number>(values: T[], options: Array<{ value: T; label: string }>, plural: string): string {
+    const names = values.map(value => options.find(option => option.value === value)?.label || String(value));
+    return names.length > 2 ? `${names.length} ${plural}` : names.join(', ');
   }
   canExport(): boolean {
     return this.permissions.tienePermiso('PROGRAMACION.LEER')

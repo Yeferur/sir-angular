@@ -1,0 +1,204 @@
+<section class="entity-detail-panel" aria-labelledby="entity-detail-title">
+  <app-drawer-close-button label="Cerrar detalle de entidad" (dismiss)="controller.close()" />
+
+  <header class="entity-detail-header">
+    @if (controller.selected(); as detail) {
+      <div class="entity-detail-heading">
+        <h2 id="entity-detail-title">{{ detail.entity.Nombre }}</h2>
+        <div class="entity-detail-statuses">
+          <span class="entity-status-chip">{{ controller.typeLabel(detail.entity.Tipo) }}</span>
+          <span class="entity-status-chip" [class.entity-status-chip--active]="detail.entity.Activo" [class.entity-status-chip--inactive]="!detail.entity.Activo">{{ detail.entity.Activo ? 'Activa' : 'Inactiva' }}</span>
+          <span class="entity-status-chip" [class.entity-status-chip--pending]="detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION'"
+            [class.entity-status-chip--validated]="detail.entity.Estado_Validacion === 'VALIDADA'"
+            [class.entity-status-chip--rejected]="detail.entity.Estado_Validacion === 'RECHAZADA'">{{ controller.validationLabel(detail.entity.Estado_Validacion) }}</span>
+        </div>
+      </div>
+    } @else if (selectedActivity; as item) {
+      <div class="entity-detail-heading">
+        <h2 id="entity-detail-title">{{ item.Nombre }}</h2>
+        <div class="entity-detail-statuses">
+          <span class="entity-status-chip">{{ controller.typeLabel(item.Tipo) }}</span>
+          <span class="entity-status-chip" [class.entity-status-chip--active]="item.Activo" [class.entity-status-chip--inactive]="!item.Activo">{{ item.Activo ? 'Activa' : 'Inactiva' }}</span>
+          <span class="entity-status-chip" [class.entity-status-chip--pending]="item.Estado_Validacion === 'PENDIENTE_VALIDACION'"
+            [class.entity-status-chip--validated]="item.Estado_Validacion === 'VALIDADA'"
+            [class.entity-status-chip--rejected]="item.Estado_Validacion === 'RECHAZADA'">{{ controller.validationLabel(item.Estado_Validacion) }}</span>
+        </div>
+      </div>
+    } @else {
+      <div class="entity-detail-heading"><h2 id="entity-detail-title">Detalle</h2></div>
+    }
+  </header>
+
+  @if (controller.selected()) {
+    <nav class="entity-detail-tabs" role="tablist" aria-label="Secciones de la entidad">
+      <button type="button" role="tab" [attr.aria-selected]="controller.detailTab() === 'resumen'" (click)="controller.selectDetailTab('resumen')">Resumen</button>
+      <button type="button" role="tab" [attr.aria-selected]="controller.detailTab() === 'operaciones'" (click)="controller.selectDetailTab('operaciones')">Operaciones</button>
+      <button type="button" role="tab" [attr.aria-selected]="controller.detailTab() === 'contactos'" (click)="controller.selectDetailTab('contactos')">Contactos</button>
+      <button type="button" role="tab" [attr.aria-selected]="controller.detailTab() === 'puntos'" (click)="controller.selectDetailTab('puntos')">Puntos de encuentro</button>
+    </nav>
+  }
+
+  <main class="entity-detail-content" [attr.aria-busy]="controller.detailLoading() || controller.detailSectionLoading()">
+    @if (controller.detailLoading() && !controller.selected()) {
+      <app-loading-state label="Cargando detalle de la entidad…" />
+    } @else if (controller.detailError() && !controller.selected()) {
+      <app-loading-state mode="error" label="No se pudo cargar la entidad" [detail]="controller.detailError()" />
+    } @else if (controller.selected(); as detail) {
+      @if (controller.detailTab() === 'resumen') {
+        @if (detail.entity.Motivo_Rechazo) {
+          <div class="entity-notice entity-notice--warning" role="status"><i class="bx bx-info-circle" aria-hidden="true"></i><span><strong>Último motivo de rechazo:</strong> {{ detail.entity.Motivo_Rechazo }}</span></div>
+        }
+        @if (detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+          <div class="entity-notice entity-notice--warning" role="status"><i class="bx bx-time-five" aria-hidden="true"></i><span>Pendiente de validación.</span></div>
+        } @else if (!detail.entity.Activo) {
+          <div class="entity-notice entity-notice--warning" role="status"><i class="bx bx-power-off" aria-hidden="true"></i><span>Entidad inactiva.</span></div>
+        }
+        @if (controller.detailNotice()) {
+          <div class="entity-notice" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i><span>{{ controller.detailNotice() }}</span></div>
+        }
+
+        <section class="entity-section-card" aria-labelledby="entity-activity-title">
+          <header class="entity-section-heading"><h3 id="entity-activity-title">Actividad</h3><small>Resumen histórico y período consultado</small></header>
+          <div class="entity-activity-grid">
+            <article class="entity-activity-metric"><span class="entity-metric-label">Histórico</span>
+              @if (detail.historic.Operaciones) {
+                <strong>{{ detail.historic.Reservas }} {{ controller.one(detail.historic.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.historic.Transfers }} {{ controller.one(detail.historic.Transfers) ? 'transfer' : 'transfers' }}</strong>
+                <small>{{ detail.historic.Pasajeros }} {{ controller.one(detail.historic.Pasajeros) ? 'pasajero' : 'pasajeros' }}</small>
+              } @else { <strong>Sin actividad</strong> }
+            </article>
+            <article class="entity-activity-metric"><span class="entity-metric-label">Período consultado</span>
+              @if (detail.period.Operaciones) {
+                <strong>{{ detail.period.Reservas }} {{ controller.one(detail.period.Reservas) ? 'reserva' : 'reservas' }} · {{ detail.period.Transfers }} {{ controller.one(detail.period.Transfers) ? 'transfer' : 'transfers' }}</strong>
+                <small>{{ detail.period.Pasajeros }} {{ controller.one(detail.period.Pasajeros) ? 'pasajero' : 'pasajeros' }}</small>
+              } @else { <strong>Sin actividad</strong> }
+            </article>
+            <article class="entity-activity-metric"><span class="entity-metric-label">Último reporte</span><strong>{{ controller.relativeReportLabel(detail.historic.Ultimo_Reporte || detail.historic.Ultima_Actividad) }}</strong></article>
+          </div>
+        </section>
+
+        <section class="entity-section-card" aria-labelledby="entity-recent-operations-title">
+          <header class="entity-section-heading"><h3 id="entity-recent-operations-title">Últimas operaciones</h3></header>
+          @if (controller.recentOperations().length) {
+            <div class="entity-operation-list">
+              @for (operation of controller.recentOperations(); track operation.tipo + ':' + operation.id_operacion) {
+                @if ((operation.tipo === 'RESERVA' && controller.canReadReservations) || (operation.tipo === 'TRANSFER' && controller.canReadTransfers)) {
+                  <button type="button" class="entity-operation-row" (click)="controller.openOperation(operation)">
+                    <span class="entity-operation-icon"><i class="bx" [class.bx-calendar-check]="operation.tipo === 'RESERVA'" [class.bx-transfer-alt]="operation.tipo === 'TRANSFER'" aria-hidden="true"></i></span>
+                    <span class="entity-operation-copy"><strong>{{ operation.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }} · {{ controller.operationLabel(operation) }}</strong><small>{{ operation.fecha_registro | date:'d MMM y':'':'es-CO' }} · {{ operation.estado || '—' }}</small></span>
+                    <svg class="entity-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                }
+              }
+            </div>
+          } @else { <p class="entity-section-state">No hay operaciones en este período.</p> }
+        </section>
+      }
+
+      @if (controller.detailTab() === 'operaciones') {
+        <section class="entity-section-card" aria-labelledby="entity-operations-title">
+          <header class="entity-section-heading"><h3 id="entity-operations-title">Operaciones del período</h3></header>
+          @if (controller.operationsLoading() && !controller.operations()) { <p class="entity-section-state" role="status">Cargando operaciones…</p> }
+          @if (controller.operationsError()) { <p class="inline-error" role="alert">{{ controller.operationsError() }}</p> }
+          @if (controller.operations(); as data) {
+            @if (!data.items.length && !controller.operationsLoading()) { <p class="entity-section-state">No hay operaciones en este período.</p> }
+            <div class="entity-operation-list">
+              @for (operation of data.items; track operation.tipo + ':' + operation.id_operacion) {
+                @if ((operation.tipo === 'RESERVA' && controller.canReadReservations) || (operation.tipo === 'TRANSFER' && controller.canReadTransfers)) {
+                  <button type="button" class="entity-operation-row" (click)="controller.openOperation(operation)">
+                    <span class="entity-operation-icon"><i class="bx" [class.bx-calendar-check]="operation.tipo === 'RESERVA'" [class.bx-transfer-alt]="operation.tipo === 'TRANSFER'" aria-hidden="true"></i></span>
+                    <span class="entity-operation-copy"><strong>{{ operation.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }} · {{ controller.operationLabel(operation) }}</strong><small>{{ operation.fecha_registro | date:'d MMM y':'':'es-CO' }} · {{ operation.estado || '—' }}</small></span>
+                    <svg class="entity-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                } @else {
+                  <div class="entity-operation-row entity-operation-row--static"><span class="entity-operation-icon"><i class="bx" [class.bx-calendar-check]="operation.tipo === 'RESERVA'" [class.bx-transfer-alt]="operation.tipo === 'TRANSFER'" aria-hidden="true"></i></span><span class="entity-operation-copy"><strong>{{ operation.tipo === 'RESERVA' ? 'Reserva' : 'Transfer' }} · {{ controller.operationLabel(operation) }}</strong><small>{{ operation.fecha_registro | date:'d MMM y':'':'es-CO' }} · {{ operation.estado || '—' }}</small></span></div>
+                }
+              }
+            </div>
+            @if (data.totalPages > 1) {
+              <nav class="entity-operations-pagination" aria-label="Paginación de operaciones">
+                <button type="button" class="pagination-button" [disabled]="data.page <= 1 || controller.operationsLoading()" (click)="controller.changeOperationsPage(data.page - 1)">Anterior</button>
+                <span class="pagination-indicator" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
+                <button type="button" class="pagination-button" [disabled]="data.page >= data.totalPages || controller.operationsLoading()" (click)="controller.changeOperationsPage(data.page + 1)">Siguiente</button>
+              </nav>
+            }
+          }
+        </section>
+      }
+
+      @if (controller.detailTab() === 'contactos') {
+        <section class="entity-section-card" aria-labelledby="entity-contacts-title">
+          <header class="entity-section-heading"><h3 id="entity-contacts-title">Contactos que han reportado</h3></header>
+          @if (controller.detailSectionLoading() && !controller.contactsLoaded()) { <p class="entity-section-state" role="status">Cargando contactos…</p> }
+          @else if (!(detail.contacts?.length)) { <p class="entity-section-state">No hay contactos registrados.</p> }
+          @else { <div class="entity-relation-list">@for (contact of (detail.contacts ?? []); track contact.Nombre + ':' + contact.Telefono) {
+            <div class="entity-relation-row"><span class="entity-relation-icon"><i class="bx bx-user" aria-hidden="true"></i></span><span><strong>{{ contact.Nombre }}</strong><small>{{ contact.Telefono || 'Sin teléfono' }} · {{ contact.Reservas }} {{ controller.one(contact.Reservas) ? 'reserva' : 'reservas' }}</small></span></div>
+          }</div> }
+        </section>
+      }
+
+      @if (controller.detailTab() === 'puntos') {
+        @if (controller.canManagePointRelations) {
+          <section class="entity-section-card entity-point-section" aria-labelledby="entity-point-search-title">
+            <header class="entity-section-heading"><h3 id="entity-point-search-title">Asociar punto de encuentro</h3></header>
+            <app-search-input inputId="point-search" placeholder="Buscar punto de encuentro" ariaLabel="Buscar punto de encuentro"
+              [value]="controller.pointSearch" (valueChange)="controller.pointSearch = $event; controller.searchPoints()" />
+            @if (controller.pointMatches().length) {
+              <div class="entity-point-suggestions sir-autocomplete-panel sir-autocomplete-panel--inline" role="listbox" aria-label="Puntos de encuentro encontrados">
+                @for (point of controller.pointMatches(); track point.Id_Punto) {
+                  <button type="button" class="sir-autocomplete-option" role="option" aria-selected="false" [disabled]="controller.saving()" (click)="controller.setPoint(point.Id_Punto, true)">{{ point.NombrePunto }}</button>
+                }
+              </div>
+            }
+          </section>
+        }
+        @if (controller.detailSectionLoading() && !controller.pointsLoaded()) { <app-loading-state label="Cargando puntos de encuentro…" /> }
+        @else {
+          <section class="entity-section-card" aria-labelledby="entity-observed-title">
+            <header class="entity-section-heading"><h3 id="entity-observed-title">Puntos observados en reservas</h3></header>
+            @if (detail.observed?.length) { <div class="entity-relation-list">@for (point of (detail.observed ?? []); track point.Id_Punto) {
+              <div class="entity-relation-row"><span class="entity-relation-icon"><i class="bx bx-map-pin" aria-hidden="true"></i></span><span><strong>{{ point.Nombre_Punto }}</strong><small>{{ point.Reservas }} {{ controller.one(point.Reservas) ? 'reserva' : 'reservas' }}</small></span>@if (controller.canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="controller.saving()" (click)="controller.setPoint(point.Id_Punto, true)">Asociar</button> }</div>
+            }</div> } @else { <p class="entity-section-state">No hay puntos observados en reservas.</p> }
+          </section>
+          <section class="entity-section-card" aria-labelledby="entity-associated-title">
+            <header class="entity-section-heading"><h3 id="entity-associated-title">Puntos asociados oficialmente</h3></header>
+            @if (detail.associated?.length) { <div class="entity-relation-list">@for (point of (detail.associated ?? []); track point.Id_Punto) {
+              <div class="entity-relation-row"><span class="entity-relation-icon"><i class="bx bx-map" aria-hidden="true"></i></span><span><strong>{{ point.Nombre_Punto }}</strong><small>{{ point.Estado_Validacion }}</small></span>@if (controller.canManagePointRelations) { <button type="button" class="sir-action sir-action--ghost sir-action--compact" [disabled]="controller.saving()" (click)="controller.setPoint(point.Id_Punto, false)">Quitar</button> }</div>
+            }</div> } @else { <p class="entity-section-state">No hay puntos asociados oficialmente.</p> }
+          </section>
+        }
+      }
+
+      @if (controller.detailTab() === 'resumen' && controller.rejecting()) {
+        <section class="entity-section-card entity-rejection-card" aria-labelledby="entity-rejection-label">
+          <header class="entity-section-heading"><h3 id="entity-rejection-label">Motivo del rechazo</h3></header>
+          <label class="sir-visually-hidden" for="entity-rejection-reason">Motivo del rechazo, opcional</label>
+          <textarea id="entity-rejection-reason" class="entity-input" rows="3" maxlength="200" [(ngModel)]="controller.rejectionReason" [disabled]="controller.saving()" placeholder="Describe brevemente por qué se rechaza"></textarea>
+          <small class="entity-character-count">{{ controller.rejectionReason.length }}/200</small>
+        </section>
+      }
+      @if (controller.detailError()) { <p class="inline-error" role="alert">{{ controller.detailError() }}</p> }
+    } @else if (controller.validationNotice()) {
+      <div class="entity-empty-state" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i><p>{{ controller.validationNotice() }}</p></div>
+    }
+  </main>
+
+  @if (controller.selected(); as detail) {
+    @if (controller.canEdit || (controller.canValidate && detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') || controller.rejecting()) {
+      <footer class="entity-detail-footer">
+        @if (controller.rejecting()) {
+          <button type="button" class="sir-action sir-action--ghost" [disabled]="controller.saving()" (click)="controller.cancelReject()"><i class="bx bx-x" aria-hidden="true"></i> Cancelar</button>
+          <button type="button" class="sir-action sir-action--primary entity-action--reject" [disabled]="controller.saving() || controller.rejectionReason.trim().length > 200" (click)="controller.validate('RECHAZADA')"><i class="bx bx-shield-x" aria-hidden="true"></i>{{ controller.saving() ? 'Rechazando…' : 'Confirmar rechazo' }}</button>
+        } @else {
+          @if (controller.canEdit) {
+            <button type="button" class="sir-action sir-action--secondary" (click)="controller.startEdit()"><i class="bx bx-edit-alt" aria-hidden="true"></i> Editar</button>
+            <button type="button" class="sir-action sir-action--secondary" [disabled]="controller.saving()" (click)="controller.setActive(!detail.entity.Activo)"><i class="bx bx-power-off" aria-hidden="true"></i>{{ detail.entity.Activo ? 'Desactivar' : 'Activar' }}</button>
+          }
+          @if (controller.canValidate && detail.entity.Estado_Validacion === 'PENDIENTE_VALIDACION') {
+            <button type="button" class="sir-action sir-action--primary" [disabled]="controller.saving()" (click)="controller.validate('VALIDADA')"><i class="bx bx-check-circle" aria-hidden="true"></i> Validar</button>
+            <button type="button" class="sir-action sir-action--ghost entity-action--reject" [disabled]="controller.saving()" (click)="controller.beginReject()"><i class="bx bx-shield-x" aria-hidden="true"></i> Rechazar</button>
+          }
+        }
+      </footer>
+    }
+  }
+</section>

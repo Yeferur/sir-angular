@@ -5,6 +5,11 @@ const SECRET_FIELD = /pass(word|wd)?|contrasena|clave|token|credencial|secret|co
 const SECRET_VALUE = /\bBearer\s+[^\s,;]+|\b(token|api[_-]?key|password|passwd|secret|credential)\s*[:=]\s*[^\s,;]+/i;
 const TOKEN_VALUE = /\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}\b|\b[A-Za-z0-9_-]{64,}\b/;
 const TABLES_MAPPED = [...new Set(MODULOS_HISTORIAL.flatMap((module) => module.tablas))];
+const KNOWN_REFERENCE_FIELDS = new Set(['Id_Usuario', 'Id_Tour', 'Id_Moneda', 'Id_Canal', 'Id_Punto', 'Id_Plan', 'Id_Entidad_Reportante',
+  'Creado_Por', 'Validado_Por', 'Rechazado_Por', 'Eliminado_Por', 'Eliminada_Por', 'Descartado_Por']);
+const USER_REFERENCE_FIELDS = new Set(['Id_Usuario', 'Creado_Por', 'Validado_Por', 'Rechazado_Por', 'Eliminado_Por', 'Eliminada_Por', 'Descartado_Por']);
+const REFERENCE_LABELS = Object.freeze({ Id_Tour: 'Tour', Id_Moneda: 'Moneda', Id_Canal: 'Canal', Id_Punto: 'Punto',
+  Id_Plan: 'Plan', Id_Entidad_Reportante: 'Entidad reportante', __user__: 'Usuario' });
 
 function list(value) {
   const values = Array.isArray(value) ? value : value == null || value === '' ? [] : String(value).split(',');
@@ -39,8 +44,117 @@ function sanitizeValue(value) {
 }
 
 function visibleDetails(rows) {
-  return (rows || []).filter((row) => !SECRET_FIELD.test(String(row.Columna || '')))
+  return (rows || []).filter((row) => !isSecretDetailField(row.Columna))
     .map((row) => ({ columna: row.Columna, anterior: sanitizeValue(row.Valor_Anterior), nuevo: sanitizeValue(row.Valor_Nuevo) }));
+}
+
+function isSecretDetailField(column) {
+  const value = String(column || '');
+  return SECRET_FIELD.test(value) && !KNOWN_REFERENCE_FIELDS.has(value);
+}
+
+function queryRows(result) { return Array.isArray(result?.[0]) ? result[0] : []; }
+
+async function resolveDetails(rows) {
+  const details = (rows || []).filter((row) => !isSecretDetailField(row.Columna))
+    .map((row) => ({ Id_Historial: Number(row.Id_Historial), columna: String(row.Columna || ''),
+      anterior: sanitizeValue(row.Valor_Anterior), nuevo: sanitizeValue(row.Valor_Nuevo) }));
+  const ids = (field) => [...new Set(details.filter((item) => item.columna === field)
+    .flatMap((item) => [item.anterior, item.nuevo]).map(Number).filter((value) => Number.isSafeInteger(value) && value > 0))];
+  const lookups = [
+    ['Id_Tour', 'SELECT Id_Tour AS id, Nombre_Tour AS nombre FROM tours WHERE Id_Tour IN (?)', ids('Id_Tour')],
+    ['Id_Moneda', 'SELECT Id_Moneda AS id, Codigo AS nombre FROM monedas WHERE Id_Moneda IN (?)', ids('Id_Moneda')],
+    ['Id_Canal', 'SELECT Id_Canal AS id, Nombre_Canal AS nombre FROM canales_origen WHERE Id_Canal IN (?)', ids('Id_Canal')],
+    ['Id_Punto', 'SELECT Id_Punto AS id, Nombre_Punto AS nombre FROM puntos WHERE Id_Punto IN (?)', ids('Id_Punto')],
+    ['Id_Plan', `SELECT Id_Plan AS id, COALESCE(NULLIF(Nombre_Plan, ''), CONCAT('Plan ', Id_Plan)) AS nombre FROM planes_tours WHERE Id_Plan IN (?)`, ids('Id_Plan')],
+    ['Id_Entidad_Reportante', 'SELECT Id_Entidad_Reportante AS id, Nombre AS nombre FROM entidades_reportantes WHERE Id_Entidad_Reportante IN (?)', ids('Id_Entidad_Reportante')],
+  ];
+  const userIds = [...new Set([...USER_REFERENCE_FIELDS].flatMap(ids))];
+  if (userIds.length) lookups.push(['__user__', `SELECT Id_Usuario AS id,
+    COALESCE(NULLIF(Nombres_Apellidos, ''), NULLIF(Usuario, ''), CONCAT('Usuario #', Id_Usuario)) AS nombre
+    FROM usuarios WHERE Id_Usuario IN (?)`, userIds]);
+  const labels = new Map();
+  await Promise.all(lookups.filter(([, , values]) => values.length).map(async ([field, sql, values]) => {
+    const result = await db.query(sql, [values]);
+    for (const row of queryRows(result)) labels.set(`${field}:${Number(row.id)}`, String(row.nombre || ''));
+  }));
+  return details.map(({ Id_Historial, columna, anterior, nuevo }) => {
+    const lookupField = USER_REFERENCE_FIELDS.has(columna) ? '__user__' : columna;
+    const lookup = (value) => {
+      if (value == null || value === '') return value;
+      const resolved = labels.get(`${lookupField}:${Number(value)}`);
+      if (resolved) return resolved;
+      return REFERENCE_LABELS[lookupField] ? `${REFERENCE_LABELS[lookupField]} #${value}` : value;
+    };
+    return { Id_Historial, columna, anterior: lookup(anterior), nuevo: lookup(nuevo) };
+  });
+}
+
+const SUBJECT_BY_MODULE = Object.freeze({
+  reservas: 'la reserva', transfers: 'el transfer', tours: 'el tour', usuarios: 'el usuario',
+  puntos: 'el punto de encuentro', programacion: 'la programación', comisiones: 'la comisión',
+  aforos: 'el aforo', turnos: 'el turno', entidades_reportantes: 'la entidad reportante',
+});
+
+function shortDate(value) {
+  const date = String(value || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+  const [year, month, day] = date.split('-').map(Number);
+  const parts = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    .formatToParts(new Date(Date.UTC(year, month - 1, day, 12)));
+  const dayPart = parts.find((part) => part.type === 'day')?.value || '';
+  const monthPart = (parts.find((part) => part.type === 'month')?.value || '').replace(/\.$/, '');
+  return [dayPart, monthPart].filter(Boolean).join(' ');
+}
+
+function referenceFor(row) {
+  const raw = String(row.Id_Registro || '').trim();
+  if (!raw || row.Tabla_Afectada === 'usuarios') return '';
+  if (row.Tabla_Afectada === 'transfers' && /^\d+$/.test(raw)) return `TRS${raw.padStart(5, '0')}`;
+  return raw;
+}
+
+function naturalSummary(row, details, module) {
+  const action = String(row.Tipo_Accion || '').toUpperCase();
+  const known = ACCIONES_CONOCIDAS.includes(action);
+  if (!known) return `Se registró actividad en ${module.label}`;
+  const subject = SUBJECT_BY_MODULE[module.value] || 'un registro';
+  const ref = referenceFor(row);
+  const referenceText = ref ? ` ${ref}` : '';
+  if (action === 'LOGIN') return 'Inició sesión';
+  if (action === 'LOGOUT' || action === 'LOGOUT_ALL_SESSIONS' || action === 'FORCE_LOGOUT_USER') return 'Cerró sesión';
+  if (action === 'CREAR_RESERVA' || action === 'DUPLICAR_RESERVA') {
+    const verb = action === 'DUPLICAR_RESERVA' ? 'Duplicó la reserva' : 'Creó la reserva';
+    const parts = [ref ? `${verb} ${ref}` : verb];
+    const tour = details.find((item) => item.columna === 'Id_Tour')?.nuevo;
+    const tourDate = details.find((item) => item.columna === 'Fecha_Tour')?.nuevo;
+    const passengers = details.find((item) => item.columna === 'Pasajeros iniciales')?.nuevo;
+    if (tour) parts.push(String(tour));
+    const date = shortDate(tourDate);
+    if (date) parts.push(date);
+    if (passengers) {
+      const count = String(passengers).split(' · ').filter(Boolean).length;
+      if (count) parts.push(`${count} pax`);
+    }
+    return parts.join(' · ');
+  }
+  if (action === 'CREAR_TRANSFER') return `Creó ${subject}${referenceText}`;
+  let verb = '';
+  if (/^(CREAR|AGREGAR|DUPLICAR)/.test(action)) verb = action.startsWith('DUPLICAR') ? 'Duplicó' : 'Creó';
+  else if (/^(ACTUALIZAR|UPSERT|CAMBIAR|GUARDAR|PUBLICAR|REORDENAR)/.test(action)) verb = 'Actualizó';
+  else if (/^(ELIMINAR|DESASOCIAR|RETIRAR)/.test(action)) verb = 'Eliminó';
+  else if (/^(CANCELAR)/.test(action)) verb = 'Canceló';
+  else if (/^(DESACTIVAR)/.test(action)) verb = 'Desactivó';
+  else if (/^(VALIDAR|ACEPTAR)/.test(action)) verb = 'Validó';
+  else if (/^(RECHAZAR)/.test(action)) verb = 'Rechazó';
+  else if (/^(PAGAR)/.test(action)) verb = 'Registró el pago de';
+  else if (/^(REABRIR)/.test(action)) verb = 'Reabrió';
+  else if (/^(EXPORTAR)/.test(action)) return `Exportó información de ${module.label.toLocaleLowerCase('es-CO')}`;
+  else if (/^(PASSWORD_)/.test(action)) return 'Actualizó la contraseña';
+  if (!verb) return `Se registró actividad en ${module.label}`;
+  const result = `${verb} ${subject}${referenceText}`;
+  const state = details.find((item) => item.columna === 'Estado' || item.columna === 'Estado_Validacion')?.nuevo;
+  return state ? `${result} · Estado: ${state}` : result;
 }
 
 function normalizarReferencia(value) {
@@ -185,19 +299,17 @@ async function getHistorial(filters = {}) {
       FROM detalle_historial WHERE Id_Historial IN (${ids.map(() => '?').join(',')})
       ORDER BY Id_Historial ASC, Id_Detalle ASC`, ids);
   }
+  const resolvedDetails = await resolveDetails(details);
   const grouped = new Map();
-  for (const detail of details || []) {
-    if (SECRET_FIELD.test(String(detail.Columna || ''))) continue;
+  for (const detail of resolvedDetails) {
     const key = Number(detail.Id_Historial);
     if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push({ columna: detail.Columna, anterior: sanitizeValue(detail.Valor_Anterior), nuevo: sanitizeValue(detail.Valor_Nuevo) });
+    grouped.get(key).push({ columna: detail.columna, anterior: detail.anterior, nuevo: detail.nuevo });
   }
   const data = (rows || []).map((row) => {
     const detail = grouped.get(Number(row.Id_Historial)) || [];
     const module = moduloDeTabla(row.Tabla_Afectada);
-    const summary = detail.length
-      ? detail.map((item) => `${item.columna}: ${item.anterior || 'vacío'} → ${item.nuevo || 'vacío'}`).join('; ')
-      : `${etiquetaAccion(row.Tipo_Accion)} en ${module.label}`;
+    const summary = naturalSummary(row, detail, module);
     // In this schema user IDs can be government identifiers; the actor name is
     // enough context for user/session events, so keep those IDs out of API/Excel.
     return { ...row, Id_Registro: module.value === 'usuarios' ? null : row.Id_Registro,
@@ -239,17 +351,23 @@ async function getHistorialByTableAndId(tabla, idRegistro) {
   if (!rows?.length) return [];
   const ids = rows.map((row) => row.Id_Historial);
   const [details] = await db.query(`SELECT Id_Historial, Columna, Valor_Anterior, Valor_Nuevo FROM detalle_historial WHERE Id_Historial IN (${ids.map(() => '?').join(',')})`, ids);
+  const resolvedDetails = await resolveDetails(details);
   const grouped = new Map();
-  for (const item of details || []) {
-    if (SECRET_FIELD.test(String(item.Columna || ''))) continue;
+  for (const item of resolvedDetails) {
     const key = Number(item.Id_Historial);
     if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push({ columna: item.Columna, anterior: sanitizeValue(item.Valor_Anterior), nuevo: sanitizeValue(item.Valor_Nuevo) });
+    grouped.get(key).push({ columna: item.columna, anterior: item.anterior, nuevo: item.nuevo });
   }
-  return rows.map((row) => ({ id: row.Id_Historial, tabla: row.Tabla, id_registro: row.Id_Registro,
-    accion: row.Accion, usuario: row.Usuario_Nombre || row.Actor_Nombre || null, actor_nombre: row.Actor_Nombre || null,
-    actor_rol: row.Actor_Rol || null, fecha: row.Fecha_Hora_Registro, detalles: grouped.get(Number(row.Id_Historial)) || [] }));
+  return rows.map((row) => {
+    const detalles = grouped.get(Number(row.Id_Historial)) || [];
+    const module = moduloDeTabla(row.Tabla);
+    return { id: row.Id_Historial, tabla: row.Tabla, id_registro: row.Id_Registro,
+      accion: row.Accion, descripcion: naturalSummary({ Tipo_Accion: row.Accion,
+        Tabla_Afectada: row.Tabla, Id_Registro: row.Id_Registro }, detalles, module),
+      usuario: row.Usuario_Nombre || row.Actor_Nombre || null, actor_nombre: row.Actor_Nombre || null,
+      actor_rol: row.Actor_Rol || null, fecha: row.Fecha_Hora_Registro, detalles };
+  });
 }
 
 module.exports = { getHistorial, getFilterOptions, registrarAccion, exportarHistorial, getHistorialByTableAndId,
-  buildWhere, visibleDetails, sanitizeValue };
+  buildWhere, visibleDetails, sanitizeValue, resolveDetails, naturalSummary };
