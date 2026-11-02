@@ -184,7 +184,24 @@ function origenFromSql(filters) {
   return `FROM (${origenUnionSql()}) ops ${filters.where}`;
 }
 
-function sortOrigenSql() {
+function sortOrigenSql(groupForExport = false) {
+  if (groupForExport) {
+    const freelance = `(UPPER(TRIM(COALESCE(ops.tipo_entidad, ''))) = 'FREELANCE'
+      OR UPPER(TRIM(COALESCE(ops.canal, ''))) = 'FREELANCE')`;
+    const exportEntity = `CASE WHEN ${freelance} THEN 'FREELANCE'
+      ELSE COALESCE(NULLIF(TRIM(ops.entidad), ''), '—') END`;
+    const exportCategory = `CASE WHEN ${freelance} THEN 'FREELANCE'
+      ELSE COALESCE(NULLIF(TRIM(ops.tipo_entidad), ''), '—') END`;
+    return `${exportEntity} COLLATE ${ORIGEN_COLLATION} ASC,
+      CAST(${exportEntity} AS BINARY) ASC,
+      COALESCE(ops.id_entidad_reportante, 0) ASC,
+      ${exportCategory} COLLATE ${ORIGEN_COLLATION} ASC,
+      CAST(${exportCategory} AS BINARY) ASC,
+      CASE WHEN ops.tipo = 'RESERVA' THEN 0 ELSE 1 END ASC,
+      ops.fecha_registro DESC,
+      CASE WHEN ops.id_transfer IS NOT NULL THEN ops.id_transfer END DESC,
+      CASE WHEN ops.id_reserva IS NOT NULL THEN ops.id_reserva COLLATE ${ORIGEN_COLLATION} END DESC`;
+  }
   return `ops.fecha_registro DESC, ops.tipo COLLATE ${ORIGEN_COLLATION} ASC,
     CASE WHEN ops.id_transfer IS NOT NULL THEN ops.id_transfer END DESC,
     CASE WHEN ops.id_reserva IS NOT NULL THEN ops.id_reserva COLLATE ${ORIGEN_COLLATION} END DESC`;
@@ -201,7 +218,7 @@ async function buscarOrigenReservas(query = {}) {
   const page = Math.min(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
   const [items] = await db.query(`SELECT ops.* ${from}
-    ORDER BY ${sortOrigenSql()} LIMIT ? OFFSET ?`, [...filters.values, pageSize, offset]);
+    ORDER BY ${sortOrigenSql(query.ordenarParaExcel === true)} LIMIT ? OFFSET ?`, [...filters.values, pageSize, offset]);
 
   const reservationIds = items.filter(item => item.tipo === 'RESERVA').map(item => item.id_reserva);
   if (reservationIds.length) {
@@ -218,29 +235,164 @@ async function buscarOrigenReservas(query = {}) {
 }
 
 async function streamOrigenExcel(query = {}, output) {
+  const filters = buildOrigenFilters(query);
+  const from = origenFromSql(filters);
+  const [typeRows] = await db.query(`SELECT DISTINCT ops.tipo ${from}`, filters.values);
+  const operationTypes = new Set(typeRows.map(row => String(row.tipo || '').toUpperCase()));
+  if (!operationTypes.size && filters.type !== 'TODOS') operationTypes.add(filters.type);
+  const singleType = operationTypes.size === 1 ? [...operationTypes][0] : null;
+  const sheetName = singleType === 'RESERVA' ? 'Reservas'
+    : singleType === 'TRANSFER' ? 'Transfers' : 'Reservas y transfers';
+  const includeTypeColumn = !singleType;
+
   let page = 1;
   const pageSize = MAX_PAGE_SIZE;
-  let result = await buscarOrigenReservas({ ...query, page, pageSize });
+  let result = await buscarOrigenReservas({ ...query, ordenarParaExcel: true, page, pageSize });
   const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: output, useStyles: true, useSharedStrings: true });
-  const sheet = workbook.addWorksheet('Origen de reservas');
-  sheet.columns = [
-    { header: 'Tipo', key: 'tipo', width: 14 }, { header: 'ID de operación', key: 'id_operacion', width: 22 },
-    { header: 'Fecha de creación', key: 'fecha_registro', width: 22 }, { header: 'Fecha de servicio', key: 'fecha_servicio', width: 19 },
-    { header: 'Canal', key: 'canal', width: 25 }, { header: 'Entidad reportante', key: 'entidad', width: 34 },
-    { header: 'Tipo de entidad', key: 'tipo_entidad', width: 25 }, { header: 'Quién reportó', key: 'nombre_reportante', width: 30 },
-    { header: 'Teléfono', key: 'telefono_reportante', width: 20 }, { header: 'Usuario creador', key: 'creador', width: 30 },
-    { header: 'Pasajeros', key: 'pasajeros', width: 14 }, { header: 'Estado', key: 'estado', width: 22 },
-    { header: 'Pendiente por entidad desde', key: 'pendiente_por_entidad_en', width: 26 },
+  const sheet = workbook.addWorksheet(sheetName);
+  const columns = [
+    { header: 'ENTIDAD', key: 'entidad', width: 34 },
+    { header: 'CATEGORÍA', key: 'categoria', width: 25 },
   ];
-  sheet.getRow(1).font = { bold: true };
+  if (includeTypeColumn) columns.push({ header: 'TIPO', key: 'tipo', width: 14 });
+  columns.push(
+    { header: 'CÓDIGO', key: 'codigo', width: 22 },
+    { header: 'FECHA DEL TOUR', key: 'fecha_tour', width: 19, style: { numFmt: 'dd/mm/yyyy' } },
+    { header: 'N.º DE PASAJEROS', key: 'pasajeros', width: 14 },
+    { header: 'QUIÉN REPORTA', key: 'quien_reporta', width: 30 },
+    { header: 'CONTACTO DEL REPORTANTE', key: 'contacto_reportante', width: 20 },
+    { header: 'QUIÉN REALIZÓ LA RESERVA', key: 'creador', width: 30 },
+    { header: 'FECHA DE REGISTRO', key: 'fecha_registro', width: 22, style: { numFmt: 'dd/mm/yyyy' } },
+  );
+  sheet.columns = columns;
+  const thinBorder = { style: 'thin' };
+  const fullThinBorder = {
+    top: thinBorder,
+    left: thinBorder,
+    bottom: thinBorder,
+    right: thinBorder,
+  };
+  const centeredWrapped = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.alignment = centeredWrapped;
+  headerRow.eachCell({ includeEmpty: true }, cell => {
+    cell.alignment = centeredWrapped;
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B0F0' } };
+    cell.border = fullThinBorder;
+  });
+  headerRow.commit();
+
+  const entityColumn = 1;
+  const categoryColumn = 2;
+  const typeColumn = includeTypeColumn ? 3 : null;
+  let nextRowNumber = 2;
+  let currentEntityKey = null;
+  let currentEntityRows = [];
+
+  const writeEntityGroup = (items) => {
+    if (!items.length) return;
+    const firstRowNumber = nextRowNumber;
+    const rows = items.map(item => {
+      const rowValues = {
+        entidad: item.exportEntity,
+        categoria: item.exportCategory,
+        codigo: item.id_operacion,
+        fecha_tour: item.fecha_servicio,
+        pasajeros: item.pasajeros,
+        quien_reporta: item.nombre_reportante,
+        contacto_reportante: item.telefono_reportante,
+        creador: item.creador,
+        fecha_registro: item.fecha_registro,
+      };
+      if (includeTypeColumn) rowValues.tipo = item.tipo;
+      const row = sheet.addRow(rowValues);
+      row.alignment = centeredWrapped;
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.alignment = centeredWrapped;
+        cell.border = fullThinBorder;
+      });
+      nextRowNumber += 1;
+      return row;
+    });
+    const lastRowNumber = nextRowNumber - 1;
+    if (rows.length > 1) {
+      sheet.mergeCells(firstRowNumber, entityColumn, lastRowNumber, entityColumn);
+      sheet.mergeCells(firstRowNumber, categoryColumn, lastRowNumber, categoryColumn);
+    }
+    if (typeColumn) {
+      let typeStart = 0;
+      while (typeStart < items.length) {
+        let typeEnd = typeStart + 1;
+        while (typeEnd < items.length && items[typeEnd].tipo === items[typeStart].tipo) typeEnd += 1;
+        if (typeEnd - typeStart > 1) {
+          sheet.mergeCells(firstRowNumber + typeStart, typeColumn, firstRowNumber + typeEnd - 1, typeColumn);
+        }
+        typeStart = typeEnd;
+      }
+    }
+    rows.forEach(row => row.commit());
+  };
+
+  const addExportFields = item => {
+    const isFreelance = String(item.tipo_entidad || '').trim().toLocaleUpperCase('es-CO') === 'FREELANCE'
+      || String(item.canal || '').trim().toLocaleUpperCase('es-CO') === 'FREELANCE';
+    const exportEntity = isFreelance ? 'FREELANCE' : excelValue(item.entidad);
+    const exportCategory = isFreelance ? 'FREELANCE' : excelValue(item.tipo_entidad);
+    const entityId = item.id_entidad_reportante;
+    const exportKey = entityId != null && String(entityId).trim() !== ''
+      ? `entidad:${entityId}` : `sin-id:${exportEntity}\u0000${exportCategory}`;
+    return {
+      ...item,
+      exportEntity,
+      exportCategory,
+      exportKey,
+      codigo: excelValue(item.id_operacion),
+      fecha_servicio: excelDate(item.fecha_servicio),
+      pasajeros: item.pasajeros == null || item.pasajeros === '' ? '—' : Number(item.pasajeros),
+      nombre_reportante: excelValue(item.nombre_reportante),
+      telefono_reportante: excelValue(item.telefono_reportante),
+      creador: excelValue(item.creador),
+      fecha_registro: excelDate(item.fecha_registro),
+    };
+  };
+
   while (true) {
-    for (const item of result.items) sheet.addRow(item).commit();
+    for (const sourceItem of result.items) {
+      const item = addExportFields(sourceItem);
+      if (currentEntityKey !== null && currentEntityKey !== item.exportKey) {
+        writeEntityGroup(currentEntityRows);
+        currentEntityRows = [];
+      }
+      currentEntityKey = item.exportKey;
+      currentEntityRows.push(item);
+    }
     if (page >= result.totalPages) break;
     page += 1;
-    result = await buscarOrigenReservas({ ...query, page, pageSize });
+    result = await buscarOrigenReservas({ ...query, ordenarParaExcel: true, page, pageSize });
   }
+  writeEntityGroup(currentEntityRows);
   sheet.commit();
   await workbook.commit();
+}
+
+function excelValue(value) {
+  return value == null || String(value).trim() === '' ? '—' : value;
+}
+
+function excelDate(value) {
+  if (value == null || value === '') return '—';
+  const dateText = value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    : String(value).trim().slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+  if (!match) return '—';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '—';
+  return date;
 }
 
 async function buscarReservasMercadeo(query = {}) {

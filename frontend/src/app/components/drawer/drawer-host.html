@@ -24,6 +24,8 @@
                           drawer()!.type === 'turnos-intercambio' ? 'Solicitar intercambio de turno' :
                           drawer()!.type === 'punto-reservas' ? 'Reservas asociadas al punto' :
                           drawer()!.type === 'entity-create' ? 'Nueva entidad' :
+                          drawer()!.type === 'entity-edit' ? 'Editar entidad' :
+                          drawer()!.type === 'entity-detail' ? 'Detalle de entidad' :
                           drawer()!.type === 'comisiones-grupo' ? 'Detalle de comisiones por entidad y día' :
                           drawer()!.type === 'mi-actividad' ? 'Avisos' :
                           drawer()!.type === 'programacion-listado' ? (drawer()!.props?.['novedades'] ? 'Novedades de Programación' : 'Listado de programación') : 'Novedades de la app'">
@@ -42,8 +44,14 @@
         (closed)="close()" />
     }
 
-    @if (drawer()!.type === 'entity-create') {
-      <app-mercadeo-entidad-create-panel [controller]="$any(drawer()!.props?.['controller'])" />
+    @if (drawer()!.type === 'entity-create' || drawer()!.type === 'entity-edit') {
+      <app-mercadeo-entidad-create-panel
+        [controller]="$any(drawer()!.props?.['controller'])"
+        [mode]="drawer()!.type === 'entity-edit' ? 'edit' : 'create'" />
+    }
+
+    @if (drawer()!.type === 'entity-detail') {
+      <app-mercadeo-entidad-detail-panel [controller]="$any(drawer()!.props?.['controller'])" />
     }
 
     @if (drawer()!.type === 'comisiones-grupo') {

@@ -192,25 +192,9 @@
   transform: none;
 }
 
-.btn-row-reservas {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 31px;
-  padding: 6px 11px;
-  border: 1px solid var(--separator-color);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: 700 .72rem var(--font-family);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.btn-row-reservas:hover,
 .btn-row-reservas:focus-visible {
-  border-color: var(--accent-blue);
-  color: var(--text-primary);
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 
 .action-spinner {

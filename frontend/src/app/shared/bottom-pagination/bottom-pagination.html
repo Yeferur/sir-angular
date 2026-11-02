@@ -1,0 +1,27 @@
+<nav class="wizard-nav wizard-nav--page-enter sir-bottom-pagination" aria-label="Paginación de resultados">
+  <div class="wizard-nav-row">
+    <div class="wizard-nav-left">
+      <button type="button" class="btn-wizard-back" [disabled]="disabled || page <= 1" (click)="goTo(page - 1)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Anterior</span>
+      </button>
+    </div>
+
+    <div class="wizard-nav-center">
+      <div class="wizard-nav-summary" aria-live="polite">
+        <span class="sir-bottom-pagination__summary">{{ summary }}</span>
+      </div>
+    </div>
+
+    <div class="wizard-nav-right">
+      <button type="button" class="btn-wizard-next" [disabled]="disabled || page >= totalPages" (click)="goTo(page + 1)">
+        <span>Siguiente</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>

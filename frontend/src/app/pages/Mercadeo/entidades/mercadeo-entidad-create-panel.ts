@@ -12,4 +12,26 @@ import { SirSelectComponent } from '../../../shared/select/select';
 })
 export class MercadeoEntidadCreatePanelComponent {
   @Input({ required: true }) controller!: any;
+  @Input() mode: 'create' | 'edit' = 'create';
+
+  onNameChange(value: string): void {
+    if (this.mode === 'create') this.controller.onCreateNameChange(value);
+    else {
+      this.controller.name = value;
+      this.controller.detailError.set('');
+    }
+  }
+
+  onTypeChange(value: any): void {
+    if (this.mode === 'create') this.controller.onCreateTypeChange(value);
+    else {
+      this.controller.type = value;
+      this.controller.detailError.set('');
+    }
+  }
+
+  cancel(): void {
+    if (this.mode === 'edit') this.controller.cancelEdit();
+    else this.controller.close();
+  }
 }

@@ -15,12 +15,13 @@ import { TurnosIntercambioPanelComponent } from '../turnos-intercambio-panel/tur
 import { MiActividadPanelComponent } from '../mi-actividad-panel/mi-actividad-panel';
 import { ReservasPuntoDrawerComponent } from '../../pages/Puntos/reservas-punto-drawer/reservas-punto-drawer';
 import { MercadeoEntidadCreatePanelComponent } from '../../pages/Mercadeo/entidades/mercadeo-entidad-create-panel';
+import { MercadeoEntidadDetailPanelComponent } from '../../pages/Mercadeo/entidades/mercadeo-entidad-detail-panel';
 import { ComisionesGrupoDrawerComponent } from '../../pages/Comisiones/comisiones-grupo-drawer';
 
 @Component({
   selector: 'app-sir-drawer',
   standalone: true,
-  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent, MercadeoEntidadCreatePanelComponent, ComisionesGrupoDrawerComponent],
+  imports: [ReservasDynamicComponent, TransferDynamicComponent, TourDetailComponent, UsuarioDetailComponent, Mapa, DuplicarPanelComponent, AppUpdatesPanelComponent, ProgramacionListadoPanelComponent, TurnosVacacionesPanelComponent, TurnosIntercambioPanelComponent, MiActividadPanelComponent, ReservasPuntoDrawerComponent, MercadeoEntidadCreatePanelComponent, MercadeoEntidadDetailPanelComponent, ComisionesGrupoDrawerComponent],
   templateUrl: './drawer-host.html',
   styleUrls: ['./drawer-host.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,7 +61,7 @@ export class SirDrawerHostComponent implements OnDestroy {
   });
 
   close(): void {
-    if (this.drawer()?.type === 'entity-create') {
+    if (this.drawer()?.type === 'entity-create' || this.drawer()?.type === 'entity-edit' || this.drawer()?.type === 'entity-detail') {
       const controller = this.drawer()!.props?.['controller'];
       if (typeof controller?.close === 'function') controller.close();
       else this.drawerSvc.close();

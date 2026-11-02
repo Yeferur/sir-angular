@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { A11yModule } from '@angular/cdk/a11y';
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -9,8 +8,9 @@ import { SirSearchInputComponent } from '../../../shared/search-input/search-inp
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { SirSelectComponent, SirSelectOption } from '../../../shared/select/select';
-import { DrawerCloseButtonComponent } from '../../../shared/drawer-close-button/drawer-close-button';
+import { BottomPaginationComponent } from '../../../shared/bottom-pagination/bottom-pagination';
 import { PermisosService } from '../../../services/Permisos/permisos.service';
+import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { Reservas, Punto } from '../../../services/Reservas/reservas';
 import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { MercadeoOrigenOperacion, MercadeoOrigenPage, MercadeoService } from '../../../services/Mercadeo/mercadeo.service';
@@ -46,13 +46,14 @@ function initialFilters(): FiltrosEntidades {
 
 @Component({
   selector: 'app-mercadeo-entidades', standalone: true,
-  imports: [CommonModule, FormsModule, A11yModule, SirDateRangePickerComponent, SirSearchInputComponent,
-    QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent, DrawerCloseButtonComponent],
+  imports: [CommonModule, FormsModule, SirDateRangePickerComponent, SirSearchInputComponent,
+    QueryEmptyStateComponent, LoadingStateComponent, SirSelectComponent, BottomPaginationComponent],
   templateUrl: './mercadeo-entidades.html', styleUrls: ['../../listado-reservas-transfers.css', './mercadeo-entidades.css'],
 })
 export class MercadeoEntidadesComponent implements OnInit {
   private readonly api = inject(EntidadesReportantesService);
   private readonly reservas = inject(Reservas);
+  private readonly alerts = inject(SirAlertService);
   private readonly permissions = inject(PermisosService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -61,6 +62,7 @@ export class MercadeoEntidadesComponent implements OnInit {
   private previousFocus: HTMLElement | null = null;
   private suggestionTimer?: ReturnType<typeof setTimeout>;
   private suggestionRun = 0;
+  private detailRequest = 0;
   private lastUrlState = '';
   readonly typeOptions = typeOptions;
   readonly createTypeOptions = typeOptions.filter(option => !!option.value);
@@ -71,6 +73,7 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly result = signal<PaginaEntidades | null>(null);
   readonly selected = signal<DetalleEntidad | null>(null);
   readonly selectedActivity = signal<ActividadEntidad | null>(null);
+  readonly detailLoading = signal(false);
   readonly consolidatedContacts = computed<ContactoReportanteAgrupado[]>(() => {
     const groups = new Map<string, ContactoReportanteAgrupado>();
     (this.selected()?.contacts ?? []).forEach((contact, index) => {
@@ -108,7 +111,7 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly detailNotice = signal('');
   readonly filterOpen = signal(false);
   readonly editing = signal(false);
-  readonly rowEditingId = signal<number | null>(null);
+  readonly editingEntityId = signal<number | null>(null);
   readonly creating = signal(false);
   readonly rejecting = signal(false);
   readonly pointMatches = signal<Punto[]>([]);
@@ -124,8 +127,6 @@ export class MercadeoEntidadesComponent implements OnInit {
   readonly canReadReservations = this.permissions.tienePermiso('RESERVAS.LEER');
   readonly canReadTransfers = this.permissions.tienePermiso('TRANSFERS.LEER');
   name = '';
-  rowEditName = '';
-  rowEditType: TipoEntidad = 'HOTEL';
   rejectionReason = '';
   type: TipoEntidad = 'HOTEL';
   pointSearch = '';
@@ -245,7 +246,6 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   async search(page = 1, syncUrl = true): Promise<void> {
     if (this.loading() || this.dateError()) return;
-    if (this.rowEditingId() !== null) this.cancelRowEdit();
     const applied = { ...this.filters() };
     this.appliedFilters.set(applied);
     if (syncUrl) this.writeUrl(applied, page);
@@ -277,22 +277,25 @@ export class MercadeoEntidadesComponent implements OnInit {
     if (this.filters().ordenarPor !== column) return 'Ordenar';
     return this.filters().orden === 'DESC' ? 'Orden descendente' : 'Orden ascendente';
   }
-  openFromRowKey(event: Event, item: ActividadEntidad): void {
-    if (event.target !== event.currentTarget) return;
-    event.preventDefault();
-    void this.open(item);
-  }
   async open(item: ActividadEntidad): Promise<void> {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const request = ++this.detailRequest;
     this.selectedActivity.set(item);
     this.detailError.set(''); this.detailNotice.set(''); this.selected.set(null); this.editing.set(false);
     this.rejecting.set(false); this.rejectionReason = '';
     this.operations.set(null); this.operationsError.set('');
+    this.detailLoading.set(true);
+    this.drawer.openEntityDetail({ controller: this });
     try {
-      this.selected.set(await firstValueFrom(this.api.detail(item.Id_Entidad_Reportante, this.appliedFilters())));
-      await this.loadOperations(item.Id_Entidad_Reportante, 1);
+      const detail = await firstValueFrom(this.api.detail(item.Id_Entidad_Reportante, this.appliedFilters()));
+      if (request === this.detailRequest) this.selected.set(detail);
     }
-    catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo cargar el detalle.'); }
+    catch (e: any) {
+      if (request === this.detailRequest) this.detailError.set(e?.error?.message || 'No se pudo cargar el detalle.');
+    }
+    finally {
+      if (request === this.detailRequest) this.detailLoading.set(false);
+    }
   }
   private async loadOperations(entityId: number, page: number): Promise<void> {
     const period = this.appliedFilters();
@@ -315,8 +318,7 @@ export class MercadeoEntidadesComponent implements OnInit {
     if (item.tipo === 'RESERVA' && this.canReadReservations && item.id_reserva) this.drawer.openReserva(item.id_reserva);
     if (item.tipo === 'TRANSFER' && this.canReadTransfers && item.id_transfer) this.drawer.openTransfer(String(item.id_transfer));
   }
-  viewOperations(): void {
-    const entityId = this.selected()?.entity.Id_Entidad_Reportante;
+  viewOperations(entityId = this.selected()?.entity.Id_Entidad_Reportante): void {
     if (!entityId) return;
     const period = this.appliedFilters();
     this.close();
@@ -331,22 +333,35 @@ export class MercadeoEntidadesComponent implements OnInit {
   operationLabel(item: MercadeoOrigenOperacion): string {
     return item.tipo === 'TRANSFER' ? 'TRS' + String(item.id_transfer).padStart(5, '0') : item.id_reserva || item.id_operacion;
   }
+  async rejectFromRow(item: ActividadEntidad): Promise<void> {
+    if (!this.canValidate || this.saving() || this.loading()
+      || item.Estado_Validacion !== 'PENDIENTE_VALIDACION') return;
+    await this.open(item);
+    if (this.selected()?.entity.Id_Entidad_Reportante === item.Id_Entidad_Reportante) this.beginReject();
+  }
   close(): void {
-    const globalCreateDrawerOpen = this.drawer.drawer()?.type === 'entity-create';
+    const drawerType = this.drawer.drawer()?.type;
+    if (drawerType === 'entity-edit') {
+      this.cancelEdit();
+      return;
+    }
+    const globalEntityDrawerOpen = drawerType === 'entity-create' || drawerType === 'entity-detail';
+    this.detailRequest++;
+    this.detailLoading.set(false);
     this.selected.set(null); this.selectedActivity.set(null); this.creating.set(false); this.editing.set(false);
+    this.editingEntityId.set(null);
     this.operations.set(null); this.operationsError.set('');
     this.rejecting.set(false); this.rejectionReason = ''; this.detailNotice.set(''); this.pointMatches.set([]);
     this.pointPickerOpen.set(false);
     this.entitySuggestions.set([]);
     clearTimeout(this.suggestionTimer); this.suggestionRun++;
-    if (globalCreateDrawerOpen) this.drawer.close();
+    if (globalEntityDrawerOpen) this.drawer.close();
     else if (this.previousFocus?.isConnected) this.previousFocus.focus();
     this.previousFocus = null;
   }
-  @HostListener('window:keydown.escape') onEscape(): void { this.close(); }
   startCreate(): void {
     this.close(); this.previousFocus = null;
-    this.name = ''; this.type = 'HOTEL'; this.detailError.set(''); this.creating.set(true);
+    this.name = ''; this.type = 'HOTEL'; this.detailError.set(''); this.editingEntityId.set(null); this.creating.set(true);
     this.drawer.openEntityCreate({ controller: this });
   }
   openSuggestedEntity(entity: ActividadEntidad): void {
@@ -385,43 +400,33 @@ export class MercadeoEntidadesComponent implements OnInit {
       } finally { if (run === this.suggestionRun) this.suggesting.set(false); }
     }, 250);
   }
-  startEdit(): void {
-    const entity = this.selected()?.entity; if (!entity) return;
-    this.name = entity.Nombre; this.type = entity.Tipo; this.editing.set(true);
-  }
-  startRowEdit(item: ActividadEntidad): void {
+  openEdit(item: Pick<ActividadEntidad, 'Id_Entidad_Reportante' | 'Nombre' | 'Tipo'>): void {
     if (!this.canEdit || this.saving() || this.loading()) return;
-    this.rowEditingId.set(item.Id_Entidad_Reportante);
-    this.rowEditName = item.Nombre;
-    this.rowEditType = item.Tipo;
-    this.error.set('');
+    this.name = item.Nombre;
+    this.type = item.Tipo;
+    this.detailError.set('');
+    this.detailNotice.set('');
+    this.editingEntityId.set(item.Id_Entidad_Reportante);
+    this.creating.set(false);
+    this.editing.set(true);
+    this.drawer.openEntityEdit({ controller: this });
   }
-  cancelRowEdit(): void {
-    this.rowEditingId.set(null);
-    this.rowEditName = '';
-    this.rowEditType = 'HOTEL';
-  }
-  async saveRowEdit(item: ActividadEntidad): Promise<void> {
-    if (!this.canEdit || this.saving() || this.loading() || this.rowEditingId() !== item.Id_Entidad_Reportante
-      || !this.rowEditName.trim()) return;
-    this.saving.set(true);
-    this.error.set('');
-    try {
-      await firstValueFrom(this.api.update(item.Id_Entidad_Reportante, {
-        Nombre: this.rowEditName.trim(), Tipo: this.rowEditType,
-      }));
-      this.cancelRowEdit();
-      await this.search(this.result()?.page || 1);
-    } catch (e: any) {
-      this.error.set(e?.error?.message || 'No se pudo actualizar la entidad.');
-    } finally { this.saving.set(false); }
+  cancelEdit(): void {
+    this.editing.set(false);
+    this.editingEntityId.set(null);
+    this.detailError.set('');
+    if (this.drawer.drawer()?.type === 'entity-edit') {
+      this.drawer.close();
+    }
   }
   async toggleRowActive(item: ActividadEntidad): Promise<void> {
     if (!this.canEdit || this.saving() || this.loading()) return;
+    const active = !Boolean(item.Activo);
     this.saving.set(true);
     this.error.set('');
     try {
-      await firstValueFrom(this.api.update(item.Id_Entidad_Reportante, { Activo: item.Activo ? 0 : 1 }));
+      if (!await this.confirmActiveChange(item.Nombre, active)) return;
+      await firstValueFrom(this.api.update(item.Id_Entidad_Reportante, { Activo: active ? 1 : 0 }));
       await this.search(this.result()?.page || 1);
     } catch (e: any) {
       this.error.set(e?.error?.message || 'No se pudo cambiar el estado de la entidad.');
@@ -429,6 +434,8 @@ export class MercadeoEntidadesComponent implements OnInit {
   }
   async save(): Promise<void> {
     if (!this.name.trim() || this.saving() || (this.creating() && this.exactDuplicate)) return;
+    const editingId = this.editingEntityId();
+    if (!this.creating() && (editingId === null || !this.canEdit)) return;
     this.saving.set(true); this.detailError.set('');
     try {
       if (this.creating()) {
@@ -436,24 +443,46 @@ export class MercadeoEntidadesComponent implements OnInit {
         this.drawer.close(true);
         this.creating.set(false); this.selected.set(detail);
         await this.search();
-      } else if (this.selected()) {
-        const id = this.selected()!.entity.Id_Entidad_Reportante;
-        await firstValueFrom(this.api.update(id, { Nombre: this.name, Tipo: this.type }));
-        this.editing.set(false); await this.search(); await this.refreshDetail(id);
+      } else if (editingId !== null) {
+        await firstValueFrom(this.api.update(editingId, { Nombre: this.name.trim(), Tipo: this.type }));
+        await this.search(this.result()?.page || 1);
+        if (this.selected()?.entity.Id_Entidad_Reportante === editingId) await this.refreshDetail(editingId);
+        this.editing.set(false);
+        this.editingEntityId.set(null);
+        this.drawer.close(true);
       }
     } catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo guardar la entidad.'); }
     finally { this.saving.set(false); }
   }
   async setActive(active: boolean): Promise<void> {
-    const id = this.selected()?.entity.Id_Entidad_Reportante; if (!id || this.saving()) return;
+    const entity = this.selected()?.entity;
+    if (!entity || this.saving()) return;
+    const id = entity.Id_Entidad_Reportante;
     this.saving.set(true);
-    try { await firstValueFrom(this.api.update(id, { Activo: active ? 1 : 0 }));
+    this.detailError.set('');
+    try {
+      if (!await this.confirmActiveChange(entity.Nombre, active)) return;
+      await firstValueFrom(this.api.update(id, { Activo: active ? 1 : 0 }));
       await this.refreshDetail(id); await this.search(this.result()?.page || 1); }
     catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo cambiar el estado.'); }
     finally { this.saving.set(false); }
   }
-  async validate(state: ValidacionEntidad): Promise<void> {
-    const id = this.selected()?.entity.Id_Entidad_Reportante; if (!id || this.saving()) return;
+  private confirmActiveChange(entityName: string, active: boolean): Promise<boolean> {
+    const action = active ? 'activar' : 'desactivar';
+    return this.alerts.confirmDecision(
+      active ? '¿Activar entidad?' : '¿Desactivar entidad?',
+      `Vas a ${action} la entidad "${entityName}". ¿Deseas continuar?`,
+      { confirmText: active ? 'Activar' : 'Desactivar', cancelText: 'Cancelar', type: 'warning', destructive: !active },
+    );
+  }
+  async validate(state: ValidacionEntidad, rowEntity?: ActividadEntidad): Promise<void> {
+    const selectedEntity = this.selected()?.entity;
+    const id = selectedEntity?.Id_Entidad_Reportante ?? rowEntity?.Id_Entidad_Reportante;
+    if (!id || this.saving()) return;
+    const currentState = selectedEntity?.Estado_Validacion ?? rowEntity?.Estado_Validacion;
+    if (!this.canValidate
+      || (state === 'RECHAZADA' && currentState !== 'PENDIENTE_VALIDACION')
+      || (state === 'VALIDADA' && currentState !== 'PENDIENTE_VALIDACION' && currentState !== 'RECHAZADA')) return;
     const reason = state === 'RECHAZADA' ? this.rejectionReason.trim() : '';
     if (state === 'RECHAZADA' && reason.length > 200) {
       this.detailError.set('El motivo de rechazo puede tener hasta 200 caracteres.');
@@ -469,21 +498,34 @@ export class MercadeoEntidadesComponent implements OnInit {
         this.selected.set(null);
         this.validationNotice.set('Entidad rechazada. Las operaciones afectadas están pendientes de datos.');
         await this.search(this.result()?.page || 1);
+        this.close();
         return;
       }
       if (this.canValidate && !this.permissions.tienePermiso('ENTIDADES_REPORTANTES.LEER')) {
         this.selected.set(null);
         this.validationNotice.set(result?.warning || 'Entidad validada.');
         await this.search(this.result()?.page || 1);
+        this.close();
+        return;
+      }
+      if (rowEntity) {
+        this.selected.set(null);
+        this.selectedActivity.set(null);
+        this.validationNotice.set(result?.warning || 'Entidad validada.');
+        await this.search(this.result()?.page || 1);
         return;
       }
       await this.refreshDetail(id); await this.search(this.result()?.page || 1);
     }
-    catch (e: any) { this.detailError.set(e?.error?.message || 'No se pudo actualizar la validación.'); }
+    catch (e: any) {
+      const message = e?.error?.message || 'No se pudo actualizar la validación.';
+      if (rowEntity) this.error.set(message);
+      else this.detailError.set(message);
+    }
     finally { this.saving.set(false); }
   }
   beginReject(): void {
-    if (!this.canValidate || this.saving()) return;
+    if (!this.canValidate || this.saving() || this.selected()?.entity.Estado_Validacion !== 'PENDIENTE_VALIDACION') return;
     this.detailError.set(''); this.detailNotice.set(''); this.rejectionReason = ''; this.rejecting.set(true);
   }
   cancelReject(): void { this.rejecting.set(false); this.rejectionReason = ''; this.detailError.set(''); }
