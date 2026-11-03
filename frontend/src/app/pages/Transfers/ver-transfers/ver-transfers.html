@@ -241,15 +241,14 @@
     }
 
     @if (transfers().length > 0) {
-      <div class="results-toolbar">
-        <strong aria-live="polite">{{ resultsRangeLabel() }}</strong>
-        @if (isSearching()) {
+      @if (isSearching()) {
+        <div class="results-toolbar">
           <span class="updating-pill" role="status">
             <span aria-hidden="true"></span>
             Actualizando
           </span>
-        }
-      </div>
+        </div>
+      }
 
       <div class="results-list" [class.results-list--updating]="isSearching()" [attr.aria-busy]="isSearching()">
         @for (t of transfers(); track t.Id_Transfer) {
@@ -332,21 +331,6 @@
         }
       </div>
 
-      @if (totalPages() > 1) {
-        <nav class="results-pagination" aria-label="Paginación de transfers">
-          <button class="pagination-button" type="button" (click)="prevPage()"
-            [disabled]="page() <= 1 || isSearching()">
-            Anterior
-          </button>
-          <span class="pagination-indicator" aria-live="polite">
-            Página {{ page() }} de {{ totalPages() }}
-          </span>
-          <button class="pagination-button" type="button" (click)="nextPage()"
-            [disabled]="page() >= totalPages() || isSearching()">
-            Siguiente
-          </button>
-        </nav>
-      }
     } @else if (isSearching()) {
       <app-loading-state label="Buscando transfers…"></app-loading-state>
     } @else if (searchError()) {
@@ -366,4 +350,9 @@
   </div>
 
 </div>
+  @if (transfers().length > 0) {
+    <app-bottom-pagination [page]="page()" [pageSize]="pageSize" [total]="total()"
+      [totalPages]="totalPages()" singularLabel="transfer" pluralLabel="transfers"
+      [disabled]="isSearching()" (pageChange)="changePage($event)" />
+  }
 }

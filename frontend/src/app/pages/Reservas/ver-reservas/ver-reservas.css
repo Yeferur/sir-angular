@@ -1,0 +1,38 @@
+:host {
+  display: block;
+  min-height: 0;
+}
+
+.reservation-browser {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 186px - env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.reservation-browser > .reservation-search-panel,
+.reservation-browser > .advanced-filters-panel {
+  flex: 0 0 auto;
+}
+
+.reservation-browser > .results-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.reservation-browser > .results-area > .results-notice,
+.reservation-browser > .results-area > .results-toolbar {
+  flex: 0 0 auto;
+}
+
+.reservation-browser > .results-area > .results-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

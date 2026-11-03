@@ -18,7 +18,7 @@ describe('VerPuntos: consulta y filtros', () => {
   let drawer: jasmine.SpyObj<SirDrawerService>;
   let canReadReservations = true;
 
-  const result = { data: [] as Punto[], total: 0, page: 1, limit: 10 };
+  const result = { data: [] as Punto[], total: 0, page: 1, limit: 25 };
 
   beforeEach(() => { canReadReservations = true; });
 
@@ -69,7 +69,7 @@ describe('VerPuntos: consulta y filtros', () => {
 
   it('ubica las acciones del listado junto al total y fuera de la búsqueda', async () => {
     await mount();
-    expect(service.getPuntos).toHaveBeenCalledWith(1, 10, '', '', []);
+    expect(service.getPuntos).toHaveBeenCalledWith(1, 25, '', '', []);
     expect(fixture.nativeElement.querySelector('.search-input')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#ver-puntos-ruta')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#ver-puntos-pendientes')).not.toBeNull();
@@ -123,7 +123,7 @@ describe('VerPuntos: consulta y filtros', () => {
     await mount({ ruta: 'PENDIENTE' });
     expect(component.selectedRoute).toBe('');
     expect(component.selectedPending).toBe('sin-ruta');
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 10, '', '', ['sin-ruta']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 25, '', '', ['sin-ruta']]);
     expect(component.rutaSelectOptions().some(option => option.value === 'PENDIENTE')).toBeFalse();
   });
 
@@ -137,7 +137,7 @@ describe('VerPuntos: consulta y filtros', () => {
     component.onSearchInput('Centro');
     expect(service.getPuntos.calls.count()).toBe(initialCalls + 2);
     component.submitSearch();
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 10, 'Centro', '2', ['sin-horario']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 25, 'Centro', '2', ['sin-horario']]);
     expect(component.appliedFilters()).toEqual({ q: 'Centro', ruta: '2', pendientes: ['sin-horario'] });
     expect(router.navigate.calls.mostRecent().args[1]?.queryParams).toEqual(jasmine.objectContaining({
       q: 'Centro', ruta: '2', pendientes: 'sin-horario', pagina: null,
@@ -146,13 +146,13 @@ describe('VerPuntos: consulta y filtros', () => {
 
   it('permite Ruta sola y Pendientes solos, y restaura filtros de la URL', async () => {
     await mount({ ruta: '2', pendientes: 'sin-ruta', pagina: '2' });
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([2, 10, '', '2', ['sin-ruta']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([2, 25, '', '2', ['sin-ruta']]);
     component.onRouteChange('1');
     component.onPendingChange('');
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 10, '', '1', []]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 25, '', '1', []]);
     component.onRouteChange('');
     component.onPendingChange('sin-coordenadas');
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 10, '', '', ['sin-coordenadas']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 25, '', '', ['sin-coordenadas']]);
   });
 
   it('reemplaza la consulta anterior al cambiar el filtro y muestra loading local', async () => {
@@ -182,10 +182,20 @@ describe('VerPuntos: consulta y filtros', () => {
     component.onPendingChange('sin-horario');
     component.totalPages.set(3);
     component.nextPage();
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([2, 10, '', '2', ['sin-horario']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([2, 25, '', '2', ['sin-horario']]);
     component.onSearchInput('Centro');
     component.submitSearch();
-    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 10, 'Centro', '2', ['sin-horario']]);
+    expect(service.getPuntos.calls.mostRecent().args).toEqual([1, 25, 'Centro', '2', ['sin-horario']]);
+  });
+
+  it('muestra la barra compartida con el rango y total correctos', async () => {
+    await mount({}, [{ Id_Punto: 12, Nombre_Punto: 'Estación Poblado' }]);
+    fixture.detectChanges();
+
+    const pagination = fixture.nativeElement.querySelector('app-bottom-pagination') as HTMLElement;
+    expect(pagination).not.toBeNull();
+    expect(pagination.textContent).toContain('1–25 de 26 puntos · Página 1 de 2');
+    expect(fixture.nativeElement.querySelector('.results-pagination')).toBeNull();
   });
 
   it('exporta con los criterios aplicados, sin tomar cambios del borrador', async () => {

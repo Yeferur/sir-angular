@@ -1,11 +1,41 @@
 :host { display: block; min-width: 0; }
 
 .marketing-reservations {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 1350px;
+  height: calc(100dvh - 186px - env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  overflow: hidden;
   gap: 14px;
   container-type: inline-size;
+}
+
+.marketing-reservations > .page-header,
+.marketing-reservations > .advanced-filters-panel,
+.marketing-reservations > .inline-error,
+.marketing-reservations > .results-notice,
+.marketing-reservations > .results-toolbar {
+  flex: 0 0 auto;
+}
+
+.marketing-reservations > .marketing-results {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.marketing-results > .sir-results-heading {
+  flex: 0 0 auto;
+}
+
+.marketing-results > .sir-data-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
 }
 
 .marketing-reservations .active-filters { align-items: center; margin-top: 1px; }

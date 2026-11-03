@@ -13,13 +13,14 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { SirSearchInputComponent } from '../../../shared/search-input/search-input';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
+import { BottomPaginationComponent } from '../../../shared/bottom-pagination/bottom-pagination';
 
 @Component({
   selector: 'app-ver-transfers',
   standalone: true,
-  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent],
+  imports: [CommonModule, DatePipe, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent, BottomPaginationComponent],
   templateUrl: './ver-transfers.html',
-  styleUrls: ['../../listado-reservas-transfers.css']
+  styleUrls: ['../../listado-reservas-transfers.css', './ver-transfers.css']
 })
 export class VerTransfersComponent implements OnInit, OnDestroy {
   private uiState = inject(UiStateService);
@@ -506,23 +507,10 @@ export class VerTransfersComponent implements OnInit, OnDestroy {
     });
   }
 
-  prevPage(): void {
-    if (this.page() <= 1 || this.isSearching()) return;
-    this.page.update((value) => value - 1);
+  changePage(page: number): void {
+    if (page < 1 || page > this.totalPages() || page === this.page() || this.isSearching()) return;
+    this.page.set(page);
     this.buscarTransfers(false);
-  }
-
-  nextPage(): void {
-    if (this.page() >= this.totalPages() || this.isSearching()) return;
-    this.page.update((value) => value + 1);
-    this.buscarTransfers(false);
-  }
-
-  resultsRangeLabel(): string {
-    if (!this.total()) return '0 transfers';
-    const first = (this.page() - 1) * this.pageSize + 1;
-    const last = Math.min(this.total(), first + this.transfers().length - 1);
-    return `${first}–${last} de ${this.total()} transfers`;
   }
 
   verTransfer(Id_Transfer: string) {

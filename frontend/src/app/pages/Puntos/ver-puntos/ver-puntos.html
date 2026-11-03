@@ -208,21 +208,6 @@
         }
       </div>
 
-      @if (totalPages() > 1) {
-        <nav class="results-pagination" aria-label="Paginación de puntos de encuentro">
-          <button class="pagination-button" type="button" (click)="prevPage()"
-            [disabled]="page() <= 1 || isSearching()">
-            Anterior
-          </button>
-          <span class="pagination-indicator" aria-live="polite">
-            Página {{ page() }} de {{ totalPages() }}
-          </span>
-          <button class="pagination-button" type="button" (click)="nextPage()"
-            [disabled]="page() >= totalPages() || isSearching()">
-            Siguiente
-          </button>
-        </nav>
-      }
     } @else if (isSearching()) {
       <app-loading-state label="Buscando puntos de encuentro…"></app-loading-state>
     } @else if (searchError()) {
@@ -242,4 +227,9 @@
     }
   </div>
 </div>
+  @if (puntos().length > 0) {
+    <app-bottom-pagination [page]="page()" [pageSize]="limit" [total]="total()"
+      [totalPages]="totalPages()" singularLabel="punto" pluralLabel="puntos"
+      [disabled]="isSearching()" (pageChange)="goToPage($event)" />
+  }
 }

@@ -160,14 +160,15 @@
             }</tbody>
           </table>
         </div>
-      @if (data.totalPages > 1) {
-        <nav class="sir-results-pagination" aria-label="Paginación del origen de operaciones">
-          <span class="sir-results-pagination__summary" aria-live="polite">Página {{ data.page }} de {{ data.totalPages }}</span>
-          <button type="button" class="sir-action sir-action--secondary sir-action--compact" (click)="changePage(data.page - 1)" [disabled]="data.page <= 1 || loading()">Anterior</button>
-          <button type="button" class="sir-action sir-action--secondary sir-action--compact" (click)="changePage(data.page + 1)" [disabled]="data.page >= data.totalPages || loading()">Siguiente</button>
-        </nav>
-      }
       </section>
     }
   }
 </main>
+
+@if (result(); as data) {
+  @if (data.items.length > 0) {
+    <app-bottom-pagination [page]="data.page" [pageSize]="pageSize" [total]="data.totalOperaciones"
+      [totalPages]="data.totalPages" singularLabel="operación" pluralLabel="operaciones"
+      [disabled]="loading()" (pageChange)="changePage($event)" />
+  }
+}

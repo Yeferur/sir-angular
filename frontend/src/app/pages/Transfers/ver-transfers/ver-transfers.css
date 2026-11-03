@@ -1,0 +1,38 @@
+:host {
+  display: block;
+  min-height: 0;
+}
+
+.transfer-browser {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 186px - env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.transfer-browser > .reservation-search-panel,
+.transfer-browser > .advanced-filters-panel {
+  flex: 0 0 auto;
+}
+
+.transfer-browser > .results-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.transfer-browser > .results-area > .results-notice,
+.transfer-browser > .results-area > .results-toolbar {
+  flex: 0 0 auto;
+}
+
+.transfer-browser > .results-area > .results-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

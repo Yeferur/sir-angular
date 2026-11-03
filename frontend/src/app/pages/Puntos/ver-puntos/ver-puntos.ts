@@ -18,6 +18,7 @@ import { SirDrawerService } from '../../../services/Drawer/drawer.service';
 import { SirAlertService } from '../../../services/Alertas/alert.service';
 import { LoadingStateComponent } from '../../../shared/loading-state/loading-state';
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
+import { BottomPaginationComponent } from '../../../shared/bottom-pagination/bottom-pagination';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
 
 type PuntoHorario = NonNullable<Punto['horarios']>[number];
@@ -32,7 +33,7 @@ type PuntoOperationalIssue = {
 @Component({
   selector: 'app-ver-puntos',
   standalone: true,
-  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent],
+  imports: [SirSelectComponent, CommonModule, FormsModule, LoadingStateComponent, QueryEmptyStateComponent, BottomPaginationComponent],
   templateUrl: './ver-puntos.html',
   styleUrls: ['../../listado-reservas-transfers.css', './ver-puntos.css']
 })
@@ -56,7 +57,7 @@ export class VerPuntos implements OnInit, OnDestroy {
   private drawer = inject(SirDrawerService);
   private alerts = inject(SirAlertService);
 
-  readonly limit = 10;
+  readonly limit = 25;
   readonly puntos = signal<Punto[]>([]);
   readonly rutas = signal<string[]>([]);
   readonly total = signal(0);
@@ -353,17 +354,15 @@ export class VerPuntos implements OnInit, OnDestroy {
     });
   }
 
-  prevPage(): void {
-    if (this.page() <= 1 || this.isSearching()) return;
-    this.page.update((value) => value - 1);
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages() || page === this.page() || this.isSearching()) return;
+    this.page.set(page);
     this.buscarPuntos(false);
   }
 
-  nextPage(): void {
-    if (this.page() >= this.totalPages() || this.isSearching()) return;
-    this.page.update((value) => value + 1);
-    this.buscarPuntos(false);
-  }
+  prevPage(): void { this.goToPage(this.page() - 1); }
+
+  nextPage(): void { this.goToPage(this.page() + 1); }
 
   descargarExcel(): void {
     if (!this.canExportPuntos || this.descargandoExcel) return;

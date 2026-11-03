@@ -1,9 +1,44 @@
 :host {
   display: block;
+  min-height: 0;
 }
 
 .points-browser {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 186px - env(safe-area-inset-bottom, 0px));
   max-width: 1350px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.points-browser > .reservation-search-panel {
+  flex: 0 0 auto;
+}
+
+.points-browser > .results-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.points-browser > .results-area > .points-results-toolbar,
+.points-browser > .results-area > .results-notice {
+  flex: 0 0 auto;
+}
+
+.points-browser > .results-area > .points-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.points-browser .points-list > .point-card {
+  flex: 0 0 auto;
 }
 
 .points-result-actions .btn-secondary,

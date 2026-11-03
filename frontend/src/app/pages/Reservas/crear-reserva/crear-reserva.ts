@@ -62,7 +62,7 @@ interface SubmitValidationIssue {
     SirAutocompletePanelPositionDirective
   ],
   templateUrl: './crear-reserva.html',
-  styleUrls: ['../reserva-shared.css'],
+  styleUrls: ['../reserva-shared.css', './crear-reserva-scroll.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
   readonly monedaSelectOptions = computed<SirSelectOption[]>(() => [...(this.monedas() || []).map((m: any) => ({ value: String(m.Id_Moneda), label: String(m.Nombre_Moneda) }))]);
@@ -209,7 +209,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     const back = index < this.currentStep;
     this.currentStep = index;
     this.triggerPanelAnimation(back);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.scrollCurrentStepToTop();
   }
 
   nextStep(): void {
@@ -225,7 +225,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
       this.currentStep++;
       this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
       this.triggerPanelAnimation(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.scrollCurrentStepToTop();
     }
   }
 
@@ -233,7 +233,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
     if (this.currentStep > 0) {
       this.currentStep--;
       this.triggerPanelAnimation(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.scrollCurrentStepToTop();
     }
   }
 
@@ -2051,8 +2051,16 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         }
         return;
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector<HTMLElement>('.wizard-shell .wizard-step-panel')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
     }, 80);
+  }
+
+  private scrollCurrentStepToTop(): void {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.wizard-shell .wizard-step-panel')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   }
 
   private getPassengerValidationIssue(): SubmitValidationIssue | null {
@@ -2333,7 +2341,7 @@ export class CrearReservaComponent implements OnInit, OnDestroy {
         this.modoPrecio = 'global';
         this.modoPlan = 'global';
         this.modoComision = 'global';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.scrollCurrentStepToTop();
         this.form.markAsPristine();
         this.cdr.markForCheck();
       } else {

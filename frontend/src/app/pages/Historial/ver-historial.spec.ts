@@ -12,7 +12,7 @@ describe('VerHistorialComponent', () => {
   let service: jasmine.SpyObj<HistorialService>;
   let router: jasmine.SpyObj<Router>;
 
-  const result: HistorialResponse = { data: [], total: 25, page: 1, limit: 10, totalPages: 3 };
+  const result: HistorialResponse = { data: [], total: 75, page: 1, limit: 25, totalPages: 3 };
   const options = {
     usuarios: [{ id: 3, label: 'Julieta' }, { id: 4, label: 'Yeferson' }],
     acciones: [{ value: 'LOGIN', label: 'Inicio de sesión', actividad: 'accesos' },
@@ -55,7 +55,7 @@ describe('VerHistorialComponent', () => {
     expect(component.draftFilters()).toEqual({ fecha, referencia: '', usuarios: [], actividad: [], modulos: [] });
     expect(component.hasQueried()).toBeTrue();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
-      fechaInicio: fecha, fechaFin: fecha, page: 1, limit: 10,
+      fechaInicio: fecha, fechaFin: fecha, page: 1, limit: 25,
     }));
     expect(fixture.nativeElement.textContent).not.toContain('Listo para consultar');
   });
@@ -171,7 +171,7 @@ describe('VerHistorialComponent', () => {
     expect(component.appliedGroupCount()).toBe(2);
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [3], actividad: ['accesos'], modulos: [],
-      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 10,
+      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 25,
     });
     expect(router.navigate).toHaveBeenCalled();
   });
@@ -287,13 +287,13 @@ describe('VerHistorialComponent', () => {
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [4], actividad: ['accesos'], modulos: ['reservas'],
-      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 2, limit: 10,
+      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 2, limit: 25,
     });
     component.totalRecords.set(21);
     component.exportarHistorial();
     expect(service.exportarHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [4], actividad: ['accesos'], modulos: ['reservas'],
-      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 10,
+      referencia: undefined, fechaInicio: '2026-10-13', fechaFin: '2026-10-13', page: 1, limit: 25,
     });
   });
 
@@ -311,7 +311,7 @@ describe('VerHistorialComponent', () => {
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [], actividad: [], modulos: [], referencia: undefined,
-      fechaInicio: '2026-10-01', fechaFin: '2026-10-01', page: 1, limit: 10,
+      fechaInicio: '2026-10-01', fechaFin: '2026-10-01', page: 1, limit: 25,
     });
   });
 
@@ -376,7 +376,7 @@ describe('VerHistorialComponent', () => {
     expect((fixture.nativeElement.querySelector('.reservation-search-button') as HTMLButtonElement).disabled).toBeTrue();
     component.buscar();
     expect(service.getHistorial.calls.count()).toBe(2);
-    pending.next({ data: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+    pending.next({ data: [], total: 0, page: 1, limit: 25, totalPages: 0 });
     pending.complete();
     fixture.detectChanges();
     expect(component.isSearching()).toBeFalse();
@@ -407,15 +407,15 @@ describe('VerHistorialComponent', () => {
       Tipo_Accion: 'LOGIN', Descripcion: 'Inicio de sesión', Tabla_Afectada: 'sesiones', Modulo: 'Usuarios',
       Id_Registro: null, Fecha_Accion: '2026-10-13 10:00:00', Detalles: [],
     };
-    service.getHistorial.and.returnValue(of({ data: [record], total: 24, page: 1, limit: 10, totalPages: 3 }));
+    service.getHistorial.and.returnValue(of({ data: [record], total: 54, page: 1, limit: 25, totalPages: 3 }));
     component.toggleUser(3, true);
     component.buscar();
     await Promise.resolve();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.results-summary').textContent).toContain('24 registros');
+    expect(fixture.nativeElement.querySelector('.results-summary').textContent).toContain('54 registros');
     expect(fixture.nativeElement.querySelector('.results-summary').textContent).not.toContain('Página');
-    expect(fixture.nativeElement.querySelector('.results-pagination .pagination-indicator').textContent).toContain('Página 1 de 3');
-    expect((fixture.nativeElement.querySelector('.results-pagination .pagination-button') as HTMLButtonElement).disabled).toBeTrue();
+    expect(fixture.nativeElement.querySelector('.sir-bottom-pagination__summary').textContent).toContain('1–25 de 54 registros · Página 1 de 3');
+    expect((fixture.nativeElement.querySelector('.sir-bottom-pagination .btn-wizard-back') as HTMLButtonElement).disabled).toBeTrue();
     component.nextPage();
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({ usuarios: [3], page: 2 }));
@@ -430,7 +430,7 @@ describe('VerHistorialComponent', () => {
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [], actividad: [], modulos: [], referencia: 'TG82673',
-      fechaInicio: component.appliedFilters().fecha, fechaFin: component.appliedFilters().fecha, page: 1, limit: 10,
+      fechaInicio: component.appliedFilters().fecha, fechaFin: component.appliedFilters().fecha, page: 1, limit: 25,
     });
   });
 
@@ -441,7 +441,7 @@ describe('VerHistorialComponent', () => {
     await Promise.resolve();
     expect(service.getHistorial.calls.mostRecent().args[0]).toEqual({
       usuarios: [], actividad: [], modulos: [], referencia: 'TG82673',
-      fechaInicio: '2026-10-01', fechaFin: '2026-10-01', page: 1, limit: 10,
+      fechaInicio: '2026-10-01', fechaFin: '2026-10-01', page: 1, limit: 25,
     });
     expect(router.navigate.calls.mostRecent().args[1]?.queryParams).toEqual(jasmine.objectContaining({
       referencia: 'TG82673', fecha: '2026-10-01', desde: null, hasta: null,

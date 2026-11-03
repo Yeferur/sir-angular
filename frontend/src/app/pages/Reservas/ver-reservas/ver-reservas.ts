@@ -17,13 +17,14 @@ import { LoadingStateComponent } from '../../../shared/loading-state/loading-sta
 import { QueryEmptyStateComponent } from '../../../shared/query-empty-state/query-empty-state';
 import { SirAutocompletePanelPositionDirective } from '../../../shared/autocomplete/autocomplete-panel-position.directive';
 import { toUserErrorMessage } from '../../../shared/errors/user-error-message';
+import { BottomPaginationComponent } from '../../../shared/bottom-pagination/bottom-pagination';
 
 @Component({
   selector: 'app-ver-reservas',
   standalone: true,
-  imports: [SirSelectComponent, SirMultiSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirAutocompletePanelPositionDirective],
+  imports: [SirSelectComponent, SirMultiSelectComponent, CommonModule, DatePipe, FormsModule, UppercaseInputDirective, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirAutocompletePanelPositionDirective, BottomPaginationComponent],
   templateUrl: './ver-reservas.html',
-  styleUrls: ['../../listado-reservas-transfers.css']
+  styleUrls: ['../../listado-reservas-transfers.css', './ver-reservas.css']
 })
 export class VerReservasComponent implements OnInit, OnDestroy {
   readonly reservationTypeOptions = [{ value: '', label: 'Todos los tipos' }, { value: 'Grupal', label: 'Solo grupales' }, { value: 'Privada', label: 'Solo privadas' }];
@@ -643,11 +644,10 @@ seleccionarPuntoAutocomplete(p: any) {
     this.buscarReservas(false);
   }
 
-  resultsRangeLabel(): string {
-    if (!this.total()) return '0 reservas';
-    const first = (this.page() - 1) * this.pageSize + 1;
-    const last = Math.min(this.total(), first + this.reservas().length - 1);
-    return `${first}–${last} de ${this.total()} reservas`;
+  changePage(page: number): void {
+    if (page < 1 || page > this.totalPages() || page === this.page() || this.isSearching()) return;
+    this.page.set(page);
+    this.buscarReservas(false);
   }
 
   verReserva(Id_Reserva: string) {

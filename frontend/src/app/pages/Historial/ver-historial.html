@@ -181,14 +181,13 @@
         </div>
       }
 
-      @if (totalPages() > 1) {
-        <nav class="results-pagination" aria-label="Paginación del historial">
-          <button type="button" class="pagination-button" (click)="previousPage()" [disabled]="currentPage() <= 1 || isSearching()">Anterior</button>
-          <span class="pagination-indicator" aria-live="polite">Página {{ currentPage() }} de {{ totalPages() }}</span>
-          <button type="button" class="pagination-button" (click)="nextPage()" [disabled]="currentPage() >= totalPages() || isSearching()">Siguiente</button>
-        </nav>
-      }
       </section>
     }
   </div>
 </main>
+
+@if (totalRecords() > 0) {
+  <app-bottom-pagination [page]="currentPage()" [pageSize]="pageSize" [total]="totalRecords()"
+    [totalPages]="totalPages()" singularLabel="registro" pluralLabel="registros"
+    [disabled]="isSearching()" (pageChange)="goToPage($event)" />
+}

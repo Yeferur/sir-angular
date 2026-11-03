@@ -9,6 +9,7 @@ import { LoadingStateComponent } from '../../shared/loading-state/loading-state'
 import { QueryEmptyStateComponent } from '../../shared/query-empty-state/query-empty-state';
 import { SirSearchInputComponent } from '../../shared/search-input/search-input';
 import { SirMultiSelectComponent, SirMultiSelectOption } from '../../shared/multi-select/multi-select';
+import { BottomPaginationComponent } from '../../shared/bottom-pagination/bottom-pagination';
 
 interface HistorialFilterState {
   fecha: string;
@@ -50,7 +51,7 @@ function isValidReference(value: string): boolean { return /^(?:[A-Z]{2,4}|TRS)\
 @Component({
   selector: 'app-ver-historial',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent, SirMultiSelectComponent],
+  imports: [CommonModule, FormsModule, DatepickerComponent, LoadingStateComponent, QueryEmptyStateComponent, SirSearchInputComponent, SirMultiSelectComponent, BottomPaginationComponent],
   templateUrl: './ver-historial.html',
   styleUrls: ['../listado-reservas-transfers.css', './ver-historial.css'],
 })
@@ -82,7 +83,7 @@ export class VerHistorialComponent implements OnInit, OnDestroy {
   readonly hasQueried = signal(false);
   readonly advancedFiltersVisible = signal(false);
   readonly expandedId = signal<number | null>(null);
-  readonly pageSize = 10;
+  readonly pageSize = 25;
 
   readonly userFilterOptions = computed<SirMultiSelectOption<number>[]>(() => this.filterOptions().usuarios
     .map((user) => ({ value: user.id, label: user.label })));

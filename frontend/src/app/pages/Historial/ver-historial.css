@@ -1,5 +1,26 @@
 :host { display: block; min-width: 0; }
 
+.reservation-browser {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 186px - env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.reservation-browser > .page-header,
+.reservation-browser > .advanced-filters-panel {
+  flex: 0 0 auto;
+}
+
+.reservation-browser > .results-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .historial-date { flex: 0 0 250px; min-width: 0; }
 .historial-date app-datepicker { display: block; width: 100%; }
 #historial-advanced-filters .form-grid {
@@ -14,14 +35,23 @@
 .clear-filters-link:hover { color: var(--accent-blue); }
 .clear-filters-link:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; border-radius: 3px; }
 
-.results-section { min-width: 0; }
+.results-section {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.results-section > .results-notice,
+.results-section > .results-heading { flex: 0 0 auto; }
 .results-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; margin: 0 0 14px; }
 .results-summary { margin: 0; color: var(--text-secondary); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .export-button { flex: 0 0 auto; }
 .result-error .secondary-button { margin-top: 14px; }
 
-.table-card { position: relative; min-width: 0; border: 1px solid var(--separator-color); border-radius: var(--radius-lg, 12px); background: var(--bg-secondary); overflow: hidden; }
-.table-scroll { width: 100%; overflow-x: auto; }
+.table-card { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--separator-color); border-radius: var(--radius-lg, 12px); background: var(--bg-secondary); overflow: hidden; }
+.table-scroll { flex: 1 1 auto; min-height: 0; width: 100%; max-height: none; overflow: auto; overscroll-behavior: contain; }
 .historial-table { width: 100%; min-width: 1060px; border-collapse: collapse; }
 .historial-table thead { background: var(--bg-tertiary); }
 .historial-table th { padding: 11px 12px; border-bottom: 1px solid var(--separator-color); color: var(--text-secondary); font-size: .72rem; font-weight: 700; letter-spacing: .035em; text-align: left; text-transform: uppercase; white-space: nowrap; }
