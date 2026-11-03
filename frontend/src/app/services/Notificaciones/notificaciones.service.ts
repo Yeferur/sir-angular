@@ -10,6 +10,26 @@ export interface SirNotification {
   fechaLectura: string | null; fechaCreacion: string;
 }
 
+export function rejectedOperationTarget(item: SirNotification): { type: 'RESERVA' | 'TRANSFER'; id: string } | null {
+  if (item.tipo.toUpperCase() !== 'ENTIDAD_REPORTANTE_RECHAZADA') return null;
+  const operationType = String(item.datos?.['operacionTipo'] || '').toUpperCase();
+  const operationId = String(item.datos?.['operacionId'] || '').trim();
+  if ((operationType === 'RESERVA' || operationType === 'TRANSFER') && operationId) {
+    return { type: operationType, id: operationId };
+  }
+  const route = String(item.datos?.['route'] || item.datos?.['ruta'] || '');
+  const match = route.match(/^\/(Reservas\/EditarReserva|Transfers\/EditarTransfer)\/([^/?#]+)/);
+  if (!match) return null;
+  try {
+    return {
+      type: match[1].startsWith('Reservas/') ? 'RESERVA' : 'TRANSFER',
+      id: decodeURIComponent(match[2]),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function notificationDisplayTitle(item: SirNotification): string {
   if (item.tipo.toUpperCase() !== 'APP_UPDATE') return item.titulo;
   const version = String(item.datos?.['version'] || item.entidadId || '').trim();

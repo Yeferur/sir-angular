@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs';
 import { Router } from '@angular/router';
 import { SirAlertService } from '../../services/Alertas/alert.service';
 import { SirDrawerService } from '../../services/Drawer/drawer.service';
-import { NotificacionesService, SirNotification, notificationDisplayTitle } from '../../services/Notificaciones/notificaciones.service';
+import { NotificacionesService, SirNotification, notificationDisplayTitle, rejectedOperationTarget } from '../../services/Notificaciones/notificaciones.service';
 import { PermisosService } from '../../services/Permisos/permisos.service';
 import { IntercambioTurno, TurnosService } from '../../services/Turnos/turnos.service';
 import { WebSocketService } from '../../services/WebSocket/web-socket';
@@ -86,6 +86,13 @@ export class NotificationsPanelComponent implements OnInit, OnDestroy {
     }
     if (type === 'APP_UPDATE') {
       this.drawer.openAppUpdates();
+      return;
+    }
+    const rejectedTarget = rejectedOperationTarget(item);
+    if (rejectedTarget) {
+      this.drawer.close(true);
+      if (rejectedTarget.type === 'RESERVA') this.drawer.openReserva(rejectedTarget.id);
+      else this.drawer.openTransfer(rejectedTarget.id);
       return;
     }
     const route = item.datos?.['route'] ?? item.datos?.['ruta'];

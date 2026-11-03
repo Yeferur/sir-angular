@@ -24,8 +24,16 @@ test('rechazo de entidad en el MySQL local configurado', {
   assert.equal(rules.length, 2,
     'La prueba requiere las reglas de 0018 y 0020 ya aplicadas; esta prueba no aplica migraciones.');
   const [[channel]] = await db.query("SELECT Id_Canal FROM canales_origen WHERE UPPER(TRIM(Nombre_Canal))='HOTEL' LIMIT 1");
-  const [users] = await db.query('SELECT Id_Usuario FROM usuarios WHERE Activo=1 ORDER BY Id_Usuario LIMIT 2');
-  assert.ok(channel && users.length === 2, 'Se requieren un canal HOTEL y dos usuarios activos existentes.');
+  const [users] = await db.query(`SELECT u.Id_Usuario FROM usuarios u
+    JOIN roles r ON r.Id_Rol=u.Id_Rol AND r.Activo=1
+    WHERE u.Activo=1 AND LOWER(TRIM(r.Nombre_Rol))='asesor'
+      AND NOT EXISTS (SELECT 1 FROM permisos p
+        LEFT JOIN rol_permisos rp ON rp.Id_Rol=u.Id_Rol AND rp.Id_Permiso=p.Id_Permiso
+        LEFT JOIN usuario_permisos up ON up.Id_Usuario=u.Id_Usuario AND up.Id_Permiso=p.Id_Permiso
+        WHERE p.Codigo_Permiso='ENTIDADES_REPORTANTES.VALIDAR' AND COALESCE(up.Tipo,'')<>'DENY'
+          AND (rp.Id_Permiso IS NOT NULL OR up.Tipo='ALLOW'))
+    ORDER BY u.Id_Usuario LIMIT 2`);
+  assert.ok(channel && users.length >= 1, 'Se requiere un canal HOTEL y un asesor activo que no sea validador.');
   const userIds = users.map(user => user.Id_Usuario);
   const date = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
 
@@ -54,7 +62,7 @@ test('rechazo de entidad en el MySQL local configurado', {
       (Id_Canal,Id_Entidad_Reportante,Nombre_Titular,Cantidad_Personas,Fecha_Transfer,
        Hora_Recogida,Estado,Fecha_Registro,Creado_Por,Pendiente_Por_Entidad_En)
       VALUES (?,?,?,2,?,'08:00','Confirmado',NOW(),?,NOW())`,
-    [channel.Id_Canal, entityId, `${prefix}_${suffix}`, date, creatorId]);
+      [channel.Id_Canal, entityId, `${prefix}_${suffix}`, date, creatorId || userIds[0]]);
     fixtures.transfers.push(String(result.insertId));
     return result.insertId;
   }
@@ -123,7 +131,7 @@ test('rechazo de entidad en el MySQL local configurado', {
   }
 
   try {
-    await t.test('FK RESTRICT exige separar transfer y borrar puntos/perfil antes de entidad', async () => {
+    await t.test('FK RESTRICT conserva solo las relaciones accesorias tras la migración 0025', async () => {
       const entityId = await createEntity('FK');
       const reservationId = await createReservation('FK_R', entityId, userIds[0]);
       const transferId = await createTransfer('FK_T', entityId, userIds[1]);
@@ -135,15 +143,13 @@ test('rechazo de entidad en el MySQL local configurado', {
         JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA
           AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME AND r.TABLE_NAME=k.TABLE_NAME
         WHERE k.TABLE_SCHEMA=DATABASE() AND k.REFERENCED_TABLE_NAME='entidades_reportantes'`);
-      assert.deepEqual(new Set(fks.map(row => row.TABLE_NAME)),
-        new Set(['reservas', 'transfers', 'entidad_reportante_puntos', 'perfiles_comision_entidad']));
-      assert.equal(fks.find(row => row.TABLE_NAME === 'transfers').DELETE_RULE, 'RESTRICT');
+      assert.deepEqual(new Set(fks.map(row => `${row.TABLE_NAME}:${row.DELETE_RULE}`)),
+        new Set(['entidad_reportante_puntos:RESTRICT', 'perfiles_comision_entidad:RESTRICT']));
       const conn = await db.getConnection();
       try {
         await conn.beginTransaction();
-        await conn.query('UPDATE reservas SET Id_Entidad_Reportante=NULL WHERE Id_Reserva=?', [reservationId]);
-        await conn.query('DELETE FROM entidad_reportante_puntos WHERE Id_Entidad_Reportante=?', [entityId]);
-        await conn.query('DELETE FROM perfiles_comision_entidad WHERE Id_Entidad_Reportante=?', [entityId]);
+        // Las reservas y los transfers ya no tienen FK a la entidad; los dos
+        // vínculos accesorios conservados sí deben impedir borrarla.
         await assert.rejects(conn.query('DELETE FROM entidades_reportantes WHERE Id_Entidad_Reportante=?', [entityId]),
           error => error.errno === 1451);
         await conn.rollback();
@@ -156,7 +162,7 @@ test('rechazo de entidad en el MySQL local configurado', {
       for (const row of [reservation, transfer]) {
         assert.equal(row.Id_Entidad_Reportante, null);
         assert.equal(row.Estado, 'Pendiente de datos');
-        assert.equal(row.Pendiente_Por_Entidad_En, null);
+        assert.ok(row.Pendiente_Por_Entidad_En);
       }
       const [[removed]] = await db.query('SELECT COUNT(*) AS n FROM entidades_reportantes WHERE Id_Entidad_Reportante=?', [entityId]);
       assert.equal(Number(removed.n), 0);
@@ -241,7 +247,7 @@ test('rechazo de entidad en el MySQL local configurado', {
       assert.equal(Number(historyCount.n), 0);
     });
 
-    await t.test('reasignar una operación cierra pendiente del creador y aviso agregado', async () => {
+    await t.test('reasignar una operación cierra el pendiente y su aviso personal', async () => {
       const rejectedEntity = await createEntity('CORRECT');
       const reservationId = await createReservation('CR', rejectedEntity, userIds[0]);
       const worker = await db.getConnection();
@@ -260,16 +266,19 @@ test('rechazo de entidad en el MySQL local configurado', {
       finally { conn.release(); }
       const [pendings] = await db.query(`SELECT Estado FROM pendientes_operativos
         WHERE Entidad_Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Id=?`, [`${prefix}_CORRECT_EVENT`]);
-      assert.equal(pendings.length, 2);
+      assert.equal(pendings.length, 1);
       assert.ok(pendings.every(row => row.Estado === 'RESUELTO_AUTOMATICAMENTE'));
-      const [notices] = await db.query(`SELECT Leida,Datos FROM notificaciones
+      const [notices] = await db.query(`SELECT Id_Usuario,Titulo,Leida,Datos FROM notificaciones
         WHERE Entidad_Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Id=?`, [`${prefix}_CORRECT_EVENT`]);
-      assert.ok(notices.length >= 1);
+      assert.ok(notices.length >= 2);
       assert.ok(notices.every(row => Number(row.Leida) === 1));
-      assert.ok(notices.some(row => {
-        const data = typeof row.Datos === 'string' ? JSON.parse(row.Datos) : row.Datos;
-        return data.rol === 'VALIDADOR';
-      }), 'un validador debe recibir el aviso agregado');
+      assert.equal(notices.filter(row => Number(row.Id_Usuario) === Number(userIds[0])
+        && row.Titulo === 'Entidad no aprobada').length, 1,
+      'el asesor conserva su aviso de fase 2');
+      assert.ok(notices.some(row => row.Titulo === 'Entidad rechazada'),
+        'los validadores/administradores reciben avisos de fase 3');
+      assert.equal(new Set(notices.map(row => String(row.Id_Usuario))).size, notices.length,
+        'un destinatario no debe recibir dos avisos para la operación');
     });
   } finally {
     try { await cleanup(); }

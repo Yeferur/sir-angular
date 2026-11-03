@@ -1,4 +1,4 @@
-import { SirNotification, notificationDisplayTitle } from './notificaciones.service';
+import { SirNotification, notificationDisplayTitle, rejectedOperationTarget } from './notificaciones.service';
 
 describe('Título de novedades de SIR', () => {
   const update = (version: string): SirNotification => ({
@@ -23,5 +23,25 @@ describe('Título de novedades de SIR', () => {
     const item = update('v1.4.0');
     item.titulo += ' · v1.4.0';
     expect(notificationDisplayTitle(item)).toBe(item.titulo);
+  });
+});
+
+describe('Destino de avisos por rechazo de entidad', () => {
+  const rejected = (datos: Record<string, unknown>): SirNotification => ({
+    idNotificacion: '1', tipo: 'ENTIDAD_REPORTANTE_RECHAZADA', titulo: '', mensaje: '',
+    entidadTipo: 'ENTIDAD_REPORTANTE_RECHAZADA', entidadId: 'evento-1', datos,
+    leida: false, fechaLectura: null, fechaCreacion: '',
+  });
+
+  it('usa el tipo e ID explícitos para abrir la operación en su drawer global', () => {
+    expect(rejectedOperationTarget(rejected({ operacionTipo: 'RESERVA', operacionId: 'R 1' })))
+      .toEqual({ type: 'RESERVA', id: 'R 1' });
+  });
+
+  it('reconoce los enlaces actuales de edición como destino de reserva o transfer', () => {
+    expect(rejectedOperationTarget(rejected({ ruta: '/Transfers/EditarTransfer/31' })))
+      .toEqual({ type: 'TRANSFER', id: '31' });
+    expect(rejectedOperationTarget(rejected({ route: '/Reservas/EditarReserva/R%201' })))
+      .toEqual({ type: 'RESERVA', id: 'R 1' });
   });
 });

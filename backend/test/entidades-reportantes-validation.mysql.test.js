@@ -46,7 +46,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-test('MySQL real aislado: migraciones 0016–0018 y validación de entidades reportantes', {
+test('MySQL real aislado: migraciones de entidades reportantes y rechazo transaccional', {
   skip: process.env.ENTIDADES_REPORTANTES_VALIDATION_MYSQL_TEST !== '1', timeout: 240000,
 }, async (t) => {
   dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
@@ -124,7 +124,13 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       `f3_${key}_${database.slice(-6)}@example.invalid`, 'solo-fixture', roleId]);
     userIds[key] = id;
   }
-  const [channelRows] = await target.query(`INSERT INTO canales_origen (Nombre_Canal,Tiene_Comision) VALUES
+  userIds.validatorSecondary = userIdBase + userOffset++;
+  await target.query(`INSERT INTO usuarios
+    (Id_Usuario,Nombres_Apellidos,Usuario,Correo,Contrasena,Id_Rol,Activo)
+    VALUES (?,?,?,?,?,?,1)`, [userIds.validatorSecondary, 'Usuario prueba validator secundario',
+    `f3_validator2_${database.slice(-6)}`, `f3_validator2_${database.slice(-6)}@example.invalid`,
+    'solo-fixture', roleIds.validator]);
+  const [channelRows] = await target.query(`INSERT INTO canales_reservas (Nombre_Canal,Tiene_Comision) VALUES
     ('HOTEL',0),('AGENCIA NACIONAL',0),('AGENCIA INTERNACIONAL',0),('FREELANCE',0)`);
   const channels = {
     hotel: channelRows.insertId,
@@ -169,6 +175,18 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       await target.query(statement);
     }
   }
+  const rejectedEntityPendingMigration = migrations.find(item => item.name === '20261025_0020_entidad_rechazada_correccion.sql');
+  assert.ok(rejectedEntityPendingMigration, 'debe existir la migración de pendientes por rechazo');
+  for (const statement of rejectedEntityPendingMigration.statements) await target.query(statement);
+  const commissionGroupMigration = migrations.find(item => item.name === '20261025_0021_comisiones_grupos_pago.sql');
+  assert.ok(commissionGroupMigration, 'debe existir la migración de grupos de comisión');
+  for (const statement of commissionGroupMigration.statements) await target.query(statement);
+  const channelRenameMigration = migrations.find(item => item.name === '20261026_0024_rename_canales_origen.sql');
+  assert.ok(channelRenameMigration, 'debe existir la migración de renombre de canales');
+  for (const statement of channelRenameMigration.statements) await target.query(statement);
+  const historicalEntityMigration = migrations.find(item => item.name === '20261102_0025_entidad_rechazada_historial_operaciones.sql');
+  assert.ok(historicalEntityMigration, 'debe existir la migración de referencias históricas');
+  for (const statement of historicalEntityMigration.statements) await target.query(statement);
   const [[migrationEvidence]] = await target.query(`SELECT
     (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()
       AND TABLE_NAME='transfers' AND INDEX_NAME='ix_transfers_entidad_registro') AS index_0016,
@@ -258,7 +276,9 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
   const tag = `F3${randomBytes(5).toString('hex')}`;
   await check('el rechazo actualiza operaciones abiertas, conserva registros asociados y guarda motivo', async () => {
     const entity = await createEntity(`rechazo ${tag}`);
-    await entities.validateEntity(entity.Id_Entidad_Reportante, 'VALIDADA', userIds.admin);
+    const [commissionGroup] = await target.query(`INSERT INTO comisiones_grupos_pago
+      (Id_Entidad_Reportante,Fecha_Tour,Estado) VALUES (?,?,'ANULADO')`,
+    [entity.Id_Entidad_Reportante, ymdPlusDays(30)]);
     const ids = {
       pending: `${tag}R1`, confirmed: `${tag}R2`, completed: `${tag}R3`, cancelled: `${tag}R4`, deleted: `${tag}R5`,
     };
@@ -284,22 +304,31 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
     assert.equal(rejected.Estado_Validacion, 'RECHAZADA');
     assert.equal(rejected.reservasAfectadas, 2);
     assert.equal(rejected.transfersAfectados, 2);
-    const [reservationRows] = await target.query('SELECT Id_Reserva,Estado,Eliminada_En,Pendiente_Por_Entidad_En FROM reservas WHERE Id_Reserva IN (?)', [[...Object.values(ids)]]);
+    assert.deepEqual(new Set(rejected.reservasIds), new Set([ids.pending, ids.confirmed]));
+    assert.deepEqual(new Set(rejected.transfersIds.map(String)), new Set([String(transferPending), String(transferConfirmed)]));
+    const [reservationRows] = await target.query('SELECT Id_Reserva,Id_Entidad_Reportante,Estado,Eliminada_En,Pendiente_Por_Entidad_En FROM reservas WHERE Id_Reserva IN (?)', [[...Object.values(ids)]]);
     const byReservation = new Map(reservationRows.map(row => [row.Id_Reserva, row]));
     for (const id of [ids.pending, ids.confirmed]) {
+      assert.equal(byReservation.get(id).Id_Entidad_Reportante, null);
       assert.equal(byReservation.get(id).Estado, 'Pendiente de datos');
       assert.ok(byReservation.get(id).Pendiente_Por_Entidad_En);
     }
     for (const [id, expected] of [[ids.completed, 'Completada'], [ids.cancelled, 'Cancelada'], [ids.deleted, 'Pendiente de pago']]) {
+      assert.equal(Number(byReservation.get(id).Id_Entidad_Reportante), Number(entity.Id_Entidad_Reportante));
       assert.equal(byReservation.get(id).Estado, expected);
       assert.equal(byReservation.get(id).Pendiente_Por_Entidad_En, null);
     }
-    const [transferRows] = await target.query(`SELECT Id_Transfer,Estado,Pendiente_Por_Entidad_En FROM transfers
+    assert.ok(byReservation.get(ids.deleted).Eliminada_En);
+    const [transferRows] = await target.query(`SELECT Id_Transfer,Id_Entidad_Reportante,Estado,Pendiente_Por_Entidad_En FROM transfers
       WHERE Id_Transfer IN (?,?,?,?)`, [transferPending, transferConfirmed, transferCompleted, transferCancelled]);
     const byTransfer = new Map(transferRows.map(row => [Number(row.Id_Transfer), row]));
     for (const id of [transferPending, transferConfirmed]) {
+      assert.equal(byTransfer.get(Number(id)).Id_Entidad_Reportante, null);
       assert.equal(byTransfer.get(Number(id)).Estado, 'Pendiente de datos');
       assert.ok(byTransfer.get(Number(id)).Pendiente_Por_Entidad_En);
+    }
+    for (const id of [transferCompleted, transferCancelled]) {
+      assert.equal(Number(byTransfer.get(Number(id)).Id_Entidad_Reportante), Number(entity.Id_Entidad_Reportante));
     }
     assert.equal(byTransfer.get(Number(transferCompleted)).Estado, 'Completado');
     assert.equal(byTransfer.get(Number(transferCancelled)).Estado, 'Cancelado');
@@ -313,22 +342,51 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       WHERE h.Tabla='entidades_reportantes' AND h.Id_Registro=? AND h.Accion='RECHAZAR'
         AND d.Columna='Motivo de rechazo'`, [entity.Id_Entidad_Reportante]);
     assert.equal(reasonHistory.at(-1)?.Valor_Nuevo, 'No se pudo verificar el vínculo con la entidad.');
+    const [entityHistory] = await target.query(`SELECT h.Id_Usuario,h.Fecha_Hora_Registro,d.Valor_Nuevo AS nombre
+      FROM historial h JOIN detalle_historial d ON d.Id_Historial=h.Id_Historial
+      WHERE h.Tabla='entidades_reportantes' AND h.Id_Registro=? AND h.Accion='RECHAZAR'
+        AND d.Columna='Nombre'`, [entity.Id_Entidad_Reportante]);
+    assert.equal(Number(entityHistory.at(-1)?.Id_Usuario), Number(userIds.admin));
+    assert.ok(entityHistory.at(-1)?.Fecha_Hora_Registro);
+    assert.equal(entityHistory.at(-1)?.nombre, `F3 ${database.slice(-6)} rechazo ${tag}`);
+    const [[retainedCommissionGroup]] = await target.query(`SELECT Id_Entidad_Reportante
+      FROM comisiones_grupos_pago WHERE Id_Grupo_Comision=?`, [commissionGroup.insertId]);
+    assert.equal(Number(retainedCommissionGroup.Id_Entidad_Reportante), Number(entity.Id_Entidad_Reportante));
+    const historyIds = [...Object.values(ids), String(transferPending), String(transferConfirmed),
+      String(transferCompleted), String(transferCancelled)];
+    const [operationHistory] = await target.query(`SELECT COUNT(*) AS n FROM historial
+      WHERE Tabla IN ('reservas','transfers') AND Accion='ENTIDAD_REPORTANTE_RECHAZADA'
+        AND Id_Registro IN (?)`, [historyIds]);
+    assert.equal(Number(operationHistory[0].n), 0);
 
-    const [eventNotifications] = await target.query(`SELECT Id_Usuario,Mensaje,Clave_Deduplicacion,Datos
-      FROM notificaciones WHERE Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Tipo='ENTIDAD_REPORTANTE'
-        AND Entidad_Id=?`, [String(entity.Id_Entidad_Reportante)]);
-    const expectedRecipients = new Set([userIds.other, userIds.validator, userIds.admin, userIds.marketing].map(String));
-    assert.equal(eventNotifications.length, expectedRecipients.size);
+    const [eventNotifications] = await target.query(`SELECT Id_Usuario,Mensaje,Clave_Deduplicacion,Datos,Entidad_Id
+      FROM notificaciones WHERE Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Tipo='ENTIDAD_REPORTANTE_RECHAZADA'
+        AND Mensaje LIKE ?`, [`%${tag}%`]);
+    const expectedRecipients = new Set([String(userIds.other), String(userIds.validator),
+      String(userIds.marketing), String(userIds.validatorSecondary)]);
+    assert.equal(eventNotifications.length, 14);
     assert.deepEqual(new Set(eventNotifications.map(row => String(row.Id_Usuario))), expectedRecipients);
+    const noticeData = eventNotifications.map(row => typeof row.Datos === 'string' ? JSON.parse(row.Datos) : row.Datos);
+    assert.deepEqual(new Set(noticeData.map(data => `${data.operacionTipo}:${data.operacionId}`)),
+      new Set([`RESERVA:${ids.pending}`, `RESERVA:${ids.confirmed}`,
+        `TRANSFER:${transferPending}`, `TRANSFER:${transferConfirmed}`]));
+    assert.equal(eventNotifications.some(row => Number(row.Id_Usuario) === Number(userIds.admin)), false);
     for (const notice of eventNotifications) {
-      assert.match(notice.Mensaje, /2 reservas y 2 transfers quedaron/);
-      assert.match(notice.Mensaje, /No se pudo verificar el vínculo/);
-      assert.match(notice.Clave_Deduplicacion, new RegExp(`^ENTIDAD_RECHAZO:${entity.Id_Entidad_Reportante}:`));
+      assert.match(notice.Clave_Deduplicacion, /^ENTIDAD_RECHAZO:[^:]+:/);
     }
+    const rejectedName = `F3 ${database.slice(-6)} rechazo ${tag}`;
+    assert.ok(eventNotifications.some(notice => notice.Mensaje ===
+      `Tu reserva ${ids.pending} quedó pendiente: la entidad "${rejectedName}" no fue aprobada. Cambia la entidad para continuar.`));
+    assert.ok(eventNotifications.some(notice => notice.Mensaje ===
+      `Tu transfer TRS${String(transferPending).padStart(5, '0')} quedó pendiente: la entidad "${rejectedName}" no fue aprobada. Cambia la entidad para continuar.`));
+    assert.ok(eventNotifications.some(notice => Number(notice.Id_Usuario) === Number(userIds.validator)
+      && notice.Mensaje === `Se rechazó la entidad "${rejectedName}": la reserva ${ids.pending} quedó pendiente por entidad.`));
+    assert.ok(eventNotifications.some(notice => Number(notice.Id_Usuario) === Number(userIds.validator)
+      && notice.Mensaje === `Se rechazó la entidad "${rejectedName}": el transfer TRS${String(transferPending).padStart(5, '0')} quedó pendiente por entidad.`));
     const duplicateInput = {
       userId: String(eventNotifications[0].Id_Usuario), type: 'ENTIDAD_REPORTANTE_RECHAZADA',
-      title: 'Repetición de prueba', message: 'Reintento del mismo evento', entityType: 'ENTIDAD_REPORTANTE',
-      entityId: String(entity.Id_Entidad_Reportante), deduplicationKey: eventNotifications[0].Clave_Deduplicacion,
+      title: 'Repetición de prueba', message: 'Reintento del mismo evento', entityType: 'ENTIDAD_REPORTANTE_RECHAZADA',
+      entityId: String(eventNotifications[0].Entidad_Id), deduplicationKey: eventNotifications[0].Clave_Deduplicacion,
       data: typeof eventNotifications[0].Datos === 'string'
         ? JSON.parse(eventNotifications[0].Datos) : eventNotifications[0].Datos,
     };
@@ -339,28 +397,103 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       WHERE Id_Usuario=? AND Clave_Deduplicacion=?`, [duplicateInput.userId, duplicateInput.deduplicationKey]);
     assert.equal(Number(sameEventCount.n), 1);
 
-    const firstEventKey = eventNotifications[0].Clave_Deduplicacion;
-    const firstMarker = byReservation.get(ids.pending).Pendiente_Por_Entidad_En;
-    await entities.validateEntity(entity.Id_Entidad_Reportante, 'VALIDADA', userIds.admin);
-    let [[stillPending]] = await target.query('SELECT Estado,Pendiente_Por_Entidad_En FROM reservas WHERE Id_Reserva=?', [ids.pending]);
-    assert.equal(stillPending.Estado, 'Pendiente de datos');
-    assert.equal(String(stillPending.Pendiente_Por_Entidad_En), String(firstMarker));
-    await entities.validateEntity(entity.Id_Entidad_Reportante, 'RECHAZADA', userIds.admin, 'Segundo rechazo tras revisión.');
-    const [secondEvents] = await target.query(`SELECT Id_Usuario,Clave_Deduplicacion FROM notificaciones
-      WHERE Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Id=?`, [String(entity.Id_Entidad_Reportante)]);
-    assert.equal(secondEvents.length, expectedRecipients.size * 2,
-      `avisos tras segundo rechazo: ${JSON.stringify(secondEvents)}`);
-    const eventKeys = new Set(secondEvents.map(row => row.Clave_Deduplicacion));
-    assert.equal(eventKeys.size, 2);
-    assert.ok(eventKeys.has(firstEventKey));
-    assert.ok([...eventKeys].some(key => key !== firstEventKey));
-    const countsByRecipient = new Map();
-    for (const row of secondEvents) countsByRecipient.set(String(row.Id_Usuario), (countsByRecipient.get(String(row.Id_Usuario)) || 0) + 1);
-    assert.deepEqual(new Set(countsByRecipient.keys()), expectedRecipients);
-    assert.ok([...countsByRecipient.values()].every(count => count === 2));
   });
 
-  await check('un error de notificación o del pendiente revierte por completo el rechazo', async () => {
+  await check('fase 3: avisa a validadores y administradores y cierra avisos al asignar entidad', async () => {
+    const entity = await createEntity(`avisos fase 3 ${tag}`);
+    const replacement = await createEntity(`reemplazo fase 3 ${tag}`);
+    await entities.validateEntity(replacement.Id_Entidad_Reportante, 'VALIDADA', userIds.admin);
+    const ids = { reservationOther: `${tag}P3R1`, reservationValidator: `${tag}P3R2` };
+    await insertReservation({ id: ids.reservationOther, entityId: entity.Id_Entidad_Reportante,
+      creatorId: userIds.other, state: 'Confirmada' });
+    await insertReservation({ id: ids.reservationValidator, entityId: entity.Id_Entidad_Reportante,
+      creatorId: userIds.validatorSecondary, state: 'Pendiente' });
+    const transferId = await insertTransfer({ entityId: entity.Id_Entidad_Reportante,
+      creatorId: userIds.other, state: 'Confirmado', titular: `F3 ${tag} transfer fase 3` });
+    const eventId = `F3EV${tag}`;
+    const websocketEvents = [];
+    const rejectedName = `F3 ${database.slice(-6)} avisos fase 3 ${tag}`;
+    const result = await entities.runValidationTransaction(target, {
+      id: entity.Id_Entidad_Reportante, state: 'RECHAZADA', actorId: userIds.validator,
+      reason: 'Prueba de avisos de fase 3.',
+    }, { eventIdFactory: () => eventId,
+      websocket: { sendToUser: (userId, payload) => websocketEvents.push({ userId: String(userId), payload }) } });
+
+    assert.deepEqual(new Set(result.reservasIds), new Set(Object.values(ids)));
+    assert.deepEqual(result.transfersIds.map(String), [String(transferId)]);
+    assert.equal(result.avisosValidacionCreados, 8);
+    assert.equal(result.alertasCreadas, 11);
+    const [eventNotices] = await target.query(`SELECT Id_Notificacion,Id_Usuario,Titulo,Mensaje,Datos,Clave_Deduplicacion,Leida
+      FROM notificaciones WHERE Tipo='ENTIDAD_REPORTANTE_RECHAZADA' AND Entidad_Id=?`, [eventId]);
+    assert.equal(eventNotices.length, 11);
+    assert.equal(eventNotices.some(row => Number(row.Id_Usuario) === Number(userIds.validator)), false,
+      'quien rechaza no debe recibir avisos de fase 3');
+    const phase3 = eventNotices.filter(row => row.Titulo === 'Entidad rechazada');
+    const phase2 = eventNotices.filter(row => row.Titulo === 'Entidad no aprobada');
+    assert.equal(phase3.length, 8);
+    assert.equal(phase2.length, 3);
+
+    const parsed = row => typeof row.Datos === 'string' ? JSON.parse(row.Datos) : row.Datos;
+    const validationRecipients = new Map([
+      [`RESERVA:${ids.reservationOther}`, new Set([String(userIds.admin), String(userIds.marketing), String(userIds.validatorSecondary)])],
+      [`RESERVA:${ids.reservationValidator}`, new Set([String(userIds.admin), String(userIds.marketing)])],
+      [`TRANSFER:${transferId}`, new Set([String(userIds.admin), String(userIds.marketing), String(userIds.validatorSecondary)])],
+    ]);
+    for (const [operation, expectedUsers] of validationRecipients) {
+      const rows = phase3.filter(row => {
+        const data = parsed(row);
+        return `${data.operacionTipo}:${data.operacionId}` === operation;
+      });
+      assert.deepEqual(new Set(rows.map(row => String(row.Id_Usuario))), expectedUsers, operation);
+      assert.ok(rows.every(row => parsed(row).eventoRechazo === eventId));
+    }
+    assert.ok(phase3.some(row => Number(row.Id_Usuario) === Number(userIds.validatorSecondary)
+      && row.Mensaje === `Se rechazó la entidad "${rejectedName}": la reserva ${ids.reservationOther} quedó pendiente por entidad.`));
+    assert.ok(phase3.some(row => Number(row.Id_Usuario) === Number(userIds.admin)
+      && row.Mensaje === `Se rechazó la entidad "${rejectedName}": la reserva ${ids.reservationValidator} quedó pendiente por entidad.`));
+    assert.ok(phase3.some(row => Number(row.Id_Usuario) === Number(userIds.admin)
+      && row.Mensaje === `Se rechazó la entidad "${rejectedName}": el transfer TRS${String(transferId).padStart(5, '0')} quedó pendiente por entidad.`));
+    assert.ok(phase3.every(row => {
+      const data = parsed(row);
+      return data.ruta === (data.operacionTipo === 'RESERVA'
+        ? `/Reservas/EditarReserva/${data.operacionId}` : `/Transfers/EditarTransfer/${data.operacionId}`);
+    }));
+    assert.ok(phase2.some(row => Number(row.Id_Usuario) === Number(userIds.validatorSecondary)
+      && parsed(row).operacionId === ids.reservationValidator
+      && row.Mensaje === `Tu reserva ${ids.reservationValidator} quedó pendiente: la entidad "${rejectedName}" no fue aprobada. Cambia la entidad para continuar.`),
+    'el creador que también valida conserva su aviso de fase 2');
+    const uniqueUserOperations = new Set(eventNotices.map(row => {
+      const data = parsed(row);
+      return `${row.Id_Usuario}:${data.operacionTipo}:${data.operacionId}`;
+    }));
+    assert.equal(uniqueUserOperations.size, eventNotices.length,
+      'ningún destinatario debe recibir dos avisos por operación');
+    assert.equal(websocketEvents.length, eventNotices.length);
+
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(`UPDATE reservas SET Id_Entidad_Reportante=?,Estado='Confirmada',Pendiente_Por_Entidad_En=NULL
+        WHERE Id_Reserva IN (?,?)`, [replacement.Id_Entidad_Reportante, ids.reservationOther, ids.reservationValidator]);
+      await conn.query(`UPDATE transfers SET Id_Entidad_Reportante=?,Estado='Confirmado',Pendiente_Por_Entidad_En=NULL
+        WHERE Id_Transfer=?`, [replacement.Id_Entidad_Reportante, transferId]);
+      await entities.resolveRejectedEntityOperation(conn, 'RESERVA', ids.reservationOther);
+      await entities.resolveRejectedEntityOperation(conn, 'RESERVA', ids.reservationValidator);
+      await entities.resolveRejectedEntityOperation(conn, 'TRANSFER', transferId);
+      await conn.commit();
+    } catch (error) { await conn.rollback(); throw error; }
+    finally { conn.release(); }
+
+    const [closedNotices] = await target.query('SELECT Leida FROM notificaciones WHERE Entidad_Id=?', [eventId]);
+    assert.ok(closedNotices.every(row => Number(row.Leida) === 1));
+    for (const recipientId of [userIds.admin, userIds.validatorSecondary, userIds.other]) {
+      const personal = await notifications.listMine(recipientId);
+      assert.equal(personal.notificaciones.some(row => row.tipo === 'ENTIDAD_REPORTANTE_RECHAZADA'
+        && row.datos?.eventoRechazo === eventId), false, `el aviso sigue visible para ${recipientId}`);
+    }
+  });
+
+  await check('los errores al notificar no bloquean el rechazo y los errores transaccionales revierten', async () => {
     for (const mode of ['notification', 'pending']) {
       const entity = await createEntity(`rollback ${mode} ${tag}`);
       const reservationId = `${tag}${mode === 'notification' ? 'N' : 'P'}1`;
@@ -374,7 +507,7 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
         dependencies.notifications = {
           createNotification: async (conn, input) => {
             calls += 1;
-            if (calls === 2) throw new Error('fallo inducido en notificación');
+            if (calls === 1) throw new Error('fallo inducido en notificación');
             return notifications.createNotification(conn, input);
           },
         };
@@ -387,10 +520,25 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
           },
         };
       }
-      await assert.rejects(entities.runValidationTransaction(target, {
+      const operation = entities.runValidationTransaction(target, {
         id: entity.Id_Entidad_Reportante, state: 'RECHAZADA', actorId: userIds.admin,
         reason: `Motivo rollback ${mode}.`,
-      }, dependencies), mode === 'notification' ? /fallo inducido en notificación/ : /fallo inducido al resolver pendiente/);
+      }, dependencies);
+      if (mode === 'notification') {
+        const response = await operation;
+        assert.equal(response.alertasFallidas, 1);
+        const [[remainingEntity]] = await target.query(
+          'SELECT COUNT(*) AS n FROM entidades_reportantes WHERE Id_Entidad_Reportante=?',
+          [entity.Id_Entidad_Reportante]);
+        const [[detached]] = await target.query(`SELECT Id_Entidad_Reportante,Estado,Pendiente_Por_Entidad_En
+          FROM reservas WHERE Id_Reserva=?`, [reservationId]);
+        assert.equal(Number(remainingEntity.n), 0);
+        assert.equal(detached.Id_Entidad_Reportante, null);
+        assert.equal(detached.Estado, 'Pendiente de datos');
+        assert.ok(detached.Pendiente_Por_Entidad_En);
+        continue;
+      }
+      await assert.rejects(operation, /fallo inducido al resolver pendiente/);
       const [[after]] = await target.query(`SELECT e.Estado_Validacion,r.Estado,r.Pendiente_Por_Entidad_En,
         p.Estado AS Estado_Pendiente,
         (SELECT COUNT(*) FROM notificaciones n WHERE n.Entidad_Tipo='ENTIDAD_REPORTANTE'
@@ -419,7 +567,7 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
     assert.equal(pendingRow.Permiso_Audiencia, 'ENTIDADES_REPORTANTES.VALIDAR');
     assert.equal(pendingRow.Estado, 'ACTIVO');
     const pendingData = typeof pendingRow.Datos === 'string' ? JSON.parse(pendingRow.Datos) : pendingRow.Datos;
-    assert.equal(pendingData.ruta, '/Mercadeo?vista=entidades&validacion=PENDIENTE_VALIDACION');
+    assert.equal(pendingData.ruta, '/Mercadeo/Entidades?validacion=PENDIENTE_VALIDACION');
     await target.query(`INSERT INTO reglas_pendientes (Codigo,Nombre,Descripcion,Activa)
       VALUES ('OTRA_AUDIENCIA_F3','Otra audiencia F3','Pendiente aislado de otra audiencia',1)`);
     await pending.upsertCondition({ ruleCode: 'OTRA_AUDIENCIA_F3', deduplicationKey: `F3:OTHER:${tag}`,
@@ -521,7 +669,6 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
 
   await check('concurrencia: rechazo mientras se guarda reserva no deja confirmada una entidad rechazada', async () => {
     const entity = await createEntity(`concurrencia ${tag}`);
-    await entities.validateEntity(entity.Id_Entidad_Reportante, 'VALIDADA', userIds.admin);
     const reservationId = `${tag}C1`;
     await insertReservation({ id: reservationId, entityId: entity.Id_Entidad_Reportante,
       state: 'Pendiente de datos', marker: '2026-01-01 00:00:00', horarioId: schedule.insertId,
@@ -571,11 +718,13 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
       if (rejectionPromise) await Promise.allSettled([savePromise, rejectionPromise]);
       db.getConnection = originalGet;
     }
-    const [[finalState]] = await target.query(`SELECT e.Estado_Validacion,r.Estado,r.Pendiente_Por_Entidad_En
-      FROM entidades_reportantes e JOIN reservas r ON r.Id_Entidad_Reportante=e.Id_Entidad_Reportante
-      WHERE e.Id_Entidad_Reportante=? AND r.Id_Reserva=?`, [entity.Id_Entidad_Reportante, reservationId]);
-    assert.equal(finalState.Estado_Validacion, 'RECHAZADA');
+    const [[entityAfterReject]] = await target.query('SELECT Id_Entidad_Reportante FROM entidades_reportantes WHERE Id_Entidad_Reportante=?',
+      [entity.Id_Entidad_Reportante]);
+    assert.equal(entityAfterReject, undefined);
+    const [[finalState]] = await target.query(`SELECT Estado,Id_Entidad_Reportante,Pendiente_Por_Entidad_En
+      FROM reservas WHERE Id_Reserva=?`, [reservationId]);
     assert.equal(finalState.Estado, 'Pendiente de datos');
+    assert.equal(finalState.Id_Entidad_Reportante, null);
     assert.ok(finalState.Pendiente_Por_Entidad_En);
   });
 
@@ -647,7 +796,11 @@ test('MySQL real aislado: migraciones 0016–0018 y validación de entidades rep
     serverSchemaSelected: serverAfter.selected_database,
     disposableSchema: database,
     copiedFromSir2: false,
-    migrationsAppliedInTemporarySchema: expectedTail,
+    migrationsAppliedInTemporarySchema: [...expectedTail,
+      '20261025_0020_entidad_rechazada_correccion.sql',
+      '20261025_0021_comisiones_grupos_pago.sql',
+      '20261026_0024_rename_canales_origen.sql',
+      '20261102_0025_entidad_rechazada_historial_operaciones.sql'],
     checks,
     result: 'PASS',
   }));

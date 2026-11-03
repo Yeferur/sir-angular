@@ -1,4 +1,14 @@
 const db = require('../../database/db');
+const UNASSIGNED_REJECTED_OPERATION = `(
+  (JSON_UNQUOTE(JSON_EXTRACT(n.Datos,'$.operacionTipo'))='RESERVA'
+    AND EXISTS (SELECT 1 FROM reservas r
+      WHERE CAST(r.Id_Reserva AS CHAR)=JSON_UNQUOTE(JSON_EXTRACT(n.Datos,'$.operacionId'))
+        AND r.Id_Entidad_Reportante IS NULL))
+  OR (JSON_UNQUOTE(JSON_EXTRACT(n.Datos,'$.operacionTipo'))='TRANSFER'
+    AND EXISTS (SELECT 1 FROM transfers tr
+      WHERE CAST(tr.Id_Transfer AS CHAR)=JSON_UNQUOTE(JSON_EXTRACT(n.Datos,'$.operacionId'))
+        AND tr.Id_Entidad_Reportante IS NULL))
+)`;
 
 async function createNotification(connection, notification) {
   const executor = connection || db;
@@ -21,6 +31,7 @@ async function listMine(userId, limit = 30) {
     `SELECT Id_Notificacion, Tipo, Titulo, Mensaje, Entidad_Tipo, Entidad_Id,
             Datos, Leida, Fecha_Lectura, Fecha_Creacion
        FROM notificaciones WHERE Id_Usuario = ?
+        AND (Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR Leida = 0)
       ORDER BY Fecha_Creacion DESC LIMIT ?`,
     [userId, safeLimit]
   );
@@ -29,8 +40,9 @@ async function listMine(userId, limit = 30) {
             n.Datos, n.Leida, n.Fecha_Lectura, n.Fecha_Creacion
        FROM notificaciones n
       WHERE n.Id_Usuario=? AND n.Tipo='ENTIDAD_REPORTANTE_RECHAZADA'
-        AND EXISTS (SELECT 1 FROM pendientes_operativos p
+        AND (EXISTS (SELECT 1 FROM pendientes_operativos p
           WHERE p.Clave_Deduplicacion=n.Clave_Deduplicacion AND p.Estado='ACTIVO')
+          OR ${UNASSIGNED_REJECTED_OPERATION})
       ORDER BY n.Fecha_Creacion DESC`, [userId]
   );
   const visible = [...new Map([...activeRejections, ...rows]
@@ -54,9 +66,10 @@ async function markRead(userId, notificationId) {
   const [result] = await db.query(
     `UPDATE notificaciones n SET Leida = 1, Fecha_Lectura = COALESCE(Fecha_Lectura, NOW())
       WHERE n.Id_Notificacion = ? AND n.Id_Usuario = ?
-        AND (n.Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR NOT EXISTS
-          (SELECT 1 FROM pendientes_operativos p
-            WHERE p.Clave_Deduplicacion=n.Clave_Deduplicacion AND p.Estado='ACTIVO'))`, [notificationId, userId]
+        AND (n.Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR (
+          NOT EXISTS (SELECT 1 FROM pendientes_operativos p
+            WHERE p.Clave_Deduplicacion=n.Clave_Deduplicacion AND p.Estado='ACTIVO')
+          AND NOT ${UNASSIGNED_REJECTED_OPERATION}))`, [notificationId, userId]
   );
   return result.affectedRows > 0;
 }
@@ -65,9 +78,10 @@ async function markAllRead(userId) {
   await db.query(
     `UPDATE notificaciones n SET Leida = 1, Fecha_Lectura = COALESCE(Fecha_Lectura, NOW())
       WHERE n.Id_Usuario = ? AND n.Leida = 0
-        AND (n.Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR NOT EXISTS
-          (SELECT 1 FROM pendientes_operativos p
-            WHERE p.Clave_Deduplicacion=n.Clave_Deduplicacion AND p.Estado='ACTIVO'))`, [userId]
+        AND (n.Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR (
+          NOT EXISTS (SELECT 1 FROM pendientes_operativos p
+            WHERE p.Clave_Deduplicacion=n.Clave_Deduplicacion AND p.Estado='ACTIVO')
+          AND NOT ${UNASSIGNED_REJECTED_OPERATION}))`, [userId]
   );
 }
 

@@ -5,7 +5,7 @@ import { EMPTY, Observable, catchError, finalize, forkJoin, of, tap } from 'rxjs
 
 import { SirAlertService, ToastAction } from '../Alertas/alert.service';
 import { SirDrawerService } from '../Drawer/drawer.service';
-import { NotificacionesService, SirNotification } from '../Notificaciones/notificaciones.service';
+import { NotificacionesService, SirNotification, rejectedOperationTarget } from '../Notificaciones/notificaciones.service';
 import { DesktopNotificationsService } from '../Notificaciones/desktop-notifications.service';
 import {
   OperationalPending,
@@ -140,7 +140,7 @@ export class MiActividadFacade {
       const items = this.notifications.items();
       for (const [notificationId, toastId] of this.rejectionToastIds) {
         const item = items.find(candidate => candidate.idNotificacion === notificationId);
-        if (item?.leida) {
+        if (!item || item.leida) {
           this.alerts.dismissToast(toastId);
           this.desktopNotifications.close(notificationId);
           this.rejectionToastIds.delete(notificationId);
@@ -487,6 +487,13 @@ export class MiActividadFacade {
     }
     if (type === 'APP_UPDATE' && !this.permissions.esCliente()) {
       this.drawer.openAppUpdates();
+      return;
+    }
+    const rejectedTarget = rejectedOperationTarget(notification);
+    if (rejectedTarget) {
+      this.drawer.close(true);
+      if (rejectedTarget.type === 'RESERVA') this.drawer.openReserva(rejectedTarget.id);
+      else this.drawer.openTransfer(rejectedTarget.id);
       return;
     }
     if (typeof route === 'string' && route.startsWith('/')) {

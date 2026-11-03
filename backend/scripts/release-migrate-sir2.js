@@ -42,6 +42,7 @@ const MIGRATIONS = Object.freeze([
   '20261025_0022_integridad.sql',
   '20261026_0023_limpieza_legacy.sql',
   '20261026_0024_rename_canales_origen.sql',
+  '20261102_0025_entidad_rechazada_historial_operaciones.sql',
 ]);
 
 function assertTargetConfiguration(env) {
@@ -194,7 +195,6 @@ const REQUIRED_FKS = Object.freeze([
   ['pagos_reservas', 'fk_pagosreserva_reserva_restrict', 'RESTRICT'],
   ['pagos_transfers', 'fk_pagostransfers_transfer_restrict', 'RESTRICT'],
   ['liquidaciones', 'fk_liquidacion_reserva_restrict', 'RESTRICT'],
-  ['reservas', 'fk_reservas_entidad_reportante', 'RESTRICT'],
   ['entidad_reportante_puntos', 'fk_entidad_puntos_entidad', 'RESTRICT'],
   ['entidad_reportante_puntos', 'fk_entidad_puntos_punto', 'RESTRICT'],
   ['tours', 'fk_tours_creado_por', 'SET NULL'],
@@ -207,6 +207,11 @@ const REQUIRED_FKS = Object.freeze([
   ['perfiles_comision_entidad', 'fk_perfiles_comision_creado_por', 'SET NULL'],
   ['perfiles_comision_entidad', 'fk_perfiles_comision_actualizado_por', 'SET NULL'],
   ['programaciones', 'fk_programaciones_creado_por', 'SET NULL'],
+]);
+const FORBIDDEN_FKS = Object.freeze([
+  ['reservas', 'fk_reservas_entidad_reportante'],
+  ['transfers', 'fk_transfers_entidad_reportante'],
+  ['comisiones_grupos_pago', 'fk_comisiones_grupo_entidad'],
 ]);
 const REQUIRED_TABLE_COLLATIONS = Object.freeze([
   ['tour_comisiones', 'utf8mb4_unicode_ci'],
@@ -294,6 +299,9 @@ async function readSchemaDrift(connection) {
       && fk.DELETE_RULE === deletion && (!referencedTable || fk.REFERENCED_TABLE_NAME === referencedTable)))
     .map(([table, name, deletion, referencedTable]) =>
       `${table}.${name}:${deletion}${referencedTable ? `->${referencedTable}` : ''}`);
+  const forbiddenForeignKeyDrift = FORBIDDEN_FKS.filter(([table, name]) =>
+    foreignKeys.some((fk) => fk.TABLE_NAME === table && fk.CONSTRAINT_NAME === name))
+    .map(([table, name]) => `${table}.${name}:must be absent`);
   const collationTables = REQUIRED_TABLE_COLLATIONS.map(([table]) => table);
   const [tableCollations] = await connection.query(`SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?)`, [collationTables]);
@@ -307,7 +315,7 @@ async function readSchemaDrift(connection) {
     ...RETIRED_COLUMNS.filter(([table, column]) => found.get(table)?.has(column))
       .map(([table, column]) => `columna ${table}.${column}`),
   ];
-  return { missing, engineDrift, foreignKeyDrift, collationDrift, retiredSchemaDrift };
+  return { missing, engineDrift, foreignKeyDrift, forbiddenForeignKeyDrift, collationDrift, retiredSchemaDrift };
 }
 
 async function readRenamedTableSources() {
@@ -398,8 +406,9 @@ async function applyMigrations(connection, migrations, { verifyFinal = true } = 
     }
     if (verifyFinal) {
       const drift = await readSchemaDrift(connection);
-      if (drift.missing.length || drift.engineDrift.length || drift.foreignKeyDrift.length || drift.collationDrift.length || drift.retiredSchemaDrift.length) {
-        throw new Error(`Drift después de migraciones. Faltan: ${drift.missing.join(', ') || 'ninguna'}; motores: ${drift.engineDrift.join(', ') || 'ninguno'}; FKs: ${drift.foreignKeyDrift.join(', ') || 'ninguna'}; collations: ${drift.collationDrift.join(', ') || 'ninguna'}; objetos retirados presentes: ${drift.retiredSchemaDrift.join(', ') || 'ninguno'}`);
+      if (drift.missing.length || drift.engineDrift.length || drift.foreignKeyDrift.length
+        || drift.forbiddenForeignKeyDrift.length || drift.collationDrift.length || drift.retiredSchemaDrift.length) {
+        throw new Error(`Drift después de migraciones. Faltan: ${drift.missing.join(', ') || 'ninguna'}; motores: ${drift.engineDrift.join(', ') || 'ninguno'}; FKs: ${drift.foreignKeyDrift.join(', ') || 'ninguna'}; FKs que deben faltar: ${drift.forbiddenForeignKeyDrift.join(', ') || 'ninguna'}; collations: ${drift.collationDrift.join(', ') || 'ninguna'}; objetos retirados presentes: ${drift.retiredSchemaDrift.join(', ') || 'ninguno'}`);
       }
     }
   } finally {
@@ -476,7 +485,7 @@ module.exports = {
   TARGET_DATABASE, MIGRATIONS, assertTargetConfiguration,
   assertConnectedDatabase, assertConfirmation, selectMigrationsThrough, parseMigrationSql,
   assertMigrationSafe, readMigrations, applyMigrations, readMigrationStatus,
-  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS, REQUIRED_FKS, REQUIRED_TABLE_COLLATIONS,
+  readSchemaDrift, migrationVersion, CREATE_LEDGER_SQL, REQUIRED_COLUMNS, REQUIRED_FKS, FORBIDDEN_FKS, REQUIRED_TABLE_COLLATIONS,
   RETIRED_TABLES, RETIRED_COLUMNS,
   classifyDatabase,
   readAvailabilityPreflight,

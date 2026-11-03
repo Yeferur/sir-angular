@@ -81,6 +81,22 @@ test('un rechazo activo sigue en Avisos aunque haya salido de los avisos recient
   assert.equal(response.noLeidas, 1);
 });
 
+test('un aviso de rechazo ya resuelto desaparece de Avisos', async (t) => {
+  const originalQuery = db.query;
+  const queries = [];
+  db.query = async (sql) => {
+    queries.push(sql);
+    if (sql.includes('COUNT(*)')) return [[{ Total: 0 }]];
+    return [[]];
+  };
+  t.after(() => { db.query = originalQuery; });
+
+  const response = await service.listMine(41);
+
+  assert.deepEqual(response.notificaciones, []);
+  assert.match(queries[0], /Tipo <> 'ENTIDAD_REPORTANTE_RECHAZADA' OR Leida = 0/);
+});
+
 test('marcar leída limita la actualización al propietario y no modifica avisos ajenos', async (t) => {
   const originalQuery = db.query;
   let captured;

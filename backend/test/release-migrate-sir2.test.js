@@ -5,7 +5,7 @@ const path = require('node:path');
 const {
   MIGRATIONS, assertTargetConfiguration, assertConnectedDatabase,
   assertConfirmation, selectMigrationsThrough, assertMigrationSafe, readMigrations,
-  REQUIRED_COLUMNS, REQUIRED_FKS,
+  REQUIRED_COLUMNS, REQUIRED_FKS, FORBIDDEN_FKS,
   REQUIRED_TABLE_COLLATIONS, RETIRED_TABLES, RETIRED_COLUMNS,
 } = require('../scripts/release-migrate-sir2');
 
@@ -178,13 +178,13 @@ test('el runner conserva 0020 como checkpoint anterior a 0021 y --through se det
   assert.equal(selected.at(-1).name, name);
   assert.ok(selected.at(-1).statements.some(statement =>
     statement.includes('ENTIDAD_REPORTANTE_RECHAZADA_SIN_REASIGNAR')));
-  assert.equal(MIGRATIONS.at(-4), nextName);
+  assert.equal(MIGRATIONS.at(-5), nextName);
 });
 
 test('la migración 0021 registra lotes, vínculo nullable y no hace backfill', async () => {
   const name = '20261025_0021_comisiones_grupos_pago.sql';
-  assert.equal(MIGRATIONS.at(-4), name);
-  const migration = (await readMigrations()).at(-4);
+  assert.equal(MIGRATIONS.at(-5), name);
+  const migration = (await readMigrations()).at(-5);
   assert.equal(migration.name, name);
   const sql = await fs.readFile(path.join(__dirname, '../database/migrations', name), 'utf8');
   assert.match(sql, /CREATE TABLE IF NOT EXISTS comisiones_grupos_pago/);
@@ -200,7 +200,7 @@ test('la migración 0021 registra lotes, vínculo nullable y no hace backfill', 
 
 test('la migración 0022 agrega las cuatro FK aprobadas y alinea collation sin cambiar datos', async () => {
   const name = '20261025_0022_integridad.sql';
-  assert.equal(MIGRATIONS.at(-3), name);
+  assert.equal(MIGRATIONS.at(-4), name);
   assert.deepEqual(REQUIRED_TABLE_COLLATIONS, [['tour_comisiones', 'utf8mb4_unicode_ci']]);
   for (const [table, constraint, onDelete] of [
     ['pasajeros', 'fk_pasajeros_plan', 'RESTRICT'],
@@ -224,7 +224,7 @@ test('la migración 0022 agrega las cuatro FK aprobadas y alinea collation sin c
 
 test('la migración 0023 retira las tablas y columnas legacy y conserva snapshots y módulos protegidos', async () => {
   const name = '20261026_0023_limpieza_legacy.sql';
-  assert.equal(MIGRATIONS.at(-2), name);
+  assert.equal(MIGRATIONS.at(-3), name);
   assert.deepEqual(RETIRED_TABLES, [
     'beneficiarios_comision',
     'beneficiarios_comision_documentos',
@@ -254,7 +254,7 @@ test('la migración 0023 retira las tablas y columnas legacy y conserva snapshot
 
 test('la migración 0024 renombra el catálogo y conserva las FK de runtime', async () => {
   const name = '20261026_0024_rename_canales_origen.sql';
-  assert.equal(MIGRATIONS.at(-1), name);
+  assert.equal(MIGRATIONS.at(-2), name);
   for (const [table, constraint, onDelete] of [
     ['reservas', 'fk_reservas_canal', 'SET NULL'],
     ['tour_comisiones', 'fk_tour_comisiones_canal', 'RESTRICT'],
@@ -263,7 +263,7 @@ test('la migración 0024 renombra el catálogo y conserva las FK de runtime', as
     assert.ok(REQUIRED_FKS.some(([fkTable, fkName, action, referencedTable]) =>
       fkTable === table && fkName === constraint && action === onDelete && referencedTable === 'canales_origen'));
   }
-  const migration = (await readMigrations()).at(-1);
+  const migration = (await readMigrations()).at(-2);
   assert.equal(migration.name, name);
   assert.equal(migration.statements.length, 1);
   const rename = migration.statements[0].match(/^RENAME TABLE ([A-Za-z0-9_]+) TO ([A-Za-z0-9_]+)$/i);
@@ -271,4 +271,27 @@ test('la migración 0024 renombra el catálogo y conserva las FK de runtime', as
   assert.equal(rename[2], 'canales_origen');
   assert.notEqual(rename[1], rename[2]);
   assert.doesNotMatch(migration.statements.join('\n'), /\b(?:DROP|TRUNCATE|DELETE|UPDATE|INSERT)\b/i);
+});
+
+test('la migración 0025 permite borrar entidades preservando operaciones y lotes históricos', async () => {
+  const name = '20261102_0025_entidad_rechazada_historial_operaciones.sql';
+  assert.equal(MIGRATIONS.at(-1), name);
+  assert.deepEqual(FORBIDDEN_FKS, [
+    ['reservas', 'fk_reservas_entidad_reportante'],
+    ['transfers', 'fk_transfers_entidad_reportante'],
+    ['comisiones_grupos_pago', 'fk_comisiones_grupo_entidad'],
+  ]);
+  const migration = (await readMigrations()).at(-1);
+  assert.equal(migration.name, name);
+  const sql = await fs.readFile(path.join(__dirname, '../database/migrations', name), 'utf8');
+  for (const [table, constraint] of [
+    ['reservas', 'fk_reservas_entidad_reportante'],
+    ['transfers', 'fk_transfers_entidad_reportante'],
+    ['comisiones_grupos_pago', 'fk_comisiones_grupo_entidad'],
+  ]) {
+    assert.match(sql, new RegExp(`TABLE_NAME='${table}'[\\s\\S]*?CONSTRAINT_NAME='${constraint}'`));
+    assert.match(sql, new RegExp(`ALTER TABLE ${table} DROP FOREIGN KEY ${constraint}`));
+  }
+  assert.doesNotMatch(sql, /\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE\s+TABLE|DROP\s+TABLE|DROP\s+COLUMN)\b/i);
+  assert.equal(migration.statements.length, 12);
 });
