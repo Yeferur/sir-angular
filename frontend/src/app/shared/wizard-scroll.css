@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  min-height: 0;
+}
+
+.wizard-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 112px);
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+
+.wizard-shell > :not(.wizard-step-panel) {
+  flex: 0 0 auto;
+}
+
+.wizard-shell > .wizard-step-panel {
+  --wizard-scroll-edge-fade: 16px;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--wizard-scroll-edge-fade);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--wizard-scroll-edge-fade);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--wizard-scroll-edge-fade),
+    #000 calc(100% - var(--wizard-scroll-edge-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--wizard-scroll-edge-fade),
+    #000 calc(100% - var(--wizard-scroll-edge-fade)),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}

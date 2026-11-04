@@ -79,7 +79,7 @@ interface LegacyNavbarFacade {
   standalone: true,
   imports: [SirSelectComponent, SirSelectOptionsPipe, CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe, UppercaseInputDirective, CuposStripComponent, DatepickerComponent, LoadingStateComponent, SirAutocompletePanelPositionDirective],
   templateUrl: './editar-reserva.html',
-  styleUrls: ['../reserva-shared.css'],
+  styleUrls: ['../reserva-shared.css', '../../../shared/wizard-scroll.css'],
 })
 export class EditarReservaComponent implements OnInit, OnDestroy {
   readonly monedaSelectOptions = computed<SirSelectOption[]>(() => [...(this.monedas() || []).map((m: any) => ({ value: String(m.Id_Moneda), label: String(m.Nombre_Moneda) }))]);
@@ -355,7 +355,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     const back = index < this.currentStep;
     this.currentStep = index;
     this.triggerPanelAnimation(back);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.scrollCurrentStepToTop();
   }
 
   nextStep(): void {
@@ -369,7 +369,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
       this.currentStep++;
       this.maxReachedStep = Math.max(this.maxReachedStep, this.currentStep);
       this.triggerPanelAnimation(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.scrollCurrentStepToTop();
     }
   }
 
@@ -377,7 +377,7 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
     if (this.currentStep > 0) {
       this.currentStep--;
       this.triggerPanelAnimation(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.scrollCurrentStepToTop();
     }
   }
 
@@ -3108,8 +3108,16 @@ export class EditarReservaComponent implements OnInit, OnDestroy {
         if ('focus' in element) (element as HTMLElement).focus();
         return;
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector<HTMLElement>('app-editar-reserva .wizard-shell .wizard-step-panel')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
     }, 80);
+  }
+
+  private scrollCurrentStepToTop(): void {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('app-editar-reserva .wizard-shell .wizard-step-panel')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   }
 
   private getPassengerValidationIssue(): SubmitValidationIssue | null {

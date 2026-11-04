@@ -62,7 +62,7 @@ interface SubmitValidationIssue {
     SirAutocompletePanelPositionDirective
   ],
   templateUrl: './crear-reserva.html',
-  styleUrls: ['../reserva-shared.css', './crear-reserva-scroll.css'],
+  styleUrls: ['../reserva-shared.css', '../../../shared/wizard-scroll.css'],
 })
 export class CrearReservaComponent implements OnInit, OnDestroy {
   readonly monedaSelectOptions = computed<SirSelectOption[]>(() => [...(this.monedas() || []).map((m: any) => ({ value: String(m.Id_Moneda), label: String(m.Nombre_Moneda) }))]);
